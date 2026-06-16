@@ -21,13 +21,13 @@ export function LoginForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error: authError } = await signInWithUsername(supabase, username, password);
+    const { error: authError, role } = await signInWithUsername(supabase, username, password);
     setLoading(false);
     if (authError) {
       setError(d.auth.invalid);
       return;
     }
-    router.push("/dashboard");
+    router.push(role === "teacher" ? "/teacher/dashboard" : "/dashboard");
     router.refresh();
   }
 

@@ -695,3 +695,181 @@ insert into public.homework_submissions (homework_id, student_id, answer_text, s
   ('f2b00001-0000-0000-0000-000000000000','b2222222-2222-2222-2222-222222222222','print("Hello, World!") запущен.','graded','5','Молодец!'),
   ('f2b00002-0000-0000-0000-000000000000','b2222222-2222-2222-2222-222222222222','3 программы с input() и f-строками.','submitted',null,null),
   ('f2a10001-0000-0000-0000-000000000000','b2222222-2222-2222-2222-222222222222','Сравнительный анализ O(n) vs O(log n).','graded','5','Отличный анализ!');
+
+-- =====================================================================
+-- teacher_auth: teacher_ivan account + groups + sample homework
+-- =====================================================================
+
+-- Auth user for teacher_ivan
+insert into auth.users (
+  instance_id, id, aud, role, email,
+  encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  phone_change, phone_change_token, email_change_token_current, reauthentication_token
+) values
+  ('00000000-0000-0000-0000-000000000000',
+   'ffffffff-ffff-ffff-ffff-ffffffffffff', 'authenticated', 'authenticated',
+   'teacher_ivan@teachers.snr.local',
+   crypt('password123', gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+   now(), now(), '', '', '', '', '', '', '', '')
+on conflict (id) do nothing;
+
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+) values
+  (gen_random_uuid(), 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+   'teacher_ivan@teachers.snr.local',
+   '{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","email":"teacher_ivan@teachers.snr.local"}'::jsonb,
+   'email', now(), now(), now())
+on conflict do nothing;
+
+-- Bind existing teacher Ivan to the new auth user and give him a username (Latin)
+update public.teachers
+  set user_id   = 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      username  = 'teacher_ivan',
+      full_name = 'Ivan Petrovich'
+  where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+-- Teacher Ivan's dedicated Programming groups (Latin names to avoid encoding risk)
+insert into public.groups (id, name, subject, teacher_id, course_price, schedule_days) values
+  ('c1000000-0000-0000-0000-000000000000', 'Programming 7A', 'programming',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc', 1100000, 'Mon, Wed'),
+  ('c2000000-0000-0000-0000-000000000000', 'Programming 7B', 'programming',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc', 1100000, 'Tue, Thu');
+
+-- Enroll students in teacher's groups
+insert into public.student_groups (student_id, group_id) values
+  ('a1111111-1111-1111-1111-111111111111', 'c1000000-0000-0000-0000-000000000000'),
+  ('b2222222-2222-2222-2222-222222222222', 'c2000000-0000-0000-0000-000000000000');
+
+-- Teacher-created homework samples (Latin titles, source='teacher')
+-- Group c1 (Programming 7A) — for Adilbek
+insert into public.homework (id, group_id, title, description, due_date, content_type, source, teacher_id) values
+  ('e1c10001-0000-0000-0000-000000000000','c1000000-0000-0000-0000-000000000000',
+   'Lab: Variables and Types',
+   'Write a script that declares 5 variables of different types and prints their values and types.',
+   '2026-06-22T23:59:00Z','file','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('e1c10002-0000-0000-0000-000000000000','c1000000-0000-0000-0000-000000000000',
+   'Quiz: Control Flow',
+   'Test your knowledge of if/elif/else and loops.',
+   '2026-06-20T23:59:00Z','test','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('e1c10003-0000-0000-0000-000000000000','c1000000-0000-0000-0000-000000000000',
+   'Project: Simple Calculator',
+   'Build a command-line calculator supporting +, -, *, /.',
+   '2026-06-28T23:59:00Z','file','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- Group a0 (Robotics 7A) — teacher-created
+insert into public.homework (id, group_id, title, description, due_date, content_type, source, teacher_id) values
+  ('e1a00001-0000-0000-0000-000000000000','a0000000-0000-0000-0000-000000000000',
+   'Lab: Autonomous Navigation',
+   'Program the robot to navigate a 1m x 1m grid autonomously using ultrasonic sensor.',
+   '2026-06-25T23:59:00Z','file','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('e1a00002-0000-0000-0000-000000000000','a0000000-0000-0000-0000-000000000000',
+   'Quiz: Digital Signals',
+   'Questions on digital vs analog signals and PWM.',
+   '2026-06-19T23:59:00Z','test','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- Group c0 (Math 7A) — teacher-created
+insert into public.homework (id, group_id, title, description, due_date, content_type, source, teacher_id) values
+  ('e1c00001-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000000',
+   'Problem Set: Linear Functions',
+   'Solve problems 1-12 on linear function properties.',
+   '2026-06-23T23:59:00Z','file','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('e1c00002-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000000',
+   'Quiz: Equations Review',
+   'Quick test on systems of equations (10 questions).',
+   '2026-06-18T23:59:00Z','test','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- Group c2 (Programming 7B) — for Dilnoza
+insert into public.homework (id, group_id, title, description, due_date, content_type, source, teacher_id) values
+  ('e2c20001-0000-0000-0000-000000000000','c2000000-0000-0000-0000-000000000000',
+   'Lab: Hello World',
+   'Write your first Python program and add 3 comments explaining what it does.',
+   '2026-06-21T23:59:00Z','file','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('e2c20002-0000-0000-0000-000000000000','c2000000-0000-0000-0000-000000000000',
+   'Quiz: Python Basics',
+   'Test covering syntax, data types, and basic I/O.',
+   '2026-06-19T23:59:00Z','test','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- Group b0 (Math 9B) — for Dilnoza
+insert into public.homework (id, group_id, title, description, due_date, content_type, source, teacher_id) values
+  ('e2b00001-0000-0000-0000-000000000000','b0000000-0000-0000-0000-000000000000',
+   'Problem Set: Integrals Practice',
+   'Compute the 15 definite integrals on the handout.',
+   '2026-06-24T23:59:00Z','file','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('e2b00002-0000-0000-0000-000000000000','b0000000-0000-0000-0000-000000000000',
+   'Quiz: Derivatives and Integrals',
+   'Assessment covering differentiation rules and basic integration.',
+   '2026-06-21T23:59:00Z','test','teacher','cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- Quiz questions for teacher-created tests (c1 Quiz + a0 Quiz + c0 Quiz + c2 Quiz + b0 Quiz)
+insert into public.test_questions (id, homework_id, question_text, question_type, order_index) values
+  -- e1c10002: Quiz Control Flow (c1)
+  ('ec000001-0000-0000-0000-000000000000','e1c10002-0000-0000-0000-000000000000',
+   'Which keyword is used to exit a loop early in Python?','single_choice',0),
+  ('ec000002-0000-0000-0000-000000000000','e1c10002-0000-0000-0000-000000000000',
+   'Describe a real-life situation where you would use a while loop instead of a for loop.','open',1),
+  ('ec000003-0000-0000-0000-000000000000','e1c10002-0000-0000-0000-000000000000',
+   'What does the continue statement do inside a loop?','single_choice',2),
+  -- e1a00002: Quiz Digital Signals (a0)
+  ('ec000004-0000-0000-0000-000000000000','e1a00002-0000-0000-0000-000000000000',
+   'What does PWM stand for?','single_choice',0),
+  ('ec000005-0000-0000-0000-000000000000','e1a00002-0000-0000-0000-000000000000',
+   'Explain the difference between analog and digital signals.','open',1),
+  -- e1c00002: Quiz Equations (c0)
+  ('ec000006-0000-0000-0000-000000000000','e1c00002-0000-0000-0000-000000000000',
+   'How many solutions does a system of 2 linear equations with 2 unknowns typically have?','single_choice',0),
+  ('ec000007-0000-0000-0000-000000000000','e1c00002-0000-0000-0000-000000000000',
+   'Solve the system: x + y = 5, x - y = 1. Show your steps.','open',1),
+  -- e2c20002: Quiz Python Basics (c2)
+  ('ec000008-0000-0000-0000-000000000000','e2c20002-0000-0000-0000-000000000000',
+   'What function is used to get user input in Python?','single_choice',0),
+  ('ec000009-0000-0000-0000-000000000000','e2c20002-0000-0000-0000-000000000000',
+   'What is the purpose of a comment in code?','open',1),
+  -- e2b00002: Quiz Derivatives (b0)
+  ('ec000010-0000-0000-0000-000000000000','e2b00002-0000-0000-0000-000000000000',
+   'What is the derivative of x^2?','single_choice',0),
+  ('ec000011-0000-0000-0000-000000000000','e2b00002-0000-0000-0000-000000000000',
+   'Explain the geometric meaning of a derivative.','open',1);
+
+insert into public.test_question_options (id, question_id, option_text, is_correct, order_index) values
+  -- ec000001 (break/continue/exit)
+  ('ed000001-0000-0000-0000-000000000000','ec000001-0000-0000-0000-000000000000','continue',false,0),
+  ('ed000002-0000-0000-0000-000000000000','ec000001-0000-0000-0000-000000000000','break',true,1),
+  ('ed000003-0000-0000-0000-000000000000','ec000001-0000-0000-0000-000000000000','exit',false,2),
+  ('ed000004-0000-0000-0000-000000000000','ec000001-0000-0000-0000-000000000000','stop',false,3),
+  -- ec000003 (continue)
+  ('ed000005-0000-0000-0000-000000000000','ec000003-0000-0000-0000-000000000000','Exits the loop completely',false,0),
+  ('ed000006-0000-0000-0000-000000000000','ec000003-0000-0000-0000-000000000000','Skips the current iteration',true,1),
+  ('ed000007-0000-0000-0000-000000000000','ec000003-0000-0000-0000-000000000000','Pauses the loop',false,2),
+  ('ed000008-0000-0000-0000-000000000000','ec000003-0000-0000-0000-000000000000','Restarts the loop from the beginning',false,3),
+  -- ec000004 (PWM)
+  ('ed000009-0000-0000-0000-000000000000','ec000004-0000-0000-0000-000000000000','Pulse Width Modulation',true,0),
+  ('ed000010-0000-0000-0000-000000000000','ec000004-0000-0000-0000-000000000000','Power Wave Management',false,1),
+  ('ed000011-0000-0000-0000-000000000000','ec000004-0000-0000-0000-000000000000','Parallel Wire Module',false,2),
+  ('ed000012-0000-0000-0000-000000000000','ec000004-0000-0000-0000-000000000000','Protocol for Wireless Mode',false,3),
+  -- ec000006 (linear equations solutions)
+  ('ed000013-0000-0000-0000-000000000000','ec000006-0000-0000-0000-000000000000','0',false,0),
+  ('ed000014-0000-0000-0000-000000000000','ec000006-0000-0000-0000-000000000000','1',true,1),
+  ('ed000015-0000-0000-0000-000000000000','ec000006-0000-0000-0000-000000000000','2',false,2),
+  ('ed000016-0000-0000-0000-000000000000','ec000006-0000-0000-0000-000000000000','Infinite',false,3),
+  -- ec000008 (input())
+  ('ed000017-0000-0000-0000-000000000000','ec000008-0000-0000-0000-000000000000','read()',false,0),
+  ('ed000018-0000-0000-0000-000000000000','ec000008-0000-0000-0000-000000000000','input()',true,1),
+  ('ed000019-0000-0000-0000-000000000000','ec000008-0000-0000-0000-000000000000','get()',false,2),
+  ('ed000020-0000-0000-0000-000000000000','ec000008-0000-0000-0000-000000000000','scan()',false,3),
+  -- ec000010 (derivative of x^2)
+  ('ed000021-0000-0000-0000-000000000000','ec000010-0000-0000-0000-000000000000','x',false,0),
+  ('ed000022-0000-0000-0000-000000000000','ec000010-0000-0000-0000-000000000000','2x',true,1),
+  ('ed000023-0000-0000-0000-000000000000','ec000010-0000-0000-0000-000000000000','2',false,2),
+  ('ed000024-0000-0000-0000-000000000000','ec000010-0000-0000-0000-000000000000','x^3/3',false,3);
+
+-- Pre-submitted homework from Adilbek for teacher grading demo
+insert into public.homework_submissions (homework_id, student_id, answer_text, status, grade, teacher_comment) values
+  ('e1c10001-0000-0000-0000-000000000000','a1111111-1111-1111-1111-111111111111',
+   'x = 42 (int), name = "Alice" (str), pi = 3.14 (float), active = True (bool), items = [1,2,3] (list). Used type() to verify.',
+   'submitted', null, null);

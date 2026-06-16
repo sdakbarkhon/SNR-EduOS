@@ -1,0 +1,32 @@
+import { createClient } from "@/lib/supabase/server";
+import {
+  getMyTeacher, getTeacherGroups, getTeacherHomework,
+  getTeacherTodayLessons, getTeacherRecentSubmissions,
+} from "@snr/core";
+import { TeacherDashboardView } from "./TeacherDashboardView";
+
+async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
+  try { return await (p as Promise<T>); } catch { return fb; }
+}
+
+export default async function TeacherDashboardPage() {
+  const supabase = await createClient();
+
+  const [teacher, groups, homework, todayLessons, recentSubmissions] = await Promise.all([
+    safe(getMyTeacher(supabase), null),
+    safe(getTeacherGroups(supabase), []),
+    safe(getTeacherHomework(supabase), []),
+    safe(getTeacherTodayLessons(supabase), []),
+    safe(getTeacherRecentSubmissions(supabase, 8), []),
+  ]);
+
+  return (
+    <TeacherDashboardView
+      teacher={teacher}
+      groups={groups as never[]}
+      homework={homework as never[]}
+      todayLessons={todayLessons as never[]}
+      recentSubmissions={recentSubmissions as never[]}
+    />
+  );
+}

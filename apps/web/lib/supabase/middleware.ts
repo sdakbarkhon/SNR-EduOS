@@ -1,9 +1,9 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@snr/core";
+import { isTeacherEmail } from "@snr/core";
 import { getSupabaseEnv } from "../env";
 
-/** Обновляет сессию в cookie и защищает маршруты (редирект на /login). */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const { url, anonKey } = getSupabaseEnv();
@@ -29,16 +29,31 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  const { pathname } = request.nextUrl;
+  const isAuthPage = pathname.startsWith("/login");
+  const isTeacherRoute = pathname.startsWith("/teacher");
+  const isTeacher = isTeacherEmail(user?.email);
+
+  // Unauthenticated → login
   if (!user && !isAuthPage) {
     const target = request.nextUrl.clone();
     target.pathname = "/login";
     return NextResponse.redirect(target);
   }
-  if (user && isAuthPage) {
+
+  // Teacher trying to access student routes or vice-versa
+  if (user && isTeacherRoute && !isTeacher) {
     const target = request.nextUrl.clone();
-    target.pathname = "/dashboard";
+    target.pathname = "/login";
     return NextResponse.redirect(target);
   }
+
+  // Already logged in on login page → go to correct home
+  if (user && isAuthPage) {
+    const target = request.nextUrl.clone();
+    target.pathname = isTeacher ? "/teacher/dashboard" : "/dashboard";
+    return NextResponse.redirect(target);
+  }
+
   return response;
 }

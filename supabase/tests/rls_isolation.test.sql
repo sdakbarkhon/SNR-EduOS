@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(38);
+select plan(54);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -108,6 +108,105 @@ select is((select count(*)::int from public.payments
 select is((select count(*)::int from public.test_submissions
            where student_id = 'a1111111-1111-1111-1111-111111111111'), 0,
           'B НЕ видит сдачи тестов A');
+
+-- ============ УЧИТЕЛЬ (teacher_ivan) — изоляция и права ============
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+-- Позитивная видимость: учитель видит данные своих групп
+select ok((select count(*) > 0 from public.groups),
+          'T: видит свои группы');
+select ok((select count(*) > 0 from public.students),
+          'T: видит учеников своих групп');
+select ok((select count(*) > 0 from public.lessons),
+          'T: видит уроки своих групп');
+select ok((select count(*) > 0 from public.homework),
+          'T: видит ДЗ своих групп');
+select ok((select count(*) > 0 from public.homework_submissions),
+          'T: видит сдачи ДЗ своих групп');
+select ok((select count(*) > 0 from public.test_questions),
+          'T: видит вопросы тестов своих групп');
+
+-- Учитель видит собственный профиль
+select ok((select count(*) > 0 from public.teachers
+           where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+          'T: видит свой профиль');
+
+-- Изоляция: учитель НЕ видит данные чужих групп
+-- Группы dddddddd (Elena) — Английский 7А/9Б
+select is((select count(*)::int from public.homework h
+           where h.group_id = 'd0000000-0000-0000-0000-000000000000'), 0,
+          'T НЕ видит ДЗ чужой группы (Английский 7А)');
+
+select is((select count(*)::int from public.lessons
+           where group_id = 'd0000000-0000-0000-0000-000000000000'), 0,
+          'T НЕ видит уроки чужой группы');
+
+-- Платежи учеников — учитель не должен видеть
+select is((select count(*)::int from public.payments), 0,
+          'T НЕ видит платежи (нет политики)');
+
+-- INSERT homework в свою группу — разрешён
+select lives_ok(
+  $$ insert into public.homework
+       (group_id, title, description, due_date, content_type, source, teacher_id)
+     values
+       ('c1000000-0000-0000-0000-000000000000',
+        'TEST-INSERT by teacher', 'desc', '2026-07-01T23:59:00Z',
+        'file', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc')
+  $$,
+  'T: может создать ДЗ в своей группе'
+);
+
+-- INSERT homework в чужую группу — запрещён (42501)
+select throws_ok(
+  $$ insert into public.homework
+       (group_id, title, description, due_date, content_type, source, teacher_id)
+     values
+       ('d0000000-0000-0000-0000-000000000000',
+        'HACK', 'desc', '2026-07-01T23:59:00Z',
+        'file', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc')
+  $$,
+  '42501', NULL,
+  'T НЕ может создать ДЗ в чужой группе (42501)'
+);
+
+-- UPDATE homework_submission (оценить) — разрешён для своей группы
+select lives_ok(
+  $$ update public.homework_submissions
+     set grade = '5', teacher_comment = 'Great!', status = 'graded'
+     where homework_id = 'e1c10001-0000-0000-0000-000000000000' $$,
+  'T: может выставить оценку в сдаче своей группы'
+);
+
+-- DELETE своего ДЗ — разрешён
+select lives_ok(
+  $$ delete from public.homework where title = 'TEST-INSERT by teacher'
+     and teacher_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$,
+  'T: может удалить своё ДЗ'
+);
+
+-- Регрессия: student A после teacher-сессии всё ещё изолирован
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select is((select count(*)::int from public.attendance
+           where student_id = 'b2222222-2222-2222-2222-222222222222'), 0,
+          'Regression: A НЕ видит посещаемость B после teacher-сессии');
+
+select is((select count(*)::int from public.payments
+           where student_id = 'b2222222-2222-2222-2222-222222222222'), 0,
+          'Regression: A НЕ видит платежи B после teacher-сессии');
 
 -- ============ Аноним не видит ничего ============
 reset role;

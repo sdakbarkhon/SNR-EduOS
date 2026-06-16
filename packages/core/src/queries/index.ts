@@ -238,6 +238,189 @@ export const getTestSubmission = async (db: Db, homeworkId: string): Promise<Tes
   return (data as TestSubmission | null);
 };
 
+// ─── TEACHER QUERIES ─────────────────────────────────────────────────────────
+
+/** Профиль учителя (текущего). */
+export const getMyTeacher = (db: Db) =>
+  db.from("teachers").select("*").single().then(unwrap);
+
+/** Группы учителя (текущего). */
+export const getTeacherGroups = (db: Db) =>
+  db.from("groups").select("*").order("name").then(unwrap);
+
+/** ДЗ учителя — с join группы и количеством сдач. */
+export const getTeacherHomework = (db: Db) =>
+  db
+    .from("homework")
+    .select("*, group:groups!inner(id, name, subject), submissions:homework_submissions(id, status)")
+    .order("due_date", { ascending: false })
+    .then(unwrap);
+
+/** Одна запись ДЗ учителя со сдачами, вопросами теста. */
+export const getTeacherHomeworkDetail = (db: Db, id: string) =>
+  db
+    .from("homework")
+    .select("*, group:groups!inner(id, name, subject)")
+    .eq("id", id)
+    .single()
+    .then(unwrap);
+
+/** Все сдачи конкретного ДЗ (включая student join). */
+export const getHomeworkSubmissions = (db: Db, homeworkId: string) =>
+  db
+    .from("homework_submissions")
+    .select("*, student:students!inner(id, full_name, avatar_url)")
+    .eq("homework_id", homeworkId)
+    .order("submitted_at", { ascending: false })
+    .then(unwrap);
+
+/** Все сдачи теста для конкретного ДЗ (teacher view). */
+export const getTestSubmissionsForHomework = (db: Db, homeworkId: string) =>
+  db
+    .from("test_submissions")
+    .select("*, student:students!inner(id, full_name, avatar_url)")
+    .eq("homework_id", homeworkId)
+    .order("submitted_at", { ascending: false })
+    .then(unwrap);
+
+/** Ответы на конкретную сдачу теста (teacher review). */
+export const getTestAnswersForSubmission = (db: Db, submissionId: string) =>
+  db
+    .from("test_answers")
+    .select("*, question:test_questions!inner(question_text, question_type, order_index)")
+    .eq("submission_id", submissionId)
+    .order("question(order_index)")
+    .then(unwrap);
+
+/** Ученики в конкретной группе. */
+export const getGroupStudents = (db: Db, groupId: string) =>
+  db
+    .from("student_groups")
+    .select("student:students!inner(id, full_name, avatar_url, status)")
+    .eq("group_id", groupId)
+    .order("student(full_name)")
+    .then(unwrap)
+    .then((rows) => (rows as unknown as { student: { id: string; full_name: string; avatar_url: string | null; status: string } }[]).map((r) => r.student));
+
+/** Выставить оценку / комментарий за сдачу ДЗ. */
+export const gradeSubmission = (
+  db: Db,
+  {
+    submissionId,
+    grade,
+    comment,
+  }: { submissionId: string; grade: number; comment: string },
+) =>
+  db
+    .from("homework_submissions")
+    .update({ grade, teacher_comment: comment, status: "graded" })
+    .eq("id", submissionId)
+    .then(unwrap);
+
+/** Создать ДЗ (file или test). Returns created homework record. */
+export const createTeacherHomework = async (
+  db: Db,
+  input: {
+    groupId: string;
+    title: string;
+    description: string;
+    dueDate: string;
+    contentType: "file" | "test";
+    teacherId: string;
+    status?: "draft" | "published";
+  },
+) => {
+  const { data, error } = await db
+    .from("homework")
+    .insert({
+      group_id: input.groupId,
+      title: input.title,
+      description: input.description,
+      due_date: input.dueDate,
+      content_type: input.contentType,
+      source: "teacher",
+      teacher_id: input.teacherId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as unknown as { id: string; [key: string]: unknown };
+};
+
+/** Создать вопросы теста с вариантами. */
+export const createTestQuestions = async (
+  db: Db,
+  homeworkId: string,
+  questions: Array<{
+    questionText: string;
+    questionType: "single_choice" | "open";
+    orderIndex: number;
+    options?: Array<{ optionText: string; isCorrect: boolean; orderIndex: number }>;
+  }>,
+) => {
+  for (const q of questions) {
+    const { data: qRow, error: qErr } = await db
+      .from("test_questions")
+      .insert({
+        homework_id: homeworkId,
+        question_text: q.questionText,
+        question_type: q.questionType,
+        order_index: q.orderIndex,
+      })
+      .select("id")
+      .single();
+    if (qErr) throw qErr;
+    const qId = (qRow as unknown as { id: string }).id;
+    if (q.questionType === "single_choice" && q.options?.length) {
+      const { error: oErr } = await db.from("test_question_options").insert(
+        q.options.map((o) => ({
+          question_id: qId,
+          option_text: o.optionText,
+          is_correct: o.isCorrect,
+          order_index: o.orderIndex,
+        })),
+      );
+      if (oErr) throw oErr;
+    }
+  }
+};
+
+/** Уроки учителя на сегодня (локальная дата). */
+export const getTeacherTodayLessons = async (db: Db) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const { data, error } = await db
+    .from("lessons")
+    .select("*, group:groups!inner(id, name, subject)")
+    .gte("starts_at", todayStart.toISOString())
+    .lte("starts_at", todayEnd.toISOString())
+    .order("starts_at");
+  if (error) throw error;
+  return data ?? [];
+};
+
+/** Последние сдачи ДЗ в группах учителя (для activity feed). */
+export const getTeacherRecentSubmissions = async (db: Db, limit = 10) => {
+  const { data, error } = await db
+    .from("homework_submissions")
+    .select(
+      "id, homework_id, student_id, status, submitted_at, grade, homework:homework!inner(title, teacher_id), student:students!inner(full_name)",
+    )
+    .order("submitted_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+};
+
+/** Обновить профиль учителя. */
+export const updateTeacherProfile = (
+  db: Db,
+  { teacherId, fullName }: { teacherId: string; fullName: string },
+) =>
+  db.from("teachers").update({ full_name: fullName }).eq("id", teacherId).then(unwrap);
+
 /** Тип ответа для submitTest. */
 export type TestAnswerInput = {
   questionId: string;
