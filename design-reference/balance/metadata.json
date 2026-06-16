@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS - Balance",
+  "description": "Payments and balance dashboard for SNR EduOS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

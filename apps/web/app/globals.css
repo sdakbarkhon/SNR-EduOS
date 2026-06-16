@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS custom properties: light (default) and dark ─── */
+:root {
+  --shell-gradient: linear-gradient(135deg, #E2EDFF 0%, #F3E5F5 50%, #CFE2FF 100%);
+  --shell-blob-1: rgba(147,197,253,0.30);
+  --shell-blob-2: rgba(249,168,212,0.30);
+  --shell-blob-3: rgba(196,181,253,0.30);
+  --shell-overlay: rgba(255,255,255,0.20);
+  --glass-bg: rgba(255,255,255,0.70);
+  --glass-border: rgba(255,255,255,0.60);
+  --topbar-bg: rgba(255,255,255,0.30);
+  --topbar-border: rgba(255,255,255,0.40);
+  --bottomnav-bg: rgba(255,255,255,0.60);
+  --bottomnav-border: rgba(255,255,255,0.40);
+}
+
+.dark {
+  --shell-gradient: linear-gradient(135deg, #0b1024 0%, #131830 50%, #0a1528 100%);
+  --shell-blob-1: rgba(37,72,180,0.18);
+  --shell-blob-2: rgba(100,30,160,0.14);
+  --shell-blob-3: rgba(50,20,130,0.14);
+  --shell-overlay: rgba(0,0,0,0.30);
+  --glass-bg: rgba(16,22,42,0.85);
+  --glass-border: rgba(255,255,255,0.07);
+  --topbar-bg: rgba(11,16,36,0.85);
+  --topbar-border: rgba(255,255,255,0.06);
+  --bottomnav-bg: rgba(11,16,36,0.90);
+  --bottomnav-border: rgba(255,255,255,0.06);
+}
+
+body {
+  background-color: theme("colors.bg-app");
+  color: theme("colors.text-primary");
+  font-family: theme("fontFamily.sans");
+}
+
+/* ─── Dark mode: global text-color overrides ─── */
+/* Declared after @tailwind utilities so cascade order gives them priority */
+.dark .text-gray-900 { color: #e2e8f8; }
+.dark .text-gray-800 { color: #ccd5f0; }
+.dark .text-gray-700 { color: #b0bde0; }
+.dark .text-gray-600 { color: #8a98c8; }
+.dark .text-gray-500 { color: #6a78a8; }
+.dark .text-gray-400 { color: #4a5880; }
+
+.dark .text-slate-800 { color: #dce4f5; }
+.dark .text-slate-700 { color: #b8c6e8; }
+.dark .text-slate-600 { color: #8fa0cc; }
+.dark .text-slate-500 { color: #6880ae; }
+
+/* ─── Dark mode: input / form fields ─── */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark textarea {
+  background: rgba(20,26,50,0.80);
+  border-color: rgba(255,255,255,0.10);
+  color: #e2e8f8;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6a78a8;
+}
+
+/* Декоративные анимации экрана Login */
+@layer utilities {
+  .animate-float-slow {
+    animation: float 8s ease-in-out infinite;
+  }
+  .animate-float-medium {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-fast {
+    animation: float 4s ease-in-out infinite;
+  }
+  .animate-entrance {
+    animation: entrance 0.9s ease-out both;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(2deg);
+  }
+}
+
+@keyframes entrance {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

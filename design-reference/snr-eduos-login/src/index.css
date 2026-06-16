@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer utilities {
+  .animate-float-slow {
+    animation: float 8s ease-in-out infinite;
+  }
+  .animate-float-medium {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-fast {
+    animation: float 4s ease-in-out infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(2deg); }
+}

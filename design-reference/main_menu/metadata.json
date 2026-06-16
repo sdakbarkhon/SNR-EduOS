@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS",
+  "description": "Educational platform dashboard featuring subjects, tasks, progress tracking, and AI assistance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

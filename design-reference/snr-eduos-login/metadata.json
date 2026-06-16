@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS Login",
+  "description": "Pixel-perfect reconstruction of the SNR EduOS student login interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

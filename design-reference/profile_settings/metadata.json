@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS Settings",
+  "description": "User settings and profile interface for SNR EduOS with glassmorphism design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

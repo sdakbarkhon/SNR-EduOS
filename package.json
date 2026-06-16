@@ -1,0 +1,33 @@
+{
+  "name": "snr-eduos",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml}\"",
+    "db:start": "npx --yes supabase start",
+    "db:stop": "npx --yes supabase stop",
+    "db:reset": "npx --yes supabase db reset",
+    "db:diff": "npx --yes supabase db diff",
+    "gen:types": "npx --yes supabase gen types typescript --local > packages/core/src/database.types.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.2.3",
+      "react-dom": "19.2.3"
+    }
+  }
+}

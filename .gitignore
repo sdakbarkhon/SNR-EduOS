@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+.next/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+
+# expo / react native
+.expo/
+.expo-shared/
+web-build/
+ios/Pods/
+*.orig.*
+
+# env & secrets — НИКОГДА не коммитить (кроме примера)
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# claude code session data
+.claude/
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+coverage/
+.idea/
+.vscode/*
+!.vscode/extensions.json
