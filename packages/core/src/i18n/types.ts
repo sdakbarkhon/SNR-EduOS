@@ -122,6 +122,19 @@ export interface Dictionary {
     daysLeft: string; // "осталось {n} дн."
     daysOverdue: string; // "просрочено на {n} дн."
     noFile: string;
+    typeFile: string;
+    typeTest: string;
+    sourceProgram: string;
+    sourceTeacher: string;
+    filterAll: string;
+    filterFiles: string;
+    filterTests: string;
+    testSubmit: string;
+    testResults: string;
+    testScore: string;
+    testCorrect: string;
+    testReview: string;
+    testWebOnly: string;
   };
   payments: {
     title: string;

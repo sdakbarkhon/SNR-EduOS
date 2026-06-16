@@ -294,32 +294,38 @@ export type Database = {
       homework: {
         Row: {
           attachments: Json
+          content_type: Database["public"]["Enums"]["content_type"]
           created_at: string
           description: string | null
           due_date: string | null
           group_id: string
           id: string
           lesson_id: string | null
+          source: Database["public"]["Enums"]["homework_source"]
           title: string
         }
         Insert: {
           attachments?: Json
+          content_type?: Database["public"]["Enums"]["content_type"]
           created_at?: string
           description?: string | null
           due_date?: string | null
           group_id: string
           id?: string
           lesson_id?: string | null
+          source?: Database["public"]["Enums"]["homework_source"]
           title: string
         }
         Update: {
           attachments?: Json
+          content_type?: Database["public"]["Enums"]["content_type"]
           created_at?: string
           description?: string | null
           due_date?: string | null
           group_id?: string
           id?: string
           lesson_id?: string | null
+          source?: Database["public"]["Enums"]["homework_source"]
           title?: string
         }
         Relationships: [
@@ -665,6 +671,161 @@ export type Database = {
         }
         Relationships: []
       }
+      test_answers: {
+        Row: {
+          id: string
+          is_correct: boolean | null
+          open_text: string | null
+          question_id: string
+          selected_option_id: string | null
+          submission_id: string
+        }
+        Insert: {
+          id?: string
+          is_correct?: boolean | null
+          open_text?: string | null
+          question_id: string
+          selected_option_id?: string | null
+          submission_id: string
+        }
+        Update: {
+          id?: string
+          is_correct?: boolean | null
+          open_text?: string | null
+          question_id?: string
+          selected_option_id?: string | null
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "test_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_answers_selected_option_id_fkey"
+            columns: ["selected_option_id"]
+            isOneToOne: false
+            referencedRelation: "test_question_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_answers_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "test_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_question_options: {
+        Row: {
+          id: string
+          is_correct: boolean
+          option_text: string
+          order_index: number
+          question_id: string
+        }
+        Insert: {
+          id?: string
+          is_correct?: boolean
+          option_text: string
+          order_index?: number
+          question_id: string
+        }
+        Update: {
+          id?: string
+          is_correct?: boolean
+          option_text?: string
+          order_index?: number
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "test_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_questions: {
+        Row: {
+          homework_id: string
+          id: string
+          order_index: number
+          question_text: string
+          question_type: string
+        }
+        Insert: {
+          homework_id: string
+          id?: string
+          order_index?: number
+          question_text: string
+          question_type: string
+        }
+        Update: {
+          homework_id?: string
+          id?: string
+          order_index?: number
+          question_text?: string
+          question_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_questions_homework_id_fkey"
+            columns: ["homework_id"]
+            isOneToOne: false
+            referencedRelation: "homework"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_submissions: {
+        Row: {
+          homework_id: string
+          id: string
+          max_score: number | null
+          score: number | null
+          student_id: string
+          submitted_at: string
+        }
+        Insert: {
+          homework_id: string
+          id?: string
+          max_score?: number | null
+          score?: number | null
+          student_id: string
+          submitted_at?: string
+        }
+        Update: {
+          homework_id?: string
+          id?: string
+          max_score?: number | null
+          score?: number | null
+          student_id?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_submissions_homework_id_fkey"
+            columns: ["homework_id"]
+            isOneToOne: false
+            referencedRelation: "homework"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -675,6 +836,8 @@ export type Database = {
     }
     Enums: {
       attendance_status: "present" | "absent" | "late"
+      content_type: "file" | "test"
+      homework_source: "curriculum" | "teacher"
       lesson_status: "scheduled" | "ongoing" | "done" | "cancelled"
       payment_kind: "subscription" | "one_time"
       payment_status: "completed" | "pending" | "canceled"
@@ -811,6 +974,8 @@ export const Constants = {
   public: {
     Enums: {
       attendance_status: ["present", "absent", "late"],
+      content_type: ["file", "test"],
+      homework_source: ["curriculum", "teacher"],
       lesson_status: ["scheduled", "ongoing", "done", "cancelled"],
       payment_kind: ["subscription", "one_time"],
       payment_status: ["completed", "pending", "canceled"],

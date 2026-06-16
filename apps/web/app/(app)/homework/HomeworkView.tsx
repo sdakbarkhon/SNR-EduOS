@@ -12,6 +12,7 @@ import {
   getSubjectStyle,
   type HomeworkWithSubmission,
   type HomeworkTab,
+  type ContentType,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -27,7 +28,23 @@ function getDeadlineColor(dueDate: string | null): string {
   return "text-slate-600";
 }
 
-function HomeworkListCard({ hw }: { hw: HomeworkWithSubmission }) {
+function TypeBadge({ contentType, locale }: { contentType: ContentType; locale: Locale }) {
+  const d = getDictionary(locale);
+  if (contentType === "test") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700">
+        ✦ {d.homework.typeTest}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">
+      ⬇ {d.homework.typeFile}
+    </span>
+  );
+}
+
+function HomeworkListCard({ hw, showSource }: { hw: HomeworkWithSubmission; showSource: boolean }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const subj = hw.group.subject;
@@ -44,7 +61,6 @@ function HomeworkListCard({ hw }: { hw: HomeworkWithSubmission }) {
 
   return (
     <div className="group rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_40px_0_rgba(31,38,135,0.1)] p-5 flex flex-col sm:flex-row gap-5 items-start sm:items-center justify-between">
-      {/* Левая часть: иконка + текст */}
       <div className="flex items-start gap-4">
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
@@ -53,24 +69,25 @@ function HomeworkListCard({ hw }: { hw: HomeworkWithSubmission }) {
           <SubjectIcon subject={subj} size={28} />
         </div>
         <div className="flex flex-col gap-1">
-          <h3 className="font-extrabold text-slate-800 text-lg leading-tight">
-            {subj}
-          </h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-extrabold text-slate-800 text-lg leading-tight">{subj}</h3>
+            <TypeBadge contentType={hw.content_type} locale={locale as Locale} />
+            {showSource && hw.source === "teacher" && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700">
+                {d.homework.sourceTeacher}
+              </span>
+            )}
+          </div>
           <p className="text-sm font-medium text-slate-500">{hw.title}</p>
           {hw.description && (
-            <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-              {hw.description}
-            </p>
+            <p className="text-xs text-slate-400 mt-1 line-clamp-1">{hw.description}</p>
           )}
         </div>
       </div>
 
-      {/* Правая часть: дедлайн + кнопка */}
       <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 shrink-0">
         {dueLabel && (
-          <span className={cn("text-sm font-bold", deadlineColor)}>
-            {dueLabel}
-          </span>
+          <span className={cn("text-sm font-bold", deadlineColor)}>{dueLabel}</span>
         )}
         <Link
           href={`/homework/${hw.id}`}
@@ -92,9 +109,7 @@ function SleepingRobot() {
       >
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-10 rounded-2xl"
-          style={{
-            background: "linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%)",
-          }}
+          style={{ background: "linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%)" }}
         >
           <div className="absolute top-3 left-2 w-3 h-1 bg-white rounded-full opacity-60" />
           <div className="absolute top-3 right-2 w-3 h-1 bg-white rounded-full opacity-60" />
@@ -111,21 +126,13 @@ function EmptyTabState({ message }: { message: string }) {
   return (
     <div className="rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl flex flex-col items-center justify-center py-20 px-6 text-center">
       <SleepingRobot />
-      <h3 className="text-xl font-bold text-slate-800 mb-2">
-        {message}
-      </h3>
-      <p className="text-slate-500 text-sm max-w-xs">
-        Проверь другие вкладки.
-      </p>
+      <h3 className="text-xl font-bold text-slate-800 mb-2">{message}</h3>
+      <p className="text-slate-500 text-sm max-w-xs">Проверь другие вкладки.</p>
     </div>
   );
 }
 
-export function HomeworkView({
-  initialRows,
-}: {
-  initialRows: HomeworkWithSubmission[];
-}) {
+export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmission[] }) {
   const sb = createClient();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -144,13 +151,25 @@ export function HomeworkView({
     overdue: d.homework.emptyOverdue,
   };
 
+  const CONTENT_FILTERS: { key: ContentType | "all"; label: string }[] = [
+    { key: "all", label: d.homework.filterAll },
+    { key: "file", label: d.homework.filterFiles },
+    { key: "test", label: d.homework.filterTests },
+  ];
+
   const [rows, setRows] = useState<HomeworkWithSubmission[]>(initialRows);
   const [tab, setTab] = useState<HomeworkTab>("active");
+  const [contentFilter, setContentFilter] = useState<ContentType | "all">("all");
 
   const counts = useMemo(() => homeworkCounts(rows), [rows]);
+
   const filtered = useMemo(
-    () => rows.filter((r) => homeworkCategory(r, r.submission) === tab),
-    [rows, tab],
+    () =>
+      rows.filter((r) => {
+        if (contentFilter !== "all" && r.content_type !== contentFilter) return false;
+        return homeworkCategory(r, r.submission) === tab;
+      }),
+    [rows, tab, contentFilter],
   );
 
   useEffect(() => {
@@ -159,27 +178,20 @@ export function HomeworkView({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "homework" },
-        async () => {
-          setRows(await getHomeworkWithSubmissions(sb));
-        },
+        async () => { setRows(await getHomeworkWithSubmissions(sb)); },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "homework_submissions" },
-        async () => {
-          setRows(await getHomeworkWithSubmissions(sb));
-        },
+        async () => { setRows(await getHomeworkWithSubmissions(sb)); },
       )
       .subscribe();
-    return () => {
-      sb.removeChannel(channel);
-    };
+    return () => { sb.removeChannel(channel); };
   }, [sb]);
 
   return (
     <div className="mx-auto max-w-7xl">
-      {/* Шапка */}
-      <header className="mb-10">
+      <header className="mb-8">
         <h2 className="text-blue-600 font-bold text-sm tracking-widest uppercase mb-1 drop-shadow-sm">
           {d.homework.eyebrow}
         </h2>
@@ -193,54 +205,76 @@ export function HomeworkView({
         </div>
       </header>
 
-      {/* Табы */}
-      <div className="flex flex-wrap items-center gap-2 mb-8 select-none">
-        {TABS.map((t) => {
-          const count = counts[t.key];
-          const isActive = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "relative px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-300",
-                isActive
-                  ? "bg-white text-blue-600 shadow-[0_4px_20px_0_rgba(31,38,135,0.05)] scale-105"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-white/40",
-              )}
-            >
-              {isActive && (
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-blue-500 rounded-full" />
-              )}
-              {t.label}{" "}
-              <span
-                className={cn(
-                  "ml-1.5 opacity-80 text-xs",
-                  isActive ? "text-blue-500" : "text-slate-400",
-                )}
-              >
-                ({count})
-              </span>
-            </button>
-          );
-        })}
+      {/* Content-type pills */}
+      <div className="flex items-center gap-2 mb-8 select-none flex-wrap">
+        {CONTENT_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setContentFilter(f.key)}
+            className={cn(
+              "px-5 py-2 rounded-full font-semibold text-sm transition-all duration-200",
+              contentFilter === f.key
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
+                : "bg-white/60 text-slate-500 hover:bg-white hover:text-slate-700 border border-white/80",
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
-      {/* Контент */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Список заданий */}
         <div className="lg:col-span-2 flex flex-col gap-4 min-h-[400px]">
           {filtered.length > 0 ? (
-            filtered.map((hw) => <HomeworkListCard key={hw.id} hw={hw} />)
+            filtered.map((hw) => (
+              <HomeworkListCard key={hw.id} hw={hw} showSource={contentFilter === "all"} />
+            ))
           ) : (
             <EmptyTabState message={EMPTY_MESSAGES[tab]} />
           )}
         </div>
 
-        {/* Статистика + Совет дня */}
+        {/* Правая колонка */}
         <div className="lg:col-span-1 flex flex-col gap-6">
-          <HomeworkStatsDonut counts={counts} statsLabel={d.homework.statsTitle} totalLabel={d.homework.statsTotal} />
+          <HomeworkStatsDonut
+            counts={counts}
+            statsLabel={d.homework.statsTitle}
+            totalLabel={d.homework.statsTotal}
+          />
+
+          {/* Статусные табы (вертикально) */}
+          <div className="rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl p-4 flex flex-col gap-1">
+            {TABS.map((t) => {
+              const count = counts[t.key];
+              const isActive = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "flex items-center justify-between px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 w-full text-left",
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-50",
+                  )}
+                >
+                  <span>{t.label}</span>
+                  <span
+                    className={cn(
+                      "text-xs font-bold px-2 py-0.5 rounded-full",
+                      isActive ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400",
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           <DailyTipCard tipLabel={d.homework.tipTitle} />
         </div>
       </div>

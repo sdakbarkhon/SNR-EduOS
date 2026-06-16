@@ -120,6 +120,44 @@ export type HomeworkSubmission = {
 };
 
 /** Homework с join'ом группы и опциональной сдачей студента. */
+export type ContentType = 'file' | 'test';
+export type HomeworkSource = 'curriculum' | 'teacher';
+
+export type TestQuestionOption = {
+  id: string;
+  question_id: string;
+  option_text: string;
+  is_correct: boolean;
+  order_index: number;
+};
+
+export type TestQuestion = {
+  id: string;
+  homework_id: string;
+  question_text: string;
+  question_type: 'single_choice' | 'open';
+  order_index: number;
+  options: TestQuestionOption[];
+};
+
+export type TestSubmission = {
+  id: string;
+  homework_id: string;
+  student_id: string;
+  submitted_at: string;
+  score: number | null;
+  max_score: number | null;
+};
+
+export type TestAnswer = {
+  id: string;
+  submission_id: string;
+  question_id: string;
+  selected_option_id: string | null;
+  open_text: string | null;
+  is_correct: boolean | null;
+};
+
 export type HomeworkWithSubmission = {
   id: string;
   group_id: string;
@@ -129,8 +167,11 @@ export type HomeworkWithSubmission = {
   due_date: string | null;
   attachments: HomeworkAttachment[];
   created_at: string;
+  content_type: ContentType;
+  source: HomeworkSource;
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
+  test_submission: TestSubmission | null;
 };
 
 

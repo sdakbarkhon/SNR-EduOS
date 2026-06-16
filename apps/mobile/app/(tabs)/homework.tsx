@@ -98,18 +98,37 @@ function HomeworkListCard({ hw }: { hw: HomeworkWithSubmission }) {
     >
       <SubjectIcon subject={subj} size={42} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: 10,
-            fontWeight: "600",
-            textTransform: "uppercase",
-            letterSpacing: 0.8,
-            color: colors.textMuted,
-            marginBottom: 2,
-          }}
-        >
-          {subj}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "600",
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              color: colors.textMuted,
+            }}
+          >
+            {subj}
+          </Text>
+          <View
+            style={{
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 8,
+              backgroundColor: hw.content_type === "test" ? "#EDE9FE" : "#DBEAFE",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: "700",
+                color: hw.content_type === "test" ? "#6D28D9" : "#1D4ED8",
+              }}
+            >
+              {hw.content_type === "test" ? d.homework.typeTest : d.homework.typeFile}
+            </Text>
+          </View>
+        </View>
         <Text
           style={{
             fontSize: 14,

@@ -14,6 +14,7 @@ import {
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, SubjectIcon, useLocale } from "@/components";
+import { TestPlayer } from "./TestPlayer";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -306,8 +307,14 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
         </GlassCard>
       )}
 
-      {/* Submission */}
-      {hw.submission ? <SubmissionBlock hw={hw} /> : <SubmitForm hw={hw} />}
+      {/* Submission or Test */}
+      {hw.content_type === "test" ? (
+        <TestPlayer hw={hw} />
+      ) : hw.submission ? (
+        <SubmissionBlock hw={hw} />
+      ) : (
+        <SubmitForm hw={hw} />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Attendance, AttendanceWithLesson, Homework, HomeworkSubmission, HomeworkWithSubmission, Lesson } from "../types";
+import type { Attendance, AttendanceWithLesson, ContentType, Homework, HomeworkSubmission, HomeworkWithSubmission, Lesson, TestSubmission } from "../types";
 
 const DEFAULT_LESSON_MS = 45 * 60 * 1000;
 
@@ -140,9 +140,15 @@ export type HomeworkTab = "active" | "review" | "completed" | "overdue";
 
 /** Категория ДЗ для табов (единая логика, не путать с homeworkState-StatusBadge). */
 export function homeworkCategory(
-  hw: Pick<Homework, "due_date">,
+  hw: Pick<Homework, "due_date"> & { content_type?: ContentType; test_submission?: TestSubmission | null },
   submission?: Pick<HomeworkSubmission, "status"> | null,
 ): HomeworkTab {
+  if (hw.content_type === "test") {
+    if (hw.test_submission) return "completed";
+    const due = hw.due_date ? new Date(hw.due_date).setHours(23, 59, 59, 999) : null;
+    if (due !== null && due < Date.now()) return "overdue";
+    return "active";
+  }
   if (submission) {
     return submission.status === "graded" ? "completed" : "review";
   }

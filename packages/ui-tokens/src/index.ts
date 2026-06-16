@@ -16,6 +16,8 @@ export const colors = {
   warning: "#F5A623",
   danger: "#F0556B",
   info: "#39B6F5",
+  typeFile: "#2563EB",
+  typeTest: "#7C3AED",
 } as const;
 
 /** Сине-фиолетовый градиент: панель логина, hero-блоки, полноэкранный отсчёт. */

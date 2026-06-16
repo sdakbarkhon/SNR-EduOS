@@ -380,6 +380,28 @@ export default function HomeworkDetailScreen() {
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <Text style={{ color: colors.textMuted }}>{d.common.loading}</Text>
         </View>
+      ) : hw?.content_type === "test" && !hw?.test_submission ? (
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 32,
+            gap: 16,
+          }}
+        >
+          <Text style={{ fontSize: 48 }}>🖥</Text>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: colors.textPrimary,
+              textAlign: "center",
+            }}
+          >
+            {d.homework.testWebOnly}
+          </Text>
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
