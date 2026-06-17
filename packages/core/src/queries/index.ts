@@ -252,11 +252,16 @@ export const getMyTeacher = async (db: Db) => {
 export const getTeacherGroups = (db: Db) =>
   db.from("groups").select("*").order("name").then(unwrap);
 
-/** ДЗ учителя — с join группы и количеством сдач. */
+/** ДЗ учителя — с join группы, enrolled-студентов, file-сдач и тест-сдач. */
 export const getTeacherHomework = (db: Db) =>
   db
     .from("homework")
-    .select("*, group:groups!inner(id, name, subject), submissions:homework_submissions(id, status)")
+    .select(
+      "*, " +
+      "group:groups!inner(id, name, subject, enrolled:student_groups(student_id)), " +
+      "submissions:homework_submissions(id, status), " +
+      "test_subs:test_submissions(id, student_id)",
+    )
     .order("due_date", { ascending: false })
     .then(unwrap);
 
