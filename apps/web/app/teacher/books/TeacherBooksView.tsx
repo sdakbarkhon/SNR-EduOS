@@ -24,9 +24,31 @@ const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
   history:     ["#B5793A", "#78350F"],
 };
 
+const SUBJECT_LABELS: Record<string, string> = {
+  math:        "Математика",
+  physics:     "Физика",
+  programming: "Программирование",
+  robotics:    "Робототехника",
+  english:     "Английский",
+  informatics: "Информатика",
+  chemistry:   "Химия",
+  biology:     "Биология",
+  history:     "История",
+};
+
 function getBookGradient(subject: string): string {
   const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
   return `linear-gradient(135deg, ${from}, ${to})`;
+}
+
+function getDownloadText(bookType: string): string {
+  switch (bookType) {
+    case "Учебник":    return "Скачать учебник";
+    case "Конспект":   return "Скачать конспект";
+    case "Сборник":    return "Скачать сборник";
+    case "Справочник": return "Скачать справочник";
+    default:           return "Скачать";
+  }
 }
 
 function formatSize(bytes: number): string {
@@ -47,6 +69,116 @@ const SUBJECTS = [
   { value: "biology",     label: "Биология" },
   { value: "history",     label: "История" },
 ] as const;
+
+// ── TeacherBookDetailModal ────────────────────────────────────────────
+
+function TeacherBookDetailModal({
+  book,
+  coverUrl,
+  onClose,
+  onDownload,
+  downloading,
+}: {
+  book: Book;
+  coverUrl?: string | null;
+  onClose: () => void;
+  onDownload: () => void;
+  downloading: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  const style = getSubjectStyle(book.subject);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+    >
+      <div
+        className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex gap-8 p-8">
+          {/* Left: cover (portrait 3:4) */}
+          <div className="w-[38%] shrink-0">
+            <div
+              className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-md"
+              style={{ background: getBookGradient(book.subject) }}
+            >
+              {coverUrl ? (
+                <img
+                  src={coverUrl}
+                  alt={book.title}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-6xl">{style.emoji}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: info */}
+          <div className="flex flex-1 flex-col">
+            <h2 className="mb-1 text-2xl font-bold leading-tight text-slate-900">{book.title}</h2>
+            {book.author && (
+              <p className="mb-3 text-sm text-slate-500">{book.author}</p>
+            )}
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                style={{ background: style.color + "22", color: style.color }}
+              >
+                {style.emoji} {SUBJECT_LABELS[book.subject] ?? book.subject}
+              </span>
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                {book.book_type}
+              </span>
+            </div>
+
+            {book.description && (
+              <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-slate-600">
+                {book.description}
+              </p>
+            )}
+
+            <div className="mt-auto pt-4">
+              <button
+                onClick={onDownload}
+                disabled={downloading}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+              >
+                {downloading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {downloading ? "Скачиваем…" : getDownloadText(book.book_type)}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Toast ─────────────────────────────────────────────────────────────
 
@@ -415,6 +547,8 @@ export function TeacherBooksView({
   const [toast, setToast] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => { setBooks(initialBooks); }, [initialBooks]);
 
@@ -438,6 +572,28 @@ export function TeacherBooksView({
     setShowUpload(false);
     setSuccessTitle(title);
     router.refresh();
+  }
+
+  async function handleModalDownload(bookId: string) {
+    setDownloadingId(bookId);
+    try {
+      const book = books.find((b) => b.id === bookId);
+      if (!book) return;
+      const url = await getBookFileUrl(bookId);
+      if (!url) { setToast("Не удалось получить ссылку"); return; }
+      const filename = book.file_storage_path.split("/").pop() || "book.pdf";
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      setToast("Не удалось скачать файл");
+    } finally {
+      setDownloadingId(null);
+    }
   }
 
   async function handleDownload(book: Book) {
@@ -474,8 +630,22 @@ export function TeacherBooksView({
     }
   }
 
+  const selectedBook = selectedBookId
+    ? (books.find((b) => b.id === selectedBookId) ?? null)
+    : null;
+
   return (
     <>
+      {selectedBook && (
+        <TeacherBookDetailModal
+          book={selectedBook}
+          coverUrl={coverUrls[selectedBook.id]}
+          onClose={() => setSelectedBookId(null)}
+          onDownload={() => handleModalDownload(selectedBook.id)}
+          downloading={downloadingId === selectedBook.id}
+        />
+      )}
+
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
 
       {successTitle && (
@@ -528,10 +698,14 @@ export function TeacherBooksView({
               const coverUrl = coverUrls[book.id];
 
               return (
-                <div key={book.id} className="group relative">
+                <div
+                  key={book.id}
+                  className="group relative cursor-pointer"
+                  onClick={() => setSelectedBookId(book.id)}
+                >
                   {/* Cover */}
                   <div
-                    className="relative mb-3 flex h-44 items-center justify-center overflow-hidden rounded-2xl"
+                    className="relative mb-3 aspect-[3/4] w-full overflow-hidden rounded-2xl"
                     style={{ background: `linear-gradient(135deg, ${(SUBJECT_GRADIENTS[book.subject] ?? ["#64748B","#334155"])[0]}, ${(SUBJECT_GRADIENTS[book.subject] ?? ["#64748B","#334155"])[1]})` }}
                   >
                     {/* Cover image */}
@@ -548,7 +722,7 @@ export function TeacherBooksView({
                       style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0.08) 100%)" }}
                     />
 
-                    {/* ••• menu — own books only */}
+                    {/* ••• menu — own books only (stopPropagation prevents modal open) */}
                     {isOwn && (
                       <div className="absolute right-2 top-2 z-20" data-menu-id={book.id}>
                         <button
@@ -560,14 +734,14 @@ export function TeacherBooksView({
                         {menuOpenId === book.id && (
                           <div className="absolute right-0 top-9 min-w-[140px] overflow-hidden rounded-xl border border-white/60 bg-white shadow-xl">
                             <button
-                              onClick={() => handleDownload(book)}
+                              onClick={(e) => { e.stopPropagation(); handleDownload(book); }}
                               className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
                             >
                               <Download className="h-4 w-4" />
                               Скачать
                             </button>
                             <button
-                              onClick={() => handleDelete(book)}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(book); }}
                               disabled={isDeleting}
                               className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
                             >
@@ -579,9 +753,9 @@ export function TeacherBooksView({
                       </div>
                     )}
 
-                    {/* Emoji fallback (no cover) */}
+                    {/* Emoji auto-cover */}
                     {!coverUrl && (
-                      <span className="relative z-[2] text-5xl transition-transform duration-300 group-hover:scale-110">
+                      <span className="absolute inset-0 z-[2] flex items-center justify-center text-5xl transition-transform duration-300 group-hover:scale-110">
                         {style.emoji}
                       </span>
                     )}

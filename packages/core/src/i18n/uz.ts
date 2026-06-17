@@ -242,6 +242,10 @@ export const uz: Dictionary = {
     typeCollection: "To'plam",
     typeReference: "Ma'lumotnoma",
     allBooks: "Barcha kitoblar",
+    downloadTextbook: "Darslik yuklab olish",
+    downloadConspect: "Konspekt yuklab olish",
+    downloadCollection: "To'plam yuklab olish",
+    downloadReference: "Ma'lumotnoma yuklab olish",
   },
   teacher: {
     role: "O'qituvchi",

@@ -242,6 +242,10 @@ export const en: Dictionary = {
     typeCollection: "Collection",
     typeReference: "Reference",
     allBooks: "All books",
+    downloadTextbook: "Download textbook",
+    downloadConspect: "Download notes",
+    downloadCollection: "Download collection",
+    downloadReference: "Download reference",
   },
   teacher: {
     role: "Teacher",

@@ -242,6 +242,10 @@ export const ru: Dictionary = {
     typeCollection: "Сборник",
     typeReference: "Справочник",
     allBooks: "Все книги",
+    downloadTextbook: "Скачать учебник",
+    downloadConspect: "Скачать конспект",
+    downloadCollection: "Скачать сборник",
+    downloadReference: "Скачать справочник",
   },
   teacher: {
     role: "Учитель",

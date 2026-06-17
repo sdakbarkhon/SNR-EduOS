@@ -232,6 +232,10 @@ export interface Dictionary {
     typeCollection: string;
     typeReference: string;
     allBooks: string;
+    downloadTextbook: string;
+    downloadConspect: string;
+    downloadCollection: string;
+    downloadReference: string;
   };
   teacher: {
     role: string;
