@@ -195,7 +195,7 @@ export const en: Dictionary = {
     role: "Teacher",
     navHome: "Home",
     navHomework: "Assignments",
-    navGroups: "Groups",
+    navGroups: "My classes",
     navProfile: "Profile",
     kpiGroups: "My groups",
     kpiActive: "Active assignments",

@@ -195,7 +195,7 @@ export const ru: Dictionary = {
     role: "Учитель",
     navHome: "Главная",
     navHomework: "Задания",
-    navGroups: "Группы",
+    navGroups: "Мои классы",
     navProfile: "Профиль",
     kpiGroups: "Мои группы",
     kpiActive: "Активных заданий",

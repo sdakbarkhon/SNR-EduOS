@@ -248,9 +248,24 @@ export const getMyTeacher = async (db: Db) => {
   return db.from("teachers").select("*").eq("user_id", user.id).single().then(unwrap);
 };
 
-/** Группы учителя (текущего). */
+/** Группы учителя (текущего) с количеством зачисленных учеников. */
 export const getTeacherGroups = (db: Db) =>
-  db.from("groups").select("*").order("name").then(unwrap);
+  db
+    .from("groups")
+    .select("*, enrolled:student_groups(student_id)")
+    .order("name")
+    .then(unwrap);
+
+/** Оценки в группах учителя (RLS ограничивает своими). group_id + score для агрегации. */
+export const getTeacherGrades = (db: Db) =>
+  db.from("grades").select("group_id, score").then(unwrap);
+
+/** Посещаемость в группах учителя — статус + group_id урока (для % по группе). */
+export const getTeacherAttendance = (db: Db) =>
+  db
+    .from("attendance")
+    .select("status, lesson:lessons!inner(group_id)")
+    .then(unwrap);
 
 /** ДЗ учителя — с join группы, enrolled-студентов, file-сдач и тест-сдач. */
 export const getTeacherHomework = (db: Db) =>

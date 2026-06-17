@@ -6,24 +6,32 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
 import { TeacherSidebar } from "./TeacherSidebar";
-import { Topbar } from "./Topbar";
-import { LayoutDashboard, ClipboardList, Users, User } from "lucide-react";
+import { TeacherTopbar } from "./TeacherTopbar";
+import { Home, BookOpen, Users, Settings } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 const teacherNavItems = [
-  { key: "home", href: "/teacher/dashboard", icon: LayoutDashboard, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
-  { key: "homework", href: "/teacher/homework", icon: ClipboardList, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
+  { key: "home", href: "/teacher/dashboard", icon: Home, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
+  { key: "homework", href: "/teacher/homework", icon: BookOpen, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "groups", href: "/teacher/groups", icon: Users, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
-  { key: "profile", href: "/teacher/profile", icon: User, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
+  { key: "profile", href: "/teacher/profile", icon: Settings, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
 ];
 
-export function TeacherShell({ teacherName, children }: { teacherName?: string; children: ReactNode }) {
+export function TeacherShell({
+  teacherName,
+  teacherSubtitle,
+  avatarUrl,
+  children,
+}: {
+  teacherName?: string;
+  teacherSubtitle?: string;
+  avatarUrl?: string | null;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const active = teacherNavItems.find((i) => pathname.startsWith(i.href));
-  const title = active ? active.label(d) : d.common.appName;
 
   return (
     <div className="flex min-h-screen overflow-hidden" style={{ background: "var(--shell-gradient)" }}>
@@ -37,8 +45,8 @@ export function TeacherShell({ teacherName, children }: { teacherName?: string; 
         </div>
         <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-[60px]" style={{ background: "var(--shell-overlay)" }} />
 
-        <Topbar title={title} studentName={teacherName} />
-        <main className="flex-1 overflow-y-auto px-4 pb-20 pt-5 md:px-8 md:pb-8 md:pt-6">
+        <TeacherTopbar name={teacherName ?? ""} subtitle={teacherSubtitle} avatarUrl={avatarUrl} />
+        <main className="flex-1 overflow-y-auto px-4 pb-20 pt-1 md:px-8 md:pb-8">
           {children}
         </main>
 

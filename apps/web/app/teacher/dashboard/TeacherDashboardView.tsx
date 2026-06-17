@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { getDictionary, getSubjectConfig } from "@snr/core";
+import { getDictionary, getSubjectConfig, formatTime } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { Users, ClipboardList, Clock, BookOpen } from "lucide-react";
-import { formatTime } from "@snr/core";
+import { Avatar } from "@/components/Avatar";
+import { Users, FileText, CheckCircle2, BookOpen, Clock } from "lucide-react";
+import { cn } from "@/lib/cn";
 
 interface Props {
   teacher: { id: string; full_name: string | null } | null;
-  groups: Array<{ id: string; name: string; subject: string }>;
+  groups: Array<{ id: string; name: string; subject: string; enrolled: Array<{ student_id: string }> }>;
   homework: Array<{
     id: string; title: string; due_date: string | null;
     submissions: Array<{ status: string }>;
+    test_subs: Array<{ id: string }>;
     teacher_id: string | null;
   }>;
   todayLessons: Array<{ id: string; starts_at: string; ends_at: string; topic: string | null; group: { name: string; subject: string } }>;
@@ -20,104 +22,134 @@ interface Props {
     id: string; homework_id: string; status: string; submitted_at: string;
     homework: { title: string } | null; student: { full_name: string } | null;
   }>;
+  grades: Array<{ group_id: string | null; score: number }>;
 }
 
-function KpiCard({ label, value, accent }: { label: string; value: number | string; accent?: boolean }) {
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "только что";
+  if (m < 60) return `${m} мин назад`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} ч назад`;
+  const days = Math.floor(h / 24);
+  return `${days} дн назад`;
+}
+
+function KpiCard({ title, value, icon: Icon, highlight }: {
+  title: string; value: string | number; icon: typeof Users; highlight?: boolean;
+}) {
   return (
-    <div className={`rounded-[20px] p-5 backdrop-blur-xl border ${accent
-      ? "bg-gradient-to-br from-brand-blue/90 to-[#0A3CB4]/90 text-white border-brand-blue/30"
-      : "bg-white/70 border-white/80 text-brand-ink"}`}
-      style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
-      <div className={`text-[32px] font-bold leading-none ${accent ? "text-white" : "text-brand-ink"}`}>{value}</div>
-      <div className={`mt-1 text-[13px] font-medium ${accent ? "text-white/80" : "text-brand-ink-muted"}`}>{label}</div>
+    <div className={cn(
+      "relative flex h-32 flex-col justify-between overflow-hidden rounded-[24px] p-5",
+      highlight
+        ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30"
+        : "border border-white bg-white/70 shadow-sm backdrop-blur-xl",
+    )}>
+      <div className="relative z-10">
+        <div className={cn("mb-1 text-sm", highlight ? "opacity-80" : "text-slate-500")}>{title}</div>
+        <div className={cn("text-3xl font-bold", highlight ? "text-white" : "text-slate-800")}>{value}</div>
+      </div>
+      {highlight && (
+        <div className="absolute -bottom-2 -right-2 opacity-20">
+          <Icon className="h-20 w-20" />
+        </div>
+      )}
     </div>
   );
 }
 
-export function TeacherDashboardView({ teacher, groups, homework, todayLessons, recentSubmissions }: Props) {
+export function TeacherDashboardView({ teacher, groups, homework, todayLessons, recentSubmissions, grades }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
 
-  const myHomework = homework.filter((h) => h.teacher_id !== null);
-  const pendingCount = myHomework.reduce((acc, h) => acc + h.submissions.filter((s) => s.status === "submitted").length, 0);
-  const now = new Date().toISOString();
-  const activeCount = myHomework.filter((h) => !h.due_date || h.due_date > now).length;
-  const totalStudents = groups.length * 10; // approximation shown for demo
+  // Real KPI computations
+  const studentIds = new Set<string>();
+  groups.forEach((g) => g.enrolled?.forEach((e) => studentIds.add(e.student_id)));
+  const totalStudents = studentIds.size;
+
+  const pendingCount = homework.reduce((acc, h) => acc + h.submissions.filter((s) => s.status === "submitted").length, 0);
+  const checkedCount = homework.reduce((acc, h) => acc + h.submissions.filter((s) => s.status === "graded").length, 0);
+  const avgScore = grades.length
+    ? (grades.reduce((acc, g) => acc + g.score, 0) / grades.length).toFixed(1)
+    : "—";
 
   return (
-    <div className="space-y-6">
-      {/* Greeting */}
-      <div>
-        <h1 className="text-[24px] font-bold text-brand-ink">
-          {d.dashboard.greeting.replace("{name}", teacher?.full_name ?? d.teacher.role)}
+    <div className="max-w-6xl space-y-8 pb-4">
+      {/* Greeting + AI button */}
+      <header className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+        <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">
+          {d.dashboard.greeting.replace("{name}", teacher?.full_name ?? d.teacher.role)} 👋
         </h1>
+        <button
+          onClick={() => alert(d.teacher.aiStub)}
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
+        >
+          ✨ Сгенерировать с помощью ИИ
+        </button>
+      </header>
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+        <KpiCard title="Всего учеников" value={totalStudents} icon={Users} />
+        <KpiCard title="На проверке" value={pendingCount} icon={FileText} highlight />
+        <KpiCard title="Проверено" value={checkedCount} icon={CheckCircle2} />
+        <KpiCard title="Средний балл" value={avgScore} icon={BookOpen} />
       </div>
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard label={d.teacher.kpiGroups} value={groups.length} />
-        <KpiCard label={d.teacher.kpiActive} value={activeCount} />
-        <KpiCard label={d.teacher.kpiPending} value={pendingCount} accent />
-        <KpiCard label={d.teacher.kpiStudents} value={groups.reduce((acc) => acc, 0)} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-6 lg:flex-row">
         {/* Today's lessons */}
-        <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5"
-          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
-          <h2 className="mb-4 text-[16px] font-bold text-brand-ink">{d.teacher.todayLessons}</h2>
+        <section className="flex flex-[1.5] flex-col rounded-[24px] border border-white bg-white/70 p-6 shadow-sm backdrop-blur-xl">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800">{d.teacher.todayLessons}</h2>
+          </div>
           {todayLessons.length === 0 ? (
-            <p className="text-[14px] text-brand-ink-muted">{d.teacher.noLessons}</p>
+            <p className="text-sm text-slate-400">{d.teacher.noLessons}</p>
           ) : (
             <div className="space-y-3">
               {todayLessons.map((lesson) => {
                 const cfg = getSubjectConfig(lesson.group.subject);
                 return (
-                  <div key={lesson.id} className="flex items-center gap-3 rounded-[14px] bg-white/60 p-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
-                      style={{ background: cfg.color + "20" }}>
-                      {cfg.emoji}
+                  <div key={lesson.id} className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white/50 p-4 transition-shadow hover:shadow-md">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                      <Clock className="h-6 w-6" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[14px] font-semibold text-brand-ink">{lesson.group.name}</div>
-                      <div className="text-[12px] text-brand-ink-muted">
-                        {formatTime(lesson.starts_at)} – {formatTime(lesson.ends_at)}
-                      </div>
+                      <div className="truncate font-bold text-slate-800">{cfg.label}</div>
+                      <div className="truncate text-xs text-slate-400">{lesson.topic ?? lesson.group.name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-slate-800">{formatTime(lesson.starts_at)}</div>
+                      <div className="mt-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{lesson.group.name}</div>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Recent activity */}
-        <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5"
-          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
-          <h2 className="mb-4 text-[16px] font-bold text-brand-ink">{d.teacher.recentActivity}</h2>
+        <section className="flex flex-1 flex-col rounded-[24px] border border-white bg-white/70 p-6 shadow-sm backdrop-blur-xl">
+          <h2 className="mb-6 text-lg font-bold text-slate-800">{d.teacher.recentActivity}</h2>
           {recentSubmissions.length === 0 ? (
-            <p className="text-[14px] text-brand-ink-muted">{d.teacher.noActivity}</p>
+            <p className="text-sm text-slate-400">{d.teacher.noActivity}</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
               {recentSubmissions.slice(0, 6).map((sub) => (
-                <Link key={sub.id} href={`/teacher/homework/${sub.homework_id}`}
-                  className="flex items-center gap-3 rounded-[14px] bg-white/60 p-3 transition-colors hover:bg-white/90">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue">
-                    <ClipboardList size={14} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-brand-ink">
-                      {sub.student?.full_name} — {sub.homework?.title}
-                    </div>
-                    <div className={`text-[11px] font-medium ${sub.status === "submitted" ? "text-amber-500" : "text-emerald-500"}`}>
-                      {sub.status === "submitted" ? d.teacher.statusPending : d.teacher.statusGraded}
-                    </div>
+                <Link key={sub.id} href={`/teacher/homework/${sub.homework_id}`} className="flex items-start gap-3">
+                  <Avatar name={sub.student?.full_name ?? "?"} size={32} />
+                  <div className="text-sm leading-snug">
+                    <span className="font-bold text-slate-800">{sub.student?.full_name}</span>{" "}
+                    {sub.status === "graded" ? "получил(а) оценку за" : "сдал(а) задание"}{" "}
+                    <span className="font-medium italic text-blue-600">«{sub.homework?.title}»</span>
+                    <div className="mt-1 text-[10px] text-slate-400">{timeAgo(sub.submitted_at)}</div>
                   </div>
                 </Link>
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );
