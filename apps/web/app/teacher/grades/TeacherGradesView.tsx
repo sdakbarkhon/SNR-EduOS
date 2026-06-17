@@ -102,7 +102,9 @@ export function TeacherGradesView({ groups, stats }: Props) {
     if (hw.content_type === "test") {
       const t = findTest(studentId, hw.id);
       if (!t) return { state: overdue ? "missed" : "pending", label: overdue ? "не сдано" : "—" };
-      return { state: "graded", label: String(t.score ?? 0) };
+      // Показываем score/max — иначе «2/2» (100%) читается как двойка.
+      const label = t.max_score != null ? `${t.score ?? 0}/${t.max_score}` : String(t.score ?? 0);
+      return { state: "graded", label };
     }
     const f = findFile(studentId, hw.id);
     if (!f) return { state: overdue ? "missed" : "pending", label: overdue ? "не сдано" : "—" };
@@ -264,7 +266,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
                           <div
                             onClick={clickable ? () => onCellClick(s.id, hw) : undefined}
                             className={cn("mx-auto flex h-12 min-w-[72px] items-center justify-center rounded-[10px] font-bold",
-                              cell.state === "graded" ? "text-[24px]" : "text-[11px]",
+                              cell.state === "graded" ? (cell.label.length <= 2 ? "text-[24px]" : "text-[16px]") : "text-[11px]",
                               clickable && "cursor-pointer transition-transform hover:scale-[1.04]")}
                             style={{ background: style.bg, color: style.fg }}>
                             {cell.label}

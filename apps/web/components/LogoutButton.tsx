@@ -1,27 +1,18 @@
-"use client";
-
 import { LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/app/actions/auth";
 
+/** Кнопка выхода — серверный action signOut() + redirect (полная навигация,
+ *  без застрявшего клиентского состояния, F5 не нужен). Единая реализация. */
 export function LogoutButton() {
-  const router = useRouter();
-
-  async function logout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
-
   return (
-    <button
-      type="button"
-      onClick={logout}
-      aria-label="Выйти"
-      className="text-text-muted transition hover:text-danger"
-    >
-      <LogOut size={20} />
-    </button>
+    <form action={signOut}>
+      <button
+        type="submit"
+        aria-label="Выйти"
+        className="text-text-muted transition hover:text-danger"
+      >
+        <LogOut size={20} />
+      </button>
+    </form>
   );
 }

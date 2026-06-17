@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, BookOpen, Award, Users, Settings, LogOut, CheckCircle } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
-import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/app/actions/auth";
 
 const teacherNavItems = [
   { key: "home", href: "/teacher/dashboard", icon: Home, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
@@ -19,16 +19,8 @@ const teacherNavItems = [
 
 export function TeacherSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-
-  async function logout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <aside
@@ -69,16 +61,17 @@ export function TeacherSidebar() {
         })}
       </nav>
 
-      {/* Bottom: logout */}
+      {/* Bottom: logout — серверный action (полная навигация, без F5) */}
       <div className="border-t border-white/20 pt-6">
-        <button
-          type="button"
-          onClick={logout}
-          className="flex w-full items-center gap-3 p-3 opacity-70 transition-opacity hover:opacity-100"
-        >
-          <LogOut className="h-5 w-5" strokeWidth={2} />
-          <span className="font-medium">Выйти</span>
-        </button>
+        <form action={signOut}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 p-3 opacity-70 transition-opacity hover:opacity-100"
+          >
+            <LogOut className="h-5 w-5" strokeWidth={2} />
+            <span className="font-medium">Выйти</span>
+          </button>
+        </form>
       </div>
     </aside>
   );

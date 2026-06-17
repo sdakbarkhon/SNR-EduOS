@@ -374,25 +374,38 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
   };
 };
 
-/** KPI учителя для журнала: всего оценил, средний балл, оценено за неделю. */
+/** KPI учителя для журнала: всего оценил, средний балл, оценено за неделю.
+ *  totalGraded + avgGrade считаются БЕЗ graded_at → работают и без миграции 19.
+ *  Нормализация: оценки файлов 1–5 как есть; тесты score/max_score → к шкале /5.
+ *  RLS ограничивает выборку группами учителя — отдельный teacher_id не нужен. */
 export const getTeacherGradeStats = async (db: Db): Promise<{ totalGraded: number; avgGrade: number; weeklyGraded: number }> => {
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const [fileRes, testRes] = await Promise.all([
-    db.from("homework_submissions").select("grade, graded_at").not("grade", "is", null),
-    db.from("test_submissions").select("score, max_score, graded_at").not("score", "is", null),
+    db.from("homework_submissions").select("grade").not("grade", "is", null),
+    db.from("test_submissions").select("score, max_score").not("score", "is", null),
   ]);
-  const files = (fileRes.data ?? []) as Array<{ grade: number; graded_at: string | null }>;
-  const tests = (testRes.data ?? []) as Array<{ score: number; max_score: number | null; graded_at: string | null }>;
+  const files = (fileRes.data ?? []) as Array<{ grade: number }>;
+  const tests = (testRes.data ?? []) as Array<{ score: number; max_score: number | null }>;
 
   const normalized: number[] = [];
-  let weekly = 0;
-  for (const f of files) { normalized.push(f.grade); if (f.graded_at && f.graded_at >= weekAgo) weekly++; }
-  for (const t of tests) { const m = t.max_score ?? 0; if (m > 0) normalized.push((t.score / m) * 5); if (t.graded_at && t.graded_at >= weekAgo) weekly++; }
+  for (const f of files) normalized.push(f.grade);
+  for (const t of tests) { const m = t.max_score ?? 0; if (m > 0) normalized.push((t.score / m) * 5); }
+
+  // «Оценено за неделю» требует graded_at (миграция 19). Изолировано:
+  // если колонки на hosted ещё нет — запрос вернёт error, оставляем 0.
+  let weeklyGraded = 0;
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const [f2, t2] = await Promise.all([
+      db.from("homework_submissions").select("id").not("grade", "is", null).gte("graded_at", weekAgo),
+      db.from("test_submissions").select("id").not("score", "is", null).gte("graded_at", weekAgo),
+    ]);
+    if (!f2.error && !t2.error) weeklyGraded = (f2.data?.length ?? 0) + (t2.data?.length ?? 0);
+  } catch { weeklyGraded = 0; }
 
   return {
     totalGraded: files.length + tests.length,
     avgGrade: normalized.length ? normalized.reduce((a, b) => a + b, 0) / normalized.length : 0,
-    weeklyGraded: weekly,
+    weeklyGraded,
   };
 };
 
