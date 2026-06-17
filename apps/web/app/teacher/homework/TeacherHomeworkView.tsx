@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getDictionary, getSubjectConfig } from "@snr/core";
+import { getDictionary, getSubjectConfig, deleteHomework } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -156,10 +156,14 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
 
   async function deleteHW(hw: HomeworkItem) {
     setBusyId(hw.id);
-    const { error } = await supabase.from("homework").delete().eq("id", hw.id);
-    setBusyId(null);
-    if (error) { alert(error.message); return; }
-    setLocalHW((list) => list.filter((h) => h.id !== hw.id));
+    try {
+      await deleteHomework(supabase, hw.id);
+      setLocalHW((list) => list.filter((h) => h.id !== hw.id));
+    } catch (e: unknown) {
+      alert((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function duplicateHW(hw: HomeworkItem) {

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDictionary, createTeacherHomework, createTestQuestions } from "@snr/core";
+import {
+  getDictionary,
+  createTeacherHomework,
+  createTestQuestions,
+  uploadHomeworkAttachment,
+  setHomeworkAttachment,
+} from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Plus, ChevronLeft } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type Format = "file" | "test" | null;
@@ -32,8 +38,28 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [deadline, setDeadline] = useState("");
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (f && f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); e.target.value = ""; return; }
+    setError(null);
+    setAttachFile(f);
+  }
+
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    if (f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); return; }
+    setError(null);
+    setAttachFile(f);
+  }
 
   function addQuestion() {
     setQuestions((qs) => [...qs, { type: "single_choice", text: "", options: [{ text: "", isCorrect: true }, { text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }] }]);
@@ -84,6 +110,15 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           questionText: q.text, questionType: q.type, orderIndex: i,
           options: q.type === "single_choice" ? q.options.map((o, oi) => ({ optionText: o.text, isCorrect: o.isCorrect, orderIndex: oi })) : undefined,
         })));
+      }
+      if (format === "file" && attachFile) {
+        const { path, sizeByte } = await uploadHomeworkAttachment(supabase, {
+          teacherId: resolvedTeacherId,
+          homeworkId: hw.id,
+          fileName: attachFile.name,
+          blob: attachFile,
+        });
+        await setHomeworkAttachment(supabase, hw.id, { path, sizeByte, fileName: attachFile.name });
       }
       router.push("/teacher/homework");
     } catch (e: unknown) {
@@ -162,8 +197,45 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         </label>
 
         {format === "file" && (
-          <div className="rounded-[14px] border-2 border-dashed border-slate-200 p-6 text-center text-[13px] text-brand-ink-muted">
-            {d.teacher.fileUploadStub}
+          <div>
+            <span className="mb-1.5 block text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.hwAttachLabel} <span className="text-slate-400 font-normal">(опционально)</span>
+            </span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,video/mp4"
+              onChange={handleFileChange}
+              className="hidden"
+              id="hw-attach"
+            />
+            {attachFile ? (
+              <div className="flex items-center gap-3 rounded-[14px] border border-brand-blue/40 bg-blue-50/60 px-4 py-3">
+                <Paperclip size={15} className="shrink-0 text-brand-blue" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-brand-blue">{attachFile.name}</p>
+                  <p className="text-[11px] text-slate-500">{(attachFile.size / (1024 * 1024)).toFixed(1)} МБ</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setAttachFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                  className="shrink-0 text-slate-400 hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <label
+                htmlFor="hw-attach"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleFileDrop}
+                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-slate-200 p-6 text-center transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+              >
+                <Paperclip size={20} className="text-slate-400" />
+                <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.hwAttachBtn}</span>
+                <span className="text-[11px] text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ</span>
+              </label>
+            )}
           </div>
         )}
       </div>
@@ -229,7 +301,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         <button onClick={() => save("published")} disabled={saving}
           className="rounded-[12px] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50"
           style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)", boxShadow: "0 4px 16px rgba(29,111,245,0.35)" }}>
-          {saving ? d.common.loading : d.teacher.publish}
+          {saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish}
         </button>
       </div>
     </div>

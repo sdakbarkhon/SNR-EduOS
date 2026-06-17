@@ -163,7 +163,10 @@ export function TeacherGradesView({ groups, stats }: Props) {
       setReviewSub({
         id: f.id, student_id: f.student_id, status: f.status,
         submitted_at: f.submitted_at, answer_text: f.answer_text,
-        grade: f.grade, teacher_comment: f.teacher_comment, student,
+        grade: f.grade, teacher_comment: f.teacher_comment,
+        file_storage_path: (f as { file_storage_path?: string | null }).file_storage_path ?? null,
+        file_original_name: (f as { file_original_name?: string | null }).file_original_name ?? null,
+        student,
       });
     }
   }

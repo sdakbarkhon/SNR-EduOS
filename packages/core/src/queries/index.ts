@@ -64,6 +64,10 @@ export const getHomeworkWithSubmissions = (db: Db) =>
         id: string; group_id: string; lesson_id: string | null; title: string;
         description: string | null; due_date: string | null; attachments: unknown;
         content_type: ContentType; source: HomeworkSource;
+        teacher_id: string | null;
+        attachment_storage_path: string | null;
+        attachment_size_bytes: number | null;
+        attachment_filename: string | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -93,6 +97,10 @@ export const getHomeworkById = (db: Db, id: string) =>
         id: string; group_id: string; lesson_id: string | null; title: string;
         description: string | null; due_date: string | null; attachments: unknown;
         content_type: ContentType; source: HomeworkSource;
+        teacher_id: string | null;
+        attachment_storage_path: string | null;
+        attachment_size_bytes: number | null;
+        attachment_filename: string | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -778,6 +786,179 @@ export const getBookSignedUrl = async (
     .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
   if (error) throw error;
   return data!.signedUrl;
+};
+
+// ─── HOMEWORK FILES (Step E) ──────────────────────────────────────────────────
+
+/** Upload teacher attachment to homework-files bucket.
+ *  Returns storage path and size. */
+export const uploadHomeworkAttachment = async (
+  db: Db,
+  { teacherId, homeworkId, fileName, blob }: {
+    teacherId: string; homeworkId: string; fileName: string; blob: Blob;
+  },
+): Promise<{ path: string; sizeByte: number }> => {
+  const ext = fileName.split(".").pop() ?? "bin";
+  const path = `${teacherId}/${homeworkId}/attachment/${Date.now()}.${ext}`;
+  const { error } = await db.storage
+    .from("homework-files")
+    .upload(path, blob, { upsert: true, contentType: (blob as File).type || undefined });
+  if (error) throw error;
+  return { path, sizeByte: blob.size };
+};
+
+/** Update homework's attachment columns after uploading (or null to clear). */
+export const setHomeworkAttachment = async (
+  db: Db,
+  homeworkId: string,
+  attachment: { path: string; sizeByte: number; fileName: string } | null,
+) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db.from("homework") as any)
+    .update({
+      attachment_storage_path: attachment?.path ?? null,
+      attachment_size_bytes: attachment?.sizeByte ?? null,
+      attachment_filename: attachment?.fileName ?? null,
+    })
+    .eq("id", homeworkId);
+  if (error) throw error;
+};
+
+/** Signed URL for teacher attachment (accessible to both student and teacher). */
+export const getHomeworkAttachmentUrl = async (
+  db: Db,
+  storagePath: string,
+  downloadAs?: string,
+): Promise<string> => {
+  const { data, error } = await db.storage
+    .from("homework-files")
+    .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
+/** Delete teacher attachment from Storage + clear homework columns. */
+export const deleteHomeworkAttachment = async (
+  db: Db,
+  homeworkId: string,
+  storagePath: string,
+) => {
+  await db.storage.from("homework-files").remove([storagePath]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db.from("homework") as any)
+    .update({ attachment_storage_path: null, attachment_size_bytes: null, attachment_filename: null })
+    .eq("id", homeworkId);
+  if (error) throw error;
+};
+
+/** Signed URL for student submission file (teacher or the submitting student). */
+export const getSubmissionFileUrl = async (
+  db: Db,
+  storagePath: string,
+  downloadAs?: string,
+): Promise<string> => {
+  const { data, error } = await db.storage
+    .from("homework-files")
+    .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
+/** Submit homework with optional file — handles both first submit and resubmit.
+ *  Deletes old storage file when resubmitting with a new file. */
+export const submitHomeworkWithFile = async (
+  db: Db,
+  {
+    homeworkId, studentId, teacherId, textAnswer, file, fileName,
+  }: {
+    homeworkId: string;
+    studentId: string;
+    teacherId: string | null;
+    textAnswer?: string;
+    file?: File | Blob | null;
+    fileName?: string;
+  },
+): Promise<HomeworkSubmission> => {
+  const { data: existing } = await db
+    .from("homework_submissions")
+    .select("id, file_storage_path")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  const existingRow = existing as { id: string; file_storage_path: string | null } | null;
+
+  if (file && existingRow?.file_storage_path) {
+    await db.storage.from("homework-files").remove([existingRow.file_storage_path]);
+  }
+
+  let fileStoragePath: string | null = null;
+  let fileSizeBytes: number | null = null;
+  let fileOriginalName: string | null = null;
+
+  if (file && fileName && teacherId) {
+    const ext = fileName.split(".").pop() ?? "bin";
+    fileStoragePath = `${teacherId}/${homeworkId}/submissions/${studentId}/${Date.now()}.${ext}`;
+    fileSizeBytes = file.size;
+    fileOriginalName = fileName;
+    const { error } = await db.storage
+      .from("homework-files")
+      .upload(fileStoragePath, file, { upsert: true, contentType: (file as File).type || undefined });
+    if (error) throw error;
+  }
+
+  const payload = {
+    homework_id: homeworkId,
+    student_id: studentId,
+    answer_text: textAnswer?.trim() || null,
+    file_storage_path: fileStoragePath,
+    file_size_bytes: fileSizeBytes,
+    file_original_name: fileOriginalName,
+    status: "submitted" as const,
+    submitted_at: new Date().toISOString(),
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const submissionsTable = db.from("homework_submissions") as any;
+  if (existingRow) {
+    const { data, error } = await submissionsTable
+      .update(payload)
+      .eq("id", existingRow.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as unknown as HomeworkSubmission;
+  } else {
+    const { data, error } = await submissionsTable
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as unknown as HomeworkSubmission;
+  }
+};
+
+/** Delete homework record + all associated Storage files (attachment + student submissions). */
+export const deleteHomework = async (db: Db, homeworkId: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [hwRes, subsRes] = await Promise.all([
+    (db.from("homework") as any).select("attachment_storage_path").eq("id", homeworkId).single(),
+    (db.from("homework_submissions") as any).select("file_storage_path").eq("homework_id", homeworkId),
+  ]);
+
+  const paths: string[] = [];
+  const attachPath = (hwRes.data as { attachment_storage_path: string | null } | null)?.attachment_storage_path;
+  if (attachPath) paths.push(attachPath);
+  for (const sub of (subsRes.data ?? [])) {
+    const fp = (sub as { file_storage_path: string | null }).file_storage_path;
+    if (fp) paths.push(fp);
+  }
+  if (paths.length > 0) {
+    await db.storage.from("homework-files").remove(paths);
+  }
+
+  const { error } = await db.from("homework").delete().eq("id", homeworkId);
+  if (error) throw error;
 };
 
 /** Книги текущего учителя (для /teacher/books). */

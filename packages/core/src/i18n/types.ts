@@ -138,6 +138,10 @@ export interface Dictionary {
     testCorrect: string;
     testReview: string;
     testWebOnly: string;
+    teacherFile: string;
+    submittedFileLbl: string;
+    uploadingFile: string;
+    resubmitBtn: string;
   };
   payments: {
     title: string;
@@ -362,5 +366,13 @@ export interface Dictionary {
     booksDone: string;
     booksMenuDownload: string;
     booksMenuDelete: string;
+    hwAttachLabel: string;
+    hwAttachBtn: string;
+    hwAttachProgress: string;
+    hwDeleteAttach: string;
+    hwDeleteAttachConfirm: string;
+    hwDownloadAttach: string;
+    hwCreatedMsg: string;
+    reviewDownloadWork: string;
   };
 }

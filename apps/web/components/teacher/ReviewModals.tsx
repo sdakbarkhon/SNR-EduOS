@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getDictionary, gradeSubmission, getTestAnswersForSubmission } from "@snr/core";
+import { getDictionary, gradeSubmission, getTestAnswersForSubmission, getSubmissionFileUrl } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { X } from "lucide-react";
+import { Download, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export type ReviewQuestion = {
@@ -19,6 +19,7 @@ export type ReviewSubmission = {
   id: string; student_id: string; status: string;
   submitted_at: string | null; answer_text: string | null;
   grade: number | null; teacher_comment: string | null;
+  file_storage_path: string | null; file_original_name: string | null;
   student: { id: string; full_name: string; avatar_url: string | null };
 };
 export type ReviewTestSub = {
@@ -47,7 +48,21 @@ export function ReviewModal({ submission, onClose, onGraded }: {
   const [grade, setGrade] = useState(submission.grade != null ? String(submission.grade) : "");
   const [comment, setComment] = useState(submission.teacher_comment ?? "");
   const [saving, setSaving] = useState(false);
+  const [dlLoading, setDlLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function downloadWork() {
+    if (!submission.file_storage_path) return;
+    setDlLoading(true);
+    try {
+      const name = submission.file_original_name ?? "work";
+      const url = await getSubmissionFileUrl(supabase, submission.file_storage_path, name);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+    } finally {
+      setDlLoading(false);
+    }
+  }
 
   async function submit() {
     const gradeNum = Number(grade.trim());
@@ -86,6 +101,23 @@ export function ReviewModal({ submission, onClose, onGraded }: {
               </div>
             ) : (
               <p className="text-[13px] text-brand-ink-muted">{d.homework.noFile}</p>
+            )}
+            {submission.file_storage_path && (
+              <div className="mt-2 flex items-center gap-3 rounded-[10px] border border-slate-100 bg-slate-50 p-2.5">
+                <Paperclip size={13} className="shrink-0 text-brand-blue" />
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-slate-700">
+                  {submission.file_original_name ?? submission.file_storage_path.split("/").pop()}
+                </span>
+                <button
+                  type="button"
+                  onClick={downloadWork}
+                  disabled={dlLoading}
+                  className="flex items-center gap-1 rounded-[8px] px-2.5 py-1 text-[11px] font-semibold text-brand-blue hover:bg-blue-50 disabled:opacity-50"
+                >
+                  <Download size={11} />
+                  {d.teacher.reviewDownloadWork}
+                </button>
+              </div>
             )}
           </div>
           <div className="space-y-3">

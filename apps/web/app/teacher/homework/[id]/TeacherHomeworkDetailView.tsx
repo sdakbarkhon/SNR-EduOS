@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getDictionary, getSubjectConfig } from "@snr/core";
+import {
+  getDictionary,
+  getSubjectConfig,
+  getHomeworkAttachmentUrl,
+  uploadHomeworkAttachment,
+  setHomeworkAttachment,
+  deleteHomeworkAttachment,
+} from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { createClient } from "@/lib/supabase/client";
 import { ReviewModal, TestReviewModal } from "@/components/teacher/ReviewModals";
 
 type Question = {
@@ -21,6 +29,7 @@ type Submission = {
   id: string; student_id: string; status: string;
   submitted_at: string | null; answer_text: string | null;
   grade: number | null; teacher_comment: string | null;
+  file_storage_path: string | null; file_original_name: string | null;
   student: { id: string; full_name: string; avatar_url: string | null };
 };
 type TestSub = {
@@ -32,6 +41,10 @@ type TestSub = {
 type HW = {
   id: string; title: string; description: string | null;
   content_type: string; due_date: string | null;
+  teacher_id: string | null;
+  attachment_storage_path: string | null;
+  attachment_filename: string | null;
+  attachment_size_bytes: number | null;
   group: { id: string; name: string; subject: string };
 };
 
@@ -40,6 +53,20 @@ interface Props {
   submissions: Submission[];
   testSubs: TestSub[];
   questions: Question[];
+}
+
+const MAX_ATTACH_BYTES = 50 * 1024 * 1024;
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function downloadViaLink(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
 }
 
 function Avatar({ name, url }: { name: string; url?: string | null }) {
@@ -52,11 +79,184 @@ function Avatar({ name, url }: { name: string; url?: string | null }) {
   );
 }
 
-export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions }: Props) {
+function AttachmentCard({
+  hw,
+  onDeleted,
+  onAttached,
+}: {
+  hw: HW;
+  onDeleted: () => void;
+  onAttached: (path: string, size: number, name: string) => void;
+}) {
+  const sb = createClient();
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dlLoading, setDlLoading] = useState(false);
+  const [delLoading, setDelLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [err, setErr] = useState("");
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    if (f && f.size > MAX_ATTACH_BYTES) { setErr("Файл больше 50 МБ"); e.target.value = ""; return; }
+    setErr("");
+    setPendingFile(f);
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    if (f.size > MAX_ATTACH_BYTES) { setErr("Файл больше 50 МБ"); return; }
+    setErr("");
+    setPendingFile(f);
+  };
+
+  const handleUpload = async () => {
+    if (!pendingFile || !hw.teacher_id) return;
+    setUploading(true);
+    setErr("");
+    try {
+      const { path, sizeByte } = await uploadHomeworkAttachment(sb, {
+        teacherId: hw.teacher_id,
+        homeworkId: hw.id,
+        fileName: pendingFile.name,
+        blob: pendingFile,
+      });
+      await setHomeworkAttachment(sb, hw.id, { path, sizeByte, fileName: pendingFile.name });
+      onAttached(path, sizeByte, pendingFile.name);
+      setPendingFile(null);
+    } catch {
+      setErr(d.common.error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!hw.attachment_storage_path) return;
+    setDlLoading(true);
+    try {
+      const name = hw.attachment_filename ?? hw.attachment_storage_path.split("/").pop() ?? "file";
+      const url = await getHomeworkAttachmentUrl(sb, hw.attachment_storage_path, name);
+      downloadViaLink(url, name);
+    } finally {
+      setDlLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!hw.attachment_storage_path) return;
+    if (!confirm(d.teacher.hwDeleteAttachConfirm)) return;
+    setDelLoading(true);
+    try {
+      await deleteHomeworkAttachment(sb, hw.id, hw.attachment_storage_path);
+      onDeleted();
+    } finally {
+      setDelLoading(false);
+    }
+  };
+
+  if (hw.attachment_storage_path) {
+    const name = hw.attachment_filename ?? hw.attachment_storage_path.split("/").pop() ?? "file";
+    const size = hw.attachment_size_bytes ? formatBytes(hw.attachment_size_bytes) : null;
+    return (
+      <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5"
+        style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.07)" }}>
+        <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest text-brand-ink-muted">
+          {d.teacher.hwAttachLabel}
+        </p>
+        <div className="flex items-center gap-3 rounded-[12px] border border-slate-100 bg-white/80 p-3">
+          <FileText size={16} className="shrink-0 text-brand-blue" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium text-slate-700">{name}</p>
+            {size && <p className="text-[11px] text-slate-400">{size}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={dlLoading}
+            className="flex items-center gap-1 rounded-[8px] px-3 py-1.5 text-[12px] font-semibold text-brand-blue hover:bg-blue-50 disabled:opacity-50"
+          >
+            <Download size={12} />
+            {d.teacher.hwDownloadAttach}
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={delLoading}
+            className="rounded-[8px] p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No attachment yet — show dropzone
+  return (
+    <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5"
+      style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.07)" }}>
+      <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest text-brand-ink-muted">
+        {d.teacher.hwAttachLabel}
+      </p>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,video/mp4"
+        onChange={handleFileChange}
+        className="hidden"
+        id="attach-input"
+      />
+      {pendingFile ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 rounded-[12px] border border-brand-blue/40 bg-blue-50/60 p-3">
+            <Paperclip size={14} className="shrink-0 text-brand-blue" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium text-brand-blue">{pendingFile.name}</p>
+              <p className="text-[11px] text-slate-500">{formatBytes(pendingFile.size)}</p>
+            </div>
+            <button type="button" onClick={() => { setPendingFile(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-slate-400 hover:text-red-500">
+              <X size={14} />
+            </button>
+          </div>
+          {err && <p className="text-[12px] text-red-500">{err}</p>}
+          <button
+            type="button"
+            onClick={handleUpload}
+            disabled={uploading}
+            className="w-full rounded-[10px] py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)" }}
+          >
+            {uploading ? d.teacher.hwAttachProgress : d.teacher.hwAttachBtn}
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor="attach-input"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleFileDrop}
+          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-slate-200 py-6 text-center transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+        >
+          <Paperclip size={18} className="text-slate-400" />
+          <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.hwAttachBtn}</span>
+          <span className="text-[11px] text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ</span>
+        </label>
+      )}
+      {err && !pendingFile && <p className="mt-1 text-[12px] text-red-500">{err}</p>}
+    </div>
+  );
+}
+
+export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs, questions }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const router = useRouter();
 
+  const [hw, setHw] = useState(initialHw);
   const [reviewSub, setReviewSub] = useState<Submission | null>(null);
   const [reviewTestSub, setReviewTestSub] = useState<TestSub | null>(null);
   const [localSubs, setLocalSubs] = useState(submissions);
@@ -64,13 +264,9 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
 
   const cfg = getSubjectConfig(hw.group.subject);
 
-  // A test has open questions if any question is of type "open"
   const hasOpenQuestions = questions.some(q => q.question_type === "open");
 
-  // Average grade: combine file-submission grades (1-5) + test scores (normalized to 5)
-  const fileGrades = localSubs
-    .filter(s => s.grade != null)
-    .map(s => Number(s.grade));
+  const fileGrades = localSubs.filter(s => s.grade != null).map(s => Number(s.grade));
   const testGrades = localTestSubs
     .filter(s => s.max_score != null && s.max_score > 0)
     .map(s => ((s.score ?? 0) / s.max_score!) * 5);
@@ -156,6 +352,25 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
         </div>
       )}
 
+      {/* Attachment card (file homework only) */}
+      {hw.content_type === "file" && (
+        <AttachmentCard
+          hw={hw}
+          onDeleted={() => setHw(h => ({
+            ...h,
+            attachment_storage_path: null,
+            attachment_filename: null,
+            attachment_size_bytes: null,
+          }))}
+          onAttached={(path, size, name) => setHw(h => ({
+            ...h,
+            attachment_storage_path: path,
+            attachment_size_bytes: size,
+            attachment_filename: name,
+          }))}
+        />
+      )}
+
       {/* Test questions (teacher view with correct answers) */}
       {hw.content_type === "test" && questions.length > 0 && (
         <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-3"
@@ -193,7 +408,6 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
           <p className="text-[14px] text-brand-ink-muted">{d.teacher.noActivity}</p>
         ) : (
           <div className="space-y-2">
-            {/* File submissions */}
             {localSubs.map((sub) => (
               <div key={sub.id}
                 className="flex cursor-pointer items-center gap-3 rounded-[14px] bg-white/60 p-3 transition-colors hover:bg-white/90"
@@ -225,7 +439,6 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
               </div>
             ))}
 
-            {/* Test submissions */}
             {localTestSubs.map((sub) => {
               const isGraded = !hasOpenQuestions || sub.max_score === questions.length;
               const needsReview = !isGraded;
@@ -262,7 +475,6 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
         )}
       </div>
 
-      {/* File submission review modal */}
       {reviewSub && (
         <ReviewModal
           submission={reviewSub}
@@ -277,7 +489,6 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
         />
       )}
 
-      {/* Test submission review modal */}
       {reviewTestSub && (
         <TestReviewModal
           testSub={reviewTestSub}

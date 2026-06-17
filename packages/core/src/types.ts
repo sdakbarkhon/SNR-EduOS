@@ -113,6 +113,9 @@ export type HomeworkSubmission = {
   student_id: string;
   submitted_at: string;
   file_url: string | null;
+  file_storage_path: string | null;
+  file_size_bytes: number | null;
+  file_original_name: string | null;
   answer_text: string | null;
   grade: number | null;
   teacher_comment: string | null;
@@ -169,6 +172,10 @@ export type HomeworkWithSubmission = {
   created_at: string;
   content_type: ContentType;
   source: HomeworkSource;
+  teacher_id: string | null;
+  attachment_storage_path: string | null;
+  attachment_size_bytes: number | null;
+  attachment_filename: string | null;
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;

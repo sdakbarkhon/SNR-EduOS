@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(72);
+select plan(82);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -28,7 +28,31 @@ select ok((select count(*) > 0 from public.groups),              'A: видит 
 select ok((select count(*) > 0 from public.lessons),             'A: видит уроки своих групп');
 select ok((select count(*) > 0 from public.attendance),          'A: видит свою посещаемость');
 select ok((select count(*) > 0 from public.homework),            'A: видит ДЗ своих групп');
+select ok((select count(*) >= 0 from public.homework where attachment_storage_path is not distinct from null or true),
+          'A: homework.attachment_storage_path column accessible (migration 22)');
 select ok((select count(*) > 0 from public.homework_submissions),'A: видит свои сдачи ДЗ');
+select ok((select count(*) >= 0 from public.homework_submissions where file_storage_path is not distinct from null or true),
+          'A: homework_submissions.file_storage_path column accessible (migration 22)');
+-- A может сдать ДЗ с прикреплённым файлом
+select lives_ok(
+  $$ insert into public.homework_submissions
+       (homework_id, student_id, file_storage_path, file_size_bytes, file_original_name, status)
+     values
+       ('40aa0001-0000-0000-0000-000000000000',
+        'a1111111-1111-1111-1111-111111111111',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc/40aa0001-0000-0000-0000-000000000000/submissions/a1111111-1111-1111-1111-111111111111/test.pdf',
+        12345, 'test.pdf', 'submitted') $$,
+  'A: может сдать ДЗ с file_storage_path'
+);
+-- A видит собственную сдачу с файлом
+select ok(
+  (select file_storage_path is not null
+   from public.homework_submissions
+   where homework_id = '40aa0001-0000-0000-0000-000000000000'
+     and student_id  = 'a1111111-1111-1111-1111-111111111111'
+   limit 1),
+  'A: видит file_storage_path собственной сдачи'
+);
 select ok((select count(*) > 0 from public.grades),              'A: видит свои оценки');
 select ok((select count(*) > 0 from public.course_materials),    'A: видит материалы своих групп');
 -- Материалы: конкретные проверки RLS
@@ -126,6 +150,17 @@ select throws_ok(
   '42501', NULL,
   'A не может вставить сдачу ДЗ за B (RLS 42501)'
 );
+select throws_ok(
+  $$ insert into public.homework_submissions
+       (homework_id, student_id, file_storage_path, file_size_bytes, file_original_name, status)
+     values
+       ('40aa0001-0000-0000-0000-000000000000',
+        'b2222222-2222-2222-2222-222222222222',
+        'cccccccc.../submissions/b2222222.../hack.pdf',
+        999, 'hack.pdf', 'submitted') $$,
+  '42501', NULL,
+  'A не может сдать ДЗ с file за B (RLS 42501)'
+);
 
 select throws_ok(
   $$ update public.grades set score = 99
@@ -156,6 +191,19 @@ select ok((select count(*) > 0 from public.messages),            'B: видит 
 -- test_* visibility for B
 select ok((select count(*) > 0 from public.test_questions),      'B: видит вопросы тестов своих групп');
 select ok((select count(*) > 0 from public.test_submissions),    'B: видит свои сдачи тестов');
+-- B: новые колонки migration 22 доступны
+select ok(
+  (select count(*) >= 0 from public.homework where attachment_storage_path is not distinct from null or true),
+  'B: attachment_storage_path column selectable (migration 22)'
+);
+
+-- B не видит file-сдачу A (изоляция file_storage_path)
+select is(
+  (select count(*)::int from public.homework_submissions
+   where student_id = 'a1111111-1111-1111-1111-111111111111' and file_storage_path is not null),
+  0,
+  'B НЕ видит file_storage_path сдачи A (изоляция migration 22)'
+);
 
 -- B не видит данные A
 select is((select count(*)::int from public.attendance
@@ -241,6 +289,23 @@ select throws_ok(
   'T НЕ может создать ДЗ в чужой группе (42501)'
 );
 
+-- Учитель может UPDATE attachment_storage_path на своём ДЗ
+select lives_ok(
+  $$ update public.homework
+     set attachment_storage_path = 'cccccccc-cccc-cccc-cccc-cccccccccccc/40aa0001-0000-0000-0000-000000000000/attachment/doc.pdf',
+         attachment_filename = 'doc.pdf',
+         attachment_size_bytes = 2048
+     where id = '40aa0001-0000-0000-0000-000000000000' $$,
+  'T: может обновить attachment_storage_path в своём ДЗ (migration 22)'
+);
+
+-- Учитель видит file_storage_path в сдачах своей группы
+select ok(
+  (select count(*)::int from public.homework_submissions
+   where homework_id = '40aa0001-0000-0000-0000-000000000000' and file_storage_path is not null) > 0,
+  'T: видит file_storage_path в сдачах своей группы (migration 22)'
+);
+
 -- UPDATE homework_submission (оценить) — разрешён для своей группы
 select lives_ok(
   $$ update public.homework_submissions
@@ -254,6 +319,15 @@ select lives_ok(
   $$ delete from public.homework where title = 'TEST-INSERT by teacher'
      and teacher_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$,
   'T: может удалить своё ДЗ'
+);
+
+-- T может сбросить file_storage_path (resubmit cleanup) в сдаче своей группы
+select lives_ok(
+  $$ update public.homework_submissions
+     set file_storage_path = null, file_size_bytes = null, file_original_name = null
+     where homework_id = '40aa0001-0000-0000-0000-000000000000'
+       and student_id  = 'a1111111-1111-1111-1111-111111111111' $$,
+  'T: может сбросить file_storage_path в сдаче своей группы (migration 22)'
 );
 
 -- Материалы: учитель может добавить в свою группу
