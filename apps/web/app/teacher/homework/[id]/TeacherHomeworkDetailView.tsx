@@ -153,26 +153,46 @@ function TestReviewModal({ testSub, questions, onClose, onGraded }: {
   const supabase = createClient();
   const [answers, setAnswers] = useState<TestAnswer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openScoreAdj, setOpenScoreAdj] = useState(0); // extra points for open questions
+  // Per-question manual score for open questions (0 or 1). Keyed by question id.
+  const [openScores, setOpenScores] = useState<Record<string, number>>({});
+  // Auto-score computed from loaded answers (count of is_correct=true), NOT from testSub.score.
+  const [computedAutoScore, setComputedAutoScore] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const autoScore = testSub.score ?? 0;
-  const autoMaxScore = testSub.max_score ?? 0;
   const openQuestions = questions.filter(q => q.question_type === "open");
   const hasOpen = openQuestions.length > 0;
+  // max_score is always total question count (1 pt per question)
+  const totalMax = questions.length;
 
   useEffect(() => {
     (async () => {
       try {
         const data = await (getTestAnswersForSubmission(supabase as never, testSub.id) as unknown as Promise<unknown>);
-        setAnswers(data as TestAnswer[]);
+        const loaded = data as TestAnswer[];
+        setAnswers(loaded);
+
+        // Compute auto-score from actual single_choice correctness (never from testSub.score)
+        const auto = loaded.filter(a => a.is_correct === true).length;
+        setComputedAutoScore(auto);
+
+        // Seed open scores from what was previously stored:
+        // existing open score = stored score − auto score (works for any number of open questions
+        // as a total, and we distribute evenly to initialize the UI)
+        const storedOpen = Math.max(0, (testSub.score ?? 0) - auto);
+        const init: Record<string, number> = {};
+        openQuestions.forEach((q, i) => {
+          // Distribute stored open score across questions (first questions get 1 if budget allows)
+          init[q.id] = storedOpen > i ? 1 : 0;
+        });
+        setOpenScores(init);
       } catch {
-        // silently ignore — answers stay empty
+        setComputedAutoScore(0);
       } finally {
         setLoading(false);
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testSub.id]);
 
   function getAnswerForQuestion(questionId: string): TestAnswer | undefined {
@@ -180,10 +200,14 @@ function TestReviewModal({ testSub, questions, onClose, onGraded }: {
   }
 
   async function save() {
+    const auto = computedAutoScore ?? 0;
+    const openTotal = Object.values(openScores).reduce((a, b) => a + b, 0);
+    const newScore = auto + openTotal;
+    // max = total questions (1 point each); writing this value signals "fully graded"
+    const newMax = totalMax;
+
     setSaving(true);
     try {
-      const newScore = autoScore + openScoreAdj;
-      const newMax = autoMaxScore + openQuestions.length;
       const { error: err } = await supabase
         .from("test_submissions")
         .update({ score: newScore, max_score: newMax })
@@ -247,9 +271,11 @@ function TestReviewModal({ testSub, questions, onClose, onGraded }: {
                       </div>
                       <label className="flex items-center gap-2 text-[12px] text-brand-ink-muted">
                         Зачтено (0 или 1):
-                        <input type="number" min={0} max={1} defaultValue={0}
+                        <input
+                          type="number" min={0} max={1}
+                          value={openScores[q.id] ?? 0}
                           className="w-16 rounded-[8px] border border-slate-200 bg-white px-2 py-1 text-[13px] font-bold text-brand-ink focus:outline-none"
-                          onChange={(e) => setOpenScoreAdj(Number(e.target.value))} />
+                          onChange={(e) => setOpenScores(prev => ({ ...prev, [q.id]: Math.min(1, Math.max(0, Number(e.target.value))) }))} />
                       </label>
                     </div>
                   )}
@@ -259,8 +285,19 @@ function TestReviewModal({ testSub, questions, onClose, onGraded }: {
           )}
 
           <div className="rounded-[12px] bg-slate-50 px-4 py-2.5 text-[13px] font-semibold text-brand-ink">
-            Авто-балл: {autoScore}/{autoMaxScore}
-            {hasOpen && <span className="ml-2 text-brand-blue">+ {openScoreAdj} за открытый вопрос</span>}
+            {loading ? (
+              <span className="text-brand-ink-muted">Загрузка...</span>
+            ) : (
+              <>
+                Авто-балл (тест): {computedAutoScore ?? "?"}/{questions.filter(q => q.question_type === "single_choice").length}
+                {hasOpen && (
+                  <span className="ml-2 text-brand-blue">
+                    + {Object.values(openScores).reduce((a, b) => a + b, 0)} за открытые →{" "}
+                    итого {(computedAutoScore ?? 0) + Object.values(openScores).reduce((a, b) => a + b, 0)}/{totalMax}
+                  </span>
+                )}
+              </>
+            )}
           </div>
 
           {error && <p className="text-[13px] text-danger">{error}</p>}
@@ -312,8 +349,10 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
     : 0;
 
   const submittedCount = localSubs.length + localTestSubs.length;
-  const gradedCount = localSubs.filter(s => s.status === "graded").length
-    + (hasOpenQuestions ? 0 : localTestSubs.length); // auto-graded only if no open questions
+  const gradedTestSubs = localTestSubs.filter(s =>
+    !hasOpenQuestions || s.max_score === questions.length
+  ).length;
+  const gradedCount = localSubs.filter(s => s.status === "graded").length + gradedTestSubs;
 
   function statusChip(status: string, isTest = false, pending = false) {
     if (isTest) {
@@ -368,7 +407,7 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
           {
             label: d.teacher.statsPending,
             value: localSubs.filter(s => s.status === "submitted").length
-              + (hasOpenQuestions ? localTestSubs.length : 0)
+              + localTestSubs.filter(s => hasOpenQuestions && s.max_score !== questions.length).length
           },
         ].map((item) => (
           <div key={item.label} className="rounded-[16px] bg-white/70 border border-white/80 p-4 text-center"
@@ -457,7 +496,11 @@ export function TeacherHomeworkDetailView({ hw, submissions, testSubs, questions
 
             {/* Test submissions */}
             {localTestSubs.map((sub) => {
-              const needsReview = hasOpenQuestions;
+              // "graded" once teacher has saved scores (max_score written to total question count).
+              // Before grading: max_score = only single_choice count (< questions.length).
+              // After grading: max_score = questions.length (all questions counted).
+              const isGraded = !hasOpenQuestions || sub.max_score === questions.length;
+              const needsReview = !isGraded;
               return (
                 <div key={sub.id}
                   className="flex cursor-pointer items-center gap-3 rounded-[14px] bg-white/60 p-3 transition-colors hover:bg-white/90"
