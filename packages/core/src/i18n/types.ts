@@ -26,6 +26,9 @@ export interface Dictionary {
     homework: string;
     attendance: string;
     materials: string;
+    books: string;
+    projects: string;
+    aiAssistant: string;
     payments: string;
     grades: string;
     profile: string;

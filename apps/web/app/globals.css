@@ -119,3 +119,25 @@ body {
     transform: none;
   }
 }
+
+/* ─── Анимации страниц-заглушек (перенос framer-motion → CSS) ─── */
+@layer utilities {
+  .anim-fade-up { animation: fadeUp 0.5s ease both; }
+  .anim-delay-1 { animation-delay: 0.1s; }
+  .anim-delay-2 { animation-delay: 0.2s; }
+  .anim-delay-3 { animation-delay: 0.3s; }
+  .anim-bob { animation: bob 4s ease-in-out infinite; }
+  .anim-grow { animation: growW 1s ease-out 0.3s both; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes growW {
+  from { width: 0; }
+}
