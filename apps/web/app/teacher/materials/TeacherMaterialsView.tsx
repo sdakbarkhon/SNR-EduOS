@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useTransition, useRef, useEffect, useMemo } from "react";
 import {
   FolderOpen, Plus, FileText, Video, FileImage, File, BookOpen,
   Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload,
@@ -56,7 +56,9 @@ function formatSize(bytes: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  // timeZone: "UTC" ensures server and browser produce identical output,
+  // preventing React hydration mismatch #418.
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "UTC" });
 }
 
 // ── Type for teacher group (matches getTeacherGroups shape) ──────────
@@ -307,9 +309,11 @@ function UploadModal({
 export function TeacherMaterialsView({
   materials: initialMaterials,
   groups,
+  initialTeacherId,
 }: {
   materials: MaterialWithGroup[];
   groups: TeacherGroup[];
+  initialTeacherId: string;
 }) {
   const router = useRouter();
   const [materials, setMaterials] = useState(initialMaterials);
@@ -319,16 +323,10 @@ export function TeacherMaterialsView({
   const [filterGroup, setFilterGroup] = useState("all");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  const [teacherId, setTeacherId] = useState<string>("");
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Get teacher id from session
-  useEffect(() => {
-    const sb = createClient();
-    sb.from("teachers").select("id").single().then(({ data }) => {
-      if (data) setTeacherId((data as { id: string }).id);
-    });
-  }, []);
+  // teacherId comes from the RSC — no client-side fetch needed.
+  const teacherId = initialTeacherId;
 
   const subjects = useMemo(() => {
     const set = new Set(materials.map((m) => m.subject ?? m.group.subject).filter(Boolean));

@@ -61,7 +61,7 @@ function formatSize(bytes: number | null): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "UTC" });
 }
 
 // ── Component ─────────────────────────────────────────────────────────
