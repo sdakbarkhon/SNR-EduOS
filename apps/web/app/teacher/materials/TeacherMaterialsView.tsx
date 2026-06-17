@@ -6,8 +6,9 @@ import {
   Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload, Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getMaterialDownloadUrl, insertMaterial, deleteMaterial } from "@snr/core";
+import { insertMaterial } from "@snr/core";
 import type { MaterialWithGroup } from "@snr/core";
+import { getMaterialUrl, deleteMaterial as deleteMaterialAction } from "@/app/actions/materials";
 import { useRouter } from "next/navigation";
 
 // ── File type helpers (same as student view) ──────────────────────────
@@ -424,6 +425,29 @@ export function TeacherMaterialsView({
     setMaterials(initialMaterials);
   }, [initialMaterials]);
 
+  // Close the open dropdown on outside click or Esc — replaces the z-index
+  // backdrop trick which was broken: backdrop-blur creates a stacking context
+  // at z-auto in root, so a fixed z-10 backdrop would sit above the card and
+  // swallow all clicks on the dropdown items.
+  useEffect(() => {
+    if (!menuOpenId) return;
+    function onMouseDown(e: MouseEvent) {
+      const target = e.target as Element;
+      if (!target.closest(`[data-menu-id="${menuOpenId}"]`)) {
+        setMenuOpenId(null);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpenId(null);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpenId]);
+
   const subjects = useMemo(() => {
     const set = new Set(materials.map((m) => m.subject ?? m.group.subject).filter(Boolean));
     return Array.from(set) as string[];
@@ -448,11 +472,25 @@ export function TeacherMaterialsView({
 
   async function handleDownload(mat: MaterialWithGroup) {
     setMenuOpenId(null);
-    if (!mat.storage_path && !mat.link_url) return;
-    const sb = createClient();
+    if (!mat.storage_path && !mat.link_url) {
+      setToast("У этого материала нет файла");
+      return;
+    }
     try {
-      const url = mat.link_url ?? await getMaterialDownloadUrl(sb, mat.storage_path!);
-      window.open(url, "_blank", "noopener,noreferrer");
+      const url = await getMaterialUrl(mat.id);
+      if (!url) { setToast("Не удалось скачать файл"); return; }
+      if (mat.link_url && !mat.storage_path) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        const filename = mat.storage_path?.split("/").pop() || mat.title || "material";
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch {
       setToast("Не удалось скачать файл");
     }
@@ -460,13 +498,16 @@ export function TeacherMaterialsView({
 
   async function handleDelete(mat: MaterialWithGroup) {
     setMenuOpenId(null);
-    if (!confirm("Удалить материал? Это действие нельзя отменить.")) return;
     setDeleting(mat.id);
-    const sb = createClient();
     try {
-      await deleteMaterial(sb, mat.id, mat.storage_path);
+      const result = await deleteMaterialAction(mat.id);
+      if (result.error) {
+        setToast("Не удалось удалить материал");
+        return;
+      }
       setMaterials((prev) => prev.filter((m) => m.id !== mat.id));
       setToast("Материал удалён");
+      router.refresh();
     } catch {
       setToast("Не удалось удалить материал");
     } finally {
@@ -561,10 +602,11 @@ export function TeacherMaterialsView({
               return (
                 <div
                   key={mat.id}
-                  className="group relative flex h-[190px] flex-col overflow-hidden rounded-[20px] border border-white/40 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:shadow-lg"
+                  className="group relative flex h-[190px] flex-col rounded-[20px] border border-white/40 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:shadow-lg"
                 >
-                  {/* ••• menu */}
-                  <div className="absolute right-3 top-3 z-10">
+                  {/* ••• menu — z-30 so it sits above other z-10 card elements.
+                      data-menu-id lets the outside-click handler identify its own node. */}
+                  <div className="absolute right-3 top-3 z-30" data-menu-id={mat.id}>
                     <button
                       onClick={() => setMenuOpenId(menuOpenId === mat.id ? null : mat.id)}
                       className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
@@ -572,7 +614,7 @@ export function TeacherMaterialsView({
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                     {menuOpenId === mat.id && (
-                      <div className="absolute right-0 top-8 z-20 min-w-[140px] overflow-hidden rounded-xl border border-white/60 bg-white shadow-xl">
+                      <div className="absolute right-0 top-8 min-w-[140px] overflow-hidden rounded-xl border border-white/60 bg-white shadow-xl">
                         {(mat.storage_path || mat.link_url) && (
                           <button
                             onClick={() => handleDownload(mat)}
@@ -618,13 +660,6 @@ export function TeacherMaterialsView({
         )}
       </div>
 
-      {/* Close menu on outside click */}
-      {menuOpenId && (
-        <div
-          className="fixed inset-0 z-10"
-          onClick={() => setMenuOpenId(null)}
-        />
-      )}
     </>
   );
 }
