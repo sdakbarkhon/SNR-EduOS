@@ -5,17 +5,21 @@ import { getDictionary, getSubjectConfig } from "@snr/core";
 import type { Locale, StudentGradeItem } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
+import { ArrowDown, ArrowUp } from "lucide-react";
 
 interface Props {
   grades: StudentGradeItem[];
 }
 
 type TypeFilter = "all" | "file" | "test";
+type SortKey = "subject" | "date" | "grade";
 
+/** Цвет оценки по проценту: >=80% зелёный, 50-79% жёлтый, <50% красный. */
 function gradeColor(g5: number | null): string {
   if (g5 == null) return "text-slate-400";
-  if (g5 >= 4.5) return "text-emerald-600";
-  if (g5 >= 3.0) return "text-amber-600";
+  const pct = g5 / 5;
+  if (pct >= 0.8) return "text-emerald-600";
+  if (pct >= 0.5) return "text-amber-600";
   return "text-red-500";
 }
 
@@ -25,40 +29,63 @@ export function GradesView({ grades }: Props) {
 
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "date", dir: -1 });
 
   const subjects = Array.from(new Set(grades.map((g) => g.subject)));
+  const showSubjectCol = subjectFilter === "all";
 
-  // KPI (over all graded works)
-  const scored = grades.filter((g) => g.grade5 != null);
+  const filtered = grades.filter((g) => {
+    if (subjectFilter !== "all" && g.subject !== subjectFilter) return false;
+    if (typeFilter !== "all" && g.kind !== typeFilter) return false;
+    return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    let r = 0;
+    if (sort.key === "date") r = (a.date ?? "").localeCompare(b.date ?? "");
+    else if (sort.key === "grade") r = (a.grade5 ?? -1) - (b.grade5 ?? -1);
+    else r = getSubjectConfig(a.subject).label.localeCompare(getSubjectConfig(b.subject).label);
+    return r * sort.dir;
+  });
+
+  // KPI: avg + count follow the filter; best subject stays global.
+  const scored = filtered.filter((g) => g.grade5 != null);
   const avgScore = scored.length
-    ? (scored.reduce((a, g) => a + (g.grade5 ?? 0), 0) / scored.length).toFixed(1)
+    ? (scored.reduce((s, g) => s + (g.grade5 ?? 0), 0) / scored.length).toFixed(1)
     : "—";
-  const doneCount = grades.length;
-  // Best subject by average grade5
+  const doneCount = filtered.length;
+
   let bestSubject = "—";
-  if (scored.length) {
+  const allScored = grades.filter((g) => g.grade5 != null);
+  if (allScored.length) {
     const bySub = new Map<string, { sum: number; n: number }>();
-    scored.forEach((g) => {
+    allScored.forEach((g) => {
       const cur = bySub.get(g.subject) ?? { sum: 0, n: 0 };
       cur.sum += g.grade5 ?? 0; cur.n += 1;
       bySub.set(g.subject, cur);
     });
     let bestAvg = -1;
     bySub.forEach((v, sub) => {
-      const avg = v.sum / v.n;
-      if (avg > bestAvg) { bestAvg = avg; bestSubject = getSubjectConfig(sub).label; }
+      const a = v.sum / v.n;
+      if (a > bestAvg) { bestAvg = a; bestSubject = getSubjectConfig(sub).label; }
     });
   }
 
-  // Filter + group by subject
-  const filtered = grades.filter((g) => {
-    if (subjectFilter !== "all" && g.subject !== subjectFilter) return false;
-    if (typeFilter !== "all" && g.kind !== typeFilter) return false;
-    return true;
-  });
-  const groupsBySubject = subjects
-    .map((sub) => ({ sub, items: filtered.filter((g) => g.subject === sub) }))
-    .filter((grp) => grp.items.length > 0);
+  function toggleSort(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: (s.dir === 1 ? -1 : 1) as 1 | -1 } : { key, dir: key === "subject" ? 1 : -1 }));
+  }
+
+  function SortHead({ k, label, align }: { k: SortKey; label: string; align?: "right" }) {
+    const active = sort.key === k;
+    return (
+      <th className={cn("px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400", align === "right" ? "text-right" : "text-left")}>
+        <button onClick={() => toggleSort(k)} className={cn("inline-flex items-center gap-1 transition-colors hover:text-brand-ink", align === "right" && "flex-row-reverse")}>
+          {label}
+          {active && (sort.dir === 1 ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+        </button>
+      </th>
+    );
+  }
 
   const kpis = [
     { label: "Средний балл", value: avgScore },
@@ -73,94 +100,113 @@ export function GradesView({ grades }: Props) {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <h1 className="text-[22px] font-bold text-brand-ink">Мои оценки</h1>
 
-      {/* KPI */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* KPI — compact (~80px) */}
+      <div className="grid grid-cols-3 gap-3">
         {kpis.map((k) => (
-          <div key={k.label} className="rounded-[20px] border border-white/80 bg-white/70 p-5 backdrop-blur-xl"
-            style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
-            <div className="truncate text-[26px] font-bold leading-none text-brand-ink">{k.value}</div>
-            <div className="mt-1 text-[13px] font-medium text-brand-ink-muted">{k.label}</div>
+          <div key={k.label} className="flex flex-col justify-center rounded-[16px] border border-white/80 bg-white/70 px-4 py-3 backdrop-blur-xl"
+            style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.05)" }}>
+            <div className="truncate text-[22px] font-bold leading-tight text-brand-ink">{k.value}</div>
+            <div className="truncate text-[12px] font-medium text-brand-ink-muted">{k.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Subject pills */}
       <div className="flex flex-wrap items-center gap-2">
-        <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}
-          className="rounded-[10px] border border-white/80 bg-white/70 px-3 py-1.5 text-[13px] font-medium text-brand-ink focus:outline-none">
-          <option value="all">Все предметы</option>
-          {subjects.map((s) => <option key={s} value={s}>{getSubjectConfig(s).label}</option>)}
-        </select>
+        <button onClick={() => setSubjectFilter("all")}
+          className={cn("rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all",
+            subjectFilter === "all" ? "bg-brand-blue text-white shadow" : "border border-white/80 bg-white/70 text-brand-ink-muted hover:text-brand-ink")}>
+          Все предметы
+        </button>
+        {subjects.map((s) => {
+          const cfg = getSubjectConfig(s);
+          const active = subjectFilter === s;
+          return (
+            <button key={s} onClick={() => setSubjectFilter(s)}
+              className={cn("flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all",
+                active ? "bg-brand-blue text-white shadow" : "border border-white/80 bg-white/70 text-brand-ink-muted hover:text-brand-ink")}>
+              <span className="text-[14px]">{cfg.emoji}</span>
+              {cfg.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Type filter — secondary */}
+      <div className="flex items-center gap-1.5">
         {typePills.map((p) => (
           <button key={p.key} onClick={() => setTypeFilter(p.key)}
-            className={cn("rounded-[10px] px-4 py-1.5 text-[13px] font-semibold transition-all",
-              typeFilter === p.key ? "bg-brand-blue text-white shadow" : "border border-white/80 bg-white/70 text-brand-ink-muted hover:text-brand-ink")}>
+            className={cn("rounded-[8px] px-3 py-1 text-[12px] font-medium transition-all",
+              typeFilter === p.key ? "bg-slate-200/80 text-brand-ink" : "text-brand-ink-muted hover:bg-slate-100")}>
             {p.label}
           </button>
         ))}
       </div>
 
-      {/* Empty state */}
-      {groupsBySubject.length === 0 ? (
-        <div className="rounded-[20px] border border-white/80 bg-white/70 p-8 text-center text-brand-ink-muted">
-          У тебя пока нет оценённых работ
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {groupsBySubject.map(({ sub, items }) => {
-            const cfg = getSubjectConfig(sub);
-            const scoredItems = items.filter((g) => g.grade5 != null);
-            const subAvg = scoredItems.length
-              ? (scoredItems.reduce((a, g) => a + (g.grade5 ?? 0), 0) / scoredItems.length).toFixed(1)
-              : "—";
-            const sorted = [...items].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-
-            return (
-              <div key={sub} className="space-y-2">
-                {/* Subject section header */}
-                <div className="flex items-center gap-3 px-1">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[12px] text-[18px]"
-                    style={{ background: cfg.color + "20" }}>
-                    {cfg.emoji}
-                  </div>
-                  <h2 className="text-[16px] font-bold text-brand-ink">{cfg.label}</h2>
-                  <span className="ml-auto text-[14px] font-bold text-brand-ink">{subAvg}<span className="text-[12px] font-medium text-slate-400"> / 5</span></span>
-                </div>
-
-                {/* Grade cards */}
-                <div className="space-y-2">
-                  {sorted.map((g) => (
-                    <div key={g.id} className="flex items-start gap-3 rounded-[16px] border border-white/80 bg-white/70 p-4 backdrop-blur-xl"
-                      style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.05)" }}>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                            g.kind === "test" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700")}>
-                            {g.kind === "test" ? d.homework.typeTest : d.homework.typeFile}
+      {/* Table */}
+      <div className="overflow-hidden rounded-[20px] border border-white/80 bg-white/70 p-2 backdrop-blur-xl"
+        style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+        {sorted.length === 0 ? (
+          <div className="px-4 py-12 text-center text-[14px] text-brand-ink-muted">
+            По этому предмету пока нет оценённых работ
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {showSubjectCol && <SortHead k="subject" label="Предмет" />}
+                  <SortHead k="date" label="Дата" />
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Тип</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Работа</th>
+                  <SortHead k="grade" label="Оценка" align="right" />
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Комментарий</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((g) => {
+                  const cfg = getSubjectConfig(g.subject);
+                  return (
+                    <tr key={g.id} className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-brand-blue/5">
+                      {showSubjectCol && (
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1.5 text-[12px] font-medium text-brand-ink-muted">
+                            <span className="text-[14px]">{cfg.emoji}</span>
+                            {cfg.label}
                           </span>
-                          <span className="text-[11px] text-slate-400">
-                            {new Date(g.date).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}
-                          </span>
-                        </div>
-                        <div className="text-[14px] font-semibold text-brand-ink">{g.title}</div>
-                        {g.comment && (
-                          <div className="mt-1 text-[12px] italic text-brand-ink-muted">«{g.comment}»</div>
-                        )}
-                      </div>
-                      <div className={cn("shrink-0 text-[22px] font-bold leading-none", gradeColor(g.grade5))}>
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-4 py-3 text-[12px] text-slate-400">
+                        {new Date(g.date).toLocaleDateString(locale, { day: "numeric", month: "short" })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                          g.kind === "test" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700")}>
+                          {g.kind === "test" ? d.homework.typeTest : d.homework.typeFile}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[14px] font-semibold text-brand-ink">{g.title}</td>
+                      <td className={cn("whitespace-nowrap px-4 py-3 text-right text-[18px] font-bold", gradeColor(g.grade5))}>
                         {g.display}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                      </td>
+                      <td className="max-w-[220px] px-4 py-3">
+                        {g.comment ? (
+                          <span title={g.comment} className="block truncate text-[13px] italic text-brand-ink-muted">«{g.comment}»</span>
+                        ) : (
+                          <span className="text-[13px] text-slate-300">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
