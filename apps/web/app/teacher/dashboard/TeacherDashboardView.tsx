@@ -79,7 +79,7 @@ export function TeacherDashboardView({ teacher, groups, homework, todayLessons, 
       {/* Greeting + AI button */}
       <header className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">
-          {d.dashboard.greeting.replace("{name}", teacher?.full_name ?? d.teacher.role)} 👋
+          {d.dashboard.greeting.replace("{name}", teacher?.full_name ?? d.teacher.role)}
         </h1>
         <button
           onClick={() => alert(d.teacher.aiStub)}

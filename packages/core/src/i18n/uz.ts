@@ -195,6 +195,7 @@ export const uz: Dictionary = {
     role: "O'qituvchi",
     navHome: "Bosh sahifa",
     navHomework: "Topshiriqlar",
+    navGrades: "Baholar",
     navGroups: "Mening sinflarim",
     navProfile: "Profil",
     kpiGroups: "Guruhlarim",

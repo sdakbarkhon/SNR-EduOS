@@ -185,6 +185,7 @@ export interface Dictionary {
     role: string;
     navHome: string;
     navHomework: string;
+    navGrades: string;
     navGroups: string;
     navProfile: string;
     kpiGroups: string;

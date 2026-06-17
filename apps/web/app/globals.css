@@ -15,6 +15,15 @@
   --topbar-border: rgba(255,255,255,0.40);
   --bottomnav-bg: rgba(255,255,255,0.60);
   --bottomnav-border: rgba(255,255,255,0.40);
+  /* Журнал оценок — мягкие пастельные фоны ячеек */
+  --cell-graded-bg: rgba(45,190,126,0.14);
+  --cell-graded-fg: #1B8A5A;
+  --cell-review-bg: rgba(245,166,35,0.16);
+  --cell-review-fg: #B97509;
+  --cell-missed-bg: rgba(240,85,107,0.14);
+  --cell-missed-fg: #C13551;
+  --cell-pending-bg: rgba(138,147,168,0.10);
+  --cell-pending-fg: #8A93A8;
 }
 
 .dark {
@@ -29,6 +38,15 @@
   --topbar-border: rgba(255,255,255,0.06);
   --bottomnav-bg: rgba(11,16,36,0.90);
   --bottomnav-border: rgba(255,255,255,0.06);
+  /* Журнал оценок — затемнённые пастельные фоны ячеек */
+  --cell-graded-bg: rgba(45,190,126,0.20);
+  --cell-graded-fg: #4ADE96;
+  --cell-review-bg: rgba(245,166,35,0.22);
+  --cell-review-fg: #F5C46A;
+  --cell-missed-bg: rgba(240,85,107,0.22);
+  --cell-missed-fg: #F58497;
+  --cell-pending-bg: rgba(255,255,255,0.04);
+  --cell-pending-fg: #8A93A8;
 }
 
 body {

@@ -267,6 +267,133 @@ export const getTeacherAttendance = (db: Db) =>
     .select("status, lesson:lessons!inner(group_id)")
     .then(unwrap);
 
+// --- Этап 2: Оценки и прогресс ---
+
+/** Одна оценка ученика (файл или тест), нормализованная для журнала. */
+export type StudentGradeItem = {
+  id: string;
+  kind: "file" | "test";
+  title: string;
+  subject: string;
+  groupName: string;
+  date: string; // graded_at ?? submitted_at
+  grade5: number | null; // нормировано к /5 для средних
+  display: string; // "4/5" или "85/100"
+  comment: string | null;
+};
+
+type HwJoin = { title: string; content_type: string; group: { subject: string; name: string } | null };
+
+/** Все оценённые работы текущего ученика (RLS отдаёт только свои). */
+export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
+  const fileSel =
+    "id, grade, teacher_comment, submitted_at, graded_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+  const testSel =
+    "id, score, max_score, submitted_at, graded_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+  const [fileRes, testRes] = await Promise.all([
+    db.from("homework_submissions").select(fileSel).not("grade", "is", null),
+    db.from("test_submissions").select(testSel).not("score", "is", null),
+  ]);
+
+  const items: StudentGradeItem[] = [];
+  for (const r of (fileRes.data ?? []) as unknown as Array<{
+    id: string; grade: number; teacher_comment: string | null; submitted_at: string; graded_at: string | null; homework: HwJoin | null;
+  }>) {
+    items.push({
+      id: r.id, kind: "file",
+      title: r.homework?.title ?? "",
+      subject: r.homework?.group?.subject ?? "",
+      groupName: r.homework?.group?.name ?? "",
+      date: r.graded_at ?? r.submitted_at,
+      grade5: r.grade,
+      display: `${r.grade}/5`,
+      comment: r.teacher_comment,
+    });
+  }
+  for (const r of (testRes.data ?? []) as unknown as Array<{
+    id: string; score: number; max_score: number | null; submitted_at: string; graded_at: string | null; homework: HwJoin | null;
+  }>) {
+    const max = r.max_score ?? 0;
+    items.push({
+      id: r.id, kind: "test",
+      title: r.homework?.title ?? "",
+      subject: r.homework?.group?.subject ?? "",
+      groupName: r.homework?.group?.name ?? "",
+      date: r.graded_at ?? r.submitted_at,
+      grade5: max > 0 ? (r.score / max) * 5 : null,
+      display: `${r.score}/${max || "?"}`,
+      comment: null,
+    });
+  }
+  items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return items;
+};
+
+/** Данные для матричного журнала учителя по одной группе. */
+export type GradeMatrixFileSub = {
+  id: string; homework_id: string; student_id: string; status: string;
+  grade: number | null; teacher_comment: string | null; answer_text: string | null; submitted_at: string | null;
+};
+export type GradeMatrixTestSub = {
+  id: string; homework_id: string; student_id: string;
+  score: number | null; max_score: number | null; submitted_at: string;
+};
+export type GradeMatrixData = {
+  students: Array<{ id: string; full_name: string; avatar_url: string | null }>;
+  homework: Array<{ id: string; title: string; content_type: string; due_date: string | null }>;
+  fileSubs: GradeMatrixFileSub[];
+  testSubs: GradeMatrixTestSub[];
+};
+
+export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<GradeMatrixData> => {
+  const students = (await getGroupStudents(db, groupId)) as GradeMatrixData["students"];
+  const hwRes = await db
+    .from("homework")
+    .select("id, title, content_type, due_date")
+    .eq("group_id", groupId)
+    .order("due_date", { ascending: false });
+  const homework = (hwRes.data ?? []) as GradeMatrixData["homework"];
+  const hwIds = homework.map((h) => h.id);
+  if (hwIds.length === 0) return { students, homework, fileSubs: [], testSubs: [] };
+
+  const [fileRes, testRes] = await Promise.all([
+    db.from("homework_submissions")
+      .select("id, homework_id, student_id, status, grade, teacher_comment, answer_text, submitted_at")
+      .in("homework_id", hwIds),
+    db.from("test_submissions")
+      .select("id, homework_id, student_id, score, max_score, submitted_at")
+      .in("homework_id", hwIds),
+  ]);
+  return {
+    students,
+    homework,
+    fileSubs: (fileRes.data ?? []) as GradeMatrixData["fileSubs"],
+    testSubs: (testRes.data ?? []) as GradeMatrixData["testSubs"],
+  };
+};
+
+/** KPI учителя для журнала: всего оценил, средний балл, оценено за неделю. */
+export const getTeacherGradeStats = async (db: Db): Promise<{ totalGraded: number; avgGrade: number; weeklyGraded: number }> => {
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const [fileRes, testRes] = await Promise.all([
+    db.from("homework_submissions").select("grade, graded_at").not("grade", "is", null),
+    db.from("test_submissions").select("score, max_score, graded_at").not("score", "is", null),
+  ]);
+  const files = (fileRes.data ?? []) as Array<{ grade: number; graded_at: string | null }>;
+  const tests = (testRes.data ?? []) as Array<{ score: number; max_score: number | null; graded_at: string | null }>;
+
+  const normalized: number[] = [];
+  let weekly = 0;
+  for (const f of files) { normalized.push(f.grade); if (f.graded_at && f.graded_at >= weekAgo) weekly++; }
+  for (const t of tests) { const m = t.max_score ?? 0; if (m > 0) normalized.push((t.score / m) * 5); if (t.graded_at && t.graded_at >= weekAgo) weekly++; }
+
+  return {
+    totalGraded: files.length + tests.length,
+    avgGrade: normalized.length ? normalized.reduce((a, b) => a + b, 0) / normalized.length : 0,
+    weeklyGraded: weekly,
+  };
+};
+
 /** ДЗ учителя — с join группы, enrolled-студентов, file-сдач и тест-сдач. */
 export const getTeacherHomework = (db: Db) =>
   db

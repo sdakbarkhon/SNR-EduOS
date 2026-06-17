@@ -7,13 +7,14 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
 import { TeacherSidebar } from "./TeacherSidebar";
 import { TeacherTopbar } from "./TeacherTopbar";
-import { Home, BookOpen, Users, Settings } from "lucide-react";
+import { Home, BookOpen, Award, Users, Settings } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 const teacherNavItems = [
   { key: "home", href: "/teacher/dashboard", icon: Home, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
   { key: "homework", href: "/teacher/homework", icon: BookOpen, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
+  { key: "grades", href: "/teacher/grades", icon: Award, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
   { key: "groups", href: "/teacher/groups", icon: Users, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
   { key: "profile", href: "/teacher/profile", icon: Settings, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
 ];
