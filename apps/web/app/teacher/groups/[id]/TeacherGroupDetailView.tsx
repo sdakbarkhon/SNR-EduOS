@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { getDictionary, getSubjectConfig } from "@snr/core";
+import { getDictionary, getSubjectConfig, pluralizeStudents } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { ChevronLeft } from "lucide-react";
@@ -39,7 +39,7 @@ export function TeacherGroupDetailView({ group, students }: Props) {
           </div>
           <div>
             <h1 className="text-[20px] font-bold text-brand-ink">{group.name}</h1>
-            <div className="text-[13px] text-brand-ink-muted">{students.length} {d.teacher.groupStudents}</div>
+            <div className="text-[13px] text-brand-ink-muted">{pluralizeStudents(students.length, locale)}</div>
           </div>
         </div>
       </div>

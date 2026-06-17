@@ -38,10 +38,10 @@ export function TeacherTopbar({
 
         <div className="flex items-center gap-3 rounded-[16px] border border-white/40 bg-white/60 py-2 pl-2 pr-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-xl">
           <Avatar name={name || "?"} src={avatarUrl ?? undefined} size={36} />
-          <div className="hidden flex-col sm:flex">
-            <span className="text-sm font-semibold leading-tight text-gray-800">{name}</span>
+          <div className="hidden max-w-[200px] flex-col sm:flex">
+            <span className="truncate text-sm font-semibold leading-tight text-gray-800">{name}</span>
             {subtitle && (
-              <span className="mt-0.5 text-[10px] font-medium leading-tight text-gray-500">{subtitle}</span>
+              <span className="mt-0.5 truncate whitespace-nowrap text-[10px] font-medium leading-tight text-gray-500">{subtitle}</span>
             )}
           </div>
         </div>

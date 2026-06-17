@@ -24,7 +24,9 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   try {
     const groups = (await getTeacherGroups(supabase)) as Array<{ subject: string }>;
     const subjects = Array.from(new Set(groups.map((g) => getSubjectConfig(g.subject).label)));
-    teacherSubtitle = subjects.join(" • ");
+    teacherSubtitle = subjects.length <= 2
+      ? subjects.join(" · ")
+      : `${subjects.slice(0, 2).join(" · ")} · ещё ${subjects.length - 2}`;
   } catch {
     // no groups
   }
