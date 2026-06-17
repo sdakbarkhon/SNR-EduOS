@@ -71,6 +71,7 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
   const [activeType, setActiveType] = useState<DisplayType | "all">("all");
   const [pending, startTransition] = useTransition();
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const decorated = useMemo(
     () => materials.map((m) => ({ ...m, _type: resolveType(m) })),
@@ -92,8 +93,17 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
   // "Недавно открытые" = 4 newest by created_at
   const recent = useMemo(() => decorated.slice(0, 4), [decorated]);
 
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }
+
   function handleOpen(mat: MaterialWithGroup) {
-    if (!mat.storage_path && !mat.link_url) return;
+    console.log("[materials] click:", { id: mat.id, storage_path: mat.storage_path, link_url: mat.link_url });
+    if (!mat.storage_path && !mat.link_url) {
+      showToast("У этого материала нет файла");
+      return;
+    }
     setOpeningId(mat.id);
     startTransition(async () => {
       const url = await getMaterialUrl(mat.id);
@@ -101,13 +111,19 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
       } else {
-        alert("Не удалось открыть файл. Попробуйте позже.");
+        console.warn("[materials] getMaterialUrl returned null for", mat.id);
+        showToast("Не удалось открыть файл");
       }
     });
   }
 
   return (
     <div className="text-slate-800">
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-2xl">
+          {toast}
+        </div>
+      )}
       {/* Header */}
       <header className="mb-6 mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold tracking-tight text-slate-800">Материалы</h1>
@@ -147,13 +163,12 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {recent.map((mat) => {
               const Icon = TYPE_ICON[mat._type];
-              const canOpen = !!(mat.storage_path || mat.link_url);
               const isOpening = openingId === mat.id && pending;
               return (
                 <button
                   key={`recent-${mat.id}`}
                   onClick={() => handleOpen(mat)}
-                  disabled={!canOpen || isOpening}
+                  disabled={isOpening}
                   className="flex w-full cursor-pointer items-center space-x-3 rounded-[20px] border border-white/40 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:shadow-md disabled:cursor-default disabled:opacity-60 text-left"
                 >
                   <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-xs ${TYPE_COLORS[mat._type]}`}>
@@ -187,13 +202,12 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((mat) => {
             const Icon = TYPE_ICON[mat._type];
-            const canOpen = !!(mat.storage_path || mat.link_url);
             const isOpening = openingId === mat.id && pending;
             return (
               <button
                 key={mat.id}
                 onClick={() => handleOpen(mat)}
-                disabled={!canOpen || isOpening}
+                disabled={isOpening}
                 className="group relative flex h-[180px] cursor-pointer flex-col overflow-hidden rounded-[20px] border border-white/40 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:shadow-lg disabled:cursor-default disabled:opacity-60 text-left w-full"
               >
                 <div className="z-10 mb-2 flex w-full flex-1 flex-col items-center justify-center">

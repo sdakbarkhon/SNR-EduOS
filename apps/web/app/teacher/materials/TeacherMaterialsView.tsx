@@ -121,6 +121,9 @@ function UploadModal({
     if (!groupId) { setError("Выберите группу"); return; }
     if (!file) { setError("Прикрепите файл"); return; }
     if (file.size > 52428800) { setError("Файл слишком большой (макс 50 МБ)"); return; }
+    // Guard against the bug where empty teacherId/groupId would let the file
+    // land at the bucket root instead of the planned folder structure.
+    if (!teacherId) { setError("Не удалось определить учителя — обновите страницу"); return; }
 
     setError(null);
     setUploading(true);
@@ -130,18 +133,30 @@ function UploadModal({
       const sb = createClient();
       const materialId = crypto.randomUUID();
       const ext = file.name.split(".").pop() ?? "bin";
-      const storagePath = `${teacherId}/${groupId}/${materialId}/${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      // Single source of truth: same path goes to storage.upload AND DB insert.
+      const storagePath = `${teacherId}/${groupId}/${materialId}/${safeName}`;
 
-      // Simulate progress ramp while uploading
+      // Hard invariant: every segment must be non-empty, otherwise the path
+      // collapses and the file ends up at the bucket root (real bug we saw).
+      const segments = storagePath.split("/");
+      if (segments.some((s) => !s)) {
+        throw new Error(`Invalid storage path "${storagePath}" — empty segment`);
+      }
+      console.log("[materials] uploading to", storagePath);
+
       const ramp = setInterval(() => setProgress((p) => Math.min(p + 5, 90)), 300);
 
       const { error: uploadErr } = await sb.storage
         .from("materials")
-        .upload(storagePath, file, { contentType: file.type || undefined });
+        .upload(storagePath, file, { contentType: file.type || undefined, upsert: false });
 
       clearInterval(ramp);
 
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) {
+        console.error("[materials] storage upload failed:", uploadErr);
+        throw uploadErr;
+      }
       setProgress(95);
 
       await insertMaterial(sb, {
@@ -160,6 +175,7 @@ function UploadModal({
       setProgress(100);
       onSuccess();
     } catch (err) {
+      console.error("[materials] upload error:", err);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
       setUploading(false);
       setProgress(0);
