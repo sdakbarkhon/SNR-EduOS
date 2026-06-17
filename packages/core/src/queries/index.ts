@@ -276,7 +276,7 @@ export type StudentGradeItem = {
   title: string;
   subject: string;
   groupName: string;
-  date: string; // graded_at ?? submitted_at
+  date: string; // submitted_at (дата работы)
   grade5: number | null; // нормировано к /5 для средних
   display: string; // "4/5" или "85/100"
   comment: string | null;
@@ -286,10 +286,12 @@ type HwJoin = { title: string; content_type: string; group: { subject: string; n
 
 /** Все оценённые работы текущего ученика (RLS отдаёт только свои). */
 export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
+  // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
+  // на hosted. Дата работы = submitted_at (для seed практически совпадает).
   const fileSel =
-    "id, grade, teacher_comment, submitted_at, graded_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+    "id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
   const testSel =
-    "id, score, max_score, submitted_at, graded_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+    "id, score, max_score, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
   const [fileRes, testRes] = await Promise.all([
     db.from("homework_submissions").select(fileSel).not("grade", "is", null),
     db.from("test_submissions").select(testSel).not("score", "is", null),
@@ -297,21 +299,21 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
 
   const items: StudentGradeItem[] = [];
   for (const r of (fileRes.data ?? []) as unknown as Array<{
-    id: string; grade: number; teacher_comment: string | null; submitted_at: string; graded_at: string | null; homework: HwJoin | null;
+    id: string; grade: number; teacher_comment: string | null; submitted_at: string; homework: HwJoin | null;
   }>) {
     items.push({
       id: r.id, kind: "file",
       title: r.homework?.title ?? "",
       subject: r.homework?.group?.subject ?? "",
       groupName: r.homework?.group?.name ?? "",
-      date: r.graded_at ?? r.submitted_at,
+      date: r.submitted_at,
       grade5: r.grade,
       display: `${r.grade}/5`,
       comment: r.teacher_comment,
     });
   }
   for (const r of (testRes.data ?? []) as unknown as Array<{
-    id: string; score: number; max_score: number | null; submitted_at: string; graded_at: string | null; homework: HwJoin | null;
+    id: string; score: number; max_score: number | null; submitted_at: string; homework: HwJoin | null;
   }>) {
     const max = r.max_score ?? 0;
     items.push({
@@ -319,7 +321,7 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
       title: r.homework?.title ?? "",
       subject: r.homework?.group?.subject ?? "",
       groupName: r.homework?.group?.name ?? "",
-      date: r.graded_at ?? r.submitted_at,
+      date: r.submitted_at,
       grade5: max > 0 ? (r.score / max) * 5 : null,
       display: `${r.score}/${max || "?"}`,
       comment: null,
