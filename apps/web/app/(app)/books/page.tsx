@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getAllBooks, getMyFavoriteBookIds } from "@snr/core";
+import { getAllBooks, getMyFavoriteBookIds, getBookSignedUrl } from "@snr/core";
 import { BooksView } from "./BooksView";
 
 async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
@@ -24,11 +24,25 @@ export default async function BooksPage() {
     safe(getMyFavoriteBookIds(supabase), []),
   ]);
 
+  const coverUrls: Record<string, string> = {};
+  await Promise.all(
+    books
+      .filter((b) => b.cover_storage_path)
+      .map(async (b) => {
+        try {
+          coverUrls[b.id] = await getBookSignedUrl(supabase, b.cover_storage_path!);
+        } catch {
+          // fallback to auto-cover
+        }
+      })
+  );
+
   return (
     <BooksView
       initialBooks={books}
       initialFavoriteIds={favoriteIds}
       studentId={studentId}
+      coverUrls={coverUrls}
     />
   );
 }

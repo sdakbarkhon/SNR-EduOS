@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getAllBooks } from "@snr/core";
+import { getAllBooks, getBookSignedUrl } from "@snr/core";
 import { TeacherBooksView } from "./TeacherBooksView";
 
 async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
@@ -21,5 +21,18 @@ export default async function TeacherBooksPage() {
 
   const books = await safe(getAllBooks(supabase), []);
 
-  return <TeacherBooksView initialBooks={books} initialTeacherId={teacherId} />;
+  const coverUrls: Record<string, string> = {};
+  await Promise.all(
+    books
+      .filter((b) => b.cover_storage_path)
+      .map(async (b) => {
+        try {
+          coverUrls[b.id] = await getBookSignedUrl(supabase, b.cover_storage_path!);
+        } catch {
+          // fallback to auto-cover
+        }
+      })
+  );
+
+  return <TeacherBooksView initialBooks={books} initialTeacherId={teacherId} coverUrls={coverUrls} />;
 }

@@ -28,12 +28,14 @@ function getBookGradient(subject: string): string {
 
 function BookCard({
   book,
+  coverUrl,
   isFavorite,
   onToggleFavorite,
   onDownload,
   downloading,
 }: {
   book: Book;
+  coverUrl?: string | null;
   isFavorite: boolean;
   onToggleFavorite: (bookId: string, current: boolean) => void;
   onDownload: (bookId: string) => void;
@@ -50,9 +52,18 @@ function BookCard({
         className="relative mb-3 flex h-44 items-center justify-center overflow-hidden rounded-2xl"
         style={{ background: getBookGradient(book.subject) }}
       >
+        {/* Cover image */}
+        {coverUrl && (
+          <img
+            src={coverUrl}
+            alt={book.title}
+            className="absolute inset-0 z-0 h-full w-full object-cover"
+          />
+        )}
+
         {/* Shine overlay */}
         <div
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 z-[1]"
           style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0.08) 100%)" }}
         />
 
@@ -69,14 +80,17 @@ function BookCard({
 
         {/* Download spinner overlay */}
         {downloading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
           </div>
         )}
 
-        <span className="relative z-0 text-5xl transition-transform duration-300 group-hover:scale-110">
-          {style.emoji}
-        </span>
+        {/* Emoji fallback (no cover) */}
+        {!coverUrl && (
+          <span className="relative z-[2] text-5xl transition-transform duration-300 group-hover:scale-110">
+            {style.emoji}
+          </span>
+        )}
       </div>
 
       <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">{book.book_type}</p>
@@ -90,10 +104,12 @@ export function BooksView({
   initialBooks,
   initialFavoriteIds,
   studentId,
+  coverUrls,
 }: {
   initialBooks: Book[];
   initialFavoriteIds: string[];
   studentId: string;
+  coverUrls: Record<string, string>;
 }) {
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
@@ -222,6 +238,7 @@ export function BooksView({
             <BookCard
               key={book.id}
               book={book}
+              coverUrl={coverUrls[book.id]}
               isFavorite={favoriteIds.has(book.id)}
               onToggleFavorite={toggleFavorite}
               onDownload={handleDownload}

@@ -402,9 +402,11 @@ function UploadModal({
 export function TeacherBooksView({
   initialBooks,
   initialTeacherId,
+  coverUrls,
 }: {
   initialBooks: Book[];
   initialTeacherId: string;
+  coverUrls: Record<string, string>;
 }) {
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
@@ -523,6 +525,7 @@ export function TeacherBooksView({
               const style = getSubjectStyle(book.subject);
               const isOwn = book.uploaded_by === initialTeacherId;
               const isDeleting = deleting === book.id;
+              const coverUrl = coverUrls[book.id];
 
               return (
                 <div key={book.id} className="group relative">
@@ -531,8 +534,17 @@ export function TeacherBooksView({
                     className="relative mb-3 flex h-44 items-center justify-center overflow-hidden rounded-2xl"
                     style={{ background: `linear-gradient(135deg, ${(SUBJECT_GRADIENTS[book.subject] ?? ["#64748B","#334155"])[0]}, ${(SUBJECT_GRADIENTS[book.subject] ?? ["#64748B","#334155"])[1]})` }}
                   >
+                    {/* Cover image */}
+                    {coverUrl && (
+                      <img
+                        src={coverUrl}
+                        alt={book.title}
+                        className="absolute inset-0 z-0 h-full w-full object-cover"
+                      />
+                    )}
+
                     <div
-                      className="pointer-events-none absolute inset-0"
+                      className="pointer-events-none absolute inset-0 z-[1]"
                       style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0.08) 100%)" }}
                     />
 
@@ -567,9 +579,12 @@ export function TeacherBooksView({
                       </div>
                     )}
 
-                    <span className="relative z-0 text-5xl transition-transform duration-300 group-hover:scale-110">
-                      {style.emoji}
-                    </span>
+                    {/* Emoji fallback (no cover) */}
+                    {!coverUrl && (
+                      <span className="relative z-[2] text-5xl transition-transform duration-300 group-hover:scale-110">
+                        {style.emoji}
+                      </span>
+                    )}
                   </div>
 
                   <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">{book.book_type}</p>
