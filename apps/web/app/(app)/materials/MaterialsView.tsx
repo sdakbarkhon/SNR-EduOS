@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo } from "react";
 import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen,
@@ -69,7 +69,6 @@ function formatDate(iso: string): string {
 export function MaterialsView({ materials }: { materials: MaterialWithGroup[] }) {
   const [query, setQuery] = useState("");
   const [activeType, setActiveType] = useState<DisplayType | "all">("all");
-  const [pending, startTransition] = useTransition();
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -98,23 +97,28 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
     setTimeout(() => setToast(null), 4000);
   }
 
-  function handleOpen(mat: MaterialWithGroup) {
+  async function handleOpen(mat: MaterialWithGroup) {
     console.log("[materials] click:", { id: mat.id, storage_path: mat.storage_path, link_url: mat.link_url });
     if (!mat.storage_path && !mat.link_url) {
       showToast("У этого материала нет файла");
       return;
     }
     setOpeningId(mat.id);
-    startTransition(async () => {
+    try {
+      console.log("[materials] calling getMaterialUrl for", mat.id);
       const url = await getMaterialUrl(mat.id);
-      setOpeningId(null);
+      console.log("[materials] signed url result:", url);
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
       } else {
-        console.warn("[materials] getMaterialUrl returned null for", mat.id);
         showToast("Не удалось открыть файл");
       }
-    });
+    } catch (err) {
+      console.error("[materials] getMaterialUrl threw:", err);
+      showToast("Ошибка при открытии файла");
+    } finally {
+      setOpeningId(null);
+    }
   }
 
   return (
@@ -163,7 +167,7 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {recent.map((mat) => {
               const Icon = TYPE_ICON[mat._type];
-              const isOpening = openingId === mat.id && pending;
+              const isOpening = openingId === mat.id;
               return (
                 <button
                   key={`recent-${mat.id}`}
@@ -202,7 +206,7 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((mat) => {
             const Icon = TYPE_ICON[mat._type];
-            const isOpening = openingId === mat.id && pending;
+            const isOpening = openingId === mat.id;
             return (
               <button
                 key={mat.id}

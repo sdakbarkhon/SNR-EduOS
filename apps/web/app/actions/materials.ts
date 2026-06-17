@@ -7,8 +7,10 @@ import { getMaterialDownloadUrl } from "@snr/core";
  *  Errors are logged to the server console — silent failure on the client was
  *  hiding real Storage 404s from us. */
 export async function getMaterialUrl(materialId: string): Promise<string | null> {
+  console.log("[getMaterialUrl] called with id:", materialId);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  console.log("[getMaterialUrl] user:", user?.id ?? "none");
   if (!user) {
     console.warn("[getMaterialUrl] no auth user");
     return null;
