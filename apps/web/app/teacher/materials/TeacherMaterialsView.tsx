@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   FolderOpen, Plus, FileText, Video, FileImage, File, BookOpen,
-  Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload,
+  Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload, Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getMaterialDownloadUrl, insertMaterial, deleteMaterial } from "@snr/core";
@@ -95,7 +95,7 @@ function UploadModal({
   groups: TeacherGroup[];
   teacherId: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (info: { title: string; groupName: string }) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -173,7 +173,7 @@ function UploadModal({
       });
 
       setProgress(100);
-      onSuccess();
+      onSuccess({ title: title.trim(), groupName: selectedGroup?.name ?? groupId });
     } catch (err) {
       console.error("[materials] upload error:", err);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
@@ -320,6 +320,81 @@ function UploadModal({
   );
 }
 
+// ── Success Modal ─────────────────────────────────────────────────────
+
+function SuccessModal({
+  title,
+  groupName,
+  onClose,
+  onUploadMore,
+}: {
+  title: string;
+  groupName: string;
+  onClose: () => void;
+  onUploadMore: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm transition-opacity duration-200 ${
+        visible ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      <div
+        className={`w-full max-w-[400px] rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${
+          visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+        }`}
+      >
+        <div className="mb-5 flex justify-center">
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
+          >
+            <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+          </div>
+        </div>
+
+        <h2 className="mb-2 text-center text-2xl font-bold text-slate-900">
+          Материал загружен!
+        </h2>
+
+        <p className="mb-8 text-center text-sm text-slate-500">
+          <span className="font-medium text-slate-700">{title}</span> уже виден ученикам группы{" "}
+          <span className="font-medium text-slate-700">{groupName}</span>.
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onUploadMore}
+            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Загрузить ещё
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700"
+          >
+            Готово
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main view ─────────────────────────────────────────────────────────
 
 export function TeacherMaterialsView({
@@ -334,15 +409,20 @@ export function TeacherMaterialsView({
   const router = useRouter();
   const [materials, setMaterials] = useState(initialMaterials);
   const [showUpload, setShowUpload] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{ title: string; groupName: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [filterSubject, setFilterSubject] = useState("all");
   const [filterGroup, setFilterGroup] = useState("all");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // teacherId comes from the RSC — no client-side fetch needed.
   const teacherId = initialTeacherId;
+
+  // Sync RSC re-render data (triggered by router.refresh()) into local state.
+  useEffect(() => {
+    setMaterials(initialMaterials);
+  }, [initialMaterials]);
 
   const subjects = useMemo(() => {
     const set = new Set(materials.map((m) => m.subject ?? m.group.subject).filter(Boolean));
@@ -360,13 +440,10 @@ export function TeacherMaterialsView({
     [materials, filterSubject, filterGroup],
   );
 
-  function handleUploadSuccess() {
+  function handleUploadSuccess(info: { title: string; groupName: string }) {
     setShowUpload(false);
-    setToast("Материал загружен, ученики уже видят его в /materials");
+    setSuccessInfo(info);
     router.refresh();
-    startTransition(() => {
-      // Optimistic: refetch via router.refresh triggers RSC re-render
-    });
   }
 
   async function handleDownload(mat: MaterialWithGroup) {
@@ -405,6 +482,14 @@ export function TeacherMaterialsView({
   return (
     <>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+      {successInfo && (
+        <SuccessModal
+          title={successInfo.title}
+          groupName={successInfo.groupName}
+          onClose={() => setSuccessInfo(null)}
+          onUploadMore={() => { setSuccessInfo(null); setShowUpload(true); }}
+        />
+      )}
       {showUpload && teacherId && (
         <UploadModal
           groups={groups}
