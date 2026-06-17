@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   formatDate,
@@ -37,6 +38,7 @@ export function ScheduleView({
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("today");
   const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
   const [lessons, setLessons] = useState<Lesson[]>(initialLessons);
@@ -106,6 +108,7 @@ export function ScheduleView({
         teacher={teacherName ?? null}
         colorBar={style.color}
         status={{ variant: badge.variant, label: d.status[badge.key] }}
+        onClick={() => router.push(`/lessons/${lesson.id}`)}
       />
     );
   }

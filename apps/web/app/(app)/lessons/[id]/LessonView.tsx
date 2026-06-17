@@ -1,5 +1,6 @@
+import Link from "next/link";
 import {
-  MapPin, User as User2, Check, Clock,
+  ChevronLeft, MapPin, User as User2, Check, Clock,
   FileText, MonitorPlay, FileCode2, CircuitBoard,
 } from "lucide-react";
 
@@ -23,6 +24,15 @@ const materials = [
 export function LessonView() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
+      {/* Назад к расписанию */}
+      <Link
+        href="/schedule"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Назад к расписанию
+      </Link>
+
       {/* Hero */}
       <div className="anim-fade-up relative flex min-h-[210px] flex-col gap-8 overflow-hidden rounded-[24px] bg-gradient-to-br from-[#1E40AF] via-[#4338CA] to-[#7C3AED] p-8 text-white shadow-2xl md:flex-row">
         <div className="relative z-10 flex flex-1 flex-col justify-between">
