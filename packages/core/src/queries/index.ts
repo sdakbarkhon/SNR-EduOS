@@ -532,19 +532,20 @@ export const getGroupStudents = (db: Db, groupId: string) =>
     .then((rows) => (rows as unknown as { student: { id: string; full_name: string; avatar_url: string | null; status: string } }[]).map((r) => r.student));
 
 /** Выставить оценку / комментарий за сдачу ДЗ. */
-export const gradeSubmission = (
+export const gradeSubmission = async (
   db: Db,
   {
     submissionId,
     grade,
     comment,
   }: { submissionId: string; grade: number; comment: string },
-) =>
-  db
+): Promise<void> => {
+  const { error } = await db
     .from("homework_submissions")
     .update({ grade, teacher_comment: comment, status: "graded" })
-    .eq("id", submissionId)
-    .then(unwrap);
+    .eq("id", submissionId);
+  if (error) throw error;
+};
 
 /** Создать ДЗ (file или test). Returns created homework record. */
 export const createTeacherHomework = async (

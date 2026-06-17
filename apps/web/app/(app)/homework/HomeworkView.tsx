@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, ChevronDown, Search, X } from "lucide-react";
 import {
   getDictionary,
   getHomeworkWithSubmissions,
@@ -21,30 +21,32 @@ import { SubjectIcon, useLocale } from "@/components";
 import { HomeworkStatsDonut } from "./HomeworkStatsDonut";
 import { DailyTipCard } from "./DailyTipCard";
 
+type SortMode = "deadline" | "created";
+
 function getDeadlineColor(dueDate: string | null): string {
   const u = deadlineUrgency(dueDate);
   if (u === "overdue") return "text-rose-500";
   if (u === "soon") return "text-amber-500";
-  return "text-slate-600";
+  return "text-slate-500";
 }
 
 function TypeBadge({ contentType, locale }: { contentType: ContentType; locale: Locale }) {
   const d = getDictionary(locale);
   if (contentType === "test") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700 whitespace-nowrap">
         ✦ {d.homework.typeTest}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 whitespace-nowrap">
       ⬇ {d.homework.typeFile}
     </span>
   );
 }
 
-function HomeworkListCard({ hw, showSource }: { hw: HomeworkWithSubmission; showSource: boolean }) {
+function HomeworkListCard({ hw }: { hw: HomeworkWithSubmission }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const subj = hw.group.subject;
@@ -52,227 +54,314 @@ function HomeworkListCard({ hw, showSource }: { hw: HomeworkWithSubmission; show
   const deadlineColor = getDeadlineColor(hw.due_date);
 
   const dueLabel = hw.due_date
-    ? "до " +
-      new Date(hw.due_date).toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "long",
-      })
+    ? "до " + new Date(hw.due_date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
     : null;
 
   return (
-    <div className="group rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_40px_0_rgba(31,38,135,0.1)] p-5 flex flex-col sm:flex-row gap-5 items-start sm:items-center justify-between">
-      <div className="flex items-start gap-4">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-          style={{ backgroundColor: `${style.color}1A` }}
-        >
-          <SubjectIcon subject={subj} size={28} />
+    <div className="group rounded-[16px] border border-white/80 bg-white/70 shadow-[0_4px_16px_0_rgba(31,38,135,0.05)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_0_rgba(31,38,135,0.09)] px-4 py-3 flex items-center gap-3">
+      {/* Icon */}
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{ backgroundColor: `${style.color}1A` }}
+      >
+        <SubjectIcon subject={subj} size={20} />
+      </div>
+
+      {/* Body */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+          <span className="text-sm font-bold text-slate-800 truncate max-w-[240px]">{hw.title}</span>
+          <TypeBadge contentType={hw.content_type} locale={locale as Locale} />
         </div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-extrabold text-slate-800 text-lg leading-tight">{subj}</h3>
-            <TypeBadge contentType={hw.content_type} locale={locale as Locale} />
-            {showSource && hw.source === "teacher" && (
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700">
-                {d.homework.sourceTeacher}
-              </span>
-            )}
-          </div>
-          <p className="text-sm font-medium text-slate-500">{hw.title}</p>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="font-medium" style={{ color: style.color }}>{style.label}</span>
+          {dueLabel && (
+            <>
+              <span className="text-slate-300">·</span>
+              <span className={cn("font-semibold", deadlineColor)}>{dueLabel}</span>
+            </>
+          )}
           {hw.description && (
-            <p className="text-xs text-slate-400 mt-1 line-clamp-1">{hw.description}</p>
+            <>
+              <span className="text-slate-300">·</span>
+              <span className="truncate max-w-[180px]">{hw.description}</span>
+            </>
           )}
         </div>
       </div>
 
-      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 shrink-0">
-        {dueLabel && (
-          <span className={cn("text-sm font-bold", deadlineColor)}>{dueLabel}</span>
-        )}
-        <Link
-          href={`/homework/${hw.id}`}
-          className="px-6 py-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-xl font-semibold text-sm transition-all shadow-sm active:scale-95"
-        >
-          {d.homework.open}
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function SleepingRobot() {
-  return (
-    <div className="relative w-20 h-20 mb-6 opacity-75">
-      <div
-        className="absolute inset-0 bg-blue-100 rounded-full animate-bounce"
-        style={{ animationDuration: "3s" }}
+      {/* Action */}
+      <Link
+        href={`/homework/${hw.id}`}
+        className="shrink-0 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg font-semibold text-xs transition-all"
       >
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-10 rounded-2xl"
-          style={{ background: "linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%)" }}
-        >
-          <div className="absolute top-3 left-2 w-3 h-1 bg-white rounded-full opacity-60" />
-          <div className="absolute top-3 right-2 w-3 h-1 bg-white rounded-full opacity-60" />
-          <span className="absolute -top-3 -right-3 text-blue-400 font-black text-base animate-pulse">
-            Z
-          </span>
-        </div>
-      </div>
+        {d.homework.open}
+      </Link>
     </div>
   );
 }
 
-function EmptyTabState({ message }: { message: string }) {
-  return (
-    <div className="rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl flex flex-col items-center justify-center py-20 px-6 text-center">
-      <SleepingRobot />
-      <h3 className="text-xl font-bold text-slate-800 mb-2">{message}</h3>
-      <p className="text-slate-500 text-sm max-w-xs">Проверь другие вкладки.</p>
-    </div>
-  );
-}
+const STATUS_COLORS: Record<HomeworkTab, string> = {
+  active:    "#2D5BFF",
+  review:    "#F5A623",
+  completed: "#2DBE7E",
+  overdue:   "#F0556B",
+};
 
 export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmission[] }) {
   const sb = createClient();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
 
-  const TABS: { key: HomeworkTab; label: string }[] = [
-    { key: "active", label: d.homework.active },
-    { key: "review", label: d.homework.onReview },
-    { key: "completed", label: d.homework.done },
-    { key: "overdue", label: d.homework.overdue },
-  ];
-
-  const EMPTY_MESSAGES: Record<HomeworkTab, string> = {
-    active: d.homework.emptyActive,
-    review: d.homework.emptyReview,
-    completed: d.homework.emptyCompleted,
-    overdue: d.homework.emptyOverdue,
-  };
-
-  const CONTENT_FILTERS: { key: ContentType | "all"; label: string }[] = [
-    { key: "all", label: d.homework.filterAll },
-    { key: "file", label: d.homework.filterFiles },
-    { key: "test", label: d.homework.filterTests },
-  ];
-
   const [rows, setRows] = useState<HomeworkWithSubmission[]>(initialRows);
-  const [tab, setTab] = useState<HomeworkTab>("active");
-  const [contentFilter, setContentFilter] = useState<ContentType | "all">("all");
+  const [tab, setTab] = useState<HomeworkTab | null>(null);
+  const [typeFilter, setTypeFilter] = useState<ContentType | "all">("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortMode>("deadline");
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const TABS: { key: HomeworkTab; label: string }[] = [
+    { key: "active",    label: d.homework.active },
+    { key: "review",    label: d.homework.onReview },
+    { key: "completed", label: d.homework.done },
+    { key: "overdue",   label: d.homework.overdue },
+  ];
 
   const counts = useMemo(() => homeworkCounts(rows), [rows]);
 
-  const filtered = useMemo(
-    () =>
-      rows.filter((r) => {
-        if (contentFilter !== "all" && r.content_type !== contentFilter) return false;
-        return homeworkCategory(r, r.submission) === tab;
-      }),
-    [rows, tab, contentFilter],
-  );
+  // unique subjects that have at least 1 homework
+  const subjectKeys = useMemo(() => {
+    const seen = new Set<string>();
+    rows.forEach((r) => seen.add(r.group.subject));
+    return Array.from(seen).sort();
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    let result = rows;
+    if (subjectFilter !== "all") result = result.filter((r) => r.group.subject === subjectFilter);
+    if (typeFilter !== "all")    result = result.filter((r) => r.content_type === typeFilter);
+    if (tab)                     result = result.filter((r) => homeworkCategory(r, r.submission) === tab);
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      result = result.filter(
+        (r) => r.title.toLowerCase().includes(q) || (r.description ?? "").toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [rows, subjectFilter, typeFilter, tab, query]);
+
+  const sorted = useMemo(() => {
+    const copy = [...filtered];
+    if (sortBy === "deadline") {
+      copy.sort((a, b) => {
+        if (!a.due_date && !b.due_date) return b.created_at.localeCompare(a.created_at);
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        const cmp = a.due_date.localeCompare(b.due_date);
+        return cmp !== 0 ? cmp : b.created_at.localeCompare(a.created_at);
+      });
+    } else {
+      copy.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    return copy;
+  }, [filtered, sortBy]);
+
+  const hasFilters = tab !== null || typeFilter !== "all" || subjectFilter !== "all" || query.trim() !== "";
+
+  function clearFilters() {
+    setTab(null);
+    setTypeFilter("all");
+    setSubjectFilter("all");
+    setQuery("");
+  }
 
   useEffect(() => {
     const channel = sb
       .channel("homework-list")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "homework" },
-        async () => { setRows(await getHomeworkWithSubmissions(sb)); },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "homework_submissions" },
-        async () => { setRows(await getHomeworkWithSubmissions(sb)); },
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "homework" },
+        async () => { setRows(await getHomeworkWithSubmissions(sb)); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "homework_submissions" },
+        async () => { setRows(await getHomeworkWithSubmissions(sb)); })
       .subscribe();
     return () => { sb.removeChannel(channel); };
   }, [sb]);
 
   return (
     <div className="mx-auto max-w-7xl">
-      <header className="mb-8">
-        <h2 className="text-blue-600 font-bold text-sm tracking-widest uppercase mb-1 drop-shadow-sm">
+      {/* Header */}
+      <header className="mb-6">
+        <h2 className="text-blue-600 font-bold text-xs tracking-widest uppercase mb-1">
           {d.homework.eyebrow}
         </h2>
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-600 text-white rounded-[14px] flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <BookOpen size={22} strokeWidth={2.5} />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-blue-600 text-white rounded-[12px] flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <BookOpen size={18} strokeWidth={2.5} />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight drop-shadow-sm">
-            {d.nav.homework}
-          </h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">{d.nav.homework}</h1>
         </div>
       </header>
 
-      {/* Content-type pills */}
-      <div className="flex items-center gap-2 mb-8 select-none flex-wrap">
-        {CONTENT_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setContentFilter(f.key)}
-            className={cn(
-              "px-5 py-2 rounded-full font-semibold text-sm transition-all duration-200",
-              contentFilter === f.key
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
-                : "bg-white/60 text-slate-500 hover:bg-white hover:text-slate-700 border border-white/80",
-            )}
-          >
-            {f.label}
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск по названию или описанию…"
+          className="w-full pl-9 pr-9 py-2.5 rounded-[14px] border border-white/80 bg-white/70 backdrop-blur-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/10"
+          style={{ boxShadow: "0 2px 12px rgba(31,38,135,0.06)" }}
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            <X size={14} />
           </button>
-        ))}
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Список заданий */}
-        <div className="lg:col-span-2 flex flex-col gap-4 min-h-[400px]">
-          {filtered.length > 0 ? (
-            filtered.map((hw) => (
-              <HomeworkListCard key={hw.id} hw={hw} showSource={contentFilter === "all"} />
-            ))
+      {/* Subject pills */}
+      <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 select-none no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setSubjectFilter("all")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold text-xs whitespace-nowrap transition-all shrink-0",
+            subjectFilter === "all"
+              ? "bg-blue-600 text-white shadow shadow-blue-500/30"
+              : "bg-white/70 text-slate-500 border border-white/80 hover:bg-white",
+          )}
+        >
+          Все предметы
+        </button>
+        {subjectKeys.map((key) => {
+          const s = getSubjectStyle(key);
+          const active = subjectFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSubjectFilter(active ? "all" : key)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold text-xs whitespace-nowrap transition-all shrink-0",
+                active
+                  ? "text-white shadow shadow-blue-500/30"
+                  : "bg-white/70 text-slate-500 border border-white/80 hover:bg-white",
+              )}
+              style={active ? { backgroundColor: s.color } : undefined}
+            >
+              <SubjectIcon subject={key} size={12} />
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Type + Sort row */}
+      <div className="flex items-center gap-2 mb-6">
+        <div className="relative">
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as ContentType | "all")}
+            className="appearance-none pl-3 pr-8 py-2 rounded-[12px] border border-white/80 bg-white/70 backdrop-blur-xl text-xs font-semibold text-slate-600 focus:outline-none cursor-pointer"
+            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+          >
+            <option value="all">Все типы</option>
+            <option value="file">{d.homework.typeFile}</option>
+            <option value="test">{d.homework.typeTest}</option>
+          </select>
+          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        </div>
+        <div className="relative ml-auto">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortMode)}
+            className="appearance-none pl-3 pr-8 py-2 rounded-[12px] border border-white/80 bg-white/70 backdrop-blur-xl text-xs font-semibold text-slate-600 focus:outline-none cursor-pointer"
+            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+          >
+            <option value="deadline">По дедлайну</option>
+            <option value="created">По дате создания</option>
+          </select>
+          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: homework list */}
+        <div className="lg:col-span-2 flex flex-col gap-2 min-h-[200px]">
+          {sorted.length > 0 ? (
+            sorted.map((hw) => <HomeworkListCard key={hw.id} hw={hw} />)
           ) : (
-            <EmptyTabState message={EMPTY_MESSAGES[tab]} />
+            <div className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl flex flex-col items-center justify-center py-16 px-6 text-center"
+              style={{ boxShadow: "0 4px 24px rgba(31,38,135,0.05)" }}>
+              <div className="text-4xl mb-3">📋</div>
+              <p className="text-slate-600 font-semibold mb-1">Заданий не найдено</p>
+              <p className="text-slate-400 text-sm mb-4">Попробуй изменить фильтры</p>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Очистить фильтры
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Правая колонка */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
+        {/* Right column */}
+        <div className="lg:col-span-1 flex flex-col gap-4">
+          {/* Stats donut */}
           <HomeworkStatsDonut
             counts={counts}
             statsLabel={d.homework.statsTitle}
             totalLabel={d.homework.statsTotal}
           />
 
-          {/* Статусные табы (вертикально) */}
-          <div className="rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl p-4 flex flex-col gap-1">
-            {TABS.map((t) => {
-              const count = counts[t.key];
-              const isActive = tab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 w-full text-left",
-                    isActive
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-50",
-                  )}
-                >
-                  <span>{t.label}</span>
-                  <span
+          {/* Status filter */}
+          <div
+            className="rounded-[20px] border border-dashed border-slate-200 bg-white/60 backdrop-blur-xl p-4"
+            style={{ boxShadow: "0 2px 12px rgba(31,38,135,0.04)" }}
+          >
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+              Фильтр по статусу
+            </p>
+            <div className="flex flex-col gap-1">
+              {TABS.map((t) => {
+                const count = counts[t.key];
+                const isActive = tab === t.key;
+                const color = STATUS_COLORS[t.key];
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setTab(isActive ? null : t.key)}
                     className={cn(
-                      "text-xs font-bold px-2 py-0.5 rounded-full",
-                      isActive ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400",
+                      "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all w-full text-left",
+                      isActive
+                        ? "bg-brand-blue text-white"
+                        : "text-slate-600 hover:bg-slate-50",
                     )}
                   >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: isActive ? "rgba(255,255,255,0.7)" : color }}
+                    />
+                    <span className="flex-1">{t.label}</span>
+                    <span
+                      className={cn(
+                        "text-xs font-bold px-1.5 py-0.5 rounded-full",
+                        isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500",
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <DailyTipCard tipLabel={d.homework.tipTitle} />
