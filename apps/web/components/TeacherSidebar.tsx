@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookOpen, Award, Users, Settings, LogOut, CheckCircle } from "lucide-react";
+import { Home, BookOpen, Award, FolderOpen, Users, Settings, LogOut, CheckCircle } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -10,11 +10,12 @@ import { useLocale } from "./LocaleProvider";
 import { signOut } from "@/app/actions/auth";
 
 const teacherNavItems = [
-  { key: "home", href: "/teacher/dashboard", icon: Home, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
-  { key: "homework", href: "/teacher/homework", icon: BookOpen, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
-  { key: "grades", href: "/teacher/grades", icon: Award, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
-  { key: "groups", href: "/teacher/groups", icon: Users, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
-  { key: "profile", href: "/teacher/profile", icon: Settings, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
+  { key: "home",      href: "/teacher/dashboard", icon: Home,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
+  { key: "homework",  href: "/teacher/homework",  icon: BookOpen,   label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
+  { key: "grades",    href: "/teacher/grades",    icon: Award,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
+  { key: "materials", href: "/teacher/materials", icon: FolderOpen, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navMaterials },
+  { key: "groups",    href: "/teacher/groups",    icon: Users,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
+  { key: "profile",   href: "/teacher/profile",   icon: Settings,   label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
 ];
 
 export function TeacherSidebar() {

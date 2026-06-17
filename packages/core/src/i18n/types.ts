@@ -184,11 +184,28 @@ export interface Dictionary {
     logout: string;
     edit: string;
   };
+  materials: {
+    title: string;
+    searchPlaceholder: string;
+    filterAll: string;
+    filterPdf: string;
+    filterVideo: string;
+    filterPresentation: string;
+    filterBook: string;
+    filterLink: string;
+    recentTitle: string;
+    emptyTitle: string;
+    emptyDesc: string;
+    openFile: string;
+    showMore: string;
+    noAccess: string;
+  };
   teacher: {
     role: string;
     navHome: string;
     navHomework: string;
     navGrades: string;
+    navMaterials: string;
     navGroups: string;
     navProfile: string;
     kpiGroups: string;
@@ -267,5 +284,26 @@ export interface Dictionary {
     profileTitle: string;
     profileSubjects: string;
     profileGroups: string;
+    materialsTitle: string;
+    materialsUploadBtn: string;
+    materialsEmpty: string;
+    materialsUploadTitle: string;
+    materialsName: string;
+    materialsDesc: string;
+    materialsSubject: string;
+    materialsGroup: string;
+    materialsLesson: string;
+    materialsFile: string;
+    materialsDragDrop: string;
+    materialsMaxSize: string;
+    materialsUploading: string;
+    materialsSuccess: string;
+    materialsDeleteConfirm: string;
+    materialsDeleting: string;
+    materialsDownload: string;
+    materialsDelete: string;
+    materialsLessonOptional: string;
+    materialsAllGroups: string;
+    materialsAllSubjects: string;
   };
 }

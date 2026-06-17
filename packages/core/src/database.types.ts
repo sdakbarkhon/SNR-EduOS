@@ -7,31 +7,6 @@
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       announcements: {
@@ -150,33 +125,51 @@ export type Database = {
       course_materials: {
         Row: {
           created_at: string
+          description: string | null
+          file_size_bytes: number | null
+          file_type: string | null
           file_url: string | null
           group_id: string
           id: string
           lesson_id: string | null
           link_url: string | null
+          storage_path: string | null
+          subject: string | null
           title: string
           type: string | null
+          uploaded_by: string | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
           file_url?: string | null
           group_id: string
           id?: string
           lesson_id?: string | null
           link_url?: string | null
+          storage_path?: string | null
+          subject?: string | null
           title: string
           type?: string | null
+          uploaded_by?: string | null
         }
         Update: {
           created_at?: string
+          description?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
           file_url?: string | null
           group_id?: string
           id?: string
           lesson_id?: string | null
           link_url?: string | null
+          storage_path?: string | null
+          subject?: string | null
           title?: string
           type?: string | null
+          uploaded_by?: string | null
         }
         Relationships: [
           {
@@ -191,6 +184,13 @@ export type Database = {
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_materials_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
         ]
@@ -1009,9 +1009,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       attendance_status: ["present", "absent", "late"],

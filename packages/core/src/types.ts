@@ -192,10 +192,20 @@ export type CourseMaterial = {
   group_id: string;
   lesson_id: string | null;
   title: string;
-  type: string | null;
+  type: string | null;            // legacy: 'pdf' | 'video' | 'presentation' | ...
   file_url: string | null;
   link_url: string | null;
+  description: string | null;
+  subject: string | null;
+  file_type: string | null;       // MIME type from Storage uploads
+  storage_path: string | null;    // path inside the 'materials' bucket
+  file_size_bytes: number | null;
+  uploaded_by: string | null;
   created_at: string;
+};
+
+export type MaterialWithGroup = CourseMaterial & {
+  group: { name: string; subject: string };
 };
 
 export type Message = {

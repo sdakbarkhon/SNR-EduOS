@@ -873,3 +873,51 @@ insert into public.homework_submissions (homework_id, student_id, answer_text, s
   ('e1c10001-0000-0000-0000-000000000000','a1111111-1111-1111-1111-111111111111',
    'x = 42 (int), name = "Alice" (str), pi = 3.14 (float), active = True (bool), items = [1,2,3] (list). Used type() to verify.',
    'submitted', null, null);
+
+-- =====================================================================
+-- МАТЕРИАЛЫ — migration 20: filled records with uploaded_by + subject
+-- =====================================================================
+
+-- Set uploaded_by for all existing materials based on group's teacher
+update public.course_materials cm
+set uploaded_by = g.teacher_id
+from public.groups g
+where g.id = cm.group_id
+  and cm.uploaded_by is null
+  and g.teacher_id is not null;
+
+-- New materials with explicit IDs, storage_path (for RLS tests + demo)
+-- Note: actual files not uploaded; storage_path is a valid path format.
+-- Teachers upload real files through the /teacher/materials UI.
+insert into public.course_materials
+  (id, group_id, title, description, subject, file_type, storage_path, file_size_bytes, uploaded_by, type)
+values
+  -- Ivan's material for Robotics 7A (a0 — Adilbek's group)
+  ('ea000001-0000-0000-0000-000000000000','a0000000-0000-0000-0000-000000000000',
+   'Lab 3: Ultrasonic Sensors',
+   'Connecting HC-SR04 to Arduino and measuring distance.',
+   'robotics','application/pdf',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/a0000000-0000-0000-0000-000000000000/ea000001-0000-0000-0000-000000000000/lab3_sensors.pdf',
+   245760,'cccccccc-cccc-cccc-cccc-cccccccccccc','pdf'),
+  -- Ivan's material for Math 7A (c0 — Adilbek's group)
+  ('ea000002-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000000',
+   'Quadratic Equations Cheatsheet',
+   'All formulas for solving quadratic equations.',
+   'math','application/pdf',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/c0000000-0000-0000-0000-000000000000/ea000002-0000-0000-0000-000000000000/quadratic_cheatsheet.pdf',
+   102400,'cccccccc-cccc-cccc-cccc-cccccccccccc','pdf'),
+  -- Ahmad's material for Informatics 7A (e0 — Adilbek's group)
+  ('ea000003-0000-0000-0000-000000000000','e0000000-0000-0000-0000-000000000000',
+   'Python Quick Reference',
+   'Core Python 3 syntax: loops, functions, lists, dicts.',
+   'informatics','application/pdf',
+   'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/e0000000-0000-0000-0000-000000000000/ea000003-0000-0000-0000-000000000000/python_quick_ref.pdf',
+   307200,'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','pdf'),
+  -- Ivan's material for Math 9B (b0 — Dilnoza's group ONLY, not Adilbek)
+  ('eb000001-0000-0000-0000-000000000000','b0000000-0000-0000-0000-000000000000',
+   'Integration Formulas Table',
+   'Complete table of indefinite integral formulas.',
+   'math','application/pdf',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/b0000000-0000-0000-0000-000000000000/eb000001-0000-0000-0000-000000000000/integration_table.pdf',
+   184320,'cccccccc-cccc-cccc-cccc-cccccccccccc','pdf')
+on conflict (id) do nothing;

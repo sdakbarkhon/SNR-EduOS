@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(54);
+select plan(59);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -31,6 +31,25 @@ select ok((select count(*) > 0 from public.homework),            'A: видит 
 select ok((select count(*) > 0 from public.homework_submissions),'A: видит свои сдачи ДЗ');
 select ok((select count(*) > 0 from public.grades),              'A: видит свои оценки');
 select ok((select count(*) > 0 from public.course_materials),    'A: видит материалы своих групп');
+-- Материалы: конкретные проверки RLS
+select ok(
+  (select count(*) > 0 from public.course_materials
+   where id = 'ea000001-0000-0000-0000-000000000000'),
+  'A: видит материал ea000001 (в своей группе a0)'
+);
+select is(
+  (select count(*)::int from public.course_materials
+   where id = 'eb000001-0000-0000-0000-000000000000'),
+  0,
+  'A НЕ видит материал eb000001 (группа b0 — только Dilnoza)'
+);
+select throws_ok(
+  $$ insert into public.course_materials (group_id, title, type, uploaded_by)
+     values ('b0000000-0000-0000-0000-000000000000',
+             'HACK', 'pdf', 'a1111111-1111-1111-1111-111111111111') $$,
+  '42501', NULL,
+  'A не может добавить материал (нет RLS INSERT-политики для ученика)'
+);
 select ok((select count(*) > 0 from public.payments),            'A: видит свои платежи');
 select ok((select count(*) > 0 from public.charges),             'A: видит свои списания');
 select ok((select count(*) > 0 from public.announcements),       'A: видит объявления');
@@ -189,6 +208,33 @@ select lives_ok(
   $$ delete from public.homework where title = 'TEST-INSERT by teacher'
      and teacher_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$,
   'T: может удалить своё ДЗ'
+);
+
+-- Материалы: учитель может добавить в свою группу
+select lives_ok(
+  $$ insert into public.course_materials
+       (group_id, title, type, storage_path, uploaded_by)
+     values
+       ('a0000000-0000-0000-0000-000000000000',
+        'TEST-MATERIAL by teacher', 'pdf',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc/a0000000-0000-0000-0000-000000000000/test-id/test.pdf',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc')
+  $$,
+  'T: может добавить материал в свою группу (a0)'
+);
+
+-- Материалы: учитель НЕ может добавить в чужую группу
+select throws_ok(
+  $$ insert into public.course_materials
+       (group_id, title, type, storage_path, uploaded_by)
+     values
+       ('d0000000-0000-0000-0000-000000000000',
+        'HACK-MATERIAL', 'pdf',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc/d0000000-0000-0000-0000-000000000000/test-id/hack.pdf',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc')
+  $$,
+  '42501', NULL,
+  'T НЕ может добавить материал в чужую группу (d0 — Elena, 42501)'
 );
 
 -- Регрессия: student A после teacher-сессии всё ещё изолирован

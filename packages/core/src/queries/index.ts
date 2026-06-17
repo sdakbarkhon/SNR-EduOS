@@ -159,6 +159,60 @@ export const uploadHomeworkFile = async (
   return path;
 };
 
+// --- Материалы --------------------------------------------------------
+
+/** Материалы, доступные текущему пользователю (RLS фильтрует по группам). */
+export const getMaterials = (db: Db) =>
+  db
+    .from("course_materials")
+    .select("*, group:groups!inner(name, subject)")
+    .order("created_at", { ascending: false })
+    .then(unwrap)
+    .then((rows) => rows as unknown as import("../types").MaterialWithGroup[]);
+
+/** Signed URL на 1 час для скачивания файла из bucket 'materials'. */
+export const getMaterialDownloadUrl = (db: Db, storagePath: string) =>
+  db.storage
+    .from("materials")
+    .createSignedUrl(storagePath, 3600)
+    .then(({ data, error }) => {
+      if (error) throw error;
+      return data!.signedUrl;
+    });
+
+/** Вставляет запись в course_materials после загрузки файла в Storage. */
+export const insertMaterial = async (
+  db: Db,
+  input: {
+    group_id: string;
+    title: string;
+    description: string | null;
+    subject: string;
+    lesson_id: string | null;
+    file_type: string;
+    storage_path: string;
+    file_size_bytes: number;
+    uploaded_by: string;
+    type: string;
+  },
+) => {
+  const { error } = await db.from("course_materials").insert(input);
+  if (error) throw error;
+};
+
+/** Удаляет материал из БД и Storage. */
+export const deleteMaterial = async (
+  db: Db,
+  materialId: string,
+  storagePath: string | null,
+) => {
+  if (storagePath) {
+    await db.storage.from("materials").remove([storagePath]);
+  }
+  const { error } = await db.from("course_materials").delete().eq("id", materialId);
+  if (error) throw error;
+};
+
 /** Signed URL на 1 час для скачивания файла из homework-submissions. */
 export const getHomeworkFileUrl = (db: Db, path: string) =>
   db.storage
@@ -190,10 +244,6 @@ export const submitHomework = (db: Db, input: SubmissionInput) =>
 // --- Оценки ---
 export const getGrades = (db: Db) =>
   db.from("grades").select("*").order("graded_at", { ascending: false }).then(unwrap);
-
-// --- Материалы ---
-export const getMaterials = (db: Db) =>
-  db.from("course_materials").select("*").order("created_at", { ascending: false }).then(unwrap);
 
 // --- Оплаты / списания ---
 export const getPayments = (db: Db) =>
