@@ -58,14 +58,26 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   async function save(status: "draft" | "published") {
     if (!title.trim()) { setError("Введите название"); return; }
     if (!groupId) { setError("Выберите группу"); return; }
+    if (!deadline) { setError("Укажите дедлайн"); return; }
+
+    // teacherId may be "" if getMyTeacher failed at page load — fetch from auth as fallback
+    let resolvedTeacherId = teacherId;
+    if (!resolvedTeacherId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setError("Нет активной сессии — войдите снова"); return; }
+      const { data: t } = await supabase.from("teachers").select("id").eq("user_id", user.id).single();
+      if (!t) { setError("Профиль учителя не найден"); return; }
+      resolvedTeacherId = (t as { id: string }).id;
+    }
+
     setSaving(true);
     setError(null);
     try {
       const hw = await createTeacherHomework(supabase, {
         groupId, title: title.trim(), description: description.trim(),
-        dueDate: deadline || new Date(Date.now() + 7 * 86400000).toISOString(),
+        dueDate: deadline,
         contentType: format === "test" ? "test" : "file",
-        teacherId, status,
+        teacherId: resolvedTeacherId, status,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({

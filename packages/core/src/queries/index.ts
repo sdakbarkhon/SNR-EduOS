@@ -240,9 +240,13 @@ export const getTestSubmission = async (db: Db, homeworkId: string): Promise<Tes
 
 // ─── TEACHER QUERIES ─────────────────────────────────────────────────────────
 
-/** Профиль учителя (текущего). */
-export const getMyTeacher = (db: Db) =>
-  db.from("teachers").select("*").single().then(unwrap);
+/** Профиль учителя (текущего). Фильтрует по user_id сессии, чтобы .single()
+ *  не ломался когда "auth reads teachers" USING(true) делает все строки видимыми. */
+export const getMyTeacher = async (db: Db) => {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  return db.from("teachers").select("*").eq("user_id", user.id).single().then(unwrap);
+};
 
 /** Группы учителя (текущего). */
 export const getTeacherGroups = (db: Db) =>
