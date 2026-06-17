@@ -170,11 +170,16 @@ export const getMaterials = (db: Db) =>
     .then(unwrap)
     .then((rows) => rows as unknown as import("../types").MaterialWithGroup[]);
 
-/** Signed URL на 1 час для скачивания файла из bucket 'materials'. */
-export const getMaterialDownloadUrl = (db: Db, storagePath: string) =>
+/** Signed URL на 1 час. Если передан downloadAs — URL принудительно скачивает
+ *  файл (Supabase ставит Content-Disposition: attachment с этим именем). */
+export const getMaterialDownloadUrl = (
+  db: Db,
+  storagePath: string,
+  downloadAs?: string,
+) =>
   db.storage
     .from("materials")
-    .createSignedUrl(storagePath, 3600)
+    .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined)
     .then(({ data, error }) => {
       if (error) throw error;
       return data!.signedUrl;

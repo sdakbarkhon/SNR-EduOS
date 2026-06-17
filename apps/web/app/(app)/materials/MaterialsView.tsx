@@ -108,14 +108,25 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
       console.log("[materials] calling getMaterialUrl for", mat.id);
       const url = await getMaterialUrl(mat.id);
       console.log("[materials] signed url result:", url);
-      if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
-      } else {
+      if (!url) {
         showToast("Не удалось открыть файл");
+        return;
       }
+      // Trigger a download via a programmatic <a download> click — avoids
+      // popup blocker and forces save instead of inline PDF render. The
+      // signed URL already carries Content-Disposition: attachment with
+      // the filename (see getMaterialDownloadUrl).
+      const filename = mat.storage_path?.split("/").pop() || mat.title || "material";
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error("[materials] getMaterialUrl threw:", err);
-      showToast("Ошибка при открытии файла");
+      showToast("Ошибка при скачивании файла");
     } finally {
       setOpeningId(null);
     }

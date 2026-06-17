@@ -38,7 +38,10 @@ export async function getMaterialUrl(materialId: string): Promise<string | null>
   }
 
   try {
-    return await getMaterialDownloadUrl(supabase, data.storage_path as string);
+    // Force download with proper filename instead of inline-rendering the PDF.
+    const path = data.storage_path as string;
+    const filename = path.split("/").pop() || "material";
+    return await getMaterialDownloadUrl(supabase, path, filename);
   } catch (e) {
     console.error("[getMaterialUrl] createSignedUrl failed for", data.storage_path, e);
     return null;
