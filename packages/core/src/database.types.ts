@@ -9,6 +9,92 @@
 export type Database = {
   public: {
     Tables: {
+      book_favorites: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_favorites_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_favorites_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      books: {
+        Row: {
+          author: string | null
+          book_type: string
+          cover_storage_path: string | null
+          created_at: string
+          description: string | null
+          file_size_bytes: number | null
+          file_storage_path: string
+          id: string
+          subject: string
+          title: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          author?: string | null
+          book_type?: string
+          cover_storage_path?: string | null
+          created_at?: string
+          description?: string | null
+          file_size_bytes?: number | null
+          file_storage_path: string
+          id?: string
+          subject: string
+          title: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          author?: string | null
+          book_type?: string
+          cover_storage_path?: string | null
+          created_at?: string
+          description?: string | null
+          file_size_bytes?: number | null
+          file_storage_path?: string
+          id?: string
+          subject?: string
+          title?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "books_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           body: string

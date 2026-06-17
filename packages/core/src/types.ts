@@ -253,3 +253,26 @@ export type Charge = {
   charged_at: string;
   note: string | null;
 };
+
+export type BookType = 'Учебник' | 'Конспект' | 'Сборник' | 'Справочник';
+
+export type Book = {
+  id: string;
+  title: string;
+  author: string | null;
+  subject: string;
+  book_type: BookType;
+  description: string | null;
+  cover_storage_path: string | null;
+  file_storage_path: string;
+  file_size_bytes: number | null;
+  uploaded_by: string | null;
+  created_at: string;
+};
+
+export type BookFavorite = {
+  id: string;
+  student_id: string;
+  book_id: string;
+  created_at: string;
+};

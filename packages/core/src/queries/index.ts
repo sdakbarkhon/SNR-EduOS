@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceWithLesson, ContentType, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
+import type { AttendanceWithLesson, Book, BookFavorite, ContentType, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -704,4 +704,89 @@ export const submitTest = async (
   }
 
   return sub as unknown as TestSubmission;
+};
+
+// ─── BOOKS ───────────────────────────────────────────────────────────────────
+
+/** Все книги библиотеки (видны всем authenticated — RLS using(true)). */
+export const getAllBooks = async (db: Db): Promise<Book[]> => {
+  const { data, error } = await db
+    .from("books")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Book[];
+};
+
+/** ID книг в избранном текущего ученика. */
+export const getMyFavoriteBookIds = async (db: Db): Promise<string[]> => {
+  const { data, error } = await db.from("book_favorites").select("book_id");
+  if (error) throw error;
+  return (data ?? []).map((r: { book_id: string }) => r.book_id);
+};
+
+/** Добавить книгу в избранное (student_id = current_student_id() через RLS). */
+export const addBookFavorite = async (db: Db, bookId: string, studentId: string): Promise<void> => {
+  const { error } = await db
+    .from("book_favorites")
+    .insert({ book_id: bookId, student_id: studentId });
+  if (error) throw error;
+};
+
+/** Удалить книгу из избранного. */
+export const removeBookFavorite = async (db: Db, bookId: string, studentId: string): Promise<void> => {
+  const { error } = await db
+    .from("book_favorites")
+    .delete()
+    .eq("book_id", bookId)
+    .eq("student_id", studentId);
+  if (error) throw error;
+};
+
+/** Вставить книгу в БД. */
+export const insertBook = async (
+  db: Db,
+  input: {
+    title: string;
+    author: string | null;
+    subject: string;
+    book_type: string;
+    description: string | null;
+    cover_storage_path: string | null;
+    file_storage_path: string;
+    file_size_bytes: number;
+    uploaded_by: string;
+  },
+): Promise<Book> => {
+  const { data, error } = await db
+    .from("books")
+    .insert(input)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as unknown as Book;
+};
+
+/** Signed URL для скачивания книги (1 час). */
+export const getBookSignedUrl = async (
+  db: Db,
+  storagePath: string,
+  downloadAs?: string,
+): Promise<string> => {
+  const { data, error } = await db.storage
+    .from("books")
+    .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
+/** Книги текущего учителя (для /teacher/books). */
+export const getTeacherBooks = async (db: Db, teacherId: string): Promise<Book[]> => {
+  const { data, error } = await db
+    .from("books")
+    .select("*")
+    .eq("uploaded_by", teacherId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Book[];
 };

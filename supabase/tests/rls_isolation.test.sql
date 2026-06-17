@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(59);
+select plan(72);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -50,6 +50,46 @@ select throws_ok(
   '42501', NULL,
   'A не может добавить материал (нет RLS INSERT-политики для ученика)'
 );
+-- Книги: A видит все книги школы
+select ok((select count(*) > 0 from public.books),
+          'A: видит книги библиотеки (видны всем authenticated)');
+-- Избранное: у A изначально нет
+select is((select count(*)::int from public.book_favorites), 0,
+          'A: нет избранных книг изначально');
+-- A может добавить в избранное
+select lives_ok(
+  $$ insert into public.book_favorites (student_id, book_id)
+     values ('a1111111-1111-1111-1111-111111111111',
+             'fa000001-0000-0000-0000-000000000000') $$,
+  'A: может добавить книгу в избранное'
+);
+-- После добавления видит 1 запись
+select is((select count(*)::int from public.book_favorites), 1,
+          'A: видит своё избранное (1 книга)');
+-- A может удалить из избранного
+select lives_ok(
+  $$ delete from public.book_favorites
+     where student_id = 'a1111111-1111-1111-1111-111111111111'
+       and book_id    = 'fa000001-0000-0000-0000-000000000000' $$,
+  'A: может удалить книгу из избранного'
+);
+-- A не может добавить избранное за B (RLS 42501)
+select throws_ok(
+  $$ insert into public.book_favorites (student_id, book_id)
+     values ('b2222222-2222-2222-2222-222222222222',
+             'fa000001-0000-0000-0000-000000000000') $$,
+  '42501', NULL,
+  'A не может добавить избранное за B (RLS 42501)'
+);
+-- A не может INSERT книгу (нет политики INSERT для студентов)
+select throws_ok(
+  $$ insert into public.books (title, subject, file_storage_path, uploaded_by)
+     values ('HACK-BOOK', 'math', 'a111.../hack.pdf',
+             'a1111111-1111-1111-1111-111111111111') $$,
+  '42501', NULL,
+  'A не может добавить книгу в библиотеку (нет INSERT для студента)'
+);
+
 select ok((select count(*) > 0 from public.payments),            'A: видит свои платежи');
 select ok((select count(*) > 0 from public.charges),             'A: видит свои списания');
 select ok((select count(*) > 0 from public.announcements),       'A: видит объявления');
@@ -127,6 +167,12 @@ select is((select count(*)::int from public.payments
 select is((select count(*)::int from public.test_submissions
            where student_id = 'a1111111-1111-1111-1111-111111111111'), 0,
           'B НЕ видит сдачи тестов A');
+-- Книги: B видит всю библиотеку
+select ok((select count(*) > 0 from public.books),
+          'B: видит книги библиотеки (видны всем authenticated)');
+-- Книги: B не видит favorites A (изоляция; A удалила своё выше)
+select is((select count(*)::int from public.book_favorites), 0,
+          'B: не видит favorites A — изоляция book_favorites');
 
 -- ============ УЧИТЕЛЬ (teacher_ivan) — изоляция и права ============
 reset role;
@@ -237,6 +283,24 @@ select throws_ok(
   'T НЕ может добавить материал в чужую группу (d0 — Elena, 42501)'
 );
 
+-- Книги: учитель видит всю библиотеку (включая книги других учителей)
+select ok((select count(*) > 0 from public.books),
+          'T: видит все книги библиотеки');
+-- Книги: учитель может добавить книгу (uploaded_by = current_teacher_id())
+select lives_ok(
+  $$ insert into public.books (title, subject, file_storage_path, uploaded_by)
+     values ('TEST-BOOK by Ivan', 'math',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc/test-book-id/test.pdf',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  'T: может добавить книгу в библиотеку'
+);
+-- Книги: учитель может удалить свою книгу
+select lives_ok(
+  $$ delete from public.books where title = 'TEST-BOOK by Ivan'
+     and uploaded_by = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$,
+  'T: может удалить свою книгу'
+);
+
 -- Регрессия: student A после teacher-сессии всё ещё изолирован
 reset role;
 select set_config(
@@ -261,6 +325,7 @@ set local role anon;
 select is((select count(*)::int from public.attendance), 0, 'anon: 0 посещаемости');
 select is((select count(*)::int from public.grades), 0, 'anon: 0 оценок');
 select is((select count(*)::int from public.payments), 0, 'anon: 0 платежей');
+select is((select count(*)::int from public.books), 0, 'anon: 0 книг (нет политики для anon)');
 
 select * from finish();
 rollback;

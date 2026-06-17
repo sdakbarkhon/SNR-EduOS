@@ -921,3 +921,55 @@ values
    'cccccccc-cccc-cccc-cccc-cccccccccccc/b0000000-0000-0000-0000-000000000000/eb000001-0000-0000-0000-000000000000/integration_table.pdf',
    184320,'cccccccc-cccc-cccc-cccc-cccccccccccc','pdf')
 on conflict (id) do nothing;
+
+-- =====================================================================
+-- BOOKS (migration 21 seed) — file_storage_path is a dummy placeholder;
+-- no real file exists in Storage. cover_storage_path intentionally NULL.
+-- uploaded_by = teacher_ivan (cccccccc-cccc-cccc-cccc-cccccccccccc)
+-- =====================================================================
+
+insert into public.books
+  (id, title, author, subject, book_type, description,
+   file_storage_path, file_size_bytes, uploaded_by)
+values
+  ('fa000001-0000-0000-0000-000000000000',
+   'Algebra Grade 7', 'I.F. Sharygin',
+   'math', 'Учебник',
+   'Core textbook for algebra and equations, grade 7.',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/fa000001-0000-0000-0000-000000000000/algebra_7.pdf',
+   8388608,
+   'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+
+  ('fa000002-0000-0000-0000-000000000000',
+   'Physics: Molecular Physics', 'A.V. Savchenko',
+   'physics', 'Конспект',
+   'Lecture notes on molecular physics and thermodynamics.',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/fa000002-0000-0000-0000-000000000000/physics_molecular.pdf',
+   4194304,
+   'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+
+  ('fa000003-0000-0000-0000-000000000000',
+   'Python Programming', 'Mark Lutz',
+   'programming', 'Учебник',
+   'Comprehensive introduction to Python programming language.',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/fa000003-0000-0000-0000-000000000000/python_programming.pdf',
+   12582912,
+   'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+
+  ('fa000004-0000-0000-0000-000000000000',
+   'Robotics for Beginners', 'D.E. Zimin',
+   'robotics', 'Справочник',
+   'Quick reference guide for robotics components and circuits.',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/fa000004-0000-0000-0000-000000000000/robotics_reference.pdf',
+   6291456,
+   'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+
+  ('fa000005-0000-0000-0000-000000000000',
+   'English Grammar Reference', 'Raymond Murphy',
+   'english', 'Справочник',
+   'Essential English grammar reference for intermediate students.',
+   'cccccccc-cccc-cccc-cccc-cccccccccccc/fa000005-0000-0000-0000-000000000000/english_grammar.pdf',
+   5242880,
+   'cccccccc-cccc-cccc-cccc-cccccccccccc')
+
+on conflict (id) do nothing;
