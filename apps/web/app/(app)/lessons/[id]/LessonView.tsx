@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, Clock, type LucideIcon } from "lucide-react";
+import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, Clock, XCircle, type LucideIcon } from "lucide-react";
 import type { StudentLessonView, LessonStagePublic, StageKey } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
 
@@ -43,12 +43,96 @@ function fmtBytes(b: number | null): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// ── Time-based access control ─────────────────────────────────────────────────
+type AccessResult =
+  | { state: "ok" }
+  | { state: "too_early"; startsAt: Date }
+  | { state: "too_late" };
+
+function computeAccess(lesson: Pick<StudentLessonView, "status" | "starts_at" | "ends_at">): AccessResult {
+  if (lesson.status === "completed") return { state: "ok" };
+  const now = new Date();
+  const startsAt = new Date(lesson.starts_at);
+  const endsAt = lesson.ends_at
+    ? new Date(lesson.ends_at)
+    : new Date(startsAt.getTime() + 90 * 60 * 1000);
+  const openFrom = new Date(startsAt.getTime() - 15 * 60 * 1000);
+  if (now < openFrom) return { state: "too_early", startsAt };
+  if (now > endsAt) return { state: "too_late" };
+  return { state: "ok" };
+}
+
+function TooEarlyGate({ lesson }: { lesson: StudentLessonView }) {
+  const startsAt = new Date(lesson.starts_at);
+  const timeStr = startsAt.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = startsAt.toLocaleDateString("ru", { day: "numeric", month: "long" });
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
+      <Link
+        href="/schedule"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
+      >
+        <ChevronLeft className="h-4 w-4" /> Назад к расписанию
+      </Link>
+      <div className="flex flex-col items-center justify-center rounded-[28px] border border-yellow-200 bg-yellow-50/60 py-20 text-center backdrop-blur-xl">
+        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-yellow-100 shadow-inner">
+          <Clock className="h-10 w-10 text-yellow-500" />
+        </div>
+        <h2 className="mb-2 text-xl font-bold">Урок ещё не доступен</h2>
+        <p className="mb-1 text-sm text-gray-500">Урок откроется за 15 минут до начала</p>
+        <p className="mb-6 text-sm font-semibold text-gray-700">Начало в {timeStr}, {dateStr}</p>
+        <Link
+          href="/schedule"
+          className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700"
+        >
+          Назад к расписанию
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TooLateGate({ lesson }: { lesson: StudentLessonView }) {
+  const startsAt = new Date(lesson.starts_at);
+  const timeStr = startsAt.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = startsAt.toLocaleDateString("ru", { day: "numeric", month: "long" });
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
+      <Link
+        href="/schedule"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
+      >
+        <ChevronLeft className="h-4 w-4" /> Назад к расписанию
+      </Link>
+      <div className="flex flex-col items-center justify-center rounded-[28px] border border-gray-200 bg-gray-50/60 py-20 text-center backdrop-blur-xl">
+        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-gray-100 shadow-inner">
+          <XCircle className="h-10 w-10 text-gray-400" />
+        </div>
+        <h2 className="mb-2 text-xl font-bold">Время урока вышло</h2>
+        <p className="mb-6 text-sm text-gray-500">
+          Этот урок проходил {dateStr}, в {timeStr}. Доступ закрыт.
+        </p>
+        <Link
+          href="/schedule"
+          className="rounded-xl bg-gray-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-gray-500/25 transition-all hover:bg-gray-700"
+        >
+          Назад к расписанию
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   lesson: StudentLessonView;
   materialUrls: Record<string, string>;
 }
 
 export function LessonView({ lesson, materialUrls }: Props) {
+  const access = computeAccess(lesson);
+  if (access.state === "too_early") return <TooEarlyGate lesson={lesson} />;
+  if (access.state === "too_late")  return <TooLateGate  lesson={lesson} />;
+
   const style = getSubjectStyle(lesson.group.subject);
   const rgb = hexToRgb(style.color);
 
