@@ -1,7 +1,16 @@
 import Link from "next/link";
-import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText } from "lucide-react";
+import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, type LucideIcon } from "lucide-react";
 import type { StudentLessonView, LessonStagePublic, StageKey } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
+
+const STAGE_ICONS: Record<StageKey, LucideIcon> = {
+  goal:      Target,
+  theory:    BookOpen,
+  practice:  Hammer,
+  classwork: Pencil,
+  review:    CheckSquare,
+  summary:   Trophy,
+};
 
 const STAGE_LABELS: Record<StageKey, string> = {
   goal:       "Цель",
@@ -144,7 +153,7 @@ export function LessonView({ lesson, materialUrls }: Props) {
                     {stage.is_completed ? (
                       <Check className="h-5 w-5 text-white" strokeWidth={3} />
                     ) : (
-                      <span className="text-xs font-bold">{stage.order_index}</span>
+                      (() => { const Icon = STAGE_ICONS[stage.stage_key as StageKey]; return Icon ? <Icon className="h-4 w-4" /> : <span className="text-xs font-bold">{stage.order_index}</span>; })()
                     )}
                   </div>
                   <span

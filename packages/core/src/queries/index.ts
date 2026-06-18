@@ -886,14 +886,69 @@ export const getStudentLessonView = async (
   };
 };
 
-/** Обновляет title и/или description урока (учитель). */
+/** Обновляет поля урока (учитель): title, description, starts_at, ends_at, room. */
 export const updateLesson = async (
   db: Db,
   lessonId: string,
-  patch: { title?: string | null; description?: string | null },
+  patch: {
+    title?: string | null;
+    description?: string | null;
+    starts_at?: string;
+    ends_at?: string | null;
+    room?: string | null;
+    group_id?: string;
+  },
 ): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db as any).from("lessons").update(patch).eq("id", lessonId);
+  if (error) throw error;
+};
+
+/** Создаёт новый урок в группе учителя. */
+export const createLesson = async (
+  db: Db,
+  input: {
+    groupId: string;
+    startsAt: string;
+    endsAt: string | null;
+    room: string | null;
+    title: string | null;
+    description: string | null;
+  },
+): Promise<{ id: string }> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lessons")
+    .insert({
+      group_id: input.groupId,
+      starts_at: input.startsAt,
+      ends_at: input.endsAt,
+      room: input.room,
+      title: input.title,
+      description: input.description,
+      topic: null,
+      status: "scheduled",
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data as { id: string };
+};
+
+/** Удаляет урок: очищает Storage-файлы, затем DELETE (CASCADE на materials/stages). */
+export const deleteLesson = async (db: Db, lessonId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: materials } = await db2
+    .from("lesson_materials")
+    .select("file_storage_path")
+    .eq("lesson_id", lessonId);
+  if (materials?.length) {
+    await db.storage.from("lesson-materials").remove(
+      (materials as Array<{ file_storage_path: string }>).map((m) => m.file_storage_path),
+    );
+  }
+  const { error } = await db.from("lessons").delete().eq("id", lessonId);
   if (error) throw error;
 };
 
