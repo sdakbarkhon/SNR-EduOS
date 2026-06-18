@@ -6,6 +6,34 @@ const GEMINI_MODELS = [
   "gemini-flash-lite-latest",
 ];
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 1,
+): Promise<Response> {
+  const res = await fetch(url, options);
+  if (res.status === 429 && retries > 0) {
+    let delayMs = 3000;
+    try {
+      const body = await res.text();
+      const data = JSON.parse(body) as {
+        error?: { details?: Array<{ "@type"?: string; retryDelay?: string }> };
+      };
+      const retryInfo = data?.error?.details?.find((d) =>
+        d["@type"]?.includes("RetryInfo"),
+      );
+      if (retryInfo?.retryDelay) {
+        const m = retryInfo.retryDelay.match(/(\d+(?:\.\d+)?)/);
+        if (m) delayMs = Math.min(parseFloat(m[1]) * 1000 + 500, 8000);
+      }
+    } catch {}
+    console.log("[gemini] rate limited, retrying in", delayMs, "ms");
+    await new Promise((r) => setTimeout(r, delayMs));
+    return fetchWithRetry(url, options, retries - 1);
+  }
+  return res;
+}
+
 export async function callGemini(
   systemPrompt: string,
   userMessage: string,
@@ -26,13 +54,13 @@ export async function callGemini(
   for (const model of GEMINI_MODELS) {
     const url = `${GEMINI_BASE}/${model}:generateContent`;
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithRetry(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
         body,
       });
       if (res.status === 429 || res.status === 404) {
-        console.warn(`[gemini] ${model} → ${res.status}, trying next`);
+        console.warn(`[gemini] ${model} → ${res.status} after retry, trying next model`);
         continue;
       }
       if (!res.ok) {
