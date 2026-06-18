@@ -1,7 +1,10 @@
 "use server";
 
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+const GEMINI_MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-flash-lite-latest",
+];
 
 export async function callGemini(
   systemPrompt: string,
@@ -19,29 +22,35 @@ export async function callGemini(
   }
   contents.push({ role: "user", parts: [{ text: userMessage }] });
 
-  try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({ contents }),
-    });
-    if (!res.ok) {
-      console.error("[gemini] error:", res.status, await res.text());
-      return { error: "AI временно недоступен" };
+  const body = JSON.stringify({ contents });
+  for (const model of GEMINI_MODELS) {
+    const url = `${GEMINI_BASE}/${model}:generateContent`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
+        body,
+      });
+      if (res.status === 429 || res.status === 404) {
+        console.warn(`[gemini] ${model} → ${res.status}, trying next`);
+        continue;
+      }
+      if (!res.ok) {
+        console.error("[gemini] error:", res.status, await res.text());
+        return { error: "AI временно недоступен" };
+      }
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) return { error: "Пустой ответ" };
+      return { text };
+    } catch (err) {
+      console.error(`[gemini] ${model} threw:`, err);
+      return { error: "Ошибка соединения" };
     }
-    const data = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return { error: "Пустой ответ" };
-    return { text };
-  } catch (err) {
-    console.error("[gemini] threw:", err);
-    return { error: "Ошибка соединения" };
   }
+  return { error: "AI временно недоступен" };
 }
 
 export async function generateHomeworkContent(params: {
