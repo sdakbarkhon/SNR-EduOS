@@ -24,7 +24,7 @@ async function fetchWithRetry(
       );
       if (retryInfo?.retryDelay) {
         const m = retryInfo.retryDelay.match(/(\d+(?:\.\d+)?)/);
-        if (m) delayMs = Math.min(parseFloat(m[1]) * 1000 + 500, 8000);
+        if (m && m[1]) delayMs = Math.min(parseFloat(m[1]) * 1000 + 500, 8000);
       }
     } catch {}
     console.log("[gemini] rate limited, retrying in", delayMs, "ms");
