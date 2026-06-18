@@ -54,6 +54,8 @@ export type Lesson = {
   group_id: string;
   lesson_no: number | null;
   topic: string | null;
+  title?: string | null;       // added in migration 24
+  description?: string | null; // added in migration 24
   starts_at: string;
   ends_at: string | null;
   room: string | null;
@@ -61,6 +63,63 @@ export type Lesson = {
   materials_link: string | null;
   status: LessonStatus;
   created_at: string;
+};
+
+export type StageKey = 'goal' | 'theory' | 'practice' | 'classwork' | 'review' | 'summary';
+
+export type LessonMaterial = {
+  id: string;
+  lesson_id: string;
+  title: string;
+  file_storage_path: string;
+  file_size_bytes: number | null;
+  file_original_name: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+};
+
+export type LessonStage = {
+  id: string;
+  lesson_id: string;
+  stage_key: StageKey;
+  order_index: number;
+  is_completed: boolean;
+  teacher_notes: string | null;
+  completed_at: string | null;
+};
+
+export type LessonStagePublic = Omit<LessonStage, 'teacher_notes'>;
+
+export type TeacherLessonView = {
+  id: string;
+  group_id: string;
+  lesson_no: number | null;
+  topic: string | null;
+  title: string | null;
+  description: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  room: string | null;
+  group: { id: string; name: string; subject: string };
+  teacher: { id: string; full_name: string } | null;
+  materials: LessonMaterial[];
+  stages: LessonStage[];
+};
+
+export type StudentLessonView = {
+  id: string;
+  group_id: string;
+  lesson_no: number | null;
+  topic: string | null;
+  title: string | null;
+  description: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  room: string | null;
+  group: { id: string; name: string; subject: string };
+  teacher: { id: string; full_name: string } | null;
+  materials: LessonMaterial[];
+  stages: LessonStagePublic[];
 };
 
 export type Attendance = {

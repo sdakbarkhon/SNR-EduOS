@@ -262,6 +262,27 @@ export interface Dictionary {
     download: string;
     linkLesson: string;     // "К какому уроку (опционально)"
     noLesson: string;       // "Не привязывать к уроку"
+    // Teacher lesson editor (migration 24)
+    titleLabel: string;
+    titlePlaceholder: string;
+    descLabel: string;
+    descPlaceholder: string;
+    aboutLesson: string;
+    addStageLabel: string;
+    stageCompletedLabel: string;
+    teacherNotesLabel: string;
+    teacherNotesPlaceholder: string;
+    removeStageLabel: string;
+    stagesHint: string;
+    addMaterialLabel: string;
+    addMaterialTitle: string;
+    materialTitleLabel: string;
+    materialTitlePlaceholder: string;
+    lessonsList: string;
+    backToLessons: string;
+    saveBtn: string;
+    uploading: string;
+    deleteConfirm: string;
   };
   teacher: {
     role: string;
@@ -368,6 +389,7 @@ export interface Dictionary {
     materialsLessonOptional: string;
     materialsAllGroups: string;
     materialsAllSubjects: string;
+    navLessons: string;
     navBooks: string;
     booksTitle: string;
     booksUploadBtn: string;

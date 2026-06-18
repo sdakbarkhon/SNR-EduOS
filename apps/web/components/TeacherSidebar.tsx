@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookOpen, Award, FolderOpen, Library, Users, Settings, LogOut, CheckCircle } from "lucide-react";
+import { Home, BookOpen, Award, CalendarDays, FolderOpen, Library, Users, Settings, LogOut, CheckCircle } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -10,8 +10,9 @@ import { useLocale } from "./LocaleProvider";
 import { signOut } from "@/app/actions/auth";
 
 const teacherNavItems = [
-  { key: "home",      href: "/teacher/dashboard", icon: Home,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
-  { key: "homework",  href: "/teacher/homework",  icon: BookOpen,   label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
+  { key: "home",      href: "/teacher/dashboard", icon: Home,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
+  { key: "lessons",   href: "/teacher/lessons",   icon: CalendarDays, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLessons },
+  { key: "homework",  href: "/teacher/homework",  icon: BookOpen,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",    href: "/teacher/grades",    icon: Award,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
   { key: "materials", href: "/teacher/materials", icon: FolderOpen, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navMaterials },
   { key: "books",     href: "/teacher/books",     icon: Library,    label: (d: ReturnType<typeof getDictionary>) => d.teacher.navBooks },

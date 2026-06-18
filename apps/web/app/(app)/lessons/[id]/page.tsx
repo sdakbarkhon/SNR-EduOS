@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getLessonById, getMaterialDownloadUrl } from "@snr/core";
+import { getStudentLessonView, getLessonMaterialUrl } from "@snr/core";
+import { notFound } from "next/navigation";
 import { LessonView } from "./LessonView";
 
 export default async function LessonPage({
@@ -10,23 +10,23 @@ export default async function LessonPage({
 }) {
   const { id } = await params;
   const db = await createClient();
-  const lesson = await getLessonById(db, id).catch(() => null);
+
+  const lesson = await getStudentLessonView(db, id).catch(() => null);
   if (!lesson) notFound();
 
+  // Pre-generate signed URLs for all lesson materials
   const materialUrls: Record<string, string> = {};
-  for (const m of lesson.materials) {
-    if (m.storage_path) {
+  await Promise.all(
+    lesson.materials.map(async (m) => {
       try {
-        materialUrls[m.id] = await getMaterialDownloadUrl(db, m.storage_path, m.title);
-      } catch {
-        // material file missing or inaccessible — skip silently
-      }
-    } else if (m.file_url) {
-      materialUrls[m.id] = m.file_url;
-    } else if (m.link_url) {
-      materialUrls[m.id] = m.link_url;
-    }
-  }
+        materialUrls[m.id] = await getLessonMaterialUrl(
+          db,
+          m.file_storage_path,
+          m.file_original_name ?? m.title,
+        );
+      } catch { /* skip if URL generation fails */ }
+    }),
+  );
 
   return <LessonView lesson={lesson} materialUrls={materialUrls} />;
 }

@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, ContentType, CourseMaterial, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, SubmissionStatus, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
+import type { AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, ContentType, CourseMaterial, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, LessonMaterial, LessonStage, LessonStagePublic, StageKey, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -791,6 +791,259 @@ export const getTeacherLessonsForGroup = async (
     .order("starts_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>;
+};
+
+// ─── LESSON MODULE (migration 24) ────────────────────────────────────────────
+
+const STAGE_ORDER: Record<StageKey, number> = {
+  goal: 1, theory: 2, practice: 3, classwork: 4, review: 5, summary: 6,
+};
+const REQUIRED_STAGES: StageKey[] = ["goal", "summary"];
+
+/** Полное представление урока для учителя — включает teacher_notes в stages. */
+export const getTeacherLessonView = async (
+  db: Db,
+  lessonId: string,
+): Promise<TeacherLessonView | null> => {
+  const { data: lessonRaw, error: lessonErr } = await db
+    .from("lessons")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, room, group:groups!inner(id, name, subject, teacher_id)")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (lessonErr) throw lessonErr;
+  if (!lessonRaw) return null;
+
+  const lesson = lessonRaw as unknown as {
+    id: string; group_id: string; lesson_no: number | null; topic: string | null;
+    title: string | null; description: string | null;
+    starts_at: string; ends_at: string | null; room: string | null;
+    group: { id: string; name: string; subject: string; teacher_id: string | null };
+  };
+
+  const teacherId = lesson.group.teacher_id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const [teacherRes, materialsRes, stagesRes] = await Promise.all([
+    teacherId
+      ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    db2.from("lesson_materials").select("*").eq("lesson_id", lessonId).order("created_at"),
+    db2.from("lesson_stages").select("*").eq("lesson_id", lessonId).order("order_index"),
+  ]);
+
+  const { teacher_id: _tid, ...groupData } = lesson.group;
+  return {
+    id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
+    topic: lesson.topic, title: lesson.title, description: lesson.description,
+    starts_at: lesson.starts_at, ends_at: lesson.ends_at, room: lesson.room,
+    group: groupData,
+    teacher: (teacherRes.data as { id: string; full_name: string } | null),
+    materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
+    stages: ((stagesRes as { data: unknown[] | null }).data ?? []) as LessonStage[],
+  };
+};
+
+/** Представление урока для ученика — без поля teacher_notes в stages. */
+export const getStudentLessonView = async (
+  db: Db,
+  lessonId: string,
+): Promise<StudentLessonView | null> => {
+  const { data: lessonRaw, error: lessonErr } = await db
+    .from("lessons")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, room, group:groups!inner(id, name, subject, teacher_id)")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (lessonErr) throw lessonErr;
+  if (!lessonRaw) return null;
+
+  const lesson = lessonRaw as unknown as {
+    id: string; group_id: string; lesson_no: number | null; topic: string | null;
+    title: string | null; description: string | null;
+    starts_at: string; ends_at: string | null; room: string | null;
+    group: { id: string; name: string; subject: string; teacher_id: string | null };
+  };
+
+  const teacherId = lesson.group.teacher_id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db3 = db as any;
+  const [teacherRes, materialsRes, stagesRes] = await Promise.all([
+    teacherId
+      ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at").eq("lesson_id", lessonId).order("created_at"),
+    db3.from("lesson_stages").select("id, lesson_id, stage_key, order_index, is_completed, completed_at").eq("lesson_id", lessonId).order("order_index"),
+  ]);
+
+  const { teacher_id: _tid, ...groupData } = lesson.group;
+  return {
+    id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
+    topic: lesson.topic, title: lesson.title, description: lesson.description,
+    starts_at: lesson.starts_at, ends_at: lesson.ends_at, room: lesson.room,
+    group: groupData,
+    teacher: (teacherRes.data as { id: string; full_name: string } | null),
+    materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
+    stages: ((stagesRes as { data: unknown[] | null }).data ?? []) as LessonStagePublic[],
+  };
+};
+
+/** Обновляет title и/или description урока (учитель). */
+export const updateLesson = async (
+  db: Db,
+  lessonId: string,
+  patch: { title?: string | null; description?: string | null },
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("lessons").update(patch).eq("id", lessonId);
+  if (error) throw error;
+};
+
+/** Загружает файл в бакет lesson-materials и вставляет запись в lesson_materials. */
+export const uploadLessonMaterial = async (
+  db: Db,
+  input: { lessonId: string; teacherId: string; file: File; title: string },
+): Promise<LessonMaterial> => {
+  const materialId = crypto.randomUUID();
+  const ext = input.file.name.split(".").pop() ?? "bin";
+  const path = `${input.teacherId}/${input.lessonId}/${materialId}/${input.file.name}`;
+  const { error: uploadErr } = await db.storage
+    .from("lesson-materials")
+    .upload(path, input.file, { contentType: input.file.type || undefined });
+  if (uploadErr) throw uploadErr;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error: insertErr } = await (db as any)
+    .from("lesson_materials")
+    .insert({
+      id: materialId,
+      lesson_id: input.lessonId,
+      title: input.title,
+      file_storage_path: path,
+      file_size_bytes: input.file.size,
+      file_original_name: input.file.name,
+      uploaded_by: input.teacherId,
+    })
+    .select("*")
+    .single();
+  if (insertErr) throw insertErr;
+  void ext; // suppress unused
+  return data as LessonMaterial;
+};
+
+/** Удаляет материал из Storage и БД. */
+export const deleteLessonMaterial = async (
+  db: Db,
+  materialId: string,
+  storagePath: string,
+): Promise<void> => {
+  await db.storage.from("lesson-materials").remove([storagePath]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("lesson_materials").delete().eq("id", materialId);
+  if (error) throw error;
+};
+
+/** Signed URL (1 час) для скачивания материала урока. */
+export const getLessonMaterialUrl = async (
+  db: Db,
+  storagePath: string,
+  downloadAs?: string,
+): Promise<string> => {
+  const { data, error } = await db.storage
+    .from("lesson-materials")
+    .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
+/** Включает или выключает опциональный этап урока. goal и summary нельзя убрать. */
+export const setStageEnabled = async (
+  db: Db,
+  lessonId: string,
+  stageKey: StageKey,
+  enabled: boolean,
+): Promise<void> => {
+  if (REQUIRED_STAGES.includes(stageKey)) return; // guard
+
+  if (enabled) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (db as any).from("lesson_stages").insert({
+      lesson_id: lessonId,
+      stage_key: stageKey,
+      order_index: STAGE_ORDER[stageKey],
+      is_completed: false,
+    });
+    // Ignore unique violation (already exists)
+    if (error && error.code !== "23505") throw error;
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (db as any)
+      .from("lesson_stages")
+      .delete()
+      .eq("lesson_id", lessonId)
+      .eq("stage_key", stageKey);
+    if (error) throw error;
+  }
+};
+
+/** Помечает этап выполненным / невыполненным. */
+export const setStageCompleted = async (
+  db: Db,
+  lessonId: string,
+  stageKey: StageKey,
+  isCompleted: boolean,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lesson_stages")
+    .update({
+      is_completed: isCompleted,
+      completed_at: isCompleted ? new Date().toISOString() : null,
+    })
+    .eq("lesson_id", lessonId)
+    .eq("stage_key", stageKey);
+  if (error) throw error;
+};
+
+/** Обновляет заметки учителя для этапа. */
+export const setStageNotes = async (
+  db: Db,
+  lessonId: string,
+  stageKey: StageKey,
+  notes: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lesson_stages")
+    .update({ teacher_notes: notes || null })
+    .eq("lesson_id", lessonId)
+    .eq("stage_key", stageKey);
+  if (error) throw error;
+};
+
+/** Создаёт обязательные этапы (goal + summary), если их нет. Идемпотентно. */
+export const initLessonStages = async (db: Db, lessonId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("lesson_stages").upsert(
+    REQUIRED_STAGES.map((key) => ({
+      lesson_id: lessonId,
+      stage_key: key,
+      order_index: STAGE_ORDER[key],
+      is_completed: false,
+    })),
+    { onConflict: "lesson_id,stage_key", ignoreDuplicates: true },
+  );
+  if (error) throw error;
+};
+
+/** Все уроки в группах учителя — для страницы /teacher/lessons. */
+export const getTeacherAllLessons = async (
+  db: Db,
+): Promise<Array<{ id: string; group_id: string; lesson_no: number | null; topic: string | null; title: string | null; starts_at: string; ends_at: string | null; room: string | null; group: { id: string; name: string; subject: string } }>> => {
+  const { data, error } = await db
+    .from("lessons")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, room, group:groups!inner(id, name, subject)")
+    .order("starts_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Array<{ id: string; group_id: string; lesson_no: number | null; topic: string | null; title: string | null; starts_at: string; ends_at: string | null; room: string | null; group: { id: string; name: string; subject: string } }>;
 };
 
 // ─── BOOKS ───────────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(84);
+select plan(92);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -375,6 +375,62 @@ select lives_ok(
   'T: может удалить свою книгу'
 );
 
+-- ── Migration 24: lesson_stages + lesson_materials ────────────────────
+
+-- Test 85: T INSERT lesson_stage (goal) для aa000001 (группа a0 — Ivan's)
+select lives_ok(
+  $$ insert into public.lesson_stages (lesson_id, stage_key, order_index, is_completed)
+     values ('aa000001-0000-0000-0000-000000000000', 'goal', 1, false) $$,
+  'T: может создать lesson_stage в своей группе (aa000001)'
+);
+
+-- Test 86: T INSERT lesson_material для aa000001
+select lives_ok(
+  $$ insert into public.lesson_materials
+       (lesson_id, title, file_storage_path, uploaded_by)
+     values (
+       'aa000001-0000-0000-0000-000000000000',
+       'TEST-MAT-A',
+       'cccccccc-cccc-cccc-cccc-cccccccccccc/aa000001-0000-0000-0000-000000000000/m01/file.pdf',
+       'cccccccc-cccc-cccc-cccc-cccccccccccc'
+     ) $$,
+  'T: может добавить lesson_material в свой урок (aa000001)'
+);
+
+-- Test 87: T INSERT lesson_stage для bb000001 (группа b0 — Ivan's, для isolation ниже)
+select lives_ok(
+  $$ insert into public.lesson_stages (lesson_id, stage_key, order_index, is_completed)
+     values ('bb000001-0000-0000-0000-000000000000', 'goal', 1, false) $$,
+  'T: может создать lesson_stage для bb000001 (своя группа b0)'
+);
+
+-- Test 88: T INSERT lesson_material для bb000001 (для isolation ниже)
+select lives_ok(
+  $$ insert into public.lesson_materials
+       (lesson_id, title, file_storage_path, uploaded_by)
+     values (
+       'bb000001-0000-0000-0000-000000000000',
+       'TEST-MAT-B',
+       'cccccccc-cccc-cccc-cccc-cccccccccccc/bb000001-0000-0000-0000-000000000000/m02/file.pdf',
+       'cccccccc-cccc-cccc-cccc-cccccccccccc'
+     ) $$,
+  'T: может добавить lesson_material для bb000001 (своя группа b0)'
+);
+
+-- Test 89: T НЕ может добавить lesson_material в чужую группу (d0 — Elena)
+select throws_ok(
+  $$ insert into public.lesson_materials
+       (lesson_id, title, file_storage_path, uploaded_by)
+     values (
+       'dd000001-0000-0000-0000-000000000000',
+       'HACK-MAT',
+       'cccccccc-cccc-cccc-cccc-cccccccccccc/dd000001-0000-0000-0000-000000000000/m99/hack.pdf',
+       'cccccccc-cccc-cccc-cccc-cccccccccccc'
+     ) $$,
+  '42501', NULL,
+  'T НЕ может добавить lesson_material в чужую группу (d0 — Elena, 42501)'
+);
+
 -- Регрессия: student A после teacher-сессии всё ещё изолирован
 reset role;
 select set_config(
@@ -391,6 +447,29 @@ select is((select count(*)::int from public.attendance
 select is((select count(*)::int from public.payments
            where student_id = 'b2222222-2222-2222-2222-222222222222'), 0,
           'Regression: A НЕ видит платежи B после teacher-сессии');
+
+-- ── Migration 24 regression: A изолирован в lesson_stages / lesson_materials ──
+
+-- Test 90: A видит lesson_stages для aa000001 (Robotics 7A — его группа)
+select ok(
+  (select count(*)::int > 0 from public.lesson_stages
+   where lesson_id = 'aa000001-0000-0000-0000-000000000000'),
+  'Regression: A видит lesson_stages своей группы (aa000001)'
+);
+
+-- Test 91: A НЕ видит lesson_stages для bb000001 (Math 9B — группа Dilnoza, не его)
+select is(
+  (select count(*)::int from public.lesson_stages
+   where lesson_id = 'bb000001-0000-0000-0000-000000000000'), 0,
+  'Regression: A НЕ видит lesson_stages чужой группы (bb000001)'
+);
+
+-- Test 92: A НЕ видит lesson_materials для bb000001
+select is(
+  (select count(*)::int from public.lesson_materials
+   where lesson_id = 'bb000001-0000-0000-0000-000000000000'), 0,
+  'Regression: A НЕ видит lesson_materials чужой группы (bb000001)'
+);
 
 -- ============ Аноним не видит ничего ============
 reset role;
