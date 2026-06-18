@@ -1123,6 +1123,24 @@ export const getTeacherAllLessons = async (db: Db): Promise<TeacherLessonListIte
   return (data ?? []) as unknown as TeacherLessonListItem[];
 };
 
+/** Уроки в группах учителя за конкретный месяц (year/month — 1-based). */
+export const getTeacherLessonsByMonth = async (
+  db: Db,
+  year: number,
+  month: number,
+): Promise<TeacherLessonListItem[]> => {
+  const start = new Date(year, month - 1, 1).toISOString();
+  const end = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
+  const { data, error } = await db
+    .from("lessons")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject)")
+    .gte("starts_at", start)
+    .lte("starts_at", end)
+    .order("starts_at");
+  if (error) throw error;
+  return (data ?? []) as unknown as TeacherLessonListItem[];
+};
+
 /** Переводит урок в статус 'in_progress', автоматически завершает этап goal. */
 export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
