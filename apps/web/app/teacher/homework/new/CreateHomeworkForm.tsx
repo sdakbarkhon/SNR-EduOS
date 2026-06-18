@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   getDictionary,
@@ -8,6 +8,7 @@ import {
   createTestQuestions,
   uploadHomeworkAttachment,
   setHomeworkAttachment,
+  getTeacherLessonsForGroup,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -38,10 +39,22 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [deadline, setDeadline] = useState("");
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [lessonId, setLessonId] = useState<string>("");
+  const [lessonsForGroup, setLessonsForGroup] = useState<
+    Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>
+  >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!groupId) return;
+    setLessonId("");
+    getTeacherLessonsForGroup(supabase, groupId)
+      .then(setLessonsForGroup)
+      .catch(() => setLessonsForGroup([]));
+  }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -103,7 +116,9 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         groupId, title: title.trim(), description: description.trim(),
         dueDate: deadline,
         contentType: format === "test" ? "test" : "file",
-        teacherId: resolvedTeacherId, status,
+        teacherId: resolvedTeacherId,
+        lessonId: lessonId || null,
+        status,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({
@@ -195,6 +210,35 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)}
             className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none" />
         </label>
+
+        {/* Lesson selector */}
+        {lessonsForGroup.length > 0 && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.lesson.linkLesson}
+            </span>
+            <select
+              value={lessonId}
+              onChange={(e) => setLessonId(e.target.value)}
+              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none"
+            >
+              <option value="">{d.lesson.noLesson}</option>
+              {lessonsForGroup.map((l) => {
+                const dateStr = new Date(l.starts_at).toLocaleDateString("ru", {
+                  day: "numeric", month: "short",
+                });
+                const label = l.topic
+                  ? `${dateStr} · ${l.topic}`
+                  : l.lesson_no
+                  ? `${dateStr} · Урок №${l.lesson_no}`
+                  : dateStr;
+                return (
+                  <option key={l.id} value={l.id}>{label}</option>
+                );
+              })}
+            </select>
+          </label>
+        )}
 
         {format === "file" && (
           <div>

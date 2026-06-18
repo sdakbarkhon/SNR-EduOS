@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceWithLesson, Book, BookFavorite, ContentType, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
+import type { AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, ContentType, CourseMaterial, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, SubmissionStatus, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -557,6 +557,7 @@ export const createTeacherHomework = async (
     dueDate: string;
     contentType: "file" | "test";
     teacherId: string;
+    lessonId?: string | null;
     status?: "draft" | "published";
   },
 ) => {
@@ -570,6 +571,7 @@ export const createTeacherHomework = async (
       content_type: input.contentType,
       source: "teacher",
       teacher_id: input.teacherId,
+    lesson_id: input.lessonId ?? null,
     })
     .select()
     .single();
@@ -713,6 +715,82 @@ export const submitTest = async (
   }
 
   return sub as unknown as TestSubmission;
+};
+
+// ─── LESSON DETAIL ───────────────────────────────────────────────────────────
+
+/** Один урок со всеми связанными данными для страницы /lessons/[id].
+ *  Возвращает null, если урок недоступен текущему пользователю (RLS). */
+export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDetail | null> => {
+  const { data: lessonRaw, error: lessonErr } = await db
+    .from("lessons")
+    .select("id, group_id, lesson_no, topic, starts_at, ends_at, room, group:groups!inner(id, name, subject, teacher_id)")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (lessonErr) throw lessonErr;
+  if (!lessonRaw) return null;
+
+  const lesson = lessonRaw as unknown as {
+    id: string; group_id: string; lesson_no: number | null; topic: string | null;
+    starts_at: string; ends_at: string | null; room: string | null;
+    group: { id: string; name: string; subject: string; teacher_id: string | null };
+  };
+
+  const teacherId = lesson.group.teacher_id;
+  const [teacherRes, materialsRes, hwRes, attRes] = await Promise.all([
+    teacherId
+      ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    db.from("course_materials").select("*").eq("lesson_id", lessonId).order("created_at"),
+    db.from("homework")
+      .select("id, title, description, due_date, content_type, submissions:homework_submissions(status, grade)")
+      .eq("lesson_id", lessonId)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    db.from("attendance").select("status").eq("lesson_id", lessonId).maybeSingle(),
+  ]);
+
+  if (materialsRes.error) throw materialsRes.error;
+
+  const hwList = (hwRes.data ?? []) as unknown as Array<{
+    id: string; title: string; description: string | null; due_date: string | null;
+    content_type: string; submissions: Array<{ status: string; grade: number | null }>;
+  }>;
+  const hw0 = hwList[0] ?? null;
+  const homeworkResult: LessonDetail["homework"] = hw0
+    ? {
+        id: hw0.id, title: hw0.title, description: hw0.description, due_date: hw0.due_date,
+        content_type: (hw0.content_type ?? "file") as ContentType,
+        submission: hw0.submissions?.[0]
+          ? { status: hw0.submissions[0].status as SubmissionStatus, grade: hw0.submissions[0].grade }
+          : null,
+      }
+    : null;
+
+  const { teacher_id: _tid, ...groupData } = lesson.group;
+  return {
+    id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
+    topic: lesson.topic, starts_at: lesson.starts_at, ends_at: lesson.ends_at, room: lesson.room,
+    group: groupData,
+    teacher: (teacherRes.data as { id: string; full_name: string } | null),
+    materials: (materialsRes.data ?? []) as unknown as CourseMaterial[],
+    homework: homeworkResult,
+    attendance: attRes.data ? { status: (attRes.data as { status: string }).status as AttendanceStatus } : null,
+  };
+};
+
+/** Уроки группы для дропдауна в форме создания ДЗ (учитель). */
+export const getTeacherLessonsForGroup = async (
+  db: Db,
+  groupId: string,
+): Promise<Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>> => {
+  const { data, error } = await db
+    .from("lessons")
+    .select("id, starts_at, topic, lesson_no")
+    .eq("group_id", groupId)
+    .order("starts_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>;
 };
 
 // ─── BOOKS ───────────────────────────────────────────────────────────────────

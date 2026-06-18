@@ -241,6 +241,28 @@ export interface Dictionary {
     downloadCollection: string;
     downloadReference: string;
   };
+  lesson: {
+    back: string;
+    progressTitle: string;
+    stagesTitle: string;
+    stage1: string;
+    stage2: string;
+    stage3: string;
+    stage4: string;
+    stage5: string;
+    stage6: string;
+    stagesOf: string;       // "{done}/{total} этапов"
+    materialsTitle: string;
+    materialsEmpty: string;
+    homeworkTitle: string;
+    homeworkEmpty: string;
+    openHomework: string;
+    cabinet: string;
+    lessonOf: string;       // "Урок от {date}"
+    download: string;
+    linkLesson: string;     // "К какому уроку (опционально)"
+    noLesson: string;       // "Не привязывать к уроку"
+  };
   teacher: {
     role: string;
     navHome: string;

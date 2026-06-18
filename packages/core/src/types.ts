@@ -215,6 +215,28 @@ export type MaterialWithGroup = CourseMaterial & {
   group: { name: string; subject: string };
 };
 
+export type LessonDetail = {
+  id: string;
+  group_id: string;
+  lesson_no: number | null;
+  topic: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  room: string | null;
+  group: { id: string; name: string; subject: string };
+  teacher: { id: string; full_name: string } | null;
+  materials: CourseMaterial[];
+  homework: {
+    id: string;
+    title: string;
+    description: string | null;
+    due_date: string | null;
+    content_type: ContentType;
+    submission: { status: SubmissionStatus; grade: number | null } | null;
+  } | null;
+  attendance: { status: AttendanceStatus } | null;
+};
+
 export type Message = {
   id: string;
   sender_id: string | null;

@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(82);
+select plan(84);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -400,6 +400,33 @@ select is((select count(*)::int from public.attendance), 0, 'anon: 0 посещ�
 select is((select count(*)::int from public.grades), 0, 'anon: 0 оценок');
 select is((select count(*)::int from public.payments), 0, 'anon: 0 платежей');
 select is((select count(*)::int from public.books), 0, 'anon: 0 книг (нет политики для anon)');
+
+-- ============ MIGRATION 23: homework.lesson_id FK integrity ============
+-- Run as superuser (role reset above from anon block)
+reset role;
+
+-- Test 83: lesson_id column is nullable (FK is optional)
+select ok(
+  (select is_nullable = 'YES'
+     from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'homework'
+      and column_name = 'lesson_id'),
+  'migration 23: homework.lesson_id is nullable (optional FK)'
+);
+
+-- Test 84: FK constraint exists on homework.lesson_id → lessons.id
+select ok(
+  (select count(*) > 0
+     from information_schema.referential_constraints rc
+     join information_schema.key_column_usage kcu
+       on rc.constraint_name = kcu.constraint_name
+      and rc.constraint_schema = kcu.constraint_schema
+    where kcu.table_schema = 'public'
+      and kcu.table_name   = 'homework'
+      and kcu.column_name  = 'lesson_id'),
+  'migration 23: homework.lesson_id FK to lessons.id exists'
+);
 
 select * from finish();
 rollback;
