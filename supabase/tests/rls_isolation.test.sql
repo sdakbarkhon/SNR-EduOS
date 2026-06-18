@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(92);
+select plan(94);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -430,6 +430,34 @@ select throws_ok(
   '42501', NULL,
   'T НЕ может добавить lesson_material в чужую группу (d0 — Elena, 42501)'
 );
+
+-- ── Migration 25: teacher INSERT + DELETE on lessons ──────────────────────────
+
+-- Test 93: T может INSERT урок в свою группу (a0 — Ivan's)
+select lives_ok(
+  $$ insert into public.lessons
+       (group_id, lesson_no, topic, status, starts_at, ends_at, room)
+     values
+       ('a0000000-0000-0000-0000-000000000000',
+        99, 'TEST-LESSON by teacher', 'scheduled',
+        '2026-09-01T05:00:00Z', '2026-09-01T06:30:00Z', '305') $$,
+  'T: может создать урок в своей группе (migration 25)'
+);
+
+-- Test 94: T НЕ может INSERT урок в чужую группу (d0 — Elena, 42501)
+select throws_ok(
+  $$ insert into public.lessons
+       (group_id, lesson_no, topic, status, starts_at, ends_at, room)
+     values
+       ('d0000000-0000-0000-0000-000000000000',
+        99, 'HACK-LESSON', 'scheduled',
+        '2026-09-01T05:00:00Z', '2026-09-01T06:30:00Z', '999') $$,
+  '42501', NULL,
+  'T НЕ может создать урок в чужой группе (d0 — Elena, 42501)'
+);
+
+-- cleanup test lesson
+delete from public.lessons where topic = 'TEST-LESSON by teacher';
 
 -- Регрессия: student A после teacher-сессии всё ещё изолирован
 reset role;
