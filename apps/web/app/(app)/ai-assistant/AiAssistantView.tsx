@@ -136,7 +136,8 @@ export function AiAssistantView() {
       </div>
 
       {/* Input bar */}
-      <div className="mt-4 flex items-end gap-2 rounded-[18px] border border-white/50 bg-white/70 p-2 shadow-sm backdrop-blur-xl">
+      <div className="mt-4 flex flex-col gap-1">
+      <div className="flex items-end gap-2 rounded-[18px] border border-white/50 bg-white/70 p-2 shadow-sm backdrop-blur-xl">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -154,6 +155,10 @@ export function AiAssistantView() {
         >
           <SendHorizonal className="h-4 w-4" />
         </button>
+      </div>
+      <p className="mt-2 text-center text-xs text-slate-400">
+        AI может ошибаться. Проверяй важную информацию.
+      </p>
       </div>
     </div>
   );

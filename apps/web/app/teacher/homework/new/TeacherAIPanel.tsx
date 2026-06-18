@@ -380,6 +380,9 @@ export function TeacherAIPanel({ isOpen, onClose, format, subject, onApply }: Pr
                 <SendHorizonal className="h-4 w-4" />
               </button>
             </div>
+            <p className="mt-2 text-center text-xs text-slate-400">
+              AI может ошибаться. Проверяй важную информацию.
+            </p>
           </div>
         )}
       </div>
