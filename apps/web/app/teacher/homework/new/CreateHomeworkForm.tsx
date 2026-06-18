@@ -13,7 +13,8 @@ import {
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check } from "lucide-react";
+import { TeacherAIPanel } from "./TeacherAIPanel";
 import { cn } from "@/lib/cn";
 
 type Format = "file" | "test" | null;
@@ -47,6 +48,8 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiToast, setAiToast] = useState(false);
 
   useEffect(() => {
     if (!groupId) return;
@@ -92,6 +95,27 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
 
   function setCorrectOption(qi: number, oi: number) {
     setQuestions((qs) => qs.map((q, idx) => idx === qi ? { ...q, options: q.options.map((o, oidx) => ({ ...o, isCorrect: oidx === oi })) } : q));
+  }
+
+  function handleAIApply(data: {
+    title: string;
+    description: string;
+    questions?: Array<{ question: string; options: string[]; correctIndex: number }>;
+  }) {
+    setTitle(data.title);
+    setDescription(data.description);
+    if (data.questions && format === "test") {
+      setQuestions(
+        data.questions.map((q) => ({
+          type: "single_choice" as QuestionType,
+          text: q.question,
+          options: q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correctIndex })),
+        })),
+      );
+    }
+    setAiPanelOpen(false);
+    setAiToast(true);
+    setTimeout(() => setAiToast(false), 4000);
   }
 
   async function save(status: "draft" | "published") {
@@ -184,8 +208,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         </h1>
         <button
           type="button"
-          onClick={() => alert(d.teacher.aiStub)}
-          title="Скоро"
+          onClick={() => setAiPanelOpen(true)}
           className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
         >
           <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
@@ -356,6 +379,21 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           {saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish}
         </button>
       </div>
+
+      <TeacherAIPanel
+        isOpen={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        format={format}
+        subject={groups.find((g) => g.id === groupId)?.subject ?? ""}
+        onApply={handleAIApply}
+      />
+
+      {aiToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[14px] bg-slate-800 px-4 py-3 text-[13px] font-medium text-white shadow-xl">
+          <Check className="h-4 w-4 text-green-400" />
+          Задание заполнено AI. Проверьте и опубликуйте.
+        </div>
+      )}
     </div>
   );
 }
