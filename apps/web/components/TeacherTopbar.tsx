@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, Search } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Avatar } from "./Avatar";
 
 export function TeacherTopbar({
@@ -12,10 +13,13 @@ export function TeacherTopbar({
   subtitle?: string;
   avatarUrl?: string | null;
 }) {
+  const pathname = usePathname();
+  const showSearch = pathname !== "/teacher/lessons";
+
   return (
     <header className="relative z-10 flex h-20 w-full shrink-0 items-center justify-between px-4 md:px-8">
-      {/* Search (no-op visual) */}
-      <div className="group relative max-w-sm flex-1">
+      {/* Search (hidden on /teacher/lessons) */}
+      <div className={`group relative max-w-sm flex-1 ${showSearch ? "" : "invisible pointer-events-none"}`}>
         <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
           <Search className="h-5 w-5 text-gray-400 transition-colors group-focus-within:text-blue-600" />
         </div>

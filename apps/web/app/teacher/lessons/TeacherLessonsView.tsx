@@ -26,8 +26,16 @@ type FormState = {
   groupId: string; date: string; startTime: string;
   endTime: string; room: string; title: string; desc: string;
 };
-type DayFilter = "all" | "upcoming" | "past";
+type EffectiveStatus = "scheduled" | "in_progress" | "completed" | "missed";
 type DayStatus = "in_progress" | "overdue" | "completed" | "scheduled" | null;
+
+// ── Effective status ──────────────────────────────────────────────────────────
+function getEffectiveStatus(lesson: LessonItem, now: Date): EffectiveStatus {
+  if (lesson.status === "in_progress") return "in_progress";
+  if (lesson.status === "completed")   return "completed";
+  if (lesson.status === "scheduled" && new Date(lesson.starts_at) < now) return "missed";
+  return "scheduled";
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MONTHS_RU = [
@@ -36,27 +44,40 @@ const MONTHS_RU = [
 ];
 const WEEKDAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 
-const STATUS_BADGE: Record<string, { label: string; cls: string; dot?: boolean }> = {
-  scheduled:   { label: "Запланирован", cls: "bg-yellow-100 text-yellow-800 border border-yellow-200" },
-  in_progress: { label: "Идёт",         cls: "bg-green-100 text-green-800 border border-green-200", dot: true },
-  completed:   { label: "Завершён",     cls: "bg-gray-100 text-gray-500 border border-gray-200" },
+const EFF_BADGE: Record<EffectiveStatus, { label: string; cls: string; dot?: boolean }> = {
+  scheduled:   { label: "Запланирован", cls: "bg-blue-100 text-blue-700 border border-blue-200" },
+  in_progress: { label: "Идёт сейчас", cls: "bg-yellow-100 text-yellow-800 border border-yellow-200", dot: true },
+  completed:   { label: "Завершён",    cls: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
+  missed:      { label: "Пропущен",   cls: "bg-red-100 text-red-700 border border-red-200" },
 };
-const STATUS_BORDER: Record<string, string> = {
-  scheduled:   "border-l-yellow-400",
-  in_progress: "border-l-green-500",
-  completed:   "border-l-gray-300",
+// Card background (soft fill)
+const EFF_CARD_BG: Record<EffectiveStatus, string> = {
+  scheduled:   "bg-blue-50",
+  in_progress: "bg-yellow-50",
+  completed:   "bg-emerald-50",
+  missed:      "bg-red-50",
 };
+// Left border colour
+const EFF_BORDER: Record<EffectiveStatus, string> = {
+  scheduled:   "border-l-blue-400",
+  in_progress: "border-l-yellow-400",
+  completed:   "border-l-emerald-400",
+  missed:      "border-l-red-400",
+};
+// Dot colour (used both in legend and in calendar cells)
+const EFF_DOT: Record<EffectiveStatus, string> = {
+  scheduled:   "bg-blue-400",
+  in_progress: "bg-yellow-400",
+  completed:   "bg-emerald-400",
+  missed:      "bg-red-400",
+};
+
+// Calendar cell background (aggregate)
 const DAY_BG: Record<NonNullable<DayStatus>, string> = {
   in_progress: "bg-yellow-50/70 border border-yellow-200",
   overdue:     "bg-red-50/70 border border-red-200",
   completed:   "bg-emerald-50/70 border border-emerald-200",
   scheduled:   "bg-blue-50/70 border border-blue-200",
-};
-const DAY_DOT: Record<NonNullable<DayStatus>, string> = {
-  in_progress: "bg-yellow-400",
-  overdue:     "bg-red-400",
-  completed:   "bg-emerald-400",
-  scheduled:   "bg-blue-400",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -94,7 +115,6 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long" });
 }
 function fmtDayHeader(key: string): string {
-  // key = YYYY-MM-DD; parse at noon to avoid timezone edge
   const d = new Date(`${key}T12:00:00`);
   return d.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" });
 }
@@ -133,7 +153,7 @@ function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => vo
     <div ref={ref} className="relative">
       <button
         onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
-        className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+        className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/60 hover:text-gray-600"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -159,17 +179,21 @@ function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => vo
 
 // ── LessonCard ────────────────────────────────────────────────────────────────
 function LessonCard({
-  lesson, onEdit, onDelete,
+  lesson, now, onEdit, onDelete,
 }: {
-  lesson: LessonItem; onEdit: (l: LessonItem) => void; onDelete: (l: LessonItem) => void;
+  lesson: LessonItem; now: Date;
+  onEdit: (l: LessonItem) => void; onDelete: (l: LessonItem) => void;
 }) {
   const style = getSubjectStyle(lesson.group.subject);
   const displayTitle = lesson.title ?? lesson.topic ?? fmtDate(lesson.starts_at);
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
     : fmtTime(lesson.starts_at);
+  const eff = getEffectiveStatus(lesson, now);
+  const badge = EFF_BADGE[eff];
+
   return (
-    <div className={`flex items-center gap-3 rounded-2xl border border-white bg-white/80 p-3 pl-4 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md border-l-4 ${STATUS_BORDER[lesson.status] ?? "border-l-gray-200"}`}>
+    <div className={`flex items-center gap-3 rounded-2xl border border-white/60 p-3 pl-4 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-l-4 ${EFF_CARD_BG[eff]} ${EFF_BORDER[eff]}`}>
       <Link href={`/teacher/lessons/${lesson.id}`} className="flex flex-1 items-center gap-3 min-w-0">
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
@@ -180,16 +204,10 @@ function LessonCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="truncate text-xs font-bold text-[#1D1D1F]">{displayTitle}</p>
-            {(() => {
-              const b = STATUS_BADGE[lesson.status];
-              if (!b) return null;
-              return (
-                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${b.cls}`}>
-                  {b.dot && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />}
-                  {b.label}
-                </span>
-              );
-            })()}
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${badge.cls}`}>
+              {badge.dot && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-500" />}
+              {badge.label}
+            </span>
           </div>
           <p className="text-[10px] text-gray-500">{lesson.group.name}</p>
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
@@ -218,8 +236,8 @@ function LessonFormModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.groupId) { setError("Выберите группу"); return; }
-    if (!form.date)    { setError("Укажите дату"); return; }
+    if (!form.groupId)   { setError("Выберите группу"); return; }
+    if (!form.date)      { setError("Укажите дату"); return; }
     if (!form.startTime) { setError("Укажите время начала"); return; }
     setSaving(true); setError("");
     try { await onSave(form); }
@@ -336,23 +354,21 @@ export function TeacherLessonsView({
   const dbRef = useRef(createClient());
   const db = dbRef.current;
 
-  const today = new Date();
-  const todayKey = localDateKey(today);
+  const now = new Date();
+  const todayKey = localDateKey(now);
 
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1); // 1-based
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-based
   const [selectedDayKey, setSelectedDayKey] = useState(todayKey);
   const [monthLessons, setMonthLessons] = useState<LessonItem[]>(() => {
-    // Seed from server prop, filtered to current month
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     return initialLessons.filter(l => {
       const d = new Date(l.starts_at);
       return d >= start && d <= end;
     });
   });
   const [loading, setLoading] = useState(false);
-  const [dayFilter, setDayFilter] = useState<DayFilter>("all");
 
   const [formModal, setFormModal] = useState<"create" | "edit" | null>(null);
   const [editLesson, setEditLesson] = useState<LessonItem | null>(null);
@@ -369,7 +385,6 @@ export function TeacherLessonsView({
     finally { setLoading(false); }
   }
 
-  // Skip first mount (seeded from prop), refetch on month navigation
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; return; }
     void loadMonth(viewYear, viewMonth);
@@ -385,7 +400,6 @@ export function TeacherLessonsView({
     else setViewMonth(m => m + 1);
   }
 
-  // Group by local date key
   const byDay = new Map<string, LessonItem[]>();
   for (const l of monthLessons) {
     const key = lessonDateKey(l.starts_at);
@@ -395,19 +409,12 @@ export function TeacherLessonsView({
 
   const calendarDays = getCalendarGrid(viewYear, viewMonth);
 
-  // Lessons for selected day, sorted by time
   const dayLessons = (byDay.get(selectedDayKey) ?? []).slice().sort(
     (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
   );
-  const nowRef = new Date();
-  const filteredDayLessons =
-    dayFilter === "all" ? dayLessons
-    : dayFilter === "upcoming"
-      ? dayLessons.filter(l => l.status === "in_progress" || new Date(l.starts_at) >= nowRef)
-      : dayLessons.filter(l => l.status === "completed" || (l.status === "scheduled" && new Date(l.starts_at) < nowRef));
 
   function openCreate() { setEditLesson(null); setFormModal("create"); }
-  function openEdit(l: LessonItem) { setEditLesson(l); setFormModal("edit"); }
+  function openEdit(l: LessonItem)   { setEditLesson(l); setFormModal("edit"); }
   function openDelete(l: LessonItem) { setDeleteTarget(l); }
 
   async function handleSave(form: FormState) {
@@ -439,17 +446,6 @@ export function TeacherLessonsView({
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#1D1D1F]">Уроки</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
-        >
-          <Plus className="h-4 w-4" /> Создать урок
-        </button>
-      </div>
-
       {/* Two-column layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
 
@@ -459,20 +455,14 @@ export function TeacherLessonsView({
 
             {/* Month nav */}
             <div className="mb-5 flex items-center justify-between">
-              <button
-                onClick={prevMonth}
-                className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100"
-              >
+              <button onClick={prevMonth} className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100">
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <h2 className="text-base font-bold text-[#1D1D1F]">
                 {MONTHS_RU[viewMonth - 1]} {viewYear}
                 {loading && <span className="ml-2 text-[11px] font-normal text-gray-400">обновляем…</span>}
               </h2>
-              <button
-                onClick={nextMonth}
-                className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100"
-              >
+              <button onClick={nextMonth} className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100">
                 <ChevronRight className="h-5 w-5" />
               </button>
             </div>
@@ -491,25 +481,21 @@ export function TeacherLessonsView({
               {calendarDays.map((day, i) => {
                 const key = localDateKey(day);
                 const isCurrentMonth = day.getMonth() === viewMonth - 1;
-                const isToday = key === todayKey;
+                const isToday    = key === todayKey;
                 const isSelected = key === selectedDayKey;
-                const dayData = byDay.get(key) ?? [];
-                const status = aggregateDayStatus(dayData, today);
+                const dayData    = byDay.get(key) ?? [];
+                const aggStatus  = aggregateDayStatus(dayData, now);
 
                 let cellCls =
                   "relative flex flex-col items-center rounded-xl p-1 transition-all hover:scale-105 cursor-pointer min-h-[52px] ";
-
                 if (isSelected) {
                   cellCls += "bg-blue-500 shadow-md shadow-blue-400/30 ";
-                } else if (status) {
-                  cellCls += DAY_BG[status] + " ";
+                } else if (aggStatus) {
+                  cellCls += DAY_BG[aggStatus] + " ";
                 } else {
                   cellCls += "hover:bg-gray-50 ";
                 }
-
-                if (isToday && !isSelected) {
-                  cellCls += "ring-2 ring-blue-400 ring-offset-1 ";
-                }
+                if (isToday && !isSelected) cellCls += "ring-2 ring-blue-400 ring-offset-1 ";
 
                 return (
                   <button key={i} onClick={() => setSelectedDayKey(key)} className={cellCls}>
@@ -520,17 +506,21 @@ export function TeacherLessonsView({
                     }`}>
                       {day.getDate()}
                     </span>
+                    {/* Per-lesson dots with individual effective-status colours */}
                     {dayData.length > 0 && (
                       <div className="mt-1.5 flex items-center justify-center gap-0.5">
-                        {dayData.slice(0, 3).map((_, di) => (
-                          <span key={di} className={`h-1.5 w-1.5 rounded-full ${
-                            isSelected ? "bg-white/80"
-                            : status ? DAY_DOT[status]
-                            : "bg-gray-300"
-                          }`} />
-                        ))}
+                        {dayData.slice(0, 3).map((l, di) => {
+                          const eff = getEffectiveStatus(l, now);
+                          return (
+                            <span key={di} className={`h-1.5 w-1.5 rounded-full ${
+                              isSelected ? "bg-white/80" : EFF_DOT[eff]
+                            }`} />
+                          );
+                        })}
                         {dayData.length > 3 && (
-                          <span className={`text-[9px] font-bold leading-none ${isSelected ? "text-white/70" : "text-gray-400"}`}>
+                          <span className={`text-[9px] font-bold leading-none ${
+                            isSelected ? "text-white/70" : "text-gray-400"
+                          }`}>
                             +{dayData.length - 3}
                           </span>
                         )}
@@ -548,11 +538,11 @@ export function TeacherLessonsView({
                   ["in_progress", "Идёт сейчас"],
                   ["scheduled",   "Запланирован"],
                   ["completed",   "Завершён"],
-                  ["overdue",     "Пропущен"],
-                ] as [NonNullable<DayStatus>, string][]
+                  ["missed",      "Пропущен"],
+                ] as [EffectiveStatus, string][]
               ).map(([s, label]) => (
                 <div key={s} className="flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${DAY_DOT[s]}`} />
+                  <span className={`h-2 w-2 rounded-full ${EFF_DOT[s]}`} />
                   <span className="text-[11px] text-gray-400">{label}</span>
                 </div>
               ))}
@@ -564,63 +554,37 @@ export function TeacherLessonsView({
         <div className="lg:col-span-2">
           <div className="rounded-2xl border border-white bg-white/70 p-5 shadow-sm backdrop-blur-xl">
 
-            {/* Day header */}
-            <h3 className="mb-4 text-sm font-bold capitalize text-[#1D1D1F]">
-              {fmtDayHeader(selectedDayKey)}
-            </h3>
-
-            {/* Filters + create button */}
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex flex-1 rounded-xl border border-gray-200 bg-gray-50 p-0.5">
-                {(["all", "upcoming", "past"] as DayFilter[]).map(f => {
-                  const label = f === "all" ? "Все" : f === "upcoming" ? "Предст." : "Прошлые";
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => setDayFilter(f)}
-                      className={`flex-1 rounded-[10px] px-2 py-1.5 text-xs font-semibold transition-all ${
-                        dayFilter === f
-                          ? "bg-blue-500 text-white shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Day header + create button */}
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold capitalize text-[#1D1D1F]">
+                {fmtDayHeader(selectedDayKey)}
+              </h3>
               <button
                 onClick={openCreate}
-                className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-600 transition-colors hover:bg-blue-100"
+                className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
               >
-                <Plus className="h-3.5 w-3.5" /> Создать
+                <Plus className="h-3.5 w-3.5" /> Создать урок
               </button>
             </div>
 
             {/* Lesson list or empty state */}
-            {filteredDayLessons.length === 0 ? (
+            {dayLessons.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-2xl">
                   📅
                 </div>
-                <p className="text-sm font-medium text-gray-400">
-                  {dayFilter !== "all"
-                    ? "Нет уроков с этим фильтром"
-                    : "На этот день уроков нет"}
-                </p>
-                {dayFilter === "all" && (
-                  <button
-                    onClick={openCreate}
-                    className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                  >
-                    + Создать урок
-                  </button>
-                )}
+                <p className="text-sm font-medium text-gray-400">На этот день уроков нет</p>
+                <button
+                  onClick={openCreate}
+                  className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                >
+                  + Создать урок
+                </button>
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredDayLessons.map(l => (
-                  <LessonCard key={l.id} lesson={l} onEdit={openEdit} onDelete={openDelete} />
+                {dayLessons.map(l => (
+                  <LessonCard key={l.id} lesson={l} now={now} onEdit={openEdit} onDelete={openDelete} />
                 ))}
               </div>
             )}
