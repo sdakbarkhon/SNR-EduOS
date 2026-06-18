@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, Plus,
-  MoreHorizontal, Pencil, Trash2, X, AlertTriangle,
+  MoreHorizontal, Pencil, Trash2, X, AlertTriangle, CalendarDays,
 } from "lucide-react";
 import {
   getSubjectStyle, createLesson, updateLesson, deleteLesson,
@@ -570,8 +570,8 @@ export function TeacherLessonsView({
             {/* Lesson list or empty state */}
             {dayLessons.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-2xl">
-                  📅
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100">
+                  <CalendarDays className="h-6 w-6 text-gray-300" />
                 </div>
                 <p className="text-sm font-medium text-gray-400">На этот день уроков нет</p>
                 <button

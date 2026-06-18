@@ -76,18 +76,10 @@ export function TeacherDashboardView({ teacher, groups, homework, todayLessons, 
 
   return (
     <div className="max-w-6xl space-y-8 pb-4">
-      {/* Greeting + AI button */}
-      <header className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-        <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">
-          {d.dashboard.greeting.replace("{name}", teacher?.full_name ?? d.teacher.role)}
-        </h1>
-        <button
-          onClick={() => alert(d.teacher.aiStub)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
-        >
-          ✨ Сгенерировать с помощью ИИ
-        </button>
-      </header>
+      {/* Greeting */}
+      <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">
+        {d.dashboard.greeting.replace("{name}", teacher?.full_name ?? d.teacher.role)}
+      </h1>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">

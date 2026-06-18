@@ -13,7 +13,7 @@ import {
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type Format = "file" | "test" | null;
@@ -179,9 +179,17 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         <button onClick={() => setFormat(null)} className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />
         </button>
-        <h1 className="text-[22px] font-bold text-brand-ink">
+        <h1 className="flex-1 text-[22px] font-bold text-brand-ink">
           {d.teacher.newHomeworkTitle} — {format === "test" ? d.teacher.step1Test : d.teacher.step1File}
         </h1>
+        <button
+          type="button"
+          onClick={() => alert(d.teacher.aiStub)}
+          title="Скоро"
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
+        >
+          <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
+        </button>
       </div>
 
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"

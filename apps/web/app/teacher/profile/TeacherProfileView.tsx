@@ -5,7 +5,7 @@ import { getDictionary, updateTeacherProfile } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { User, Shield, Bell, LayoutTemplate, Camera, Settings2 } from "lucide-react";
+import { User, Shield, Bell, LayoutTemplate, Camera, Settings2, Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type Tab = "profile" | "security" | "notifications" | "interface";
@@ -147,7 +147,7 @@ export function TeacherProfileView({ teacher, groups }: Props) {
               <div className="flex justify-end">
                 <button onClick={saveProfile} disabled={saving}
                   className="rounded-[12px] bg-blue-600 px-6 py-2.5 font-bold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-700 disabled:opacity-50">
-                  {saved ? "✓ Сохранено" : saving ? d.common.loading : "Сохранить изменения"}
+                  {saved ? <><Check className="inline-block h-4 w-4 mr-1" /> Сохранено</> : saving ? d.common.loading : "Сохранить изменения"}
                 </button>
               </div>
             </div>

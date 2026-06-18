@@ -319,7 +319,7 @@ export function TeacherLessonDetailView({
               disabled={infoSaving}
               className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-60"
             >
-              {infoSaved ? "✓ Сохранено" : infoSaving ? d.lesson.uploading : d.lesson.saveBtn}
+              {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {d.lesson.saveBtn}</>  : infoSaving ? d.lesson.uploading : d.lesson.saveBtn}
             </button>
           )}
         </div>
