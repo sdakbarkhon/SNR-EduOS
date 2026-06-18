@@ -21,7 +21,21 @@ type LessonItem = {
   starts_at: string;
   ends_at: string | null;
   room: string | null;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
   group: { id: string; name: string; subject: string };
+};
+
+const STATUS_BADGE: Record<string, { label: string; cls: string; dot?: boolean }> = {
+  scheduled:   { label: "Запланирован", cls: "bg-yellow-100 text-yellow-800 border border-yellow-200" },
+  in_progress: { label: "Идёт",        cls: "bg-green-100  text-green-800  border border-green-200",  dot: true },
+  completed:   { label: "Завершён",    cls: "bg-gray-100   text-gray-500   border border-gray-200" },
+};
+const STATUS_BORDER: Record<string, string> = {
+  scheduled:   "border-l-yellow-400",
+  in_progress: "border-l-green-500",
+  completed:   "border-l-gray-300",
 };
 
 type FormState = {
@@ -142,7 +156,7 @@ function LessonCard({
     : fmtTime(lesson.starts_at);
 
   return (
-    <div className="group flex items-center gap-4 rounded-2xl border border-white bg-white/80 p-4 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md">
+    <div className={`group flex items-center gap-4 rounded-2xl border border-white bg-white/80 p-4 pl-5 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md border-l-4 ${STATUS_BORDER[lesson.status] ?? "border-l-gray-200"}`}>
       <Link href={`/teacher/lessons/${lesson.id}`} className="flex flex-1 items-center gap-4 min-w-0">
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white text-xl"
@@ -151,7 +165,19 @@ function LessonCard({
           {style.emoji}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-[#1D1D1F]">{displayTitle}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="truncate text-sm font-bold text-[#1D1D1F]">{displayTitle}</p>
+            {(() => {
+              const b = STATUS_BADGE[lesson.status];
+              if (!b) return null;
+              return (
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${b.cls}`}>
+                  {b.dot && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />}
+                  {b.label}
+                </span>
+              );
+            })()}
+          </div>
           <p className="text-xs text-gray-500">{lesson.group.name} · {style.label}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-400">
             <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeRange}</span>

@@ -965,7 +965,7 @@ export type Database = {
       attendance_status: "present" | "absent" | "late"
       content_type: "file" | "test"
       homework_source: "curriculum" | "teacher"
-      lesson_status: "scheduled" | "ongoing" | "done" | "cancelled"
+      lesson_status: "scheduled" | "in_progress" | "completed"
       payment_kind: "subscription" | "one_time"
       payment_status: "completed" | "pending" | "canceled"
       student_status: "active" | "debtor" | "frozen"
@@ -1100,7 +1100,7 @@ export const Constants = {
       attendance_status: ["present", "absent", "late"],
       content_type: ["file", "test"],
       homework_source: ["curriculum", "teacher"],
-      lesson_status: ["scheduled", "ongoing", "done", "cancelled"],
+      lesson_status: ["scheduled", "in_progress", "completed"],
       payment_kind: ["subscription", "one_time"],
       payment_status: ["completed", "pending", "canceled"],
       student_status: ["active", "debtor", "frozen"],

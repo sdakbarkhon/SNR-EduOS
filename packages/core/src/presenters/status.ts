@@ -43,10 +43,11 @@ export function lessonStatus(
   lesson: Pick<Lesson, "starts_at" | "ends_at" | "status">,
   now: number = Date.now(),
 ): StatusBadge {
-  if (lesson.status === "cancelled") return { variant: "danger", key: "cancelled" };
+  if (lesson.status === "completed") return { variant: "neutral", key: "passed" };
+  if (lesson.status === "in_progress") return { variant: "success", key: "now" };
   const start = new Date(lesson.starts_at).getTime();
   const end = lesson.ends_at ? new Date(lesson.ends_at).getTime() : start + DEFAULT_LESSON_MS;
-  if (lesson.status === "done" || end < now) return { variant: "neutral", key: "passed" };
+  if (end < now) return { variant: "neutral", key: "passed" };
   if (now >= start && now <= end) return { variant: "success", key: "now" };
   if (start - now <= SOON_WINDOW_MS) return { variant: "warning", key: "soon" };
   return { variant: "info", key: "scheduled" };

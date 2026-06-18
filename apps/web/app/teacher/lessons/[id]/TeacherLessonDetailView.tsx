@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   ChevronLeft, MapPin, Target, BookOpen, Hammer, Pencil,
   CheckSquare, Trophy, Check, Plus, X, FileText, Download,
-  Trash2, Upload,
+  Trash2, Upload, Play, Square, Clock,
 } from "lucide-react";
 import {
   updateLesson, setStageEnabled, setStageCompleted, setStageNotes,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
-  getSubjectStyle,
+  getSubjectStyle, startLesson, endLesson,
 } from "@snr/core";
-import type { TeacherLessonView, LessonStage, StageKey, LessonMaterial, Teacher } from "@snr/core";
+import type { TeacherLessonView, LessonStatus, LessonStage, StageKey, LessonMaterial, Teacher } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDictionary } from "@snr/core";
@@ -97,6 +97,39 @@ export function TeacherLessonDetailView({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const db = createClient();
+
+  const [status, setStatus] = useState<LessonStatus>(lesson.status);
+  const [startedAt, setStartedAt] = useState<string | null>(lesson.started_at);
+  const [endedAt, setEndedAt] = useState<string | null>(lesson.ended_at);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [elapsedMin, setElapsedMin] = useState(0);
+
+  useEffect(() => {
+    if (status !== "in_progress" || !startedAt) return;
+    const tick = () => setElapsedMin(Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000));
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [status, startedAt]);
+
+  async function handleStart() {
+    setStatusLoading(true);
+    try {
+      await startLesson(db, lesson.id);
+      const now = new Date().toISOString();
+      setStatus("in_progress");
+      setStartedAt(now);
+    } catch { /* noop */ } finally { setStatusLoading(false); }
+  }
+
+  async function handleEnd() {
+    setStatusLoading(true);
+    try {
+      await endLesson(db, lesson.id);
+      setStatus("completed");
+      setEndedAt(new Date().toISOString());
+    } catch { /* noop */ } finally { setStatusLoading(false); }
+  }
 
   const style = getSubjectStyle(lesson.group.subject);
   const stageLabels: Record<StageKey, string> = {
@@ -190,28 +223,71 @@ export function TeacherLessonDetailView({
         {d.lesson.backToLessons}
       </Link>
 
-      {/* Header card */}
-      <div
-        className="flex flex-col gap-2 rounded-2xl p-6 text-white shadow-xl"
-        style={{ background: `linear-gradient(135deg, ${style.color}, color-mix(in sRGB, ${style.color} 60%, #1e1b4b))` }}
-      >
-        <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
-          {style.label} · {lesson.group.name}
-        </p>
-        {lesson.lesson_no && <p className="text-xs text-white/60">Урок №{lesson.lesson_no}</p>}
-        <h1 className="text-2xl font-bold">
-          {lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
-        </h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="rounded-full bg-white/10 px-3 py-1">{timeRange}</span>
-          <span className="rounded-full bg-white/10 px-3 py-1">{fmtDate(lesson.starts_at)}</span>
-          {lesson.room && (
-            <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
-              <MapPin className="h-3.5 w-3.5" /> Каб. {lesson.room}
-            </span>
-          )}
+      {/* Header card — color varies by status */}
+      {(() => {
+        const bg =
+          status === "in_progress" ? "linear-gradient(135deg, #16a34a, #15803d)"
+          : status === "completed"  ? "linear-gradient(135deg, #6b7280, #4b5563)"
+          : `linear-gradient(135deg, ${style.color}, color-mix(in sRGB, ${style.color} 60%, #1e1b4b))`;
+        return (
+          <div className="flex flex-col gap-2 rounded-2xl p-6 text-white shadow-xl" style={{ background: bg }}>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
+              {style.label} · {lesson.group.name}
+            </p>
+            {lesson.lesson_no && <p className="text-xs text-white/60">Урок №{lesson.lesson_no}</p>}
+            <h1 className="text-2xl font-bold">
+              {lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
+            </h1>
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="rounded-full bg-white/10 px-3 py-1">{timeRange}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1">{fmtDate(lesson.starts_at)}</span>
+              {lesson.room && (
+                <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
+                  <MapPin className="h-3.5 w-3.5" /> Каб. {lesson.room}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Status control */}
+      {status === "scheduled" && (
+        <div className="flex items-center justify-between rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4">
+          <p className="text-sm text-yellow-800">Урок запланирован. Нажмите когда начнётся.</p>
+          <button
+            onClick={handleStart}
+            disabled={statusLoading}
+            className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-green-500/25 hover:bg-green-700 active:scale-95 disabled:opacity-50"
+          >
+            <Play className="h-4 w-4 fill-white" /> Начать урок
+          </button>
         </div>
-      </div>
+      )}
+      {status === "in_progress" && (
+        <div className="flex items-center justify-between rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
+          <p className="text-sm text-green-800 flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Урок идёт. Длится {elapsedMin} мин.
+          </p>
+          <button
+            onClick={handleEnd}
+            disabled={statusLoading}
+            className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-red-500/25 hover:bg-red-700 active:scale-95 disabled:opacity-50"
+          >
+            <Square className="h-4 w-4 fill-white" /> Закончить урок
+          </button>
+        </div>
+      )}
+      {status === "completed" && (
+        <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4">
+          <Check className="h-5 w-5 text-gray-500" />
+          <p className="text-sm text-gray-600">
+            Урок завершён
+            {startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
+          </p>
+        </div>
+      )}
 
       {/* About lesson block */}
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">

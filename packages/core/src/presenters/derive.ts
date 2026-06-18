@@ -17,7 +17,7 @@ export function nextLesson<T extends Pick<Lesson, "starts_at" | "ends_at" | "sta
   now: number = Date.now(),
 ): T | null {
   const upcoming = lessons
-    .filter((l) => l.status !== "cancelled")
+    .filter((l) => l.status !== "completed")
     .filter((l) => {
       const end = l.ends_at
         ? new Date(l.ends_at).getTime()

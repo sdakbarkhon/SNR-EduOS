@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, type LucideIcon } from "lucide-react";
+import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, Clock, type LucideIcon } from "lucide-react";
 import type { StudentLessonView, LessonStagePublic, StageKey } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
 
@@ -61,6 +61,10 @@ export function LessonView({ lesson, materialUrls }: Props) {
 
   const heroTitle = lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`;
 
+  const isScheduled   = lesson.status === "scheduled";
+  const isInProgress  = lesson.status === "in_progress";
+  const isCompleted   = lesson.status === "completed";
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
       {/* Back */}
@@ -71,6 +75,26 @@ export function LessonView({ lesson, materialUrls }: Props) {
         <ChevronLeft className="h-4 w-4" />
         Назад к расписанию
       </Link>
+
+      {/* Status indicator */}
+      {isScheduled && (
+        <div className="flex items-center gap-3 rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-3 text-sm text-yellow-800">
+          <Clock className="h-4 w-4 shrink-0" />
+          Урок ещё не начался. Дождитесь начала.
+        </div>
+      )}
+      {isInProgress && (
+        <div className="flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm text-green-800">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-green-500 shrink-0" />
+          Урок идёт прямо сейчас
+        </div>
+      )}
+      {isCompleted && (
+        <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-3 text-sm text-gray-500">
+          <Check className="h-4 w-4 shrink-0" />
+          Урок завершён
+        </div>
+      )}
 
       {/* Hero */}
       <div
@@ -175,7 +199,12 @@ export function LessonView({ lesson, materialUrls }: Props) {
         <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-gray-500">
           Материалы урока
         </h3>
-        {lesson.materials.length === 0 ? (
+        {isScheduled ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-yellow-100 bg-yellow-50/60 px-5 py-4 text-sm text-yellow-700">
+            <Clock className="h-4 w-4 shrink-0" />
+            Материалы появятся когда учитель начнёт урок
+          </div>
+        ) : lesson.materials.length === 0 ? (
           <div className="flex items-center gap-3 rounded-2xl border border-white/60 bg-white/50 px-5 py-4 text-sm text-gray-400 backdrop-blur-xl">
             <BookOpen className="h-4 w-4 shrink-0" />
             Материалы к этому уроку пока не добавлены

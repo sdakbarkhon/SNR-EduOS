@@ -807,7 +807,7 @@ export const getTeacherLessonView = async (
 ): Promise<TeacherLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, room, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -816,7 +816,9 @@ export const getTeacherLessonView = async (
   const lesson = lessonRaw as unknown as {
     id: string; group_id: string; lesson_no: number | null; topic: string | null;
     title: string | null; description: string | null;
-    starts_at: string; ends_at: string | null; room: string | null;
+    starts_at: string; ends_at: string | null;
+    started_at: string | null; ended_at: string | null; status: string;
+    room: string | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -835,7 +837,10 @@ export const getTeacherLessonView = async (
   return {
     id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
     topic: lesson.topic, title: lesson.title, description: lesson.description,
-    starts_at: lesson.starts_at, ends_at: lesson.ends_at, room: lesson.room,
+    starts_at: lesson.starts_at, ends_at: lesson.ends_at,
+    started_at: lesson.started_at, ended_at: lesson.ended_at,
+    status: lesson.status as TeacherLessonView["status"],
+    room: lesson.room,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -850,7 +855,7 @@ export const getStudentLessonView = async (
 ): Promise<StudentLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, room, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -859,7 +864,9 @@ export const getStudentLessonView = async (
   const lesson = lessonRaw as unknown as {
     id: string; group_id: string; lesson_no: number | null; topic: string | null;
     title: string | null; description: string | null;
-    starts_at: string; ends_at: string | null; room: string | null;
+    starts_at: string; ends_at: string | null;
+    started_at: string | null; ended_at: string | null; status: string;
+    room: string | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -878,7 +885,10 @@ export const getStudentLessonView = async (
   return {
     id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
     topic: lesson.topic, title: lesson.title, description: lesson.description,
-    starts_at: lesson.starts_at, ends_at: lesson.ends_at, room: lesson.room,
+    starts_at: lesson.starts_at, ends_at: lesson.ends_at,
+    started_at: lesson.started_at, ended_at: lesson.ended_at,
+    status: lesson.status as StudentLessonView["status"],
+    room: lesson.room,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -917,7 +927,8 @@ export const createLesson = async (
   },
 ): Promise<{ id: string }> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
+  const db2 = db as any;
+  const { data, error } = await db2
     .from("lessons")
     .insert({
       group_id: input.groupId,
@@ -932,7 +943,13 @@ export const createLesson = async (
     .select("id")
     .single();
   if (error) throw error;
-  return data as { id: string };
+  const created = data as { id: string };
+  // Goal stage created + pre-completed at lesson creation time
+  await db2.from("lesson_stages").upsert(
+    { lesson_id: created.id, stage_key: "goal", order_index: 1, is_completed: true, completed_at: new Date().toISOString() },
+    { onConflict: "lesson_id,stage_key", ignoreDuplicates: true },
+  );
+  return created;
 };
 
 /** Удаляет урок: очищает Storage-файлы, затем DELETE (CASCADE на materials/stages). */
@@ -1089,16 +1106,53 @@ export const initLessonStages = async (db: Db, lessonId: string): Promise<void> 
   if (error) throw error;
 };
 
+type TeacherLessonListItem = {
+  id: string; group_id: string; lesson_no: number | null; topic: string | null;
+  title: string | null; starts_at: string; ends_at: string | null; room: string | null;
+  status: string; started_at: string | null; ended_at: string | null;
+  group: { id: string; name: string; subject: string };
+};
+
 /** Все уроки в группах учителя — для страницы /teacher/lessons. */
-export const getTeacherAllLessons = async (
-  db: Db,
-): Promise<Array<{ id: string; group_id: string; lesson_no: number | null; topic: string | null; title: string | null; starts_at: string; ends_at: string | null; room: string | null; group: { id: string; name: string; subject: string } }>> => {
+export const getTeacherAllLessons = async (db: Db): Promise<TeacherLessonListItem[]> => {
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, room, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject)")
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as Array<{ id: string; group_id: string; lesson_no: number | null; topic: string | null; title: string | null; starts_at: string; ends_at: string | null; room: string | null; group: { id: string; name: string; subject: string } }>;
+  return (data ?? []) as unknown as TeacherLessonListItem[];
+};
+
+/** Переводит урок в статус 'in_progress', автоматически завершает этап goal. */
+export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { error } = await db2.from("lessons")
+    .update({ status: "in_progress", started_at: new Date().toISOString() })
+    .eq("id", lessonId);
+  if (error) throw error;
+  await db2.from("lesson_stages").upsert(
+    { lesson_id: lessonId, stage_key: "goal", order_index: 1, is_completed: true, completed_at: new Date().toISOString() },
+    { onConflict: "lesson_id,stage_key", ignoreDuplicates: false },
+  );
+  await db2.from("lesson_stages").upsert(
+    { lesson_id: lessonId, stage_key: "summary", order_index: 6, is_completed: false },
+    { onConflict: "lesson_id,stage_key", ignoreDuplicates: true },
+  );
+};
+
+/** Завершает урок: статус 'completed', итог-этап отмечается выполненным. */
+export const endLesson = async (db: Db, lessonId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { error } = await db2.from("lessons")
+    .update({ status: "completed", ended_at: new Date().toISOString() })
+    .eq("id", lessonId);
+  if (error) throw error;
+  await db2.from("lesson_stages").upsert(
+    { lesson_id: lessonId, stage_key: "summary", order_index: 6, is_completed: true, completed_at: new Date().toISOString() },
+    { onConflict: "lesson_id,stage_key", ignoreDuplicates: false },
+  );
 };
 
 // ─── BOOKS ───────────────────────────────────────────────────────────────────

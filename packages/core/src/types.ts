@@ -7,7 +7,7 @@
  */
 
 export type StudentStatus = "active" | "debtor" | "frozen";
-export type LessonStatus = "scheduled" | "ongoing" | "done" | "cancelled";
+export type LessonStatus = "scheduled" | "in_progress" | "completed";
 export type AttendanceStatus = "present" | "absent" | "late";
 export type SubmissionStatus = "submitted" | "checking" | "graded";
 export type PaymentStatus = "completed" | "pending" | "canceled";
@@ -54,10 +54,12 @@ export type Lesson = {
   group_id: string;
   lesson_no: number | null;
   topic: string | null;
-  title?: string | null;       // added in migration 24
-  description?: string | null; // added in migration 24
+  title?: string | null;        // added in migration 24
+  description?: string | null;  // added in migration 24
   starts_at: string;
   ends_at: string | null;
+  started_at?: string | null;   // added in migration 26
+  ended_at?: string | null;     // added in migration 26
   room: string | null;
   online_url: string | null;
   materials_link: string | null;
@@ -99,6 +101,9 @@ export type TeacherLessonView = {
   description: string | null;
   starts_at: string;
   ends_at: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  status: LessonStatus;
   room: string | null;
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;
@@ -115,6 +120,9 @@ export type StudentLessonView = {
   description: string | null;
   starts_at: string;
   ends_at: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  status: LessonStatus;
   room: string | null;
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;

@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(94);
+select plan(96);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -533,6 +533,25 @@ select ok(
       and kcu.table_name   = 'homework'
       and kcu.column_name  = 'lesson_id'),
   'migration 23: homework.lesson_id FK to lessons.id exists'
+);
+
+-- ── Migration 26: lesson status columns ────────────────────────────────────
+reset role;
+
+-- Test 95: new status column default is 'scheduled' and valid values accepted
+select ok(
+  (select column_default = '''scheduled'''::text
+     from information_schema.columns
+    where table_schema = 'public' and table_name = 'lessons' and column_name = 'status'),
+  'migration 26: lessons.status default is scheduled'
+);
+
+-- Test 96: CHECK constraint rejects invalid status value
+select throws_ok(
+  $$ insert into public.lessons (group_id, status, starts_at)
+     values ('a0000000-0000-0000-0000-000000000000', 'invalid_status', now()) $$,
+  '23514', NULL,
+  'migration 26: invalid status value rejected by CHECK constraint'
 );
 
 select * from finish();
