@@ -252,7 +252,7 @@ export function DashboardView({
               {subjects.map((s) => {
                 const badge = activeBySub.get(s) ?? 0;
                 return (
-                  <Link href="/materials" key={s}>
+                  <Link href={`/homework?subject=${encodeURIComponent(s)}`} key={s}>
                     <div className="relative flex flex-col items-center gap-2 rounded-2xl p-3 transition-all hover:scale-[1.02] hover:bg-white/40 cursor-pointer">
                       <div className="relative">
                         <SubjectIcon subject={s} size={60} />

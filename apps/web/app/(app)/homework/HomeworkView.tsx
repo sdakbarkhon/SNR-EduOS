@@ -191,7 +191,13 @@ const STATUS_COLORS: Record<HomeworkTab, string> = {
   overdue:   "#F0556B",
 };
 
-export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmission[] }) {
+export function HomeworkView({
+  initialRows,
+  initialSubject = "all",
+}: {
+  initialRows: HomeworkWithSubmission[];
+  initialSubject?: string;
+}) {
   const sb = createClient();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -199,7 +205,7 @@ export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmiss
   const [rows, setRows] = useState<HomeworkWithSubmission[]>(initialRows);
   const [tab, setTab] = useState<ViewTab>(null);
   const [typeFilter, setTypeFilter] = useState<ContentType | "all">("all");
-  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>(initialSubject);
   const [sortBy, setSortBy] = useState<SortMode>("deadline");
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
