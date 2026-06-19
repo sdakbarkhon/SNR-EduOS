@@ -18,11 +18,13 @@ type Props = {
   lessonId: string;
   teacherId: string;
   lessonStatus: "scheduled" | "in_progress" | "completed";
+  /** Map of studentId → excuse reason; rows get a red stripe + tooltip. */
+  excused?: Record<string, string>;
   /** Called whenever rows change; parent can use to check completeness. */
   onStatusChange?: (allMarked: boolean, unmarkedNames: string[]) => void;
 };
 
-export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, onStatusChange }: Props) {
+export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused, onStatusChange }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dt = d.teacher;
@@ -67,9 +69,9 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, onStatus
     }
   }
 
-  const present   = rows.filter((r) => r.status === "present").length;
-  const excused   = rows.filter((r) => r.status === "absent_excused").length;
-  const unexcused = rows.filter((r) => r.status === "absent_unexcused").length;
+  const present     = rows.filter((r) => r.status === "present").length;
+  const excusedCount = rows.filter((r) => r.status === "absent_excused").length;
+  const unexcused   = rows.filter((r) => r.status === "absent_unexcused").length;
   const unmarked  = rows.filter((r) => r.status === null).length;
 
   if (loading) {
@@ -103,7 +105,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, onStatus
           </span>
           <span className="text-gray-300">|</span>
           <span className="flex items-center gap-1.5 text-[12px] font-semibold text-yellow-600">
-            <BookMarked className="h-3.5 w-3.5" /> {dt.rollCallExcused}: {excused}
+            <BookMarked className="h-3.5 w-3.5" /> {dt.rollCallExcused}: {excusedCount}
           </span>
           <span className="text-gray-300">|</span>
           <span className="flex items-center gap-1.5 text-[12px] font-semibold text-red-500">
@@ -127,8 +129,16 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, onStatus
         <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden bg-white">
           {rows.map((row) => {
             const st = row.status;
+            const excuseReason = excused?.[row.student_id];
             return (
-              <div key={row.student_id} className="flex items-center gap-3 px-4 py-3">
+              <div
+                key={row.student_id}
+                title={excuseReason ? `${d.lesson.excuse.reasonPrefix} ${excuseReason}` : undefined}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3",
+                  excuseReason && "border-l-4 border-red-400 bg-red-50/40",
+                )}
+              >
                 <div className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-bold",
                   st === null ? "bg-slate-100 text-slate-400" : "bg-slate-100 text-slate-600",

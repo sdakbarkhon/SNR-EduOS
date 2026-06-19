@@ -430,3 +430,29 @@ export type Classwork = {
 export type ClassworkSubmissionWithStudent = ClassworkSubmission & {
   student: { id: string; full_name: string; avatar_url: string | null };
 };
+
+// ── Lesson features (migration 30): excuse requests + raised hands ──
+export type ExcuseRequest = {
+  id: string;
+  lesson_id: string;
+  student_id: string;
+  reason: string;
+  created_at: string;
+};
+
+export type ExcuseRequestWithStudent = ExcuseRequest & {
+  student: { id: string; full_name: string; avatar_url: string | null };
+};
+
+export type RaisedHand = {
+  id: string;
+  lesson_id: string;
+  student_id: string;
+  raised_at: string;
+  lowered_at: string | null;
+  lowered_by: string | null;
+};
+
+export type RaisedHandWithStudent = RaisedHand & {
+  student: { id: string; full_name: string; avatar_url: string | null };
+};

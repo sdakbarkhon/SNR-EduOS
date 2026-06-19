@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, LessonMaterial, LessonStage, LessonStagePublic, StageKey, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, LessonMaterial, LessonStage, LessonStagePublic, RaisedHand, RaisedHandWithStudent, StageKey, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -1756,4 +1756,122 @@ export const gradeClasswork = async (
     graded_by: teacherId,
   }).eq("id", submissionId);
   if (error) throw error;
+};
+
+// ─── LESSON EXCUSE REQUESTS (migration 30) ──────────────────────────────────────
+
+/** Ученик отпрашивается с урока (только пока урок scheduled). */
+export const createExcuseRequest = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+  reason: string,
+): Promise<{ id: string; created_at: string }> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  // Server-side guard in case RLS is bypassed: lesson must still be scheduled.
+  const { data: lessonRow } = await db2.from("lessons").select("status").eq("id", lessonId).single();
+  if (lessonRow && lessonRow.status !== "scheduled") {
+    throw new Error("Урок уже начался — отпроситься нельзя");
+  }
+  const { data, error } = await db2.from("lesson_excuse_requests")
+    .insert({ lesson_id: lessonId, student_id: studentId, reason: reason.trim() })
+    .select("id, created_at").single();
+  if (error) throw error;
+  return data as { id: string; created_at: string };
+};
+
+/** Ученик отменяет свою заявку. */
+export const deleteExcuseRequest = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("lesson_excuse_requests")
+    .delete().eq("lesson_id", lessonId).eq("student_id", studentId);
+  if (error) throw error;
+};
+
+/** Своя заявка на отпрашивание (или null). */
+export const getMyExcuseRequest = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+): Promise<ExcuseRequest | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("lesson_excuse_requests")
+    .select("*").eq("lesson_id", lessonId).eq("student_id", studentId).maybeSingle();
+  return (data as ExcuseRequest | null) ?? null;
+};
+
+/** Все отпросившиеся на уроке (для учителя) с именами учеников. */
+export const getLessonExcuseRequests = async (
+  db: Db,
+  lessonId: string,
+): Promise<ExcuseRequestWithStudent[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("lesson_excuse_requests")
+    .select("*, student:students(id, full_name, avatar_url)")
+    .eq("lesson_id", lessonId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ExcuseRequestWithStudent[];
+};
+
+// ─── LESSON RAISED HANDS (migration 30) ─────────────────────────────────────────
+
+/** Ученик поднимает руку (только во время идущего урока). */
+export const raiseHand = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+): Promise<{ id: string; raised_at: string }> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("lesson_raised_hands")
+    .insert({ lesson_id: lessonId, student_id: studentId })
+    .select("id, raised_at").single();
+  if (error) throw error;
+  return data as { id: string; raised_at: string };
+};
+
+/** Учитель опускает руку ученику. */
+export const lowerHand = async (
+  db: Db,
+  handId: string,
+  teacherId: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("lesson_raised_hands")
+    .update({ lowered_at: new Date().toISOString(), lowered_by: teacherId })
+    .eq("id", handId);
+  if (error) throw error;
+};
+
+/** Активные (не опущенные) поднятые руки на уроке — для учителя, FIFO. */
+export const getActiveRaisedHands = async (
+  db: Db,
+  lessonId: string,
+): Promise<RaisedHandWithStudent[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("lesson_raised_hands")
+    .select("*, student:students(id, full_name, avatar_url)")
+    .eq("lesson_id", lessonId)
+    .is("lowered_at", null)
+    .order("raised_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as RaisedHandWithStudent[];
+};
+
+/** Активная поднятая рука самого ученика (или null). */
+export const getMyRaisedHand = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+): Promise<RaisedHand | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("lesson_raised_hands")
+    .select("*").eq("lesson_id", lessonId).eq("student_id", studentId)
+    .is("lowered_at", null).maybeSingle();
+  return (data as RaisedHand | null) ?? null;
 };

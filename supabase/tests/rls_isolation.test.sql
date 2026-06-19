@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(107);
+select plan(115);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -674,6 +674,112 @@ select ok(
 -- cleanup
 reset role;
 delete from public.classwork where title = 'TEST-CW by Ivan';
+
+-- ============ MIGRATION 30: excuse requests + raised hands ============
+-- Set lesson aa000001 (group a0 — Ivan teacher / Adilbek student) to scheduled
+reset role;
+update public.lessons set status = 'scheduled'
+  where id = 'aa000001-0000-0000-0000-000000000000';
+delete from public.lesson_excuse_requests
+  where lesson_id in ('aa000001-0000-0000-0000-000000000000',
+                      'dd000001-0000-0000-0000-000000000000');
+delete from public.lesson_raised_hands
+  where lesson_id = 'aa000001-0000-0000-0000-000000000000';
+
+-- as student A
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 108: student creates excuse on own scheduled lesson → works
+select lives_ok(
+  $$ insert into public.lesson_excuse_requests (lesson_id, student_id, reason)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111', 'плохо себя чувствую') $$,
+  'M30: student can create excuse on own scheduled lesson');
+
+-- Test 109: student CANNOT create excuse on a lesson outside own group → 42501
+select throws_ok(
+  $$ insert into public.lesson_excuse_requests (lesson_id, student_id, reason)
+     values ('dd000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111', 'hack') $$,
+  '42501', NULL,
+  'M30: student cannot create excuse on lesson outside own group');
+
+-- Set aa000001 to in_progress to test the status gate
+reset role;
+delete from public.lesson_excuse_requests
+  where lesson_id = 'aa000001-0000-0000-0000-000000000000'
+    and student_id = 'a1111111-1111-1111-1111-111111111111';
+update public.lessons set status = 'in_progress'
+  where id = 'aa000001-0000-0000-0000-000000000000';
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 110: student CANNOT create excuse once lesson is in progress → 42501
+select throws_ok(
+  $$ insert into public.lesson_excuse_requests (lesson_id, student_id, reason)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111', 'опоздал') $$,
+  '42501', NULL,
+  'M30: student cannot create excuse once lesson is in progress');
+
+-- Test 111: student CAN raise hand during in_progress lesson → works
+select lives_ok(
+  $$ insert into public.lesson_raised_hands (lesson_id, student_id)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111') $$,
+  'M30: student can raise hand during in_progress lesson');
+
+-- Seed excuse rows (superuser bypasses RLS): one in own group, one in foreign group
+reset role;
+insert into public.lesson_excuse_requests (lesson_id, student_id, reason)
+  values ('aa000001-0000-0000-0000-000000000000',
+          'a1111111-1111-1111-1111-111111111111', 'болезнь')
+  on conflict do nothing;
+insert into public.lesson_excuse_requests (lesson_id, student_id, reason)
+  values ('dd000001-0000-0000-0000-000000000000',
+          'b2222222-2222-2222-2222-222222222222', 'foreign')
+  on conflict do nothing;
+
+-- as teacher Ivan
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 112: teacher sees excuse requests in own group
+select ok(
+  (select count(*) > 0 from public.lesson_excuse_requests
+    where lesson_id = 'aa000001-0000-0000-0000-000000000000'),
+  'M30: teacher sees excuse requests in own group');
+
+-- Test 113: teacher does NOT see excuse requests outside own groups
+select is(
+  (select count(*)::int from public.lesson_excuse_requests
+    where lesson_id = 'dd000001-0000-0000-0000-000000000000'), 0,
+  'M30: teacher does not see excuse requests outside own groups');
+
+-- Test 114: teacher can lower a raised hand in own group
+select lives_ok(
+  $$ update public.lesson_raised_hands
+       set lowered_at = now(),
+           lowered_by = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+     where lesson_id = 'aa000001-0000-0000-0000-000000000000'
+       and student_id = 'a1111111-1111-1111-1111-111111111111' $$,
+  'M30: teacher can lower a raised hand in own group');
+
+-- Test 115: deleting raised hands is forbidden for everyone (no grant) → 42501
+select throws_ok(
+  $$ delete from public.lesson_raised_hands
+     where lesson_id = 'aa000001-0000-0000-0000-000000000000' $$,
+  '42501', NULL,
+  'M30: deleting raised hands is forbidden');
+
+reset role;
 
 select * from finish();
 rollback;

@@ -1,25 +1,27 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   ChevronLeft, MapPin, Target, BookOpen, Hammer, Pencil,
   CheckSquare, Trophy, Check, Plus, X, FileText, Download,
-  Trash2, Upload, Play, Square, Clock, AlertCircle,
+  Trash2, Upload, Play, Square, Clock, AlertCircle, CalendarX,
 } from "lucide-react";
 import {
   updateLesson, setStageEnabled, setStageCompleted, setStageNotes,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
-  getSubjectStyle, startLesson, endLesson,
+  getSubjectStyle, startLesson, endLesson, getLessonExcuseRequests,
 } from "@snr/core";
-import type { TeacherLessonView, LessonStatus, LessonStage, StageKey, LessonMaterial, Teacher } from "@snr/core";
+import type { TeacherLessonView, LessonStatus, LessonStage, StageKey, LessonMaterial, Teacher, ExcuseRequestWithStudent } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { AttendanceRollCall } from "./AttendanceRollCall";
 import { ClassworkModal } from "./ClassworkModal";
+import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { useRealtimeChannel } from "@/lib/realtime";
 
 const ALL_STAGE_KEYS: StageKey[] = ["goal", "theory", "practice", "classwork", "review", "summary"];
 const REQUIRED = new Set<StageKey>(["goal", "summary"]);
@@ -120,11 +122,36 @@ export function TeacherLessonDetailView({
   // Classwork modal
   const [classworkOpen, setClassworkOpen] = useState(false);
 
+  // Excuse requests (visible before & during the lesson)
+  const [excuses, setExcuses] = useState<ExcuseRequestWithStudent[]>([]);
+  const reloadExcuses = useCallback(() => {
+    getLessonExcuseRequests(db as never, lesson.id)
+      .then(setExcuses)
+      .catch(() => null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.id]);
+
   // Mount gate — this page formats lesson timestamps (starts_at/ended_at/…) in JSX.
   // SSR runs in UTC, the client in UTC+5, so the rendered times would differ and
   // trigger React #418. Render a placeholder until mounted, then the real UI.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  // Load excuse requests while the lesson is not finalized
+  useEffect(() => {
+    if (status !== "completed") reloadExcuses();
+  }, [status, reloadExcuses]);
+
+  // Realtime: new / cancelled excuse requests appear instantly (disabled once completed)
+  useRealtimeChannel(
+    status === "completed" ? null : `lesson-excuses-${lesson.id}`,
+    "lesson_excuse_requests",
+    `lesson_id=eq.${lesson.id}`,
+    reloadExcuses,
+  );
+
+  const excusedMap: Record<string, string> = {};
+  for (const e of excuses) excusedMap[e.student_id] = e.reason;
 
   useEffect(() => {
     if (status !== "in_progress" || !startedAt) return;
@@ -364,11 +391,17 @@ export function TeacherLessonDetailView({
           lessonId={lesson.id}
           teacherId={teacher.id}
           lessonStatus={status}
+          excused={excusedMap}
           onStatusChange={(allDone, names) => {
             setAllMarked(allDone);
             setUnmarkedNames(names);
           }}
         />
+      )}
+
+      {/* Raised hands — only while the lesson is live */}
+      {status === "in_progress" && (
+        <RaisedHandsBlock lessonId={lesson.id} teacherId={teacher.id} />
       )}
 
       {/* About lesson block */}
@@ -406,6 +439,30 @@ export function TeacherLessonDetailView({
           )}
         </div>
       </section>
+
+      {/* Excuse requests — visible before & during the lesson */}
+      {status !== "completed" && excuses.length > 0 && (
+        <section className="rounded-2xl border border-orange-100 bg-orange-50/50 p-6 shadow-sm backdrop-blur-xl space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-orange-600">
+            <CalendarX className="h-4 w-4" />
+            {d.lesson.excuse.teacherTitle} ({excuses.length})
+          </h2>
+          <div className="space-y-2">
+            {excuses.map((e) => (
+              <div key={e.id} className="flex items-start gap-3 rounded-xl border border-white bg-white/80 px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[12px] font-bold text-orange-600">
+                  {e.student.full_name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-slate-800">{e.student.full_name}</p>
+                  <p className="mt-0.5 text-[13px] text-slate-500">{e.reason}</p>
+                </div>
+                <span className="shrink-0 text-[11px] text-slate-400">{fmtTime(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Stages block */}
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">

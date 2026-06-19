@@ -296,6 +296,37 @@ export interface Dictionary {
     saveBtn: string;
     uploading: string;
     deleteConfirm: string;
+    // Lesson features (migration 30)
+    nowStarting: string;          // "Сейчас начинается урок"
+    startsInLabel: string;        // "Урок начнётся через {time}"
+    goToLesson: string;           // "Перейти"
+    goToLessonNow: string;        // "сейчас"
+    countdownNote: string;        // "Переход в режим урока через {n} секунд"
+    excuse: {
+      button: string;             // "Отпроситься"
+      title: string;              // "Отпроситься с урока"
+      subtitle: string;           // "Учитель увидит вашу заявку до начала урока"
+      reasonLabel: string;        // "Причина"
+      reasonPlaceholder: string;
+      submit: string;             // "Отправить заявку"
+      sending: string;            // "Отправка…"
+      cancel: string;             // "Отмена"
+      minLengthError: string;     // "Минимум 5 символов"
+      requestedTitle: string;     // "Вы отпросились"
+      reasonPrefix: string;       // "Причина:"
+      cancelRequest: string;      // "Отменить заявку"
+      teacherTitle: string;       // "Отпросились" (+ count)
+    };
+    raisedHand: {
+      raise: string;              // "Поднять руку"
+      raised: string;             // "Рука поднята"
+      teacherSees: string;        // "Учитель видит"
+      teacherTitle: string;       // "Поднятые руки"
+      empty: string;              // "Никто не поднял руку"
+      lower: string;              // "Опустить руку"
+      agoSeconds: string;         // "{n} сек назад"
+      agoMinutes: string;         // "{n} мин назад"
+    };
   };
   teacher: {
     role: string;
