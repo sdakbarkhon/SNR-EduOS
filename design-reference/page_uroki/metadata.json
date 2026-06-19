@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS - Урок",
+  "description": "Интерфейс «Обзор урока» для образовательной платформы SNR EduOS",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

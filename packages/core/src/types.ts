@@ -380,3 +380,52 @@ export type BookFavorite = {
   book_id: string;
   created_at: string;
 };
+
+// ─── Classwork ────────────────────────────────────────────────────────────────
+
+export type ClassworkType = "file" | "test" | "learning" | "programming";
+
+export type ClassworkQuestion = {
+  id: string;
+  classwork_id: string;
+  position: number;
+  question_text: string;
+  options: string[];         // array of option strings
+  correct_index: number;
+};
+
+export type ClassworkSubmission = {
+  id: string;
+  classwork_id: string;
+  student_id: string;
+  text_answer: string | null;
+  file_storage_path: string | null;
+  file_original_name: string | null;
+  file_size_bytes: number | null;
+  test_answers: number[] | null;
+  test_score: number | null;
+  test_max: number | null;
+  submitted_at: string;
+  grade: number | null;
+  teacher_comment: string | null;
+  graded_at: string | null;
+  graded_by: string | null;
+};
+
+export type Classwork = {
+  id: string;
+  lesson_id: string;
+  title: string;
+  description: string | null;
+  work_type: ClassworkType;
+  created_by: string | null;
+  created_at: string;
+  attachment_storage_path: string | null;
+  attachment_filename: string | null;
+  attachment_size_bytes: number | null;
+  questions: ClassworkQuestion[];
+};
+
+export type ClassworkSubmissionWithStudent = ClassworkSubmission & {
+  student: { id: string; full_name: string; avatar_url: string | null };
+};

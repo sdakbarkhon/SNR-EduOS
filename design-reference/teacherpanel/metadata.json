@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS - Teacher Panel",
+  "description": "High-fidelity Liquid Glass UI prototype for an EdTech Teacher Dashboard",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

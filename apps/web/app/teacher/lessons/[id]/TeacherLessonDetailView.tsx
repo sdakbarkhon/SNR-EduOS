@@ -5,19 +5,21 @@ import Link from "next/link";
 import {
   ChevronLeft, MapPin, Target, BookOpen, Hammer, Pencil,
   CheckSquare, Trophy, Check, Plus, X, FileText, Download,
-  Trash2, Upload, Play, Square, Clock,
+  Trash2, Upload, Play, Square, Clock, AlertCircle,
 } from "lucide-react";
 import {
   updateLesson, setStageEnabled, setStageCompleted, setStageNotes,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   getSubjectStyle, startLesson, endLesson,
 } from "@snr/core";
-import { AttendanceRollCall } from "./AttendanceRollCall";
 import type { TeacherLessonView, LessonStatus, LessonStage, StageKey, LessonMaterial, Teacher } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
+import { AttendanceRollCall } from "./AttendanceRollCall";
+import { ClassworkModal } from "./ClassworkModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 const ALL_STAGE_KEYS: StageKey[] = ["goal", "theory", "practice", "classwork", "review", "summary"];
 const REQUIRED = new Set<StageKey>(["goal", "summary"]);
@@ -105,6 +107,19 @@ export function TeacherLessonDetailView({
   const [statusLoading, setStatusLoading] = useState(false);
   const [elapsedMin, setElapsedMin] = useState(0);
 
+  // Attendance completeness tracking
+  const [allMarked, setAllMarked] = useState(false);
+  const [unmarkedNames, setUnmarkedNames] = useState<string[]>([]);
+
+  // Modals
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  const [incompleteOpen, setIncompleteOpen] = useState(false);
+  const [confirmDeleteMatOpen, setConfirmDeleteMatOpen] = useState(false);
+  const [matToDelete, setMatToDelete] = useState<LessonMaterial | null>(null);
+
+  // Classwork modal
+  const [classworkOpen, setClassworkOpen] = useState(false);
+
   useEffect(() => {
     if (status !== "in_progress" || !startedAt) return;
     const tick = () => setElapsedMin(Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000));
@@ -123,14 +138,27 @@ export function TeacherLessonDetailView({
     } catch { /* noop */ } finally { setStatusLoading(false); }
   }
 
+  function requestEnd() {
+    // If attendance roll-call is active and not complete, show incomplete modal first
+    if (status === "in_progress" && !allMarked && unmarkedNames.length > 0) {
+      setIncompleteOpen(true);
+      return;
+    }
+    setConfirmEndOpen(true);
+  }
+
   async function handleEnd() {
-    const confirmMsg = `${d.teacher.endLessonConfirmTitle}\n\n${d.teacher.endLessonConfirmMsg}`;
-    if (!window.confirm(confirmMsg)) return;
     setStatusLoading(true);
     try {
       await endLesson(db, lesson.id);
+      const now = new Date().toISOString();
       setStatus("completed");
-      setEndedAt(new Date().toISOString());
+      setEndedAt(now);
+      // Auto-mark summary stage as completed in UI
+      setStages((prev) => ({
+        ...prev,
+        summary: { ...prev.summary, enabled: true, is_completed: true },
+      }));
     } catch { /* noop */ } finally { setStatusLoading(false); }
   }
 
@@ -161,6 +189,18 @@ export function TeacherLessonDetailView({
   // ── Stage toggle ───────────────────────────────────────────────────
   async function handleToggleStage(key: StageKey) {
     if (REQUIRED.has(key)) return;
+    // Classwork stage opens the classwork modal instead of toggling
+    if (key === "classwork") {
+      if (!stages[key].enabled) {
+        // Enable stage then open modal
+        setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: true } }));
+        await setStageEnabled(db, lesson.id, key, true).catch(() =>
+          setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: false } }))
+        );
+      }
+      setClassworkOpen(true);
+      return;
+    }
     const next = !stages[key].enabled;
     setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: next } }));
     await setStageEnabled(db, lesson.id, key, next).catch(() =>
@@ -200,10 +240,16 @@ export function TeacherLessonDetailView({
     }
   }
 
-  async function handleDeleteMaterial(mat: LessonMaterial) {
-    if (!confirm(d.lesson.deleteConfirm)) return;
-    await deleteLessonMaterial(db, mat.id, mat.file_storage_path).catch(() => null);
-    setMaterials((prev) => prev.filter((m) => m.id !== mat.id));
+  function requestDeleteMaterial(mat: LessonMaterial) {
+    setMatToDelete(mat);
+    setConfirmDeleteMatOpen(true);
+  }
+
+  async function handleDeleteMaterial() {
+    if (!matToDelete) return;
+    await deleteLessonMaterial(db, matToDelete.id, matToDelete.file_storage_path).catch(() => null);
+    setMaterials((prev) => prev.filter((m) => m.id !== matToDelete.id));
+    setMatToDelete(null);
   }
 
   async function handleDownloadMaterial(mat: LessonMaterial) {
@@ -226,7 +272,7 @@ export function TeacherLessonDetailView({
         {d.lesson.backToLessons}
       </Link>
 
-      {/* Header card — color varies by status */}
+      {/* Header card */}
       {(() => {
         const bg =
           status === "in_progress" ? "linear-gradient(135deg, #16a34a, #15803d)"
@@ -274,7 +320,7 @@ export function TeacherLessonDetailView({
             Урок идёт. Длится {elapsedMin} мин.
           </p>
           <button
-            onClick={handleEnd}
+            onClick={requestEnd}
             disabled={statusLoading}
             className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-red-500/25 hover:bg-red-700 active:scale-95 disabled:opacity-50"
           >
@@ -292,12 +338,16 @@ export function TeacherLessonDetailView({
         </div>
       )}
 
-      {/* Roll call — visible only during in_progress and completed (read-only) */}
+      {/* Roll call — visible during in_progress and completed (read-only) */}
       {(status === "in_progress" || status === "completed") && (
         <AttendanceRollCall
           lessonId={lesson.id}
           teacherId={teacher.id}
           lessonStatus={status}
+          onStatusChange={(allDone, names) => {
+            setAllMarked(allDone);
+            setUnmarkedNames(names);
+          }}
         />
       )}
 
@@ -331,7 +381,7 @@ export function TeacherLessonDetailView({
               disabled={infoSaving}
               className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-60"
             >
-              {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {d.lesson.saveBtn}</>  : infoSaving ? d.lesson.uploading : d.lesson.saveBtn}
+              {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {d.lesson.saveBtn}</> : infoSaving ? d.lesson.uploading : d.lesson.saveBtn}
             </button>
           )}
         </div>
@@ -349,6 +399,7 @@ export function TeacherLessonDetailView({
             const label = stageLabels[key];
             const required = REQUIRED.has(key);
             const order = STAGE_ORDER[key];
+            const isClasswork = key === "classwork";
 
             if (!st.enabled) {
               return (
@@ -366,9 +417,12 @@ export function TeacherLessonDetailView({
             return (
               <div
                 key={key}
+                onClick={isClasswork ? () => setClassworkOpen(true) : undefined}
                 className={`relative flex flex-col gap-2 rounded-2xl border p-4 transition-all ${
                   st.is_completed
                     ? "border-emerald-200 bg-emerald-50"
+                    : isClasswork
+                    ? "border-blue-200 bg-blue-50 cursor-pointer hover:shadow-md"
                     : "border-gray-100 bg-white shadow-sm"
                 }`}
               >
@@ -376,9 +430,9 @@ export function TeacherLessonDetailView({
                   <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
                     {STAGE_ICONS[key]}
                   </span>
-                  {!required && (
+                  {!required && !isClasswork && (
                     <button
-                      onClick={() => handleToggleStage(key)}
+                      onClick={(e) => { e.stopPropagation(); handleToggleStage(key); }}
                       className="rounded-full p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-400"
                       title={d.lesson.removeStageLabel}
                     >
@@ -388,32 +442,42 @@ export function TeacherLessonDetailView({
                 </div>
                 <p className="text-xs font-bold text-gray-700">{label}</p>
                 <p className="text-[10px] font-medium text-gray-400">Этап {order}</p>
-                <button
-                  onClick={() => handleToggleCompleted(key)}
-                  className={`mt-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                    st.is_completed
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
-                  }`}
-                >
-                  {st.is_completed ? <Check className="h-3.5 w-3.5" /> : <div className="h-3.5 w-3.5 rounded-sm border-2 border-current" />}
-                  {st.is_completed ? d.lesson.stageCompletedLabel : "Отметить"}
-                </button>
-                <button
-                  onClick={() => setStages((p) => ({ ...p, [key]: { ...p[key], notesOpen: !p[key].notesOpen } }))}
-                  className="text-left text-xs text-gray-400 hover:text-blue-500"
-                >
-                  {st.notesOpen ? "▲" : "▼"} {d.lesson.teacherNotesLabel}
-                </button>
-                {st.notesOpen && (
-                  <textarea
-                    rows={2}
-                    value={st.notes}
-                    placeholder={d.lesson.teacherNotesPlaceholder}
-                    onChange={(e) => setStages((p) => ({ ...p, [key]: { ...p[key], notes: e.target.value } }))}
-                    onBlur={() => handleNotesBlur(key)}
-                    className="w-full resize-none rounded-lg border border-gray-200 bg-white/80 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-400"
-                  />
+                {isClasswork ? (
+                  <span className="mt-auto text-[11px] font-semibold text-blue-600">
+                    Открыть →
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleToggleCompleted(key)}
+                    className={`mt-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                      st.is_completed
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
+                    }`}
+                  >
+                    {st.is_completed ? <Check className="h-3.5 w-3.5" /> : <div className="h-3.5 w-3.5 rounded-sm border-2 border-current" />}
+                    {st.is_completed ? d.lesson.stageCompletedLabel : "Отметить"}
+                  </button>
+                )}
+                {!isClasswork && (
+                  <>
+                    <button
+                      onClick={() => setStages((p) => ({ ...p, [key]: { ...p[key], notesOpen: !p[key].notesOpen } }))}
+                      className="text-left text-xs text-gray-400 hover:text-blue-500"
+                    >
+                      {st.notesOpen ? "▲" : "▼"} {d.lesson.teacherNotesLabel}
+                    </button>
+                    {st.notesOpen && (
+                      <textarea
+                        rows={2}
+                        value={st.notes}
+                        placeholder={d.lesson.teacherNotesPlaceholder}
+                        onChange={(e) => setStages((p) => ({ ...p, [key]: { ...p[key], notes: e.target.value } }))}
+                        onBlur={() => handleNotesBlur(key)}
+                        className="w-full resize-none rounded-lg border border-gray-200 bg-white/80 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-400"
+                      />
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -460,7 +524,7 @@ export function TeacherLessonDetailView({
                     <Download className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteMaterial(mat)}
+                    onClick={() => requestDeleteMaterial(mat)}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
                     title={d.lesson.deleteConfirm}
                   >
@@ -528,6 +592,60 @@ export function TeacherLessonDetailView({
           </div>
         </div>
       )}
+
+      {/* Incomplete attendance modal */}
+      <ConfirmModal
+        open={incompleteOpen}
+        onClose={() => setIncompleteOpen(false)}
+        title="Перекличка не завершена"
+        message={`Отметь всех учеников перед завершением урока. Не отмечено: ${unmarkedNames.length}`}
+        icon={<AlertCircle className="h-6 w-6 text-orange-500" />}
+        variant="warning"
+        confirmText="Понятно"
+      >
+        {unmarkedNames.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {unmarkedNames.map((name) => (
+              <li key={name} className="flex items-center gap-2 text-[13px] text-gray-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </ConfirmModal>
+
+      {/* Confirm end lesson */}
+      <ConfirmModal
+        open={confirmEndOpen}
+        onClose={() => setConfirmEndOpen(false)}
+        onConfirm={handleEnd}
+        title={d.teacher.endLessonConfirmTitle}
+        message={d.teacher.endLessonConfirmMsg}
+        variant="danger"
+        confirmText="Закончить"
+        cancelText={d.common.cancel}
+      />
+
+      {/* Confirm delete material */}
+      <ConfirmModal
+        open={confirmDeleteMatOpen}
+        onClose={() => { setConfirmDeleteMatOpen(false); setMatToDelete(null); }}
+        onConfirm={handleDeleteMaterial}
+        title={d.lesson.deleteConfirm}
+        variant="danger"
+        confirmText="Удалить"
+        cancelText={d.common.cancel}
+      />
+
+      {/* Classwork modal */}
+      <ClassworkModal
+        open={classworkOpen}
+        onClose={() => setClassworkOpen(false)}
+        lessonId={lesson.id}
+        groupId={lesson.group_id}
+        teacherId={teacher.id}
+      />
     </div>
   );
 }

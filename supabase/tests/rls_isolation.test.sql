@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(101);
+select plan(107);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -602,6 +602,78 @@ select ok(
     where table_schema = 'public' and table_name = 'attendance' and column_name = 'marked_at'),
   'migration 27: attendance.marked_at column exists'
 );
+
+-- ============ КЛАССНАЯ РАБОТА (migration 28) ============
+
+-- Test 102: classwork table exists with expected columns
+reset role;
+select ok(
+  (select count(*) > 0
+     from information_schema.tables
+    where table_schema = 'public' and table_name = 'classwork'),
+  'migration 28: classwork table exists'
+);
+
+-- Test 103: classwork_questions table exists
+select ok(
+  (select count(*) > 0
+     from information_schema.tables
+    where table_schema = 'public' and table_name = 'classwork_questions'),
+  'migration 28: classwork_questions table exists'
+);
+
+-- Test 104: classwork_submissions table exists
+select ok(
+  (select count(*) > 0
+     from information_schema.tables
+    where table_schema = 'public' and table_name = 'classwork_submissions'),
+  'migration 28: classwork_submissions table exists'
+);
+
+-- Test 105 (as teacher): teacher can INSERT classwork in own lesson
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select lives_ok(
+  $$ insert into public.classwork (lesson_id, title, work_type, created_by)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'TEST-CW by Ivan', 'file',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  'T: can INSERT classwork in own lesson (migration 28)'
+);
+
+-- Test 106 (as teacher): teacher CANNOT INSERT classwork in another teacher's lesson
+select throws_ok(
+  $$ insert into public.classwork (lesson_id, title, work_type, created_by)
+     values ('dd000001-0000-0000-0000-000000000000',
+             'HACK-CW', 'file',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  '42501', NULL,
+  'T: cannot INSERT classwork in another teacher lesson (42501)'
+);
+
+-- Test 107 (as student A): student sees classwork in own group lesson
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select ok(
+  (select count(*) > 0 from public.classwork
+    where lesson_id = 'aa000001-0000-0000-0000-000000000000'),
+  'classwork RLS: student A sees classwork in own group lesson'
+);
+
+-- cleanup
+reset role;
+delete from public.classwork where title = 'TEST-CW by Ivan';
 
 select * from finish();
 rollback;

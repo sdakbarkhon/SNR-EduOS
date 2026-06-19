@@ -1,0 +1,6 @@
+{
+  "name": "SNR EduOS - Books",
+  "description": "A high-fidelity modern UI for an educational book library dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

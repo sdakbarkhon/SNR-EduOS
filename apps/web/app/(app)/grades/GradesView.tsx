@@ -12,7 +12,7 @@ interface Props {
   grades: StudentGradeItem[];
 }
 
-type TypeFilter = "all" | "file" | "test";
+type TypeFilter = "all" | "file" | "test" | "classwork";
 type SortKey = "subject" | "date" | "grade";
 
 /** Цвет оценки по проценту: >=80% зелёный, 50-79% жёлтый, <50% красный. */
@@ -98,6 +98,7 @@ export function GradesView({ grades }: Props) {
     { key: "all", label: "Все типы" },
     { key: "file", label: d.homework.typeFile },
     { key: "test", label: d.homework.typeTest },
+    { key: "classwork", label: d.classwork.title },
   ];
 
   return (
@@ -187,8 +188,16 @@ export function GradesView({ grades }: Props) {
                       </td>
                       <td className="px-4 py-3">
                         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                          g.kind === "test" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700")}>
-                          {g.kind === "test" ? d.homework.typeTest : d.homework.typeFile}
+                          g.kind === "classwork"
+                            ? "bg-purple-100 text-purple-700"
+                            : g.kind === "test"
+                            ? "bg-violet-100 text-violet-700"
+                            : "bg-blue-100 text-blue-700")}>
+                          {g.kind === "classwork"
+                            ? d.classwork.title
+                            : g.kind === "test"
+                            ? d.homework.typeTest
+                            : d.homework.typeFile}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-[14px] font-semibold text-brand-ink">{g.title}</td>

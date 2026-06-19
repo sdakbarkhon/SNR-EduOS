@@ -17,6 +17,7 @@ import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-re
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { ReviewModal, TestReviewModal } from "@/components/teacher/ReviewModals";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type Question = {
   id: string;
@@ -147,9 +148,10 @@ function AttachmentCard({
     }
   };
 
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
   const handleDelete = async () => {
     if (!hw.attachment_storage_path) return;
-    if (!confirm(d.teacher.hwDeleteAttachConfirm)) return;
     setDelLoading(true);
     try {
       await deleteHomeworkAttachment(sb, hw.id, hw.attachment_storage_path);
@@ -185,13 +187,22 @@ function AttachmentCard({
           </button>
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => setDeleteConfirmOpen(true)}
             disabled={delLoading}
             className="rounded-[8px] p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
           >
             <Trash2 size={14} />
           </button>
         </div>
+        <ConfirmModal
+          open={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+          onConfirm={handleDelete}
+          title={d.teacher.hwDeleteAttachConfirm}
+          variant="danger"
+          confirmText="Удалить"
+          cancelText={d.common.cancel}
+        />
       </div>
     );
   }

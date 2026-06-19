@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStudentLessonView, getLessonMaterialUrl } from "@snr/core";
+import { getStudentLessonView, getLessonMaterialUrl, getMyStudent } from "@snr/core";
 import { notFound } from "next/navigation";
 import { LessonView } from "./LessonView";
 
@@ -11,7 +11,10 @@ export default async function LessonPage({
   const { id } = await params;
   const db = await createClient();
 
-  const lesson = await getStudentLessonView(db, id).catch(() => null);
+  const [lesson, student] = await Promise.all([
+    getStudentLessonView(db, id).catch(() => null),
+    Promise.resolve(getMyStudent(db)).catch(() => null),
+  ]);
   if (!lesson) notFound();
 
   // Pre-generate signed URLs for all lesson materials
@@ -28,5 +31,5 @@ export default async function LessonPage({
     }),
   );
 
-  return <LessonView lesson={lesson} materialUrls={materialUrls} />;
+  return <LessonView lesson={lesson} materialUrls={materialUrls} studentId={student?.id ?? null} />;
 }

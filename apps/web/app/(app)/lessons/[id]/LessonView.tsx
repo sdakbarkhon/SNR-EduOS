@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, Clock, XCircle, type LucideIcon } from "lucide-react";
 import type { StudentLessonView, LessonStagePublic, StageKey } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
+import { ClassworkBlock } from "./ClassworkBlock";
 
 const STAGE_ICONS: Record<StageKey, LucideIcon> = {
   goal:      Target,
@@ -126,9 +127,10 @@ function TooLateGate({ lesson }: { lesson: StudentLessonView }) {
 interface Props {
   lesson: StudentLessonView;
   materialUrls: Record<string, string>;
+  studentId: string | null;
 }
 
-export function LessonView({ lesson, materialUrls }: Props) {
+export function LessonView({ lesson, materialUrls, studentId }: Props) {
   const access = computeAccess(lesson);
   if (access.state === "too_early") return <TooEarlyGate lesson={lesson} />;
   if (access.state === "too_late")  return <TooLateGate  lesson={lesson} />;
@@ -275,6 +277,16 @@ export function LessonView({ lesson, materialUrls }: Props) {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Classwork — visible only while lesson is in progress */}
+      {isInProgress && studentId && (
+        <div className="anim-fade-up anim-delay-2">
+          <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-gray-500">
+            Классная работа
+          </h3>
+          <ClassworkBlock lessonId={lesson.id} studentId={studentId} />
         </div>
       )}
 

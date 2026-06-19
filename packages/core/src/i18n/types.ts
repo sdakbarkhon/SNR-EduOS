@@ -441,5 +441,55 @@ export interface Dictionary {
     rollCallStats: string;
     endLessonConfirmTitle: string;
     endLessonConfirmMsg: string;
+    incompleteAttendanceTitle: string;
+    incompleteAttendanceMsg: string;
+    rollCallUnmarked: string;
+    // Classwork
+    classworkBtn: string;
+    classworkModalTitle: string;
+    classworkTabTask: string;
+    classworkTabSubmissions: string;
+    classworkTypeFile: string;
+    classworkTypeTest: string;
+    classworkTypeLearning: string;
+    classworkTypeProgramming: string;
+    classworkTitleLabel: string;
+    classworkDescLabel: string;
+    classworkTypeLabel: string;
+    classworkSaveBtn: string;
+    classworkSavingBtn: string;
+    classworkDeleteBtn: string;
+    classworkDeleteConfirm: string;
+    classworkAddQuestion: string;
+    classworkQuestionText: string;
+    classworkQuestionOption: string;
+    classworkMarkCorrect: string;
+    classworkNoSubmissions: string;
+    classworkSubmittedLabel: string;
+    classworkGradeLabel: string;
+    classworkCommentLabel: string;
+    classworkGradeBtn: string;
+    classworkGradedLabel: string;
+    classworkTestScore: string;
+  };
+  classwork: {
+    title: string;
+    submitBtn: string;
+    submittedTitle: string;
+    yourGrade: string;
+    teacherComment: string;
+    textAnswerLabel: string;
+    textAnswerPlaceholder: string;
+    attachFileLabel: string;
+    submitError: string;
+    testComplete: string;
+    testResultsTitle: string;
+    testScore: string;
+    questionOf: string;    // "{n} из {total}"
+    noClasswork: string;
+    typeFile: string;
+    typeTest: string;
+    typeLearning: string;
+    typeProgramming: string;
   };
 }
