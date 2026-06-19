@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+
+<html lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SNR EduOS - Lesson Mode</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-dim": "#cbdbf5",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#001f26",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "surface-container": "#e5eeff",
+                        "surface-tint": "#005bc1",
+                        "secondary": "#6b38d4",
+                        "primary": "#0058bc",
+                        "on-primary-fixed-variant": "#004493",
+                        "on-secondary-fixed-variant": "#5516be",
+                        "surface-bright": "#f8f9ff",
+                        "inverse-surface": "#213145",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#f9fdff",
+                        "on-primary-container": "#fefcff",
+                        "error": "#ba1a1a",
+                        "on-surface": "#0b1c30",
+                        "on-secondary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#d3e4fe",
+                        "outline": "#717786",
+                        "inverse-primary": "#adc6ff",
+                        "on-background": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface": "#f8f9ff",
+                        "primary-fixed-dim": "#adc6ff",
+                        "error-container": "#ffdad6",
+                        "primary-fixed": "#d8e2ff",
+                        "outline-variant": "#c1c6d7",
+                        "surface-container-high": "#dce9ff",
+                        "tertiary-fixed-dim": "#4cd7f6",
+                        "background": "#f8f9ff",
+                        "on-surface-variant": "#414755",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary-container": "#0070eb",
+                        "secondary-container": "#8455ef",
+                        "tertiary-container": "#008096",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#e9ddff",
+                        "on-primary-fixed": "#001a41",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-container-low": "#eff4ff",
+                        "on-secondary-fixed": "#23005c",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#acedff",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary": "#006577",
+                        "snr-gradient-start": "#0058bc",
+                        "snr-gradient-end": "#6b38d4"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "unit-xl": "48px",
+                        "unit-md": "16px",
+                        "container-max": "1280px",
+                        "unit-sm": "8px",
+                        "gutter": "24px",
+                        "margin-mobile": "16px",
+                        "unit-lg": "24px",
+                        "margin-desktop": "40px",
+                        "unit-xs": "4px"
+                    },
+                    fontFamily: {
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    fontSize: {
+                        "label-sm": ["12px", { lineHeight: "1.2", fontWeight: "600" }],
+                        "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "1.2", fontWeight: "700" }],
+                        "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "label-md": ["14px", { lineHeight: "1.4", letterSpacing: "0.01em", fontWeight: "500" }],
+                        "headline-lg": ["32px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-xl": ["40px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-md": ["24px", { lineHeight: "1.3", fontWeight: "600" }]
+                    },
+                    boxShadow: {
+                        'glass': '0 10px 40px rgba(0, 0, 0, 0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background: linear-gradient(135deg, #0b1c30 0%, #213145 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Atmospheric Background Elements */
+        .ambient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: rgba(107, 56, 212, 0.6); /* Purple */
+            top: -100px;
+            left: -100px;
+            animation: float1 20s ease-in-out infinite;
+        }
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: rgba(0, 88, 188, 0.5); /* Blue */
+            bottom: -150px;
+            right: -100px;
+            animation: float2 25s ease-in-out infinite;
+        }
+        .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: rgba(76, 215, 246, 0.4); /* Cyan */
+            top: 40%;
+            left: 60%;
+            animation: float3 18s ease-in-out infinite;
+        }
+
+        @keyframes float1 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(50px, 50px); }
+        }
+        @keyframes float2 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-50px, -30px); }
+        }
+        @keyframes float3 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, -40px); }
+        }
+
+        .glass-card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .stepper-line {
+            width: 2px;
+            background: #d3e4fe;
+            position: absolute;
+            left: 11px;
+            top: 24px;
+            bottom: -8px;
+            z-index: 0;
+        }
+        .step-item:last-child .stepper-line {
+            display: none;
+        }
+
+        /* Custom Scrollbar for inner content if needed */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface flex items-center justify-center p-unit-md md:p-margin-desktop relative h-screen">
+<!-- Ambient Background -->
+<div class="ambient-orb orb-1"></div>
+<div class="ambient-orb orb-2"></div>
+<div class="ambient-orb orb-3"></div>
+<!-- Main Workspace Container -->
+<main class="glass-card w-full max-w-container-max h-full rounded-2xl flex flex-col overflow-hidden relative z-10 shadow-glass">
+<!-- Top Header Panel (Gradient) -->
+<header class="bg-gradient-to-r from-snr-gradient-start to-snr-gradient-end text-white px-unit-lg py-unit-md flex items-center justify-between shrink-0">
+<div class="flex items-center gap-unit-md">
+<!-- Branding & Title Info -->
+<div class="flex items-center gap-unit-sm">
+<img alt="SNR Logo Badge" class="h-10 w-auto object-contain rounded-lg bg-white/10 p-1" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAwCAYAAAA2GtvFAAAAa0lEQVR4AeyQuwmAQBBEF8USTIysxdxK7EFswNTAukwNtQvFN+cHvPC48A4ezD12N5jMvJfEv5CYfRScFqajDZ8ZBqgkWsICK3QSJ+GAHNzKSCihhkkTO6F/2CTIphXhViQ+3okk7gYC+rgAAAD///RoZUsAAAAGSURBVAMA0v0MYREj5D0AAAAASUVORK5CYII="/>
+<div class="hidden lg:block h-8 w-px bg-white/20 mx-2"></div>
+<div>
+<h1 class="font-headline-md text-headline-md leading-tight">Робототехника и электроника</h1>
+<p class="font-label-md text-label-md text-white/80 mt-1">Урок 12. Управление светодиодом и кнопкой</p>
+</div>
+</div>
+</div>
+<!-- Header Right: Teacher, Timer, Actions -->
+<div class="flex items-center gap-unit-lg">
+<!-- Teacher Info -->
+<div class="hidden md:flex items-center gap-unit-sm bg-white/10 rounded-full pr-4 pl-1 py-1 border border-white/10">
+<img alt="Teacher avatar" class="w-8 h-8 rounded-full border-2 border-white/20" data-alt="A small circular avatar placeholder image of a male teacher in a modern e-learning platform interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgr2mhzgeAOwJzXKILH34UJ_jDEgHOAfOoC65_You6hWeFx2WAQQBn0VG5qAY9280zPajqvLFufJWSsSrvD4CKQNNuOEbpTEyiYll3XVZxRcpWYKn66cmLaz4Jt4drJ2YHJPZCwTKeOV9viVg8d5mm1gyq8hntiliKORzCu5sn6MVp_gp3DwlMAydccvOmtFPA6gqyeaLfgmpmIChoMUIsSZ9a9fmrZKfWqrNB8hmkiBJtrNVNt8UvYdLVztGp4JdKIoSsJJUyfKuH"/>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm">Иван Петрович</span>
+<span class="text-[10px] text-white/70">Кабинет 305</span>
+</div>
+</div>
+<!-- Timer -->
+<div class="flex items-center gap-unit-sm bg-black/20 rounded-lg px-4 py-2 border border-white/10 font-mono">
+<span class="material-symbols-outlined text-white/80">timer</span>
+<span class="font-headline-md text-headline-md tracking-wider" id="lesson-timer">00:04:12</span>
+</div>
+<!-- Action Buttons -->
+<div class="flex gap-unit-sm">
+<button class="bg-white/10 hover:bg-white/20 text-white font-label-md text-label-md px-4 py-2 rounded-lg border border-white/20 transition-colors backdrop-blur-sm">
+                        Показать еще
+                    </button>
+<button class="bg-white text-primary hover:bg-surface-dim font-label-md text-label-md font-bold px-6 py-2 rounded-lg shadow-sm transition-transform active:scale-95">
+                        Завершить
+                    </button>
+</div>
+</div>
+</header>
+<!-- Main Content Area (3 Columns) -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Column: Stepper -->
+<aside class="w-64 border-r border-outline-variant/30 flex flex-col bg-surface/30 backdrop-blur-sm shrink-0">
+<div class="p-unit-lg border-b border-outline-variant/30">
+<h2 class="font-headline-md text-headline-md text-on-surface">Этапы урока</h2>
+</div>
+<div class="flex-1 overflow-y-auto p-unit-lg">
+<ul class="relative flex flex-col gap-unit-lg">
+<!-- Step 1: Completed -->
+<li class="step-item relative flex gap-unit-sm cursor-pointer group">
+<div class="stepper-line"></div>
+<div class="w-6 h-6 rounded-full bg-green-100 border-2 border-green-500 flex items-center justify-center shrink-0 z-10 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[14px] text-green-600 font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="font-label-md text-label-md text-on-surface-variant font-medium group-hover:text-primary transition-colors">Цель урока</span>
+</div>
+</li>
+<!-- Step 2: Completed -->
+<li class="step-item relative flex gap-unit-sm cursor-pointer group">
+<div class="stepper-line"></div>
+<div class="w-6 h-6 rounded-full bg-green-100 border-2 border-green-500 flex items-center justify-center shrink-0 z-10 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[14px] text-green-600 font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="font-label-md text-label-md text-on-surface-variant font-medium group-hover:text-primary transition-colors">Теория</span>
+</div>
+</li>
+<!-- Step 3: Completed -->
+<li class="step-item relative flex gap-unit-sm cursor-pointer group">
+<div class="stepper-line"></div>
+<div class="w-6 h-6 rounded-full bg-green-100 border-2 border-green-500 flex items-center justify-center shrink-0 z-10 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[14px] text-green-600 font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="font-label-md text-label-md text-on-surface-variant font-medium group-hover:text-primary transition-colors">Практика</span>
+</div>
+</li>
+<!-- Step 4: Active -->
+<li class="step-item relative flex gap-unit-sm cursor-pointer group">
+<div class="stepper-line bg-surface-variant"></div>
+<div class="w-6 h-6 rounded-full bg-primary border-2 border-primary flex items-center justify-center shrink-0 z-10 ring-4 ring-primary-container/50">
+<div class="w-2 h-2 rounded-full bg-white"></div>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="font-label-md text-label-md text-primary font-bold">Задание</span>
+</div>
+</li>
+<!-- Step 5: Upcoming -->
+<li class="step-item relative flex gap-unit-sm cursor-pointer group">
+<div class="stepper-line bg-surface-variant"></div>
+<div class="w-6 h-6 rounded-full bg-surface-bright border-2 border-outline-variant flex items-center justify-center shrink-0 z-10 group-hover:border-primary transition-colors">
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="font-label-md text-label-md text-outline font-medium group-hover:text-primary transition-colors">Проверка</span>
+</div>
+</li>
+<!-- Step 6: Upcoming -->
+<li class="step-item relative flex gap-unit-sm cursor-pointer group">
+<div class="stepper-line bg-surface-variant"></div>
+<div class="w-6 h-6 rounded-full bg-surface-bright border-2 border-outline-variant flex items-center justify-center shrink-0 z-10 group-hover:border-primary transition-colors">
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="font-label-md text-label-md text-outline font-medium group-hover:text-primary transition-colors">Итог</span>
+</div>
+</li>
+</ul>
+</div>
+<!-- User ID Footer -->
+<div class="p-unit-md mt-auto border-t border-outline-variant/30 text-center">
+<span class="font-label-sm text-label-sm text-outline">ID: 41257410</span>
+</div>
+</aside>
+<!-- Center Column: Workspace Canvas -->
+<section class="flex-1 flex flex-col bg-surface-bright/50 p-unit-xl overflow-y-auto">
+<div class="max-w-3xl mx-auto w-full flex flex-col gap-unit-lg h-full">
+<!-- Task Heading -->
+<div>
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-2">Задание:</h3>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                            Соберите схему управления светодиодом и кнопкой на Arduino, используя предоставленные компоненты. Обратите внимание на полярность подключения светодиода и использование подтягивающего резистора для кнопки.
+                        </p>
+</div>
+<!-- Interactive Diagram Card -->
+<div class="glass-panel flex-1 rounded-xl p-unit-md border border-white flex flex-col shadow-sm relative group">
+<!-- Toolbar overlay -->
+<div class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+<button class="bg-white/80 p-2 rounded-lg shadow-sm hover:bg-white text-on-surface-variant" title="Zoom In"><span class="material-symbols-outlined">zoom_in</span></button>
+<button class="bg-white/80 p-2 rounded-lg shadow-sm hover:bg-white text-on-surface-variant" title="Fullscreen"><span class="material-symbols-outlined">fullscreen</span></button>
+</div>
+<!-- The Diagram Image Placeholder -->
+<div class="flex-1 w-full rounded-lg bg-surface-container-low border border-outline-variant/30 overflow-hidden flex items-center justify-center">
+<div class="w-full h-full bg-contain bg-center bg-no-repeat" data-alt="A highly detailed illustration of an Arduino Uno circuit diagram connected to a breadboard. The circuit features a red LED, a push button, and resistors with colorful bands, wired together with black, red, and green jumper wires on a light background. Technical schematic style." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBin-47X8deohKZ5Ct7QFJUGybHKMRmjXoa5jf47GXbBwAvfR-1-3s-E_JUiy8OmVQlarSmngPnjtcJCTuE8pLafNWNXL0UWaY-P87Z6p6c5FPY80158Mt0rSst4R_G639jJ35Z5_8YjfBI4BUZLpWAZFGWb-pTXAjsYN54FtqT9fFsPOKrbr9hx1RHHft3IefoUDfAMHtn0QY1S9wGE5E91RdXb9EkMzlOr6K3ctKK8WK8EEQ-2RJX8IyuoFHfew725DXGCpqTxwyN')"></div>
+</div>
+</div>
+<!-- Workspace Footer Actions -->
+<div class="flex justify-between items-center mt-auto pt-unit-md">
+<button class="font-label-md text-label-md px-6 py-3 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant/30 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined">arrow_back</span>
+                            Назад
+                        </button>
+<div class="flex gap-unit-sm">
+<button class="font-label-md text-label-md px-6 py-3 rounded-lg bg-white border border-outline-variant text-primary hover:bg-surface-container-low transition-colors shadow-sm">
+                                Сохранить черновик
+                            </button>
+<button class="font-label-md text-label-md px-8 py-3 rounded-lg bg-primary text-on-primary hover:bg-on-primary-fixed-variant transition-colors shadow-md flex items-center gap-2">
+                                Сдать работу
+                                <span class="material-symbols-outlined text-[20px]">send</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Column: Resources & AI -->
+<aside class="w-80 border-l border-outline-variant/30 flex flex-col bg-surface/30 backdrop-blur-sm shrink-0">
+<!-- Materials Section -->
+<div class="p-unit-lg flex-1 overflow-y-auto">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-unit-md">Материалы</h3>
+<ul class="flex flex-col gap-unit-sm">
+<!-- Material Item 1 -->
+<li>
+<a class="flex items-center gap-unit-sm p-unit-sm rounded-lg hover:bg-white/60 border border-transparent hover:border-white/50 transition-all group" href="#">
+<div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-orange-600">retention</span>
+</div>
+<div class="flex flex-col flex-1">
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors">Презентация урока</span>
+<span class="text-[12px] text-outline">PDF, 2.4 MB</span>
+</div>
+</a>
+</li>
+<!-- Material Item 2 -->
+<li>
+<a class="flex items-center gap-unit-sm p-unit-sm rounded-lg bg-white/40 border border-white/50 hover:bg-white/60 transition-all group" href="#">
+<div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-blue-600">account_tree</span>
+</div>
+<div class="flex flex-col flex-1">
+<span class="font-label-md text-label-md text-primary font-medium">Схема сборки</span>
+<span class="text-[12px] text-primary/70">Текущий</span>
+</div>
+</a>
+</li>
+<!-- Material Item 3 -->
+<li>
+<a class="flex items-center gap-unit-sm p-unit-sm rounded-lg hover:bg-white/60 border border-transparent hover:border-white/50 transition-all group" href="#">
+<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-slate-600">description</span>
+</div>
+<div class="flex flex-col flex-1">
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors">Инструкция по сборке</span>
+<span class="text-[12px] text-outline">DOCX, 1.1 MB</span>
+</div>
+</a>
+</li>
+<!-- Material Item 4 -->
+<li>
+<a class="flex items-center gap-unit-sm p-unit-sm rounded-lg hover:bg-white/60 border border-transparent hover:border-white/50 transition-all group" href="#">
+<div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-red-600">code</span>
+</div>
+<div class="flex flex-col flex-1">
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors">Примеры кода</span>
+<span class="text-[12px] text-outline">.ino, 14 KB</span>
+</div>
+</a>
+</li>
+</ul>
+</div>
+<!-- AI Assistant Widget -->
+<div class="p-unit-md mt-auto">
+<div class="rounded-xl bg-gradient-to-br from-inverse-surface to-on-surface text-white p-unit-md shadow-lg border border-white/10 relative overflow-hidden group cursor-pointer hover:shadow-xl transition-shadow">
+<!-- AI Glow effect -->
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/30 rounded-full blur-2xl group-hover:bg-primary/50 transition-colors"></div>
+<div class="relative z-10 flex flex-col gap-unit-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-fixed-dim">smart_toy</span>
+<span class="font-headline-md text-[16px] font-bold">AI-помощник</span>
+</div>
+<p class="font-body-md text-[14px] text-white/80 leading-snug">
+                                Затрудняетесь со схемой? Чем я могу помочь тебе сегодня?
+                            </p>
+<div class="mt-2 bg-white/10 hover:bg-white/20 rounded-lg p-2 text-center text-label-sm font-medium transition-colors backdrop-blur-sm border border-white/5">
+                                Задать вопрос
+                            </div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<script>
+        // Simple timer logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const timerEl = document.getElementById('lesson-timer');
+            let [hours, minutes, seconds] = timerEl.innerText.split(':').map(Number);
+            
+            setInterval(() => {
+                seconds++;
+                if (seconds >= 60) {
+                    seconds = 0;
+                    minutes++;
+                    if (minutes >= 60) {
+                        minutes = 0;
+                        hours++;
+                    }
+                }
+                
+                const h = String(hours).padStart(2, '0');
+                const m = String(minutes).padStart(2, '0');
+                const s = String(seconds).padStart(2, '0');
+                
+                timerEl.innerText = `${h}:${m}:${s}`;
+            }, 1000);
+        });
+    </script>
+</body></html>

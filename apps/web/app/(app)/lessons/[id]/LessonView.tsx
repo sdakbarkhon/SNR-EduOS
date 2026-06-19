@@ -2,9 +2,8 @@ import Link from "next/link";
 import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, Clock, type LucideIcon } from "lucide-react";
 import type { StudentLessonView, LessonStagePublic, StageKey } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
-import { ClassworkBlock } from "./ClassworkBlock";
 import { PreLessonView } from "./PreLessonView";
-import { RaiseHandButton } from "./RaiseHandButton";
+import { LessonWorkspaceView } from "./LessonWorkspaceView";
 
 const STAGE_ICONS: Record<StageKey, LucideIcon> = {
   goal:      Target,
@@ -57,6 +56,10 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
   if (lesson.status === "scheduled") {
     return <PreLessonView lesson={lesson} studentId={studentId} />;
   }
+  // Lesson is live → workspace (design lesson_workspace).
+  if (lesson.status === "in_progress") {
+    return <LessonWorkspaceView lesson={lesson} materialUrls={materialUrls} studentId={studentId} />;
+  }
 
   const style = getSubjectStyle(lesson.group.subject);
   const rgb = hexToRgb(style.color);
@@ -70,10 +73,10 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
 
   const heroTitle = lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`;
 
-  // scheduled is handled earlier by <PreLessonView>; here status is in_progress | completed
+  // scheduled → PreLessonView, in_progress → LessonWorkspaceView; here status is completed
   const isScheduled   = false;
-  const isInProgress  = lesson.status === "in_progress";
-  const isCompleted   = lesson.status === "completed";
+  const isInProgress  = false;
+  const isCompleted   = true;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
@@ -201,23 +204,6 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* Raise hand — only while lesson is in progress */}
-      {isInProgress && studentId && (
-        <div className="anim-fade-up anim-delay-1 max-w-xs">
-          <RaiseHandButton lessonId={lesson.id} studentId={studentId} />
-        </div>
-      )}
-
-      {/* Classwork — visible only while lesson is in progress */}
-      {isInProgress && studentId && (
-        <div className="anim-fade-up anim-delay-2">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-gray-500">
-            Классная работа
-          </h3>
-          <ClassworkBlock lessonId={lesson.id} studentId={studentId} />
         </div>
       )}
 

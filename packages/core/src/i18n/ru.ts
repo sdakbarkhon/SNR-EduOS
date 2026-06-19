@@ -335,6 +335,16 @@ export const ru: Dictionary = {
       agoSeconds: "{n} сек назад",
       agoMinutes: "{n} мин назад",
     },
+    workspace: {
+      live: "Урок идёт",
+      task: "Задание",
+      noTask: "На этом этапе задания нет",
+      materials: "Материалы",
+      aiTitle: "AI-помощник",
+      aiPrompt: "Затрудняешься? Чем я могу помочь тебе сегодня?",
+      aiAsk: "Задать вопрос",
+      soon: "Скоро будет доступно",
+    },
   },
   teacher: {
     role: "Учитель",

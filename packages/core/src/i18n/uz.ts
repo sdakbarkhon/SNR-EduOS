@@ -335,6 +335,16 @@ export const uz: Dictionary = {
       agoSeconds: "{n} soniya oldin",
       agoMinutes: "{n} daqiqa oldin",
     },
+    workspace: {
+      live: "Dars davom etmoqda",
+      task: "Topshiriq",
+      noTask: "Bu bosqichda topshiriq yo'q",
+      materials: "Materiallar",
+      aiTitle: "AI yordamchi",
+      aiPrompt: "Qiynalyapsizmi? Bugun sizga qanday yordam bera olaman?",
+      aiAsk: "Savol berish",
+      soon: "Tez orada",
+    },
   },
   teacher: {
     role: "O'qituvchi",

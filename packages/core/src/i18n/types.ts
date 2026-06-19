@@ -327,6 +327,16 @@ export interface Dictionary {
       agoSeconds: string;         // "{n} сек назад"
       agoMinutes: string;         // "{n} мин назад"
     };
+    workspace: {
+      live: string;               // "Урок идёт"
+      task: string;               // "Задание"
+      noTask: string;             // "На этом этапе задания нет"
+      materials: string;          // "Материалы"
+      aiTitle: string;            // "AI-помощник"
+      aiPrompt: string;           // "Затрудняешься? Чем я могу помочь тебе сегодня?"
+      aiAsk: string;              // "Задать вопрос"
+      soon: string;               // "Скоро будет доступно"
+    };
   };
   teacher: {
     role: string;
