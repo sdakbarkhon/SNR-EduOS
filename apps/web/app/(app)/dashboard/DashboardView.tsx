@@ -111,9 +111,11 @@ export function DashboardView({
   const timeStr = now
     ? now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : "—";
+  // null on server + first client render → empty placeholder to avoid hydration mismatch
+  // (Vercel renders in UTC, client is in local TZ — the date string can differ).
   const dateStr = now
     ? now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })
-    : new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+    : "";
   const dateCapitalized = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   const activeSuffix = format(d.dashboard.activeTasks, { count: "" }).trim();

@@ -132,6 +132,10 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [localHW, setLocalHW] = useState<HomeworkItem[]>(homework);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // null on server + first client render → no overdue counted until after mount,
+  // keeping SSR and hydration identical (avoids React error #418).
+  const [nowIso, setNowIso] = useState<string | null>(null);
+  useEffect(() => { setNowIso(new Date().toISOString()); }, []);
 
   const filtered = localHW.filter((hw) => {
     if (groupFilter !== "all" && hw.group.id !== groupFilter) return false;
@@ -141,10 +145,9 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   });
 
   // Tri-color donut over all works (file submissions + test attempts)
-  const now = new Date().toISOString();
   let checked = 0, pending = 0, overdue = 0;
   localHW.forEach((hw) => {
-    const isOverdue = !!hw.due_date && hw.due_date < now;
+    const isOverdue = !!hw.due_date && nowIso !== null && hw.due_date < nowIso;
     hw.submissions.forEach((s) => {
       if (s.status === "graded") checked++;
       else if (isOverdue) overdue++;

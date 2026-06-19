@@ -376,6 +376,11 @@ export function TeacherLessonsView({
 
   const mountedRef = useRef(false);
 
+  // Gate the calendar until after mount: Vercel renders in UTC, client in local TZ,
+  // so the initial month / "today" cell can differ and trigger hydration error #418.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   async function loadMonth(year: number, month: number) {
     setLoading(true);
     try {
@@ -398,6 +403,16 @@ export function TeacherLessonsView({
   function nextMonth() {
     if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
     else setViewMonth(m => m + 1);
+  }
+
+  if (!mounted) {
+    return (
+      <div className="mx-auto max-w-7xl">
+        <div className="flex justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        </div>
+      </div>
+    );
   }
 
   const byDay = new Map<string, LessonItem[]>();

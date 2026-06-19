@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   attendanceForDay,
   getDictionary,
@@ -50,8 +50,13 @@ export function AttendanceCalendar({
   month: number;
 }) {
   const d = getDictionary(defaultLocale);
-  const today = new Date();
-  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  // "" on server + first client render → no "today" highlight, set after mount to
+  // avoid hydration error #418 (server UTC date vs client local date can differ).
+  const [todayKey, setTodayKey] = useState<string>("");
+  useEffect(() => {
+    const t = new Date();
+    setTodayKey(`${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`);
+  }, []);
 
   const days = useMemo(() => getCalendarDays(year, month), [year, month]);
 

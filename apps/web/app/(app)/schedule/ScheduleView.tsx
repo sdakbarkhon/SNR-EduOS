@@ -128,8 +128,12 @@ export function ScheduleView({
   const [lessons, setLessons] = useState<Lesson[]>(initialLessons);
   const [weekStart, setWeekStart] = useState<Date>(() => getWeekMonday(new Date()));
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  // Gate time-dependent UI until after mount: Vercel renders in UTC, the client in
+  // local TZ, so "today"/current-week would differ and trigger hydration error #418.
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
@@ -211,6 +215,12 @@ export function ScheduleView({
         {dict.schedule.title}
       </h1>
 
+      {!mounted ? (
+        <div className="flex justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        </div>
+      ) : (
+      <>
       {/* ── Week navigation ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <button
@@ -463,6 +473,8 @@ export function ScheduleView({
           </>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

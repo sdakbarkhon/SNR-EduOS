@@ -82,8 +82,10 @@ function lessonPalette(status: string, isPastScheduled: boolean): LessonPalette 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+// nowMs is null on server + first client render → returns "" to avoid hydration mismatch.
+function timeAgo(iso: string, nowMs: number | null): string {
+  if (nowMs === null) return "";
+  const m = Math.floor((nowMs - new Date(iso).getTime()) / 60000);
   if (m < 1)  return "только что";
   if (m < 60) return `${m} мин назад`;
   const h = Math.floor(m / 60);
@@ -306,7 +308,7 @@ export function TeacherDashboardView({
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800">Расписание сегодня</h2>
             <span className="text-[13px] text-slate-400">
-              {new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+              {now ? now.toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : ""}
             </span>
           </div>
 
@@ -423,7 +425,7 @@ export function TeacherDashboardView({
                         </div>
                       </div>
                       <span className="shrink-0 text-[10px] text-slate-400">
-                        {timeAgo(sub.submitted_at)}
+                        {timeAgo(sub.submitted_at, now?.getTime() ?? null)}
                       </span>
                     </Link>
                   ))}
@@ -474,7 +476,7 @@ export function TeacherDashboardView({
                         «{sub.homework?.title}»
                       </span>
                       <div className="mt-0.5 text-[10px] text-slate-400">
-                        {timeAgo(sub.submitted_at)}
+                        {timeAgo(sub.submitted_at, now?.getTime() ?? null)}
                       </div>
                     </div>
                   </Link>
