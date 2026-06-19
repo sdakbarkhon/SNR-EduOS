@@ -231,7 +231,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
                       {hw.content_type === "test" ? d.homework.typeTest : d.homework.typeFile}
                     </span>
                     <div className="text-[12px] font-bold text-brand-ink">
-                      {hw.due_date ? new Date(hw.due_date).toLocaleDateString(locale, { day: "numeric", month: "short" }) : "—"}
+                      {hw.due_date ? new Date(hw.due_date).toLocaleDateString(locale, { day: "numeric", month: "short", timeZone: "Asia/Tashkent" }) : "—"}
                     </div>
                     <div className="mx-auto max-w-[90px] truncate text-[10px] font-medium text-brand-ink-muted">{hw.title}</div>
                   </th>

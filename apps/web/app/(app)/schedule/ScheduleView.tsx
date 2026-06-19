@@ -404,6 +404,7 @@ export function ScheduleView({
                   ? new Date(hw.due_date).toLocaleDateString("ru-RU", {
                       day: "numeric",
                       month: "long",
+                      timeZone: "Asia/Tashkent",
                     })
                   : null;
 

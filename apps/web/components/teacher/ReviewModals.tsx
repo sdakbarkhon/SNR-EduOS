@@ -83,7 +83,7 @@ export function ReviewModal({ submission, onClose, onGraded }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}
-      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}>
+      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
@@ -214,7 +214,7 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}
-      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}>
+      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>

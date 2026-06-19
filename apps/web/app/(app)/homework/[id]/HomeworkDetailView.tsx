@@ -189,6 +189,7 @@ function SubmissionBlock({
             day: "numeric",
             month: "long",
             year: "numeric",
+            timeZone: "Asia/Tashkent",
           }),
         )}
       </div>
@@ -388,6 +389,7 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: "Asia/Tashkent",
       })
     : null;
 

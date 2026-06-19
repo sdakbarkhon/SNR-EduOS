@@ -121,7 +121,7 @@ function HomeworkListCard({ hw, zone }: { hw: HomeworkWithSubmission; zone: Card
   const style = getSubjectStyle(subj);
 
   const dueLabel = hw.due_date
-    ? "до " + new Date(hw.due_date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
+    ? "до " + new Date(hw.due_date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" })
     : null;
 
   const dueLabelCls =

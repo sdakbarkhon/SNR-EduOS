@@ -109,18 +109,18 @@ function aggregateDayStatus(dayLessons: LessonItem[], now: Date): DayStatus {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
 }
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long" });
+  return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
 }
 function fmtDayHeader(key: string): string {
   const d = new Date(`${key}T12:00:00`);
-  return d.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long" });
+  return d.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
 }
 function toLocalDateStr(iso: string): string { return localDateKey(new Date(iso)); }
 function toLocalTimeStr(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tashkent" });
 }
 function buildIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
@@ -248,7 +248,7 @@ function LessonFormModal({
   const labelCls = "mb-1 block text-xs font-semibold text-gray-600";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between p-6 pb-4">
           <h2 className="text-lg font-bold text-[#1D1D1F]">
@@ -318,7 +318,7 @@ function DeleteModal({ lesson, onClose, onConfirm }: {
     try { await onConfirm(); } catch { setDeleting(false); }
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">

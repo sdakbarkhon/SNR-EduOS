@@ -27,11 +27,15 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0"
+        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
         onClick={onClose}
       />
       {/* Sheet */}
-      <div className="relative z-10 flex w-full max-w-lg flex-col rounded-[24px] border border-white/80 bg-white/90 shadow-2xl backdrop-blur-2xl max-h-[80vh]">
+      <div
+        className="relative z-10 flex w-full max-w-lg flex-col rounded-[24px] border border-white/80 shadow-2xl max-h-[80vh]"
+        style={{ background: "#ffffff" }}
+      >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100/70 px-6 py-4">
           <h2 className="text-[17px] font-bold text-slate-900">{title}</h2>
           <button

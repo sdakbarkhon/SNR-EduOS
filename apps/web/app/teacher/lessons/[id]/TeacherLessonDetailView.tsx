@@ -36,10 +36,10 @@ const STAGE_ICONS: Record<StageKey, React.ReactNode> = {
 };
 
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
+  return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent" });
 }
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
 }
 function fmtBytes(b: number | null): string {
   if (!b) return "";
@@ -119,6 +119,12 @@ export function TeacherLessonDetailView({
 
   // Classwork modal
   const [classworkOpen, setClassworkOpen] = useState(false);
+
+  // Mount gate — this page formats lesson timestamps (starts_at/ended_at/…) in JSX.
+  // SSR runs in UTC, the client in UTC+5, so the rendered times would differ and
+  // trigger React #418. Render a placeholder until mounted, then the real UI.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (status !== "in_progress" || !startedAt) return;
@@ -264,6 +270,16 @@ export function TeacherLessonDetailView({
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
     : fmtTime(lesson.starts_at);
+
+  if (!mounted) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <div className="flex justify-center py-24">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -543,7 +559,10 @@ export function TeacherLessonDetailView({
 
       {/* Upload modal */}
       {uploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
+        >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[#1D1D1F]">{d.lesson.addMaterialTitle}</h3>

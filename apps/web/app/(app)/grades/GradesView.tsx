@@ -184,7 +184,7 @@ export function GradesView({ grades }: Props) {
                         </td>
                       )}
                       <td className="whitespace-nowrap px-4 py-3 text-[12px] text-slate-400">
-                        {new Date(g.date).toLocaleDateString(locale, { day: "numeric", month: "short" })}
+                        {new Date(g.date).toLocaleDateString(locale, { day: "numeric", month: "short", timeZone: "Asia/Tashkent" })}
                       </td>
                       <td className="px-4 py-3">
                         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",

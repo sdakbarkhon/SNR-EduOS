@@ -265,7 +265,7 @@ export function AttendanceView({
                 const subject = row.lesson.group.subject;
                 const style = getSubjectStyle(subject);
                 const dateLbl = new Date(row.lesson.starts_at).toLocaleDateString("ru-RU", {
-                  day: "numeric", month: "short",
+                  day: "numeric", month: "short", timeZone: "Asia/Tashkent",
                 });
                 const { label: badgeLbl, cls: badgeCls } = statusBadge(row.status);
                 return (

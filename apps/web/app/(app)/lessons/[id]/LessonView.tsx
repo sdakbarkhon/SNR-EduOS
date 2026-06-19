@@ -26,10 +26,10 @@ function initials(name: string): string {
   return name.split(" ").map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 2);
 }
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
 }
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long" });
+  return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
 }
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -65,8 +65,8 @@ function computeAccess(lesson: Pick<StudentLessonView, "status" | "starts_at" | 
 
 function TooEarlyGate({ lesson }: { lesson: StudentLessonView }) {
   const startsAt = new Date(lesson.starts_at);
-  const timeStr = startsAt.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
-  const dateStr = startsAt.toLocaleDateString("ru", { day: "numeric", month: "long" });
+  const timeStr = startsAt.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
+  const dateStr = startsAt.toLocaleDateString("ru", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
   return (
     <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
       <Link
@@ -95,8 +95,8 @@ function TooEarlyGate({ lesson }: { lesson: StudentLessonView }) {
 
 function TooLateGate({ lesson }: { lesson: StudentLessonView }) {
   const startsAt = new Date(lesson.starts_at);
-  const timeStr = startsAt.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
-  const dateStr = startsAt.toLocaleDateString("ru", { day: "numeric", month: "long" });
+  const timeStr = startsAt.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
+  const dateStr = startsAt.toLocaleDateString("ru", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
   return (
     <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
       <Link

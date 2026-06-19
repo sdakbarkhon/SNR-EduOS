@@ -256,7 +256,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
               <option value="">{d.lesson.noLesson}</option>
               {lessonsForGroup.map((l) => {
                 const dateStr = new Date(l.starts_at).toLocaleDateString("ru", {
-                  day: "numeric", month: "short",
+                  day: "numeric", month: "short", timeZone: "Asia/Tashkent",
                 });
                 const label = l.topic
                   ? `${dateStr} · ${l.topic}`
