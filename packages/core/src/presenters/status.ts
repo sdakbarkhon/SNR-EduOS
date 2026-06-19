@@ -79,10 +79,12 @@ export function attendanceStatus(status: AttendanceStatus): StatusBadge {
   switch (status) {
     case "present":
       return { variant: "success", key: "present" };
-    case "absent":
-      return { variant: "danger", key: "absent" };
-    case "late":
+    case "absent_excused":
       return { variant: "warning", key: "late" };
+    case "absent_unexcused":
+      return { variant: "danger", key: "absent" };
+    default:
+      return { variant: "neutral", key: "absent" };
   }
 }
 

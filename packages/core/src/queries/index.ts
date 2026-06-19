@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, ContentType, CourseMaterial, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, LessonMaterial, LessonStage, LessonStagePublic, StageKey, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, ContentType, CourseMaterial, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonDetail, LessonMaterial, LessonStage, LessonStagePublic, StageKey, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -1159,10 +1159,118 @@ export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
   );
 };
 
+// ─── ATTENDANCE ROLL-CALL ─────────────────────────────────────────────────────
+
+/** Список всех учеников группы с их статусом на конкретном уроке (для переклички). */
+export const getTeacherLessonAttendance = async (
+  db: Db,
+  lessonId: string,
+): Promise<AttendanceRollCallRow[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+
+  const { data: lesson } = await db2.from("lessons").select("group_id").eq("id", lessonId).single();
+  if (!lesson) return [];
+
+  const { data: enrollments } = await db2
+    .from("student_groups")
+    .select("student_id, students!inner(id, full_name)")
+    .eq("group_id", lesson.group_id);
+
+  const { data: records } = await db2
+    .from("attendance")
+    .select("student_id, status, marked_at, is_finalized")
+    .eq("lesson_id", lessonId);
+
+  const attMap = new Map<string, { status: string; marked_at: string; is_finalized: boolean }>(
+    ((records ?? []) as Array<{ student_id: string; status: string; marked_at: string; is_finalized: boolean }>)
+      .map((r) => [r.student_id, r]),
+  );
+
+  return ((enrollments ?? []) as Array<{ student_id: string; students: { id: string; full_name: string } }>)
+    .map((e) => {
+      const att = attMap.get(e.student_id);
+      return {
+        student_id: e.student_id,
+        full_name: e.students.full_name,
+        status: (att?.status ?? null) as AttendanceStatus | null,
+        marked_at: att?.marked_at ?? null,
+        is_finalized: att?.is_finalized ?? false,
+      };
+    })
+    .sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
+};
+
+/** UPSERT одной записи посещаемости (optimistic, вызывается при клике кнопки). */
+export const markStudentAttendance = async (
+  db: Db,
+  lessonId: string,
+  studentId: string,
+  status: AttendanceStatus,
+  teacherId: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { error } = await db2.from("attendance").upsert(
+    {
+      lesson_id: lessonId,
+      student_id: studentId,
+      status,
+      marked_at: new Date().toISOString(),
+      marked_by: teacherId,
+      is_finalized: false,
+    },
+    { onConflict: "lesson_id,student_id", ignoreDuplicates: false },
+  );
+  if (error) throw error;
+};
+
+/** Финализирует перекличку: отсутствующим без записи → absent_unexcused; всем → is_finalized=true. */
+export const finalizeLessonAttendance = async (
+  db: Db,
+  lessonId: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+
+  const { data: lesson } = await db2.from("lessons").select("group_id").eq("id", lessonId).single();
+  if (!lesson) return;
+
+  const [{ data: enrollments }, { data: existing }] = await Promise.all([
+    db2.from("student_groups").select("student_id").eq("group_id", lesson.group_id),
+    db2.from("attendance").select("student_id").eq("lesson_id", lessonId),
+  ]);
+
+  const existingIds = new Set<string>(
+    ((existing ?? []) as Array<{ student_id: string }>).map((r) => r.student_id),
+  );
+  const now = new Date().toISOString();
+
+  const missing = ((enrollments ?? []) as Array<{ student_id: string }>)
+    .filter((e) => !existingIds.has(e.student_id))
+    .map((e) => ({
+      lesson_id: lessonId,
+      student_id: e.student_id,
+      status: "absent_unexcused" as const,
+      marked_at: now,
+      is_finalized: true,
+    }));
+
+  if (missing.length > 0) {
+    await db2.from("attendance").insert(missing);
+  }
+
+  await db2.from("attendance").update({ is_finalized: true }).eq("lesson_id", lessonId);
+};
+
 /** Завершает урок: статус 'completed', итог-этап отмечается выполненным. */
 export const endLesson = async (db: Db, lessonId: string): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+
+  // Финализировать перекличку перед закрытием урока
+  await finalizeLessonAttendance(db, lessonId).catch(() => null);
+
   const { error } = await db2.from("lessons")
     .update({ status: "completed", ended_at: new Date().toISOString() })
     .eq("id", lessonId);

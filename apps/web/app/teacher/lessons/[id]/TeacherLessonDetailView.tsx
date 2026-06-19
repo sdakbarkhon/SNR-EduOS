@@ -12,6 +12,7 @@ import {
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   getSubjectStyle, startLesson, endLesson,
 } from "@snr/core";
+import { AttendanceRollCall } from "./AttendanceRollCall";
 import type { TeacherLessonView, LessonStatus, LessonStage, StageKey, LessonMaterial, Teacher } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -123,6 +124,8 @@ export function TeacherLessonDetailView({
   }
 
   async function handleEnd() {
+    const confirmMsg = `${d.teacher.endLessonConfirmTitle}\n\n${d.teacher.endLessonConfirmMsg}`;
+    if (!window.confirm(confirmMsg)) return;
     setStatusLoading(true);
     try {
       await endLesson(db, lesson.id);
@@ -287,6 +290,15 @@ export function TeacherLessonDetailView({
             {startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
           </p>
         </div>
+      )}
+
+      {/* Roll call — visible only during in_progress and completed (read-only) */}
+      {(status === "in_progress" || status === "completed") && (
+        <AttendanceRollCall
+          lessonId={lesson.id}
+          teacherId={teacher.id}
+          lessonStatus={status}
+        />
       )}
 
       {/* About lesson block */}

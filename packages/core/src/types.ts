@@ -8,7 +8,7 @@
 
 export type StudentStatus = "active" | "debtor" | "frozen";
 export type LessonStatus = "scheduled" | "in_progress" | "completed";
-export type AttendanceStatus = "present" | "absent" | "late";
+export type AttendanceStatus = "present" | "absent_excused" | "absent_unexcused";
 export type SubmissionStatus = "submitted" | "checking" | "graded";
 export type PaymentStatus = "completed" | "pending" | "canceled";
 export type PaymentKind = "subscription" | "one_time";
@@ -157,6 +157,14 @@ export type AttendanceWithLesson = {
   };
 };
 
+/** Строка переклички для экрана учителя — студент + его статус посещаемости. */
+export type AttendanceRollCallRow = {
+  student_id: string;
+  full_name: string;
+  status: AttendanceStatus | null; // null = ещё не отмечен
+  marked_at: string | null;
+  is_finalized: boolean;
+};
 
 export type HomeworkAttachment = {
   name: string;

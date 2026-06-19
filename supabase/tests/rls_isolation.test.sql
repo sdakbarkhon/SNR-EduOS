@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(96);
+select plan(101);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -552,6 +552,55 @@ select throws_ok(
      values ('a0000000-0000-0000-0000-000000000000', 'invalid_status', now()) $$,
   '23514', NULL,
   'migration 26: invalid status value rejected by CHECK constraint'
+);
+
+-- ============ ПОСЕЩАЕМОСТЬ (migration 27) — новые статусы ============
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+-- Test 97: attendance status column uses text (not enum) after migration 27
+select ok(
+  (select data_type = 'text'
+     from information_schema.columns
+    where table_schema = 'public' and table_name = 'attendance' and column_name = 'status'),
+  'migration 27: attendance.status is text type'
+);
+
+-- Test 98: attendance.is_finalized column exists with bool type
+select ok(
+  (select data_type = 'boolean'
+     from information_schema.columns
+    where table_schema = 'public' and table_name = 'attendance' and column_name = 'is_finalized'),
+  'migration 27: attendance.is_finalized column exists'
+);
+
+-- Test 99: student A sees own attendance rows only
+select ok(
+  (select count(*) > 0 from public.attendance
+    where student_id = 'a1111111-1111-1111-1111-111111111111'),
+  'attendance: student A sees own rows'
+);
+
+-- Test 100: student A does NOT see student B attendance rows
+select is(
+  (select count(*) from public.attendance
+    where student_id = 'b2222222-2222-2222-2222-222222222222'),
+  0::bigint,
+  'attendance: student A sees 0 rows of student B'
+);
+
+-- Test 101: attendance.marked_at column exists (migration 27)
+select ok(
+  (select column_name = 'marked_at'
+     from information_schema.columns
+    where table_schema = 'public' and table_name = 'attendance' and column_name = 'marked_at'),
+  'migration 27: attendance.marked_at column exists'
 );
 
 select * from finish();

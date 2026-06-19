@@ -11,11 +11,11 @@ import { colors } from "@snr/ui-tokens";
 
 const DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-/** Цветная рамка по статусу: absent > late > present */
+/** Цветная рамка: absent_unexcused > absent_excused > present */
 function getBorderColor(dayRows: AttendanceWithLesson[]): string | null {
   if (dayRows.length === 0) return null;
-  if (dayRows.some((r) => r.status === "absent")) return colors.danger;
-  if (dayRows.some((r) => r.status === "late")) return colors.warning;
+  if (dayRows.some((r) => r.status === "absent_unexcused")) return colors.danger;
+  if (dayRows.some((r) => r.status === "absent_excused")) return colors.warning;
   if (dayRows.some((r) => r.status === "present")) return colors.success;
   return null;
 }
@@ -57,8 +57,8 @@ export function AttendanceCalendar({
 
   const LEGEND = [
     { color: colors.success, label: d.attendance.legendPresent },
-    { color: colors.danger,  label: d.attendance.legendAbsent },
-    { color: colors.warning, label: d.attendance.legendLate },
+    { color: colors.danger,  label: d.attendance.legendUnexcused },
+    { color: colors.warning, label: d.attendance.legendExcused },
   ];
 
   return (

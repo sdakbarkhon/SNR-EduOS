@@ -73,18 +73,31 @@ export interface Dictionary {
     title: string;
     overall: string;
     bySubject: string;
-    lowWarning: string; // "Посещаемость ниже {threshold}%"
+    lowWarning: string;
     prevMonth: string;
     nextMonth: string;
     kpiOverall: string;
     kpiDays: string;
     kpiMissed: string;
+    kpiPresent: string;
+    kpiExcused: string;
+    kpiUnexcused: string;
+    kpiTotal: string;
     daysUnit: string;
     lessonsUnit: string;
     calendarTitle: string;
     legendPresent: string;
     legendAbsent: string;
-    legendLate: string;
+    legendLate: string;   // reused as "Уваж. пропуск" in new scheme
+    legendExcused: string;
+    legendUnexcused: string;
+    statusPresent: string;
+    statusExcused: string;
+    statusUnexcused: string;
+    periodMonth: string;
+    periodSemester: string;
+    periodYear: string;
+    lessonListTitle: string;
     bySubjectTitle: string;
     empty: string;
   };
@@ -418,5 +431,15 @@ export interface Dictionary {
     hwDownloadAttach: string;
     hwCreatedMsg: string;
     reviewDownloadWork: string;
+    rollCallTitle: string;
+    rollCallSubtitle: string;
+    rollCallFinalizedNote: string;
+    rollCallPresent: string;
+    rollCallExcused: string;
+    rollCallUnexcused: string;
+    rollCallSaved: string;
+    rollCallStats: string;
+    endLessonConfirmTitle: string;
+    endLessonConfirmMsg: string;
   };
 }

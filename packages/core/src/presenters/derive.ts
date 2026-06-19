@@ -2,12 +2,10 @@ import type { Attendance, AttendanceWithLesson, ContentType, Homework, HomeworkS
 
 const DEFAULT_LESSON_MS = 45 * 60 * 1000;
 
-/** % посещаемости: (присутствовал + опоздал) / всего, округлённый. */
+/** % посещаемости: present / всего, округлённый. */
 export function attendancePercent(records: Pick<Attendance, "status">[]): number {
   if (records.length === 0) return 0;
-  const attended = records.filter(
-    (r) => r.status === "present" || r.status === "late",
-  ).length;
+  const attended = records.filter((r) => r.status === "present").length;
   return Math.round((attended / records.length) * 100);
 }
 
@@ -55,18 +53,18 @@ export function attendanceCalcAll(rows: AttendanceWithLesson[]): AttendanceStats
   }
 
   // overall
-  const attended = rows.filter((r) => r.status === "present" || r.status === "late").length;
+  const attended = rows.filter((r) => r.status === "present").length;
   const overall = Math.round((attended / rows.length) * 100);
 
-  // missed (absent записей)
-  const missed = rows.filter((r) => r.status === "absent").length;
+  // missed = any absence (excused or unexcused)
+  const missed = rows.filter((r) => r.status !== "present").length;
 
-  // days without absence: дни, в которые были занятия, без ни одного absent
+  // days without absence
   const byDay = new Map<string, { hasAbsent: boolean }>();
   for (const r of rows) {
-    const d = r.lesson.starts_at.slice(0, 10); // "YYYY-MM-DD"
+    const d = r.lesson.starts_at.slice(0, 10);
     const cur = byDay.get(d) ?? { hasAbsent: false };
-    if (r.status === "absent") cur.hasAbsent = true;
+    if (r.status !== "present") cur.hasAbsent = true;
     byDay.set(d, cur);
   }
   const daysWithoutAbsence = [...byDay.values()].filter((d) => !d.hasAbsent).length;
@@ -77,7 +75,7 @@ export function attendanceCalcAll(rows: AttendanceWithLesson[]): AttendanceStats
     const subj = r.lesson.group.subject;
     const cur = subjectMap.get(subj) ?? { attended: 0, total: 0 };
     cur.total += 1;
-    if (r.status === "present" || r.status === "late") cur.attended += 1;
+    if (r.status === "present") cur.attended += 1;
     subjectMap.set(subj, cur);
   }
   const bySubject: SubjectAttendanceStat[] = [...subjectMap.entries()]
@@ -106,11 +104,11 @@ export function attendanceForDay(
   });
 }
 
-/** Цвет точки для дня: absent → warning, present/late → success, нет записей → null */
+/** Цвет точки для дня: absent_* → warning, present → success, нет записей → null */
 export type DotColor = "success" | "warning" | "neutral" | null;
 export function dayDotColor(dayRows: AttendanceWithLesson[]): DotColor {
   if (dayRows.length === 0) return null;
-  if (dayRows.some((r) => r.status === "absent")) return "warning";
+  if (dayRows.some((r) => r.status !== "present")) return "warning";
   return "success";
 }
 

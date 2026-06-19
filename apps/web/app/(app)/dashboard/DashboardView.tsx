@@ -93,7 +93,7 @@ export function DashboardView({
   const nextSubject = next ? (groupById.get(next.group_id)?.subject ?? null) : null;
   const submittedIds = new Set(submissions.map((s) => s.homework_id));
   const activeCount = homework.filter((h) => !submittedIds.has(h.id)).length;
-  const attPct = attendancePercent(attendance);
+  const attPct = attendancePercent(attendance as any);
   const subjects = Array.from(new Set(groups.map((g) => g.subject)));
   const recent = materials.slice(0, 4);
   const firstName = student.full_name.split(" ")[0] ?? student.full_name;
