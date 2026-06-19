@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
-  Camera, Edit2, Lock, LogOut, Mail, Monitor, Moon,
+  Camera, Check, Edit2, Lock, LogOut, Mail, Monitor, Moon,
   Phone, Save, Settings, ShieldCheck, Sun, User, X,
 } from "lucide-react";
 import {
@@ -329,7 +329,7 @@ export function ProfileView({
         <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Смена пароля</h3>
         <p className="text-sm text-slate-500 mb-6 font-medium">Вам на почту будет отправлена ссылка для сброса и создания нового пароля.</p>
         {pwResetSent ? (
-          <p className="text-sm font-semibold text-green-600">✓ Письмо отправлено</p>
+          <p className="flex items-center gap-1 text-sm font-semibold text-green-600"><Check className="h-4 w-4" /> Письмо отправлено</p>
         ) : (
           <button
             onClick={handlePasswordReset}

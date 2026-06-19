@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BookOpen, ChevronDown, Search, X } from "lucide-react";
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle,
+  ChevronDown,
+  ClipboardList,
+  Clock,
+  FileText,
+  Search,
+  Star,
+  X,
+} from "lucide-react";
 import {
   getDictionary,
   getHomeworkWithSubmissions,
@@ -46,14 +57,14 @@ function TypeBadge({ contentType, locale }: { contentType: ContentType; locale: 
   const d = getDictionary(locale);
   if (contentType === "test") {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700 whitespace-nowrap">
-        ✦ {d.homework.typeTest}
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700 whitespace-nowrap">
+        <ClipboardList className="h-2.5 w-2.5" /> {d.homework.typeTest}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 whitespace-nowrap">
-      ⬇ {d.homework.typeFile}
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 whitespace-nowrap">
+      <FileText className="h-2.5 w-2.5" /> {d.homework.typeFile}
     </span>
   );
 }
@@ -61,22 +72,22 @@ function TypeBadge({ contentType, locale }: { contentType: ContentType; locale: 
 function ZoneBadge({ zone }: { zone: CardZone }) {
   if (zone === "overdue") {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap shrink-0">
-        ⚠ Просрочено
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap shrink-0">
+        <AlertTriangle className="h-3 w-3" /> Просрочено
       </span>
     );
   }
   if (zone === "urgent") {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-600 whitespace-nowrap shrink-0">
-        ⏰ Скоро дедлайн
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-600 whitespace-nowrap shrink-0">
+        <Clock className="h-3 w-3" /> Скоро дедлайн
       </span>
     );
   }
   if (zone === "review") {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600 whitespace-nowrap shrink-0">
-        ◷ На проверке
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600 whitespace-nowrap shrink-0">
+        <Clock className="h-3 w-3" /> На проверке
       </span>
     );
   }
@@ -89,8 +100,8 @@ function GradeBadge({ grade }: { grade: number }) {
     grade >= 6 ? "bg-amber-100 text-amber-700" :
                  "bg-red-100 text-red-600";
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0", cls)}>
-      ★ {grade}
+    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0", cls)}>
+      <Star className="h-3 w-3 fill-current" /> {grade}
     </span>
   );
 }
@@ -402,7 +413,7 @@ export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmiss
               className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl flex flex-col items-center justify-center py-16 px-6 text-center"
               style={{ boxShadow: "0 4px 24px rgba(31,38,135,0.05)" }}
             >
-              <div className="text-4xl mb-3">🎉</div>
+              <CheckCircle className="h-14 w-14 text-green-400 mb-3" />
               <p className="text-slate-700 font-bold mb-1 text-base">У тебя нет активных заданий!</p>
               <p className="text-slate-400 text-sm mb-5">
                 Все работы либо проверены, либо ожидают оценки учителя.
@@ -429,7 +440,7 @@ export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmiss
               className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl flex flex-col items-center justify-center py-16 px-6 text-center"
               style={{ boxShadow: "0 4px 24px rgba(31,38,135,0.05)" }}
             >
-              <div className="text-4xl mb-3">📋</div>
+              <ClipboardList className="h-14 w-14 text-slate-400 mb-3" />
               <p className="text-slate-600 font-semibold mb-1">Заданий не найдено</p>
               <p className="text-slate-400 text-sm mb-4">Попробуй изменить фильтры</p>
               <button

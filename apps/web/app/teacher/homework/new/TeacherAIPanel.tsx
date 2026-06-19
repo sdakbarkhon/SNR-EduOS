@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Sparkles, Bot, SendHorizonal, RefreshCw, Check } from "lucide-react";
+import { X, Sparkles, Bot, SendHorizonal, RefreshCw, Check, MessageSquare } from "lucide-react";
 import { callGemini, generateHomeworkContent } from "@/app/actions/ai";
 import { cn } from "@/lib/cn";
 
@@ -140,7 +140,15 @@ export function TeacherAIPanel({ isOpen, onClose, format, subject, onApply }: Pr
                   : "text-slate-500 hover:text-slate-700",
               )}
             >
-              {m === "generate" ? "✨ Генерация" : "💬 Чат"}
+              {m === "generate" ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" /> Генерация
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5" /> Чат
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -169,7 +177,7 @@ export function TeacherAIPanel({ isOpen, onClose, format, subject, onApply }: Pr
                       "border-blue-200 bg-blue-50 text-blue-700",
                     )}
                   >
-                    {format === "file" ? "📄 Файл" : "📋 Тест"} (из формы)
+                    {format === "file" ? "Файл" : "Тест"} (из формы)
                   </div>
                 </div>
 
@@ -225,7 +233,9 @@ export function TeacherAIPanel({ isOpen, onClose, format, subject, onApply }: Pr
                       Генерирую…
                     </span>
                   ) : (
-                    "✨ Сгенерировать"
+                    <span className="flex items-center justify-center gap-2">
+                      <Sparkles className="h-4 w-4" /> Сгенерировать
+                    </span>
                   )}
                 </button>
               </div>
