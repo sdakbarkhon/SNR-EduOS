@@ -242,7 +242,7 @@ export function DashboardView({
       {/* Предметы + Материалы */}
       <div className="grid gap-6 lg:grid-cols-3">
         <GlassCard className="p-5 lg:col-span-2">
-          <Link href="/materials">
+          <Link href="/homework">
             <h3 className="mb-5 inline-block text-[16px] font-bold text-gray-800 transition-colors hover:text-blue-600">
               {d.dashboard.mySubjects}
             </h3>
