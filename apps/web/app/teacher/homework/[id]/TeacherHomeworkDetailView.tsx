@@ -35,7 +35,7 @@ type Submission = {
 };
 type TestSub = {
   id: string; student_id: string;
-  score: number | null; max_score: number | null;
+  score: number | null; max_score: number | null; grade: number | null;
   submitted_at: string;
   student: { id: string; full_name: string; avatar_url: string | null };
 };
@@ -46,6 +46,8 @@ type HW = {
   attachment_storage_path: string | null;
   attachment_filename: string | null;
   attachment_size_bytes: number | null;
+  test_duration_seconds: number | null;
+  test_auto_grade: boolean;
   group: { id: string; name: string; subject: string };
 };
 
@@ -334,6 +336,14 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
               {hw.content_type === "test" ? d.homework.typeTest : d.homework.typeFile}
             </span>
           </div>
+          {hw.content_type === "test" && (
+            <p className="mt-1 text-[11px] text-brand-ink-muted">
+              {d.homework.test.info
+                .replace("{q}", String(questions.length))
+                .replace("{min}", hw.test_duration_seconds ? String(Math.round(hw.test_duration_seconds / 60)) : "—")
+                .replace("{grade}", hw.test_auto_grade ? d.homework.test.autoGradeOn : d.homework.test.autoGradeOff)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -463,9 +473,13 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
                     <div className="flex items-center gap-2 mt-0.5">
                       {statusChip("", true, needsReview)}
                       {sub.score !== null && sub.max_score !== null && (
-                        <span className="text-[12px] font-bold text-emerald-600">
+                        <span className="text-[12px] font-semibold text-slate-500">
                           {sub.score}/{sub.max_score}
+                          {sub.max_score > 0 && ` (${Math.round((sub.score / sub.max_score) * 100)}%)`}
                         </span>
+                      )}
+                      {sub.grade != null && (
+                        <span className="text-[12px] font-bold text-emerald-600">{sub.grade}/5</span>
                       )}
                     </div>
                   </div>

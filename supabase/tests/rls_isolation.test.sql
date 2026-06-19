@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(115);
+select plan(119);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -780,6 +780,67 @@ select throws_ok(
   'M30: deleting raised hands is forbidden');
 
 reset role;
+
+-- ============ MIGRATION 31: homework test types (start-gate) ============
+-- Setup (superuser): a 'test' homework in group a0 (Ivan/Adilbek) + one in d0 (Elena)
+reset role;
+insert into public.homework (id, group_id, title, content_type, source, teacher_id, test_auto_grade)
+  values ('aa310001-0000-0000-0000-000000000000', 'a0000000-0000-0000-0000-000000000000',
+          'M31 TEST HW', 'test', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc', true);
+insert into public.test_questions (id, homework_id, question_text, question_type, order_index)
+  values ('aa310002-0000-0000-0000-000000000000', 'aa310001-0000-0000-0000-000000000000',
+          'Q1', 'single_choice', 0);
+insert into public.homework (id, group_id, title, content_type, source)
+  values ('dd310001-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000000',
+          'M31 FOREIGN TEST', 'test', 'curriculum');
+insert into public.test_questions (id, homework_id, question_text, question_type, order_index)
+  values ('dd310002-0000-0000-0000-000000000000', 'dd310001-0000-0000-0000-000000000000',
+          'FQ1', 'single_choice', 0);
+
+-- Test 116 (teacher): can create a 'test' homework in own group
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+select lives_ok(
+  $$ insert into public.homework (group_id, title, content_type, source, teacher_id)
+     values ('a0000000-0000-0000-0000-000000000000', 'M31-TEACHER-TEST',
+             'test', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  'M31: teacher can create a test homework in own group');
+
+-- as student A
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 117: student cannot see test questions before starting
+select is(
+  (select count(*)::int from public.test_questions
+    where homework_id = 'aa310001-0000-0000-0000-000000000000'), 0,
+  'M31: student cannot read test questions before starting the test');
+
+-- student starts the test
+insert into public.test_submissions (homework_id, student_id, started_at)
+  values ('aa310001-0000-0000-0000-000000000000',
+          'a1111111-1111-1111-1111-111111111111', now());
+
+-- Test 118: after starting, questions are visible
+select ok(
+  (select count(*) > 0 from public.test_questions
+    where homework_id = 'aa310001-0000-0000-0000-000000000000'),
+  'M31: student can read test questions after starting');
+
+-- Test 119: foreign-group test questions are never visible
+select is(
+  (select count(*)::int from public.test_questions
+    where homework_id = 'dd310001-0000-0000-0000-000000000000'), 0,
+  'M31: student cannot read test questions in another group');
+
+reset role;
+delete from public.homework
+  where id in ('aa310001-0000-0000-0000-000000000000','dd310001-0000-0000-0000-000000000000');
 
 select * from finish();
 rollback;

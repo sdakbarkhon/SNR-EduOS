@@ -13,11 +13,11 @@ import {
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, GraduationCap, Code } from "lucide-react";
 import { TeacherAIPanel } from "./TeacherAIPanel";
 import { cn } from "@/lib/cn";
 
-type Format = "file" | "test" | null;
+type Format = "file" | "test" | "learning" | "programming";
 type QuestionType = "single_choice" | "open";
 
 interface Option { text: string; isCorrect: boolean }
@@ -34,7 +34,9 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const router = useRouter();
   const supabase = createClient();
 
-  const [format, setFormat] = useState<Format>(null);
+  const [format, setFormat] = useState<Format>("file");
+  const [testDuration, setTestDuration] = useState(10); // minutes
+  const [autoGrade, setAutoGrade] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -119,6 +121,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   }
 
   async function save(status: "draft" | "published") {
+    if (format === "learning" || format === "programming") return; // stubs
     if (!title.trim()) { setError("Введите название"); return; }
     if (!groupId) { setError("Выберите группу"); return; }
     if (!deadline) { setError("Укажите дедлайн"); return; }
@@ -143,6 +146,8 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         teacherId: resolvedTeacherId,
         lessonId: lessonId || null,
         status,
+        testDurationSeconds: format === "test" ? testDuration * 60 : null,
+        testAutoGrade: format === "test" ? autoGrade : true,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({
@@ -167,54 +172,72 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     }
   }
 
-  if (!format) {
-    return (
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
-            <ChevronLeft size={20} />
-          </button>
-          <h1 className="text-[22px] font-bold text-brand-ink">{d.teacher.newHomeworkTitle}</h1>
-        </div>
-        <p className="text-[15px] text-brand-ink-muted">{d.teacher.step1Title}</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-xl">
-          <button onClick={() => setFormat("test")}
-            className="rounded-[24px] bg-white/70 border border-white/80 backdrop-blur-xl p-6 text-left transition-all hover:bg-white hover:shadow-lg"
-            style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
-            <ClipboardList size={32} className="mb-3 text-violet-500" />
-            <div className="text-[18px] font-bold text-brand-ink">{d.teacher.step1Test}</div>
-            <div className="mt-1 text-[13px] text-brand-ink-muted">{d.teacher.step1TestDesc}</div>
-          </button>
-          <button onClick={() => setFormat("file")}
-            className="rounded-[24px] bg-white/70 border border-white/80 backdrop-blur-xl p-6 text-left transition-all hover:bg-white hover:shadow-lg"
-            style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
-            <FileText size={32} className="mb-3 text-brand-blue" />
-            <div className="text-[18px] font-bold text-brand-ink">{d.teacher.step1File}</div>
-            <div className="mt-1 text-[13px] text-brand-ink-muted">{d.teacher.step1FileDesc}</div>
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const isStub = format === "learning" || format === "programming";
+  const TYPE_TABS: Array<{ key: Format; label: string; Icon: typeof FileText }> = [
+    { key: "file", label: d.homework.typeFile, Icon: FileText },
+    { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
+    { key: "learning", label: d.homework.typeLearning, Icon: GraduationCap },
+    { key: "programming", label: d.homework.typeProgramming, Icon: Code },
+  ];
 
   return (
     <div className="space-y-5 max-w-2xl">
       <div className="flex items-center gap-3">
-        <button onClick={() => setFormat(null)} className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
+        <button onClick={() => router.back()} className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />
         </button>
         <h1 className="flex-1 text-[22px] font-bold text-brand-ink">
-          {d.teacher.newHomeworkTitle} — {format === "test" ? d.teacher.step1Test : d.teacher.step1File}
+          {d.teacher.newHomeworkTitle}
         </h1>
-        <button
-          type="button"
-          onClick={() => setAiPanelOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
-        >
-          <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
-        </button>
+        {!isStub && (
+          <button
+            type="button"
+            onClick={() => setAiPanelOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
+          >
+            <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
+          </button>
+        )}
       </div>
 
+      {/* Type switcher */}
+      <div className="flex flex-wrap gap-2">
+        {TYPE_TABS.map((t) => {
+          const active = format === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setFormat(t.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all",
+                active
+                  ? "bg-brand-blue text-white shadow-md shadow-brand-blue/25"
+                  : "bg-white/70 border border-slate-200 text-brand-ink-muted hover:bg-white",
+              )}
+            >
+              <t.Icon size={15} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {isStub ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-[24px] border border-white/80 bg-white/70 px-6 py-16 text-center backdrop-blur-xl"
+          style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.07)" }}>
+          {format === "learning"
+            ? <GraduationCap size={40} className="text-slate-300" />
+            : <Code size={40} className="text-slate-300" />}
+          <p className="text-[16px] font-bold text-brand-ink">
+            {format === "learning" ? d.homework.test.learningStub : d.homework.test.programmingStub}
+          </p>
+          <p className="max-w-sm text-[13px] text-brand-ink-muted">
+            {format === "learning" ? d.homework.test.learningStubSub : d.homework.test.programmingStubSub}
+          </p>
+        </div>
+      ) : (
+      <>
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"
         style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -317,6 +340,26 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
 
       {format === "test" && (
         <div className="space-y-3">
+          {/* Test settings: duration + auto-grade */}
+          <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"
+            style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.test.durationLabel}</span>
+              <input type="number" min={1} max={180} value={testDuration}
+                onChange={(e) => setTestDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-32 rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none focus:border-brand-blue/50" />
+            </label>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={autoGrade} onChange={(e) => setAutoGrade(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/30" />
+              <span className="flex-1">
+                <span className="block text-[13px] font-medium text-brand-ink">{d.homework.test.autoGradeLabel}</span>
+                {autoGrade && (
+                  <span className="mt-0.5 block text-[12px] text-brand-ink-muted">{d.homework.test.autoGradeFormula}</span>
+                )}
+              </span>
+            </label>
+          </div>
           <div className="flex items-center justify-between">
             <h2 className="text-[16px] font-bold text-brand-ink">Вопросы</h2>
             <button onClick={() => alert(d.teacher.aiStub)}
@@ -365,25 +408,27 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           </button>
         </div>
       )}
+      </>
+      )}
 
       {error && <p className="text-[13px] font-medium text-danger">{error}</p>}
 
       <div className="flex gap-3">
-        <button onClick={() => save("draft")} disabled={saving}
+        <button onClick={() => save("draft")} disabled={saving || isStub}
           className="rounded-[12px] border border-slate-200 bg-white/80 px-5 py-2.5 text-[14px] font-semibold text-brand-ink transition-all hover:bg-white disabled:opacity-50">
           {saving ? d.common.loading : d.teacher.saveDraft}
         </button>
-        <button onClick={() => save("published")} disabled={saving}
+        <button onClick={() => save("published")} disabled={saving || isStub}
           className="rounded-[12px] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50"
           style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)", boxShadow: "0 4px 16px rgba(29,111,245,0.35)" }}>
-          {saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish}
+          {format === "test" ? d.homework.test.createTest : (saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish)}
         </button>
       </div>
 
       <TeacherAIPanel
         isOpen={aiPanelOpen}
         onClose={() => setAiPanelOpen(false)}
-        format={format}
+        format={format === "test" ? "test" : "file"}
         subject={groups.find((g) => g.id === groupId)?.subject ?? ""}
         onApply={handleAIApply}
       />

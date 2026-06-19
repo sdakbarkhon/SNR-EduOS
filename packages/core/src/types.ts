@@ -225,6 +225,8 @@ export type TestSubmission = {
   submitted_at: string;
   score: number | null;
   max_score: number | null;
+  started_at: string | null;   // migration 31: set when the student begins
+  grade: number | null;        // migration 31: discrete auto-grade 2..5
 };
 
 export type TestAnswer = {
@@ -251,6 +253,8 @@ export type HomeworkWithSubmission = {
   attachment_storage_path: string | null;
   attachment_size_bytes: number | null;
   attachment_filename: string | null;
+  test_duration_seconds: number | null; // migration 31 (test type)
+  test_auto_grade: boolean;             // migration 31 (test type)
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;

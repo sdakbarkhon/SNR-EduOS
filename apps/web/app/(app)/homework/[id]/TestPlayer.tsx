@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { CheckCircle, Circle, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CheckCircle, Circle, Loader2, Play, Clock, ChevronDown } from "lucide-react";
 import {
   getDictionary,
   getTestQuestions,
   getTestSubmission,
+  startHomeworkTest,
   submitTest,
   type HomeworkWithSubmission,
   type TestQuestion,
@@ -19,104 +20,112 @@ import { cn } from "@/lib/cn";
 
 const sb = createClient();
 
-function ResultsScreen({
-  questions,
-  submission,
-  answers,
-  locale,
+function fmt(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Countdown driven by the DB started_at (survives F5 — no localStorage needed). */
+function TestTimer({ endsAt, onTimeout, label }: { endsAt: number; onTimeout: () => void; label: string }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, endsAt - Date.now()));
+  const fired = useRef(false);
+  const cb = useRef(onTimeout);
+  useEffect(() => { cb.current = onTimeout; });
+  useEffect(() => {
+    if (endsAt <= Date.now()) { if (!fired.current) { fired.current = true; cb.current(); } return; }
+    const id = setInterval(() => {
+      const r = Math.max(0, endsAt - Date.now());
+      setRemaining(r);
+      if (r <= 0 && !fired.current) { fired.current = true; clearInterval(id); cb.current(); }
+    }, 500);
+    return () => clearInterval(id);
+  }, [endsAt]);
+  const secs = Math.floor(remaining / 1000);
+  const urgent = secs < 60;
+  return (
+    <div className={cn(
+      "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold tabular-nums",
+      urgent ? "bg-red-50 text-red-600 animate-pulse" : "bg-slate-100 text-slate-700",
+    )}>
+      <Clock size={15} />
+      {label}: {fmt(secs)}
+    </div>
+  );
+}
+
+function Results({
+  hw, questions, submission, locale,
 }: {
+  hw: HomeworkWithSubmission;
   questions: TestQuestion[];
   submission: TestSubmission;
-  answers: Map<string, TestAnswerInput>;
   locale: Locale;
 }) {
   const d = getDictionary(locale);
+  const t = d.homework.test;
+  const [open, setOpen] = useState(false);
   const score = submission.score ?? 0;
-  const maxScore = submission.max_score ?? 0;
-  const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+  const max = submission.max_score ?? 0;
+  const pct = max > 0 ? Math.round((score / max) * 100) : 0;
 
   return (
     <GlassCard className="p-6">
-      <h2 className="text-lg font-bold text-slate-800 mb-1">{d.homework.testResults}</h2>
-      <div className="mb-6">
-        <span className="text-3xl font-black text-blue-600">{score}</span>
-        <span className="text-slate-400 font-semibold text-lg"> / {maxScore}</span>
-        <span className="ml-3 text-sm text-slate-500">({pct}%)</span>
-      </div>
+      <p className="text-[15px] font-semibold text-slate-700">
+        {t.resultLine
+          .replace("{score}", String(score))
+          .replace("{max}", String(max))
+          .replace("{pct}", String(pct))}
+      </p>
 
-      <div className="flex flex-col gap-4">
-        {questions.map((q, idx) => {
-          const ans = answers.get(q.id);
-          const isCorrect = q.question_type === "single_choice"
-            ? q.options.find((o) => o.id === ans?.selectedOptionId)?.is_correct ?? false
-            : null;
+      {submission.grade != null ? (
+        <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2">
+          <span className="text-2xl font-black text-emerald-600">{submission.grade}</span>
+          <span className="text-sm font-semibold text-emerald-500">/ 5</span>
+        </div>
+      ) : (
+        <div className="mt-3 inline-flex rounded-xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
+          {t.awaitingReview}
+        </div>
+      )}
 
-          return (
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="mt-5 flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+      >
+        <ChevronDown size={16} className={cn("transition-transform", open && "rotate-180")} />
+        {t.viewAnswers}
+      </button>
+
+      {open && (
+        <div className="mt-4 flex flex-col gap-4">
+          {questions.map((q, idx) => (
             <div key={q.id} className="rounded-xl border border-slate-100 bg-white/80 p-4">
               <div className="flex items-start gap-2 mb-3">
-                <span className="text-xs font-bold text-slate-400 mt-0.5 shrink-0">
-                  {idx + 1}.
-                </span>
+                <span className="mt-0.5 shrink-0 text-xs font-bold text-slate-400">{idx + 1}.</span>
                 <p className="text-sm font-semibold text-slate-700">{q.question_text}</p>
-                {q.question_type === "single_choice" && (
-                  <span
-                    className={cn(
-                      "ml-auto shrink-0 text-xs font-bold px-2 py-0.5 rounded-full",
-                      isCorrect ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600",
-                    )}
-                  >
-                    {isCorrect ? "✓" : "✗"}
-                  </span>
-                )}
-                {q.question_type === "open" && (
-                  <span className="ml-auto shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                    {d.homework.testReview}
-                  </span>
-                )}
               </div>
-
               {q.question_type === "single_choice" && (
                 <div className="flex flex-col gap-1.5">
-                  {q.options.map((opt) => {
-                    const selected = ans?.selectedOptionId === opt.id;
-                    return (
-                      <div
-                        key={opt.id}
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
-                          opt.is_correct
-                            ? "bg-green-50 text-green-700 font-semibold"
-                            : selected && !opt.is_correct
-                            ? "bg-red-50 text-red-600"
-                            : "text-slate-600",
-                        )}
-                      >
-                        {opt.is_correct ? (
-                          <CheckCircle size={14} className="text-green-600 shrink-0" />
-                        ) : (
-                          <Circle size={14} className="text-slate-300 shrink-0" />
-                        )}
-                        {opt.option_text}
-                        {opt.is_correct && (
-                          <span className="ml-1 text-xs text-green-600">
-                            — {d.homework.testCorrect}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt) => (
+                    <div key={opt.id} className={cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                      opt.is_correct ? "bg-green-50 text-green-700 font-semibold" : "text-slate-600",
+                    )}>
+                      {opt.is_correct ? <CheckCircle size={14} className="text-green-600 shrink-0" /> : <Circle size={14} className="text-slate-300 shrink-0" />}
+                      {opt.option_text}
+                      {opt.is_correct && <span className="ml-1 text-xs text-green-600">— {d.homework.testCorrect}</span>}
+                    </div>
+                  ))}
                 </div>
               )}
-
-              {q.question_type === "open" && ans?.openText && (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  {ans.openText}
-                </div>
+              {q.question_type === "open" && (
+                <span className="text-xs font-semibold text-amber-600">{d.homework.testReview}</span>
               )}
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </GlassCard>
   );
 }
@@ -124,25 +133,27 @@ function ResultsScreen({
 export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const t = d.homework.test;
 
+  const [studentId, setStudentId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
-  const [existingSubmission, setExistingSubmission] = useState<TestSubmission | null>(
-    hw.test_submission ?? null,
-  );
+  const [submission, setSubmission] = useState<TestSubmission | null>(hw.test_submission ?? null);
   const [answers, setAnswers] = useState<Map<string, TestAnswerInput>>(new Map());
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState<TestSubmission | null>(null);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [qs, sub] = await Promise.all([
-        getTestQuestions(sb, hw.id),
-        hw.test_submission ? Promise.resolve(hw.test_submission) : getTestSubmission(sb, hw.id),
-      ]);
-      setQuestions(qs);
-      setExistingSubmission(sub);
+      const sres = await sb.from("students").select("id").single();
+      if (!sres.error) setStudentId(sres.data.id);
+      const sub = hw.test_submission ?? (await getTestSubmission(sb, hw.id));
+      setSubmission(sub);
+      // Questions are only readable (RLS) once the student has started.
+      if (sub?.started_at) {
+        setQuestions(await getTestQuestions(sb, hw.id));
+      }
     } finally {
       setLoading(false);
     }
@@ -150,45 +161,44 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const setOption = (questionId: string, selectedOptionId: string) => {
-    setAnswers((prev) => {
-      const next = new Map(prev);
-      next.set(questionId, { questionId, selectedOptionId });
-      return next;
-    });
-  };
+  const isSubmitted = submission != null && submission.score != null;
+  const isInProgress = submission != null && submission.started_at != null && submission.score == null;
 
-  const setOpenText = (questionId: string, openText: string) => {
-    setAnswers((prev) => {
-      const next = new Map(prev);
-      next.set(questionId, { questionId, openText });
-      return next;
-    });
-  };
+  const setOption = (questionId: string, selectedOptionId: string) =>
+    setAnswers((prev) => new Map(prev).set(questionId, { questionId, selectedOptionId }));
+  const setOpenText = (questionId: string, openText: string) =>
+    setAnswers((prev) => new Map(prev).set(questionId, { questionId, openText }));
 
-  const handleSubmit = async () => {
+  async function handleStart() {
+    if (!studentId) return;
+    setStarting(true);
     setError("");
-    const answerList = Array.from(answers.values());
-    if (answerList.length === 0) {
-      setError("Ответьте хотя бы на один вопрос");
-      return;
-    }
-    setSubmitting(true);
     try {
-      const studentRes = await sb.from("students").select("id").single();
-      if (studentRes.error) throw studentRes.error;
-      const result = await submitTest(sb, {
-        homeworkId: hw.id,
-        studentId: studentRes.data.id,
-        answers: answerList,
-      });
-      setSubmitted(result);
+      const s = await startHomeworkTest(sb, hw.id, studentId);
+      setSubmission(s);
+      setQuestions(await getTestQuestions(sb, hw.id));
     } catch (e) {
-      setError((e as Error).message ?? "Ошибка отправки");
+      setError((e as Error).message ?? d.common.error);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  const handleSubmit = useCallback(async (auto = false) => {
+    if (!studentId || submitting) return;
+    const answerList = Array.from(answers.values());
+    if (!auto && answerList.length === 0) { setError("Ответьте хотя бы на один вопрос"); return; }
+    setSubmitting(true);
+    setError("");
+    try {
+      const result = await submitTest(sb, { homeworkId: hw.id, studentId, answers: answerList });
+      setSubmission(result);
+    } catch (e) {
+      setError((e as Error).message ?? d.common.error);
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [studentId, submitting, answers, hw.id, d.common.error]);
 
   if (loading) {
     return (
@@ -199,72 +209,78 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
     );
   }
 
-  const finalSubmission = submitted ?? existingSubmission;
-  if (finalSubmission) {
+  // Already submitted → results
+  if (isSubmitted && submission) {
+    return <Results hw={hw} questions={questions} submission={submission} locale={locale as Locale} />;
+  }
+
+  // Not started → start gate
+  if (!isInProgress) {
+    const durMin = hw.test_duration_seconds ? Math.round(hw.test_duration_seconds / 60) : null;
     return (
-      <ResultsScreen
-        questions={questions}
-        submission={finalSubmission}
-        answers={answers}
-        locale={locale as Locale}
-      />
+      <GlassCard className="p-8 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+          <Play size={28} className="fill-violet-600" />
+        </div>
+        <p className="text-sm text-slate-500">
+          {t.meta
+            .replace("{q}", String(hw.test_submission ? questions.length : "?"))
+            .replace("{min}", durMin ? String(durMin) : "—")}
+        </p>
+        <p className="mt-2 mb-5 text-xs text-slate-400 max-w-sm mx-auto">{t.startWarning}</p>
+        {error && <p className="mb-3 text-sm text-red-500">{error}</p>}
+        <button
+          onClick={handleStart}
+          disabled={starting || !studentId}
+          className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-md transition disabled:opacity-60"
+          style={{ background: "linear-gradient(135deg,#7C3AED 0%,#5B21B6 100%)" }}
+        >
+          {starting ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
+          {t.start}
+        </button>
+      </GlassCard>
     );
   }
 
+  // In progress → timer + questions
+  const endsAt = submission?.started_at && hw.test_duration_seconds
+    ? new Date(submission.started_at).getTime() + hw.test_duration_seconds * 1000
+    : null;
+
   return (
     <GlassCard className="p-6">
-      <h2 className="text-lg font-bold text-slate-800 mb-6">{d.nav.homework}</h2>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-bold text-slate-800">{d.nav.homework}</h2>
+        {endsAt && <TestTimer endsAt={endsAt} onTimeout={() => handleSubmit(true)} label={t.timeLeft} />}
+      </div>
 
       <div className="flex flex-col gap-6">
         {questions.map((q, idx) => (
           <div key={q.id}>
-            <p className="text-sm font-semibold text-slate-700 mb-3">
-              <span className="text-slate-400 mr-1">{idx + 1}.</span>
+            <p className="mb-3 text-sm font-semibold text-slate-700">
+              <span className="mr-1 text-slate-400">{idx + 1}.</span>
               {q.question_text}
             </p>
-
             {q.question_type === "single_choice" && (
               <fieldset className="flex flex-col gap-2">
-                {q.options
-                  .slice()
-                  .sort((a, b) => a.order_index - b.order_index)
-                  .map((opt) => {
-                    const selected = answers.get(q.id)?.selectedOptionId === opt.id;
-                    return (
-                      <label
-                        key={opt.id}
-                        className={cn(
-                          "flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all text-sm",
-                          selected
-                            ? "border-blue-500 bg-blue-50 text-blue-700 font-semibold"
-                            : "border-slate-200 bg-white/80 text-slate-600 hover:border-blue-300",
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          name={`q-${q.id}`}
-                          value={opt.id}
-                          checked={selected}
-                          onChange={() => setOption(q.id, opt.id)}
-                          className="sr-only"
-                        />
-                        <span
-                          className={cn(
-                            "w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center",
-                            selected ? "border-blue-500" : "border-slate-300",
-                          )}
-                        >
-                          {selected && (
-                            <span className="w-2 h-2 rounded-full bg-blue-500 block" />
-                          )}
-                        </span>
-                        {opt.option_text}
-                      </label>
-                    );
-                  })}
+                {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt) => {
+                  const selected = answers.get(q.id)?.selectedOptionId === opt.id;
+                  return (
+                    <label key={opt.id} className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-all",
+                      selected ? "border-blue-500 bg-blue-50 font-semibold text-blue-700" : "border-slate-200 bg-white/80 text-slate-600 hover:border-blue-300",
+                    )}>
+                      <input type="radio" name={`q-${q.id}`} value={opt.id} checked={selected}
+                        onChange={() => setOption(q.id, opt.id)} className="sr-only" />
+                      <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2", selected ? "border-blue-500" : "border-slate-300")}>
+                        {selected && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+                      </span>
+                      {opt.option_text}
+                    </label>
+                  );
+                })}
               </fieldset>
             )}
-
             {q.question_type === "open" && (
               <textarea
                 value={answers.get(q.id)?.openText ?? ""}
@@ -282,13 +298,13 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
 
       <button
         type="button"
-        onClick={handleSubmit}
+        onClick={() => handleSubmit(false)}
         disabled={submitting}
-        className="mt-8 w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition disabled:opacity-60"
+        className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition disabled:opacity-60"
         style={{ background: "linear-gradient(135deg,#1D6FF5 0%,#0B3EDB 100%)" }}
       >
         {submitting && <Loader2 size={14} className="animate-spin" />}
-        {submitting ? d.homework.formSubmitting : d.homework.testSubmit}
+        {submitting ? d.homework.formSubmitting : t.finish}
       </button>
     </GlassCard>
   );

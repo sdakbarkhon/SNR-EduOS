@@ -155,6 +155,32 @@ export interface Dictionary {
     submittedFileLbl: string;
     uploadingFile: string;
     resubmitBtn: string;
+    // Homework types (migration 31)
+    typeLearning: string;
+    typeProgramming: string;
+    test: {
+      durationLabel: string;       // "Длительность теста (минут)"
+      autoGradeLabel: string;      // "Автоматически выставить оценку по результату"
+      autoGradeFormula: string;    // "≥85% → 5, ≥70% → 4, ≥50% → 3, <50% → 2"
+      createTest: string;          // "Создать тест"
+      info: string;                // "{q} вопросов · {min} мин · {grade}"
+      autoGradeOn: string;         // "авто-оценка вкл"
+      autoGradeOff: string;        // "авто-оценка выкл"
+      start: string;               // "Начать тест"
+      startWarning: string;        // "После нажатия запустится таймер…"
+      meta: string;                // "{q} вопросов · {min} мин на выполнение"
+      finish: string;              // "Завершить тест"
+      timeLeft: string;            // "Осталось"
+      timeUp: string;              // "Время истекло — ответы отправлены"
+      resultLine: string;          // "Вы ответили на {score} из {max} ({pct}%)"
+      awaitingReview: string;      // "Ожидает проверки учителя"
+      viewAnswers: string;         // "Просмотреть свои ответы"
+      yourAnswer: string;          // "Ваш ответ"
+      learningStub: string;
+      learningStubSub: string;
+      programmingStub: string;
+      programmingStubSub: string;
+    };
   };
   payments: {
     title: string;

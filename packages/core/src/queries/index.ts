@@ -68,6 +68,8 @@ export const getHomeworkWithSubmissions = (db: Db) =>
         attachment_storage_path: string | null;
         attachment_size_bytes: number | null;
         attachment_filename: string | null;
+        test_duration_seconds: number | null;
+        test_auto_grade: boolean;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -101,6 +103,8 @@ export const getHomeworkById = (db: Db, id: string) =>
         attachment_storage_path: string | null;
         attachment_size_bytes: number | null;
         attachment_filename: string | null;
+        test_duration_seconds: number | null;
+        test_auto_grade: boolean;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -298,7 +302,7 @@ export const getTestSubmission = async (db: Db, homeworkId: string): Promise<Tes
     .eq("homework_id", homeworkId)
     .maybeSingle();
   if (error) throw error;
-  return (data as TestSubmission | null);
+  return (data as unknown as TestSubmission | null);
 };
 
 // ─── TEACHER QUERIES ─────────────────────────────────────────────────────────
@@ -354,7 +358,7 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
   const fileSel =
     "id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
   const testSel =
-    "id, score, max_score, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+    "id, score, max_score, grade, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
   const [fileRes, testRes] = await Promise.all([
     db.from("homework_submissions").select(fileSel).not("grade", "is", null),
     db.from("test_submissions").select(testSel).not("score", "is", null),
@@ -376,17 +380,19 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
     });
   }
   for (const r of (testRes.data ?? []) as unknown as Array<{
-    id: string; score: number; max_score: number | null; submitted_at: string; homework: HwJoin | null;
+    id: string; score: number; max_score: number | null; grade: number | null; submitted_at: string; homework: HwJoin | null;
   }>) {
     const max = r.max_score ?? 0;
+    // Migration 31: prefer the discrete auto-grade when present.
+    const hasGrade = r.grade != null;
     items.push({
       id: r.id, kind: "test",
       title: r.homework?.title ?? "",
       subject: r.homework?.group?.subject ?? "",
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
-      grade5: max > 0 ? (r.score / max) * 5 : null,
-      display: `${r.score}/${max || "?"}`,
+      grade5: hasGrade ? r.grade : (max > 0 ? (r.score / max) * 5 : null),
+      display: hasGrade ? `${r.grade}/5` : `${r.score}/${max || "?"}`,
       comment: null,
     });
   }
@@ -582,9 +588,12 @@ export const createTeacherHomework = async (
     teacherId: string;
     lessonId?: string | null;
     status?: "draft" | "published";
+    testDurationSeconds?: number | null;
+    testAutoGrade?: boolean;
   },
 ) => {
-  const { data, error } = await db
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
     .from("homework")
     .insert({
       group_id: input.groupId,
@@ -594,7 +603,9 @@ export const createTeacherHomework = async (
       content_type: input.contentType,
       source: "teacher",
       teacher_id: input.teacherId,
-    lesson_id: input.lessonId ?? null,
+      lesson_id: input.lessonId ?? null,
+      test_duration_seconds: input.contentType === "test" ? (input.testDurationSeconds ?? null) : null,
+      test_auto_grade: input.contentType === "test" ? (input.testAutoGrade ?? true) : true,
     })
     .select()
     .single();
@@ -683,12 +694,71 @@ export type TestAnswerInput = {
   openText?: string;
 };
 
-/** Сдача теста: auto-score single_choice, create submission + answers. */
+/** Discrete auto-grade from a test ratio (migration 31 formula). null if no
+ *  auto-gradable (single_choice) questions. */
+export const autoGradeFromRatio = (score: number, max: number): number | null => {
+  if (max <= 0) return null;
+  const r = score / max;
+  if (r >= 0.85) return 5;
+  if (r >= 0.70) return 4;
+  if (r >= 0.50) return 3;
+  return 2;
+};
+
+/** Ученик начинает тест: создаёт/возвращает submission с started_at.
+ *  Нельзя начать дважды — если started_at уже стоит, возвращаем существующую. */
+export const startHomeworkTest = async (
+  db: Db,
+  homeworkId: string,
+  studentId: string,
+): Promise<TestSubmission> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const existing = await db2
+    .from("test_submissions")
+    .select("*")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle()
+    .then(({ data }: { data: TestSubmission | null }) => data);
+  if (existing) {
+    if (existing.started_at) return existing;
+    // Row exists without started_at (legacy) → set it
+    const { data, error } = await db2
+      .from("test_submissions")
+      .update({ started_at: new Date().toISOString() })
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data as TestSubmission;
+  }
+  const { data, error } = await db2
+    .from("test_submissions")
+    .insert({ homework_id: homeworkId, student_id: studentId, started_at: new Date().toISOString() })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as TestSubmission;
+};
+
+/** Сдача теста: auto-score single_choice, finalise the started submission,
+ *  write answers, and (if homework.test_auto_grade) the discrete grade. */
 export const submitTest = async (
   db: Db,
   input: { homeworkId: string; studentId: string; answers: TestAnswerInput[] },
 ): Promise<TestSubmission> => {
   const { homeworkId, studentId, answers } = input;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+
+  // homework auto-grade flag
+  const { data: hwRow } = await db2
+    .from("homework")
+    .select("test_auto_grade")
+    .eq("id", homeworkId)
+    .maybeSingle();
+  const autoGrade = (hwRow as { test_auto_grade?: boolean } | null)?.test_auto_grade ?? true;
 
   // Получить вопросы с правильными ответами
   const { data: questions, error: qErr } = await db
@@ -720,16 +790,49 @@ export const submitTest = async (
     }
   }
 
-  // Создать test_submission
-  const { data: sub, error: subErr } = await db
-    .from("test_submissions")
-    .insert({ homework_id: homeworkId, student_id: studentId, score, max_score: singleChoiceCount })
-    .select("*")
-    .single();
-  if (subErr) throw subErr;
-  const submissionId = (sub as unknown as { id: string }).id;
+  const hasOpen = [...qMap.values()].some(q => q.question_type === "open");
+  // Auto-grade only when enabled AND there are no manually-graded (open) questions.
+  const grade = autoGrade && !hasOpen ? autoGradeFromRatio(score, singleChoiceCount) : null;
 
-  // Создать test_answers
+  const payload = {
+    score,
+    max_score: singleChoiceCount,
+    grade,
+    submitted_at: new Date().toISOString(),
+  };
+
+  // Finalise the started submission (start-gate flow) or insert if missing (legacy).
+  const existing = await db2
+    .from("test_submissions")
+    .select("id")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle()
+    .then(({ data }: { data: { id: string } | null }) => data);
+
+  let sub: unknown;
+  if (existing) {
+    const { data, error } = await db2
+      .from("test_submissions")
+      .update(payload)
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    sub = data;
+  } else {
+    const { data, error } = await db2
+      .from("test_submissions")
+      .insert({ homework_id: homeworkId, student_id: studentId, started_at: new Date().toISOString(), ...payload })
+      .select("*")
+      .single();
+    if (error) throw error;
+    sub = data;
+  }
+  const submissionId = (sub as { id: string }).id;
+
+  // Replace answers (delete any prior, then insert) — students can re-finalise
+  // only while ungraded; for the normal flow there are no prior answers.
   if (answerRows.length > 0) {
     const { error: ansErr } = await db
       .from("test_answers")
@@ -737,7 +840,7 @@ export const submitTest = async (
     if (ansErr) throw ansErr;
   }
 
-  return sub as unknown as TestSubmission;
+  return sub as TestSubmission;
 };
 
 // ─── LESSON DETAIL ───────────────────────────────────────────────────────────
