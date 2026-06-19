@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { LogoutButton } from "./LogoutButton";
@@ -22,7 +23,11 @@ export function Topbar({
         >
           <Bell size={18} />
         </button>
-        {studentName && <Avatar name={studentName} />}
+        {studentName && (
+          <Link href="/profile" className="transition-transform hover:scale-105">
+            <Avatar name={studentName} />
+          </Link>
+        )}
         <LogoutButton />
       </div>
     </header>

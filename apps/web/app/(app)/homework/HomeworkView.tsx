@@ -29,7 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { SubjectIcon, useLocale } from "@/components";
 import { HomeworkStatsDonut } from "./HomeworkStatsDonut";
-import { DailyTipCard } from "./DailyTipCard";
+import { AiTipCard } from "./AiTipCard";
 
 type SortMode = "deadline" | "created";
 type ViewTab = null | "all" | HomeworkTab;
@@ -502,7 +502,7 @@ export function HomeworkView({ initialRows }: { initialRows: HomeworkWithSubmiss
             </div>
           </div>
 
-          <DailyTipCard tipLabel={d.homework.tipTitle} />
+          <AiTipCard tipLabel={d.homework.tipTitle} />
         </div>
       </div>
     </div>

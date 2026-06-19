@@ -6,6 +6,7 @@ import type { Locale, StudentGradeItem } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { AiGradesCard } from "./AiGradesCard";
 
 interface Props {
   grades: StudentGradeItem[];
@@ -102,6 +103,8 @@ export function GradesView({ grades }: Props) {
   return (
     <div className="space-y-4">
       <h1 className="text-[22px] font-bold text-brand-ink">Мои оценки</h1>
+
+      <AiGradesCard grades={grades} />
 
       {/* KPI — compact (~80px) */}
       <div className="grid grid-cols-3 gap-3">

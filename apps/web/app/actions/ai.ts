@@ -81,6 +81,25 @@ export async function callGemini(
   return { error: "AI временно недоступен" };
 }
 
+export async function getDailyFact(): Promise<{ text: string } | { error: string }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const systemPrompt = `Ты — помощник для школьников. Дай один интересный факт из науки, истории или технологий — 2-3 предложения, живо и увлекательно. Только факт, без вводных слов. Дата: ${today}.`;
+  return callGemini(systemPrompt, "Дай один интересный факт дня.", []);
+}
+
+export async function getStudyTip(): Promise<{ text: string } | { error: string }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const systemPrompt = `Ты — школьный коуч. Дай один практичный совет по учёбе, концентрации или продуктивности — 1-2 предложения, конкретно и по делу. Только совет, без вводных фраз. Дата: ${today}.`;
+  return callGemini(systemPrompt, "Дай совет по учёбе на сегодня.", []);
+}
+
+export async function getGradesAdvice(
+  gradesSummary: string,
+): Promise<{ text: string } | { error: string }> {
+  const systemPrompt = `Ты — добрый школьный наставник. На основе оценок ученика дай персональный совет: что улучшить, на что обратить внимание, что делать дальше. Ответ — 2-3 предложения, поддерживающий тон, конкретно. Только совет, без вводных.`;
+  return callGemini(systemPrompt, gradesSummary, []);
+}
+
 export async function generateHomeworkContent(params: {
   subject: string;
   topic: string;
