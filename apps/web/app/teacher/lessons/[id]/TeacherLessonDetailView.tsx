@@ -159,7 +159,11 @@ export function TeacherLessonDetailView({
         ...prev,
         summary: { ...prev.summary, enabled: true, is_completed: true },
       }));
-    } catch { /* noop */ } finally { setStatusLoading(false); }
+    } catch { /* noop */ } finally {
+      setStatusLoading(false);
+      setConfirmEndOpen(false);
+      setIncompleteOpen(false);
+    }
   }
 
   const style = getSubjectStyle(lesson.group.subject);
@@ -539,7 +543,7 @@ export function TeacherLessonDetailView({
 
       {/* Upload modal */}
       {uploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[#1D1D1F]">{d.lesson.addMaterialTitle}</h3>

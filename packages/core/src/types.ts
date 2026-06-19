@@ -423,6 +423,7 @@ export type Classwork = {
   attachment_storage_path: string | null;
   attachment_filename: string | null;
   attachment_size_bytes: number | null;
+  duration_seconds: number | null;
   questions: ClassworkQuestion[];
 };
 

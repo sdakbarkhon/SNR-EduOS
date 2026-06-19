@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -41,23 +42,26 @@ export function ConfirmModal({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
+  // Safety net: clear any accidental body overflow lock on unmount
+  useEffect(() => {
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative z-10 w-full max-w-md animate-[scale-in_0.2s_ease-out] rounded-[24px] border border-white/80 bg-white p-6 shadow-2xl"
-        style={{ animation: "scaleIn 0.2s ease-out" }}
+        className="relative z-10 w-full max-w-md rounded-[24px] border border-white/80 bg-white p-6 shadow-2xl"
+        style={{ animation: "scaleIn 0.18s ease-out" }}
       >
         <style>{`@keyframes scaleIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}`}</style>
 
-        {/* Close */}
         <button onClick={onClose} className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
           <X size={16} />
         </button>
 
-        {/* Icon + Title */}
         <div className="mb-4 flex items-start gap-3">
           <div className="mt-0.5 shrink-0">
             {icon ?? <Icon className={cn("h-6 w-6", iconCls)} />}
@@ -65,15 +69,12 @@ export function ConfirmModal({
           <h3 className="text-[17px] font-bold text-slate-900 leading-snug">{title}</h3>
         </div>
 
-        {/* Message */}
         {message && (
           <p className="mb-4 text-[14px] leading-relaxed text-gray-600">{message}</p>
         )}
 
-        {/* Custom children (e.g. list of names) */}
         {children && <div className="mb-4">{children}</div>}
 
-        {/* Buttons */}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           {cancelText && (
             <button
@@ -107,6 +108,7 @@ export function ConfirmModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

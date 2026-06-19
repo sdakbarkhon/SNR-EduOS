@@ -1584,9 +1584,9 @@ export const getClasswork = async (db: Db, lessonId: string): Promise<Classwork 
 /** Создать classwork (без вопросов). */
 export const createClasswork = async (
   db: Db,
-  { lessonId, teacherId, title, description, workType }: {
+  { lessonId, teacherId, title, description, workType, durationSeconds }: {
     lessonId: string; teacherId: string; title: string;
-    description?: string; workType: ClassworkType;
+    description?: string; workType: ClassworkType; durationSeconds?: number;
   },
 ): Promise<string> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1596,6 +1596,7 @@ export const createClasswork = async (
     description: description ?? null,
     work_type: workType,
     created_by: teacherId,
+    duration_seconds: durationSeconds ?? null,
   }).select("id").single();
   if (error) throw error;
   return (data as { id: string }).id;
