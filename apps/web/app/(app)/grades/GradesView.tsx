@@ -192,11 +192,15 @@ export function GradesView({ grades }: Props) {
                             ? "bg-purple-100 text-purple-700"
                             : g.kind === "test"
                             ? "bg-violet-100 text-violet-700"
+                            : g.kind === "programming"
+                            ? "bg-emerald-100 text-emerald-700"
                             : "bg-blue-100 text-blue-700")}>
                           {g.kind === "classwork"
                             ? d.classwork.title
                             : g.kind === "test"
                             ? d.homework.typeTest
+                            : g.kind === "programming"
+                            ? d.homework.typeProgramming
                             : d.homework.typeFile}
                         </span>
                       </td>

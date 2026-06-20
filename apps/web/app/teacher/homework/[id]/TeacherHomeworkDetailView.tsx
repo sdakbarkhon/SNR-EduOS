@@ -10,7 +10,10 @@ import {
   uploadHomeworkAttachment,
   setHomeworkAttachment,
   deleteHomeworkAttachment,
+  getHomeworkTestsUrl,
 } from "@snr/core";
+import { Code2 } from "lucide-react";
+import { TeacherProgrammingSubmissions } from "./TeacherProgrammingSubmissions";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
@@ -29,6 +32,7 @@ type Question = {
 type Submission = {
   id: string; student_id: string; status: string;
   submitted_at: string | null; answer_text: string | null;
+  code_text: string | null;
   grade: number | null; teacher_comment: string | null;
   file_storage_path: string | null; file_original_name: string | null;
   student: { id: string; full_name: string; avatar_url: string | null };
@@ -48,6 +52,10 @@ type HW = {
   attachment_size_bytes: number | null;
   test_duration_seconds: number | null;
   test_auto_grade: boolean;
+  programming_language: "python" | "cpp" | null;
+  expected_output: string | null;
+  tests_attachment_path: string | null;
+  tests_attachment_filename: string | null;
   group: { id: string; name: string; subject: string };
 };
 
@@ -332,8 +340,12 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-[12px] text-brand-ink-muted">{hw.group.name}</span>
             <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              hw.content_type === "test" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700")}>
-              {hw.content_type === "test" ? d.homework.typeTest : d.homework.typeFile}
+              hw.content_type === "test" ? "bg-violet-100 text-violet-700"
+                : hw.content_type === "programming" ? "bg-emerald-100 text-emerald-700"
+                : "bg-blue-100 text-blue-700")}>
+              {hw.content_type === "test" ? d.homework.typeTest
+                : hw.content_type === "programming" ? d.homework.typeProgramming
+                : d.homework.typeFile}
             </span>
           </div>
           {hw.content_type === "test" && (
@@ -342,6 +354,11 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
                 .replace("{q}", String(questions.length))
                 .replace("{min}", hw.test_duration_seconds ? String(Math.round(hw.test_duration_seconds / 60)) : "—")
                 .replace("{grade}", hw.test_auto_grade ? d.homework.test.autoGradeOn : d.homework.test.autoGradeOff)}
+            </p>
+          )}
+          {hw.content_type === "programming" && (
+            <p className="mt-1 flex items-center gap-1 text-[11px] text-brand-ink-muted">
+              <Code2 size={12} /> {hw.programming_language === "cpp" ? "C++" : "Python"}
             </p>
           )}
         </div>
@@ -370,6 +387,29 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
       {hw.description && (
         <div className="rounded-[16px] bg-white/70 border border-white/80 p-4 text-[14px] text-brand-ink">
           {hw.description}
+        </div>
+      )}
+
+      {/* Programming info (expected output + tests file) */}
+      {hw.content_type === "programming" && (hw.expected_output || hw.tests_attachment_path) && (
+        <div className="rounded-[16px] bg-white/70 border border-white/80 p-4 space-y-3">
+          {hw.expected_output && (
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-brand-ink-muted">{d.homework.programming.expectedLabel}</p>
+              <pre className="overflow-auto rounded-lg bg-[#1e1e1e] p-2.5 text-[12px] text-slate-100" style={{ fontFamily: "'JetBrains Mono',Monaco,monospace" }}>{hw.expected_output}</pre>
+            </div>
+          )}
+          {hw.tests_attachment_path && (
+            <button
+              onClick={async () => {
+                const url = await getHomeworkTestsUrl(createClient(), hw.tests_attachment_path!, hw.tests_attachment_filename ?? "tests").catch(() => null);
+                if (url) window.open(url, "_blank");
+              }}
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600 hover:underline"
+            >
+              <Download size={13} /> {d.homework.programming.testsFile}: {hw.tests_attachment_filename}
+            </button>
+          )}
         </div>
       )}
 
@@ -421,7 +461,14 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
         </div>
       )}
 
-      {/* Submissions list */}
+      {/* Programming submissions (code viewer + inline grade) */}
+      {hw.content_type === "programming" ? (
+        <TeacherProgrammingSubmissions
+          language={hw.programming_language ?? "python"}
+          submissions={localSubs}
+        />
+      ) : (
+      /* Submissions list */
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5"
         style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.07)" }}>
         <h2 className="mb-4 text-[15px] font-bold text-brand-ink">{d.teacher.detailStudents}</h2>
@@ -499,6 +546,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           </div>
         )}
       </div>
+      )}
 
       {reviewSub && (
         <ReviewModal

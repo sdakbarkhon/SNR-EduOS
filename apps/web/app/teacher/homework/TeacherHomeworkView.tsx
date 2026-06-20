@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 type Submission = { id: string; status: string };
 type TestSub = { id: string; student_id: string };
 type HomeworkItem = {
-  id: string; title: string; due_date: string | null; content_type: "file" | "test";
+  id: string; title: string; due_date: string | null; content_type: "file" | "test" | "programming";
   teacher_id: string | null;
   group: {
     id: string; name: string; subject: string;
@@ -172,7 +172,8 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   async function duplicateHW(hw: HomeworkItem) {
     setBusyId(hw.id);
     try {
-      const { data: newHW, error: hwErr } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: newHW, error: hwErr } = await (supabase as any)
         .from("homework")
         .insert({
           group_id: hw.group.id, title: hw.title + " (копия)", description: null,
@@ -299,8 +300,12 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
                     <span className={cn("rounded-[8px] border px-2.5 py-1 text-[11px] font-semibold",
                       hw.content_type === "test"
                         ? "border-amber-200/50 bg-amber-100/80 text-amber-700"
+                        : hw.content_type === "programming"
+                        ? "border-emerald-200/50 bg-emerald-100/80 text-emerald-700"
                         : "border-gray-200/50 bg-gray-100/80 text-gray-700")}>
-                      {hw.content_type === "test" ? d.homework.typeTest : d.homework.typeFile}
+                      {hw.content_type === "test" ? d.homework.typeTest
+                        : hw.content_type === "programming" ? d.homework.typeProgramming
+                        : d.homework.typeFile}
                     </span>
                     {active && (
                       <span className="rounded-[8px] border border-emerald-200/50 bg-emerald-100/80 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">{d.teacher.statsActive}</span>

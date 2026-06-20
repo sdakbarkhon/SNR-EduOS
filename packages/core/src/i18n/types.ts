@@ -181,6 +181,27 @@ export interface Dictionary {
       programmingStub: string;
       programmingStubSub: string;
     };
+    programming: {
+      language: string;
+      starterLabel: string;
+      starterHint: string;
+      expectedLabel: string;
+      expectedHint: string;
+      testsLabel: string;
+      testsHint: string;
+      condition: string;        // "Условие"
+      run: string;              // "Запустить"
+      submit: string;           // "Отправить учителю"
+      output: string;           // "Вывод"
+      outputEmpty: string;
+      runSoonTitle: string;     // "Скоро будет доступно"
+      runSoonBody: string;
+      understood: string;       // "Понятно"
+      sent: string;             // "Код отправлен учителю"
+      testsFile: string;        // "Файл с тестами"
+      download: string;         // "Скачать"
+      noCode: string;           // "Ученик ещё не отправил код"
+    };
   };
   payments: {
     title: string;

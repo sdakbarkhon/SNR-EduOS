@@ -192,13 +192,15 @@ export type HomeworkSubmission = {
   file_size_bytes: number | null;
   file_original_name: string | null;
   answer_text: string | null;
+  code_text: string | null;       // migration 32 (programming submissions)
   grade: number | null;
   teacher_comment: string | null;
   status: SubmissionStatus;
 };
 
 /** Homework с join'ом группы и опциональной сдачей студента. */
-export type ContentType = 'file' | 'test';
+export type ContentType = 'file' | 'test' | 'programming';
+export type ProgrammingLanguage = 'python' | 'cpp';
 export type HomeworkSource = 'curriculum' | 'teacher';
 
 export type TestQuestionOption = {
@@ -255,6 +257,12 @@ export type HomeworkWithSubmission = {
   attachment_filename: string | null;
   test_duration_seconds: number | null; // migration 31 (test type)
   test_auto_grade: boolean;             // migration 31 (test type)
+  programming_language: ProgrammingLanguage | null; // migration 32
+  starter_code: string | null;
+  expected_output: string | null;
+  tests_attachment_path: string | null;
+  tests_attachment_filename: string | null;
+  tests_attachment_size_bytes: number | null;
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;

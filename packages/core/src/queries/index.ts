@@ -70,6 +70,12 @@ export const getHomeworkWithSubmissions = (db: Db) =>
         attachment_filename: string | null;
         test_duration_seconds: number | null;
         test_auto_grade: boolean;
+        programming_language: "python" | "cpp" | null;
+        starter_code: string | null;
+        expected_output: string | null;
+        tests_attachment_path: string | null;
+        tests_attachment_filename: string | null;
+        tests_attachment_size_bytes: number | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -105,6 +111,12 @@ export const getHomeworkById = (db: Db, id: string) =>
         attachment_filename: string | null;
         test_duration_seconds: number | null;
         test_auto_grade: boolean;
+        programming_language: "python" | "cpp" | null;
+        starter_code: string | null;
+        expected_output: string | null;
+        tests_attachment_path: string | null;
+        tests_attachment_filename: string | null;
+        tests_attachment_size_bytes: number | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -339,7 +351,7 @@ export const getTeacherAttendance = (db: Db) =>
 /** Одна оценка ученика (файл, тест или классная работа), нормализованная для журнала. */
 export type StudentGradeItem = {
   id: string;
-  kind: "file" | "test" | "classwork";
+  kind: "file" | "test" | "classwork" | "programming";
   title: string;
   subject: string;
   groupName: string;
@@ -369,7 +381,8 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
     id: string; grade: number; teacher_comment: string | null; submitted_at: string; homework: HwJoin | null;
   }>) {
     items.push({
-      id: r.id, kind: "file",
+      id: r.id,
+      kind: r.homework?.content_type === "programming" ? "programming" : "file",
       title: r.homework?.title ?? "",
       subject: r.homework?.group?.subject ?? "",
       groupName: r.homework?.group?.name ?? "",
@@ -584,14 +597,21 @@ export const createTeacherHomework = async (
     title: string;
     description: string;
     dueDate: string;
-    contentType: "file" | "test";
+    contentType: "file" | "test" | "programming";
     teacherId: string;
     lessonId?: string | null;
     status?: "draft" | "published";
     testDurationSeconds?: number | null;
     testAutoGrade?: boolean;
+    programmingLanguage?: "python" | "cpp" | null;
+    starterCode?: string | null;
+    expectedOutput?: string | null;
+    testsAttachmentPath?: string | null;
+    testsAttachmentFilename?: string | null;
+    testsAttachmentSizeBytes?: number | null;
   },
 ) => {
+  const isProg = input.contentType === "programming";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
     .from("homework")
@@ -606,6 +626,12 @@ export const createTeacherHomework = async (
       lesson_id: input.lessonId ?? null,
       test_duration_seconds: input.contentType === "test" ? (input.testDurationSeconds ?? null) : null,
       test_auto_grade: input.contentType === "test" ? (input.testAutoGrade ?? true) : true,
+      programming_language: isProg ? (input.programmingLanguage ?? null) : null,
+      starter_code: isProg ? (input.starterCode ?? null) : null,
+      expected_output: isProg ? (input.expectedOutput ?? null) : null,
+      tests_attachment_path: isProg ? (input.testsAttachmentPath ?? null) : null,
+      tests_attachment_filename: isProg ? (input.testsAttachmentFilename ?? null) : null,
+      tests_attachment_size_bytes: isProg ? (input.testsAttachmentSizeBytes ?? null) : null,
     })
     .select()
     .single();
@@ -841,6 +867,74 @@ export const submitTest = async (
   }
 
   return sub as TestSubmission;
+};
+
+// ─── PROGRAMMING HOMEWORK (migration 32) ───────────────────────────────────────
+
+/** Загрузить файл с тестами учителя в bucket homework-tests. */
+export const uploadHomeworkTestsFile = async (
+  db: Db,
+  { teacherId, homeworkId, fileName, blob }: { teacherId: string; homeworkId: string; fileName: string; blob: Blob },
+): Promise<{ path: string; sizeByte: number }> => {
+  const path = `${teacherId}/${homeworkId}/tests/${fileName}`;
+  const { error } = await db.storage
+    .from("homework-tests")
+    .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
+  if (error) throw error;
+  return { path, sizeByte: (blob as File).size ?? 0 };
+};
+
+/** Signed URL для скачивания файла с тестами. */
+export const getHomeworkTestsUrl = async (db: Db, storagePath: string, downloadName?: string): Promise<string> => {
+  const { data, error } = await db.storage
+    .from("homework-tests")
+    .createSignedUrl(storagePath, 3600, downloadName ? { download: downloadName } : undefined);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
+/** Ученик отправляет код (UPSERT homework_submissions.code_text). */
+export const submitProgrammingHomework = async (
+  db: Db,
+  homeworkId: string,
+  studentId: string,
+  codeText: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const existing = await db2
+    .from("homework_submissions")
+    .select("id")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle()
+    .then(({ data }: { data: { id: string } | null }) => data);
+  const payload = { code_text: codeText, status: "submitted", submitted_at: new Date().toISOString() };
+  if (existing) {
+    const { error } = await db2.from("homework_submissions").update(payload).eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await db2
+      .from("homework_submissions")
+      .insert({ homework_id: homeworkId, student_id: studentId, ...payload });
+    if (error) throw error;
+  }
+};
+
+/** Последняя отправка кода ученика (для восстановления редактора). */
+export const getProgrammingSubmission = async (
+  db: Db,
+  homeworkId: string,
+  studentId: string,
+): Promise<HomeworkSubmission | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any)
+    .from("homework_submissions")
+    .select("*")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  return (data as HomeworkSubmission | null) ?? null;
 };
 
 // ─── LESSON DETAIL ───────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ClipboardList,
   Clock,
+  Code,
   FileText,
   Search,
   Star,
@@ -59,6 +60,13 @@ function TypeBadge({ contentType, locale }: { contentType: ContentType; locale: 
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700 whitespace-nowrap">
         <ClipboardList className="h-2.5 w-2.5" /> {d.homework.typeTest}
+      </span>
+    );
+  }
+  if (contentType === "programming") {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 whitespace-nowrap">
+        <Code className="h-2.5 w-2.5" /> {d.homework.typeProgramming}
       </span>
     );
   }

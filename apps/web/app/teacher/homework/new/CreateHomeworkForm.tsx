@@ -8,6 +8,7 @@ import {
   createTestQuestions,
   uploadHomeworkAttachment,
   setHomeworkAttachment,
+  uploadHomeworkTestsFile,
   getTeacherLessonsForGroup,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -18,6 +19,11 @@ import { TeacherAIPanel } from "./TeacherAIPanel";
 import { cn } from "@/lib/cn";
 
 type Format = "file" | "test" | "learning" | "programming";
+
+const STARTER_PLACEHOLDER: Record<"python" | "cpp", string> = {
+  python: "def solve():\n    # Твой код здесь\n    pass\n\nsolve()",
+  cpp: "#include <iostream>\nusing namespace std;\n\nint main() {\n    // Твой код здесь\n    return 0;\n}",
+};
 type QuestionType = "single_choice" | "open";
 
 interface Option { text: string; isCorrect: boolean }
@@ -37,6 +43,11 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [format, setFormat] = useState<Format>("file");
   const [testDuration, setTestDuration] = useState(10); // minutes
   const [autoGrade, setAutoGrade] = useState(true);
+  const [progLanguage, setProgLanguage] = useState<"python" | "cpp">("python");
+  const [starterCode, setStarterCode] = useState("");
+  const [expectedOutput, setExpectedOutput] = useState("");
+  const [testsFile, setTestsFile] = useState<File | null>(null);
+  const testsRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -121,8 +132,9 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   }
 
   async function save(status: "draft" | "published") {
-    if (format === "learning" || format === "programming") return; // stubs
+    if (format === "learning") return; // stub
     if (!title.trim()) { setError("Введите название"); return; }
+    if (format === "programming" && !description.trim()) { setError("Введите условие задачи"); return; }
     if (!groupId) { setError("Выберите группу"); return; }
     if (!deadline) { setError("Укажите дедлайн"); return; }
 
@@ -142,12 +154,15 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
       const hw = await createTeacherHomework(supabase, {
         groupId, title: title.trim(), description: description.trim(),
         dueDate: deadline,
-        contentType: format === "test" ? "test" : "file",
+        contentType: format === "test" ? "test" : format === "programming" ? "programming" : "file",
         teacherId: resolvedTeacherId,
         lessonId: lessonId || null,
         status,
         testDurationSeconds: format === "test" ? testDuration * 60 : null,
         testAutoGrade: format === "test" ? autoGrade : true,
+        programmingLanguage: format === "programming" ? progLanguage : null,
+        starterCode: format === "programming" ? (starterCode || null) : null,
+        expectedOutput: format === "programming" ? (expectedOutput || null) : null,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({
@@ -164,6 +179,15 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         });
         await setHomeworkAttachment(supabase, hw.id, { path, sizeByte, fileName: attachFile.name });
       }
+      if (format === "programming" && testsFile) {
+        const { path, sizeByte } = await uploadHomeworkTestsFile(supabase, {
+          teacherId: resolvedTeacherId, homeworkId: hw.id, fileName: testsFile.name, blob: testsFile,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("homework").update({
+          tests_attachment_path: path, tests_attachment_filename: testsFile.name, tests_attachment_size_bytes: sizeByte,
+        }).eq("id", hw.id);
+      }
       router.push("/teacher/homework");
     } catch (e: unknown) {
       setError((e as Error).message ?? d.common.error);
@@ -172,7 +196,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     }
   }
 
-  const isStub = format === "learning" || format === "programming";
+  const isStub = format === "learning";
   const TYPE_TABS: Array<{ key: Format; label: string; Icon: typeof FileText }> = [
     { key: "file", label: d.homework.typeFile, Icon: FileText },
     { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
@@ -406,6 +430,66 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             className="w-full rounded-[14px] border-2 border-dashed border-slate-200 py-3 text-[13px] font-semibold text-brand-ink-muted transition-all hover:border-brand-blue/40 hover:text-brand-blue">
             {d.teacher.addQuestion}
           </button>
+        </div>
+      )}
+
+      {format === "programming" && (
+        <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"
+          style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+          {/* Language */}
+          <div>
+            <span className="mb-1.5 block text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.language}</span>
+            <div className="flex gap-2">
+              {(["python", "cpp"] as const).map((l) => (
+                <button key={l} type="button" onClick={() => setProgLanguage(l)}
+                  className={cn("flex items-center gap-2 rounded-[10px] border px-4 py-2 text-[13px] font-semibold transition-colors",
+                    progLanguage === l ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-brand-ink-muted hover:border-emerald-300")}>
+                  <span className={cn("h-3.5 w-3.5 rounded-full border-2", progLanguage === l ? "border-emerald-500 bg-emerald-500" : "border-slate-300")} />
+                  {l === "python" ? "Python" : "C++"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Starter code */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.starterLabel}</span>
+            <span className="mb-1 text-[11px] text-slate-400">{d.homework.programming.starterHint}</span>
+            <textarea rows={6} value={starterCode} onChange={(e) => setStarterCode(e.target.value)}
+              placeholder={STARTER_PLACEHOLDER[progLanguage]} spellCheck={false}
+              className="rounded-[10px] border border-slate-700 bg-[#1e1e1e] px-3 py-2.5 text-[13px] text-slate-100 resize-none focus:outline-none focus:border-emerald-500/60"
+              style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace" }} />
+          </label>
+          {/* Expected output */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.expectedLabel}</span>
+            <span className="mb-1 text-[11px] text-slate-400">{d.homework.programming.expectedHint}</span>
+            <textarea rows={2} value={expectedOutput} onChange={(e) => setExpectedOutput(e.target.value)}
+              placeholder="Hello, World!" spellCheck={false}
+              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink resize-none focus:outline-none focus:border-brand-blue/50"
+              style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace" }} />
+          </label>
+          {/* Tests file */}
+          <div>
+            <span className="mb-1.5 block text-[13px] font-medium text-brand-ink-muted">
+              {d.homework.programming.testsLabel} <span className="font-normal text-slate-400">(опционально)</span>
+            </span>
+            <input ref={testsRef} type="file" accept=".txt,.json,.py,.cpp,.zip,application/zip,text/plain"
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; if (f && f.size > 10 * 1024 * 1024) { setError("Файл больше 10 МБ"); if (testsRef.current) testsRef.current.value = ""; return; } setError(null); setTestsFile(f); }}
+              className="hidden" id="prog-tests" />
+            {testsFile ? (
+              <div className="flex items-center gap-3 rounded-[14px] border border-emerald-400/40 bg-emerald-50/60 px-4 py-3">
+                <Paperclip size={15} className="shrink-0 text-emerald-600" />
+                <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-emerald-700">{testsFile.name}</p>
+                <button type="button" onClick={() => { setTestsFile(null); if (testsRef.current) testsRef.current.value = ""; }} className="shrink-0 text-slate-400 hover:text-red-500"><X size={14} /></button>
+              </div>
+            ) : (
+              <label htmlFor="prog-tests" className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-slate-200 p-6 text-center transition-all hover:border-emerald-400/40 hover:bg-emerald-50/20">
+                <Paperclip size={18} className="text-slate-400" />
+                <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.testsHint}</span>
+                <span className="text-[11px] text-slate-400">.txt, .json, .py, .cpp, .zip · до 10 МБ</span>
+              </label>
+            )}
+          </div>
         </div>
       )}
       </>

@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(119);
+select plan(121);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -841,6 +841,31 @@ select is(
 reset role;
 delete from public.homework
   where id in ('aa310001-0000-0000-0000-000000000000','dd310001-0000-0000-0000-000000000000');
+
+-- ============ MIGRATION 32: programming homework type ============
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 120: teacher can create a programming homework (python) in own group
+select lives_ok(
+  $$ insert into public.homework (group_id, title, content_type, source, teacher_id, programming_language)
+     values ('a0000000-0000-0000-0000-000000000000', 'M32-PROG',
+             'programming', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'python') $$,
+  'M32: teacher can create a programming homework (python)');
+
+-- Test 121: invalid programming_language rejected by CHECK
+select throws_ok(
+  $$ insert into public.homework (group_id, title, content_type, source, teacher_id, programming_language)
+     values ('a0000000-0000-0000-0000-000000000000', 'M32-BAD',
+             'programming', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'java') $$,
+  '23514', NULL,
+  'M32: invalid programming_language rejected by CHECK');
+
+reset role;
+delete from public.homework where title in ('M32-PROG', 'M32-BAD');
 
 select * from finish();
 rollback;

@@ -16,6 +16,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, SubjectIcon, useLocale } from "@/components";
 import { TestPlayer } from "./TestPlayer";
+import { ProgrammingIDE } from "./ProgrammingIDE";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -392,6 +393,11 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
         timeZone: "Asia/Tashkent",
       })
     : null;
+
+  // Programming homework → dedicated two-column pseudo-IDE page.
+  if (hw.content_type === "programming") {
+    return <ProgrammingIDE hw={hw} />;
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:px-8">
