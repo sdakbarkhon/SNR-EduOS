@@ -74,14 +74,9 @@ export const NotificationsBell = memo(function NotificationsBell() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         "postgres_changes" as any,
         { event: "INSERT", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${uid}` },
-        (payload: unknown) => {
-          console.log("[bell] new notification:", payload);
-          reloadRef.current();
-        },
+        () => { reloadRef.current(); },
       )
-      .subscribe((status: string) => {
-        console.log("[bell] subscribed:", status);
-      });
+      .subscribe();
     return () => { db.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
