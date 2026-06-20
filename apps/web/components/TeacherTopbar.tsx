@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Avatar } from "./Avatar";
+import { NotificationsBell } from "./NotificationsBell";
 
 export function TeacherTopbar({
   name,
@@ -31,14 +32,7 @@ export function TeacherTopbar({
       </div>
 
       <div className="flex items-center gap-3 md:gap-5">
-        <button
-          type="button"
-          aria-label="Уведомления"
-          className="group relative flex h-11 w-11 items-center justify-center rounded-[12px] border border-white/40 bg-white/60 text-gray-600 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-xl transition-colors hover:bg-white/80 hover:text-blue-600"
-        >
-          <Bell className="h-5 w-5 transition-transform group-hover:scale-110" />
-          <span className="absolute right-3 top-3 h-2 w-2 rounded-full border border-white bg-blue-600" />
-        </button>
+        <NotificationsBell />
 
         <div className="flex items-center gap-3 rounded-[16px] border border-white/40 bg-white/60 py-2 pl-2 pr-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-xl">
           <Avatar name={name || "?"} src={avatarUrl ?? undefined} size={36} />

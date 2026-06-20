@@ -334,6 +334,45 @@ export type ProjectSubmissionWithStudent = ProjectSubmission & {
   attachments: ProjectAttachment[];
 };
 
+// ── Announcements + Notifications (migration 34) ─────────────────────
+export type AnnouncementScope = "group" | "all_my_groups" | "student";
+export type Announcement = {
+  id: string;
+  created_by: string | null;
+  title: string;
+  body: string;
+  scope: AnnouncementScope;
+  group_id: string | null;
+  target_student_id: string | null;
+  is_pinned: boolean;
+  created_at: string;
+};
+export type TeacherAnnouncement = Announcement & {
+  groupName: string | null;
+  targetStudentName: string | null;
+  readCount: number;
+  totalRecipients: number;
+};
+export type StudentAnnouncement = Announcement & {
+  teacherName: string | null;
+  isRead: boolean;
+};
+export type NotificationKind =
+  | "announcement" | "new_homework" | "new_grade" | "homework_graded"
+  | "lesson_material" | "student_excused" | "student_submitted";
+export type AppNotification = {
+  id: string;
+  recipient_user_id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  link: string | null;
+  source_id: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+};
+
 
 export type Grade = {
   id: string;
@@ -400,13 +439,6 @@ export type Message = {
   read_at: string | null;
 };
 
-export type Announcement = {
-  id: string;
-  title: string;
-  body: string;
-  target_group_id: string | null;
-  created_at: string;
-};
 
 export type NotificationSettings = {
   student_id: string;

@@ -424,11 +424,9 @@ insert into public.course_materials (group_id, title, type) values
 -- ОБЪЯВЛЕНИЯ
 -- =====================================================================
 
-insert into public.announcements (title, body, target_group_id) values
-  ('Добро пожаловать в SNR EduOS!',     'Платформа запущена. Олимпиада по информатике — 25 июня.', null),
-  ('Робототехника: перенос урока',       'Урок 22 июня переносится на 09:00 в каб. 305.',           'a0000000-0000-0000-0000-000000000000'),
-  ('Контрольная по математике',          'Контрольная 24 июня. Тема: функции и свойства.',          'c0000000-0000-0000-0000-000000000000'),
-  ('English: mock exam next Tuesday',   'Bring your dictionary. Room 303, 10:00.',                  'f0000000-0000-0000-0000-000000000000');
+insert into public.announcements (title, body, scope, group_id, created_by, is_pinned) values
+  ('Робототехника: перенос урока', 'Урок 22 июня переносится на 09:00 в каб. 305.', 'group', 'a0000000-0000-0000-0000-000000000000', 'cccccccc-cccc-cccc-cccc-cccccccccccc', true),
+  ('Школьное собрание',            'Завтра общее собрание для всех групп.',         'all_my_groups', null, 'cccccccc-cccc-cccc-cccc-cccccccccccc', false);
 
 -- =====================================================================
 -- СООБЩЕНИЯ

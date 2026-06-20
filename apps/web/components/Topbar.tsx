@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { LogoutButton } from "./LogoutButton";
+import { NotificationsBell } from "./NotificationsBell";
 
 export function Topbar({
   title,
@@ -16,13 +16,7 @@ export function Topbar({
         {title}
       </h1>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label="Уведомления"
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/70 text-blue-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-white/90"
-        >
-          <Bell size={18} />
-        </button>
+        <NotificationsBell />
         {studentName && (
           <Link href="/profile" className="transition-transform hover:scale-105">
             <Avatar name={studentName} />

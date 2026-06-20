@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(127);
+select plan(133);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -944,6 +944,67 @@ reset role;
 delete from public.projects where id in
   ('aa330001-0000-0000-0000-000000000000', 'dd330001-0000-0000-0000-000000000000');
 delete from public.projects where title in ('M33-OWN');
+
+-- ============ MIGRATION 34: announcements + notifications ============
+-- Setup (superuser): a foreign-group announcement (d0 — Elena)
+reset role;
+insert into public.announcements (id, title, body, scope, group_id) values
+  ('dd340002-0000-0000-0000-000000000000', 'M34-FOREIGN', 'x', 'group', 'd0000000-0000-0000-0000-000000000000');
+
+-- as teacher Ivan
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 128: teacher creates a group announcement in own group
+select lives_ok(
+  $$ insert into public.announcements (title, body, scope, group_id, created_by)
+     values ('M34-A', 'body', 'group', 'a0000000-0000-0000-0000-000000000000',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  'M34: teacher creates announcement in own group');
+
+-- Test 129: teacher CANNOT create a group announcement in a foreign group → 42501
+select throws_ok(
+  $$ insert into public.announcements (title, body, scope, group_id, created_by)
+     values ('M34-H', 'body', 'group', 'd0000000-0000-0000-0000-000000000000',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  '42501', NULL,
+  'M34: teacher cannot create announcement in foreign group');
+
+-- teacher creates homework in own group → fires fn_homework_notify
+insert into public.homework (id, group_id, title, content_type, source, teacher_id)
+  values ('aa340001-0000-0000-0000-000000000000', 'a0000000-0000-0000-0000-000000000000',
+          'M34-HW', 'file', 'teacher', 'cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- as student A
+reset role;
+select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 130: student sees announcement of own group
+select ok(
+  (select count(*) > 0 from public.announcements where title = 'M34-A'),
+  'M34: student sees announcement of own group');
+
+-- Test 131: student does NOT see foreign-group announcements
+select is(
+  (select count(*)::int from public.announcements where group_id = 'd0000000-0000-0000-0000-000000000000'), 0,
+  'M34: student does not see announcement of another group');
+
+-- Test 132: homework insert produced a notification for the student
+select ok(
+  (select count(*) > 0 from public.notifications
+    where source_id = 'aa340001-0000-0000-0000-000000000000' and kind = 'new_homework'),
+  'M34: student receives new_homework notification');
+
+-- Test 133: student cannot see another user's notifications
+select is(
+  (select count(*)::int from public.notifications
+    where recipient_user_id = '22222222-2222-2222-2222-222222222222'), 0,
+  'M34: student cannot see another user notifications');
+
+reset role;
+delete from public.homework where id = 'aa340001-0000-0000-0000-000000000000';
+delete from public.announcements where title in ('M34-A', 'M34-FOREIGN');
 
 select * from finish();
 rollback;

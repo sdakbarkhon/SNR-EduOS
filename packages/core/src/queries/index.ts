@@ -9,6 +9,7 @@ import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
 export * from "./projects";
+export * from "./announcements";
 
 // --- Профиль / группы ---
 export const getMyStudent = (db: Db) =>

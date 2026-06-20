@@ -231,6 +231,23 @@ export interface Dictionary {
     teacherComment: string;
     deleteFile: string;
   };
+  announcements: {
+    title: string;
+    empty: string;
+    pinned: string;
+    newBadge: string;          // "Новое"
+    by: string;                // "Учитель"
+    dashboardTitle: string;    // "Объявления"
+    dashboardEmpty: string;
+    seeAll: string;
+  };
+  notifications: {
+    title: string;
+    markAll: string;
+    empty: string;
+    seeAll: string;
+    agoSeconds: string; agoMinutes: string; agoHours: string; agoDays: string;
+  };
   payments: {
     title: string;
     balance: string;
@@ -611,6 +628,23 @@ export interface Dictionary {
       files: string;
       gradeLabel: string; commentLabel: string; gradeBtn: string; gradedLabel: string;
       noStages: string;
+    };
+    announcements: {
+      nav: string;
+      title: string;
+      create: string;
+      empty: string;
+      formTitle: string;
+      titleLabel: string; bodyLabel: string;
+      audience: string;
+      audienceGroup: string; audienceAll: string; audienceStudent: string;
+      pinLabel: string;
+      publish: string;
+      audienceGroupLabel: string;   // "Группа {name}"
+      audienceAllLabel: string;     // "Все мои группы"
+      readCount: string;            // "Прочитали: {read} из {total}"
+      pin: string; unpin: string; delete: string; deleteConfirm: string;
+      pinnedTag: string;
     };
   };
   classwork: {
