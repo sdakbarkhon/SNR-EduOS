@@ -103,6 +103,11 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // [#418 diagnostics] render-time snapshot (client-only); remove after diagnosis
+  if (typeof window !== "undefined") {
+    console.log("[hydration] ClassworkModal render", { open, lessonId, tab, loading, hasClasswork: !!classwork });
+  }
+
   if (!open) return null;
 
   async function handleSave() {

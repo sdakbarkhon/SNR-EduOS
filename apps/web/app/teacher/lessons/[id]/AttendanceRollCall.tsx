@@ -37,6 +37,11 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   const isFinalized = lessonStatus === "completed" || rows.some((r) => r.is_finalized);
   const readOnly = isFinalized;
 
+  // [#418 diagnostics] render-time snapshot (client-only); remove after diagnosis
+  if (typeof window !== "undefined") {
+    console.log("[hydration] AttendanceRollCall render", { lessonId, lessonStatus, rowCount: rows.length, loading, isFinalized });
+  }
+
   // Notify parent whenever rows change
   useEffect(() => {
     if (!onStatusChange || rows.length === 0) return;

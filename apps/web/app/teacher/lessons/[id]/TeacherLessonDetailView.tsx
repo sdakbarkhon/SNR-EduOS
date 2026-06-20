@@ -162,6 +162,13 @@ export function TeacherLessonDetailView({
     return () => clearInterval(id);
   }, [status, startedAt]);
 
+  // [#418 diagnostics] render-time snapshot (client-only). status/startedAt/
+  // elapsedMin are derived from Date.now() and differ server↔client — log them
+  // to pinpoint the hydration-mismatch source before applying any fix.
+  if (typeof window !== "undefined") {
+    console.log("[hydration] TeacherLessonDetailView render", { lessonId: lesson.id, status, startedAt, elapsedMin });
+  }
+
   async function handleStart() {
     setStatusLoading(true);
     try {
