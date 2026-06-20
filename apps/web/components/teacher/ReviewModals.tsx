@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { getDictionary, gradeSubmission, getTestAnswersForSubmission, getSubmissionFileUrl } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -81,9 +82,10 @@ export function ReviewModal({ submission, onClose, onGraded }: {
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center p-4" onClick={onClose}
+      style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
@@ -142,7 +144,8 @@ export function ReviewModal({ submission, onClose, onGraded }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -212,9 +215,10 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center p-4" onClick={onClose}
+      style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
@@ -308,6 +312,7 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

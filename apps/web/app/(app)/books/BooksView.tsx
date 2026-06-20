@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Star, BookOpen, Library, X, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getSubjectStyle, addBookFavorite, removeBookFavorite } from "@snr/core";
@@ -90,10 +91,12 @@ function BookDetailModal({
     onToggleFavorite();
   }
 
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+      style={{ zIndex: 9999 }}
+      className={`fixed inset-0 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       <div
         className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
@@ -191,7 +194,8 @@ function BookDetailModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

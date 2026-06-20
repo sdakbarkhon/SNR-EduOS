@@ -24,10 +24,27 @@
   --cell-missed-fg: #C13551;
   --cell-pending-bg: rgba(138,147,168,0.10);
   --cell-pending-fg: #8A93A8;
+  /* Семантические токены поверхностей/текста/границ (lessons + модалки).
+     Используются в ClassworkModal / ClassworkBlock и т.п. Без них фон
+     bg-[var(--surface-1)] был прозрачным. */
+  --surface-1: #ffffff;
+  --surface-2: #f1f5f9;
+  --text-1: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --border: #e2e8f0;
+  --accent: #2563eb;
 }
 
 .dark {
   --shell-gradient: linear-gradient(135deg, #0b1024 0%, #131830 50%, #0a1528 100%);
+  --surface-1: #131a30;
+  --surface-2: #1e2742;
+  --text-1: #e6ecfb;
+  --text-2: #9aa8cc;
+  --text-3: #6a78a8;
+  --border: rgba(255,255,255,0.09);
+  --accent: #60a5fa;
   --shell-blob-1: rgba(37,72,180,0.18);
   --shell-blob-2: rgba(100,30,160,0.14);
   --shell-blob-3: rgba(50,20,130,0.14);
@@ -64,10 +81,48 @@ body {
 .dark .text-gray-500 { color: #6a78a8; }
 .dark .text-gray-400 { color: #4a5880; }
 
+.dark .text-slate-900 { color: #e6ecfb; }
 .dark .text-slate-800 { color: #dce4f5; }
 .dark .text-slate-700 { color: #b8c6e8; }
 .dark .text-slate-600 { color: #8fa0cc; }
 .dark .text-slate-500 { color: #6880ae; }
+.dark .text-slate-400 { color: #5a6a98; }
+.dark .text-slate-300 { color: #4a5880; }
+.dark .text-gray-300 { color: #4a5880; }
+
+/* brand-* — статичные брендовые цвета текста (не CSS-vars), осветляем для тёмной темы */
+.dark .text-brand-ink { color: #e6ecfb; }
+.dark .text-brand-ink-muted { color: #9aa8cc; }
+.dark .text-brand-navy { color: #cdd8f5; }
+
+/* ─── Dark mode: surface / background overrides ─── */
+/* Карточки и светлые поверхности по умолчанию белые/светло-серые; в тёмной
+   теме делаем их тёмными, чтобы текст оставался читаемым. */
+.dark .bg-white { background-color: #131a30; }
+.dark .bg-white\/95,
+.dark .bg-white\/90,
+.dark .bg-white\/80,
+.dark .bg-white\/70,
+.dark .bg-white\/60,
+.dark .bg-white\/50,
+.dark .bg-white\/40,
+.dark .bg-white\/30 { background-color: rgba(19,26,48,0.85); }
+.dark .bg-gray-50,
+.dark .bg-slate-50 { background-color: #10162c; }
+.dark .bg-gray-100,
+.dark .bg-slate-100 { background-color: #1a2238; }
+.dark .bg-gray-200,
+.dark .bg-slate-200 { background-color: #232c46; }
+
+/* ─── Dark mode: border overrides ─── */
+.dark .border-white,
+.dark .border-white\/60,
+.dark .border-white\/50,
+.dark .border-white\/40 { border-color: rgba(255,255,255,0.10); }
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-slate-100,
+.dark .border-slate-200 { border-color: rgba(255,255,255,0.08); }
 
 /* ─── Dark mode: input / form fields ─── */
 .dark input[type="text"],

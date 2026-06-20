@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ChevronLeft, MapPin, Target, BookOpen, Hammer, Pencil,
@@ -615,14 +616,14 @@ export function TeacherLessonDetailView({
       </section>
 
       {/* Upload modal */}
-      {uploadModal && (
+      {uploadModal && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
         >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#1D1D1F]">{d.lesson.addMaterialTitle}</h3>
+              <h3 className="text-lg font-bold text-slate-900">{d.lesson.addMaterialTitle}</h3>
               <button onClick={() => setUploadModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
@@ -670,7 +671,8 @@ export function TeacherLessonDetailView({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Incomplete attendance modal */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function Modal({
@@ -21,10 +22,10 @@ export function Modal({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+  return createPortal(
+    <div className="fixed inset-0 flex items-end justify-center p-4 sm:items-center" style={{ zIndex: 9999 }}>
       {/* Backdrop */}
       <div
         className="absolute inset-0"
@@ -33,8 +34,8 @@ export function Modal({
       />
       {/* Sheet */}
       <div
-        className="relative z-10 flex w-full max-w-lg flex-col rounded-[24px] border border-white/80 shadow-2xl max-h-[80vh]"
-        style={{ background: "#ffffff" }}
+        className="relative z-10 flex w-full max-w-lg flex-col rounded-[24px] border shadow-2xl max-h-[80vh]"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100/70 px-6 py-4">
           <h2 className="text-[17px] font-bold text-slate-900">{title}</h2>
@@ -47,6 +48,7 @@ export function Modal({
         </div>
         <div className="overflow-y-auto flex-1 px-6 py-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
