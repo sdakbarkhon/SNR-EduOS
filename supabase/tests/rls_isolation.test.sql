@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(121);
+select plan(127);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -866,6 +866,84 @@ select throws_ok(
 
 reset role;
 delete from public.homework where title in ('M32-PROG', 'M32-BAD');
+
+-- ============ MIGRATION 33: projects ============
+-- Setup (superuser): P1 in a0 (Ivan/Adilbek), P2 in d0 (Elena) + foreign submission
+reset role;
+insert into public.projects (id, group_id, subject, title, created_by) values
+  ('aa330001-0000-0000-0000-000000000000', 'a0000000-0000-0000-0000-000000000000',
+   'robotics', 'M33 P1', 'cccccccc-cccc-cccc-cccc-cccccccccccc');
+insert into public.project_stages (id, project_id, position, title) values
+  ('aa330002-0000-0000-0000-000000000000', 'aa330001-0000-0000-0000-000000000000', 0, 'Stage 1');
+insert into public.projects (id, group_id, subject, title) values
+  ('dd330001-0000-0000-0000-000000000000', 'd0000000-0000-0000-0000-000000000000', 'robotics', 'M33 P2 foreign');
+insert into public.project_submissions (id, project_id, student_id) values
+  ('dd330003-0000-0000-0000-000000000000', 'dd330001-0000-0000-0000-000000000000',
+   'b2222222-2222-2222-2222-222222222222');
+
+-- as teacher Ivan
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 122: teacher creates a project in own group
+select lives_ok(
+  $$ insert into public.projects (group_id, subject, title, created_by)
+     values ('a0000000-0000-0000-0000-000000000000', 'robotics', 'M33-OWN',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  'M33: teacher creates project in own group');
+
+-- Test 123: teacher CANNOT create a project in a foreign group → 42501
+select throws_ok(
+  $$ insert into public.projects (group_id, subject, title, created_by)
+     values ('d0000000-0000-0000-0000-000000000000', 'robotics', 'M33-HACK',
+             'cccccccc-cccc-cccc-cccc-cccccccccccc') $$,
+  '42501', NULL,
+  'M33: teacher cannot create project in foreign group');
+
+-- as student A
+reset role;
+select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 124: student creates own submission on own-group project
+select lives_ok(
+  $$ insert into public.project_submissions (id, project_id, student_id)
+     values ('aa330003-0000-0000-0000-000000000000', 'aa330001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111') $$,
+  'M33: student creates own project submission');
+
+-- Test 125: student cannot see another student's submission
+select is(
+  (select count(*)::int from public.project_submissions
+    where student_id = 'b2222222-2222-2222-2222-222222222222'), 0,
+  'M33: student does not see another student project submission');
+
+-- as teacher Ivan
+reset role;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 126: teacher grades a submission in own group
+select lives_ok(
+  $$ update public.project_submissions
+       set grade = 5, teacher_comment = 'ok', graded_at = now(),
+           graded_by = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+     where id = 'aa330003-0000-0000-0000-000000000000' $$,
+  'M33: teacher grades submission in own group');
+
+-- Test 127: teacher cannot grade a submission in a foreign group (0 rows → stays null)
+update public.project_submissions set grade = 5
+  where id = 'dd330003-0000-0000-0000-000000000000';
+reset role;
+select is(
+  (select grade from public.project_submissions where id = 'dd330003-0000-0000-0000-000000000000'),
+  NULL,
+  'M33: teacher cannot grade a foreign-group submission');
+
+reset role;
+delete from public.projects where id in
+  ('aa330001-0000-0000-0000-000000000000', 'dd330001-0000-0000-0000-000000000000');
+delete from public.projects where title in ('M33-OWN');
 
 select * from finish();
 rollback;

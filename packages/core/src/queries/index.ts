@@ -8,6 +8,8 @@ import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Boo
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
+export * from "./projects";
+
 // --- Профиль / группы ---
 export const getMyStudent = (db: Db) =>
   db.from("students").select("*").single().then(unwrap);
@@ -351,7 +353,7 @@ export const getTeacherAttendance = (db: Db) =>
 /** Одна оценка ученика (файл, тест или классная работа), нормализованная для журнала. */
 export type StudentGradeItem = {
   id: string;
-  kind: "file" | "test" | "classwork" | "programming";
+  kind: "file" | "test" | "classwork" | "programming" | "project";
   title: string;
   subject: string;
   groupName: string;
@@ -431,6 +433,29 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
       });
     }
   } catch { /* classwork table may not exist on older hosted instances */ }
+
+  // Project submissions with grades (migration 33)
+  try {
+    const projSel =
+      "id, grade, teacher_comment, submitted_at, graded_at, project:projects!inner(title, group:groups!inner(subject, name))";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const projRes = await (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
+    for (const r of (projRes.data ?? []) as unknown as Array<{
+      id: string; grade: number; teacher_comment: string | null; submitted_at: string | null; graded_at: string | null;
+      project: { title: string; group: { subject: string; name: string } | null } | null;
+    }>) {
+      items.push({
+        id: r.id, kind: "project",
+        title: r.project?.title ?? "Проект",
+        subject: r.project?.group?.subject ?? "",
+        groupName: r.project?.group?.name ?? "",
+        date: r.submitted_at ?? r.graded_at ?? "",
+        grade5: r.grade,
+        display: `${r.grade}/5`,
+        comment: r.teacher_comment,
+      });
+    }
+  } catch { /* projects table may not exist on older hosted instances */ }
 
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;

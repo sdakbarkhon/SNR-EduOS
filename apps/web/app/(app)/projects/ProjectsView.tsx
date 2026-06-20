@@ -1,74 +1,105 @@
-import { Plus } from "lucide-react";
+"use client";
 
-// ── Моки (захардкожены, без БД) ──
-const projects = [
-  { id: 1, title: "Умный дом", status: "В работе", progress: 75, gradient: "from-violet-900 via-indigo-800 to-blue-900", image: "https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&q=80&w=600&h=400" },
-  { id: 2, title: "Робот-манипулятор", status: "В работе", progress: 80, gradient: "from-orange-900 via-red-900 to-rose-900", image: "https://images.unsplash.com/photo-1531746790731-6c087fecd65a?auto=format&fit=crop&q=80&w=600&h=400" },
-  { id: 3, title: "Сайт-портфолио", status: "Завершён", progress: 100, gradient: "from-emerald-900 via-teal-800 to-cyan-900", image: "https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&q=80&w=600&h=400" },
-  { id: 4, title: "Метеостанция", status: "В работе", progress: 40, gradient: "from-sky-900 via-blue-800 to-indigo-900", image: "https://images.unsplash.com/photo-1592210454359-9043f067919b?auto=format&fit=crop&q=80&w=600&h=400" },
-  { id: 5, title: "Игра на Python", status: "В работе", progress: 90, gradient: "from-fuchsia-900 via-purple-800 to-violet-900", image: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?auto=format&fit=crop&q=80&w=600&h=400" },
-];
+import { useState } from "react";
+import Link from "next/link";
+import { Briefcase, Calendar } from "lucide-react";
+import { getDictionary, getSubjectStyle, type Locale, type StudentProjectListItem } from "@snr/core";
+import { SubjectIcon, useLocale } from "@/components";
+import { cn } from "@/lib/cn";
 
-function FilterPill({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <button className={`rounded-full px-6 py-2 text-sm font-bold transition-all duration-300 ${
-      active ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border border-white/50 bg-white/70 text-slate-600 backdrop-blur-xl hover:bg-white/90"
-    }`}>
-      {label}
-    </button>
-  );
+type Filter = "all" | "active" | "submitted" | "graded";
+
+function statusOf(p: StudentProjectListItem): "not_started" | "in_progress" | "awaiting" | "graded" {
+  const s = p.submission;
+  if (!s) return "not_started";
+  if (s.grade != null) return "graded";
+  if (s.is_submitted) return "awaiting";
+  return "in_progress";
 }
 
-export function ProjectsView() {
+export function ProjectsView({ projects }: { projects: StudentProjectListItem[] }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const t = d.projects;
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const pills: { key: Filter; label: string }[] = [
+    { key: "all", label: t.filterAll },
+    { key: "active", label: t.filterActive },
+    { key: "submitted", label: t.filterSubmitted },
+    { key: "graded", label: t.filterGraded },
+  ];
+
+  const filtered = projects.filter((p) => {
+    const s = statusOf(p);
+    if (filter === "active") return s === "not_started" || s === "in_progress";
+    if (filter === "submitted") return s === "awaiting";
+    if (filter === "graded") return s === "graded";
+    return true;
+  });
+
+  function statusBadge(p: StudentProjectListItem) {
+    const s = statusOf(p);
+    if (s === "graded") return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{t.statusGraded}: {p.submission?.grade}</span>;
+    if (s === "awaiting") return <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-[10px] font-bold text-yellow-700">{t.statusAwaiting}</span>;
+    if (s === "in_progress") return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-700">{t.statusInProgress}</span>;
+    return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>;
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl text-slate-800">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Проекты</h1>
-        <div className="mt-4 flex gap-2">
-          <FilterPill label="Мои проекты" active />
-          <FilterPill label="В работе" />
-          <FilterPill label="Завершённые" />
-        </div>
+      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{t.title}</h1>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {pills.map((p) => (
+          <button key={p.key} onClick={() => setFilter(p.key)}
+            className={cn("rounded-full px-5 py-2 text-sm font-bold transition-all",
+              filter === p.key ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border border-white/50 bg-white/70 text-slate-600 backdrop-blur-xl hover:bg-white/90")}>
+            {p.label}
+          </button>
+        ))}
       </div>
 
-      {/* Grid */}
-      <div className="mt-8 grid grid-cols-1 content-start items-start gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
-        {projects.map((p) => {
-          const isCompleted = p.status === "Завершён";
-          return (
-            <div key={p.id} className="group flex cursor-pointer flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 shadow-md backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-              <div className="relative h-28 overflow-hidden bg-slate-900">
-                <div className={`absolute inset-0 bg-gradient-to-br ${p.gradient} opacity-90`} />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image} alt={p.title} className="h-full w-full object-cover opacity-60 mix-blend-luminosity transition-opacity duration-300 group-hover:scale-105 group-hover:opacity-80" />
-                <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                  isCompleted ? "bg-green-400/90 text-green-950" : "bg-yellow-400/90 text-yellow-950"
-                }`}>
-                  {p.status}
-                </span>
-              </div>
-              <div className="p-5">
-                <h3 className="mb-4 font-bold text-slate-900">{p.title}</h3>
-                <div className="flex items-center gap-3">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <div className={`h-full rounded-full transition-all duration-1000 ${isCompleted ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${p.progress}%` }} />
+      {filtered.length === 0 ? (
+        <div className="mt-10 flex flex-col items-center gap-3 rounded-[24px] border border-white/70 bg-white/60 py-20 text-center backdrop-blur-xl">
+          <Briefcase className="h-10 w-10 text-slate-300" />
+          <p className="text-sm text-slate-400">{t.empty}</p>
+        </div>
+      ) : (
+        <div className="mt-8 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((p) => {
+            const style = getSubjectStyle(p.subject);
+            const pct = p.stageCount > 0 ? Math.round((p.completedCount / p.stageCount) * 100) : 0;
+            const due = p.deadline ? new Date(p.deadline).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" }) : null;
+            const overdue = p.deadline ? new Date(p.deadline).getTime() < Date.now() && statusOf(p) !== "graded" : false;
+            return (
+              <Link key={p.id} href={`/projects/${p.id}`}
+                className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${style.color}1a` }}>
+                      <SubjectIcon subject={p.subject} size={20} />
+                    </div>
+                    <h3 className="font-bold text-slate-900">{p.title}</h3>
                   </div>
-                  <span className="text-[11px] font-bold tabular-nums text-slate-400">{p.progress}%</span>
+                  {statusBadge(p)}
                 </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* New project card */}
-        <div className="group flex h-full min-h-[178px] cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-slate-300 bg-slate-100/30 transition-all hover:bg-slate-100/50">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-transform group-hover:scale-110">
-            <Plus className="h-6 w-6" strokeWidth={2} />
-          </div>
-          <p className="mt-4 text-sm font-bold text-slate-500">Новый проект</p>
+                {p.description && <p className="mt-3 line-clamp-2 text-[13px] text-slate-500">{p.description}</p>}
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div className={cn("h-full rounded-full", statusOf(p) === "graded" ? "bg-emerald-500" : "bg-blue-500")} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-[11px] font-bold tabular-nums text-slate-400">{p.completedCount}/{p.stageCount}</span>
+                </div>
+                {due && (
+                  <p className={cn("mt-3 flex items-center gap-1 text-[12px]", overdue ? "font-semibold text-red-500" : "text-slate-400")}>
+                    <Calendar size={12} /> {t.deadline}: {due}
+                  </p>
+                )}
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
 }

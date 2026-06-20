@@ -16,14 +16,10 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, GraduationCap, Code } from "lucide-react";
 import { TeacherAIPanel } from "./TeacherAIPanel";
+import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 
 type Format = "file" | "test" | "learning" | "programming";
-
-const STARTER_PLACEHOLDER: Record<"python" | "cpp", string> = {
-  python: "def solve():\n    # Твой код здесь\n    pass\n\nsolve()",
-  cpp: "#include <iostream>\nusing namespace std;\n\nint main() {\n    // Твой код здесь\n    return 0;\n}",
-};
 type QuestionType = "single_choice" | "open";
 
 interface Option { text: string; isCorrect: boolean }
@@ -450,15 +446,12 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
               ))}
             </div>
           </div>
-          {/* Starter code */}
-          <label className="flex flex-col gap-1">
+          {/* Starter code (editable highlighted editor) */}
+          <div className="flex flex-col gap-1">
             <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.starterLabel}</span>
             <span className="mb-1 text-[11px] text-slate-400">{d.homework.programming.starterHint}</span>
-            <textarea rows={6} value={starterCode} onChange={(e) => setStarterCode(e.target.value)}
-              placeholder={STARTER_PLACEHOLDER[progLanguage]} spellCheck={false}
-              className="rounded-[10px] border border-slate-700 bg-[#1e1e1e] px-3 py-2.5 text-[13px] text-slate-100 resize-none focus:outline-none focus:border-emerald-500/60"
-              style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace" }} />
-          </label>
+            <CodeEditor value={starterCode} onChange={setStarterCode} language={progLanguage} minHeight={150} />
+          </div>
           {/* Expected output */}
           <label className="flex flex-col gap-1">
             <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.expectedLabel}</span>

@@ -268,6 +268,72 @@ export type HomeworkWithSubmission = {
   test_submission: TestSubmission | null;
 };
 
+// ── Projects (migration 33) ─────────────────────────────────────────
+export type Project = {
+  id: string;
+  group_id: string;
+  subject: string;
+  title: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  deadline: string | null;
+  cover_image_path: string | null;
+};
+export type ProjectStage = {
+  id: string;
+  project_id: string;
+  position: number;
+  title: string;
+  description: string | null;
+};
+export type ProjectSubmission = {
+  id: string;
+  project_id: string;
+  student_id: string;
+  is_submitted: boolean;
+  submitted_at: string | null;
+  grade: number | null;
+  teacher_comment: string | null;
+  graded_at: string | null;
+  graded_by: string | null;
+};
+export type ProjectStageProgress = {
+  id: string;
+  submission_id: string;
+  stage_id: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  student_notes: string | null;
+};
+export type ProjectAttachment = {
+  id: string;
+  submission_id: string;
+  stage_id: string | null;
+  storage_path: string;
+  original_filename: string;
+  size_bytes: number | null;
+  uploaded_at: string;
+};
+export type ProjectWithStages = Project & { stages: ProjectStage[] };
+export type TeacherProjectListItem = Project & {
+  group: { name: string; subject: string };
+  stageCount: number;
+  totalStudents: number;
+  submittedCount: number;
+};
+export type StudentProjectListItem = Project & {
+  stageCount: number;
+  completedCount: number;
+  submission: ProjectSubmission | null;
+  teacherName: string | null;
+};
+export type ProjectSubmissionWithStudent = ProjectSubmission & {
+  student: { id: string; full_name: string; avatar_url: string | null };
+  progress: ProjectStageProgress[];
+  attachments: ProjectAttachment[];
+};
+
 
 export type Grade = {
   id: string;

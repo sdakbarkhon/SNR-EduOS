@@ -203,6 +203,34 @@ export interface Dictionary {
       noCode: string;           // "Ученик ещё не отправил код"
     };
   };
+  projects: {
+    title: string;
+    filterAll: string; filterActive: string; filterSubmitted: string; filterGraded: string;
+    statusNotStarted: string; statusInProgress: string; statusAwaiting: string; statusGraded: string;
+    empty: string;
+    stagesCount: string;        // "{n} этапов"
+    badge: string;              // "Проект"
+    teacher: string;            // "Учитель"
+    deadline: string;
+    start: string;              // "Начать проект"
+    stagesTitle: string;        // "Этапы проекта"
+    markDone: string;           // "Отметить пройденным"
+    done: string;               // "Пройдено"
+    notesLabel: string;
+    notesPlaceholder: string;
+    attachLabel: string;        // "Прикреплённые файлы"
+    attachStage: string;        // "Прикрепить файл к этапу"
+    generalFiles: string;       // "Файлы проекта"
+    attachGeneral: string;
+    progressLabel: string;      // "Пройдено: {done} из {total} этапов"
+    submitBtn: string;          // "Сдать проект"
+    submitConfirmTitle: string;
+    submitConfirmMsg: string;
+    submittedTitle: string;     // "Проект сдан, ждёт проверки"
+    gradedTitle: string;        // "Оценка: {grade}"
+    teacherComment: string;
+    deleteFile: string;
+  };
   payments: {
     title: string;
     balance: string;
@@ -559,6 +587,31 @@ export interface Dictionary {
     classworkGradeBtn: string;
     classworkGradedLabel: string;
     classworkTestScore: string;
+    projects: {
+      nav: string;              // "Проекты"
+      title: string;
+      create: string;
+      empty: string;
+      stagesCount: string;      // "{n} этапов"
+      submittedCount: string;   // "{done}/{total} сдали"
+      formTitle: string;
+      editTitle: string;
+      group: string; subject: string; name: string; description: string; deadline: string;
+      stagesBlock: string;
+      addStage: string;
+      stageTitle: string;
+      stageDesc: string;
+      createBtn: string;
+      saveBtn: string;
+      deleteConfirm: string;
+      studentsBlock: string;
+      notStarted: string; inWork: string; awaiting: string; graded: string;
+      review: string;
+      studentNotes: string;
+      files: string;
+      gradeLabel: string; commentLabel: string; gradeBtn: string; gradedLabel: string;
+      noStages: string;
+    };
   };
   classwork: {
     title: string;
