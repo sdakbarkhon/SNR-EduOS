@@ -30,12 +30,6 @@ export function RaisedHandsBlock({ lessonId, teacherId }: { lessonId: string; te
     return () => clearInterval(id);
   }, []);
 
-  // [#418 diagnostics] render-time snapshot (client-only); nowMs is null on the
-  // server pass and a number after mount — prime hydration-mismatch suspect.
-  if (typeof window !== "undefined") {
-    console.log("[hydration] RaisedHandsBlock render", { lessonId, handCount: hands.length, nowMs, flash });
-  }
-
   const reload = useCallback(() => {
     getActiveRaisedHands(db as never, lessonId)
       .then((rows) => {

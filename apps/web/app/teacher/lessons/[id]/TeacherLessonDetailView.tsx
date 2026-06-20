@@ -113,6 +113,12 @@ export function TeacherLessonDetailView({
   // Attendance completeness tracking
   const [allMarked, setAllMarked] = useState(false);
   const [unmarkedNames, setUnmarkedNames] = useState<string[]>([]);
+  // Stable callback — passing an inline arrow here re-triggered AttendanceRollCall's
+  // notify effect every render and caused an infinite render loop (see that file).
+  const handleAttendanceStatus = useCallback((allDone: boolean, names: string[]) => {
+    setAllMarked(allDone);
+    setUnmarkedNames(names);
+  }, []);
 
   // Modals
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
@@ -161,13 +167,6 @@ export function TeacherLessonDetailView({
     const id = setInterval(tick, 30000);
     return () => clearInterval(id);
   }, [status, startedAt]);
-
-  // [#418 diagnostics] render-time snapshot (client-only). status/startedAt/
-  // elapsedMin are derived from Date.now() and differ server↔client — log them
-  // to pinpoint the hydration-mismatch source before applying any fix.
-  if (typeof window !== "undefined") {
-    console.log("[hydration] TeacherLessonDetailView render", { lessonId: lesson.id, status, startedAt, elapsedMin });
-  }
 
   async function handleStart() {
     setStatusLoading(true);
@@ -400,10 +399,7 @@ export function TeacherLessonDetailView({
           teacherId={teacher.id}
           lessonStatus={status}
           excused={excusedMap}
-          onStatusChange={(allDone, names) => {
-            setAllMarked(allDone);
-            setUnmarkedNames(names);
-          }}
+          onStatusChange={handleAttendanceStatus}
         />
       )}
 

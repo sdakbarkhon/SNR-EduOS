@@ -43,10 +43,6 @@ export const NotificationsBell = memo(function NotificationsBell() {
   const prevUnread = useRef(0);
   const reloadRef = useRef<() => void>(() => {});
 
-  if (typeof window !== "undefined") {
-    console.log("[hydration] NotificationsBell render", { unreadCount: unread, open });
-  }
-
   async function reload() {
     const [list, count] = await Promise.all([
       getMyNotifications(db, 20).catch(() => []),
