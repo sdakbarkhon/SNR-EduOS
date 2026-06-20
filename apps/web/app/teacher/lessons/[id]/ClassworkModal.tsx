@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus, Trash2, Check, FileText, TestTube2, BookOpen, Code2, Pencil } from "lucide-react";
 import type { Classwork, ClassworkQuestion, ClassworkSubmissionWithStudent, ClassworkType } from "@snr/core";
 import {
@@ -193,12 +194,20 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
     programming: d.teacher.classworkTypeProgramming,
   };
 
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      }}
     >
-      <div className="bg-[var(--surface-1)] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[var(--surface-1)] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-lg font-semibold text-[var(--text-1)]">{d.teacher.classworkModalTitle}</h2>
@@ -514,6 +523,7 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -42,27 +42,57 @@ export const deleteAnnouncement = async (db: Db, announcementId: string): Promis
 };
 
 export const getTeacherAnnouncements = async (db: Db, teacherId: string): Promise<TeacherAnnouncement[]> => {
+  // Base select drives visibility (RLS: own). Keep it free of joins so a join
+  // problem can never hide the teacher's own announcements.
   const { data, error } = await (db as any).from("announcements")
-    .select("*, group:groups(name, student_groups(count)), target:students(full_name), reads:announcement_reads(count)")
+    .select("*")
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw error;
-  // total distinct students across the teacher's groups (for all_my_groups scope)
+  const list = (data ?? []) as any[];
+
+  // ── Enrichment (best-effort; never throws) ──
+  const gName = new Map<string, string>();
+  const gSize = new Map<string, number>();
+  try {
+    const { data: groups } = await (db as any).from("groups").select("id, name, student_groups(count)");
+    for (const g of (groups ?? [])) { gName.set(g.id, g.name); gSize.set(g.id, g.student_groups?.[0]?.count ?? 0); }
+  } catch { /* ignore */ }
+
   let totalAll = 0;
   try {
     const { data: memb } = await (db as any).from("student_groups")
-      .select("student_id, group:groups!inner(teacher_id)")
-      .eq("group.teacher_id", teacherId);
+      .select("student_id, group:groups!inner(teacher_id)").eq("group.teacher_id", teacherId);
     totalAll = new Set((memb ?? []).map((m: any) => m.student_id)).size;
-  } catch { totalAll = 0; }
-  return ((data ?? []) as any[]).map((a) => ({
-    ...a,
-    groupName: a.group?.name ?? null,
-    targetStudentName: a.target?.full_name ?? null,
-    readCount: a.reads?.[0]?.count ?? 0,
-    totalRecipients: a.scope === "group" ? (a.group?.student_groups?.[0]?.count ?? 0)
-      : a.scope === "student" ? 1 : totalAll,
-  })) as TeacherAnnouncement[];
+  } catch { /* ignore */ }
+
+  const sName = new Map<string, string>();
+  const sids = list.filter((a) => a.target_student_id).map((a) => a.target_student_id);
+  if (sids.length) {
+    try {
+      const { data: studs } = await (db as any).from("students").select("id, full_name").in("id", sids);
+      for (const s of (studs ?? [])) sName.set(s.id, s.full_name);
+    } catch { /* ignore */ }
+  }
+
+  const out: TeacherAnnouncement[] = [];
+  for (const a of list) {
+    let readCount = 0;
+    try {
+      const { count } = await (db as any).from("announcement_reads")
+        .select("id", { count: "exact", head: true }).eq("announcement_id", a.id);
+      readCount = count ?? 0;
+    } catch { /* ignore */ }
+    out.push({
+      ...a,
+      groupName: a.group_id ? (gName.get(a.group_id) ?? null) : null,
+      targetStudentName: a.target_student_id ? (sName.get(a.target_student_id) ?? null) : null,
+      readCount,
+      totalRecipients: a.scope === "group" ? (gSize.get(a.group_id) ?? 0)
+        : a.scope === "student" ? 1 : totalAll,
+    } as TeacherAnnouncement);
+  }
+  return out;
 };
 
 // ── Student: announcements ──
