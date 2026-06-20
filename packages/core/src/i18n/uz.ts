@@ -571,7 +571,7 @@ export const uz: Dictionary = {
     hwDownloadAttach: "Faylni yuklab olish",
     hwCreatedMsg: "Topshiriq yaratildi! O'quvchilar allaqachon ko'rishmoqda.",
     reviewDownloadWork: "Ishni yuklab olish",
-    rollCallTitle: "Yo'qlamа",
+    rollCallTitle: "Yo'qlama",
     rollCallSubtitle: "Kelmagan o'quvchilarni belgilang",
     rollCallFinalizedNote: "Yo'qlama yakunlandi",
     rollCallPresent: "Keldi",
