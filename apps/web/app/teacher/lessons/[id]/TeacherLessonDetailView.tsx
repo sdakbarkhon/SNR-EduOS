@@ -7,7 +7,7 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -18,8 +18,9 @@ import {
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
   LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
-  CodeLanguage, CodeStageConfig,
+  CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
 } from "@snr/core";
+import { SERVICE_CONFIG, validateServiceUrl, isExternalService } from "@/lib/external-services";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDictionary } from "@snr/core";
@@ -109,6 +110,29 @@ function StageModal({
   const [expectedOutput, setExpectedOutput] = useState(existingCfg.expected_output ?? "");
   const isCode = contentType === "code";
 
+  // external-service config (scratch/tinkercad/app_inventor/code_monkey)
+  const existingExtCfg = (existing?.config ?? {}) as Partial<ExternalServiceConfig>;
+  const isExternal = isExternalService(contentType);
+  const externalMeta = isExternal ? SERVICE_CONFIG[contentType as ExternalServiceType] : null;
+  const [extUrl, setExtUrl] = useState(existingExtCfg.url ?? "");
+  const [extEmbedUrl, setExtEmbedUrl] = useState<string | null>(existingExtCfg.embed_url ?? null);
+  const [extUrlError, setExtUrlError] = useState("");
+  const [extUrlValid, setExtUrlValid] = useState(!!existingExtCfg.url);
+  const [reqLink, setReqLink] = useState(existingExtCfg.requires_link ?? true);
+  const [reqScreenshot, setReqScreenshot] = useState(existingExtCfg.requires_screenshot ?? false);
+
+  function validateExtUrl() {
+    if (!isExternal || !extUrl.trim()) { setExtUrlValid(false); setExtUrlError(""); setExtEmbedUrl(null); return; }
+    const res = validateServiceUrl(contentType as ExternalServiceType, extUrl);
+    setExtUrlValid(res.valid);
+    setExtUrlError(res.valid ? "" : (res.error ?? ""));
+    setExtEmbedUrl(res.embedUrl);
+  }
+
+  const externalReady = !isExternal || (
+    extUrlValid && (externalMeta?.embedSupported || reqLink || reqScreenshot)
+  );
+
   const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
 
   function handleNext() {
@@ -119,9 +143,16 @@ function StageModal({
 
   async function handleSave() {
     if (!stageType || !title.trim()) return;
-    const config: Record<string, unknown> | undefined = isCode
-      ? { language: codeLang, starter_code: starterCode, expected_output: expectedOutput.trim() || undefined }
-      : undefined;
+    let config: Record<string, unknown> | undefined;
+    if (isCode) {
+      config = { language: codeLang, starter_code: starterCode, expected_output: expectedOutput.trim() || undefined };
+    } else if (isExternal) {
+      config = {
+        url: extUrl.trim(),
+        ...(externalMeta?.embedSupported ? { embed_url: extEmbedUrl } : {}),
+        ...(!externalMeta?.embedSupported ? { requires_link: reqLink, requires_screenshot: reqScreenshot } : {}),
+      };
+    }
     setSaving(true);
     try {
       await onSave({ stageType: stageType as LessonStageType, contentType, title: title.trim(), description: desc.trim() || null, config });
@@ -226,10 +257,62 @@ function StageModal({
             <div className={isEdit ? "" : "border-t border-slate-100 dark:border-white/10 pt-5"}>
               {!isEdit && <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep3Title}</p>}
 
-              {/* Stub note: still a placeholder for content types other than presentation/code */}
-              {contentType && contentType !== "presentation" && contentType !== "code" && (
+              {/* Stub note: still a placeholder for content types we haven't built yet */}
+              {contentType && contentType !== "presentation" && !isCode && !isExternal && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                   {d.stageContentStubNote}
+                </div>
+              )}
+
+              {/* External service: project URL + (for non-embeddable) attachment requirements */}
+              {isExternal && externalMeta && (
+                <div className="mb-4 space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      {d.external.projectLink} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={extUrl}
+                        onChange={(e) => { setExtUrl(e.target.value); setExtUrlError(""); }}
+                        onBlur={validateExtUrl}
+                        placeholder={externalMeta.placeholder}
+                        className={`w-full rounded-xl border bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 outline-none transition-all focus:ring-2 dark:bg-white/5 dark:text-slate-100 ${
+                          extUrlError
+                            ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                            : extUrlValid
+                            ? "border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100"
+                            : "border-slate-200 focus:border-blue-500 focus:ring-blue-100 dark:border-white/10"
+                        }`}
+                      />
+                      {extUrlValid && !extUrlError && (
+                        <Check className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500" strokeWidth={3} />
+                      )}
+                    </div>
+                    {extUrlError && <p className="mt-1 text-xs text-red-500">{extUrlError}</p>}
+                  </div>
+
+                  {/* Non-embeddable: attachment requirements */}
+                  {!externalMeta.embedSupported && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/5">
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <Globe className="h-3.5 w-3.5" /> {d.external.cantEmbedHint}
+                      </p>
+                      <label className="mb-1.5 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input type="checkbox" checked={reqLink} onChange={(e) => setReqLink(e.target.checked)} className="h-4 w-4 rounded" />
+                        {d.external.requiredLink}
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input type="checkbox" checked={reqScreenshot} onChange={(e) => setReqScreenshot(e.target.checked)} className="h-4 w-4 rounded" />
+                        {d.external.requiredScreenshot}
+                      </label>
+                      {!reqLink && !reqScreenshot && (
+                        <p className="mt-1.5 text-xs text-red-500">{d.external.atLeastOne}</p>
+                      )}
+                      <p className="mt-2 text-[11px] text-slate-400">{d.external.mustAttachHint}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -317,7 +400,7 @@ function StageModal({
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType))}
+                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType)) || !externalReady}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-50"
                 >
                   {saving ? "Сохранение…" : isEdit ? d.stageSaveBtn2 : d.stageAddConfirmBtn}
