@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(144);
+select plan(145);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1128,6 +1128,13 @@ select is(
   (select relreplident from pg_class where oid = 'public.lessons'::regclass),
   'f'::"char",
   'M37: lessons has REPLICA IDENTITY FULL'
+);
+
+-- Test 145 (M38): stage-attachments storage bucket exists (external-service screenshots).
+select is(
+  (select count(*)::int from storage.buckets where id = 'stage-attachments'),
+  1,
+  'M38: stage-attachments bucket exists'
 );
 
 select * from finish();

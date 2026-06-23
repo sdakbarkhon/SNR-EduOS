@@ -1499,6 +1499,27 @@ export const submitStageTask = async (
   return data as LessonStageProgress;
 };
 
+/** Загрузить скриншот/файл к этапу (внешние сервисы, Prompt 5).
+ *  Путь: <studentId>/<stageId>/<timestamp>.<ext> в бакете stage-attachments.
+ *  foldername[1]=studentId (RLS ученика), foldername[2]=stageId (RLS учителя). */
+export const uploadStageAttachment = async (
+  db: Db,
+  { studentId, stageId, file }: { studentId: string; stageId: string; file: File },
+): Promise<{ path: string }> => {
+  const ext = file.name.split(".").pop() ?? "png";
+  const path = `${studentId}/${stageId}/${Date.now()}.${ext}`;
+  const { error } = await db.storage.from("stage-attachments").upload(path, file, { upsert: true });
+  if (error) throw error;
+  return { path };
+};
+
+/** Signed URL для просмотра вложения этапа. */
+export const getStageAttachmentUrl = async (db: Db, storagePath: string): Promise<string> => {
+  const { data, error } = await db.storage.from("stage-attachments").createSignedUrl(storagePath, 3600);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
 // ─── TEACHER GRADING OF STAGE TASKS ──────────────────────────────────────────
 
 /** Учитель выставляет оценку за задачу-этап. */

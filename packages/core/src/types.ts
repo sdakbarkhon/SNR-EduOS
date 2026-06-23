@@ -123,6 +123,23 @@ export type CodeSubmission = {
   language: CodeLanguage;
 };
 
+export type ExternalServiceType = 'scratch' | 'tinkercad' | 'app_inventor' | 'code_monkey';
+
+/** Stored in lesson_stages.config for external-service stages (Prompt 5). */
+export interface ExternalServiceConfig {
+  url: string;                   // original project link the teacher entered
+  embed_url?: string | null;     // computed embed URL (scratch/tinkercad only)
+  requires_link?: boolean;       // app_inventor/code_monkey: student must attach a link
+  requires_screenshot?: boolean; // app_inventor/code_monkey: student must attach a screenshot
+}
+
+/** Stored in lesson_stage_progress.submission_data for external-service stages. */
+export interface ExternalServiceSubmission {
+  link?: string;                 // student's link to their own project (optional)
+  screenshot_path?: string;      // storage path of an uploaded screenshot
+  last_opened_at?: string;       // when the student opened the external service
+}
+
 export type LessonMaterial = {
   id: string;
   lesson_id: string;

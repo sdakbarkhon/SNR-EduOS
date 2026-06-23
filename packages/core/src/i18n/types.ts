@@ -534,6 +534,49 @@ export interface Dictionary {
       gradeSaved: string;
       submittedAt: string;
     };
+    // External services: scratch / tinkercad / app_inventor / code_monkey (Prompt 5)
+    external: {
+      scratch: string;
+      tinkercad: string;
+      appInventor: string;
+      codeMonkey: string;
+      service: string;            // "Сервис"
+      projectLink: string;        // teacher config field
+      open: string;               // student stage open button
+      openService: string;        // "Открыть" (+ service name)
+      openInNewTab: string;
+      cantEmbedHint: string;      // teacher config note
+      opensInNewTab: string;      // student note
+      afterWork: string;          // "После работы вернись и прикрепи результат"
+      loadError: string;
+      loadErrorBody: string;
+      attachResult: string;       // "Прикрепи результат"
+      attachResultOptional: string;
+      attachLink: string;
+      attachScreenshot: string;
+      chooseFile: string;
+      requiredLink: string;       // checkbox label
+      requiredScreenshot: string; // checkbox label
+      atLeastOne: string;
+      mustAttachHint: string;     // "Ученик не сможет сдать пока не прикрепит…"
+      submitAndSave: string;
+      confirmSubmit: string;
+      submittedWaiting: string;
+      // teacher review
+      reviewSubmissions: string;
+      noSubmissions: string;
+      openStudentProject: string;
+      studentLink: string;
+      studentScreenshot: string;
+      openedAt: string;
+      submittedAt: string;
+      gradeField: string;
+      commentField: string;
+      saveGrade: string;
+      gradeSaved: string;
+      graded: string;
+      teacherComment: string;
+    };
   };
   teacher: {
     role: string;
