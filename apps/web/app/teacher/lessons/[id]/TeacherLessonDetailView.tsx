@@ -426,24 +426,40 @@ export function TeacherLessonDetailView({
     setStageToDelete(null);
   }
 
+  // Перезагрузка этапов из БД (приходят .order("position")) — синхронизирует
+  // порядок массива state с реальными position после любого reorder.
+  async function reloadStages() {
+    const fresh = await getLessonStages(db, lesson.id).catch(() => null);
+    if (fresh) setStages(fresh);
+  }
+
   async function handleMoveStage(stageId: string, direction: "up" | "down") {
-    const middles = stages.filter((s) => s.stage_role === "middle");
+    // ВСЕ middle-этапы (theory + task), строго по position — НЕ по порядку
+    // в массиве state, который дрейфует после оптимистичных обновлений.
+    const middles = stages
+      .filter((s) => s.stage_role === "middle")
+      .sort((a, b) => a.position - b.position);
     const idx = middles.findIndex((s) => s.id === stageId);
     if (idx === -1) return;
     const newIdx = direction === "up" ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= middles.length) return;
+
     const reordered = [...middles];
     const tmp = reordered[idx]!;
     reordered[idx] = reordered[newIdx]!;
     reordered[newIdx] = tmp;
     const orderedIds = reordered.map((s) => s.id);
-    // Optimistic update
+
+    // Оптимистично: переназначаем position 1..N по новому порядку (мгновенный отклик).
     const posMap = new Map(reordered.map((s, i) => [s.id, i + 1]));
     setStages((prev) => prev.map((s) => posMap.has(s.id) ? { ...s, position: posMap.get(s.id)! } : s));
-    await reorderLessonStages(db, lesson.id, orderedIds).catch(() => {
-      // Reload on failure
-      getLessonStages(db, lesson.id).then(setStages).catch(() => null);
-    });
+
+    // Весь массив middle-ID в новом порядке → bump-стратегия проставит 1..N в БД.
+    await reorderLessonStages(db, lesson.id, orderedIds).catch(() => null);
+
+    // ОБЯЗАТЕЛЬНО перезагрузить из БД — иначе следующий клик считает индексы по
+    // устаревшему порядку массива и Задача «залипает».
+    await reloadStages();
   }
 
   // ── Material CRUD ───────────────────────────────────────────────────────────
