@@ -24,6 +24,17 @@ export function AppShell({
   const active = navItems.find((i) => pathname.startsWith(i.href));
   const title = active ? active.label(d) : d.common.appName;
 
+  // Fullscreen lesson workspace — hide chrome so the stage content gets full viewport
+  const isFullscreenLesson = /^\/lessons\/[^/]+/.test(pathname);
+  if (isFullscreenLesson) {
+    return (
+      <div className="min-h-screen" style={{ background: "var(--shell-gradient)" }}>
+        <LessonStartBanner />
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex min-h-screen overflow-hidden"

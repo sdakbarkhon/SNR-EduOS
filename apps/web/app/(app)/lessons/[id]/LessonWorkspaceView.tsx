@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Clock, Check, FileText, FileCode2, File,
-  Image as ImageIcon, Sparkles, BookOpen, ListChecks, Lock,
+  Image as ImageIcon, Sparkles, BookOpen, ListChecks, Lock, X, Download,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -131,6 +131,59 @@ function TaskStubModal({
   );
 }
 
+// ── MaterialViewerModal ────────────────────────────────────────────────────────
+type ViewerMaterial = { url: string; type: "pdf" | "image" | "other"; title: string };
+
+function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: () => void }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9998] flex flex-col"
+      style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <p className="truncate text-sm font-medium text-white">{mat.title}</p>
+        <div className="flex items-center gap-2">
+          <a
+            href={mat.url}
+            download
+            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Скачать
+          </a>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      {/* Content */}
+      <div className="flex flex-1 items-center justify-center overflow-hidden">
+        {mat.type === "pdf" && (
+          <iframe
+            src={`${mat.url}#toolbar=0`}
+            className="h-full w-full"
+            title={mat.title}
+          />
+        )}
+        {mat.type === "image" && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={mat.url}
+            alt={mat.title}
+            className="max-h-full max-w-full object-contain"
+          />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function LessonWorkspaceView({
@@ -154,6 +207,7 @@ export function LessonWorkspaceView({
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
   const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -535,15 +589,29 @@ export function LessonWorkspaceView({
               <ul className="flex flex-col gap-1.5">
                 {lesson.materials.map((m) => {
                   const url = materialUrls[m.id];
-                  const ext = (m.file_original_name ?? m.title).split(".").pop()?.toUpperCase() ?? "";
-                  const { Icon, cls } = materialIcon(m.file_original_name ?? m.title);
+                  const fname = m.file_original_name ?? m.title;
+                  const rawExt = (fname.split(".").pop() ?? "").toLowerCase();
+                  const ext = rawExt.toUpperCase();
+                  const { Icon, cls } = materialIcon(fname);
+                  const isPdf = rawExt === "pdf";
+                  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(rawExt);
+                  const viewerType: ViewerMaterial["type"] = isPdf ? "pdf" : isImage ? "image" : "other";
+
+                  function handleOpen() {
+                    if (!url) return;
+                    if (viewerType === "other") {
+                      window.open(url, "_blank", "noopener,noreferrer");
+                    } else {
+                      setViewerMat({ url, type: viewerType, title: m.title });
+                    }
+                  }
+
                   return (
                     <li key={m.id}>
-                      <a
-                        href={url ?? "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-3 rounded-xl border border-transparent p-2 transition-all hover:border-white/60 hover:bg-white/70"
+                      <button
+                        onClick={handleOpen}
+                        disabled={!url}
+                        className="group flex w-full items-center gap-3 rounded-xl border border-transparent p-2 text-left transition-all hover:border-white/60 hover:bg-white/70 disabled:opacity-50"
                       >
                         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${cls}`}>
                           <Icon className="h-5 w-5" />
@@ -554,7 +622,7 @@ export function LessonWorkspaceView({
                             {[ext, fmtBytes(m.file_size_bytes)].filter(Boolean).join(", ")}
                           </p>
                         </div>
-                      </a>
+                      </button>
                     </li>
                   );
                 })}
@@ -589,6 +657,11 @@ export function LessonWorkspaceView({
           stage={openTaskStage}
           onClose={() => setOpenTaskStageId(null)}
         />
+      )}
+
+      {/* Material viewer modal */}
+      {mounted && viewerMat && (
+        <MaterialViewerModal mat={viewerMat} onClose={() => setViewerMat(null)} />
       )}
     </div>
   );
