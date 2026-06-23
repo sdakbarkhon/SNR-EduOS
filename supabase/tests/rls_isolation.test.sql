@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(145);
+select plan(151);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1136,6 +1136,68 @@ select is(
   1,
   'M38: stage-attachments bucket exists'
 );
+
+-- ============ Migration 39: quizzes (QIA + Kahoot) ============
+-- Setup (superuser): one quiz stage in Ivan's lesson (aa000001 / group a0) and
+-- one in Elena's lesson (dd000001 / group d0 — NOT Ivan's, NOT student A's).
+reset role;
+insert into public.lesson_stages (id, lesson_id, position, stage_role, stage_type, content_type, title)
+values
+  ('99990001-0000-0000-0000-000000000000','aa000001-0000-0000-0000-000000000000',50,'middle','task','quiz_qia','IVAN-QUIZ'),
+  ('99990002-0000-0000-0000-000000000000','dd000001-0000-0000-0000-000000000000',50,'middle','task','quiz_qia','ELENA-QUIZ')
+on conflict (id) do nothing;
+
+-- teacher_ivan session
+select set_config('request.jwt.claims','{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 146: teacher inserts a quiz_question on his own stage
+select lives_ok(
+  $$ insert into public.quiz_questions (stage_id, position, question_text, options, correct_option_index)
+     values ('99990001-0000-0000-0000-000000000000', 0, 'Q?', '["a","b","c","d"]'::jsonb, 0) $$,
+  'M39: teacher inserts quiz_question on own stage'
+);
+
+-- Test 147: teacher cannot insert a quiz_question on another group''s stage
+select throws_ok(
+  $$ insert into public.quiz_questions (stage_id, position, question_text, options, correct_option_index)
+     values ('99990002-0000-0000-0000-000000000000', 0, 'HACK', '["a","b"]'::jsonb, 0) $$,
+  '42501', NULL, 'M39: teacher cannot insert quiz_question on other group stage'
+);
+
+-- Test 148: teacher creates a kahoot_session for his own stage
+select lives_ok(
+  $$ insert into public.kahoot_sessions (stage_id) values ('99990001-0000-0000-0000-000000000000') $$,
+  'M39: teacher creates kahoot_session for own stage'
+);
+
+-- student A session
+reset role;
+select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 149: student inserts his OWN quiz_attempt
+select lives_ok(
+  $$ insert into public.quiz_attempts (stage_id, student_id, total_questions)
+     values ('99990001-0000-0000-0000-000000000000', public.current_student_id(), 1) $$,
+  'M39: student inserts own quiz_attempt'
+);
+
+-- Test 150: student cannot insert an attempt for ANOTHER student
+select throws_ok(
+  $$ insert into public.quiz_attempts (stage_id, student_id, total_questions)
+     values ('99990001-0000-0000-0000-000000000000', 'b2222222-2222-2222-2222-222222222222', 1) $$,
+  '42501', NULL, 'M39: student cannot insert another students quiz_attempt'
+);
+
+-- Test 151: student sees the kahoot_session of his own group stage
+select ok(
+  (select count(*)::int > 0 from public.kahoot_sessions
+    where stage_id = '99990001-0000-0000-0000-000000000000'),
+  'M39: student sees kahoot_session of own group stage'
+);
+
+reset role;
 
 select * from finish();
 rollback;
