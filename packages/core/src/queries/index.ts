@@ -1373,10 +1373,34 @@ export const reorderLessonStages = async (
 ): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
-  const updates = orderedStageIds.map((id, idx) =>
-    db2.from("lesson_stages").update({ position: idx + 1 }).eq("id", id).eq("lesson_id", lessonId),
-  );
-  await Promise.all(updates);
+
+  // BUMP-стратегия против 409 от UNIQUE(lesson_id, position):
+  // если ставить финальные позиции напрямую (параллельно), PATCH этапа А на
+  // position, всё ещё занятый этапом Б, ловит конфликт. Поэтому в два прохода,
+  // строго последовательно.
+
+  // Шаг 1: всем переупорядочиваемым — временные большие позиции (10000 + i).
+  // Диапазон 10000+ гарантированно вне start(0) / middle(1..N) / summary(9999).
+  for (let i = 0; i < orderedStageIds.length; i++) {
+    const id = orderedStageIds[i];
+    if (!id) continue;
+    await db2
+      .from("lesson_stages")
+      .update({ position: 10000 + i })
+      .eq("id", id)
+      .eq("lesson_id", lessonId);
+  }
+
+  // Шаг 2: финальные позиции middle-этапов 1..N (start=0 / summary=9999 не трогаем).
+  for (let i = 0; i < orderedStageIds.length; i++) {
+    const id = orderedStageIds[i];
+    if (!id) continue;
+    await db2
+      .from("lesson_stages")
+      .update({ position: i + 1 })
+      .eq("id", id)
+      .eq("lesson_id", lessonId);
+  }
 };
 
 /** Отмечает start/summary этап выполненным (или нет). */

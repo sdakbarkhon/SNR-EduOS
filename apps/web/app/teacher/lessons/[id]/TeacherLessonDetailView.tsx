@@ -112,7 +112,7 @@ function StageModal({
   return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center"
-      style={{ zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      style={{ zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
     >
       <div
         className="relative w-full max-w-lg rounded-2xl shadow-2xl"
