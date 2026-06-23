@@ -30,6 +30,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LessonEndReminderModal } from "./LessonEndReminderModal";
 import { CodeEditor } from "@/components/CodeEditor";
+import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -352,6 +353,7 @@ export function TeacherLessonDetailView({
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
+  const [reviewStage, setReviewStage] = useState<LessonStage | null>(null);
   // Reorder lock: ref = синхронный гард (срабатывает в том же тике, до re-render),
   // state = визуальный feedback (disabled + spinner). Вместе исключают наложение
   // двух reorder-операций → bump одной не конфликтует с финалом другой (409).
@@ -837,6 +839,16 @@ export function TeacherLessonDetailView({
                   )}
                 </div>
 
+                {/* Review submissions — code stages, always available (incl. after lesson ends) */}
+                {stage.content_type === "code" && (
+                  <button
+                    onClick={() => setReviewStage(stage)}
+                    className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  >
+                    {dl.code.reviewSubmissions}
+                  </button>
+                )}
+
                 {/* Actions */}
                 {!isLessonCompleted && (
                 <div className="flex shrink-0 items-center gap-1">
@@ -1028,6 +1040,15 @@ export function TeacherLessonDetailView({
         confirmText="Удалить"
         cancelText={d.common.cancel}
       />
+
+      {/* Code submissions review */}
+      {mounted && reviewStage && (
+        <CodeStageSubmissionsModal
+          stage={reviewStage}
+          teacherId={teacher.id}
+          onClose={() => setReviewStage(null)}
+        />
+      )}
 
       {/* 5-min reminder modal (only while in_progress) */}
       {status === "in_progress" && mounted && (
