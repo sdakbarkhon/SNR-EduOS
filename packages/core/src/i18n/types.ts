@@ -470,6 +470,16 @@ export interface Dictionary {
     stageTaskSubmittedLabel: string;   // "Сдано"
     stageTaskGradedLabel: string;      // "Оценка"
     stageTaskCloseBtn: string;         // "Закрыть"
+    // Auto-schedule + visibility (migration 36)
+    completedLock: string;             // "Урок завершён. Редактирование недоступно."
+    durationMinutes: string;           // "Длительность (мин.)"
+    stageLocked: string;               // "Сначала пройди"
+    stageLockedSummary: string;        // "Доступно после завершения урока"
+    materialVisibilityAll: string;     // "Видно всем"
+    materialVisibilityTeacher: string; // "Только для учителя"
+    materialTeacherOnlyBadge: string;  // "Только для учителя"
+    bannerStarted: string;             // "Урок начался!"
+    bannerGo: string;                  // "Перейти →"
   };
   teacher: {
     role: string;

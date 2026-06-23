@@ -9,6 +9,7 @@ import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { navItems } from "./nav-items";
+import { LessonStartBanner } from "./LessonStartBanner";
 
 export function AppShell({
   studentName,
@@ -28,6 +29,7 @@ export function AppShell({
       className="flex min-h-screen overflow-hidden"
       style={{ background: "var(--shell-gradient)" }}
     >
+      <LessonStartBanner />
       <Sidebar />
 
       {/* Правая колонка */}

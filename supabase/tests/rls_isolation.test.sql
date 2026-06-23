@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(139);
+select plan(143);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1076,6 +1076,50 @@ select lives_ok(
 -- cleanup M35
 reset role;
 delete from public.lesson_stages where title = 'M35-TEST-STAGE';
+
+-- ============ MIGRATION 36: auto-schedule triggers + visibility ============
+
+-- Test 140 (superuser): fn_compute_lesson_end sets ends_at on INSERT
+reset role;
+insert into public.lessons
+  (id, group_id, teacher_id, starts_at, duration_minutes, status, topic)
+  values (
+    'aa360001-0000-0000-0000-000000000000',
+    'a0000000-0000-0000-0000-000000000000',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    now() + interval '1 hour', 45, 'scheduled', 'M36-COMPUTE-END'
+  );
+select ok(
+  (select ends_at is not null
+     from public.lessons
+    where id = 'aa360001-0000-0000-0000-000000000000'),
+  'M36-T1: fn_compute_lesson_end sets ends_at on INSERT'
+);
+delete from public.lessons where id = 'aa360001-0000-0000-0000-000000000000';
+
+-- Test 141 (authenticated teacher): past starts_at rejected by fn_validate_lesson_start
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+select throws_ok(
+  $$ insert into public.lessons
+       (group_id, teacher_id, starts_at, duration_minutes, status, topic)
+       values (
+         'a0000000-0000-0000-0000-000000000000',
+         'cccccccc-cccc-cccc-cccc-cccccccccccc',
+         '2020-01-01T00:00:00Z', 45, 'scheduled', 'M36-PAST'
+       ) $$,
+  'P0001', NULL,
+  'M36-T2: past starts_at rejected by fn_validate_lesson_start'
+);
+
+-- Test 142: fn_auto_start_lessons function exists
+reset role;
+select has_function('public', 'fn_auto_start_lessons', 'M36-T3: fn_auto_start_lessons exists');
+
+-- Test 143: fn_auto_end_lessons function exists
+select has_function('public', 'fn_auto_end_lessons', 'M36-T4: fn_auto_end_lessons exists');
 
 select * from finish();
 rollback;

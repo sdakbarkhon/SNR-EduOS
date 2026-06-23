@@ -7,7 +7,7 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Play, Square, Clock, AlertCircle, CalendarX,
   ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -288,6 +288,7 @@ export function TeacherLessonDetailView({
   const [uploadModal, setUploadModal] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadVisibility, setUploadVisibility] = useState<'all' | 'teacher_only'>('all');
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -488,12 +489,14 @@ export function TeacherLessonDetailView({
     setUploading(true);
     try {
       const mat = await uploadLessonMaterial(db, {
-        lessonId: lesson.id, teacherId: teacher.id, file: uploadFile, title: uploadTitle.trim(),
+        lessonId: lesson.id, teacherId: teacher.id, file: uploadFile,
+        title: uploadTitle.trim(), visibility: uploadVisibility,
       });
       setMaterials((prev) => [...prev, mat]);
       setUploadModal(false);
       setUploadTitle("");
       setUploadFile(null);
+      setUploadVisibility('all');
     } catch { /* noop */ } finally { setUploading(false); }
   }
 
@@ -511,6 +514,7 @@ export function TeacherLessonDetailView({
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
+  const isLessonCompleted = status === "completed";
   const style = getSubjectStyle(lesson.group.subject);
   const infoChanged = title !== (lesson.title ?? "") || desc !== (lesson.description ?? "");
   const timeRange = lesson.ends_at
@@ -611,11 +615,17 @@ export function TeacherLessonDetailView({
         </div>
       )}
       {status === "completed" && (
-        <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4">
-          <Check className="h-5 w-5 text-gray-500" />
-          <p className="text-sm text-gray-600">
-            Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
-          </p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4">
+            <Check className="h-5 w-5 text-gray-500" />
+            <p className="text-sm text-gray-600">
+              Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-3">
+            <Lock className="h-4 w-4 shrink-0 text-yellow-600" />
+            <p className="text-sm font-medium text-yellow-800">{dl.completedLock}</p>
+          </div>
         </div>
       )}
 
@@ -642,16 +652,18 @@ export function TeacherLessonDetailView({
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.titleLabel}</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              disabled={isLessonCompleted}
               placeholder={dl.titlePlaceholder}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.descLabel}</label>
             <textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)}
+              disabled={isLessonCompleted}
               placeholder={dl.descPlaceholder}
-              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400" />
           </div>
-          {infoChanged && (
+          {!isLessonCompleted && infoChanged && (
             <button onClick={handleSaveInfo} disabled={infoSaving}
               className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-60">
               {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {dl.saveBtn}</> : infoSaving ? dl.uploading : dl.saveBtn}
@@ -688,12 +700,14 @@ export function TeacherLessonDetailView({
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
-          <button
-            onClick={() => setStageModal({ mode: "add" })}
-            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
-          >
-            <Plus className="h-4 w-4" /> {dl.stageAddBtn}
-          </button>
+          {!isLessonCompleted && (
+            <button
+              onClick={() => setStageModal({ mode: "add" })}
+              className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
+            >
+              <Plus className="h-4 w-4" /> {dl.stageAddBtn}
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -766,6 +780,7 @@ export function TeacherLessonDetailView({
                 </div>
 
                 {/* Actions */}
+                {!isLessonCompleted && (
                 <div className="flex shrink-0 items-center gap-1">
                   {reorderingStageId === stage.id ? (
                     // Спиннер на этапе, по которому идёт reorder
@@ -805,6 +820,7 @@ export function TeacherLessonDetailView({
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
+                )}
               </div>
             ))
           )}
@@ -834,10 +850,12 @@ export function TeacherLessonDetailView({
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.materialsTitle}</h2>
-          <button onClick={() => setUploadModal(true)}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95">
-            {dl.addMaterialLabel}
-          </button>
+          {!isLessonCompleted && (
+            <button onClick={() => setUploadModal(true)}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95">
+              {dl.addMaterialLabel}
+            </button>
+          )}
         </div>
         {materials.length === 0 ? (
           <p className="text-sm text-gray-400">{dl.materialsEmpty}</p>
@@ -850,17 +868,26 @@ export function TeacherLessonDetailView({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{mat.title}</p>
-                  {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
+                    {mat.visibility === 'teacher_only' && (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                        {dl.materialTeacherOnlyBadge}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex shrink-0 gap-1">
                   <button onClick={() => handleDownloadMaterial(mat)}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
                     <Download className="h-4 w-4" />
                   </button>
-                  <button onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title={dl.deleteConfirm}>
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {!isLessonCompleted && (
+                    <button onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title={dl.deleteConfirm}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -871,11 +898,12 @@ export function TeacherLessonDetailView({
       {/* Upload material modal */}
       {uploadModal && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 flex items-center justify-center"
-          style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
+          style={{ zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">{dl.addMaterialTitle}</h3>
-              <button onClick={() => setUploadModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadVisibility('all'); }}
+                className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -892,8 +920,23 @@ export function TeacherLessonDetailView({
                   {uploadFile ? uploadFile.name : "Выбрать файл (макс. 50 МБ)"}
                 </button>
               </div>
+              {/* Visibility toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setUploadVisibility('all')}
+                  className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition-colors ${uploadVisibility === 'all' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {dl.materialVisibilityAll}
+                </button>
+                <button
+                  onClick={() => setUploadVisibility('teacher_only')}
+                  className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition-colors ${uploadVisibility === 'teacher_only' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {dl.materialVisibilityTeacher}
+                </button>
+              </div>
               <div className="flex gap-3">
-                <button onClick={() => setUploadModal(false)}
+                <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadVisibility('all'); }}
                   className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.common.cancel}</button>
                 <button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadTitle.trim()}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">

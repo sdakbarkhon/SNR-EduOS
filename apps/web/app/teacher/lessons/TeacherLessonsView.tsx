@@ -24,7 +24,7 @@ type LessonItem = {
 };
 type FormState = {
   groupId: string; date: string; startTime: string;
-  endTime: string; room: string; title: string; desc: string;
+  durationMinutes: string; room: string; title: string; desc: string;
 };
 type EffectiveStatus = "scheduled" | "in_progress" | "completed" | "missed";
 type DayStatus = "in_progress" | "overdue" | "completed" | "scheduled" | null;
@@ -126,14 +126,14 @@ function buildIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 function emptyForm(groupId = ""): FormState {
-  return { groupId, date: "", startTime: "", endTime: "", room: "", title: "", desc: "" };
+  return { groupId, date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "" };
 }
 function lessonToForm(l: LessonItem): FormState {
   return {
     groupId: l.group_id,
     date: toLocalDateStr(l.starts_at),
     startTime: toLocalTimeStr(l.starts_at),
-    endTime: l.ends_at ? toLocalTimeStr(l.ends_at) : "",
+    durationMinutes: "45",
     room: l.room ?? "", title: l.title ?? "", desc: "",
   };
 }
@@ -268,7 +268,7 @@ function LessonFormModal({
           </div>
           <div>
             <label className={labelCls}>Дата *</label>
-            <input type="date" value={form.date} onChange={e => set("date", e.target.value)} className={inputCls} />
+            <input type="date" value={form.date} min={new Date().toISOString().split("T")[0]} onChange={e => set("date", e.target.value)} className={inputCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -276,8 +276,8 @@ function LessonFormModal({
               <input type="time" value={form.startTime} onChange={e => set("startTime", e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Конец</label>
-              <input type="time" value={form.endTime} onChange={e => set("endTime", e.target.value)} className={inputCls} />
+              <label className={labelCls}>Длительность (мин.)</label>
+              <input type="number" min="5" max="240" value={form.durationMinutes} onChange={e => set("durationMinutes", e.target.value)} className={inputCls} />
             </div>
           </div>
           <div>
@@ -434,17 +434,17 @@ export function TeacherLessonsView({
 
   async function handleSave(form: FormState) {
     const startsAt = buildIso(form.date, form.startTime);
-    const endsAt = form.endTime ? buildIso(form.date, form.endTime) : null;
+    const durationMinutes = Math.max(5, Math.min(240, parseInt(form.durationMinutes, 10) || 45));
     if (formModal === "create") {
       const created = await createLesson(db, {
-        groupId: form.groupId, startsAt, endsAt,
+        groupId: form.groupId, startsAt, durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
       });
       setFormModal(null);
       router.push(`/teacher/lessons/${created.id}`);
     } else if (formModal === "edit" && editLesson) {
       await updateLesson(db, editLesson.id, {
-        group_id: form.groupId, starts_at: startsAt, ends_at: endsAt,
+        group_id: form.groupId, starts_at: startsAt, duration_minutes: durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
       });
       setFormModal(null);

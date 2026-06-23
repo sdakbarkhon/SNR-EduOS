@@ -115,6 +115,7 @@ export type LessonMaterial = {
   file_original_name: string | null;
   uploaded_by: string | null;
   created_at: string;
+  visibility: 'all' | 'teacher_only';
 };
 
 

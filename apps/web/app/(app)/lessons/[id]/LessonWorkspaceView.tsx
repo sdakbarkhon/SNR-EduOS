@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Clock, Check, FileText, FileCode2, File,
-  Image as ImageIcon, Sparkles, BookOpen, ListChecks,
+  Image as ImageIcon, Sparkles, BookOpen, ListChecks, Lock,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -233,6 +233,14 @@ export function LessonWorkspaceView({
     return "upcoming";
   }
 
+  function isMiddleStageUnlocked(idx: number): boolean {
+    if (idx === 0) return true;
+    // All previous middle stages must be completed
+    return middleStages.slice(0, idx).every((s) =>
+      s.progress?.is_completed || s.progress?.submission_data != null
+    );
+  }
+
   const allStepsForStepper = [
     ...(startStage ? [startStage] : []),
     ...middleStages,
@@ -380,15 +388,27 @@ export function LessonWorkspaceView({
               <p className="text-center text-sm text-slate-400">{w.noTask}</p>
             </div>
           ) : (
-            middleStages.map((stage) => {
+            middleStages.map((stage, idx) => {
+              const unlocked = isMiddleStageUnlocked(idx);
+              const prevStage = idx > 0 ? middleStages[idx - 1] : null;
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
               const isLoading = studiedLoading === stage.id;
 
               return (
+                <div key={stage.id} className="relative">
+                {/* Lock overlay for sequential unlock */}
+                {!unlocked && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl backdrop-blur-sm"
+                    style={{ background: "rgba(255,255,255,0.75)" }}>
+                    <Lock className="h-5 w-5 text-gray-400" />
+                    <p className="text-sm font-medium text-gray-500 text-center px-4">
+                      {dl.stageLocked}{prevStage ? `: ${prevStage.title}` : ""}
+                    </p>
+                  </div>
+                )}
                 <div
-                  key={stage.id}
                   className={`rounded-2xl border p-5 shadow-sm backdrop-blur-xl transition-all ${
                     stage.stage_type === "task"
                       ? "border-violet-100 bg-violet-50/40 dark:border-violet-500/20 dark:bg-violet-500/5"
@@ -471,8 +491,37 @@ export function LessonWorkspaceView({
                     </div>
                   )}
                 </div>
+                </div>
               );
             })
+          )}
+
+          {/* Summary stage — locked until lesson completed */}
+          {summaryStage && (
+            <div className="relative">
+              {lesson.status !== "completed" && (
+                <div
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl backdrop-blur-sm"
+                  style={{ background: "rgba(255,255,255,0.75)" }}
+                >
+                  <Lock className="h-5 w-5 text-gray-400" />
+                  <p className="text-sm font-medium text-gray-500 text-center px-4">
+                    {dl.stageLockedSummary}
+                  </p>
+                </div>
+              )}
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 shadow-sm backdrop-blur-xl">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-[15px] font-bold text-slate-800">{summaryStage.title}</h3>
+                </div>
+                {summaryStage.description && (
+                  <p className="text-sm leading-relaxed text-slate-600">{summaryStage.description}</p>
+                )}
+              </div>
+            </div>
           )}
         </section>
 

@@ -1118,7 +1118,7 @@ export const getStudentLessonView = async (
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at").eq("lesson_id", lessonId).order("created_at"),
+    db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
     db3.from("lesson_stages").select("*, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
   ]);
 
@@ -1145,7 +1145,7 @@ export const getStudentLessonView = async (
   };
 };
 
-/** Обновляет поля урока (учитель): title, description, starts_at, ends_at, room. */
+/** Обновляет поля урока (учитель): title, description, starts_at, duration_minutes, room. */
 export const updateLesson = async (
   db: Db,
   lessonId: string,
@@ -1153,28 +1153,38 @@ export const updateLesson = async (
     title?: string | null;
     description?: string | null;
     starts_at?: string;
+    duration_minutes?: number;
     ends_at?: string | null;
     room?: string | null;
     group_id?: string;
   },
 ): Promise<void> => {
+  if (patch.starts_at && new Date(patch.starts_at) < new Date()) {
+    throw new Error("Нельзя создать урок в прошедшее время");
+  }
+  if (patch.duration_minutes !== undefined && (patch.duration_minutes < 5 || patch.duration_minutes > 240)) {
+    throw new Error("Некорректная длительность");
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db as any).from("lessons").update(patch).eq("id", lessonId);
   if (error) throw error;
 };
 
-/** Создаёт новый урок в группе учителя. */
+/** Создаёт новый урок в группе учителя. ends_at вычисляется триггером. */
 export const createLesson = async (
   db: Db,
   input: {
     groupId: string;
     startsAt: string;
-    endsAt: string | null;
+    durationMinutes?: number;
     room: string | null;
     title: string | null;
     description: string | null;
   },
 ): Promise<{ id: string }> => {
+  const dur = input.durationMinutes ?? 45;
+  if (new Date(input.startsAt) < new Date()) throw new Error("Нельзя создать урок в прошедшее время");
+  if (dur < 5 || dur > 240) throw new Error("Некорректная длительность");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
   const { data, error } = await db2
@@ -1182,7 +1192,7 @@ export const createLesson = async (
     .insert({
       group_id: input.groupId,
       starts_at: input.startsAt,
-      ends_at: input.endsAt,
+      duration_minutes: dur,
       room: input.room,
       title: input.title,
       description: input.description,
@@ -1194,6 +1204,7 @@ export const createLesson = async (
   if (error) throw error;
   const created = data as { id: string };
   // Trigger trg_lesson_default_stages auto-creates start + summary stages.
+  // Trigger trg_compute_lesson_end auto-sets ends_at = starts_at + duration_minutes.
   return created;
 };
 
@@ -1217,7 +1228,13 @@ export const deleteLesson = async (db: Db, lessonId: string): Promise<void> => {
 /** Загружает файл в бакет lesson-materials и вставляет запись в lesson_materials. */
 export const uploadLessonMaterial = async (
   db: Db,
-  input: { lessonId: string; teacherId: string; file: File; title: string },
+  input: {
+    lessonId: string;
+    teacherId: string;
+    file: File;
+    title: string;
+    visibility?: 'all' | 'teacher_only';
+  },
 ): Promise<LessonMaterial> => {
   const materialId = crypto.randomUUID();
   const ext = input.file.name.split(".").pop() ?? "bin";
@@ -1238,6 +1255,7 @@ export const uploadLessonMaterial = async (
       file_size_bytes: input.file.size,
       file_original_name: input.file.name,
       uploaded_by: input.teacherId,
+      visibility: input.visibility ?? 'all',
     })
     .select("*")
     .single();
