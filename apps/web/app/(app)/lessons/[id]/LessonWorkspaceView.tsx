@@ -12,10 +12,11 @@ import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
 } from "@snr/core";
-import type { StudentLessonView, LessonStageWithProgress, Locale } from "@snr/core";
+import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
+import { CodeStageView } from "./CodeStageView";
 import { createClient } from "@/lib/supabase/client";
 
 function initials(name: string): string {
@@ -205,6 +206,7 @@ export function LessonWorkspaceView({
 
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
+  const [activeCodeStageId, setActiveCodeStageId] = useState<string | null>(null);
   const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
@@ -272,6 +274,11 @@ export function LessonWorkspaceView({
     .sort((a, b) => a.position - b.position);
 
   const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
+  const activeCodeStage = activeCodeStageId ? stages.find((s) => s.id === activeCodeStageId) : null;
+
+  const handleCodeSubmitted = useCallback((progress: LessonStageProgress) => {
+    setStages((prev) => prev.map((s) => s.id === progress.stage_id ? { ...s, progress } : s));
+  }, []);
 
   // Compute stepper state
   type StepState = "done" | "active" | "upcoming";
@@ -300,6 +307,20 @@ export function LessonWorkspaceView({
     ...middleStages,
     ...(summaryStage ? [summaryStage] : []),
   ];
+
+  // Code-task stage opens as a full-width inline IDE, replacing the stepper view.
+  if (activeCodeStage && studentId) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-5">
+        <CodeStageView
+          stage={activeCodeStage}
+          studentId={studentId}
+          onBack={() => setActiveCodeStageId(null)}
+          onSubmitted={handleCodeSubmitted}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
@@ -520,9 +541,9 @@ export function LessonWorkspaceView({
                     )
                   )}
 
-                  {/* Task: stub button */}
+                  {/* Task */}
                   {stage.stage_type === "task" && (
-                    <div>
+                    <div className="space-y-2">
                       {isGraded ? (
                         <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                           <Check className="h-4 w-4" />
@@ -532,16 +553,26 @@ export function LessonWorkspaceView({
                         <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                           {dl.stageTaskSubmittedLabel}
                         </div>
-                      ) : (
-                        mounted && studentId && (
-                          <button
-                            onClick={() => setOpenTaskStageId(stage.id)}
-                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
-                          >
-                            {dl.stageTaskStubPrefix}
-                          </button>
-                        )
-                      )}
+                      ) : null}
+
+                      {/* Code stages always offer an editor button (open / view read-only) */}
+                      {stage.content_type === "code"
+                        ? mounted && studentId && (
+                            <button
+                              onClick={() => setActiveCodeStageId(stage.id)}
+                              className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                            >
+                              {dl.code.openEditor}
+                            </button>
+                          )
+                        : !isGraded && !isSubmitted && mounted && studentId && (
+                            <button
+                              onClick={() => setOpenTaskStageId(stage.id)}
+                              className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                            >
+                              {dl.stageTaskStubPrefix}
+                            </button>
+                          )}
                     </div>
                   )}
                 </div>

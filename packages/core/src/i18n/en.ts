@@ -520,6 +520,7 @@ export const en: Dictionary = {
       loading: "Loading…",
       graded: "Graded",
       teacherComment: "Teacher comment",
+      openEditor: "Open editor",
       reviewSubmissions: "Review submissions",
       noSubmissions: "No submissions yet",
       openSolution: "Open solution",

@@ -520,6 +520,7 @@ export const ru: Dictionary = {
       loading: "Загрузка…",
       graded: "Оценено",
       teacherComment: "Комментарий учителя",
+      openEditor: "Открыть редактор",
       reviewSubmissions: "Проверить сдачи",
       noSubmissions: "Пока нет сдач",
       openSolution: "Открыть решение",

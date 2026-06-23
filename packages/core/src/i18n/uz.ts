@@ -520,6 +520,7 @@ export const uz: Dictionary = {
       loading: "Yuklanmoqda…",
       graded: "Baholandi",
       teacherComment: "O'qituvchi izohi",
+      openEditor: "Muharrirni ochish",
       reviewSubmissions: "Topshiriqlarni tekshirish",
       noSubmissions: "Hozircha topshiriqlar yo'q",
       openSolution: "Yechimni ochish",

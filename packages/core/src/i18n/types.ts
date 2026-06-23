@@ -519,6 +519,7 @@ export interface Dictionary {
       loading: string;
       graded: string;
       teacherComment: string;
+      openEditor: string;
       // teacher review
       reviewSubmissions: string;
       noSubmissions: string;
