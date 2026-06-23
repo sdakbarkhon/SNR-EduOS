@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GraduationCap, ChevronLeft, ChevronRight } from "lucide-react";
+import { GraduationCap, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -35,7 +35,8 @@ export function Sidebar() {
     });
   }
 
-  const width = mounted && collapsed ? "w-16" : "w-[230px]";
+  const isCollapsed = mounted && collapsed;
+  const width = isCollapsed ? "w-16" : "w-[230px]";
 
   return (
     <aside
@@ -45,16 +46,32 @@ export function Sidebar() {
       )}
       style={{ background: "linear-gradient(to bottom, #2A75FF, #0A3CB4)" }}
     >
-      {/* Бренд */}
-      <div className="mb-8 flex items-center gap-3 px-4 overflow-hidden">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 shadow-inner">
-          <GraduationCap className="h-6 w-6 text-white" strokeWidth={2.5} />
-        </div>
-        {(!mounted || !collapsed) && (
-          <span className="whitespace-nowrap text-[17px] font-bold tracking-wide text-white">
-            SNR EduOS
-          </span>
+      {/* Бренд + кнопка сворачивания (в одной строке сверху) */}
+      <div
+        className={cn(
+          "mb-8 px-3",
+          isCollapsed ? "flex flex-col items-center gap-3" : "flex items-center justify-between gap-2",
         )}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 shadow-inner">
+            <GraduationCap className="h-6 w-6 text-white" strokeWidth={2.5} />
+          </div>
+          {!isCollapsed && (
+            <span className="whitespace-nowrap text-[17px] font-bold tracking-wide text-white">
+              SNR EduOS
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={toggle}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+          title={isCollapsed ? "Развернуть" : "Свернуть"}
+          aria-label={isCollapsed ? "Развернуть меню" : "Свернуть меню"}
+        >
+          {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+        </button>
       </div>
 
       {/* Навигация */}
@@ -72,7 +89,7 @@ export function Sidebar() {
                 active
                   ? "bg-white/25 text-white shadow-sm backdrop-blur-sm"
                   : "text-white/80 hover:bg-white/10 hover:text-white",
-                mounted && collapsed && "justify-center",
+                isCollapsed && "justify-center",
               )}
             >
               <Icon
@@ -80,25 +97,13 @@ export function Sidebar() {
                 strokeWidth={active ? 2.5 : 2}
                 className="shrink-0"
               />
-              {(!mounted || !collapsed) && (
+              {!isCollapsed && (
                 <span className="whitespace-nowrap">{item.label(d)}</span>
               )}
             </Link>
           );
         })}
       </nav>
-
-      {/* Toggle button */}
-      <button
-        onClick={toggle}
-        className="mx-auto mt-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white/80 transition-colors hover:bg-white/25 hover:text-white"
-        title={collapsed ? "Развернуть" : "Свернуть"}
-      >
-        {mounted && collapsed
-          ? <ChevronRight className="h-4 w-4" />
-          : <ChevronLeft className="h-4 w-4" />
-        }
-      </button>
     </aside>
   );
 }
