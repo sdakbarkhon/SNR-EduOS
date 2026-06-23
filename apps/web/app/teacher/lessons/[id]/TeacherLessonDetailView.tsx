@@ -18,6 +18,7 @@ import {
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
   LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
+  CodeLanguage, CodeStageConfig,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -28,6 +29,7 @@ import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LessonEndReminderModal } from "./LessonEndReminderModal";
+import { CodeEditor } from "@/components/CodeEditor";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -81,13 +83,16 @@ function StageModal({
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    config?: Record<string, unknown>;
   }) => Promise<void>;
   contentLabel: (ct: LessonContentType) => string;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).lesson;
+  const dc = d.code;
   const isEdit = modalState.mode === "edit";
   const existing = isEdit ? modalState.stage : null;
+  const existingCfg = (existing?.config ?? {}) as Partial<CodeStageConfig>;
 
   const [step, setStep] = useState<ModalStep>(isEdit ? 3 : 1);
   const [stageType, setStageType] = useState<LessonStageType | null>(isEdit ? (existing?.stage_type ?? "theory") : null);
@@ -96,6 +101,12 @@ function StageModal({
   const [desc, setDesc] = useState(existing?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [stepError, setStepError] = useState("");
+
+  // code-stage config
+  const [codeLang, setCodeLang] = useState<CodeLanguage>(existingCfg.language ?? "python");
+  const [starterCode, setStarterCode] = useState(existingCfg.starter_code ?? "");
+  const [expectedOutput, setExpectedOutput] = useState(existingCfg.expected_output ?? "");
+  const isCode = contentType === "code";
 
   const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
 
@@ -107,9 +118,12 @@ function StageModal({
 
   async function handleSave() {
     if (!stageType || !title.trim()) return;
+    const config: Record<string, unknown> | undefined = isCode
+      ? { language: codeLang, starter_code: starterCode, expected_output: expectedOutput.trim() || undefined }
+      : undefined;
     setSaving(true);
     try {
-      await onSave({ stageType: stageType as LessonStageType, contentType, title: title.trim(), description: desc.trim() || null });
+      await onSave({ stageType: stageType as LessonStageType, contentType, title: title.trim(), description: desc.trim() || null, config });
     } finally {
       setSaving(false);
     }
@@ -123,11 +137,11 @@ function StageModal({
       style={{ zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
     >
       <div
-        className="relative w-full max-w-lg rounded-2xl shadow-2xl"
+        className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${isCode ? "max-w-2xl" : "max-w-lg"}`}
         style={{ background: "var(--surface-1)" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
             {isEdit ? d.stageEditModalTitle : d.stageAddModalTitle}
           </h3>
@@ -136,7 +150,7 @@ function StageModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Step 1: Stage type (hidden in edit mode) */}
           {!isEdit && step >= 1 && (
             <div>
@@ -211,10 +225,36 @@ function StageModal({
             <div className={isEdit ? "" : "border-t border-slate-100 dark:border-white/10 pt-5"}>
               {!isEdit && <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep3Title}</p>}
 
-              {/* Stub note for non-presentation types */}
-              {contentType && contentType !== "presentation" && (
+              {/* Stub note: still a placeholder for content types other than presentation/code */}
+              {contentType && contentType !== "presentation" && contentType !== "code" && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                   {d.stageContentStubNote}
+                </div>
+              )}
+
+              {/* Code stage: language selector (big, on top) */}
+              {isCode && (
+                <div className="mb-4">
+                  <label className="mb-2 block text-xs font-semibold text-slate-600 dark:text-slate-400">{dc.language}</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["python", "cpp"] as CodeLanguage[]).map((lang) => (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => setCodeLang(lang)}
+                        className={`flex items-center gap-2 rounded-xl border-2 p-3 text-left transition-all ${
+                          codeLang === lang
+                            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10"
+                            : "border-slate-200 dark:border-white/10 hover:border-slate-300"
+                        }`}
+                      >
+                        <Code2 className="h-5 w-5 text-emerald-600" />
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                          {lang === "python" ? dc.python : dc.cpp}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -233,7 +273,9 @@ function StageModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">{d.stageDescLabel2}</label>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {isCode ? dc.problemStatement : d.stageDescLabel2}
+                  </label>
                   <textarea
                     rows={3}
                     value={desc}
@@ -242,6 +284,27 @@ function StageModal({
                     className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                   />
                 </div>
+
+                {/* Code stage: starter code + expected output */}
+                {isCode && (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">{dc.starterCode}</label>
+                      <CodeEditor value={starterCode} onChange={setStarterCode} language={codeLang} minHeight={160} />
+                      <p className="mt-1 text-[11px] text-slate-400">{dc.starterCodePlaceholder}</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">{dc.expectedOutput}</label>
+                      <textarea
+                        rows={2}
+                        value={expectedOutput}
+                        onChange={(e) => setExpectedOutput(e.target.value)}
+                        className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400">{dc.expectedOutputHint}</p>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="mt-4 flex gap-3">
@@ -396,6 +459,7 @@ export function TeacherLessonDetailView({
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    config?: Record<string, unknown>;
   }) {
     const newStage = await addLessonStage(db, lesson.id, data);
     setStages((prev) => {
@@ -411,6 +475,7 @@ export function TeacherLessonDetailView({
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    config?: Record<string, unknown>;
   }) {
     if (stageModal.mode !== "edit") return;
     const updated = await updateLessonStage(db, stageModal.stage.id, {
@@ -418,6 +483,7 @@ export function TeacherLessonDetailView({
       description: data.description,
       stage_type: data.stageType,
       content_type: data.contentType,
+      ...(data.config !== undefined ? { config: data.config } : {}),
     });
     setStages((prev) => prev.map((s) => s.id === updated.id ? updated : s));
     setStageModal({ mode: "closed" });
