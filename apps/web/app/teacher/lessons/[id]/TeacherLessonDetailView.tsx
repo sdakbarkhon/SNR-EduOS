@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
-  Trash2, Upload, Play, Square, Clock, AlertCircle, CalendarX,
+  Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock,
 } from "lucide-react";
@@ -13,7 +14,7 @@ import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
-  getSubjectStyle, startLesson, endLesson, getLessonExcuseRequests,
+  getSubjectStyle, getLessonExcuseRequests,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -27,6 +28,7 @@ import { AttendanceRollCall } from "./AttendanceRollCall";
 import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { LessonEndReminderModal } from "./LessonEndReminderModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -63,7 +65,7 @@ type ModalStep = 1 | 2 | 3;
 
 const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
-  "presentation", "code", "scratch", "tinkercad",
+  "code", "scratch", "tinkercad",
   "app_inventor", "code_monkey", "quiz_qia", "quiz_kahoot",
 ];
 
@@ -89,19 +91,26 @@ function StageModal({
   const existing = isEdit ? modalState.stage : null;
 
   const [step, setStep] = useState<ModalStep>(isEdit ? 3 : 1);
-  const [stageType, setStageType] = useState<LessonStageType>(existing?.stage_type ?? "theory");
+  const [stageType, setStageType] = useState<LessonStageType | null>(isEdit ? (existing?.stage_type ?? "theory") : null);
   const [contentType, setContentType] = useState<LessonContentType | null>(existing?.content_type ?? null);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
   const [saving, setSaving] = useState(false);
+  const [stepError, setStepError] = useState("");
 
-  const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : TASK_CONTENT_TYPES;
+  const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
+
+  function handleNext() {
+    if (!stageType) { setStepError("Выбери тип этапа"); return; }
+    setStepError("");
+    setStep(2);
+  }
 
   async function handleSave() {
-    if (!title.trim()) return;
+    if (!stageType || !title.trim()) return;
     setSaving(true);
     try {
-      await onSave({ stageType, contentType, title: title.trim(), description: desc.trim() || null });
+      await onSave({ stageType: stageType as LessonStageType, contentType, title: title.trim(), description: desc.trim() || null });
     } finally {
       setSaving(false);
     }
@@ -165,12 +174,15 @@ function StageModal({
           {!isEdit && step >= 1 && (
             <div>
               {step < 2 ? (
-                <button
-                  onClick={() => setStep(2)}
-                  className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
-                >
-                  Далее →
-                </button>
+                <div>
+                  <button
+                    onClick={handleNext}
+                    className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Далее →
+                  </button>
+                  {stepError && <p className="mt-1.5 text-xs text-red-500">{stepError}</p>}
+                </div>
               ) : (
                 <>
                   <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep2Title}</p>
@@ -242,7 +254,7 @@ function StageModal({
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !title.trim()}
+                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType))}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-50"
                 >
                   {saving ? "Сохранение…" : isEdit ? d.stageSaveBtn2 : d.stageAddConfirmBtn}
@@ -293,21 +305,18 @@ export function TeacherLessonDetailView({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const db = createClient();
+  const router = useRouter();
+  const rollCallRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<LessonStatus>(lesson.status);
-  const [startedAt, setStartedAt] = useState<string | null>(lesson.started_at);
-  const [endedAt, setEndedAt] = useState<string | null>(lesson.ended_at);
-  const [statusLoading, setStatusLoading] = useState(false);
+  const [startedAt] = useState<string | null>(lesson.started_at);
+  const [endedAt] = useState<string | null>(lesson.ended_at);
   const [elapsedMin, setElapsedMin] = useState(0);
 
-  const [allMarked, setAllMarked] = useState(false);
   const [unmarkedNames, setUnmarkedNames] = useState<string[]>([]);
-  const handleAttendanceStatus = useCallback((allDone: boolean, names: string[]) => {
-    setAllMarked(allDone);
+  const handleAttendanceStatus = useCallback((_allDone: boolean, names: string[]) => {
     setUnmarkedNames(names);
   }, []);
 
-  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
-  const [incompleteOpen, setIncompleteOpen] = useState(false);
   const [confirmDeleteMatOpen, setConfirmDeleteMatOpen] = useState(false);
   const [matToDelete, setMatToDelete] = useState<LessonMaterial | null>(null);
 
@@ -331,6 +340,14 @@ export function TeacherLessonDetailView({
     reloadExcuses,
   );
 
+  // Auto-refresh when pg_cron changes lesson status (scheduled→in_progress→completed)
+  useRealtimeChannel(
+    `lesson-status-${lesson.id}`,
+    "lessons",
+    `id=eq.${lesson.id}`,
+    () => router.refresh(),
+  );
+
   const excusedMap: Record<string, string> = {};
   for (const e of excuses) excusedMap[e.student_id] = e.reason;
 
@@ -341,46 +358,6 @@ export function TeacherLessonDetailView({
     const id = setInterval(tick, 30000);
     return () => clearInterval(id);
   }, [status, startedAt]);
-
-  async function handleStart() {
-    setStatusLoading(true);
-    try {
-      await startLesson(db, lesson.id);
-      const now = new Date().toISOString();
-      setStatus("in_progress");
-      setStartedAt(now);
-      // Mark start stage completed in local state
-      setStages((prev) => prev.map((s) =>
-        s.stage_role === "start" ? { ...s, is_completed: true, completed_at: now } : s
-      ));
-    } catch { /* noop */ } finally { setStatusLoading(false); }
-  }
-
-  function requestEnd() {
-    if (status === "in_progress" && !allMarked && unmarkedNames.length > 0) {
-      setIncompleteOpen(true);
-      return;
-    }
-    setConfirmEndOpen(true);
-  }
-
-  async function handleEnd() {
-    setStatusLoading(true);
-    try {
-      await endLesson(db, lesson.id);
-      const now = new Date().toISOString();
-      setStatus("completed");
-      setEndedAt(now);
-      // Mark summary stage completed in local state
-      setStages((prev) => prev.map((s) =>
-        s.stage_role === "summary" ? { ...s, is_completed: true, completed_at: now } : s
-      ));
-    } catch { /* noop */ } finally {
-      setStatusLoading(false);
-      setConfirmEndOpen(false);
-      setIncompleteOpen(false);
-    }
-  }
 
   async function handleSaveInfo() {
     setInfoSaving(true);
@@ -588,30 +565,20 @@ export function TeacherLessonDetailView({
         );
       })()}
 
-      {/* Status control */}
+      {/* Status indicator (no manual start/end — pg_cron handles transitions) */}
       {status === "scheduled" && (
-        <div className="flex items-center justify-between rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4">
-          <p className="text-sm text-yellow-800">Урок запланирован. Нажмите когда начнётся.</p>
-          <button
-            onClick={handleStart} disabled={statusLoading}
-            className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-green-500/25 hover:bg-green-700 active:scale-95 disabled:opacity-50"
-          >
-            <Play className="h-4 w-4 fill-white" /> Начать урок
-          </button>
+        <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
+          <Clock className="h-4 w-4 shrink-0 text-blue-500" />
+          <p className="text-sm text-blue-800">{dl.scheduledAutoNote}</p>
         </div>
       )}
       {status === "in_progress" && (
-        <div className="flex items-center justify-between rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
-          <p className="text-sm text-green-800 flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Урок идёт. Длится {elapsedMin} мин.
+        <div className="flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
+          <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-green-500" />
+          <p className="text-sm text-green-800">
+            {dl.inProgressAutoNote}{" "}
+            {elapsedMin > 0 && dl.inProgressMins.replace("{n}", String(elapsedMin))}
           </p>
-          <button
-            onClick={requestEnd} disabled={statusLoading}
-            className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-red-500/25 hover:bg-red-700 active:scale-95 disabled:opacity-50"
-          >
-            <Square className="h-4 w-4 fill-white" /> Закончить урок
-          </button>
         </div>
       )}
       {status === "completed" && (
@@ -631,6 +598,7 @@ export function TeacherLessonDetailView({
 
       {/* Roll call */}
       {(status === "in_progress" || status === "completed") && (
+        <div ref={rollCallRef}>
         <AttendanceRollCall
           lessonId={lesson.id}
           teacherId={teacher.id}
@@ -638,6 +606,7 @@ export function TeacherLessonDetailView({
           excused={excusedMap}
           onStatusChange={handleAttendanceStatus}
         />
+        </div>
       )}
 
       {/* Raised hands */}
@@ -732,13 +701,15 @@ export function TeacherLessonDetailView({
 
           {/* Middle stages */}
           {middleStages.length === 0 ? (
-            <div
-              onClick={() => setStageModal({ mode: "add" })}
-              className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-6 text-slate-400 transition-all hover:border-blue-300 hover:text-blue-500"
-            >
-              <Plus className="h-5 w-5" />
-              <span className="text-sm">{dl.stageAddBtn}</span>
-            </div>
+            !isLessonCompleted && (
+              <div
+                onClick={() => setStageModal({ mode: "add" })}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-6 text-slate-400 transition-all hover:border-blue-300 hover:text-blue-500"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="text-sm">{dl.stageAddBtn}</span>
+              </div>
+            )
           ) : (
             middleStages.map((stage, idx) => (
               <div
@@ -971,39 +942,18 @@ export function TeacherLessonDetailView({
         cancelText={d.common.cancel}
       />
 
-      {/* Incomplete attendance modal */}
-      <ConfirmModal
-        open={incompleteOpen}
-        onClose={() => setIncompleteOpen(false)}
-        title="Перекличка не завершена"
-        message={`Отметь всех учеников перед завершением урока. Не отмечено: ${unmarkedNames.length}`}
-        icon={<AlertCircle className="h-6 w-6 text-orange-500" />}
-        variant="warning"
-        confirmText="Понятно"
-      >
-        {unmarkedNames.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {unmarkedNames.map((name) => (
-              <li key={name} className="flex items-center gap-2 text-[13px] text-gray-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
-                {name}
-              </li>
-            ))}
-          </ul>
-        )}
-      </ConfirmModal>
-
-      {/* Confirm end lesson */}
-      <ConfirmModal
-        open={confirmEndOpen}
-        onClose={() => setConfirmEndOpen(false)}
-        onConfirm={handleEnd}
-        title={d.teacher.endLessonConfirmTitle}
-        message={d.teacher.endLessonConfirmMsg}
-        variant="danger"
-        confirmText="Закончить"
-        cancelText={d.common.cancel}
-      />
+      {/* 5-min reminder modal (only while in_progress) */}
+      {status === "in_progress" && mounted && (
+        <LessonEndReminderModal
+          lessonId={lesson.id}
+          endsAt={lesson.ends_at}
+          unmarkedNames={unmarkedNames}
+          status={status}
+          onScrollToRollCall={() =>
+            rollCallRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        />
+      )}
 
       {/* Confirm delete material */}
       <ConfirmModal

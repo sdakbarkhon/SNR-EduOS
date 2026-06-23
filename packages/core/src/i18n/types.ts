@@ -480,6 +480,15 @@ export interface Dictionary {
     materialTeacherOnlyBadge: string;  // "Только для учителя"
     bannerStarted: string;             // "Урок начался!"
     bannerGo: string;                  // "Перейти →"
+    // Reminder modal (teacher, 5 min before end)
+    reminderTitle: string;             // "До конца урока 5 минут"
+    reminderBody: string;              // "У вас осталась неоконченная перекличка..."
+    reminderUnmarked: string;          // "Не отмечены:"
+    reminderGoToRollCall: string;      // "Перейти к перекличке"
+    // Lesson auto-status (pg_cron, no manual start/end)
+    scheduledAutoNote: string;         // "Урок начнётся автоматически по расписанию"
+    inProgressAutoNote: string;        // "Урок идёт."
+    inProgressMins: string;            // "Длится {n} мин."
   };
   teacher: {
     role: string;

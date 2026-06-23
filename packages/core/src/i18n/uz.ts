@@ -400,7 +400,7 @@ export const uz: Dictionary = {
     startsInLabel: "Dars {time} dan keyin boshlanadi",
     goToLesson: "O'tish",
     goToLessonNow: "hozir",
-    countdownNote: "Dars rejimiga {n} soniyada o'tiladi",
+    countdownNote: "Dars rejimiga o'tiladi",
     excuse: {
       button: "Ruxsat so'rash",
       title: "Darsdan ruxsat so'rash",
@@ -484,6 +484,13 @@ export const uz: Dictionary = {
     materialTeacherOnlyBadge: "Faqat o'qituvchi",
     bannerStarted: "Dars boshlandi!",
     bannerGo: "O'tish →",
+    reminderTitle: "Dars tugashiga 5 daqiqa qoldi",
+    reminderBody: "Tugallanmagan davomatni tekshiring. Dars tugashidan oldin barcha o'quvchilarni belgilang.",
+    reminderUnmarked: "Belgilanmagan:",
+    reminderGoToRollCall: "Davomat tekshirishga o'tish",
+    scheduledAutoNote: "Dars jadval bo'yicha avtomatik boshlanadi.",
+    inProgressAutoNote: "Dars ketmoqda.",
+    inProgressMins: "{n} daqiqa davom etmoqda.",
   },
   teacher: {
     role: "O'qituvchi",

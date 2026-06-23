@@ -400,7 +400,7 @@ export const en: Dictionary = {
     startsInLabel: "Lesson starts in {time}",
     goToLesson: "Go",
     goToLessonNow: "now",
-    countdownNote: "Switching to lesson mode in {n} seconds",
+    countdownNote: "Switching to lesson mode",
     excuse: {
       button: "Ask to be excused",
       title: "Ask to be excused",
@@ -484,6 +484,13 @@ export const en: Dictionary = {
     materialTeacherOnlyBadge: "Teacher only",
     bannerStarted: "Lesson started!",
     bannerGo: "Go →",
+    reminderTitle: "5 minutes until lesson ends",
+    reminderBody: "You have an unfinished roll call. Mark all students before the lesson ends.",
+    reminderUnmarked: "Not marked:",
+    reminderGoToRollCall: "Go to roll call",
+    scheduledAutoNote: "Lesson will start automatically on schedule.",
+    inProgressAutoNote: "Lesson is in progress.",
+    inProgressMins: "Running {n} min.",
   },
   teacher: {
     role: "Teacher",

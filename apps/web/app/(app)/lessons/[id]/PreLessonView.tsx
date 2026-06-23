@@ -221,9 +221,7 @@ export function PreLessonView({
               </div>
             </div>
             <p className="max-w-[180px] text-center text-[12px] leading-snug text-white/70">
-              {secsUntil !== null
-                ? dl.countdownNote.replace("{n}", String(secsUntil))
-                : dl.startsInLabel.replace("{time}", "—")}
+              {dl.countdownNote}
             </p>
             <button
               onClick={() => router.refresh()}

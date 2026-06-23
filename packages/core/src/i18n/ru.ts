@@ -400,7 +400,7 @@ export const ru: Dictionary = {
     startsInLabel: "Урок начнётся через {time}",
     goToLesson: "Перейти",
     goToLessonNow: "сейчас",
-    countdownNote: "Переход в режим урока через {n} секунд",
+    countdownNote: "Переход в режим урока через",
     excuse: {
       button: "Отпроситься",
       title: "Отпроситься с урока",
@@ -484,6 +484,13 @@ export const ru: Dictionary = {
     materialTeacherOnlyBadge: "Только для учителя",
     bannerStarted: "Урок начался!",
     bannerGo: "Перейти →",
+    reminderTitle: "До конца урока 5 минут",
+    reminderBody: "У вас осталась неоконченная перекличка. Отметьте всех учеников перед окончанием урока.",
+    reminderUnmarked: "Не отмечены:",
+    reminderGoToRollCall: "Перейти к перекличке",
+    scheduledAutoNote: "Урок начнётся автоматически по расписанию.",
+    inProgressAutoNote: "Урок идёт.",
+    inProgressMins: "Длится {n} мин.",
   },
   teacher: {
     role: "Учитель",
