@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -1558,6 +1558,305 @@ export const getStageSubmissions = async (
     .order("completed_at");
   if (error) throw error;
   return (data ?? []) as Array<LessonStageProgress & { student: { id: string; full_name: string; avatar_url: string | null } }>;
+};
+
+// ─── QUIZZES: QIA test + Kahoot game (migration 39, Prompt 6) ────────────────
+
+/** % правильных → оценка 1–5 (общая шкала для QIA и Kahoot). */
+export function gradeFromPercent(pct: number): number {
+  if (pct >= 90) return 5;
+  if (pct >= 75) return 4;
+  if (pct >= 60) return 3;
+  if (pct >= 40) return 2;
+  return 1;
+}
+
+/** Kahoot: баллы за ответ. Верно мгновенно → 1000, на последней секунде → ~500, неверно → 0. */
+export function kahootScore(isCorrect: boolean, responseTimeMs: number, timeLimitSeconds: number): number {
+  if (!isCorrect) return 0;
+  const limitMs = Math.max(1, timeLimitSeconds) * 1000;
+  const frac = Math.min(1, Math.max(0, responseTimeMs / limitMs));
+  return Math.round(1000 * (1 - frac / 2));
+}
+
+// ── Teacher: question CRUD (RLS enforces stage ownership) ──
+
+export const getQuizQuestions = async (db: Db, stageId: string): Promise<QuizQuestion[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("quiz_questions").select("*").eq("stage_id", stageId).order("position");
+  if (error) throw error;
+  return (data ?? []) as QuizQuestion[];
+};
+
+export const createQuizQuestion = async (
+  db: Db, stageId: string, position: number, input: QuizQuestionInput,
+): Promise<QuizQuestion> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("quiz_questions").insert({
+    stage_id: stageId,
+    position,
+    question_text: input.question_text,
+    options: input.options,
+    correct_option_index: input.correct_option_index,
+    points: input.points ?? 1,
+    time_per_question_seconds: input.time_per_question_seconds ?? 20,
+  }).select("*").single();
+  if (error) throw error;
+  return data as QuizQuestion;
+};
+
+export const updateQuizQuestion = async (
+  db: Db, questionId: string, patch: Partial<QuizQuestionInput> & { position?: number },
+): Promise<QuizQuestion> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("quiz_questions").update(patch).eq("id", questionId).select("*").single();
+  if (error) throw error;
+  return data as QuizQuestion;
+};
+
+export const deleteQuizQuestion = async (db: Db, questionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("quiz_questions").delete().eq("id", questionId);
+  if (error) throw error;
+};
+
+/** Полностью заменяет вопросы этапа (delete-all + insert) — для сохранения из StageModal. */
+export const replaceQuizQuestions = async (
+  db: Db, stageId: string, questions: QuizQuestionInput[],
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  await db2.from("quiz_questions").delete().eq("stage_id", stageId);
+  if (questions.length === 0) return;
+  const rows = questions.map((q, i) => ({
+    stage_id: stageId,
+    position: i,
+    question_text: q.question_text,
+    options: q.options,
+    correct_option_index: q.correct_option_index,
+    points: q.points ?? 1,
+    time_per_question_seconds: q.time_per_question_seconds ?? 20,
+  }));
+  const { error } = await db2.from("quiz_questions").insert(rows);
+  if (error) throw error;
+};
+
+// ── QIA: student self-paced attempt ──
+
+export const getStudentQuizAttempt = async (
+  db: Db, stageId: string, studentId: string,
+): Promise<QuizAttempt | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any)
+    .from("quiz_attempts").select("*").eq("stage_id", stageId).eq("student_id", studentId).maybeSingle();
+  return (data ?? null) as QuizAttempt | null;
+};
+
+/** Создаёт (или возвращает существующую) попытку прохождения. */
+export const startQuizAttempt = async (
+  db: Db, stageId: string, studentId: string, totalQuestions: number,
+): Promise<QuizAttempt> => {
+  const existing = await getStudentQuizAttempt(db, stageId, studentId);
+  if (existing) return existing;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("quiz_attempts").insert({
+    stage_id: stageId, student_id: studentId, total_questions: totalQuestions,
+  }).select("*").single();
+  if (error) throw error;
+  return data as QuizAttempt;
+};
+
+/** Сохраняет выбранный вариант (мгновенно, чтобы не потерять при обрыве связи). */
+export const submitQuizAnswer = async (
+  db: Db, attemptId: string, questionId: string, selectedIndex: number | null,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("quiz_answers").upsert({
+    attempt_id: attemptId,
+    question_id: questionId,
+    selected_option_index: selectedIndex,
+    answered_at: new Date().toISOString(),
+  }, { onConflict: "attempt_id,question_id", ignoreDuplicates: false });
+  if (error) throw error;
+};
+
+/** Финализация QIA: считает is_correct по каждому ответу, оценку по % и пишет в lesson_stage_progress. */
+export const finalizeQuizAttempt = async (
+  db: Db, attemptId: string, studentId: string,
+): Promise<{ correct: number; total: number; grade: number }> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: attempt } = await db2.from("quiz_attempts").select("*").eq("id", attemptId).single();
+  const stageId = attempt.stage_id as string;
+  const questions = await getQuizQuestions(db, stageId);
+  const { data: answers } = await db2.from("quiz_answers").select("*").eq("attempt_id", attemptId);
+  const answerMap = new Map<string, QuizAnswer>(((answers ?? []) as QuizAnswer[]).map((a) => [a.question_id, a]));
+
+  let correct = 0;
+  let totalScore = 0;
+  for (const q of questions) {
+    const a = answerMap.get(q.id);
+    const isCorrect = !!a && a.selected_option_index === q.correct_option_index;
+    if (isCorrect) { correct += 1; totalScore += q.points; }
+    if (a) {
+      await db2.from("quiz_answers").update({ is_correct: isCorrect, score: isCorrect ? q.points : 0 }).eq("id", a.id);
+    }
+  }
+  const total = questions.length;
+  const grade = gradeFromPercent(total > 0 ? (correct / total) * 100 : 0);
+
+  await db2.from("quiz_attempts").update({
+    finished_at: new Date().toISOString(),
+    correct_count: correct,
+    total_score: totalScore,
+    total_questions: total,
+    is_finalized: true,
+  }).eq("id", attemptId);
+
+  await db2.from("lesson_stage_progress").upsert({
+    stage_id: stageId,
+    student_id: studentId,
+    is_completed: true,
+    completed_at: new Date().toISOString(),
+    grade,
+    submission_data: { kind: "quiz", correct, total, total_score: totalScore },
+  }, { onConflict: "stage_id,student_id", ignoreDuplicates: false });
+
+  return { correct, total, grade };
+};
+
+/** Детали попытки: вопросы + ответы ученика (для экрана результата / read-only). */
+export const getQuizAttemptResults = async (
+  db: Db, attemptId: string,
+): Promise<{ questions: QuizQuestion[]; answers: QuizAnswer[] }> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: attempt } = await db2.from("quiz_attempts").select("stage_id").eq("id", attemptId).single();
+  const questions = await getQuizQuestions(db, attempt.stage_id);
+  const { data: answers } = await db2.from("quiz_answers").select("*").eq("attempt_id", attemptId);
+  return { questions, answers: (answers ?? []) as QuizAnswer[] };
+};
+
+// ── Kahoot: live game (teacher-driven) ──
+
+export const getKahootSession = async (db: Db, stageId: string): Promise<KahootSession | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("kahoot_sessions").select("*").eq("stage_id", stageId).maybeSingle();
+  return (data ?? null) as KahootSession | null;
+};
+
+/** Учитель открывает игру: пересоздаёт сессию в lobby (reset при перезапуске). */
+export const createKahootSession = async (db: Db, stageId: string): Promise<KahootSession> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  await db2.from("kahoot_sessions").delete().eq("stage_id", stageId);
+  const { data, error } = await db2.from("kahoot_sessions").insert({
+    stage_id: stageId, status: "lobby", current_question_index: -1,
+  }).select("*").single();
+  if (error) throw error;
+  return data as KahootSession;
+};
+
+export const startKahootGame = async (db: Db, sessionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("kahoot_sessions").update({
+    status: "question_active", current_question_index: 0,
+    started_at: new Date().toISOString(), question_started_at: new Date().toISOString(),
+  }).eq("id", sessionId);
+  if (error) throw error;
+};
+
+export const showNextKahootQuestion = async (db: Db, sessionId: string, nextIndex: number): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("kahoot_sessions").update({
+    status: "question_active", current_question_index: nextIndex,
+    question_started_at: new Date().toISOString(),
+  }).eq("id", sessionId);
+  if (error) throw error;
+};
+
+export const revealKahootAnswer = async (db: Db, sessionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("kahoot_sessions").update({ status: "question_revealed" }).eq("id", sessionId);
+  if (error) throw error;
+};
+
+/** Ученик отвечает: считает is_correct + баллы по формуле скорости, пишет ответ и обновляет попытку. */
+export const submitKahootAnswer = async (
+  db: Db,
+  { stageId, attemptId, questionId, selectedIndex, isCorrect, responseTimeMs, timeLimitSeconds }: {
+    stageId: string; attemptId: string; questionId: string;
+    selectedIndex: number; isCorrect: boolean; responseTimeMs: number; timeLimitSeconds: number;
+  },
+): Promise<number> => {
+  void stageId;
+  const score = kahootScore(isCorrect, responseTimeMs, timeLimitSeconds);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { error } = await db2.from("quiz_answers").upsert({
+    attempt_id: attemptId,
+    question_id: questionId,
+    selected_option_index: selectedIndex,
+    is_correct: isCorrect,
+    response_time_ms: responseTimeMs,
+    score,
+    answered_at: new Date().toISOString(),
+  }, { onConflict: "attempt_id,question_id", ignoreDuplicates: false });
+  if (error) throw error;
+  return score;
+};
+
+/** Лидерборд: сумма баллов по каждому ученику в этапе (по убыванию). */
+export const getKahootLeaderboard = async (db: Db, stageId: string): Promise<QuizLeaderboardEntry[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any)
+    .from("quiz_attempts")
+    .select("student_id, student:students(full_name), answers:quiz_answers(score, is_correct)")
+    .eq("stage_id", stageId);
+  type Raw = { student_id: string; student: { full_name: string } | null; answers: Array<{ score: number; is_correct: boolean | null }> };
+  const rows = ((data ?? []) as Raw[]).map((r) => ({
+    student_id: r.student_id,
+    full_name: r.student?.full_name ?? "—",
+    total_score: r.answers.reduce((s, a) => s + (a.score ?? 0), 0),
+    correct_count: r.answers.filter((a) => a.is_correct).length,
+  }));
+  rows.sort((a, b) => b.total_score - a.total_score);
+  return rows;
+};
+
+/** Учитель завершает игру: статус finished + оценка каждому ученику по % правильных. */
+export const finishKahootGame = async (db: Db, sessionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: session } = await db2.from("kahoot_sessions").select("stage_id").eq("id", sessionId).single();
+  const stageId = session.stage_id as string;
+
+  await db2.from("kahoot_sessions").update({ status: "finished", finished_at: new Date().toISOString() }).eq("id", sessionId);
+
+  const total = (await getQuizQuestions(db, stageId)).length;
+  const { data: attempts } = await db2.from("quiz_attempts")
+    .select("id, student_id, answers:quiz_answers(score, is_correct)").eq("stage_id", stageId);
+
+  type Raw = { id: string; student_id: string; answers: Array<{ score: number; is_correct: boolean | null }> };
+  for (const a of (attempts ?? []) as Raw[]) {
+    const correct = a.answers.filter((x) => x.is_correct).length;
+    const totalScore = a.answers.reduce((s, x) => s + (x.score ?? 0), 0);
+    const grade = gradeFromPercent(total > 0 ? (correct / total) * 100 : 0);
+    await db2.from("quiz_attempts").update({
+      correct_count: correct, total_score: totalScore, total_questions: total,
+      is_finalized: true, finished_at: new Date().toISOString(),
+    }).eq("id", a.id);
+    await db2.from("lesson_stage_progress").upsert({
+      stage_id: stageId,
+      student_id: a.student_id,
+      is_completed: true,
+      completed_at: new Date().toISOString(),
+      grade,
+      submission_data: { kind: "kahoot", correct, total, total_score: totalScore },
+    }, { onConflict: "stage_id,student_id", ignoreDuplicates: false });
+  }
 };
 
 type TeacherLessonListItem = {

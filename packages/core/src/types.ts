@@ -140,6 +140,76 @@ export interface ExternalServiceSubmission {
   last_opened_at?: string;       // when the student opened the external service
 }
 
+// ── Quizzes: QIA test + Kahoot game (migration 39, Prompt 6) ─────────────────
+export type KahootStatus = 'lobby' | 'question_active' | 'question_revealed' | 'finished';
+
+export type QuizQuestion = {
+  id: string;
+  stage_id: string;
+  position: number;
+  question_text: string;
+  options: string[];
+  correct_option_index: number;
+  points: number;
+  time_per_question_seconds: number;
+};
+
+export type QuizAttempt = {
+  id: string;
+  stage_id: string;
+  student_id: string;
+  started_at: string;
+  finished_at: string | null;
+  total_questions: number;
+  correct_count: number;
+  total_score: number;
+  is_finalized: boolean;
+};
+
+export type QuizAnswer = {
+  id: string;
+  attempt_id: string;
+  question_id: string;
+  selected_option_index: number | null;
+  is_correct: boolean | null;
+  answered_at: string;
+  response_time_ms: number | null;
+  score: number;
+};
+
+export type KahootSession = {
+  id: string;
+  stage_id: string;
+  started_at: string | null;
+  finished_at: string | null;
+  current_question_index: number;
+  question_started_at: string | null;
+  status: KahootStatus;
+};
+
+/** Stored in lesson_stages.config for content_type='quiz_qia' / 'quiz_kahoot'. */
+export type QuizConfigForStage = {
+  time_limit_minutes?: number;     // QIA optional countdown
+  questions_per_attempt?: number;  // QIA: all or N random (not used in MVP)
+  points_per_question?: number;    // QIA: points multiplier (default 1)
+};
+
+export type QuizLeaderboardEntry = {
+  student_id: string;
+  full_name: string;
+  total_score: number;
+  correct_count: number;
+};
+
+/** Input for a single quiz question in the teacher builder. */
+export type QuizQuestionInput = {
+  question_text: string;
+  options: string[];
+  correct_option_index: number;
+  points?: number;
+  time_per_question_seconds?: number;
+};
+
 export type LessonMaterial = {
   id: string;
   lesson_id: string;
