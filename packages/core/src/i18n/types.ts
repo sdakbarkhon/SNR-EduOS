@@ -577,6 +577,73 @@ export interface Dictionary {
       graded: string;
       teacherComment: string;
     };
+    // Quizzes: QIA test + Kahoot game (Prompt 6)
+    quiz: {
+      // builder (teacher)
+      addQuestion: string;
+      question: string;            // "Вопрос {n}"
+      questionText: string;
+      questionPlaceholder: string;
+      option: string;             // "Вариант"
+      correct: string;            // "Правильный"
+      secondsPerQuestion: string; // Kahoot
+      limitTime: string;          // QIA checkbox
+      minutesForTest: string;     // QIA
+      pointsPerCorrect: string;   // QIA
+      deleteQuestion: string;
+      minOneQuestion: string;
+      invalidQuestions: string;
+      // QIA player
+      test: string;
+      time: string;
+      questionOf: string;         // "Вопрос {n} из {total}"
+      prev: string;
+      next: string;
+      finish: string;
+      confirmFinish: string;
+      resultTitle: string;        // "Молодец!"
+      youAnsweredCorrectly: string;
+      ofTotal: string;            // "{correct} из {total}"
+      grade: string;
+      review: string;
+      correctLabel: string;       // "правильно"
+      correctAnswerWas: string;   // "правильный ответ —"
+      closeReturn: string;
+      start: string;
+      timeUp: string;
+      open: string;               // student open button
+      // Kahoot common
+      players: string;
+      waitingStudents: string;
+      startGame: string;
+      answeredCount: string;      // "Ответили"
+      correctAnswer: string;
+      topThree: string;
+      nextQuestion: string;
+      gameOver: string;
+      winner: string;
+      points: string;
+      leaderboard: string;
+      close: string;
+      launchGame: string;
+      // Kahoot student
+      waitingTeacher: string;
+      teacherWillStart: string;
+      ready: string;
+      answerRecorded: string;
+      waitingOthers: string;
+      yourAnswer: string;
+      correctPlus: string;        // "Правильно! +{n}"
+      wrongAnswer: string;
+      totalScore: string;
+      yourPlace: string;          // "Твоё место"
+      waitingNext: string;
+      yourResult: string;
+      place: string;              // "место"
+      you: string;                // "ТЫ"
+      reviewSubmissions: string;  // teacher: see QIA results
+      noSubmissions: string;
+    };
   };
   teacher: {
     role: string;

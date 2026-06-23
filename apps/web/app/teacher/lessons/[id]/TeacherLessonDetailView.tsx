@@ -14,13 +14,16 @@ import {
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   getSubjectStyle, getLessonExcuseRequests,
+  getQuizQuestions, replaceQuizQuestions,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
   LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
   CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
+  QuizQuestionInput, QuizConfigForStage,
 } from "@snr/core";
 import { SERVICE_CONFIG, validateServiceUrl, isExternalService } from "@/lib/external-services";
+import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDictionary } from "@snr/core";
@@ -78,6 +81,7 @@ function StageModal({
   onClose,
   onSave,
   contentLabel,
+  db,
 }: {
   modalState: Extract<StageModalState, { mode: "add" | "edit" }>;
   onClose: () => void;
@@ -87,8 +91,11 @@ function StageModal({
     title: string;
     description: string | null;
     config?: Record<string, unknown>;
+    quizQuestions?: QuizQuestionInput[];
   }) => Promise<void>;
   contentLabel: (ct: LessonContentType) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).lesson;
@@ -134,6 +141,33 @@ function StageModal({
     extUrlValid && (externalMeta?.embedSupported || reqLink || reqScreenshot)
   );
 
+  // quiz config (quiz_qia / quiz_kahoot)
+  const isQqia = contentType === "quiz_qia";
+  const isKahoot = contentType === "quiz_kahoot";
+  const isQuiz = isQqia || isKahoot;
+  const existingQuizCfg = (existing?.config ?? {}) as QuizConfigForStage;
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestionInput[]>([]);
+  const [quizTimeLimited, setQuizTimeLimited] = useState<boolean>(existingQuizCfg.time_limit_minutes != null);
+  const [quizMinutes, setQuizMinutes] = useState<number>(existingQuizCfg.time_limit_minutes ?? 5);
+  const [quizPoints, setQuizPoints] = useState<number>(existingQuizCfg.points_per_question ?? 1);
+
+  useEffect(() => {
+    if (isEdit && isQuiz && existing) {
+      getQuizQuestions(db, existing.id).then((qs) => {
+        setQuizQuestions(qs.map((q) => ({
+          question_text: q.question_text,
+          options: [0, 1, 2, 3].map((i) => q.options[i] ?? ""),
+          correct_option_index: q.correct_option_index,
+          points: q.points,
+          time_per_question_seconds: q.time_per_question_seconds,
+        })));
+      }).catch(() => null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const quizReady = !isQuiz || quizQuestionsValid(quizQuestions);
+
   const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
 
   function handleNext() {
@@ -145,6 +179,7 @@ function StageModal({
   async function handleSave() {
     if (!stageType || !title.trim()) return;
     let config: Record<string, unknown> | undefined;
+    let quizQuestionsOut: QuizQuestionInput[] | undefined;
     if (isCode) {
       config = { language: codeLang, starter_code: starterCode, expected_output: expectedOutput.trim() || undefined };
     } else if (isExternal) {
@@ -153,10 +188,18 @@ function StageModal({
         ...(externalMeta?.embedSupported ? { embed_url: extEmbedUrl } : {}),
         ...(!externalMeta?.embedSupported ? { requires_link: reqLink, requires_screenshot: reqScreenshot } : {}),
       };
+    } else if (isQuiz) {
+      config = isQqia
+        ? { time_limit_minutes: quizTimeLimited ? quizMinutes : undefined, points_per_question: quizPoints }
+        : {};
+      quizQuestionsOut = quizQuestions.map((q) => ({
+        ...q,
+        options: q.options.map((o) => o.trim()).filter((_, i) => i < 4),
+      }));
     }
     setSaving(true);
     try {
-      await onSave({ stageType: stageType as LessonStageType, contentType, title: title.trim(), description: desc.trim() || null, config });
+      await onSave({ stageType: stageType as LessonStageType, contentType, title: title.trim(), description: desc.trim() || null, config, quizQuestions: quizQuestionsOut });
     } finally {
       setSaving(false);
     }
@@ -170,7 +213,7 @@ function StageModal({
       style={{ zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
     >
       <div
-        className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${isCode ? "max-w-2xl" : "max-w-lg"}`}
+        className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${isCode || isQuiz ? "max-w-2xl" : "max-w-lg"}`}
         style={{ background: "var(--surface-1)" }}
       >
         {/* Header */}
@@ -259,7 +302,7 @@ function StageModal({
               {!isEdit && <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep3Title}</p>}
 
               {/* Stub note: still a placeholder for content types we haven't built yet */}
-              {contentType && contentType !== "presentation" && !isCode && !isExternal && (
+              {contentType && contentType !== "presentation" && !isCode && !isExternal && !isQuiz && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                   {d.stageContentStubNote}
                 </div>
@@ -313,6 +356,38 @@ function StageModal({
                       )}
                       <p className="mt-2 text-[11px] text-slate-400">{d.external.mustAttachHint}</p>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Quiz stage: question builder + (QIA) options */}
+              {isQuiz && (
+                <div className="mb-4 space-y-4">
+                  {isQqia && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/5">
+                      <label className="mb-2 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input type="checkbox" checked={quizTimeLimited} onChange={(e) => setQuizTimeLimited(e.target.checked)} className="h-4 w-4 rounded" />
+                        {d.quiz.limitTime}
+                      </label>
+                      {quizTimeLimited && (
+                        <div className="mb-2 flex items-center gap-2">
+                          <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">{d.quiz.minutesForTest}</label>
+                          <input type="number" min={1} max={120} value={quizMinutes} onChange={(e) => setQuizMinutes(Math.max(1, Number(e.target.value) || 5))}
+                            className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/5" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">{d.quiz.pointsPerCorrect}</label>
+                        <input type="number" min={1} max={100} value={quizPoints} onChange={(e) => setQuizPoints(Math.max(1, Number(e.target.value) || 1))}
+                          className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/5" />
+                      </div>
+                    </div>
+                  )}
+                  <QuizBuilder questions={quizQuestions} onChange={setQuizQuestions} isKahoot={isKahoot} />
+                  {!quizReady && (
+                    <p className="text-xs text-red-500">
+                      {quizQuestions.length === 0 ? d.quiz.minOneQuestion : d.quiz.invalidQuestions}
+                    </p>
                   )}
                 </div>
               )}
@@ -401,7 +476,7 @@ function StageModal({
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType)) || !externalReady}
+                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType)) || !externalReady || !quizReady}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-50"
                 >
                   {saving ? "Сохранение…" : isEdit ? d.stageSaveBtn2 : d.stageAddConfirmBtn}
@@ -546,8 +621,12 @@ export function TeacherLessonDetailView({
     title: string;
     description: string | null;
     config?: Record<string, unknown>;
+    quizQuestions?: QuizQuestionInput[];
   }) {
     const newStage = await addLessonStage(db, lesson.id, data);
+    if (data.quizQuestions) {
+      await replaceQuizQuestions(db, newStage.id, data.quizQuestions).catch(() => null);
+    }
     setStages((prev) => {
       const withoutSummary = prev.filter((s) => s.stage_role !== "summary");
       const summary = prev.find((s) => s.stage_role === "summary");
@@ -562,6 +641,7 @@ export function TeacherLessonDetailView({
     title: string;
     description: string | null;
     config?: Record<string, unknown>;
+    quizQuestions?: QuizQuestionInput[];
   }) {
     if (stageModal.mode !== "edit") return;
     const updated = await updateLessonStage(db, stageModal.stage.id, {
@@ -571,6 +651,9 @@ export function TeacherLessonDetailView({
       content_type: data.contentType,
       ...(data.config !== undefined ? { config: data.config } : {}),
     });
+    if (data.quizQuestions) {
+      await replaceQuizQuestions(db, updated.id, data.quizQuestions).catch(() => null);
+    }
     setStages((prev) => prev.map((s) => s.id === updated.id ? updated : s));
     setStageModal({ mode: "closed" });
   }
@@ -1110,6 +1193,7 @@ export function TeacherLessonDetailView({
           onClose={() => setStageModal({ mode: "closed" })}
           onSave={stageModal.mode === "add" ? handleAddStage : handleEditStage}
           contentLabel={contentLabel}
+          db={db}
         />
       )}
 
