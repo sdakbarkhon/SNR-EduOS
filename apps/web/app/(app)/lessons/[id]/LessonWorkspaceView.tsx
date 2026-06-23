@@ -18,6 +18,7 @@ import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
 import { CodeStageView } from "./CodeStageView";
 import { ExternalStageModal } from "./ExternalStageModal";
+import { QiaQuizModal } from "./QiaQuizModal";
 import { isExternalService } from "@/lib/external-services";
 import { createClient } from "@/lib/supabase/client";
 
@@ -210,6 +211,7 @@ export function LessonWorkspaceView({
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
   const [activeCodeStageId, setActiveCodeStageId] = useState<string | null>(null);
   const [externalStageId, setExternalStageId] = useState<string | null>(null);
+  const [qiaStageId, setQiaStageId] = useState<string | null>(null);
   const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
@@ -279,6 +281,7 @@ export function LessonWorkspaceView({
   const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
   const activeCodeStage = activeCodeStageId ? stages.find((s) => s.id === activeCodeStageId) : null;
   const externalStage = externalStageId ? stages.find((s) => s.id === externalStageId) : null;
+  const qiaStage = qiaStageId ? stages.find((s) => s.id === qiaStageId) : null;
 
   const handleStageSubmitted = useCallback((progress: LessonStageProgress) => {
     setStages((prev) => prev.map((s) => s.id === progress.stage_id ? { ...s, progress } : s));
@@ -578,6 +581,15 @@ export function LessonWorkspaceView({
                             {dl.external.open}
                           </button>
                         )
+                      ) : stage.content_type === "quiz_qia" ? (
+                        mounted && studentId && (
+                          <button
+                            onClick={() => setQiaStageId(stage.id)}
+                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                          >
+                            {dl.quiz.open}
+                          </button>
+                        )
                       ) : (
                         !isGraded && !isSubmitted && mounted && studentId && (
                           <button
@@ -716,6 +728,16 @@ export function LessonWorkspaceView({
           stage={externalStage}
           studentId={studentId}
           onClose={() => setExternalStageId(null)}
+          onSubmitted={handleStageSubmitted}
+        />
+      )}
+
+      {/* QIA quiz modal */}
+      {mounted && qiaStage && studentId && (
+        <QiaQuizModal
+          stage={qiaStage}
+          studentId={studentId}
+          onClose={() => setQiaStageId(null)}
           onSubmitted={handleStageSubmitted}
         />
       )}
