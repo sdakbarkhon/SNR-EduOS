@@ -7,7 +7,7 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Play, Square, Clock, AlertCircle, CalendarX,
   ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -278,6 +278,11 @@ export function TeacherLessonDetailView({
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
+  // Reorder lock: ref = синхронный гард (срабатывает в том же тике, до re-render),
+  // state = визуальный feedback (disabled + spinner). Вместе исключают наложение
+  // двух reorder-операций → bump одной не конфликтует с финалом другой (409).
+  const reorderingRef = useRef(false);
+  const [reorderingStageId, setReorderingStageId] = useState<string | null>(null);
 
   const [materials, setMaterials] = useState<LessonMaterial[]>(lesson.materials);
   const [uploadModal, setUploadModal] = useState(false);
@@ -434,32 +439,46 @@ export function TeacherLessonDetailView({
   }
 
   async function handleMoveStage(stageId: string, direction: "up" | "down") {
-    // ВСЕ middle-этапы (theory + task), строго по position — НЕ по порядку
-    // в массиве state, который дрейфует после оптимистичных обновлений.
-    const middles = stages
-      .filter((s) => s.stage_role === "middle")
-      .sort((a, b) => a.position - b.position);
-    const idx = middles.findIndex((s) => s.id === stageId);
-    if (idx === -1) return;
-    const newIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= middles.length) return;
+    // Синхронный гард: блокирует наложение reorder-операций в одном тике, ещё до
+    // того как сработает re-render с disabled-кнопками. Без этого два быстрых
+    // клика стартуют параллельно → bump одного конфликтует с финалом другого (409).
+    if (reorderingRef.current) return;
+    reorderingRef.current = true;
+    setReorderingStageId(stageId);
+    try {
+      // ВСЕ middle-этапы (theory + task), строго по position — НЕ по порядку
+      // в массиве state, который дрейфует после оптимистичных обновлений.
+      const middles = stages
+        .filter((s) => s.stage_role === "middle")
+        .sort((a, b) => a.position - b.position);
+      const idx = middles.findIndex((s) => s.id === stageId);
+      if (idx === -1) return;
+      const newIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= middles.length) return;
 
-    const reordered = [...middles];
-    const tmp = reordered[idx]!;
-    reordered[idx] = reordered[newIdx]!;
-    reordered[newIdx] = tmp;
-    const orderedIds = reordered.map((s) => s.id);
+      const reordered = [...middles];
+      const tmp = reordered[idx]!;
+      reordered[idx] = reordered[newIdx]!;
+      reordered[newIdx] = tmp;
+      const orderedIds = reordered.map((s) => s.id);
 
-    // Оптимистично: переназначаем position 1..N по новому порядку (мгновенный отклик).
-    const posMap = new Map(reordered.map((s, i) => [s.id, i + 1]));
-    setStages((prev) => prev.map((s) => posMap.has(s.id) ? { ...s, position: posMap.get(s.id)! } : s));
+      // Оптимистично: переназначаем position 1..N по новому порядку (мгновенный отклик).
+      const posMap = new Map(reordered.map((s, i) => [s.id, i + 1]));
+      setStages((prev) => prev.map((s) => posMap.has(s.id) ? { ...s, position: posMap.get(s.id)! } : s));
 
-    // Весь массив middle-ID в новом порядке → bump-стратегия проставит 1..N в БД.
-    await reorderLessonStages(db, lesson.id, orderedIds).catch(() => null);
+      // Весь массив middle-ID в новом порядке → bump-стратегия проставит 1..N в БД.
+      await reorderLessonStages(db, lesson.id, orderedIds);
 
-    // ОБЯЗАТЕЛЬНО перезагрузить из БД — иначе следующий клик считает индексы по
-    // устаревшему порядку массива и Задача «залипает».
-    await reloadStages();
+      // ОБЯЗАТЕЛЬНО перезагрузить из БД — иначе следующий клик считает индексы по
+      // устаревшему порядку массива и Задача «залипает».
+      await reloadStages();
+    } catch (e) {
+      console.error("[reorder] failed:", e);
+      await reloadStages().catch(() => null);
+    } finally {
+      reorderingRef.current = false;
+      setReorderingStageId(null);
+    }
   }
 
   // ── Material CRUD ───────────────────────────────────────────────────────────
@@ -748,22 +767,31 @@ export function TeacherLessonDetailView({
 
                 {/* Actions */}
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => handleMoveStage(stage.id, "up")}
-                    disabled={idx === 0}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10"
-                    title={dl.stageMoveUp}
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleMoveStage(stage.id, "down")}
-                    disabled={idx === middleStages.length - 1}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10"
-                    title={dl.stageMoveDown}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
+                  {reorderingStageId === stage.id ? (
+                    // Спиннер на этапе, по которому идёт reorder
+                    <span className="flex h-7 w-[60px] items-center justify-center text-blue-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleMoveStage(stage.id, "up")}
+                        disabled={idx === 0 || reorderingStageId !== null}
+                        className={`rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10 ${reorderingStageId !== null ? "cursor-not-allowed" : ""}`}
+                        title={dl.stageMoveUp}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveStage(stage.id, "down")}
+                        disabled={idx === middleStages.length - 1 || reorderingStageId !== null}
+                        className={`rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10 ${reorderingStageId !== null ? "cursor-not-allowed" : ""}`}
+                        title={dl.stageMoveDown}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => setStageModal({ mode: "edit", stage })}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-500/10"
