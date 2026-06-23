@@ -489,6 +489,50 @@ export interface Dictionary {
     scheduledAutoNote: string;         // "Урок начнётся автоматически по расписанию"
     inProgressAutoNote: string;        // "Урок идёт."
     inProgressMins: string;            // "Длится {n} мин."
+    // Programming code stages (Prompt 4)
+    code: {
+      backToStages: string;
+      problemStatement: string;
+      language: string;
+      python: string;
+      cpp: string;
+      starterCode: string;
+      starterCodePlaceholder: string;
+      expectedOutput: string;
+      expectedOutputHint: string;
+      editorLabel: string;
+      stdin: string;
+      stdinPlaceholder: string;
+      run: string;
+      running: string;
+      runFirst: string;       // first Pyodide load (5–15s)
+      runningCpp: string;     // sending to Piston
+      output: string;
+      emptyOutput: string;
+      clear: string;
+      submit: string;
+      confirmSubmit: string;
+      submittedWaiting: string;
+      error: string;
+      compileError: string;
+      timeout: string;
+      loading: string;
+      graded: string;
+      teacherComment: string;
+      // teacher review
+      reviewSubmissions: string;
+      noSubmissions: string;
+      openSolution: string;
+      studentCode: string;
+      studentStdin: string;
+      studentOutput: string;
+      runHere: string;
+      gradeField: string;
+      commentField: string;
+      saveGrade: string;
+      gradeSaved: string;
+      submittedAt: string;
+    };
   };
   teacher: {
     role: string;

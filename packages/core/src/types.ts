@@ -106,6 +106,23 @@ export type LessonStageWithProgress = LessonStage & {
   progress: LessonStageProgress | null;
 };
 
+export type CodeLanguage = 'python' | 'cpp';
+
+/** Stored in lesson_stages.config for content_type='code' (Prompt 4). */
+export type CodeStageConfig = {
+  language: CodeLanguage;
+  starter_code: string;
+  expected_output?: string;
+};
+
+/** Stored in lesson_stage_progress.submission_data for code task stages. */
+export type CodeSubmission = {
+  code: string;
+  stdin: string;
+  last_output: string;
+  language: CodeLanguage;
+};
+
 export type LessonMaterial = {
   id: string;
   lesson_id: string;
