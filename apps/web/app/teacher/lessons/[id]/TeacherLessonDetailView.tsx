@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
@@ -305,9 +304,8 @@ export function TeacherLessonDetailView({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const db = createClient();
-  const router = useRouter();
   const rollCallRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<LessonStatus>(lesson.status);
+  const [status] = useState<LessonStatus>(lesson.status);
   const [startedAt] = useState<string | null>(lesson.started_at);
   const [endedAt] = useState<string | null>(lesson.ended_at);
   const [elapsedMin, setElapsedMin] = useState(0);
@@ -340,13 +338,36 @@ export function TeacherLessonDetailView({
     reloadExcuses,
   );
 
-  // Auto-refresh when pg_cron changes lesson status (scheduled→in_progress→completed)
+  // Auto-refresh when pg_cron changes lesson status (scheduled→in_progress→completed).
+  // A status transition is only ever triggered server-side by pg_cron, so a full
+  // page reload is safe here and guarantees fresh server-rendered props (router.refresh
+  // alone is unreliable for Server Components in Next 15, and `status` lives in useState
+  // which would otherwise stay stale).
   useRealtimeChannel(
     `lesson-status-${lesson.id}`,
     "lessons",
     `id=eq.${lesson.id}`,
-    () => router.refresh(),
+    (payload) => {
+      const newStatus = payload?.new?.status as LessonStatus | undefined;
+      // eslint-disable-next-line no-console
+      console.log("[lesson-realtime] event:", payload?.eventType, newStatus);
+      if (newStatus && newStatus !== status) window.location.reload();
+    },
   );
+
+  // Polling safety net: even if realtime delivery is misconfigured, this guarantees
+  // the teacher sees scheduled→in_progress→completed without F5. Stops once completed.
+  useEffect(() => {
+    if (status === "completed") return;
+    const id = setInterval(() => {
+      db.from("lessons").select("status").eq("id", lesson.id).single()
+        .then(({ data }) => {
+          if (data?.status && data.status !== status) window.location.reload();
+        });
+    }, 15000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, lesson.id]);
 
   const excusedMap: Record<string, string> = {};
   for (const e of excuses) excusedMap[e.student_id] = e.reason;

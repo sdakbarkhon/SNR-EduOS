@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(143);
+select plan(144);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1120,6 +1120,15 @@ select has_function('public', 'fn_auto_start_lessons', 'M36-T3: fn_auto_start_le
 
 -- Test 143: fn_auto_end_lessons function exists
 select has_function('public', 'fn_auto_end_lessons', 'M36-T4: fn_auto_end_lessons exists');
+
+-- Test 144 (M37): lessons has REPLICA IDENTITY FULL so realtime can evaluate the
+-- teacher RLS policy (is_my_teacher_group(group_id)) on UPDATE events.
+reset role;
+select is(
+  (select relreplident from pg_class where oid = 'public.lessons'::regclass),
+  'f'::"char",
+  'M37: lessons has REPLICA IDENTITY FULL'
+);
 
 select * from finish();
 rollback;
