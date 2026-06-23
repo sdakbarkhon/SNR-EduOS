@@ -32,6 +32,7 @@ import { useRealtimeChannel } from "@/lib/realtime";
 import { LessonEndReminderModal } from "./LessonEndReminderModal";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
+import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -922,8 +923,8 @@ export function TeacherLessonDetailView({
                   )}
                 </div>
 
-                {/* Review submissions — code stages, always available (incl. after lesson ends) */}
-                {stage.content_type === "code" && (
+                {/* Review submissions — code + external stages, always available (incl. after lesson ends) */}
+                {(stage.content_type === "code" || isExternalService(stage.content_type)) && (
                   <button
                     onClick={() => setReviewStage(stage)}
                     className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
@@ -1124,13 +1125,21 @@ export function TeacherLessonDetailView({
         cancelText={d.common.cancel}
       />
 
-      {/* Code submissions review */}
+      {/* Submissions review — code vs external service */}
       {mounted && reviewStage && (
-        <CodeStageSubmissionsModal
-          stage={reviewStage}
-          teacherId={teacher.id}
-          onClose={() => setReviewStage(null)}
-        />
+        reviewStage.content_type === "code" ? (
+          <CodeStageSubmissionsModal
+            stage={reviewStage}
+            teacherId={teacher.id}
+            onClose={() => setReviewStage(null)}
+          />
+        ) : (
+          <ExternalSubmissionsModal
+            stage={reviewStage}
+            teacherId={teacher.id}
+            onClose={() => setReviewStage(null)}
+          />
+        )
       )}
 
       {/* 5-min reminder modal (only while in_progress) */}
