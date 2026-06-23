@@ -1655,62 +1655,14 @@ export const markStudentAttendance = async (
   if (error) throw error;
 };
 
-/** Финализирует перекличку: отсутствующим без записи → absent_unexcused; всем → is_finalized=true. */
-export const finalizeLessonAttendance = async (
-  db: Db,
-  lessonId: string,
-): Promise<void> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db2 = db as any;
-
-  const { data: lesson } = await db2.from("lessons").select("group_id").eq("id", lessonId).single();
-  if (!lesson) return;
-
-  const [{ data: enrollments }, { data: existing }] = await Promise.all([
-    db2.from("student_groups").select("student_id").eq("group_id", lesson.group_id),
-    db2.from("attendance").select("student_id").eq("lesson_id", lessonId),
-  ]);
-
-  const existingIds = new Set<string>(
-    ((existing ?? []) as Array<{ student_id: string }>).map((r) => r.student_id),
-  );
-  const now = new Date().toISOString();
-
-  const missing = ((enrollments ?? []) as Array<{ student_id: string }>)
-    .filter((e) => !existingIds.has(e.student_id))
-    .map((e) => ({
-      lesson_id: lessonId,
-      student_id: e.student_id,
-      status: "absent_unexcused" as const,
-      marked_at: now,
-      is_finalized: true,
-    }));
-
-  if (missing.length > 0) {
-    await db2.from("attendance").insert(missing);
-  }
-
-  await db2.from("attendance").update({ is_finalized: true }).eq("lesson_id", lessonId);
-};
-
-/** Завершает урок: статус 'completed', этап Итог отмечается выполненным. */
-export const endLesson = async (db: Db, lessonId: string): Promise<void> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db2 = db as any;
-
-  // Финализировать перекличку перед закрытием урока
-  await finalizeLessonAttendance(db, lessonId).catch(() => null);
-
-  const { error } = await db2.from("lessons")
-    .update({ status: "completed", ended_at: new Date().toISOString() })
-    .eq("id", lessonId);
-  if (error) throw error;
-  // Отмечаем этап Итог (stage_role='summary') выполненным
-  await db2.from("lesson_stages")
-    .update({ is_completed: true, completed_at: new Date().toISOString() })
-    .eq("lesson_id", lessonId)
-    .eq("stage_role", "summary");
-};
+// NOTE: `endLesson` and `finalizeLessonAttendance` were removed (Prompt-4 audit, Bug 2).
+// A lesson must NEVER be closed by marking attendance ("перекличка не закрывает урок").
+// Closing + attendance finalization is now exclusively server-side and TIME-BASED via
+// the pg_cron function `fn_auto_end_lessons` (migration 36): it flips a lesson to
+// 'completed' only when `ends_at <= now()`, regardless of how many students are marked.
+// These client helpers (which set lessons.status='completed' and finalized attendance)
+// had no callers after Prompt 3 removed the Start/End buttons; they are deleted so the
+// bug cannot be re-introduced by accidentally wiring them to the roll-call UI.
 
 // ─── BOOKS ───────────────────────────────────────────────────────────────────
 
