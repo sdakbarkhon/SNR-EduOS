@@ -36,6 +36,7 @@ import { LessonEndReminderModal } from "./LessonEndReminderModal";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
+import { KahootTeacherModal } from "./KahootTeacherModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -513,6 +514,7 @@ export function TeacherLessonDetailView({
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
   const [reviewStage, setReviewStage] = useState<LessonStage | null>(null);
+  const [kahootStage, setKahootStage] = useState<LessonStage | null>(null);
   // Reorder lock: ref = синхронный гард (срабатывает в том же тике, до re-render),
   // state = визуальный feedback (disabled + spinner). Вместе исключают наложение
   // двух reorder-операций → bump одной не конфликтует с финалом другой (409).
@@ -1016,6 +1018,16 @@ export function TeacherLessonDetailView({
                   </button>
                 )}
 
+                {/* Kahoot: launch live game */}
+                {stage.content_type === "quiz_kahoot" && (
+                  <button
+                    onClick={() => setKahootStage(stage)}
+                    className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
+                  >
+                    {dl.quiz.launchGame}
+                  </button>
+                )}
+
                 {/* Actions */}
                 {!isLessonCompleted && (
                 <div className="flex shrink-0 items-center gap-1">
@@ -1224,6 +1236,15 @@ export function TeacherLessonDetailView({
             onClose={() => setReviewStage(null)}
           />
         )
+      )}
+
+      {/* Kahoot live game control panel */}
+      {mounted && kahootStage && (
+        <KahootTeacherModal
+          stage={kahootStage}
+          teacherId={teacher.id}
+          onClose={() => setKahootStage(null)}
+        />
       )}
 
       {/* 5-min reminder modal (only while in_progress) */}

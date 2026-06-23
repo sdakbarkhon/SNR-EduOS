@@ -1808,6 +1808,25 @@ export const submitKahootAnswer = async (
   return score;
 };
 
+/** Участники игры (ученики, у которых есть попытка на этапе) — для лобби. */
+export const getKahootParticipants = async (
+  db: Db, stageId: string,
+): Promise<Array<{ student_id: string; full_name: string }>> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any)
+    .from("quiz_attempts").select("student_id, student:students(full_name)").eq("stage_id", stageId);
+  type Raw = { student_id: string; student: { full_name: string } | null };
+  return ((data ?? []) as Raw[]).map((r) => ({ student_id: r.student_id, full_name: r.student?.full_name ?? "—" }));
+};
+
+/** Сколько ответов уже есть на конкретный вопрос (для счётчика «Ответили»). */
+export const getKahootAnswerCount = async (db: Db, questionId: string): Promise<number> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count } = await (db as any)
+    .from("quiz_answers").select("id", { count: "exact", head: true }).eq("question_id", questionId);
+  return count ?? 0;
+};
+
 /** Лидерборд: сумма баллов по каждому ученику в этапе (по убыванию). */
 export const getKahootLeaderboard = async (db: Db, stageId: string): Promise<QuizLeaderboardEntry[]> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
