@@ -4,38 +4,40 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
-  ChevronLeft, MapPin, Target, BookOpen, Hammer, Pencil,
-  CheckSquare, Trophy, Check, Plus, X, FileText, Download,
+  ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Play, Square, Clock, AlertCircle, CalendarX,
+  ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks,
 } from "lucide-react";
 import {
-  updateLesson, setStageEnabled, setStageCompleted, setStageNotes,
+  updateLesson, getLessonStages, addLessonStage, updateLessonStage,
+  deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   getSubjectStyle, startLesson, endLesson, getLessonExcuseRequests,
 } from "@snr/core";
-import type { TeacherLessonView, LessonStatus, LessonStage, StageKey, LessonMaterial, Teacher, ExcuseRequestWithStudent } from "@snr/core";
+import type {
+  TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
+  LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
+} from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { AttendanceRollCall } from "./AttendanceRollCall";
-import { ClassworkModal } from "./ClassworkModal";
 import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
 
-const ALL_STAGE_KEYS: StageKey[] = ["goal", "theory", "practice", "classwork", "review", "summary"];
-const REQUIRED = new Set<StageKey>(["goal", "summary"]);
-const STAGE_ORDER: Record<StageKey, number> = {
-  goal: 1, theory: 2, practice: 3, classwork: 4, review: 5, summary: 6,
-};
-const STAGE_ICONS: Record<StageKey, React.ReactNode> = {
-  goal:       <Target className="h-4 w-4" />,
-  theory:     <BookOpen className="h-4 w-4" />,
-  practice:   <Hammer className="h-4 w-4" />,
-  classwork:  <Pencil className="h-4 w-4" />,
-  review:     <CheckSquare className="h-4 w-4" />,
-  summary:    <Trophy className="h-4 w-4" />,
+// ── Content type metadata ─────────────────────────────────────────────────────
+const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
+  presentation: <Presentation className="h-4 w-4" />,
+  code:         <Code2 className="h-4 w-4" />,
+  scratch:      <Puzzle className="h-4 w-4" />,
+  tinkercad:    <Wrench className="h-4 w-4" />,
+  app_inventor: <Bot className="h-4 w-4" />,
+  code_monkey:  <Monitor className="h-4 w-4" />,
+  quiz_qia:     <TestTube2 className="h-4 w-4" />,
+  quiz_kahoot:  <Gamepad2 className="h-4 w-4" />,
 };
 
 function fmtDate(iso: string): string {
@@ -51,30 +53,211 @@ function fmtBytes(b: number | null): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
-type StageState = {
-  enabled: boolean;
-  id: string | null;
-  is_completed: boolean;
-  notes: string;
-  notesOpen: boolean;
-};
+// ── Stage add/edit modal ──────────────────────────────────────────────────────
+type StageModalState =
+  | { mode: "closed" }
+  | { mode: "add" }
+  | { mode: "edit"; stage: LessonStage };
 
-function initStageState(stages: LessonStage[]): Record<StageKey, StageState> {
-  const map: Record<string, LessonStage> = {};
-  for (const s of stages) map[s.stage_key] = s;
-  const result = {} as Record<StageKey, StageState>;
-  for (const key of ALL_STAGE_KEYS) {
-    const s = map[key];
-    result[key] = {
-      enabled: !!s,
-      id: s?.id ?? null,
-      is_completed: s?.is_completed ?? false,
-      notes: s?.teacher_notes ?? "",
-      notesOpen: !!(s?.teacher_notes),
-    };
+type ModalStep = 1 | 2 | 3;
+
+const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
+const TASK_CONTENT_TYPES: LessonContentType[] = [
+  "presentation", "code", "scratch", "tinkercad",
+  "app_inventor", "code_monkey", "quiz_qia", "quiz_kahoot",
+];
+
+function StageModal({
+  modalState,
+  onClose,
+  onSave,
+  contentLabel,
+}: {
+  modalState: Extract<StageModalState, { mode: "add" | "edit" }>;
+  onClose: () => void;
+  onSave: (data: {
+    stageType: LessonStageType;
+    contentType: LessonContentType | null;
+    title: string;
+    description: string | null;
+  }) => Promise<void>;
+  contentLabel: (ct: LessonContentType) => string;
+}) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale).lesson;
+  const isEdit = modalState.mode === "edit";
+  const existing = isEdit ? modalState.stage : null;
+
+  const [step, setStep] = useState<ModalStep>(isEdit ? 3 : 1);
+  const [stageType, setStageType] = useState<LessonStageType>(existing?.stage_type ?? "theory");
+  const [contentType, setContentType] = useState<LessonContentType | null>(existing?.content_type ?? null);
+  const [title, setTitle] = useState(existing?.title ?? "");
+  const [desc, setDesc] = useState(existing?.description ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : TASK_CONTENT_TYPES;
+
+  async function handleSave() {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await onSave({ stageType, contentType, title: title.trim(), description: desc.trim() || null });
+    } finally {
+      setSaving(false);
+    }
   }
-  return result;
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        className="relative w-full max-w-lg rounded-2xl shadow-2xl"
+        style={{ background: "var(--surface-1)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-white/10">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            {isEdit ? d.stageEditModalTitle : d.stageAddModalTitle}
+          </h3>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Step 1: Stage type (hidden in edit mode) */}
+          {!isEdit && step >= 1 && (
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep1Title}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {(["theory", "task"] as LessonStageType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => { setStageType(type); setContentType(null); }}
+                    className={`flex flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-all ${
+                      stageType === type
+                        ? type === "theory"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10"
+                          : "border-violet-500 bg-violet-50 dark:bg-violet-500/10"
+                        : "border-slate-200 dark:border-white/10 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      {type === "theory" ? <BookOpen className="h-4 w-4" /> : <ListChecks className="h-4 w-4" />}
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                        {type === "theory" ? d.stageTypeTheoryLabel : d.stageTypeTaskLabel}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      {type === "theory" ? d.stageTypeTheoryDesc : d.stageTypeTaskDesc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Content type (or next button) */}
+          {!isEdit && step >= 1 && (
+            <div>
+              {step < 2 ? (
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                >
+                  Далее →
+                </button>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep2Title}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableContentTypes.map((ct) => (
+                      <button
+                        key={ct}
+                        onClick={() => setContentType(ct === contentType ? null : ct)}
+                        className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm transition-all ${
+                          contentType === ct
+                            ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 text-slate-700 dark:text-slate-200"
+                        }`}
+                      >
+                        <span className="shrink-0 text-slate-500">{CONTENT_ICONS[ct]}</span>
+                        <span>{contentLabel(ct)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Title + description (shown after content type selection, or immediately in edit) */}
+          {(isEdit || step >= 2) && (
+            <div className={isEdit ? "" : "border-t border-slate-100 dark:border-white/10 pt-5"}>
+              {!isEdit && <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep3Title}</p>}
+
+              {/* Stub note for non-presentation types */}
+              {contentType && contentType !== "presentation" && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                  {d.stageContentStubNote}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {d.stageTitleLabel} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    autoFocus={!isEdit}
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={d.stageTitlePlaceholder}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">{d.stageDescLabel2}</label>
+                  <textarea
+                    rows={3}
+                    value={desc}
+                    onChange={(e) => setDesc(e.target.value)}
+                    placeholder={d.stageDescPlaceholder2}
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !title.trim()}
+                  className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-50"
+                >
+                  {saving ? "Сохранение…" : isEdit ? d.stageSaveBtn2 : d.stageAddConfirmBtn}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function TeacherLessonDetailView({
   lesson,
@@ -85,15 +268,16 @@ export function TeacherLessonDetailView({
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const dl = d.lesson;
 
   const [title, setTitle] = useState(lesson.title ?? "");
   const [desc, setDesc] = useState(lesson.description ?? "");
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
 
-  const [stages, setStages] = useState<Record<StageKey, StageState>>(() =>
-    initStageState(lesson.stages)
-  );
+  const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
+  const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
+  const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
 
   const [materials, setMaterials] = useState<LessonMaterial[]>(lesson.materials);
   const [uploadModal, setUploadModal] = useState(false);
@@ -103,53 +287,37 @@ export function TeacherLessonDetailView({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const db = createClient();
-
   const [status, setStatus] = useState<LessonStatus>(lesson.status);
   const [startedAt, setStartedAt] = useState<string | null>(lesson.started_at);
   const [endedAt, setEndedAt] = useState<string | null>(lesson.ended_at);
   const [statusLoading, setStatusLoading] = useState(false);
   const [elapsedMin, setElapsedMin] = useState(0);
 
-  // Attendance completeness tracking
   const [allMarked, setAllMarked] = useState(false);
   const [unmarkedNames, setUnmarkedNames] = useState<string[]>([]);
-  // Stable callback — passing an inline arrow here re-triggered AttendanceRollCall's
-  // notify effect every render and caused an infinite render loop (see that file).
   const handleAttendanceStatus = useCallback((allDone: boolean, names: string[]) => {
     setAllMarked(allDone);
     setUnmarkedNames(names);
   }, []);
 
-  // Modals
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const [incompleteOpen, setIncompleteOpen] = useState(false);
   const [confirmDeleteMatOpen, setConfirmDeleteMatOpen] = useState(false);
   const [matToDelete, setMatToDelete] = useState<LessonMaterial | null>(null);
 
-  // Classwork modal
-  const [classworkOpen, setClassworkOpen] = useState(false);
-
-  // Excuse requests (visible before & during the lesson)
   const [excuses, setExcuses] = useState<ExcuseRequestWithStudent[]>([]);
   const reloadExcuses = useCallback(() => {
-    getLessonExcuseRequests(db as never, lesson.id)
-      .then(setExcuses)
-      .catch(() => null);
+    getLessonExcuseRequests(db as never, lesson.id).then(setExcuses).catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id]);
 
-  // Mount gate — this page formats lesson timestamps (starts_at/ended_at/…) in JSX.
-  // SSR runs in UTC, the client in UTC+5, so the rendered times would differ and
-  // trigger React #418. Render a placeholder until mounted, then the real UI.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // Load excuse requests while the lesson is not finalized
   useEffect(() => {
     if (status !== "completed") reloadExcuses();
   }, [status, reloadExcuses]);
 
-  // Realtime: new / cancelled excuse requests appear instantly (disabled once completed)
   useRealtimeChannel(
     status === "completed" ? null : `lesson-excuses-${lesson.id}`,
     "lesson_excuse_requests",
@@ -175,11 +343,14 @@ export function TeacherLessonDetailView({
       const now = new Date().toISOString();
       setStatus("in_progress");
       setStartedAt(now);
+      // Mark start stage completed in local state
+      setStages((prev) => prev.map((s) =>
+        s.stage_role === "start" ? { ...s, is_completed: true, completed_at: now } : s
+      ));
     } catch { /* noop */ } finally { setStatusLoading(false); }
   }
 
   function requestEnd() {
-    // If attendance roll-call is active and not complete, show incomplete modal first
     if (status === "in_progress" && !allMarked && unmarkedNames.length > 0) {
       setIncompleteOpen(true);
       return;
@@ -194,11 +365,10 @@ export function TeacherLessonDetailView({
       const now = new Date().toISOString();
       setStatus("completed");
       setEndedAt(now);
-      // Auto-mark summary stage as completed in UI
-      setStages((prev) => ({
-        ...prev,
-        summary: { ...prev.summary, enabled: true, is_completed: true },
-      }));
+      // Mark summary stage completed in local state
+      setStages((prev) => prev.map((s) =>
+        s.stage_role === "summary" ? { ...s, is_completed: true, completed_at: now } : s
+      ));
     } catch { /* noop */ } finally {
       setStatusLoading(false);
       setConfirmEndOpen(false);
@@ -206,87 +376,90 @@ export function TeacherLessonDetailView({
     }
   }
 
-  const style = getSubjectStyle(lesson.group.subject);
-  const stageLabels: Record<StageKey, string> = {
-    goal:       d.lesson.stage1,
-    theory:     d.lesson.stage2,
-    practice:   d.lesson.stage3,
-    classwork:  d.lesson.stage4,
-    review:     d.lesson.stage5,
-    summary:    d.lesson.stage6,
-  };
-
-  // ── Info save ──────────────────────────────────────────────────────
   async function handleSaveInfo() {
     setInfoSaving(true);
     try {
       await updateLesson(db, lesson.id, { title: title || null, description: desc || null });
       setInfoSaved(true);
       setTimeout(() => setInfoSaved(false), 2000);
-    } catch { /* noop */ } finally {
-      setInfoSaving(false);
-    }
+    } catch { /* noop */ } finally { setInfoSaving(false); }
   }
 
-  const infoChanged = title !== (lesson.title ?? "") || desc !== (lesson.description ?? "");
+  // ── Stage CRUD ──────────────────────────────────────────────────────────────
 
-  // ── Stage toggle ───────────────────────────────────────────────────
-  async function handleToggleStage(key: StageKey) {
-    if (REQUIRED.has(key)) return;
-    // Classwork stage opens the classwork modal instead of toggling
-    if (key === "classwork") {
-      if (!stages[key].enabled) {
-        // Enable stage then open modal
-        setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: true } }));
-        await setStageEnabled(db, lesson.id, key, true).catch(() =>
-          setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: false } }))
-        );
-      }
-      setClassworkOpen(true);
-      return;
-    }
-    const next = !stages[key].enabled;
-    setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: next } }));
-    await setStageEnabled(db, lesson.id, key, next).catch(() =>
-      setStages((prev) => ({ ...prev, [key]: { ...prev[key], enabled: !next } }))
-    );
+  async function handleAddStage(data: {
+    stageType: LessonStageType;
+    contentType: LessonContentType | null;
+    title: string;
+    description: string | null;
+  }) {
+    const newStage = await addLessonStage(db, lesson.id, data);
+    setStages((prev) => {
+      const withoutSummary = prev.filter((s) => s.stage_role !== "summary");
+      const summary = prev.find((s) => s.stage_role === "summary");
+      return summary ? [...withoutSummary, newStage, summary] : [...withoutSummary, newStage];
+    });
+    setStageModal({ mode: "closed" });
   }
 
-  async function handleToggleCompleted(key: StageKey) {
-    const next = !stages[key].is_completed;
-    setStages((prev) => ({ ...prev, [key]: { ...prev[key], is_completed: next } }));
-    await setStageCompleted(db, lesson.id, key, next).catch(() =>
-      setStages((prev) => ({ ...prev, [key]: { ...prev[key], is_completed: !next } }))
-    );
+  async function handleEditStage(data: {
+    stageType: LessonStageType;
+    contentType: LessonContentType | null;
+    title: string;
+    description: string | null;
+  }) {
+    if (stageModal.mode !== "edit") return;
+    const updated = await updateLessonStage(db, stageModal.stage.id, {
+      title: data.title,
+      description: data.description,
+      stage_type: data.stageType,
+      content_type: data.contentType,
+    });
+    setStages((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+    setStageModal({ mode: "closed" });
   }
 
-  function handleNotesBlur(key: StageKey) {
-    setStageNotes(db, lesson.id, key, stages[key].notes).catch(() => null);
+  async function handleDeleteStage() {
+    if (!stageToDelete) return;
+    await deleteLessonStage(db, stageToDelete.id).catch(() => null);
+    setStages((prev) => prev.filter((s) => s.id !== stageToDelete.id));
+    setStageToDelete(null);
   }
 
-  // ── Material upload ────────────────────────────────────────────────
+  async function handleMoveStage(stageId: string, direction: "up" | "down") {
+    const middles = stages.filter((s) => s.stage_role === "middle");
+    const idx = middles.findIndex((s) => s.id === stageId);
+    if (idx === -1) return;
+    const newIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= middles.length) return;
+    const reordered = [...middles];
+    const tmp = reordered[idx]!;
+    reordered[idx] = reordered[newIdx]!;
+    reordered[newIdx] = tmp;
+    const orderedIds = reordered.map((s) => s.id);
+    // Optimistic update
+    const posMap = new Map(reordered.map((s, i) => [s.id, i + 1]));
+    setStages((prev) => prev.map((s) => posMap.has(s.id) ? { ...s, position: posMap.get(s.id)! } : s));
+    await reorderLessonStages(db, lesson.id, orderedIds).catch(() => {
+      // Reload on failure
+      getLessonStages(db, lesson.id).then(setStages).catch(() => null);
+    });
+  }
+
+  // ── Material CRUD ───────────────────────────────────────────────────────────
+
   async function handleUpload() {
     if (!uploadFile || !uploadTitle.trim()) return;
     setUploading(true);
     try {
       const mat = await uploadLessonMaterial(db, {
-        lessonId: lesson.id,
-        teacherId: teacher.id,
-        file: uploadFile,
-        title: uploadTitle.trim(),
+        lessonId: lesson.id, teacherId: teacher.id, file: uploadFile, title: uploadTitle.trim(),
       });
       setMaterials((prev) => [...prev, mat]);
       setUploadModal(false);
       setUploadTitle("");
       setUploadFile(null);
-    } catch { /* noop */ } finally {
-      setUploading(false);
-    }
-  }
-
-  function requestDeleteMaterial(mat: LessonMaterial) {
-    setMatToDelete(mat);
-    setConfirmDeleteMatOpen(true);
+    } catch { /* noop */ } finally { setUploading(false); }
   }
 
   async function handleDeleteMaterial() {
@@ -301,16 +474,38 @@ export function TeacherLessonDetailView({
     if (url) window.open(url, "_blank");
   }
 
+  // ── Derived ─────────────────────────────────────────────────────────────────
+
+  const style = getSubjectStyle(lesson.group.subject);
+  const infoChanged = title !== (lesson.title ?? "") || desc !== (lesson.description ?? "");
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
     : fmtTime(lesson.starts_at);
 
+  const startStage = stages.find((s) => s.stage_role === "start");
+  const summaryStage = stages.find((s) => s.stage_role === "summary");
+  const middleStages = stages
+    .filter((s) => s.stage_role === "middle")
+    .sort((a, b) => a.position - b.position);
+
+  function contentLabel(ct: LessonContentType): string {
+    const map: Record<LessonContentType, string> = {
+      presentation: dl.stageContentPresentation,
+      code:         dl.stageContentCode,
+      scratch:      dl.stageContentScratch,
+      tinkercad:    dl.stageContentTinkercad,
+      app_inventor: dl.stageContentAppInventor,
+      code_monkey:  dl.stageContentCodeMonkey,
+      quiz_qia:     dl.stageContentQuizQia,
+      quiz_kahoot:  dl.stageContentQuizKahoot,
+    };
+    return map[ct] ?? ct;
+  }
+
   if (!mounted) {
     return (
-      <div className="mx-auto max-w-5xl">
-        <div className="flex justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-        </div>
+      <div className="mx-auto max-w-5xl flex justify-center py-24">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
       </div>
     );
   }
@@ -323,7 +518,7 @@ export function TeacherLessonDetailView({
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
       >
         <ChevronLeft className="h-4 w-4" />
-        {d.lesson.backToLessons}
+        {dl.backToLessons}
       </Link>
 
       {/* Header card */}
@@ -359,8 +554,7 @@ export function TeacherLessonDetailView({
         <div className="flex items-center justify-between rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4">
           <p className="text-sm text-yellow-800">Урок запланирован. Нажмите когда начнётся.</p>
           <button
-            onClick={handleStart}
-            disabled={statusLoading}
+            onClick={handleStart} disabled={statusLoading}
             className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-green-500/25 hover:bg-green-700 active:scale-95 disabled:opacity-50"
           >
             <Play className="h-4 w-4 fill-white" /> Начать урок
@@ -374,8 +568,7 @@ export function TeacherLessonDetailView({
             Урок идёт. Длится {elapsedMin} мин.
           </p>
           <button
-            onClick={requestEnd}
-            disabled={statusLoading}
+            onClick={requestEnd} disabled={statusLoading}
             className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-red-500/25 hover:bg-red-700 active:scale-95 disabled:opacity-50"
           >
             <Square className="h-4 w-4 fill-white" /> Закончить урок
@@ -386,13 +579,12 @@ export function TeacherLessonDetailView({
         <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4">
           <Check className="h-5 w-5 text-gray-500" />
           <p className="text-sm text-gray-600">
-            Урок завершён
-            {startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
+            Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
           </p>
         </div>
       )}
 
-      {/* Roll call — visible during in_progress and completed (read-only) */}
+      {/* Roll call */}
       {(status === "in_progress" || status === "completed") && (
         <AttendanceRollCall
           lessonId={lesson.id}
@@ -403,53 +595,42 @@ export function TeacherLessonDetailView({
         />
       )}
 
-      {/* Raised hands — only while the lesson is live */}
+      {/* Raised hands */}
       {status === "in_progress" && (
         <RaisedHandsBlock lessonId={lesson.id} teacherId={teacher.id} />
       )}
 
-      {/* About lesson block */}
+      {/* About lesson */}
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{d.lesson.aboutLesson}</h2>
+        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.aboutLesson}</h2>
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">{d.lesson.titleLabel}</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={d.lesson.titlePlaceholder}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+            <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.titleLabel}</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder={dl.titlePlaceholder}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">{d.lesson.descLabel}</label>
-            <textarea
-              rows={3}
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              placeholder={d.lesson.descPlaceholder}
-              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+            <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.descLabel}</label>
+            <textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)}
+              placeholder={dl.descPlaceholder}
+              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
           </div>
           {infoChanged && (
-            <button
-              onClick={handleSaveInfo}
-              disabled={infoSaving}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-60"
-            >
-              {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {d.lesson.saveBtn}</> : infoSaving ? d.lesson.uploading : d.lesson.saveBtn}
+            <button onClick={handleSaveInfo} disabled={infoSaving}
+              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-60">
+              {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {dl.saveBtn}</> : infoSaving ? dl.uploading : dl.saveBtn}
             </button>
           )}
         </div>
       </section>
 
-      {/* Excuse requests — visible before & during the lesson */}
+      {/* Excuse requests */}
       {status !== "completed" && excuses.length > 0 && (
-        <section className="rounded-2xl border border-orange-100 bg-orange-50/50 p-6 shadow-sm backdrop-blur-xl space-y-3">
+        <section className="rounded-2xl border border-orange-100 bg-orange-50/50 p-6 shadow-sm space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-orange-600">
             <CalendarX className="h-4 w-4" />
-            {d.lesson.excuse.teacherTitle} ({excuses.length})
+            {dl.excuse.teacherTitle} ({excuses.length})
           </h2>
           <div className="space-y-2">
             {excuses.map((e) => (
@@ -468,147 +649,172 @@ export function TeacherLessonDetailView({
         </section>
       )}
 
-      {/* Stages block */}
+      {/* ── STAGES BLOCK ──────────────────────────────────────────────────── */}
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{d.lesson.stagesTitle}</h2>
-          <p className="text-xs text-gray-400">{d.lesson.stagesHint}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {ALL_STAGE_KEYS.map((key) => {
-            const st = stages[key];
-            const label = stageLabels[key];
-            const required = REQUIRED.has(key);
-            const order = STAGE_ORDER[key];
-            const isClasswork = key === "classwork";
-
-            if (!st.enabled) {
-              return (
-                <button
-                  key={key}
-                  onClick={() => handleToggleStage(key)}
-                  className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 p-4 text-gray-400 transition-all hover:border-blue-300 hover:text-blue-500"
-                >
-                  <Plus className="h-5 w-5" />
-                  <span className="text-xs font-medium">{label}</span>
-                </button>
-              );
-            }
-
-            return (
-              <div
-                key={key}
-                onClick={isClasswork ? () => setClassworkOpen(true) : undefined}
-                className={`relative flex flex-col gap-2 rounded-2xl border p-4 transition-all ${
-                  st.is_completed
-                    ? "border-emerald-200 bg-emerald-50"
-                    : isClasswork
-                    ? "border-blue-200 bg-blue-50 cursor-pointer hover:shadow-md"
-                    : "border-gray-100 bg-white shadow-sm"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
-                    {STAGE_ICONS[key]}
-                  </span>
-                  {!required && !isClasswork && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleToggleStage(key); }}
-                      className="rounded-full p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-400"
-                      title={d.lesson.removeStageLabel}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs font-bold text-gray-700">{label}</p>
-                <p className="text-[10px] font-medium text-gray-400">Этап {order}</p>
-                {isClasswork ? (
-                  <span className="mt-auto text-[11px] font-semibold text-blue-600">
-                    Открыть →
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleToggleCompleted(key)}
-                    className={`mt-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                      st.is_completed
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600"
-                    }`}
-                  >
-                    {st.is_completed ? <Check className="h-3.5 w-3.5" /> : <div className="h-3.5 w-3.5 rounded-sm border-2 border-current" />}
-                    {st.is_completed ? d.lesson.stageCompletedLabel : "Отметить"}
-                  </button>
-                )}
-                {!isClasswork && (
-                  <>
-                    <button
-                      onClick={() => setStages((p) => ({ ...p, [key]: { ...p[key], notesOpen: !p[key].notesOpen } }))}
-                      className="text-left text-xs text-gray-400 hover:text-blue-500"
-                    >
-                      {st.notesOpen ? "▲" : "▼"} {d.lesson.teacherNotesLabel}
-                    </button>
-                    {st.notesOpen && (
-                      <textarea
-                        rows={2}
-                        value={st.notes}
-                        placeholder={d.lesson.teacherNotesPlaceholder}
-                        onChange={(e) => setStages((p) => ({ ...p, [key]: { ...p[key], notes: e.target.value } }))}
-                        onBlur={() => handleNotesBlur(key)}
-                        className="w-full resize-none rounded-lg border border-gray-200 bg-white/80 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-400"
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Materials block */}
-      <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{d.lesson.materialsTitle}</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
           <button
-            onClick={() => setUploadModal(true)}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95"
+            onClick={() => setStageModal({ mode: "add" })}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
           >
-            {d.lesson.addMaterialLabel}
+            <Plus className="h-4 w-4" /> {dl.stageAddBtn}
           </button>
         </div>
 
+        <div className="flex flex-col gap-2">
+          {/* Start stage */}
+          {startStage && (
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+              startStage.is_completed
+                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
+            }`}>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                startStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
+              }`}>
+                {startStage.is_completed ? <Check className="h-4 w-4" /> : "→"}
+              </div>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageStartLabel}</span>
+              {startStage.is_completed && (
+                <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
+              )}
+            </div>
+          )}
+
+          {/* Middle stages */}
+          {middleStages.length === 0 ? (
+            <div
+              onClick={() => setStageModal({ mode: "add" })}
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-6 text-slate-400 transition-all hover:border-blue-300 hover:text-blue-500"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="text-sm">{dl.stageAddBtn}</span>
+            </div>
+          ) : (
+            middleStages.map((stage, idx) => (
+              <div
+                key={stage.id}
+                className="flex items-start gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5"
+              >
+                {/* Position + type badge */}
+                <div className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold ${
+                    stage.stage_type === "task"
+                      ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                  }`}>
+                    {idx + 1}
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage.title}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      stage.stage_type === "task"
+                        ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                    }`}>
+                      {stage.stage_type === "task" ? dl.stageBadgeTask : dl.stageBadgeTheory}
+                    </span>
+                    {stage.content_type && (
+                      <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        {CONTENT_ICONS[stage.content_type]}
+                        {contentLabel(stage.content_type)}
+                      </span>
+                    )}
+                  </div>
+                  {stage.description && (
+                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{stage.description}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => handleMoveStage(stage.id, "up")}
+                    disabled={idx === 0}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10"
+                    title={dl.stageMoveUp}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleMoveStage(stage.id, "down")}
+                    disabled={idx === middleStages.length - 1}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10"
+                    title={dl.stageMoveDown}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setStageModal({ mode: "edit", stage })}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-500/10"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setStageToDelete(stage)}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Summary stage */}
+          {summaryStage && (
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+              summaryStage.is_completed
+                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
+            }`}>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                summaryStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
+              }`}>
+                {summaryStage.is_completed ? <Check className="h-4 w-4" /> : "✓"}
+              </div>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageSummaryLabel}</span>
+              {summaryStage.is_completed && (
+                <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Materials */}
+      <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.materialsTitle}</h2>
+          <button onClick={() => setUploadModal(true)}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95">
+            {dl.addMaterialLabel}
+          </button>
+        </div>
         {materials.length === 0 ? (
-          <p className="text-sm text-gray-400">{d.lesson.materialsEmpty}</p>
+          <p className="text-sm text-gray-400">{dl.materialsEmpty}</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {materials.map((mat) => (
-              <div
-                key={mat.id}
-                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
-              >
+              <div key={mat.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                   <FileText className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{mat.title}</p>
-                  {mat.file_size_bytes && (
-                    <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>
-                  )}
+                  {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
                 </div>
                 <div className="flex shrink-0 gap-1">
-                  <button
-                    onClick={() => handleDownloadMaterial(mat)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
-                    title={d.lesson.download}
-                  >
+                  <button onClick={() => handleDownloadMaterial(mat)}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
                     <Download className="h-4 w-4" />
                   </button>
-                  <button
-                    onClick={() => requestDeleteMaterial(mat)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
-                    title={d.lesson.deleteConfirm}
-                  >
+                  <button onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title={dl.deleteConfirm}>
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -618,58 +824,36 @@ export function TeacherLessonDetailView({
         )}
       </section>
 
-      {/* Upload modal */}
+      {/* Upload material modal */}
       {uploadModal && typeof document !== "undefined" && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center"
-          style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
-        >
+        <div className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900">{d.lesson.addMaterialTitle}</h3>
-              <button onClick={() => setUploadModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-5 w-5" />
-              </button>
+              <h3 className="text-lg font-bold text-slate-900">{dl.addMaterialTitle}</h3>
+              <button onClick={() => setUploadModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">{d.lesson.materialTitleLabel}</label>
-                <input
-                  type="text"
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder={d.lesson.materialTitlePlaceholder}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.materialTitleLabel}</label>
+                <input type="text" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)}
+                  placeholder={dl.materialTitlePlaceholder}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
               </div>
               <div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 transition-all hover:border-blue-300 hover:text-blue-500"
-                >
+                <input ref={fileRef} type="file" className="hidden" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+                <button onClick={() => fileRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
                   <Upload className="h-5 w-5" />
                   {uploadFile ? uploadFile.name : "Выбрать файл (макс. 50 МБ)"}
                 </button>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setUploadModal(false)}
-                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                >
-                  {d.common.cancel}
-                </button>
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading || !uploadFile || !uploadTitle.trim()}
-                  className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50"
-                >
-                  {uploading ? d.lesson.uploading : d.lesson.saveBtn}
+                <button onClick={() => setUploadModal(false)}
+                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.common.cancel}</button>
+                <button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadTitle.trim()}
+                  className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {uploading ? dl.uploading : dl.saveBtn}
                 </button>
               </div>
             </div>
@@ -677,6 +861,28 @@ export function TeacherLessonDetailView({
         </div>,
         document.body,
       )}
+
+      {/* Stage add/edit modal */}
+      {stageModal.mode !== "closed" && (
+        <StageModal
+          modalState={stageModal}
+          onClose={() => setStageModal({ mode: "closed" })}
+          onSave={stageModal.mode === "add" ? handleAddStage : handleEditStage}
+          contentLabel={contentLabel}
+        />
+      )}
+
+      {/* Confirm delete stage */}
+      <ConfirmModal
+        open={!!stageToDelete}
+        onClose={() => setStageToDelete(null)}
+        onConfirm={handleDeleteStage}
+        title="Удалить этап?"
+        message={dl.stageDeleteConfirmMsg}
+        variant="danger"
+        confirmText="Удалить"
+        cancelText={d.common.cancel}
+      />
 
       {/* Incomplete attendance modal */}
       <ConfirmModal
@@ -717,19 +923,10 @@ export function TeacherLessonDetailView({
         open={confirmDeleteMatOpen}
         onClose={() => { setConfirmDeleteMatOpen(false); setMatToDelete(null); }}
         onConfirm={handleDeleteMaterial}
-        title={d.lesson.deleteConfirm}
+        title={dl.deleteConfirm}
         variant="danger"
         confirmText="Удалить"
         cancelText={d.common.cancel}
-      />
-
-      {/* Classwork modal */}
-      <ClassworkModal
-        open={classworkOpen}
-        onClose={() => setClassworkOpen(false)}
-        lessonId={lesson.id}
-        groupId={lesson.group_id}
-        teacherId={teacher.id}
       />
     </div>
   );

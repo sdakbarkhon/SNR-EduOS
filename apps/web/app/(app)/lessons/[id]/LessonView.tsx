@@ -1,27 +1,9 @@
 import Link from "next/link";
-import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Target, Hammer, Pencil, CheckSquare, Trophy, Clock, type LucideIcon } from "lucide-react";
-import type { StudentLessonView, LessonStagePublic, StageKey } from "@snr/core";
+import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Clock } from "lucide-react";
+import type { StudentLessonView, LessonStageWithProgress } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
 import { PreLessonView } from "./PreLessonView";
 import { LessonWorkspaceView } from "./LessonWorkspaceView";
-
-const STAGE_ICONS: Record<StageKey, LucideIcon> = {
-  goal:      Target,
-  theory:    BookOpen,
-  practice:  Hammer,
-  classwork: Pencil,
-  review:    CheckSquare,
-  summary:   Trophy,
-};
-
-const STAGE_LABELS: Record<StageKey, string> = {
-  goal:       "Цель",
-  theory:     "Теория",
-  practice:   "Практика",
-  classwork:  "Задание",
-  review:     "Проверка",
-  summary:    "Итог",
-};
 
 function initials(name: string): string {
   return name.split(" ").map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 2);
@@ -64,8 +46,8 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
   const style = getSubjectStyle(lesson.group.subject);
   const rgb = hexToRgb(style.color);
 
-  const stages = [...lesson.stages].sort((a, b) => a.order_index - b.order_index);
-  const doneCount = stages.filter((s) => s.is_completed).length;
+  const stages = [...lesson.stages].sort((a, b) => a.position - b.position);
+  const doneCount = stages.filter((s) => s.is_completed || s.progress?.is_completed).length;
 
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
@@ -176,29 +158,29 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
           </h3>
           <div className="relative flex items-center justify-between px-4">
             <div className="absolute left-[60px] right-[60px] top-[18px] z-0 h-[2px] bg-gray-200" />
-            {stages.map((stage: LessonStagePublic) => {
-              const label = STAGE_LABELS[stage.stage_key as StageKey] ?? stage.stage_key;
+            {stages.map((stage: LessonStageWithProgress) => {
+              const isDone = stage.is_completed || stage.progress?.is_completed;
               return (
                 <div key={stage.id} className="relative z-10 flex flex-col items-center gap-2">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-4 transition-transform duration-300 hover:scale-105 ${
-                      stage.is_completed
+                      isDone
                         ? "border-white bg-green-500 text-white shadow-sm"
                         : "border-gray-200 bg-white/70 text-gray-400 backdrop-blur-sm"
                     }`}
                   >
-                    {stage.is_completed ? (
+                    {isDone ? (
                       <Check className="h-5 w-5 text-white" strokeWidth={3} />
                     ) : (
-                      (() => { const Icon = STAGE_ICONS[stage.stage_key as StageKey]; return Icon ? <Icon className="h-4 w-4" /> : <span className="text-xs font-bold">{stage.order_index}</span>; })()
+                      <span className="text-xs font-bold">{stage.position}</span>
                     )}
                   </div>
                   <span
-                    className={`text-xs font-bold ${
-                      stage.is_completed ? "text-green-600" : "font-medium text-gray-400"
+                    className={`max-w-[64px] truncate text-center text-xs font-bold ${
+                      isDone ? "text-green-600" : "font-medium text-gray-400"
                     }`}
                   >
-                    {label}
+                    {stage.title}
                   </span>
                 </div>
               );

@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronLeft, Clock, MapPin, Check, FileText, FileCode2, File,
-  Image as ImageIcon, Sparkles,
+  ChevronLeft, Clock, Check, FileText, FileCode2, File,
+  Image as ImageIcon, Sparkles, BookOpen, ListChecks,
 } from "lucide-react";
-import { getSubjectStyle, formatTime, getDictionary } from "@snr/core";
-import type { StudentLessonView, LessonStagePublic, Locale } from "@snr/core";
+import {
+  getSubjectStyle, formatTime, getDictionary,
+  markTheoryStudied, submitStageTask,
+} from "@snr/core";
+import type { StudentLessonView, LessonStageWithProgress, Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
-import { ClassworkBlock } from "./ClassworkBlock";
 import { RaiseHandButton } from "./RaiseHandButton";
-
-const STAGE_KEYS = ["goal", "theory", "practice", "classwork", "review", "summary"] as const;
+import { createClient } from "@/lib/supabase/client";
 
 function initials(name: string): string {
   return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
@@ -44,6 +46,93 @@ function materialIcon(name: string): { Icon: typeof FileText; cls: string } {
   return { Icon: File, cls: "bg-slate-100 text-slate-600" };
 }
 
+// ── Task stub modal ────────────────────────────────────────────────────────────
+function TaskStubModal({
+  stage,
+  onClose,
+}: {
+  stage: LessonStageWithProgress;
+  onClose: () => void;
+}) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale).lesson;
+
+  const contentName = stage.content_type
+    ? {
+        presentation: d.stageContentPresentation,
+        code:         d.stageContentCode,
+        scratch:      d.stageContentScratch,
+        tinkercad:    d.stageContentTinkercad,
+        app_inventor: d.stageContentAppInventor,
+        code_monkey:  d.stageContentCodeMonkey,
+        quiz_qia:     d.stageContentQuizQia,
+        quiz_kahoot:  d.stageContentQuizKahoot,
+      }[stage.content_type] ?? stage.content_type
+    : null;
+
+  const isSubmitted = !!stage.progress?.submission_data;
+  const isGraded = stage.progress?.grade != null;
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl"
+        style={{ background: "var(--surface-1, #fff)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{stage.title}</h3>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10"
+          >
+            ✕
+          </button>
+        </div>
+
+        {stage.description && (
+          <p className="mb-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
+        )}
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          {d.stageTaskStubPrefix}
+          {contentName ? ` ${contentName}` : ""}
+        </div>
+
+        {isGraded && (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+            {d.stageTaskGradedLabel}: {stage.progress?.grade}/5
+            {stage.progress?.teacher_comment && (
+              <p className="mt-1 text-xs opacity-80">{stage.progress.teacher_comment}</p>
+            )}
+          </div>
+        )}
+        {!isGraded && isSubmitted && (
+          <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+            {d.stageTaskSubmittedLabel}
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="mt-4 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+        >
+          {d.stageTaskCloseBtn}
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 export function LessonWorkspaceView({
   lesson,
   materialUrls,
@@ -56,15 +145,19 @@ export function LessonWorkspaceView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const w = d.lesson.workspace;
+  const dl = d.lesson;
   const router = useRouter();
+  const db = createClient();
   const style = getSubjectStyle(lesson.group.subject);
 
-  const stageLabels: Record<(typeof STAGE_KEYS)[number], string> = {
-    goal: d.lesson.stage1, theory: d.lesson.stage2, practice: d.lesson.stage3,
-    classwork: d.lesson.stage4, review: d.lesson.stage5, summary: d.lesson.stage6,
-  };
+  const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
+  const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
+  const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Live elapsed timer (client-only → "00:00:00" until mounted to avoid hydration mismatch)
+  useEffect(() => { setMounted(true); }, []);
+
+  // Live elapsed timer (client-only → "00:00:00" until mounted)
   const [nowMs, setNowMs] = useState<number | null>(null);
   useEffect(() => {
     setNowMs(Date.now());
@@ -76,26 +169,75 @@ export function LessonWorkspaceView({
       ? fmtElapsed(nowMs - new Date(lesson.started_at).getTime())
       : "00:00:00";
 
-  // When the teacher ends the lesson (status → completed), refresh into the completed view.
+  // Refresh when teacher ends lesson
   useRealtimeChannel(`lesson-status-${lesson.id}`, "lessons", `id=eq.${lesson.id}`, () => {
     router.refresh();
   });
 
-  // Map canonical stages → done / active / upcoming
-  const stagesByKey = new Map<string, LessonStagePublic>();
-  for (const s of lesson.stages) stagesByKey.set(s.stage_key, s);
-  let activeAssigned = false;
-  const steps = STAGE_KEYS.map((key) => {
-    const s = stagesByKey.get(key);
-    if (s?.is_completed) return { key, state: "done" as const };
-    if (s && !activeAssigned) { activeAssigned = true; return { key, state: "active" as const }; }
-    return { key, state: "upcoming" as const };
-  });
+  const handleMarkStudied = useCallback(async (stageId: string) => {
+    if (!studentId) return;
+    setStudiedLoading(stageId);
+    try {
+      await markTheoryStudied(db, stageId, studentId);
+      setStages((prev) =>
+        prev.map((s) =>
+          s.id === stageId
+            ? {
+                ...s,
+                progress: {
+                  ...s.progress,
+                  id: s.progress?.id ?? "",
+                  stage_id: stageId,
+                  student_id: studentId,
+                  is_completed: true,
+                  completed_at: new Date().toISOString(),
+                  submission_data: s.progress?.submission_data ?? null,
+                  grade: s.progress?.grade ?? null,
+                  teacher_comment: s.progress?.teacher_comment ?? null,
+                  graded_at: s.progress?.graded_at ?? null,
+                  graded_by: s.progress?.graded_by ?? null,
+                },
+              }
+            : s,
+        ),
+      );
+    } catch { /* noop */ } finally {
+      setStudiedLoading(null);
+    }
+  }, [db, studentId]);
 
   const heroTitle = lesson.title ?? lesson.topic ?? style.label;
   const timeRange = lesson.ends_at
     ? `${formatTime(lesson.starts_at)} — ${formatTime(lesson.ends_at)}`
     : formatTime(lesson.starts_at);
+
+  const startStage   = stages.find((s) => s.stage_role === "start");
+  const summaryStage = stages.find((s) => s.stage_role === "summary");
+  const middleStages = stages
+    .filter((s) => s.stage_role === "middle")
+    .sort((a, b) => a.position - b.position);
+
+  const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
+
+  // Compute stepper state
+  type StepState = "done" | "active" | "upcoming";
+  function getStepState(stage: LessonStageWithProgress, idx: number): StepState {
+    if (stage.is_completed) return "done";
+    if (stage.stage_role === "start" && lesson.status === "in_progress") return "done";
+    if (stage.progress?.is_completed) return "done";
+    // first non-done middle stage is active
+    const prevAllDone = middleStages.slice(0, idx).every(
+      (s) => s.is_completed || s.progress?.is_completed,
+    );
+    if (prevAllDone) return "active";
+    return "upcoming";
+  }
+
+  const allStepsForStepper = [
+    ...(startStage ? [startStage] : []),
+    ...middleStages,
+    ...(summaryStage ? [summaryStage] : []),
+  ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
@@ -104,10 +246,10 @@ export function LessonWorkspaceView({
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
       >
         <ChevronLeft className="h-4 w-4" />
-        {d.lesson.back}
+        {dl.back}
       </Link>
 
-      {/* ── Header bar (gradient) ────────────────────────────────────── */}
+      {/* Header bar */}
       <header
         className="relative overflow-hidden rounded-2xl px-6 py-4 text-white shadow-xl"
         style={{ background: "linear-gradient(110deg, #0058bc 0%, #6b38d4 100%)" }}
@@ -131,7 +273,7 @@ export function LessonWorkspaceView({
                 </div>
                 <div className="flex flex-col leading-tight">
                   <span className="text-xs font-semibold">{lesson.teacher.full_name}</span>
-                  {lesson.room && <span className="text-[10px] text-white/70">{d.lesson.cabinet} {lesson.room}</span>}
+                  {lesson.room && <span className="text-[10px] text-white/70">{dl.cabinet} {lesson.room}</span>}
                 </div>
               </div>
             )}
@@ -143,52 +285,79 @@ export function LessonWorkspaceView({
         </div>
       </header>
 
-      {/* ── 3-column workspace ───────────────────────────────────────── */}
+      {/* 3-column workspace */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* Left: stages + raise hand */}
+
+        {/* Left: stages stepper */}
         <aside className="space-y-5 lg:col-span-3">
           <section className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
             <h2 className="mb-4 text-sm font-bold uppercase tracking-widest text-gray-500">
-              {d.lesson.stagesTitle}
+              {dl.stagesTitle}
             </h2>
             <ul className="relative flex flex-col gap-4">
-              {steps.map((step, i) => {
-                const isLast = i === steps.length - 1;
+              {allStepsForStepper.map((stage, i) => {
+                const isLast = i === allStepsForStepper.length - 1;
+                const middleIdx = middleStages.findIndex((s) => s.id === stage.id);
+                const stepState: StepState =
+                  stage.stage_role === "start"
+                    ? lesson.status === "in_progress" || lesson.status === "completed"
+                      ? "done"
+                      : "upcoming"
+                    : stage.stage_role === "summary"
+                    ? lesson.status === "completed"
+                      ? "done"
+                      : "upcoming"
+                    : getStepState(stage, middleIdx);
+
                 return (
-                  <li key={step.key} className="relative flex gap-3">
+                  <li key={stage.id} className="relative flex gap-3">
                     {!isLast && (
                       <span className="absolute left-[11px] top-6 h-[calc(100%+4px)] w-0.5 bg-slate-200" />
                     )}
                     <span
                       className={`z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                        step.state === "done"
+                        stepState === "done"
                           ? "border-emerald-500 bg-emerald-100 text-emerald-600"
-                          : step.state === "active"
+                          : stepState === "active"
                           ? "border-blue-600 bg-blue-600 ring-4 ring-blue-200"
                           : "border-slate-300 bg-white"
                       }`}
                     >
-                      {step.state === "done" ? (
+                      {stepState === "done" ? (
                         <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                      ) : step.state === "active" ? (
+                      ) : stepState === "active" ? (
                         <span className="h-2 w-2 rounded-full bg-white" />
                       ) : null}
                     </span>
-                    <span
-                      className={`pt-0.5 text-sm ${
-                        step.state === "done"
-                          ? "font-medium text-slate-500"
-                          : step.state === "active"
-                          ? "font-bold text-blue-600"
-                          : "font-medium text-slate-400"
-                      }`}
-                    >
-                      {stageLabels[step.key]}
-                    </span>
+                    <div className="flex flex-1 flex-col gap-0.5 pt-0.5">
+                      <span
+                        className={`text-sm ${
+                          stepState === "done"
+                            ? "font-medium text-slate-500"
+                            : stepState === "active"
+                            ? "font-bold text-blue-600"
+                            : "font-medium text-slate-400"
+                        }`}
+                      >
+                        {stage.title}
+                      </span>
+                      {stage.stage_role === "middle" && stage.stage_type && (
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                          stage.stage_type === "task" ? "text-violet-500" : "text-blue-400"
+                        }`}>
+                          {stage.stage_type === "task"
+                            ? dl.stageBadgeTask
+                            : dl.stageBadgeTheory}
+                        </span>
+                      )}
+                    </div>
                   </li>
                 );
               })}
             </ul>
+            {allStepsForStepper.length === 0 && (
+              <p className="text-center text-xs text-slate-400">—</p>
+            )}
             <p className="mt-5 border-t border-slate-100 pt-3 text-center text-[11px] font-medium text-slate-300">
               ID: {lesson.id.slice(0, 8)}
             </p>
@@ -198,21 +367,113 @@ export function LessonWorkspaceView({
           {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
         </aside>
 
-        {/* Center: task / classwork */}
-        <section className="lg:col-span-6">
-          <div className="rounded-2xl border border-white/60 bg-white/60 p-6 shadow-sm backdrop-blur-xl md:p-8">
-            <h3 className="text-2xl font-bold tracking-tight text-slate-900">{w.task}</h3>
-            {lesson.description && (
-              <p className="mt-2 text-[15px] leading-relaxed text-slate-600">{lesson.description}</p>
-            )}
-            {studentId ? (
-              <div className="mt-5">
-                <ClassworkBlock lessonId={lesson.id} studentId={studentId} />
-              </div>
-            ) : (
-              <p className="mt-5 text-sm text-slate-400">{w.noTask}</p>
-            )}
-          </div>
+        {/* Center: active middle stages content */}
+        <section className="space-y-4 lg:col-span-6">
+          {lesson.description && (
+            <div className="rounded-2xl border border-white/60 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
+              <p className="text-[15px] leading-relaxed text-slate-600">{lesson.description}</p>
+            </div>
+          )}
+
+          {middleStages.length === 0 ? (
+            <div className="rounded-2xl border border-white/60 bg-white/60 p-6 shadow-sm backdrop-blur-xl">
+              <p className="text-center text-sm text-slate-400">{w.noTask}</p>
+            </div>
+          ) : (
+            middleStages.map((stage) => {
+              const isStudied = stage.progress?.is_completed;
+              const isSubmitted = !!stage.progress?.submission_data;
+              const isGraded = stage.progress?.grade != null;
+              const isLoading = studiedLoading === stage.id;
+
+              return (
+                <div
+                  key={stage.id}
+                  className={`rounded-2xl border p-5 shadow-sm backdrop-blur-xl transition-all ${
+                    stage.stage_type === "task"
+                      ? "border-violet-100 bg-violet-50/40 dark:border-violet-500/20 dark:bg-violet-500/5"
+                      : "border-blue-100 bg-blue-50/40 dark:border-blue-500/20 dark:bg-blue-500/5"
+                  }`}
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                      stage.stage_type === "task"
+                        ? "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300"
+                        : "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
+                    }`}>
+                      {stage.stage_type === "task"
+                        ? <ListChecks className="h-4 w-4" />
+                        : <BookOpen className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-[15px] font-bold text-slate-800 dark:text-slate-100">{stage.title}</h3>
+                      {stage.content_type && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          {dl.stageContentPresentation && stage.content_type === "presentation"
+                            ? dl.stageContentPresentation
+                            : stage.content_type}
+                        </span>
+                      )}
+                    </div>
+                    {(isStudied || isSubmitted || isGraded) && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+
+                  {stage.description && (
+                    <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
+                  )}
+
+                  {/* Theory: "Изучил" button */}
+                  {stage.stage_type === "theory" && (
+                    isStudied ? (
+                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        <Check className="h-4 w-4" />
+                        {dl.stageStudiedDone}
+                      </div>
+                    ) : (
+                      studentId && (
+                        <button
+                          onClick={() => handleMarkStudied(stage.id)}
+                          disabled={isLoading}
+                          className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-60"
+                        >
+                          {isLoading ? "…" : dl.stageStudiedBtn}
+                        </button>
+                      )
+                    )
+                  )}
+
+                  {/* Task: stub button */}
+                  {stage.stage_type === "task" && (
+                    <div>
+                      {isGraded ? (
+                        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                          <Check className="h-4 w-4" />
+                          {dl.stageTaskGradedLabel}: {stage.progress?.grade}/5
+                        </div>
+                      ) : isSubmitted ? (
+                        <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                          {dl.stageTaskSubmittedLabel}
+                        </div>
+                      ) : (
+                        mounted && studentId && (
+                          <button
+                            onClick={() => setOpenTaskStageId(stage.id)}
+                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                          >
+                            {dl.stageTaskStubPrefix}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </section>
 
         {/* Right: materials + AI */}
@@ -220,7 +481,7 @@ export function LessonWorkspaceView({
           <section className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
             <h3 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-500">{w.materials}</h3>
             {lesson.materials.length === 0 ? (
-              <p className="text-sm text-gray-400">{d.lesson.materialsEmpty}</p>
+              <p className="text-sm text-gray-400">{dl.materialsEmpty}</p>
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {lesson.materials.map((m) => {
@@ -252,7 +513,7 @@ export function LessonWorkspaceView({
             )}
           </section>
 
-          {/* AI assistant (links to the dedicated AI page) */}
+          {/* AI assistant link */}
           <Link
             href="/ai-assistant"
             className="group relative block overflow-hidden rounded-2xl p-5 text-white shadow-lg transition-shadow hover:shadow-xl"
@@ -272,6 +533,14 @@ export function LessonWorkspaceView({
           </Link>
         </aside>
       </div>
+
+      {/* Task stub modal */}
+      {mounted && openTaskStage && (
+        <TaskStubModal
+          stage={openTaskStage}
+          onClose={() => setOpenTaskStageId(null)}
+        />
+      )}
     </div>
   );
 }

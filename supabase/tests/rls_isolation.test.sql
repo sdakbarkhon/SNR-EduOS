@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(133);
+select plan(139);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -377,11 +377,12 @@ select lives_ok(
 
 -- ── Migration 24: lesson_stages + lesson_materials ────────────────────
 
--- Test 85: T INSERT lesson_stage (goal) для aa000001 (группа a0 — Ivan's)
-select lives_ok(
-  $$ insert into public.lesson_stages (lesson_id, stage_key, order_index, is_completed)
-     values ('aa000001-0000-0000-0000-000000000000', 'goal', 1, false) $$,
-  'T: может создать lesson_stage в своей группе (aa000001)'
+-- Test 85: trigger (migration 35) auto-created start stage (stage_role='start') for aa000001
+select ok(
+  (select count(*) > 0 from public.lesson_stages
+    where lesson_id = 'aa000001-0000-0000-0000-000000000000'
+      and stage_role = 'start'),
+  'M35 trigger: start stage auto-created for aa000001'
 );
 
 -- Test 86: T INSERT lesson_material для aa000001
@@ -397,11 +398,12 @@ select lives_ok(
   'T: может добавить lesson_material в свой урок (aa000001)'
 );
 
--- Test 87: T INSERT lesson_stage для bb000001 (группа b0 — Ivan's, для isolation ниже)
-select lives_ok(
-  $$ insert into public.lesson_stages (lesson_id, stage_key, order_index, is_completed)
-     values ('bb000001-0000-0000-0000-000000000000', 'goal', 1, false) $$,
-  'T: может создать lesson_stage для bb000001 (своя группа b0)'
+-- Test 87: trigger (migration 35) auto-created summary stage (stage_role='summary') for bb000001
+select ok(
+  (select count(*) > 0 from public.lesson_stages
+    where lesson_id = 'bb000001-0000-0000-0000-000000000000'
+      and stage_role = 'summary'),
+  'M35 trigger: summary stage auto-created for bb000001'
 );
 
 -- Test 88: T INSERT lesson_material для bb000001 (для isolation ниже)
@@ -1005,6 +1007,75 @@ select is(
 reset role;
 delete from public.homework where id = 'aa340001-0000-0000-0000-000000000000';
 delete from public.announcements where title in ('M34-A', 'M34-FOREIGN');
+
+-- ============ MIGRATION 35: lesson_stages_v2 + lesson_stage_progress ============
+reset role;
+
+-- Test 134: lesson_stages.position column exists (migration 35 schema)
+select ok(
+  (select count(*) > 0
+     from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'lesson_stages'
+      and column_name  = 'position'),
+  'M35: lesson_stages.position column exists'
+);
+
+-- Test 135: lesson_stage_progress table exists
+select ok(
+  (select count(*) > 0
+     from information_schema.tables
+    where table_schema = 'public'
+      and table_name   = 'lesson_stage_progress'),
+  'M35: lesson_stage_progress table exists'
+);
+
+-- Test 136 (teacher): can INSERT middle stage in own group lesson
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+select lives_ok(
+  $$ insert into public.lesson_stages (lesson_id, position, stage_role, stage_type, title)
+     values ('aa000001-0000-0000-0000-000000000000', 5, 'middle', 'theory', 'M35-TEST-STAGE') $$,
+  'M35: teacher can INSERT middle stage in own group lesson'
+);
+
+-- Test 137 (teacher): CANNOT INSERT stage in foreign group lesson → 42501
+select throws_ok(
+  $$ insert into public.lesson_stages (lesson_id, position, stage_role, stage_type, title)
+     values ('dd000001-0000-0000-0000-000000000000', 5, 'middle', 'theory', 'HACK-STAGE') $$,
+  '42501', NULL,
+  'M35: teacher cannot INSERT stage in foreign group lesson'
+);
+
+-- Test 138 (student A): can SELECT lesson_stages for own group lesson
+reset role;
+select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+select ok(
+  (select count(*) > 0 from public.lesson_stages
+    where lesson_id = 'aa000001-0000-0000-0000-000000000000'),
+  'M35: student A can SELECT lesson_stages for own group lesson'
+);
+
+-- Test 139 (student A): can upsert lesson_stage_progress for own stage
+select lives_ok(
+  $$ insert into public.lesson_stage_progress (stage_id, student_id, is_completed)
+     values (
+       (select id from public.lesson_stages
+         where lesson_id = 'aa000001-0000-0000-0000-000000000000'
+           and stage_role = 'start'
+         limit 1),
+       'a1111111-1111-1111-1111-111111111111',
+       true
+     ) $$,
+  'M35: student A can upsert lesson_stage_progress for own stage'
+);
+
+-- cleanup M35
+reset role;
+delete from public.lesson_stages where title = 'M35-TEST-STAGE';
 
 select * from finish();
 rollback;

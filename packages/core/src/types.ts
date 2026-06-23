@@ -67,7 +67,44 @@ export type Lesson = {
   created_at: string;
 };
 
-export type StageKey = 'goal' | 'theory' | 'practice' | 'classwork' | 'review' | 'summary';
+// ── Lesson stages v2 (migration 35) ──────────────────────────────────────────
+export type LessonStageRole = 'start' | 'middle' | 'summary';
+export type LessonStageType = 'theory' | 'task';
+export type LessonContentType =
+  | 'presentation' | 'code' | 'scratch' | 'tinkercad'
+  | 'app_inventor' | 'code_monkey' | 'quiz_qia' | 'quiz_kahoot';
+
+export type LessonStage = {
+  id: string;
+  lesson_id: string;
+  position: number;
+  stage_role: LessonStageRole;
+  stage_type: LessonStageType | null;
+  content_type: LessonContentType | null;
+  title: string;
+  description: string | null;
+  config: Record<string, unknown>;
+  is_completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type LessonStageProgress = {
+  id: string;
+  stage_id: string;
+  student_id: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  submission_data: unknown | null;
+  grade: number | null;
+  teacher_comment: string | null;
+  graded_at: string | null;
+  graded_by: string | null;
+};
+
+export type LessonStageWithProgress = LessonStage & {
+  progress: LessonStageProgress | null;
+};
 
 export type LessonMaterial = {
   id: string;
@@ -80,17 +117,6 @@ export type LessonMaterial = {
   created_at: string;
 };
 
-export type LessonStage = {
-  id: string;
-  lesson_id: string;
-  stage_key: StageKey;
-  order_index: number;
-  is_completed: boolean;
-  teacher_notes: string | null;
-  completed_at: string | null;
-};
-
-export type LessonStagePublic = Omit<LessonStage, 'teacher_notes'>;
 
 export type TeacherLessonView = {
   id: string;
@@ -127,7 +153,7 @@ export type StudentLessonView = {
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;
   materials: LessonMaterial[];
-  stages: LessonStagePublic[];
+  stages: LessonStageWithProgress[];
 };
 
 export type Attendance = {
