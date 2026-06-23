@@ -17,6 +17,8 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
 import { CodeStageView } from "./CodeStageView";
+import { ExternalStageModal } from "./ExternalStageModal";
+import { isExternalService } from "@/lib/external-services";
 import { createClient } from "@/lib/supabase/client";
 
 function initials(name: string): string {
@@ -207,6 +209,7 @@ export function LessonWorkspaceView({
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
   const [activeCodeStageId, setActiveCodeStageId] = useState<string | null>(null);
+  const [externalStageId, setExternalStageId] = useState<string | null>(null);
   const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
@@ -275,8 +278,9 @@ export function LessonWorkspaceView({
 
   const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
   const activeCodeStage = activeCodeStageId ? stages.find((s) => s.id === activeCodeStageId) : null;
+  const externalStage = externalStageId ? stages.find((s) => s.id === externalStageId) : null;
 
-  const handleCodeSubmitted = useCallback((progress: LessonStageProgress) => {
+  const handleStageSubmitted = useCallback((progress: LessonStageProgress) => {
     setStages((prev) => prev.map((s) => s.id === progress.stage_id ? { ...s, progress } : s));
   }, []);
 
@@ -316,7 +320,7 @@ export function LessonWorkspaceView({
           stage={activeCodeStage}
           studentId={studentId}
           onBack={() => setActiveCodeStageId(null)}
-          onSubmitted={handleCodeSubmitted}
+          onSubmitted={handleStageSubmitted}
         />
       </div>
     );
@@ -555,24 +559,35 @@ export function LessonWorkspaceView({
                         </div>
                       ) : null}
 
-                      {/* Code stages always offer an editor button (open / view read-only) */}
-                      {stage.content_type === "code"
-                        ? mounted && studentId && (
-                            <button
-                              onClick={() => setActiveCodeStageId(stage.id)}
-                              className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
-                            >
-                              {dl.code.openEditor}
-                            </button>
-                          )
-                        : !isGraded && !isSubmitted && mounted && studentId && (
-                            <button
-                              onClick={() => setOpenTaskStageId(stage.id)}
-                              className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
-                            >
-                              {dl.stageTaskStubPrefix}
-                            </button>
-                          )}
+                      {/* Code + external stages always offer an open button (open / view read-only) */}
+                      {stage.content_type === "code" ? (
+                        mounted && studentId && (
+                          <button
+                            onClick={() => setActiveCodeStageId(stage.id)}
+                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                          >
+                            {dl.code.openEditor}
+                          </button>
+                        )
+                      ) : isExternalService(stage.content_type) ? (
+                        mounted && studentId && (
+                          <button
+                            onClick={() => setExternalStageId(stage.id)}
+                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                          >
+                            {dl.external.open}
+                          </button>
+                        )
+                      ) : (
+                        !isGraded && !isSubmitted && mounted && studentId && (
+                          <button
+                            onClick={() => setOpenTaskStageId(stage.id)}
+                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+                          >
+                            {dl.stageTaskStubPrefix}
+                          </button>
+                        )
+                      )}
                     </div>
                   )}
                 </div>
@@ -693,6 +708,16 @@ export function LessonWorkspaceView({
       {/* Material viewer modal */}
       {mounted && viewerMat && (
         <MaterialViewerModal mat={viewerMat} onClose={() => setViewerMat(null)} />
+      )}
+
+      {/* External service modal (scratch/tinkercad/app_inventor/code_monkey) */}
+      {mounted && externalStage && studentId && (
+        <ExternalStageModal
+          stage={externalStage}
+          studentId={studentId}
+          onClose={() => setExternalStageId(null)}
+          onSubmitted={handleStageSubmitted}
+        />
       )}
     </div>
   );
