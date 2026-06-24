@@ -138,6 +138,27 @@ export const getActiveTickerAnnouncements = async (db: Db): Promise<Announcement
   return (data ?? []) as Announcement[];
 };
 
+// Returns ticker announcements not yet seen by the current user (using announcement_user_reads).
+export const getUnreadTickerAnnouncements = async (db: Db, userId: string): Promise<Announcement[]> => {
+  const all = await getActiveTickerAnnouncements(db);
+  if (all.length === 0) return [];
+  const ids = all.map((a) => a.id);
+  const { data: reads } = await (db as any).from("announcement_user_reads")
+    .select("announcement_id")
+    .eq("user_id", userId)
+    .in("announcement_id", ids);
+  const readSet = new Set(((reads ?? []) as any[]).map((r) => r.announcement_id));
+  return all.filter((a) => !readSet.has(a.id));
+};
+
+export const markTickerAnnouncementsRead = async (db: Db, userId: string, announcementIds: string[]): Promise<void> => {
+  if (announcementIds.length === 0) return;
+  const rows = announcementIds.map((id) => ({ user_id: userId, announcement_id: id }));
+  await (db as any).from("announcement_user_reads")
+    .upsert(rows, { onConflict: "user_id,announcement_id", ignoreDuplicates: true })
+    .catch(() => null);
+};
+
 export const markAnnouncementRead = async (db: Db, announcementId: string, studentId: string): Promise<void> => {
   const { error } = await (db as any).from("announcement_reads")
     .upsert({ announcement_id: announcementId, student_id: studentId }, { onConflict: "announcement_id,student_id", ignoreDuplicates: true });

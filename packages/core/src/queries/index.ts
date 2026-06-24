@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -2824,4 +2824,70 @@ export const getMyRaisedHand = async (
     .select("*").eq("lesson_id", lessonId).eq("student_id", studentId)
     .is("lowered_at", null).maybeSingle();
   return (data as RaisedHand | null) ?? null;
+};
+
+// ── Leave Requests (migration 47) ────────────────────────────────────────────
+
+export const createLeaveRequest = async (
+  db: Db,
+  { studentId, lessonId, reason }: { studentId: string; lessonId: string; reason: string },
+): Promise<LeaveRequest> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("leave_requests")
+    .insert({ student_id: studentId, lesson_id: lessonId, reason })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as LeaveRequest;
+};
+
+export const getStudentLeaveRequestForLesson = async (
+  db: Db,
+  studentId: string,
+  lessonId: string,
+): Promise<LeaveRequest | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("leave_requests")
+    .select("*")
+    .eq("student_id", studentId)
+    .eq("lesson_id", lessonId)
+    .maybeSingle();
+  return (data as LeaveRequest | null) ?? null;
+};
+
+export const getLeaveRequestsForLesson = async (
+  db: Db,
+  lessonId: string,
+): Promise<LeaveRequestWithStudent[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("leave_requests")
+    .select("*, student:students(id, full_name, avatar_url)")
+    .eq("lesson_id", lessonId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as LeaveRequestWithStudent[];
+};
+
+export const decideLeaveRequest = async (
+  db: Db,
+  leaveRequestId: string,
+  teacherId: string,
+  status: "approved" | "rejected",
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("leave_requests")
+    .update({ status, decided_by: teacherId, decided_at: new Date().toISOString() })
+    .eq("id", leaveRequestId);
+  if (error) throw error;
+};
+
+export const cancelLeaveRequest = async (
+  db: Db,
+  leaveRequestId: string,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).from("leave_requests")
+    .delete()
+    .eq("id", leaveRequestId);
+  if (error) throw error;
 };

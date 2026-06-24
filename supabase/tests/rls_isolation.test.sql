@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(166);
+select plan(171);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1403,6 +1403,95 @@ select has_function(
   'public', 'fn_cleanup_expired_announcements',
   'M44: fn_cleanup_expired_announcements function exists'
 );
+
+-- ============ MIGRATION 21 (book_favorites): RLS isolation ============
+-- Setup: insert a test book as superuser, then test student favorite
+reset role;
+insert into public.books (id, title, subject, file_storage_path, uploaded_by)
+values ('bb210001-0000-0000-0000-000000000000', 'M21-FAV-BOOK', 'math',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc/test/book.pdf',
+        'cccccccc-cccc-cccc-cccc-cccccccccccc')
+on conflict (id) do nothing;
+
+-- as student A
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 167: student A can add a book_favorite for their own student record
+select lives_ok(
+  $$ insert into public.book_favorites (book_id, student_id)
+     values ('bb210001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111')
+     on conflict do nothing $$,
+  'M21: student A can insert own book_favorite'
+);
+
+-- as student B
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 168: student B cannot see student A's book_favorites
+select is(
+  (select count(*)::int from public.book_favorites
+    where student_id = 'a1111111-1111-1111-1111-111111111111'),
+  0,
+  'M21: student B cannot see student A book_favorites (RLS)'
+);
+
+-- cleanup
+reset role;
+delete from public.books where id = 'bb210001-0000-0000-0000-000000000000';
+
+-- ============ MIGRATION 47: leave_requests ============
+-- Setup: lesson aa000001 is already in_progress from M30 tests
+-- Insert a leave_request as student A, test teacher access
+
+-- as student A
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 169: student A can INSERT leave_request for in_progress lesson in own group
+select lives_ok(
+  $$ insert into public.leave_requests (lesson_id, student_id, reason)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111', 'M47-test reason')
+     on conflict do nothing $$,
+  'M47: student A can INSERT leave_request for own in-progress lesson'
+);
+
+-- Test 170: student A cannot INSERT leave_request with another student's id → 42501
+select throws_ok(
+  $$ insert into public.leave_requests (lesson_id, student_id, reason)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'b2222222-2222-2222-2222-222222222222', 'HACK') $$,
+  '42501', NULL,
+  'M47: student A cannot INSERT leave_request with another student_id'
+);
+
+-- as teacher Ivan (cccccccc)
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 171: teacher Ivan can read leave_requests for own group lesson
+select ok(
+  (select count(*)::int > 0 from public.leave_requests
+    where lesson_id = 'aa000001-0000-0000-0000-000000000000'
+      and reason = 'M47-test reason'),
+  'M47: teacher Ivan can see leave_requests for own group lesson'
+);
+
+-- cleanup
+reset role;
+delete from public.leave_requests
+  where lesson_id = 'aa000001-0000-0000-0000-000000000000'
+    and reason = 'M47-test reason';
 
 select * from finish();
 rollback;

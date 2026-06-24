@@ -702,6 +702,24 @@ export type RaisedHandWithStudent = RaisedHand & {
   student: { id: string; full_name: string; avatar_url: string | null };
 };
 
+// ── Leave requests (migration 47): student requests to leave in-progress lesson ──
+export type LeaveRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export type LeaveRequest = {
+  id: string;
+  lesson_id: string;
+  student_id: string;
+  reason: string;
+  status: LeaveRequestStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+};
+
+export type LeaveRequestWithStudent = LeaveRequest & {
+  student: { id: string; full_name: string; avatar_url: string | null };
+};
+
 /** Оценка за урок (migration 40), выставляется учителем через перекличку. */
 export type LessonGrade = {
   id: string;

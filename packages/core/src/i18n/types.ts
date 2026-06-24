@@ -756,6 +756,28 @@ export interface Dictionary {
       kindKahoot: string;        // grade badge: kahoot game
       kindExternal: string;      // grade badge: external service stage
     };
+    // Leave requests (migration 47) — student requests to leave during in_progress lesson
+    leave: {
+      button: string;             // "Отпроситься"
+      title: string;              // "Запрос на выход с урока"
+      reasonLabel: string;        // "Причина"
+      reasonIll: string;          // "Плохое самочувствие"
+      reasonFamily: string;       // "Семейные обстоятельства"
+      reasonMedical: string;      // "Медицинская причина"
+      reasonOther: string;        // "Другое"
+      otherPlaceholder: string;   // "Укажите причину…"
+      submit: string;             // "Отправить запрос"
+      sending: string;            // "Отправка…"
+      cancel: string;             // "Отмена"
+      pending: string;            // "На рассмотрении"
+      approved: string;           // "Одобрен"
+      rejected: string;           // "Отклонён"
+      cancelRequest: string;      // "Отменить запрос"
+      teacherTitle: string;       // "Запросы на выход"
+      teacherEmpty: string;       // "Запросов нет"
+      approve: string;            // "Одобрить"
+      reject: string;             // "Отклонить"
+    };
     // Lesson grade modal (teacher, migration 40)
     gradeStudent: string;          // modal title prefix "Оценить ученика:"
     gradeChoose: string;           // "Выбери оценку"

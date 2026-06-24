@@ -205,12 +205,16 @@ function BookCard({
   book,
   coverUrl,
   isFavorite,
+  isStudent,
   onSelect,
+  onToggleFavorite,
 }: {
   book: Book;
   coverUrl?: string | null;
   isFavorite: boolean;
+  isStudent: boolean;
   onSelect: (bookId: string) => void;
+  onToggleFavorite: (bookId: string) => void;
 }) {
   const style = getSubjectStyle(book.subject);
 
@@ -238,11 +242,14 @@ function BookCard({
           }}
         />
 
-        {/* Favorite indicator (non-interactive — toggle is in modal) */}
-        {isFavorite && (
-          <div className="absolute right-2.5 top-2.5 z-10 rounded-lg border border-white/20 bg-white/70 p-1 backdrop-blur-xl">
-            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-          </div>
+        {/* Favorite star — clickable for students */}
+        {isStudent && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(book.id); }}
+            className="absolute right-2.5 top-2.5 z-10 rounded-lg border border-white/20 bg-white/70 p-1 backdrop-blur-xl transition-transform hover:scale-110"
+          >
+            <Star className={`h-3.5 w-3.5 ${isFavorite ? "fill-yellow-400 text-yellow-400" : "text-slate-400"}`} />
+          </button>
         )}
 
         {/* Emoji auto-cover */}
@@ -484,7 +491,9 @@ export function BooksView({
               book={book}
               coverUrl={coverUrls[book.id]}
               isFavorite={favoriteIds.has(book.id)}
+              isStudent={!!studentId}
               onSelect={setSelectedBookId}
+              onToggleFavorite={toggleFavorite}
             />
           ))}
         </div>

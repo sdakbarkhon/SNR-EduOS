@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Clock, Check, FileText, FileCode2, File,
-  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download,
+  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, LogOut,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
+  createLeaveRequest, getStudentLeaveRequestForLesson, cancelLeaveRequest,
 } from "@snr/core";
-import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, Locale } from "@snr/core";
+import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LeaveRequest, Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
@@ -190,6 +191,102 @@ function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: (
   );
 }
 
+// ── Leave Request Modal ─────────────────────────────────────────────────────────
+
+type LeaveDb = ReturnType<typeof createClient>;
+
+function LeaveRequestModal({
+  db, lessonId, studentId, locale, onClose, onSubmitted,
+}: {
+  db: LeaveDb;
+  lessonId: string;
+  studentId: string;
+  locale: Locale;
+  onClose: () => void;
+  onSubmitted: (req: LeaveRequest) => void;
+}) {
+  const d = getDictionary(locale).lesson.leave;
+  const REASONS = [d.reasonIll, d.reasonFamily, d.reasonMedical, d.reasonOther];
+  const [selected, setSelected] = useState(REASONS[0]);
+  const [other, setOther] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const isOther = selected === d.reasonOther;
+  const reason = isOther ? other.trim() : selected;
+
+  async function handleSubmit() {
+    if (!reason) return;
+    setSending(true);
+    try {
+      const req = await createLeaveRequest(db, { studentId, lessonId, reason });
+      onSubmitted(req);
+    } catch {
+      setSending(false);
+    }
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.85)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-white">{d.title}</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <p className="mb-3 text-xs font-medium text-slate-400">{d.reasonLabel}</p>
+        <div className="mb-4 space-y-2">
+          {REASONS.map((r) => (
+            <button
+              key={r}
+              onClick={() => setSelected(r)}
+              className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition ${
+                selected === r
+                  ? "border-indigo-500 bg-indigo-500/20 text-indigo-200"
+                  : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        {isOther && (
+          <textarea
+            value={other}
+            onChange={(e) => setOther(e.target.value)}
+            placeholder={d.otherPlaceholder}
+            rows={3}
+            className="mb-4 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none"
+          />
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-slate-300 hover:bg-white/5"
+          >
+            {d.cancel}
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={sending || (isOther && !other.trim())}
+            className="flex-1 rounded-xl bg-rose-500 py-2.5 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
+          >
+            {sending ? d.sending : d.submit}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function LessonWorkspaceView({
@@ -218,8 +315,19 @@ export function LessonWorkspaceView({
   const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveRequest, setLeaveRequest] = useState<LeaveRequest | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Load existing leave request on mount
+  useEffect(() => {
+    if (!studentId) return;
+    getStudentLeaveRequestForLesson(db, studentId, lesson.id)
+      .then((r) => setLeaveRequest(r))
+      .catch(() => null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, lesson.id]);
 
   // Live elapsed timer (client-only → "00:00:00" until mounted)
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -459,6 +567,47 @@ export function LessonWorkspaceView({
 
           {/* Raise hand */}
           {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
+
+          {/* Leave request button */}
+          {mounted && studentId && (
+            <div className="mt-2">
+              {leaveRequest ? (
+                <div className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium ${
+                  leaveRequest.status === "approved"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : leaveRequest.status === "rejected"
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}>
+                  <LogOut className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    {leaveRequest.status === "approved" ? dl.leave.approved
+                     : leaveRequest.status === "rejected" ? dl.leave.rejected
+                     : dl.leave.pending}
+                  </span>
+                  {leaveRequest.status === "pending" && (
+                    <button
+                      className="ml-auto text-amber-500/70 hover:text-amber-700"
+                      onClick={async () => {
+                        await cancelLeaveRequest(db, leaveRequest.id).catch(() => null);
+                        setLeaveRequest(null);
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowLeaveModal(true)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-xl transition hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  {dl.leave.button}
+                </button>
+              )}
+            </div>
+          )}
         </aside>
 
         {/* Center: active middle stages content */}
@@ -755,6 +904,18 @@ export function LessonWorkspaceView({
           studentId={studentId}
           onClose={() => setKahootStageId(null)}
           onSubmitted={handleStageSubmitted}
+        />
+      )}
+
+      {/* Leave request modal */}
+      {mounted && showLeaveModal && studentId && (
+        <LeaveRequestModal
+          db={db}
+          lessonId={lesson.id}
+          studentId={studentId}
+          locale={locale as Locale}
+          onClose={() => setShowLeaveModal(false)}
+          onSubmitted={(req) => { setLeaveRequest(req); setShowLeaveModal(false); }}
         />
       )}
     </div>

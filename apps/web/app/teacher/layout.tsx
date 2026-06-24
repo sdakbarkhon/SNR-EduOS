@@ -20,8 +20,8 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
     const teacher = await getMyTeacher(supabase);
     teacherName = teacher.full_name ?? "";
     avatarUrl = teacher.avatar_url ?? null;
-  } catch {
-    // no teacher record yet
+  } catch (e) {
+    console.error("[TeacherLayout] getMyTeacher failed:", e);
   }
   try {
     const groups = (await getTeacherGroups(supabase)) as Array<{ subject: string }>;
@@ -29,8 +29,8 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
     teacherSubtitle = subjects.length <= 2
       ? subjects.join(" · ")
       : `${subjects.slice(0, 2).join(" · ")} · ещё ${subjects.length - 2}`;
-  } catch {
-    // no groups
+  } catch (e) {
+    console.error("[TeacherLayout] getTeacherGroups failed:", e);
   }
 
   return (

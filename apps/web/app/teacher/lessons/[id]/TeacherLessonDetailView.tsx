@@ -7,18 +7,20 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   getSubjectStyle, getLessonExcuseRequests,
+  getLeaveRequestsForLesson, decideLeaveRequest,
   getQuizQuestions, replaceQuizQuestions,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
   LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
+  LeaveRequestWithStudent,
   CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
   QuizQuestionInput, QuizConfigForStage,
 } from "@snr/core";
@@ -552,6 +554,12 @@ export function TeacherLessonDetailView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id]);
 
+  const [leaveReqs, setLeaveReqs] = useState<LeaveRequestWithStudent[]>([]);
+  const reloadLeaveReqs = useCallback(() => {
+    getLeaveRequestsForLesson(db as never, lesson.id).then(setLeaveReqs).catch(() => null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.id]);
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -564,6 +572,17 @@ export function TeacherLessonDetailView({
     "lesson_excuse_requests",
     `lesson_id=eq.${lesson.id}`,
     reloadExcuses,
+  );
+
+  useEffect(() => {
+    if (status === "in_progress") reloadLeaveReqs();
+  }, [status, reloadLeaveReqs]);
+
+  useRealtimeChannel(
+    status === "in_progress" ? `lesson-leave-${lesson.id}` : null,
+    "leave_requests",
+    `lesson_id=eq.${lesson.id}`,
+    reloadLeaveReqs,
   );
 
   // Auto-refresh when pg_cron changes lesson status (scheduled→in_progress→completed).
@@ -872,6 +891,70 @@ export function TeacherLessonDetailView({
       {/* Raised hands */}
       {status === "in_progress" && (
         <RaisedHandsBlock lessonId={lesson.id} teacherId={teacher.id} />
+      )}
+
+      {/* Leave requests */}
+      {status === "in_progress" && (
+        <section className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+          <div className="mb-3 flex items-center gap-2">
+            <LogOut className="h-4 w-4 text-rose-500" />
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.leave.teacherTitle}</h2>
+            {leaveReqs.filter((r) => r.status === "pending").length > 0 && (
+              <span className="ml-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                {leaveReqs.filter((r) => r.status === "pending").length}
+              </span>
+            )}
+          </div>
+          {leaveReqs.length === 0 ? (
+            <p className="text-sm text-slate-400">{dl.leave.teacherEmpty}</p>
+          ) : (
+            <div className="space-y-2">
+              {leaveReqs.map((req) => (
+                <div key={req.id} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+                  req.status === "approved" ? "border-emerald-200 bg-emerald-50"
+                  : req.status === "rejected" ? "border-red-100 bg-red-50"
+                  : "border-amber-200 bg-amber-50"
+                }`}>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-slate-600 shadow-sm">
+                    {req.student.full_name.split(" ").map((p: string) => p[0]).filter(Boolean).slice(0, 2).join("")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800">{req.student.full_name}</p>
+                    <p className="truncate text-xs text-slate-500">{req.reason}</p>
+                  </div>
+                  {req.status === "pending" ? (
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={async () => {
+                          await decideLeaveRequest(db as never, req.id, teacher.id, "approved").catch(() => null);
+                          reloadLeaveReqs();
+                        }}
+                        className="rounded-lg bg-emerald-500 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-600"
+                      >
+                        {dl.leave.approve}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await decideLeaveRequest(db as never, req.id, teacher.id, "rejected").catch(() => null);
+                          reloadLeaveReqs();
+                        }}
+                        className="rounded-lg bg-red-500 px-3 py-1 text-xs font-medium text-white hover:bg-red-600"
+                      >
+                        {dl.leave.reject}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      req.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                    }`}>
+                      {req.status === "approved" ? dl.leave.approved : dl.leave.rejected}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {/* About lesson */}
