@@ -465,8 +465,9 @@ export type ProjectSubmissionWithStudent = ProjectSubmission & {
   attachments: ProjectAttachment[];
 };
 
-// ── Announcements + Notifications (migration 34) ─────────────────────
+// ── Announcements + Notifications (migrations 34 + 44) ───────────────
 export type AnnouncementScope = "group" | "all_my_groups" | "student";
+export type AnnouncementCategory = "general" | "academic" | "event" | "urgent" | "reminder";
 export type Announcement = {
   id: string;
   created_by: string | null;
@@ -476,6 +477,9 @@ export type Announcement = {
   group_id: string | null;
   target_student_id: string | null;
   is_pinned: boolean;
+  category: AnnouncementCategory;
+  is_ticker: boolean;
+  valid_until: string | null;
   created_at: string;
 };
 export type TeacherAnnouncement = Announcement & {

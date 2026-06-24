@@ -329,17 +329,30 @@ export interface Dictionary {
     title: string;
     empty: string;
     pinned: string;
-    newBadge: string;          // "Новое"
-    by: string;                // "Учитель"
-    dashboardTitle: string;    // "Объявления"
+    newBadge: string;
+    by: string;
+    dashboardTitle: string;
     dashboardEmpty: string;
     seeAll: string;
+    validUntil: string;
+    expired: string;
+    tickerBadge: string;
+    categoryGeneral: string;
+    categoryAcademic: string;
+    categoryEvent: string;
+    categoryUrgent: string;
+    categoryReminder: string;
   };
   notifications: {
     title: string;
     markAll: string;
     empty: string;
     seeAll: string;
+    noMore: string;
+    loadMore: string;
+    delete: string;
+    today: string;
+    yesterday: string;
     agoSeconds: string; agoMinutes: string; agoHours: string; agoDays: string;
   };
   payments: {
@@ -973,6 +986,9 @@ export interface Dictionary {
       readCount: string;            // "Прочитали: {read} из {total}"
       pin: string; unpin: string; delete: string; deleteConfirm: string;
       pinnedTag: string;
+      categoryLabel: string;
+      isTickerLabel: string;
+      validUntilLabel: string;
     };
   };
   classwork: {

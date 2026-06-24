@@ -3,13 +3,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Db } from "../supabase/factory";
 import type {
-  AnnouncementScope, TeacherAnnouncement, StudentAnnouncement, AppNotification,
+  AnnouncementScope, AnnouncementCategory, Announcement,
+  TeacherAnnouncement, StudentAnnouncement, AppNotification,
 } from "../types";
 
 // ── Teacher: announcements ──
 export const createAnnouncement = async (
   db: Db,
-  input: { teacherId: string; scope: AnnouncementScope; groupId?: string | null; targetStudentId?: string | null; title: string; body: string; isPinned?: boolean },
+  input: {
+    teacherId: string;
+    scope: AnnouncementScope;
+    groupId?: string | null;
+    targetStudentId?: string | null;
+    title: string;
+    body: string;
+    isPinned?: boolean;
+    category?: AnnouncementCategory;
+    isTicker?: boolean;
+    validUntil?: string | null;
+  },
 ): Promise<string> => {
   const { data, error } = await (db as any).from("announcements").insert({
     created_by: input.teacherId,
@@ -19,6 +31,9 @@ export const createAnnouncement = async (
     title: input.title,
     body: input.body,
     is_pinned: input.isPinned ?? false,
+    category: input.category ?? "general",
+    is_ticker: input.isTicker ?? false,
+    valid_until: input.validUntil ?? null,
   }).select("id").single();
   if (error) throw error;
   return (data as { id: string }).id;
@@ -107,6 +122,20 @@ export const getStudentAnnouncements = async (db: Db, _studentId: string): Promi
     teacherName: a.teacher?.full_name ?? null,
     isRead: (a.reads ?? []).length > 0,
   })) as StudentAnnouncement[];
+};
+
+// Returns live ticker announcements visible to the current user (RLS filters).
+// Sorted by pinned-first, then newest. Excludes expired (valid_until < now).
+export const getActiveTickerAnnouncements = async (db: Db): Promise<Announcement[]> => {
+  const now = new Date().toISOString();
+  const { data, error } = await (db as any).from("announcements")
+    .select("*")
+    .eq("is_ticker", true)
+    .or(`valid_until.is.null,valid_until.gt.${now}`)
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Announcement[];
 };
 
 export const markAnnouncementRead = async (db: Db, announcementId: string, studentId: string): Promise<void> => {
