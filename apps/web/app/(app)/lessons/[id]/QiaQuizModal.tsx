@@ -12,7 +12,6 @@ import type {
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 const OPT = [
   { dot: "🔴", on: "bg-red-500 text-white border-red-500",       off: "bg-red-50 border-red-200 text-red-800 hover:border-red-400" },
@@ -47,7 +46,7 @@ export function QiaQuizModal({
   const [idx, setIdx] = useState(0);
   const [result, setResult] = useState<{ correct: number; total: number; grade: number } | null>(null);
   const [finalizing, setFinalizing] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmStep, setConfirmStep] = useState(false);
   const [nowMs, setNowMs] = useState<number | null>(null);
 
   // initial load
@@ -104,7 +103,7 @@ export function QiaQuizModal({
 
   async function doFinalize() {
     if (!attempt) return;
-    setConfirmOpen(false);
+    setConfirmStep(false);
     setFinalizing(true);
     try {
       const r = await finalizeQuizAttempt(db, attempt.id, studentId);
@@ -191,23 +190,41 @@ export function QiaQuizModal({
                 </div>
               </div>
 
-              {/* Footer nav */}
+              {/* Footer nav — confirmStep collapses nav into confirm row */}
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
-                <div className="flex gap-2">
-                  <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-                    <ChevronLeft className="h-4 w-4" /> {dq.prev}
-                  </button>
-                  <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))} disabled={idx >= total - 1}
-                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-                    {dq.next} <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-                <button onClick={() => setConfirmOpen(true)} disabled={finalizing}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-md shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95 disabled:opacity-60">
-                  {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
-                  <span className="opacity-80">({answeredCount}/{total})</span>
-                </button>
+                {confirmStep ? (
+                  <>
+                    <p className="text-sm font-semibold text-slate-600">{dq.confirmFinish}</p>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setConfirmStep(false)}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                        {dCommon.cancel}
+                      </button>
+                      <button onClick={doFinalize} disabled={finalizing}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95 disabled:opacity-60">
+                        {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                        <ChevronLeft className="h-4 w-4" /> {dq.prev}
+                      </button>
+                      <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))} disabled={idx >= total - 1}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                        {dq.next} <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button onClick={() => setConfirmStep(true)} disabled={finalizing}
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-md shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95 disabled:opacity-60">
+                      {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
+                      <span className="opacity-80">({answeredCount}/{total})</span>
+                    </button>
+                  </>
+                )}
               </div>
             </>
           ) : (
@@ -215,12 +232,6 @@ export function QiaQuizModal({
           )}
         </div>
       </div>
-
-      <ConfirmModal
-        open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={doFinalize}
-        title={dq.finish} message={dq.confirmFinish} variant="warning"
-        confirmText={dq.finish} cancelText={dCommon.cancel}
-      />
     </div>,
     document.body,
   );
