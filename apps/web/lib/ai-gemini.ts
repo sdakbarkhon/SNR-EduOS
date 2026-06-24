@@ -1,7 +1,7 @@
 // Server-side only — API key never reaches the browser.
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "gemini-2.5-flash";
 
 export async function callGemini(
   systemInstruction: string,
