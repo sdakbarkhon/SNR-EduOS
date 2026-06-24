@@ -128,6 +128,7 @@ export interface Dictionary {
     navStudents: string;
     navTeachers: string;
     navGroups: string;
+    navAnnouncements: string;
     navProfile: string;
     role: string;
     // dashboard

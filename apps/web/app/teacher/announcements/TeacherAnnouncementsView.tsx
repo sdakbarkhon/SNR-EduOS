@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Megaphone, Pin, PinOff, Trash2, Users, User, Globe } from "lucide-react";
+import { Plus, Megaphone, Pin, PinOff, Trash2, Users, User, Globe, BookOpen, CalendarDays, AlertTriangle, Bell } from "lucide-react";
 import {
   getDictionary, togglePinAnnouncement, deleteAnnouncement,
-  type Locale, type TeacherAnnouncement,
+  type Locale, type TeacherAnnouncement, type AnnouncementCategory,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -42,6 +42,14 @@ export function TeacherAnnouncementsView({
     setDeleteId(null);
   }
 
+  const CATEGORY_CFG: Record<AnnouncementCategory, { cls: string; Icon: typeof Megaphone }> = {
+    general:  { cls: "bg-slate-100 text-slate-600", Icon: Megaphone },
+    academic: { cls: "bg-blue-100 text-blue-700",   Icon: BookOpen },
+    event:    { cls: "bg-violet-100 text-violet-700", Icon: CalendarDays },
+    urgent:   { cls: "bg-red-100 text-red-700",     Icon: AlertTriangle },
+    reminder: { cls: "bg-amber-100 text-amber-700", Icon: Bell },
+  };
+
   function audience(a: TeacherAnnouncement) {
     if (a.scope === "group") return { Icon: Users, label: t.audienceGroupLabel.replace("{name}", a.groupName ?? "") };
     if (a.scope === "student") return { Icon: User, label: a.targetStudentName ?? "" };
@@ -67,17 +75,29 @@ export function TeacherAnnouncementsView({
           {list.map((a) => {
             const aud = audience(a);
             const date = new Date(a.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" });
+            const catCfg = CATEGORY_CFG[a.category ?? "general"];
+            const catLabel = (d.announcements as Record<string, string>)[`category${(a.category ?? "general").charAt(0).toUpperCase()}${(a.category ?? "general").slice(1)}`];
+            const validDate = a.valid_until ? new Date(a.valid_until).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" }) : null;
             return (
               <div key={a.id} className={cn("rounded-2xl border p-5 shadow-sm backdrop-blur-xl", a.is_pinned ? "border-amber-200 bg-amber-50/50" : "border-white/70 bg-white/70")}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {a.is_pinned && <Pin size={14} className="text-amber-500" />}
                       <h3 className="truncate text-[16px] font-bold text-brand-ink">{a.title}</h3>
+                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", catCfg.cls)}>
+                        <catCfg.Icon size={10} /> {catLabel}
+                      </span>
+                      {a.is_ticker && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          {d.announcements.tickerBadge}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-brand-ink-muted">
                       <span className="inline-flex items-center gap-1"><aud.Icon size={13} /> {aud.label}</span>
                       <span>{date}</span>
+                      {validDate && <span className="text-slate-400">{d.announcements.validUntil.replace("{date}", validDate)}</span>}
                       <span className="font-medium text-blue-600">{t.readCount.replace("{read}", String(a.readCount)).replace("{total}", String(a.totalRecipients))}</span>
                     </div>
                   </div>

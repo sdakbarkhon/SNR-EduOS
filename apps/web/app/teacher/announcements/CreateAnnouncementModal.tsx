@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { createAnnouncement, getDictionary, type Locale, type AnnouncementScope } from "@snr/core";
+import { createAnnouncement, getDictionary, type Locale, type AnnouncementScope, type AnnouncementCategory } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
@@ -29,6 +29,9 @@ export function CreateAnnouncementModal({
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
   const [pinned, setPinned] = useState(false);
+  const [category, setCategory] = useState<AnnouncementCategory>("general");
+  const [isTicker, setIsTicker] = useState(false);
+  const [validUntil, setValidUntil] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,6 +46,9 @@ export function CreateAnnouncementModal({
         teacherId, scope, title: title.trim(), body: body.trim(), isPinned: pinned,
         groupId: scope === "group" ? groupId : null,
         targetStudentId: scope === "student" ? studentId : null,
+        category,
+        isTicker,
+        validUntil: validUntil ? new Date(validUntil).toISOString() : null,
       });
       onClose();
       router.refresh();
@@ -103,9 +109,30 @@ export function CreateAnnouncementModal({
             )}
           </div>
 
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-slate-500">{t.categoryLabel}</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value as AnnouncementCategory)}
+              className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500">
+              {(["general","academic","event","urgent","reminder"] as AnnouncementCategory[]).map((c) => (
+                <option key={c} value={c}>{(d.announcements as Record<string, string>)[`category${c.charAt(0).toUpperCase()}${c.slice(1)}`]}</option>
+              ))}
+            </select>
+          </label>
+
           <label className="flex items-center gap-2.5 cursor-pointer">
             <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="h-4 w-4 rounded text-blue-600" />
             <span className="text-[13px] font-medium text-slate-700">{t.pinLabel}</span>
+          </label>
+
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" checked={isTicker} onChange={(e) => setIsTicker(e.target.checked)} className="h-4 w-4 rounded text-blue-600" />
+            <span className="text-[13px] font-medium text-slate-700">{t.isTickerLabel}</span>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-slate-500">{t.validUntilLabel}</span>
+            <input type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)}
+              className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
           </label>
 
           {error && <p className="text-sm text-red-500">{error}</p>}

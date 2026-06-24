@@ -137,6 +137,7 @@ export const ru: Dictionary = {
     navStudents: "Ученики",
     navTeachers: "Учителя",
     navGroups: "Группы",
+    navAnnouncements: "Объявления",
     navProfile: "Профиль",
     role: "Администратор",
     statStudents: "Учеников",
