@@ -636,6 +636,10 @@ export const ru: Dictionary = {
       you: "ТЫ",
       reviewSubmissions: "Результаты",
       noSubmissions: "Пока нет результатов",
+      viewResult: "Посмотреть результат",
+      kindQuiz: "Квиз (тест)",
+      kindKahoot: "Квиз-игра",
+      kindExternal: "Внешний сервис",
     },
   },
   teacher: {

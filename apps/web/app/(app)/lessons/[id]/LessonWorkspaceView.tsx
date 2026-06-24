@@ -599,7 +599,7 @@ export function LessonWorkspaceView({
                             onClick={() => setKahootStageId(stage.id)}
                             className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
                           >
-                            {dl.quiz.open}
+                            {stage.progress?.is_completed ? dl.quiz.viewResult : dl.quiz.open}
                           </button>
                         )
                       ) : (

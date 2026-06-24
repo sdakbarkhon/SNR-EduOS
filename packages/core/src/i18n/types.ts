@@ -643,6 +643,10 @@ export interface Dictionary {
       you: string;                // "ТЫ"
       reviewSubmissions: string;  // teacher: see QIA results
       noSubmissions: string;
+      viewResult: string;        // student: re-open finished kahoot/qia read-only
+      kindQuiz: string;          // grade badge: lesson quiz (QIA)
+      kindKahoot: string;        // grade badge: kahoot game
+      kindExternal: string;      // grade badge: external service stage
     };
   };
   teacher: {

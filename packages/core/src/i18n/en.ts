@@ -636,6 +636,10 @@ export const en: Dictionary = {
       you: "YOU",
       reviewSubmissions: "Results",
       noSubmissions: "No results yet",
+      viewResult: "View result",
+      kindQuiz: "Quiz (test)",
+      kindKahoot: "Live quiz",
+      kindExternal: "External service",
     },
   },
   teacher: {

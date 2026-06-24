@@ -636,6 +636,10 @@ export const uz: Dictionary = {
       you: "SIZ",
       reviewSubmissions: "Natijalar",
       noSubmissions: "Hozircha natijalar yo'q",
+      viewResult: "Natijani ko'rish",
+      kindQuiz: "Kviz (test)",
+      kindKahoot: "Jonli kviz",
+      kindExternal: "Tashqi xizmat",
     },
   },
   teacher: {

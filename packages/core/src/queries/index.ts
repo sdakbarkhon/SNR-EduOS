@@ -351,14 +351,14 @@ export const getTeacherAttendance = (db: Db) =>
 
 // --- Этап 2: Оценки и прогресс ---
 
-/** Одна оценка ученика (файл, тест или классная работа), нормализованная для журнала. */
+/** Одна оценка ученика (файл, тест, классная, этап урока), нормализованная для журнала. */
 export type StudentGradeItem = {
   id: string;
-  kind: "file" | "test" | "classwork" | "programming" | "project";
+  kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external";
   title: string;
   subject: string;
   groupName: string;
-  date: string; // submitted_at (дата работы)
+  date: string; // submitted_at / graded_at (дата работы)
   grade5: number | null; // нормировано к /5 для средних
   display: string; // "4/5" или "85/100"
   comment: string | null;
@@ -457,6 +457,39 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
       });
     }
   } catch { /* projects table may not exist on older hosted instances */ }
+
+  // Lesson stage task grades (quiz_qia, quiz_kahoot, code, external — migration 39)
+  try {
+    const stageSel =
+      "id, grade, teacher_comment, completed_at, graded_at, submission_data, " +
+      "stage:lesson_stages!inner(title, content_type, lesson:lessons!inner(group:groups!inner(subject, name)))";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stageRes = await (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
+    for (const r of (stageRes.data ?? []) as unknown as Array<{
+      id: string; grade: number; teacher_comment: string | null;
+      completed_at: string | null; graded_at: string | null;
+      submission_data: { kind?: string } | null;
+      stage: { title: string; content_type: string; lesson: { group: { subject: string; name: string } | null } | null } | null;
+    }>) {
+      const ct = r.stage?.content_type ?? "";
+      const kind: StudentGradeItem["kind"] =
+        ct === "quiz_qia" ? "quiz" :
+        ct === "quiz_kahoot" ? "kahoot" :
+        ct === "code" ? "programming" :
+        "external";
+      items.push({
+        id: r.id,
+        kind,
+        title: r.stage?.title ?? "Задание урока",
+        subject: r.stage?.lesson?.group?.subject ?? "",
+        groupName: r.stage?.lesson?.group?.name ?? "",
+        date: r.graded_at ?? r.completed_at ?? "",
+        grade5: r.grade,
+        display: `${r.grade}/5`,
+        comment: r.teacher_comment,
+      });
+    }
+  } catch { /* lesson_stage_progress join may not be available on older instances */ }
 
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;
@@ -1715,12 +1748,15 @@ export const finalizeQuizAttempt = async (
     is_finalized: true,
   }).eq("id", attemptId);
 
+  const nowIso = new Date().toISOString();
   await db2.from("lesson_stage_progress").upsert({
     stage_id: stageId,
     student_id: studentId,
     is_completed: true,
-    completed_at: new Date().toISOString(),
+    completed_at: nowIso,
     grade,
+    graded_at: nowIso,
+    graded_by: null,
     submission_data: { kind: "quiz", correct, total, total_score: totalScore },
   }, { onConflict: "stage_id,student_id", ignoreDuplicates: false });
 
@@ -1747,10 +1783,14 @@ export const getKahootSession = async (db: Db, stageId: string): Promise<KahootS
   return (data ?? null) as KahootSession | null;
 };
 
-/** Учитель открывает игру: пересоздаёт сессию в lobby (reset при перезапуске). */
+/** Учитель открывает игру: если сессия завершена — возвращает её (read-only просмотр).
+ *  Иначе удаляет старую и создаёт новое лобби. */
 export const createKahootSession = async (db: Db, stageId: string): Promise<KahootSession> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+  const { data: existing } = await db2.from("kahoot_sessions").select("*").eq("stage_id", stageId).maybeSingle();
+  // Finished session is read-only — preserve it, don't reset
+  if ((existing as KahootSession | null)?.status === "finished") return existing as KahootSession;
   await db2.from("kahoot_sessions").delete().eq("stage_id", stageId);
   const { data, error } = await db2.from("kahoot_sessions").insert({
     stage_id: stageId, status: "lobby", current_question_index: -1,
@@ -1859,20 +1899,23 @@ export const finishKahootGame = async (db: Db, sessionId: string): Promise<void>
     .select("id, student_id, answers:quiz_answers(score, is_correct)").eq("stage_id", stageId);
 
   type Raw = { id: string; student_id: string; answers: Array<{ score: number; is_correct: boolean | null }> };
+  const nowIso = new Date().toISOString();
   for (const a of (attempts ?? []) as Raw[]) {
     const correct = a.answers.filter((x) => x.is_correct).length;
     const totalScore = a.answers.reduce((s, x) => s + (x.score ?? 0), 0);
     const grade = gradeFromPercent(total > 0 ? (correct / total) * 100 : 0);
     await db2.from("quiz_attempts").update({
       correct_count: correct, total_score: totalScore, total_questions: total,
-      is_finalized: true, finished_at: new Date().toISOString(),
+      is_finalized: true, finished_at: nowIso,
     }).eq("id", a.id);
     await db2.from("lesson_stage_progress").upsert({
       stage_id: stageId,
       student_id: a.student_id,
       is_completed: true,
-      completed_at: new Date().toISOString(),
+      completed_at: nowIso,
       grade,
+      graded_at: nowIso,
+      graded_by: null,
       submission_data: { kind: "kahoot", correct, total, total_score: totalScore },
     }, { onConflict: "stage_id,student_id", ignoreDuplicates: false });
   }
