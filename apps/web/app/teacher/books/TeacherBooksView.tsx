@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  BookOpen, Plus, MoreHorizontal, Download, Trash2, X, Upload, Check, Library,
+  BookOpen, Plus, MoreHorizontal, Download, Trash2, X, Upload, Check, Library, Search,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertBook, getSubjectStyle } from "@snr/core";
@@ -549,8 +549,16 @@ export function TeacherBooksView({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+  const [filterSubject, setFilterSubject] = useState("all");
 
   useEffect(() => { setBooks(initialBooks); }, [initialBooks]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
   // Outside-click handler for ••• dropdowns (same pattern as TeacherMaterialsView)
   useEffect(() => {
@@ -630,6 +638,23 @@ export function TeacherBooksView({
     }
   }
 
+  const subjects = useMemo(() => {
+    const set = new Set(books.map((b) => b.subject).filter(Boolean));
+    return Array.from(set) as string[];
+  }, [books]);
+
+  const displayed = useMemo(() => {
+    const q = query.toLowerCase();
+    return books.filter((b) => {
+      const matchSubject = filterSubject === "all" || b.subject === filterSubject;
+      const matchQuery =
+        !q ||
+        b.title.toLowerCase().includes(q) ||
+        (b.author ?? "").toLowerCase().includes(q);
+      return matchSubject && matchQuery;
+    });
+  }, [books, query, filterSubject]);
+
   const selectedBook = selectedBookId
     ? (books.find((b) => b.id === selectedBookId) ?? null)
     : null;
@@ -677,6 +702,34 @@ export function TeacherBooksView({
           </button>
         </div>
 
+        {/* Search + filter */}
+        {books.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Поиск по названию или автору…"
+                value={rawQuery}
+                onChange={(e) => setRawQuery(e.target.value)}
+                className="w-64 rounded-xl border border-white/50 bg-white/60 py-2 pl-9 pr-4 text-sm text-slate-700 backdrop-blur-md placeholder-slate-400 focus:outline-none"
+              />
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            </div>
+            {subjects.length > 1 && (
+              <select
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+                className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
+              >
+                <option value="all">Все предметы</option>
+                {subjects.map((s) => (
+                  <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
         {/* Grid */}
         {books.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-white/40 py-20 text-center backdrop-blur-xl">
@@ -689,9 +742,15 @@ export function TeacherBooksView({
               + Добавить первую книгу
             </button>
           </div>
+        ) : displayed.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-white/40 py-20 text-center backdrop-blur-xl">
+            <BookOpen className="h-12 w-12 text-slate-300" />
+            <p className="text-base font-semibold text-slate-500">Ничего не найдено</p>
+            <p className="text-sm text-slate-400">Попробуйте изменить запрос или фильтр</p>
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {books.map((book) => {
+            {displayed.map((book) => {
               const style = getSubjectStyle(book.subject);
               const isOwn = book.uploaded_by === initialTeacherId;
               const isDeleting = deleting === book.id;

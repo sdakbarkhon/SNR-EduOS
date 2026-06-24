@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   FolderOpen, Plus, FileText, Video, FileImage, File, BookOpen,
-  Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload, Check,
+  Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload, Check, Search,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertMaterial } from "@snr/core";
@@ -414,6 +414,8 @@ export function TeacherMaterialsView({
   const [toast, setToast] = useState<string | null>(null);
   const [filterSubject, setFilterSubject] = useState("all");
   const [filterGroup, setFilterGroup] = useState("all");
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -424,6 +426,11 @@ export function TeacherMaterialsView({
   useEffect(() => {
     setMaterials(initialMaterials);
   }, [initialMaterials]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
   // Close the open dropdown on outside click or Esc — replaces the z-index
   // backdrop trick which was broken: backdrop-blur creates a stacking context
@@ -453,16 +460,19 @@ export function TeacherMaterialsView({
     return Array.from(set) as string[];
   }, [materials]);
 
-  const filtered = useMemo(
-    () =>
-      materials.filter((m) => {
-        const matchSubject =
-          filterSubject === "all" || (m.subject ?? m.group.subject) === filterSubject;
-        const matchGroup = filterGroup === "all" || m.group_id === filterGroup;
-        return matchSubject && matchGroup;
-      }),
-    [materials, filterSubject, filterGroup],
-  );
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    return materials.filter((m) => {
+      const matchSubject =
+        filterSubject === "all" || (m.subject ?? m.group.subject) === filterSubject;
+      const matchGroup = filterGroup === "all" || m.group_id === filterGroup;
+      const matchQuery =
+        !q ||
+        m.title.toLowerCase().includes(q) ||
+        (m.description ?? "").toLowerCase().includes(q);
+      return matchSubject && matchGroup && matchQuery;
+    });
+  }, [materials, filterSubject, filterGroup, query]);
 
   function handleUploadSuccess(info: { title: string; groupName: string }) {
     setShowUpload(false);
@@ -554,7 +564,18 @@ export function TeacherMaterialsView({
         </div>
 
         {/* Filters */}
-        <div className="mb-6 flex flex-wrap gap-3">
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Поиск по названию…"
+              value={rawQuery}
+              onChange={(e) => setRawQuery(e.target.value)}
+              className="w-56 rounded-xl border border-white/50 bg-white/60 py-2 pl-9 pr-4 text-sm text-slate-700 backdrop-blur-md placeholder-slate-400 focus:outline-none"
+            />
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          </div>
           <select
             value={filterSubject}
             onChange={(e) => setFilterSubject(e.target.value)}

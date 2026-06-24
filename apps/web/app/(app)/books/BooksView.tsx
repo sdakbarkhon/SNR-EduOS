@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Star, BookOpen, Library, X, Download } from "lucide-react";
+import { Star, BookOpen, Library, X, Download, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getSubjectStyle, addBookFavorite, removeBookFavorite } from "@snr/core";
 import type { Book } from "@snr/core";
@@ -280,15 +280,28 @@ export function BooksView({
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+  const [filterSubject, setFilterSubject] = useState("all");
 
   useEffect(() => { setBooks(initialBooks); }, [initialBooks]);
   useEffect(() => { setFavoriteIds(new Set(initialFavoriteIds)); }, [initialFavoriteIds]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  const subjects = useMemo(() => {
+    const set = new Set(books.map((b) => b.subject).filter(Boolean));
+    return Array.from(set) as string[];
+  }, [books]);
 
   const toggleFavorite = useCallback(
     async (bookId: string) => {
@@ -347,8 +360,18 @@ export function BooksView({
     ? (books.find((b) => b.id === selectedBookId) ?? null)
     : null;
 
-  const displayed =
-    activeTab === "library" ? books : books.filter((b) => favoriteIds.has(b.id));
+  const displayed = useMemo(() => {
+    const base = activeTab === "library" ? books : books.filter((b) => favoriteIds.has(b.id));
+    const q = query.toLowerCase();
+    return base.filter((b) => {
+      const matchesSubject = filterSubject === "all" || b.subject === filterSubject;
+      const matchesQuery =
+        !q ||
+        b.title.toLowerCase().includes(q) ||
+        (b.author ?? "").toLowerCase().includes(q);
+      return matchesSubject && matchesQuery;
+    });
+  }, [books, favoriteIds, activeTab, query, filterSubject]);
 
   return (
     <section className="mx-auto max-w-7xl text-slate-800">
@@ -373,9 +396,39 @@ export function BooksView({
         />
       )}
 
-      <h1 className="mb-6 text-3xl font-bold text-slate-800">Книги и учебники</h1>
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-slate-800">Библиотека</h1>
+        <div className="relative w-full max-w-xs sm:w-80">
+          <input
+            type="text"
+            placeholder="Поиск по названию или автору…"
+            value={rawQuery}
+            onChange={(e) => setRawQuery(e.target.value)}
+            className="w-full rounded-2xl border border-white/40 bg-white/60 py-3 pl-12 pr-4 text-sm text-slate-700 shadow-sm backdrop-blur-xl transition-all placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+          />
+          <Search className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+        </div>
+      </div>
 
-      {/* Tabs */}
+      {/* Tabs + subject filter */}
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        {/* Subject dropdown */}
+        {subjects.length > 1 && (
+          <select
+            value={filterSubject}
+            onChange={(e) => setFilterSubject(e.target.value)}
+            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
+          >
+            <option value="all">Все предметы</option>
+            {subjects.map((s) => (
+              <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Library / Favorites tabs */}
       <div className="mb-8 flex flex-wrap gap-3">
         <button
           onClick={() => setActiveTab("library")}

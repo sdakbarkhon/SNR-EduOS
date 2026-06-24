@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen,
@@ -66,28 +66,48 @@ function formatDate(iso: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────
 
+const SUBJECT_LABELS: Record<string, string> = {
+  robotics: "Робототехника", math: "Математика", english: "Английский",
+  informatics: "Информатика", chemistry: "Химия", programming: "Программирование",
+  physics: "Физика", biology: "Биология", history: "История",
+};
+
 export function MaterialsView({ materials }: { materials: MaterialWithGroup[] }) {
+  const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [activeType, setActiveType] = useState<DisplayType | "all">("all");
+  const [filterSubject, setFilterSubject] = useState("all");
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Debounce search 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
   const decorated = useMemo(
     () => materials.map((m) => ({ ...m, _type: resolveType(m) })),
     [materials],
   );
 
+  const subjects = useMemo(() => {
+    const set = new Set(decorated.map((m) => m.group.subject).filter(Boolean));
+    return Array.from(set) as string[];
+  }, [decorated]);
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     return decorated.filter((m) => {
       const matchesType = activeType === "all" || m._type === activeType;
+      const matchesSubject = filterSubject === "all" || m.group.subject === filterSubject;
       const matchesQuery =
         !q ||
         m.title.toLowerCase().includes(q) ||
         (m.description ?? "").toLowerCase().includes(q);
-      return matchesType && matchesQuery;
+      return matchesType && matchesSubject && matchesQuery;
     });
-  }, [decorated, query, activeType]);
+  }, [decorated, query, activeType, filterSubject]);
 
   // "Недавно открытые" = 4 newest by created_at
   const recent = useMemo(() => decorated.slice(0, 4), [decorated]);
@@ -141,21 +161,35 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
       )}
       {/* Header */}
       <header className="mb-6 mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Материалы</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Учебные материалы</h1>
         <div className="relative w-full max-w-xs sm:w-80">
           <input
             type="text"
             placeholder="Поиск материалов…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={rawQuery}
+            onChange={(e) => setRawQuery(e.target.value)}
             className="w-full rounded-2xl border border-white/40 bg-white/60 py-3 pl-12 pr-4 text-sm text-slate-700 shadow-sm backdrop-blur-xl transition-all placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
           />
           <Search className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
         </div>
       </header>
 
-      {/* Filter tabs */}
-      <div className="mb-8 flex flex-wrap gap-2">
+      {/* Filters row */}
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        {/* Subject dropdown */}
+        {subjects.length > 1 && (
+          <select
+            value={filterSubject}
+            onChange={(e) => setFilterSubject(e.target.value)}
+            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
+          >
+            <option value="all">Все предметы</option>
+            {subjects.map((s) => (
+              <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+            ))}
+          </select>
+        )}
+        {/* Type tabs */}
         {FILTER_TABS.map(({ key, label }) => (
           <button
             key={key}
