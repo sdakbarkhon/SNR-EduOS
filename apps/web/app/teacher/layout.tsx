@@ -3,13 +3,15 @@ import { redirect } from "next/navigation";
 import { getMyTeacher, getTeacherGroups, getSubjectConfig } from "@snr/core";
 import { TeacherShell } from "@/components/TeacherShell";
 import { createClient } from "@/lib/supabase/server";
-import { isTeacherEmail } from "@snr/core";
+import { getCurrentUserRole } from "@/lib/auth";
 
 export default async function TeacherLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || !isTeacherEmail(user.email)) redirect("/login");
+  if (!user) redirect("/login");
+  const role = await getCurrentUserRole(supabase, user.id);
+  if (role !== "teacher") redirect("/login");
 
   let teacherName = "";
   let avatarUrl: string | null = null;

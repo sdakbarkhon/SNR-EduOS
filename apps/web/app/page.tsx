@@ -1,17 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isTeacherEmail } from "@snr/core";
+import { getCurrentUserRole, roleToHome } from "@/lib/auth";
 
-// Root entry: route by real auth state (never a hardcoded default).
-//  • no session            → /login
-//  • teacher account        → /teacher/dashboard
-//  • student account        → /dashboard
+// Root entry: route by DB role (admin > teacher > student).
 export default async function Home() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  redirect(isTeacherEmail(user.email) ? "/teacher/dashboard" : "/dashboard");
+  const role = await getCurrentUserRole(supabase, user.id);
+  redirect(roleToHome(role));
 }

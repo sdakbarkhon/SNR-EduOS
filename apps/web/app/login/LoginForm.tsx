@@ -21,13 +21,24 @@ export function LoginForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error: authError, role } = await signInWithUsername(supabase, username, password);
+    const { error: authError, data } = await signInWithUsername(supabase, username, password);
     setLoading(false);
     if (authError) {
       setError(d.auth.invalid);
       return;
     }
-    const dest = role === "admin" ? "/admin" : role === "teacher" ? "/teacher/dashboard" : "/dashboard";
+    // Determine destination from DB (admin > teacher > student) so that a
+    // user who appears in admins table always lands on /admin regardless of email domain.
+    const userId = data?.user?.id;
+    let dest = "/dashboard";
+    if (userId) {
+      const [adminRes, teacherRes] = await Promise.all([
+        supabase.from("admins" as any).select("id").eq("user_id", userId).maybeSingle(),
+        supabase.from("teachers" as any).select("id").eq("user_id", userId).maybeSingle(),
+      ]);
+      if (adminRes.data) dest = "/admin";
+      else if (teacherRes.data) dest = "/teacher/dashboard";
+    }
     router.push(dest);
     router.refresh();
   }
