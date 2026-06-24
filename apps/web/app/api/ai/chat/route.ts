@@ -155,6 +155,7 @@ ${stageCtx}
   const { text, error } = await callGemini(systemPrompt, chatMessages);
 
   if (error) {
+    console.error("[ai-chat] callGemini returned error:", error);
     // Still save the user message so the limit counts it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db as any).from("ai_chat_messages").insert({

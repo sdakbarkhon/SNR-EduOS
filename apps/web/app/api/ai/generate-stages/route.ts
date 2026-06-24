@@ -186,21 +186,28 @@ export async function POST(req: NextRequest) {
       { temperature: 0.8, responseMimeType: "application/json" },
     );
 
-    if (error) { lastError = error; continue; }
+    if (error) {
+      console.error(`[ai-generate] attempt ${attempt} callGemini error:`, error);
+      lastError = error;
+      continue;
+    }
 
     try {
       const parsed = JSON.parse(text) as GenerateResult;
       if (Array.isArray(parsed?.stages) && validateStages(parsed.stages)) {
         result = parsed;
       } else {
+        console.error("[ai-generate] validation failed. stages:", JSON.stringify(parsed?.stages).slice(0, 300));
         lastError = "Generated stages failed validation";
       }
-    } catch {
+    } catch (e: unknown) {
+      console.error("[ai-generate] JSON parse error. raw text:", text.slice(0, 300), (e as Error)?.message);
       lastError = "Generated JSON parse error";
     }
   }
 
   if (!result) {
+    console.error("[ai-generate] all attempts failed. lastError:", lastError);
     return NextResponse.json({ error: lastError || "Generation failed" }, { status: 500 });
   }
 
