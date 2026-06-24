@@ -19,26 +19,43 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return !!email?.endsWith(`@${ADMIN_EMAIL_DOMAIN}`);
 }
 
-/** Tries student → teacher → admin domain. Returns role alongside auth result. */
+/** Tries student → teacher → admin domain. Returns role alongside auth result.
+ *  If username already contains "@" it is treated as a full email and tried directly first. */
 export async function signInWithUsername(
   db: Db,
   username: string,
   password: string,
 ) {
+  const input = username.trim();
+
+  // Support entering the full synthetic email (e.g. admin@admins.snr.local)
+  if (input.includes("@")) {
+    const direct = await db.auth.signInWithPassword({
+      email: input.toLowerCase(),
+      password,
+    });
+    if (!direct.error) {
+      const role = isAdminEmail(input) ? "admin" as const
+        : isTeacherEmail(input) ? "teacher" as const
+        : "student" as const;
+      return { ...direct, role };
+    }
+  }
+
   const studentResult = await db.auth.signInWithPassword({
-    email: usernameToEmail(username, DEFAULT_STUDENT_EMAIL_DOMAIN),
+    email: usernameToEmail(input, DEFAULT_STUDENT_EMAIL_DOMAIN),
     password,
   });
   if (!studentResult.error) return { ...studentResult, role: "student" as const };
 
   const teacherResult = await db.auth.signInWithPassword({
-    email: usernameToEmail(username, TEACHER_EMAIL_DOMAIN),
+    email: usernameToEmail(input, TEACHER_EMAIL_DOMAIN),
     password,
   });
   if (!teacherResult.error) return { ...teacherResult, role: "teacher" as const };
 
   const adminResult = await db.auth.signInWithPassword({
-    email: usernameToEmail(username, ADMIN_EMAIL_DOMAIN),
+    email: usernameToEmail(input, ADMIN_EMAIL_DOMAIN),
     password,
   });
   if (!adminResult.error) return { ...adminResult, role: "admin" as const };
