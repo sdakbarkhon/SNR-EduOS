@@ -901,4 +901,43 @@ export interface Dictionary {
     typeLearning: string;
     typeProgramming: string;
   };
+  ai: {
+    chat: {
+      title: string;             // "Робокот"
+      placeholder: string;       // "Напиши вопрос…"
+      send: string;              // "Отправить"
+      welcomeMessage: string;    // "Привет! Я Робокот 🤖…"
+      remaining: string;         // "Осталось: {n} из {total}"
+      limitReached: string;      // "Лимит на сегодня исчерпан…"
+      error: string;             // "Что-то пошло не так…"
+      collapse: string;          // "Свернуть"
+      expand: string;            // "Развернуть"
+      loading: string;           // "Думаю…"
+    };
+    generate: {
+      button: string;            // "✨ Добавить этапы через ИИ"
+      title: string;             // "Создать этапы через ИИ"
+      topic: string;             // "Тема урока"
+      topicPlaceholder: string;  // "Например: Циклы в Python"
+      grade: string;             // "Класс"
+      stageTypes: string;        // "Какие этапы создать?"
+      theory: string;            // "Теория (презентация)"
+      code: string;              // "Программирование"
+      quizQia: string;           // "Тест (QIA)"
+      quizKahoot: string;        // "Квиз-игра (Kahoot)"
+      quizCount: string;         // "Вопросов в тесте"
+      kahootCount: string;       // "Вопросов в Kahoot"
+      generating: string;        // "Создаю этапы…"
+      regenerate: string;        // "Сгенерировать заново"
+      addToLesson: string;       // "Добавить в урок"
+      preview: string;           // "ИИ создал {n} этапов. Проверь и подтверди:"
+      error: string;             // "Не удалось создать этапы"
+      retry: string;             // "Попробовать заново"
+      edit: string;              // "Редактировать"
+      remove: string;            // "Убрать"
+      adding: string;            // "Добавляю…"
+      added: string;             // "Этапы добавлены!"
+      stageQuestions: string;    // "{n} вопросов"
+    };
+  };
 }

@@ -7,7 +7,7 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -37,6 +37,7 @@ import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
+import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -512,6 +513,7 @@ export function TeacherLessonDetailView({
 
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
+  const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
   const [reviewStage, setReviewStage] = useState<LessonStage | null>(null);
   const [kahootStage, setKahootStage] = useState<LessonStage | null>(null);
@@ -928,12 +930,20 @@ export function TeacherLessonDetailView({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
           {!isLessonCompleted && (
-            <button
-              onClick={() => setStageModal({ mode: "add" })}
-              className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
-            >
-              <Plus className="h-4 w-4" /> {dl.stageAddBtn}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAiGenerateOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-violet-300 bg-gradient-to-r from-blue-50 to-violet-50 px-4 py-2 text-sm font-bold text-violet-700 shadow-sm hover:from-blue-100 hover:to-violet-100 active:scale-95 dark:border-violet-500/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-300"
+              >
+                <Sparkles className="h-4 w-4" /> {d.ai.generate.button}
+              </button>
+              <button
+                onClick={() => setStageModal({ mode: "add" })}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
+              >
+                <Plus className="h-4 w-4" /> {dl.stageAddBtn}
+              </button>
+            </div>
           )}
         </div>
 
@@ -1244,6 +1254,19 @@ export function TeacherLessonDetailView({
           stage={kahootStage}
           teacherId={teacher.id}
           onClose={() => setKahootStage(null)}
+        />
+      )}
+
+      {/* AI generate stages modal */}
+      {mounted && aiGenerateOpen && (
+        <AiGenerateStagesModal
+          lessonId={lesson.id}
+          lessonTopic={lesson.topic ?? lesson.title}
+          onClose={() => setAiGenerateOpen(false)}
+          onAdded={async () => {
+            const fresh = await getLessonStages(db, lesson.id);
+            setStages(fresh);
+          }}
         />
       )}
 

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Clock, Check, FileText, FileCode2, File,
-  Image as ImageIcon, Sparkles, BookOpen, ListChecks, Lock, X, Download,
+  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -16,6 +16,7 @@ import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, L
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
+import { AiChatPanel } from "./AiChatPanel";
 import { CodeStageView } from "./CodeStageView";
 import { ExternalStageModal } from "./ExternalStageModal";
 import { QiaQuizModal } from "./QiaQuizModal";
@@ -700,26 +701,19 @@ export function LessonWorkspaceView({
             )}
           </section>
 
-          {/* AI assistant link */}
-          <Link
-            href="/ai-assistant"
-            className="group relative block overflow-hidden rounded-2xl p-5 text-white shadow-lg transition-shadow hover:shadow-xl"
-            style={{ background: "linear-gradient(135deg, #213145 0%, #0b1c30 100%)" }}
-          >
-            <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-blue-500/30 blur-2xl transition-colors group-hover:bg-blue-500/50" />
-            <div className="relative z-10 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-blue-300" />
-                <span className="text-[15px] font-bold">{w.aiTitle}</span>
-              </div>
-              <p className="text-[13px] leading-snug text-white/80">{w.aiPrompt}</p>
-              <span className="mt-1 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-center text-xs font-semibold backdrop-blur-sm transition-colors group-hover:bg-white/20">
-                {w.aiAsk}
-              </span>
-            </div>
-          </Link>
         </aside>
       </div>
+
+      {/* AI chat panel (fixed overlay) */}
+      {mounted && studentId && (
+        <AiChatPanel
+          lessonId={lesson.id}
+          stageId={
+            openTaskStageId ?? activeCodeStageId ?? externalStageId ??
+            qiaStageId ?? kahootStageId ?? null
+          }
+        />
+      )}
 
       {/* Task stub modal */}
       {mounted && openTaskStage && (

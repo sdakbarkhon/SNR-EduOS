@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(155);
+select plan(158);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1248,6 +1248,42 @@ select is(
     where student_id = 'a1111111-1111-1111-1111-111111111111'),
   0,
   'M40: student B cannot see student A lesson_grade'
+);
+
+reset role;
+
+-- ============ Migration 41: ai_chat_messages ============
+
+-- student A session
+select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 156: student A can INSERT own ai_chat_message
+select lives_ok(
+  $$ insert into public.ai_chat_messages (student_id, lesson_id, role, content)
+     values (public.current_student_id(), 'aa000001-0000-0000-0000-000000000000', 'user', 'M41-TEST') $$,
+  'M41: student A can INSERT own ai_chat_message'
+);
+
+-- student B session
+reset role;
+select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 157: student B cannot see student A's messages
+select is(
+  (select count(*)::int from public.ai_chat_messages
+    where student_id = 'a1111111-1111-1111-1111-111111111111'),
+  0,
+  'M41: student B cannot see student A ai_chat_messages'
+);
+
+-- Test 158: DELETE is blocked (no GRANT DELETE on table)
+select throws_ok(
+  $$ delete from public.ai_chat_messages
+      where student_id = 'a1111111-1111-1111-1111-111111111111' $$,
+  '42501', NULL,
+  'M41: DELETE ai_chat_messages is blocked (no grant)'
 );
 
 reset role;
