@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(162);
+select plan(166);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1364,6 +1364,45 @@ reset role;
 delete from public.students where username in ('pgtap_student_42', 'hack_42');
 delete from public.admins where full_name = 'PGTap Admin';
 delete from auth.users where email in ('pgtap_admin@admins.snr.local', 'pgtap_new_student@students.snr.local');
+
+-- ============ MIGRATION 44: announcements_v2 ============
+reset role;
+
+-- Test 163: announcements.category column exists with correct default
+select ok(
+  (select column_default like '%general%'
+     from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'announcements'
+      and column_name  = 'category'),
+  'M44: announcements.category column exists with default general'
+);
+
+-- Test 164: announcements.is_ticker column exists as boolean, default false
+select ok(
+  (select data_type = 'boolean'
+     from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'announcements'
+      and column_name  = 'is_ticker'),
+  'M44: announcements.is_ticker column is boolean'
+);
+
+-- Test 165: announcements.valid_until column exists as timestamptz
+select ok(
+  (select data_type = 'timestamp with time zone'
+     from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'announcements'
+      and column_name  = 'valid_until'),
+  'M44: announcements.valid_until column is timestamptz'
+);
+
+-- Test 166: fn_cleanup_expired_announcements function exists
+select has_function(
+  'public', 'fn_cleanup_expired_announcements',
+  'M44: fn_cleanup_expired_announcements function exists'
+);
 
 select * from finish();
 rollback;
