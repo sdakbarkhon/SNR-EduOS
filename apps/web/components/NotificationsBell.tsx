@@ -3,8 +3,9 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, FolderOpen, Check,
+  Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, FolderOpen, Check, ChevronRight,
 } from "lucide-react";
 import {
   getDictionary, getMyNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead,
@@ -167,6 +168,17 @@ export const NotificationsBell = memo(function NotificationsBell() {
             );
           })
         )}
+      </div>
+      {/* See all link */}
+      <div className="border-t border-slate-100 dark:border-slate-700">
+        <Link
+          href="/notifications"
+          onClick={() => setOpen(false)}
+          className="flex w-full items-center justify-center gap-1 py-2.5 text-[12px] font-semibold text-blue-600 hover:bg-slate-50 dark:text-blue-400 dark:hover:bg-slate-700/40"
+        >
+          {t.seeAll}
+          <ChevronRight size={12} />
+        </Link>
       </div>
     </div>,
     document.body,

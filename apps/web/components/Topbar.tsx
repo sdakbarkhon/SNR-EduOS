@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { LogoutButton } from "./LogoutButton";
 import { NotificationsBell } from "./NotificationsBell";
+import { AnnouncementTicker } from "./AnnouncementTicker";
 
 export function Topbar({
   title,
@@ -16,6 +17,7 @@ export function Topbar({
         {title}
       </h1>
       <div className="flex items-center gap-3">
+        <AnnouncementTicker />
         <NotificationsBell />
         {studentName && (
           <Link href="/profile" className="transition-transform hover:scale-105">
