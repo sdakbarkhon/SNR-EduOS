@@ -22,16 +22,14 @@ const MONTH_NAMES_RU = [
 
 function cellStyle(status: AttendanceStatus | null): string {
   if (status === "present") return "bg-emerald-100 text-emerald-700";
-  if (status === "late") return "bg-amber-100 text-amber-700";
-  if (status === "absent_excused") return "bg-red-100 text-red-600";
+  if (status === "absent_excused") return "bg-amber-100 text-amber-700";
   if (status === "absent_unexcused") return "bg-red-200 text-red-700";
   return "bg-gray-50 text-gray-300";
 }
 
 function cellIcon(status: AttendanceStatus | null): string {
   if (status === "present") return "✓";
-  if (status === "late") return "!";
-  if (status === "absent_excused") return "х";
+  if (status === "absent_excused") return "у";
   if (status === "absent_unexcused") return "—";
   return "·";
 }
@@ -151,8 +149,8 @@ export function TeacherAttendanceView({
       <div className="flex flex-wrap gap-4 text-[12px] text-gray-500">
         {[
           { icon: "✓", label: da.teacherLegendPresent, cls: "text-emerald-600" },
-          { icon: "!", label: da.teacherLegendLate, cls: "text-amber-600" },
-          { icon: "х", label: da.teacherLegendAbsent, cls: "text-red-600" },
+          { icon: "у", label: da.teacherLegendLate, cls: "text-amber-600" },
+          { icon: "—", label: da.teacherLegendAbsent, cls: "text-red-600" },
           { icon: "·", label: da.teacherLegendNone, cls: "text-gray-300" },
         ].map((l) => (
           <span key={l.label} className="flex items-center gap-1">
@@ -164,8 +162,11 @@ export function TeacherAttendanceView({
 
       {/* Matrix */}
       {!data || (data.lessons.length === 0 || data.students.length === 0) ? (
-        <div className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl p-10 text-center text-[14px] text-gray-400">
-          {da.teacherMatrixEmpty}
+        <div className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl p-10 text-center space-y-2">
+          <p className="text-[14px] text-gray-400">{da.teacherMatrixEmpty}</p>
+          {data && data.students.length > 0 && data.lessons.length === 0 && (
+            <p className="text-[12px] text-gray-300">Попробуйте выбрать другой месяц</p>
+          )}
         </div>
       ) : (
         <div className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl overflow-x-auto"
