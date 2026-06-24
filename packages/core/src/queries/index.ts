@@ -1202,14 +1202,14 @@ export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDet
 export const getTeacherLessonsForGroup = async (
   db: Db,
   groupId: string,
-): Promise<Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>> => {
+): Promise<Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>> => {
   const { data, error } = await db
     .from("lessons")
-    .select("id, starts_at, topic, lesson_no")
+    .select("id, starts_at, topic, title, lesson_no")
     .eq("group_id", groupId)
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>;
+  return (data ?? []) as unknown as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>;
 };
 
 // ─── LESSON MODULE (migration 24 → 35) ───────────────────────────────────────

@@ -51,7 +51,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [lessonId, setLessonId] = useState<string>("");
   const [lessonsForGroup, setLessonsForGroup] = useState<
-    Array<{ id: string; starts_at: string; topic: string | null; lesson_no: number | null }>
+    Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>
   >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -298,11 +298,12 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             >
               <option value="">{d.lesson.noLesson}</option>
               {lessonsForGroup.map((l) => {
-                const dateStr = new Date(l.starts_at).toLocaleDateString("ru", {
-                  day: "numeric", month: "short", timeZone: "Asia/Tashkent",
+                const dateStr = new Date(l.starts_at).toLocaleDateString("ru-RU", {
+                  day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Tashkent",
                 });
-                const label = l.topic
-                  ? `${dateStr} · ${l.topic}`
+                const topic = l.title ?? l.topic;
+                const label = topic
+                  ? `${dateStr} · ${topic}`
                   : l.lesson_no
                   ? `${dateStr} · Урок №${l.lesson_no}`
                   : dateStr;
