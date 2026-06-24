@@ -12,7 +12,7 @@ interface Props {
   grades: StudentGradeItem[];
 }
 
-type TypeFilter = "all" | "file" | "test" | "classwork";
+type TypeFilter = "all" | "file" | "test" | "classwork" | "quiz" | "kahoot";
 type SortKey = "subject" | "date" | "grade";
 
 /** Цвет оценки по проценту: >=80% зелёный, 50-79% жёлтый, <50% красный. */
@@ -99,6 +99,8 @@ export function GradesView({ grades }: Props) {
     { key: "file", label: d.homework.typeFile },
     { key: "test", label: d.homework.typeTest },
     { key: "classwork", label: d.classwork.title },
+    { key: "quiz", label: d.lesson.quiz.kindQuiz },
+    { key: "kahoot", label: d.lesson.quiz.kindKahoot },
   ];
 
   return (
@@ -196,6 +198,12 @@ export function GradesView({ grades }: Props) {
                             ? "bg-emerald-100 text-emerald-700"
                             : g.kind === "project"
                             ? "bg-orange-100 text-orange-700"
+                            : g.kind === "quiz"
+                            ? "bg-indigo-100 text-indigo-700"
+                            : g.kind === "kahoot"
+                            ? "bg-amber-100 text-amber-700"
+                            : g.kind === "external"
+                            ? "bg-cyan-100 text-cyan-700"
                             : "bg-blue-100 text-blue-700")}>
                           {g.kind === "classwork"
                             ? d.classwork.title
@@ -205,6 +213,12 @@ export function GradesView({ grades }: Props) {
                             ? d.homework.typeProgramming
                             : g.kind === "project"
                             ? d.projects.badge
+                            : g.kind === "quiz"
+                            ? d.lesson.quiz.kindQuiz
+                            : g.kind === "kahoot"
+                            ? d.lesson.quiz.kindKahoot
+                            : g.kind === "external"
+                            ? d.lesson.quiz.kindExternal
                             : d.homework.typeFile}
                         </span>
                       </td>
