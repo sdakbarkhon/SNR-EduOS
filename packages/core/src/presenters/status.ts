@@ -29,7 +29,7 @@ export type StatusKey =
   | "todo"
   | "present"
   | "absent"
-  | "late";
+  | "excused";
 
 export interface StatusBadge {
   variant: StatusVariant;
@@ -80,11 +80,9 @@ export function attendanceStatus(status: AttendanceStatus): StatusBadge {
     case "present":
       return { variant: "success", key: "present" };
     case "absent_excused":
-      return { variant: "warning", key: "late" };
+      return { variant: "warning", key: "excused" };
     case "absent_unexcused":
       return { variant: "danger", key: "absent" };
-    default:
-      return { variant: "neutral", key: "absent" };
   }
 }
 

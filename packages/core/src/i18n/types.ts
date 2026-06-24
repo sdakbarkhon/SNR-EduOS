@@ -92,7 +92,6 @@ export interface Dictionary {
     legendExcused: string;
     legendUnexcused: string;
     statusPresent: string;
-    statusLate: string;
     statusExcused: string;
     statusUnexcused: string;
     periodMonth: string;

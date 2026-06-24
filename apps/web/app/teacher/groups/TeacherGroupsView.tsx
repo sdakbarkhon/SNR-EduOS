@@ -39,7 +39,7 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
       const avgGrade = groupGrades.length
         ? (groupGrades.reduce((a, g) => a + g.score, 0) / groupGrades.length).toFixed(1)
         : "—";
-      const attended = groupAtt.filter((a) => a.status === "present" || a.status === "late").length;
+      const attended = groupAtt.filter((a) => a.status === "present").length;
       const attendancePct = groupAtt.length ? `${Math.round((attended / groupAtt.length) * 100)}%` : "—";
 
       return { group, studentCount, hasData, avgGrade, attendancePct };

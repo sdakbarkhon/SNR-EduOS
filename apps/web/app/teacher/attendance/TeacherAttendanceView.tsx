@@ -195,7 +195,7 @@ export function TeacherAttendanceView({
               {data.students.map((student) => {
                 const row = data.matrix[student.id] ?? {};
                 const attended = Object.values(row).filter(
-                  (s) => s === "present" || s === "late",
+                  (s) => s === "present",
                 ).length;
                 const total = data.lessons.length;
                 const pct = total > 0 ? Math.round((attended / total) * 100) : 0;

@@ -68,7 +68,7 @@ export const getStudentAttendance = async (
     status: AttendanceStatus;
     marked_at: string | null;
   }>;
-  stats: { total: number; present: number; late: number; absent: number; percentage: number };
+  stats: { total: number; present: number; excused: number; unexcused: number; percentage: number };
 }> => {
   const raw = await db
     .from("attendance")
@@ -93,9 +93,9 @@ export const getStudentAttendance = async (
 
   const total = rows.length;
   const present = rows.filter((r) => r.status === "present").length;
-  const late = rows.filter((r) => r.status === "late").length;
-  const absent = rows.filter((r) => r.status === "absent_excused" || r.status === "absent_unexcused").length;
-  const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+  const excused = rows.filter((r) => r.status === "absent_excused").length;
+  const unexcused = rows.filter((r) => r.status === "absent_unexcused").length;
+  const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
 
   return {
     records: rows.map((r) => ({
@@ -108,7 +108,7 @@ export const getStudentAttendance = async (
       status: r.status,
       marked_at: r.marked_at,
     })),
-    stats: { total, present, late, absent, percentage },
+    stats: { total, present, excused, unexcused, percentage },
   };
 };
 
@@ -164,7 +164,7 @@ export const getGroupAttendance = async (
 
   const totalCells = students.length * lessons.length;
   const presentCells = Object.values(matrix).flatMap((row) => Object.values(row))
-    .filter((s) => s === "present" || s === "late").length;
+    .filter((s) => s === "present").length;
   const groupAvgPct = totalCells > 0 ? Math.round((presentCells / totalCells) * 100) : 0;
 
   return { lessons, students, matrix, groupAvgPct };
