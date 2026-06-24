@@ -64,6 +64,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
   const [matrix, setMatrix] = useState<GradeMatrixData | null>(null);
   const [loading, setLoading] = useState(false);
   const [lessonGrades, setLessonGrades] = useState<LessonGradeRow[]>([]);
+  const [showAllLessonGrades, setShowAllLessonGrades] = useState(false);
 
   // Review modal state
   const [reviewSub, setReviewSub] = useState<ReviewSubmission | null>(null);
@@ -334,7 +335,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {lessonGrades.map((r) => (
+                {(showAllLessonGrades ? lessonGrades : lessonGrades.slice(0, 5)).map((r) => (
                   <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/40">
                     <td className="px-3 py-2 font-semibold text-slate-800">{r.student_name}</td>
                     <td className="px-3 py-2 text-slate-500">
@@ -354,6 +355,17 @@ export function TeacherGradesView({ groups, stats }: Props) {
               </tbody>
             </table>
           </div>
+          {lessonGrades.length > 5 && (
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => setShowAllLessonGrades((v) => !v)}
+                className="rounded-[10px] border border-slate-200 bg-white px-4 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-violet-300 hover:text-violet-600"
+              >
+                {showAllLessonGrades ? "Свернуть" : `Показать все (${lessonGrades.length})`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -18,7 +18,8 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { factBanner } from "@snr/ui-tokens";
-import { EmptyState, GlassCard, MaterialTile, RingProgress, SubjectIcon, useLocale } from "@/components";
+import { EmptyState, MaterialTile, RingProgress, SubjectIcon, useLocale } from "@/components";
+import { DashboardCard } from "@/components/DashboardCard";
 import type { Database } from "@snr/core";
 import { getDailyFact } from "@/app/actions/ai";
 import { FloatingActionButton } from "./FloatingActionButton";
@@ -144,68 +145,50 @@ export function DashboardView({
 
       {/* KPI — 3 clickable cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {/* Следующий урок */}
-        <Link href={next ? `/lessons/${next.id}` : "/schedule"} className="group">
-          <GlassCard className="flex flex-col p-5 cursor-pointer transition-all group-hover:scale-[1.02] group-hover:shadow-lg">
-            <span className="mb-4 text-[13px] font-semibold text-gray-500">
-              {d.dashboard.nextLesson}
-            </span>
-            {next ? (
-              <div className="flex items-center gap-4">
-                <SubjectIcon subject={nextSubject} size={64} />
-                <div className="flex flex-col">
-                  <span className="text-[18px] font-bold text-gray-900">
-                    {getSubjectStyle(nextSubject).label}
-                  </span>
-                  <span className="text-[14px] text-gray-500">
-                    {formatTime(next.starts_at)}
-                  </span>
-                  {next.room && (
-                    <span className="text-[13px] text-gray-400">
-                      {d.dashboard.room} {next.room}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <span className="text-[14px] text-gray-400">{d.dashboard.noNextLesson}</span>
-            )}
-          </GlassCard>
-        </Link>
-
-        {/* Мои задания */}
-        <Link href="/homework" className="group">
-          <GlassCard className="flex flex-col p-5 cursor-pointer transition-all group-hover:scale-[1.02] group-hover:shadow-lg">
-            <span className="mb-4 text-[13px] font-semibold text-gray-500">
-              {d.dashboard.myTasks}
-            </span>
+        <DashboardCard title={d.dashboard.nextLesson} href={next ? `/lessons/${next.id}` : "/schedule"}>
+          {next ? (
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-white bg-blue-100 shadow-sm">
-                <Copy size={22} className="text-blue-600" />
+              <SubjectIcon subject={nextSubject} size={64} />
+              <div className="flex flex-col">
+                <span className="text-[18px] font-bold text-gray-900">
+                  {getSubjectStyle(nextSubject).label}
+                </span>
+                <span className="text-[14px] text-gray-500">
+                  {formatTime(next.starts_at)}
+                </span>
+                {next.room && (
+                  <span className="text-[13px] text-gray-400">
+                    {d.dashboard.room} {next.room}
+                  </span>
+                )}
               </div>
-              <p className="text-[28px] font-bold leading-none text-gray-900">
-                {activeCount}
-                <span className="ml-2 text-base font-medium text-gray-500">{activeSuffix}</span>
-              </p>
             </div>
-          </GlassCard>
-        </Link>
+          ) : (
+            <span className="text-[14px] text-gray-400">{d.dashboard.noNextLesson}</span>
+          )}
+        </DashboardCard>
 
-        {/* Прогресс недели */}
-        <Link href="/attendance" className="group">
-          <GlassCard className="flex flex-col p-5 cursor-pointer transition-all group-hover:scale-[1.02] group-hover:shadow-lg">
-            <span className="mb-4 text-[13px] font-semibold text-gray-500">
-              {d.dashboard.weekProgress}
-            </span>
-            <div className="flex items-center gap-5">
-              <RingProgress value={attPct} size={72} />
-              <div>
-                <p className="text-[32px] font-bold leading-none text-gray-900">{attPct}%</p>
-                <p className="mt-1 text-[13px] text-gray-400">{d.attendance.overall}</p>
-              </div>
+        <DashboardCard title={d.dashboard.myTasks} href="/homework">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 shadow-sm">
+              <Copy size={22} className="text-blue-600" />
             </div>
-          </GlassCard>
-        </Link>
+            <p className="text-[28px] font-bold leading-none text-gray-900">
+              {activeCount}
+              <span className="ml-2 text-base font-medium text-gray-500">{activeSuffix}</span>
+            </p>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard title={d.dashboard.weekProgress} href="/attendance">
+          <div className="flex items-center gap-5">
+            <RingProgress value={attPct} size={72} />
+            <div>
+              <p className="text-[32px] font-bold leading-none text-gray-900">{attPct}%</p>
+              <p className="mt-1 text-[13px] text-gray-400">{d.attendance.overall}</p>
+            </div>
+          </div>
+        </DashboardCard>
       </div>
 
       {/* AI Факт дня */}
@@ -243,19 +226,14 @@ export function DashboardView({
 
       {/* Предметы + Материалы */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <GlassCard className="p-5 lg:col-span-2">
-          <Link href="/homework">
-            <h3 className="mb-5 inline-block text-[16px] font-bold text-gray-800 transition-colors hover:text-blue-600">
-              {d.dashboard.mySubjects}
-            </h3>
-          </Link>
+        <DashboardCard title={d.dashboard.mySubjects} className="lg:col-span-2">
           {subjects.length ? (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
               {subjects.map((s) => {
                 const badge = activeBySub.get(s) ?? 0;
                 return (
                   <Link href={`/homework?subject=${encodeURIComponent(s)}`} key={s}>
-                    <div className="relative flex flex-col items-center gap-2 rounded-2xl p-3 transition-all hover:scale-[1.02] hover:bg-white/40 cursor-pointer">
+                    <div className="relative flex flex-col items-center gap-2 rounded-2xl p-3 transition-all hover:scale-[1.02] hover:bg-slate-50 cursor-pointer">
                       <div className="relative">
                         <SubjectIcon subject={s} size={60} />
                         {badge > 0 && (
@@ -275,14 +253,9 @@ export function DashboardView({
           ) : (
             <EmptyState>{d.common.none}</EmptyState>
           )}
-        </GlassCard>
+        </DashboardCard>
 
-        <GlassCard className="p-5">
-          <Link href="/materials">
-            <h3 className="mb-5 inline-block text-[16px] font-bold text-gray-800 transition-colors hover:text-blue-600">
-              {d.dashboard.recentMaterials}
-            </h3>
-          </Link>
+        <DashboardCard title={d.dashboard.recentMaterials} href="/materials">
           {recent.length ? (
             <div className="flex flex-col">
               {recent.map((m) => (
@@ -298,7 +271,7 @@ export function DashboardView({
           ) : (
             <EmptyState>{d.common.none}</EmptyState>
           )}
-        </GlassCard>
+        </DashboardCard>
       </div>
 
       <FloatingActionButton />

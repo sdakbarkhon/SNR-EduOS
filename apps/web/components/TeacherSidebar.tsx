@@ -59,7 +59,7 @@ export function TeacherSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200",
+        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-screen sticky top-0",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #2563EB, #1E3A8A)" }}
@@ -121,7 +121,7 @@ export function TeacherSidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="border-t border-white/20 pt-4 px-2">
+      <div className="shrink-0 border-t border-white/20 pt-4 px-2">
         <form action={signOut}>
           <button
             type="submit"
