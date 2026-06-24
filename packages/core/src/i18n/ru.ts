@@ -449,7 +449,7 @@ export const ru: Dictionary = {
     stageContentQuizQia: "Тест (QIA)",
     stageContentQuizKahoot: "Квиз-игра (Kahoot)",
     stageStepLabel: "Этап {n}",
-    stageAddBtn: "+ Добавить этап",
+    stageAddBtn: "Добавить этап",
     stageAddModalTitle: "Добавить этап",
     stageEditModalTitle: "Редактировать этап",
     stageStep1Title: "Шаг 1: Тип этапа",
@@ -910,7 +910,7 @@ export const ru: Dictionary = {
       loading: "Думаю…",
     },
     generate: {
-      button: "✨ Этапы через ИИ",
+      button: "Этапы через ИИ",
       title: "Создать этапы через ИИ",
       topic: "Тема урока",
       topicPlaceholder: "Например: Циклы в Python",

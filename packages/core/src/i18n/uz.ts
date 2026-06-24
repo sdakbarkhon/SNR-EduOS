@@ -449,7 +449,7 @@ export const uz: Dictionary = {
     stageContentQuizQia: "Test (QIA)",
     stageContentQuizKahoot: "Kviz o'yini (Kahoot)",
     stageStepLabel: "Bosqich {n}",
-    stageAddBtn: "+ Bosqich qo'shish",
+    stageAddBtn: "Bosqich qo'shish",
     stageAddModalTitle: "Bosqich qo'shish",
     stageEditModalTitle: "Bosqichni tahrirlash",
     stageStep1Title: "1-qadam: Bosqich turi",
@@ -910,7 +910,7 @@ export const uz: Dictionary = {
       loading: "O'ylamoqda…",
     },
     generate: {
-      button: "✨ AI bosqichlari",
+      button: "AI bosqichlari",
       title: "AI yordamida bosqichlar yaratish",
       topic: "Dars mavzusi",
       topicPlaceholder: "masalan: O'zgaruvchilar va ma'lumot turlari",

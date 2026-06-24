@@ -153,14 +153,15 @@ export async function POST(req: NextRequest) {
     kahoot_questions_count?: number;
   };
 
-  // Verify teacher owns the lesson
+  // Verify teacher owns the lesson via groups (lessons has no teacher_id column)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("teacher_id")
+    .select("group:groups!inner(teacher_id)")
     .eq("id", body.lesson_id)
     .single();
-  if (!lesson || lesson.teacher_id !== teacher.id) {
+  const ownerTeacherId = (lesson?.group as { teacher_id: string } | null)?.teacher_id;
+  if (!lesson || ownerTeacherId !== teacher.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

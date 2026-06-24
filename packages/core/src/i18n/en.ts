@@ -449,7 +449,7 @@ export const en: Dictionary = {
     stageContentQuizQia: "Quiz (QIA)",
     stageContentQuizKahoot: "Quiz game (Kahoot)",
     stageStepLabel: "Stage {n}",
-    stageAddBtn: "+ Add stage",
+    stageAddBtn: "Add stage",
     stageAddModalTitle: "Add stage",
     stageEditModalTitle: "Edit stage",
     stageStep1Title: "Step 1: Stage type",
@@ -910,7 +910,7 @@ export const en: Dictionary = {
       loading: "Thinking…",
     },
     generate: {
-      button: "✨ AI Stages",
+      button: "AI Stages",
       title: "Generate Stages with AI",
       topic: "Lesson topic",
       topicPlaceholder: "e.g. Variables and data types",

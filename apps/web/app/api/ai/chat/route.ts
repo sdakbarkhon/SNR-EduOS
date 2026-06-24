@@ -86,13 +86,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Get lesson context
+  // Get lesson context + membership check (student must be enrolled in lesson's group)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("id, title, topic, description, group:groups(subject)")
+    .select("id, title, topic, description, group_id, group:groups(subject)")
     .eq("id", body.lesson_id)
     .single();
+
+  if (lesson?.group_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: membership } = await (db as any)
+      .from("student_groups")
+      .select("student_id")
+      .eq("group_id", lesson.group_id)
+      .eq("student_id", student.id)
+      .maybeSingle();
+    if (!membership) {
+      return NextResponse.json({ error: "Not enrolled in this lesson" }, { status: 403 });
+    }
+  }
 
   const lessonSubject = (lesson?.group as { subject: string } | null)?.subject ?? "";
   const lessonTitle = lesson?.title ?? lesson?.topic ?? "Урок";
