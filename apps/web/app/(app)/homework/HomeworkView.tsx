@@ -7,6 +7,7 @@ import {
   BookOpen,
   CheckCircle,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   Clock,
   Code,
@@ -35,6 +36,9 @@ import { AiTipCard } from "./AiTipCard";
 type SortMode = "deadline" | "created";
 type ViewTab = null | "all" | HomeworkTab;
 type CardZone = "overdue" | "urgent" | "normal" | "review" | "completed";
+type UrgencyFilter = "all" | "this_week" | "next_week" | "later";
+
+const PAGE_SIZE = 10;
 
 function isUrgent(dueDate: string | null): boolean {
   if (!dueDate) return false;
@@ -124,7 +128,6 @@ const ZONE_CARD: Record<CardZone, string> = {
 
 function HomeworkListCard({ hw, zone }: { hw: HomeworkWithSubmission; zone: CardZone }) {
   const { locale } = useLocale();
-  const d = getDictionary(locale as Locale);
   const subj = hw.group.subject;
   const style = getSubjectStyle(subj);
 
@@ -138,11 +141,12 @@ function HomeworkListCard({ hw, zone }: { hw: HomeworkWithSubmission; zone: Card
                          "text-slate-500 font-semibold";
 
   return (
-    <div
+    <Link
+      href={`/homework/${hw.id}`}
       className={cn(
         "group rounded-[16px] shadow-[0_4px_16px_0_rgba(31,38,135,0.05)] backdrop-blur-xl",
         "transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_0_rgba(31,38,135,0.09)]",
-        "px-4 py-3 flex items-center gap-3",
+        "px-4 py-3 flex items-center gap-3 block",
         ZONE_CARD[zone],
       )}
     >
@@ -181,14 +185,9 @@ function HomeworkListCard({ hw, zone }: { hw: HomeworkWithSubmission; zone: Card
         ) : (
           <ZoneBadge zone={zone} />
         )}
-        <Link
-          href={`/homework/${hw.id}`}
-          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg font-semibold text-xs transition-all"
-        >
-          {d.homework.open}
-        </Link>
+        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -215,7 +214,9 @@ export function HomeworkView({
   const [typeFilter, setTypeFilter] = useState<ContentType | "all">("all");
   const [subjectFilter, setSubjectFilter] = useState<string>(initialSubject);
   const [sortBy, setSortBy] = useState<SortMode>("deadline");
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const counts = useMemo(() => homeworkCounts(rows), [rows]);
@@ -240,6 +241,21 @@ export function HomeworkView({
     return result;
   }, [rows, subjectFilter, typeFilter, query]);
 
+  const urgencyFiltered = useMemo(() => {
+    if (urgencyFilter === "all") return baseFiltered;
+    const now = Date.now();
+    const week = 7 * 24 * 3_600_000;
+    return baseFiltered.filter((r) => {
+      if (!r.due_date) return urgencyFilter === "later";
+      const diff = new Date(r.due_date).getTime() - now;
+      if (urgencyFilter === "this_week") return diff > 0 && diff <= week;
+      if (urgencyFilter === "next_week") return diff > week && diff <= 2 * week;
+      return diff > 2 * week;
+    });
+  }, [baseFiltered, urgencyFilter]);
+
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [tab, typeFilter, subjectFilter, urgencyFilter, query]);
+
   const zonedItems = useMemo(() => {
     const overdueBucket: HomeworkWithSubmission[] = [];
     const urgentBucket: HomeworkWithSubmission[] = [];
@@ -247,7 +263,7 @@ export function HomeworkView({
     const reviewBucket: HomeworkWithSubmission[] = [];
     const completedBucket: HomeworkWithSubmission[] = [];
 
-    for (const r of baseFiltered) {
+    for (const r of urgencyFiltered) {
       const cat = homeworkCategory(r, r.submission);
       if (cat === "overdue")        overdueBucket.push(r);
       else if (cat === "review")    reviewBucket.push(r);
@@ -278,9 +294,9 @@ export function HomeworkView({
       ...s(urgentBucket).map((hw)   => ({ hw, zone: "urgent"  as CardZone })),
       ...s(normalBucket).map((hw)   => ({ hw, zone: "normal"  as CardZone })),
     ];
-  }, [baseFiltered, tab, sortBy]);
+  }, [urgencyFiltered, tab, sortBy]);
 
-  const hasSearchFilters = typeFilter !== "all" || subjectFilter !== "all" || query.trim() !== "";
+  const hasSearchFilters = typeFilter !== "all" || subjectFilter !== "all" || urgencyFilter !== "all" || query.trim() !== "";
   // True empty: no active/overdue in the entire dataset, not just this filter slice
   const noActiveWork =
     (tab === null || tab === "active") &&
@@ -293,8 +309,13 @@ export function HomeworkView({
     setTab(null);
     setTypeFilter("all");
     setSubjectFilter("all");
+    setUrgencyFilter("all");
     setQuery("");
+    setVisibleCount(PAGE_SIZE);
   }
+
+  const visibleItems = zonedItems.slice(0, visibleCount);
+  const remaining = zonedItems.length - visibleCount;
 
   useEffect(() => {
     const channel = sb
@@ -386,8 +407,8 @@ export function HomeworkView({
         })}
       </div>
 
-      {/* Type + Sort row */}
-      <div className="flex items-center gap-2 mb-6">
+      {/* Type + Urgency + Sort row */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <div className="relative">
           <select
             value={typeFilter}
@@ -398,6 +419,20 @@ export function HomeworkView({
             <option value="all">Все типы</option>
             <option value="file">{d.homework.typeFile}</option>
             <option value="test">{d.homework.typeTest}</option>
+          </select>
+          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            value={urgencyFilter}
+            onChange={(e) => setUrgencyFilter(e.target.value as UrgencyFilter)}
+            className="appearance-none pl-3 pr-8 py-2 rounded-[12px] border border-white/80 bg-white/70 backdrop-blur-xl text-xs font-semibold text-slate-600 focus:outline-none cursor-pointer"
+            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+          >
+            <option value="all">Все сроки</option>
+            <option value="this_week">Эта неделя</option>
+            <option value="next_week">Следующая</option>
+            <option value="later">Позже</option>
           </select>
           <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
@@ -417,11 +452,25 @@ export function HomeworkView({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: zoned homework list */}
-        <div className="lg:col-span-2 flex flex-col gap-2 min-h-[200px]">
+        <div className="lg:col-span-2 flex flex-col gap-4 min-h-[200px]">
           {zonedItems.length > 0 ? (
-            zonedItems.map(({ hw, zone }) => (
-              <HomeworkListCard key={hw.id} hw={hw} zone={zone} />
-            ))
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {visibleItems.map(({ hw, zone }) => (
+                  <HomeworkListCard key={hw.id} hw={hw} zone={zone} />
+                ))}
+              </div>
+              {remaining > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  className="mx-auto rounded-[14px] border border-white/80 bg-white/70 backdrop-blur-xl px-6 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:bg-white hover:text-brand-blue"
+                  style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+                >
+                  Загрузить ещё ({remaining})
+                </button>
+              )}
+            </>
           ) : noActiveWork ? (
             <div
               className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl flex flex-col items-center justify-center py-16 px-6 text-center"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getDictionary, getSubjectConfig, deleteHomework } from "@snr/core";
@@ -29,6 +29,8 @@ interface Props {
 }
 
 type StatusFilter = "all" | "active" | "done";
+type UrgencyFilter = "all" | "this_week" | "next_week" | "later";
+const HW_PAGE_SIZE = 10;
 
 function isActive(hw: HomeworkItem): boolean {
   const now = new Date().toISOString();
@@ -130,6 +132,8 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [visibleCount, setVisibleCount] = useState(HW_PAGE_SIZE);
   const [localHW, setLocalHW] = useState<HomeworkItem[]>(homework);
   const [busyId, setBusyId] = useState<string | null>(null);
   // null on server + first client render → no overdue counted until after mount,
@@ -143,6 +147,24 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
     if (statusFilter === "done" && isActive(hw)) return false;
     return true;
   });
+
+  const urgencyFiltered = useMemo(() => {
+    if (urgencyFilter === "all" || nowIso === null) return filtered;
+    const week = 7 * 24 * 3_600_000;
+    return filtered.filter((hw) => {
+      if (!hw.due_date) return urgencyFilter === "later";
+      const diff = new Date(hw.due_date).getTime() - new Date(nowIso).getTime();
+      if (urgencyFilter === "this_week") return diff > 0 && diff <= week;
+      if (urgencyFilter === "next_week") return diff > week && diff <= 2 * week;
+      return diff > 2 * week;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, urgencyFilter, nowIso]);
+
+  useEffect(() => { setVisibleCount(HW_PAGE_SIZE); }, [groupFilter, statusFilter, urgencyFilter]);
+
+  const visibleItems = urgencyFiltered.slice(0, visibleCount);
+  const remaining = urgencyFiltered.length - visibleCount;
 
   // Tri-color donut over all works (file submissions + test attempts)
   let checked = 0, pending = 0, overdue = 0;
@@ -258,16 +280,27 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
               {p.label}
             </button>
           ))}
+          <select
+            value={urgencyFilter}
+            onChange={(e) => setUrgencyFilter(e.target.value as UrgencyFilter)}
+            className="ml-auto rounded-full border border-white/50 bg-white/60 py-2 pl-3 pr-8 text-sm font-semibold text-gray-700 shadow-sm backdrop-blur outline-none appearance-none cursor-pointer"
+          >
+            <option value="all">Все сроки</option>
+            <option value="this_week">Эта неделя</option>
+            <option value="next_week">Следующая</option>
+            <option value="later">Позже</option>
+          </select>
         </div>
 
         {/* Grid */}
-        {filtered.length === 0 ? (
+        {urgencyFiltered.length === 0 ? (
           <div className="rounded-[24px] border border-white/50 bg-white/70 p-8 text-center text-brand-ink-muted">
             {d.homework.noTasks}
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {filtered.map((hw) => {
+            {visibleItems.map((hw) => {
               const cfg = getSubjectConfig(hw.group.subject);
               const total = hw.group.enrolled?.length ?? 0;
               const submitted = hw.submissions.length + hw.test_subs.length;
@@ -325,6 +358,18 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
               );
             })}
           </div>
+          {remaining > 0 && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + HW_PAGE_SIZE)}
+                className="rounded-[14px] border border-white/60 bg-white/70 px-6 py-2.5 text-sm font-semibold text-gray-600 shadow-sm backdrop-blur transition-all hover:bg-white hover:text-blue-600"
+              >
+                Загрузить ещё ({remaining})
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
