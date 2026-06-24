@@ -27,7 +27,8 @@ export function LoginForm() {
       setError(d.auth.invalid);
       return;
     }
-    router.push(role === "teacher" ? "/teacher/dashboard" : "/dashboard");
+    const dest = role === "admin" ? "/admin" : role === "teacher" ? "/teacher/dashboard" : "/dashboard";
+    router.push(dest);
     router.refresh();
   }
 

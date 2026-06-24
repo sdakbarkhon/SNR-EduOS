@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(158);
+select plan(162);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1287,6 +1287,83 @@ select throws_ok(
 );
 
 reset role;
+
+-- ============ MIGRATION 42: admin role + fn_is_admin ============
+
+-- Setup (superuser): create test admin auth user + admins entry
+-- Also: a throwaway auth user for the INSERT-into-students test
+reset role;
+
+insert into auth.users (
+  instance_id, id, aud, role, email,
+  encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  phone_change, phone_change_token, email_change_token_current, reauthentication_token
+) values
+  ('00000000-0000-0000-0000-000000000000',
+   'ad000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+   'pgtap_admin@admins.snr.local',
+   crypt('adminpwd', gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+   now(), now(), '', '', '', '', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000',
+   'ad000001-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+   'pgtap_new_student@students.snr.local',
+   crypt('studentpwd', gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+   now(), now(), '', '', '', '', '', '', '', '')
+on conflict (id) do nothing;
+
+insert into public.admins (user_id, full_name)
+values ('ad000000-0000-0000-0000-000000000000', 'PGTap Admin')
+on conflict (user_id) do nothing;
+
+-- Test 159: fn_is_admin returns true for the test admin user
+select is(
+  public.fn_is_admin('ad000000-0000-0000-0000-000000000000'),
+  true,
+  'M42: fn_is_admin returns true for admin user'
+);
+
+-- Test 160: fn_is_admin returns false for student A
+select is(
+  public.fn_is_admin('11111111-1111-1111-1111-111111111111'),
+  false,
+  'M42: fn_is_admin returns false for student user'
+);
+
+-- Test 161: admin can INSERT into students (admin full access policy)
+select set_config('request.jwt.claims',
+  '{"sub":"ad000000-0000-0000-0000-000000000000","role":"authenticated"}', true);
+set local role authenticated;
+
+select lives_ok(
+  $$ insert into public.students (user_id, full_name, username)
+     values ('ad000001-0000-0000-0000-000000000000', 'PGTap New Student', 'pgtap_student_42')
+     on conflict (user_id) do nothing $$,
+  'M42: admin can INSERT into students (admin full access policy)'
+);
+
+-- Test 162: non-admin (teacher jwt, not in admins) cannot INSERT into students
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","role":"authenticated"}', true);
+set local role authenticated;
+
+select throws_ok(
+  $$ insert into public.students (user_id, full_name, username)
+     values ('ad000000-0000-0000-0000-000000000000', 'Hack Student', 'hack_42') $$,
+  '42501', NULL,
+  'M42: non-admin cannot INSERT into students table (42501)'
+);
+
+-- cleanup M42
+reset role;
+delete from public.students where username in ('pgtap_student_42', 'hack_42');
+delete from public.admins where full_name = 'PGTap Admin';
+delete from auth.users where email in ('pgtap_admin@admins.snr.local', 'pgtap_new_student@students.snr.local');
 
 select * from finish();
 rollback;

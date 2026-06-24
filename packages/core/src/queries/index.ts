@@ -53,6 +53,123 @@ export const getAttendanceWithLesson = (
       );
     });
 
+/** Посещаемость ученика с join урока/группы; фильтрация по предмету и месяцу (YYYY-MM). */
+export const getStudentAttendance = async (
+  db: Db,
+  filters?: { subject?: string; month?: string },
+): Promise<{
+  records: Array<{
+    id: string;
+    lesson_id: string;
+    lesson_title: string;
+    lesson_topic: string;
+    subject: string;
+    lesson_date: string;
+    status: AttendanceStatus;
+    marked_at: string | null;
+  }>;
+  stats: { total: number; present: number; late: number; absent: number; percentage: number };
+}> => {
+  const raw = await db
+    .from("attendance")
+    .select(
+      "id, lesson_id, status, marked_at, lesson:lessons!inner(topic, starts_at, group:groups!inner(subject, name))",
+    )
+    .order("marked_at", { ascending: false })
+    .then(unwrap);
+
+  let rows = (raw as unknown as Array<{
+    id: string;
+    lesson_id: string;
+    status: AttendanceStatus;
+    marked_at: string | null;
+    lesson: { topic: string | null; starts_at: string; group: { subject: string; name: string } };
+  }>);
+
+  if (filters?.subject) rows = rows.filter((r) => r.lesson.group.subject === filters.subject);
+  if (filters?.month) {
+    rows = rows.filter((r) => r.lesson.starts_at.slice(0, 7) === filters.month);
+  }
+
+  const total = rows.length;
+  const present = rows.filter((r) => r.status === "present").length;
+  const late = rows.filter((r) => r.status === "late").length;
+  const absent = rows.filter((r) => r.status === "absent_excused" || r.status === "absent_unexcused").length;
+  const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+
+  return {
+    records: rows.map((r) => ({
+      id: r.id,
+      lesson_id: r.lesson_id,
+      lesson_title: r.lesson.group.name,
+      lesson_topic: r.lesson.topic ?? "",
+      subject: r.lesson.group.subject,
+      lesson_date: r.lesson.starts_at,
+      status: r.status,
+      marked_at: r.marked_at,
+    })),
+    stats: { total, present, late, absent, percentage },
+  };
+};
+
+/** Посещаемость группы для учителя: матрица студент × урок. */
+export const getGroupAttendance = async (
+  db: Db,
+  groupId: string,
+  month?: string,
+): Promise<{
+  lessons: Array<{ id: string; topic: string | null; starts_at: string }>;
+  students: Array<{ id: string; full_name: string }>;
+  matrix: Record<string, Record<string, AttendanceStatus | null>>;
+  groupAvgPct: number;
+}> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+
+  const lessonsRes = await db2
+    .from("lessons")
+    .select("id, topic, starts_at")
+    .eq("group_id", groupId)
+    .order("starts_at", { ascending: true });
+
+  let lessons = (lessonsRes.data ?? []) as Array<{ id: string; topic: string | null; starts_at: string }>;
+  if (month) lessons = lessons.filter((l) => l.starts_at.slice(0, 7) === month);
+
+  const studentsRes = await db2
+    .from("students")
+    .select("id, full_name")
+    .in("id", db2.from("student_groups").select("student_id").eq("group_id", groupId));
+
+  const students = (studentsRes.data ?? []) as Array<{ id: string; full_name: string }>;
+
+  if (lessons.length === 0 || students.length === 0) {
+    return { lessons, students, matrix: {}, groupAvgPct: 0 };
+  }
+
+  const lessonIds = lessons.map((l) => l.id);
+  const attRes = await db2
+    .from("attendance")
+    .select("student_id, lesson_id, status")
+    .in("lesson_id", lessonIds);
+
+  const matrix: Record<string, Record<string, AttendanceStatus | null>> = {};
+  for (const s of students) {
+    matrix[s.id] = {};
+    for (const l of lessons) { const m = matrix[s.id]; if (m) m[l.id] = null; }
+  }
+  for (const row of (attRes.data ?? []) as Array<{ student_id: string; lesson_id: string; status: AttendanceStatus }>) {
+    const rowMatrix = matrix[row.student_id];
+    if (rowMatrix) rowMatrix[row.lesson_id] = row.status;
+  }
+
+  const totalCells = students.length * lessons.length;
+  const presentCells = Object.values(matrix).flatMap((row) => Object.values(row))
+    .filter((s) => s === "present" || s === "late").length;
+  const groupAvgPct = totalCells > 0 ? Math.round((presentCells / totalCells) * 100) : 0;
+
+  return { lessons, students, matrix, groupAvgPct };
+};
+
 // --- Домашние задания ---
 
 /** Все ДЗ для групп ученика + join группы + LEFT JOIN собственной сдачи (RLS). */

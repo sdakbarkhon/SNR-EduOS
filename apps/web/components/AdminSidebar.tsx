@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home, BookOpen, Award, CalendarDays, FolderOpen, Library, Briefcase,
-  Megaphone, Users, Settings, LogOut, CheckCircle, ClipboardList,
-  PanelLeftClose, PanelLeftOpen,
+  LayoutDashboard, Users, GraduationCap, BookOpen, Settings,
+  LogOut, Shield, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -14,26 +13,13 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { signOut } from "@/app/actions/auth";
 
-const STORAGE_KEY = "teacher_sidebar_collapsed";
+const STORAGE_KEY = "admin_sidebar_collapsed";
 
-const teacherNavItems = [
-  { key: "home",       href: "/teacher/dashboard",    icon: Home,          label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
-  { key: "lessons",    href: "/teacher/lessons",      icon: CalendarDays,  label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLessons },
-  { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
-  { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
-  { key: "attendance", href: "/teacher/attendance",   icon: ClipboardList, label: (d: ReturnType<typeof getDictionary>) => d.attendance.title },
-  { key: "materials",  href: "/teacher/materials",    icon: FolderOpen,    label: (d: ReturnType<typeof getDictionary>) => d.teacher.navMaterials },
-  { key: "books",      href: "/teacher/books",        icon: Library,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navBooks },
-  { key: "announce",   href: "/teacher/announcements",icon: Megaphone,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.announcements.nav },
-  { key: "projects",   href: "/teacher/projects",     icon: Briefcase,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.projects.nav },
-  { key: "groups",     href: "/teacher/groups",       icon: Users,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
-  { key: "profile",    href: "/teacher/profile",      icon: Settings,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
-];
-
-export function TeacherSidebar() {
+export function AdminSidebar() {
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const da = d.admin;
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -56,13 +42,21 @@ export function TeacherSidebar() {
   const isCollapsed = mounted && collapsed;
   const width = isCollapsed ? "w-16" : "w-[230px]";
 
+  const navItems = [
+    { key: "dashboard", href: "/admin",           icon: LayoutDashboard, label: da.navDashboard },
+    { key: "students",  href: "/admin/students",  icon: GraduationCap,   label: da.navStudents },
+    { key: "teachers",  href: "/admin/teachers",  icon: Users,           label: da.navTeachers },
+    { key: "groups",    href: "/admin/groups",    icon: BookOpen,        label: da.navGroups },
+    { key: "profile",   href: "/admin/profile",   icon: Settings,        label: da.navProfile },
+  ];
+
   return (
     <aside
       className={cn(
         "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200",
         width,
       )}
-      style={{ background: "linear-gradient(to bottom, #2563EB, #1E3A8A)" }}
+      style={{ background: "linear-gradient(to bottom, #7C3AED, #4C1D95)" }}
     >
       {/* Branding + collapse */}
       <div className={cn(
@@ -71,7 +65,7 @@ export function TeacherSidebar() {
       )}>
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 shadow-inner">
-            <CheckCircle className="h-6 w-6 text-white" strokeWidth={2.5} />
+            <Shield className="h-6 w-6 text-white" strokeWidth={2.5} />
           </div>
           {!isCollapsed && (
             <span className="whitespace-nowrap text-[17px] font-bold tracking-wide text-white">SNR EduOS</span>
@@ -89,22 +83,24 @@ export function TeacherSidebar() {
       {/* Role pill */}
       {!isCollapsed && (
         <div className="mb-8 px-3">
-          <div className="w-fit rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm">
-            {d.teacher.role}
+          <div className="w-fit rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm">
+            {da.role}
           </div>
         </div>
       )}
 
-      {/* Navigation */}
+      {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
-        {teacherNavItems.map((item) => {
-          const active = pathname.startsWith(item.href);
+        {navItems.map((item) => {
+          const active = item.key === "dashboard"
+            ? pathname === "/admin"
+            : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link
               key={item.key}
               href={item.href}
-              title={item.label(d)}
+              title={item.label}
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
                 active
@@ -114,7 +110,7 @@ export function TeacherSidebar() {
               )}
             >
               <Icon size={20} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
-              {!isCollapsed && <span className="whitespace-nowrap">{item.label(d)}</span>}
+              {!isCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
             </Link>
           );
         })}

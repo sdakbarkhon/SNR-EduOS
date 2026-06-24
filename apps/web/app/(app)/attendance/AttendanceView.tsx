@@ -1,85 +1,122 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  attendanceCalcAll,
   getDictionary,
-  getAttendanceWithLesson,
+  getStudentAttendance,
   getSubjectStyle,
-  type AttendanceWithLesson,
+  type AttendanceStatus,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
-import { colors } from "@snr/ui-tokens";
 import { createClient } from "@/lib/supabase/client";
-import { GlassCard, SubjectIcon, useLocale } from "@/components";
-import { AttendanceCalendar } from "./AttendanceCalendar";
-import { SubjectAttendanceList } from "./SubjectAttendanceList";
+import { SubjectIcon, useLocale } from "@/components";
 import { cn } from "@/lib/cn";
 
+type AttendanceRecord = {
+  id: string;
+  lesson_id: string;
+  lesson_title: string;
+  lesson_topic: string;
+  subject: string;
+  lesson_date: string;
+  status: AttendanceStatus;
+  marked_at: string | null;
+};
+
+type Stats = { total: number; present: number; late: number; absent: number; percentage: number };
+
+const DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
 const MONTH_NAMES_RU = [
-  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  "Январь","Февраль","Март","Апрель","Май","Июнь",
+  "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
 ];
 
-type Period = "month" | "semester" | "year";
+function statusColor(status: AttendanceStatus): string {
+  if (status === "present") return "#22c55e";
+  if (status === "late") return "#f59e0b";
+  return "#ef4444";
+}
 
-function getPeriodRange(period: Period): { from: string; to: string } {
+function statusLabel(status: AttendanceStatus, d: ReturnType<typeof getDictionary>): string {
+  if (status === "present") return d.attendance.statusPresent;
+  if (status === "late") return d.attendance.statusLate;
+  if (status === "absent_excused") return d.attendance.statusExcused;
+  return d.attendance.statusUnexcused;
+}
+
+function getCalendarDays(year: number, month: number): Date[] {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDow = firstDay.getDay();
+  const mondayOffset = startDow === 0 ? -6 : 1 - startDow;
+  const start = new Date(firstDay);
+  start.setDate(start.getDate() + mondayOffset);
+  const endDow = lastDay.getDay();
+  const sundayOffset = endDow === 0 ? 0 : 7 - endDow;
+  const end = new Date(lastDay);
+  end.setDate(end.getDate() + sundayOffset);
+  const days: Date[] = [];
+  const cur = new Date(start);
+  while (cur <= end) { days.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
+  return days;
+}
+
+function getDotColor(records: AttendanceRecord[], day: Date): string | null {
+  const dayStr = day.toISOString().slice(0, 10);
+  const dayRecs = records.filter((r) => r.lesson_date.slice(0, 10) === dayStr);
+  if (dayRecs.length === 0) return null;
+  if (dayRecs.some((r) => r.status === "absent_unexcused")) return "#ef4444";
+  if (dayRecs.some((r) => r.status === "absent_excused")) return "#f59e0b";
+  if (dayRecs.some((r) => r.status === "late")) return "#f59e0b";
+  return "#22c55e";
+}
+
+// Generate list of last N months for filter dropdown
+function getMonthOptions(n: number): Array<{ value: string; label: string }> {
+  const opts: Array<{ value: string; label: string }> = [];
   const now = new Date();
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-  if (period === "month") {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    return { from, to };
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    opts.push({ value, label: `${MONTH_NAMES_RU[d.getMonth()]} ${d.getFullYear()}` });
   }
-  if (period === "semester") {
-    const from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
-    return { from, to };
-  }
-  const from = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString();
-  return { from, to };
-}
-
-function monthRange(year: number, month: number) {
-  return {
-    from: new Date(year, month, 1).toISOString(),
-    to: new Date(year, month + 1, 1).toISOString(),
-  };
-}
-
-function statusBadge(status: string): { label: string; cls: string } {
-  if (status === "present") return { label: "Присутствовал", cls: "bg-emerald-100 text-emerald-700" };
-  if (status === "absent_excused") return { label: "Уважительная", cls: "bg-yellow-100 text-yellow-700" };
-  return { label: "Без причины", cls: "bg-red-100 text-red-600" };
+  return opts;
 }
 
 export function AttendanceView({
-  initialRows,
-  initialYear,
-  initialMonth,
+  initialRecords,
+  initialStats,
+  defaultMonth,
 }: {
-  initialRows: AttendanceWithLesson[];
-  initialYear: number;
-  initialMonth: number;
+  initialRecords: AttendanceRecord[];
+  initialStats: Stats;
+  defaultMonth: string;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const sb = createClient();
+  const sb = useMemo(() => createClient(), []);
 
-  const [year, setYear] = useState(initialYear);
-  const [month, setMonth] = useState(initialMonth);
-  const [rows, setRows] = useState<AttendanceWithLesson[]>(initialRows);
+  const [allRecords, setAllRecords] = useState<AttendanceRecord[]>(initialRecords);
+  const [allStats, setAllStats] = useState<Stats>(initialStats);
+  const [subject, setSubject] = useState<string>("");
+  const [month, setMonth] = useState<string>(defaultMonth);
   const [loading, setLoading] = useState(false);
-  const [period, setPeriod] = useState<Period>("month");
-  const [periodRows, setPeriodRows] = useState<AttendanceWithLesson[]>(initialRows);
+  const [mounted, setMounted] = useState(false);
 
-  const loadMonth = useCallback(
-    async (y: number, m: number) => {
+  useEffect(() => { setMounted(true); }, []);
+
+  const reload = useCallback(
+    async (newSubject: string, newMonth: string) => {
       setLoading(true);
       try {
-        const range = monthRange(y, m);
-        const data = await getAttendanceWithLesson(sb, range);
-        setRows(data);
+        const { records, stats } = await getStudentAttendance(sb, {
+          subject: newSubject || undefined,
+          month: newMonth || undefined,
+        });
+        setAllRecords(records);
+        setAllStats(stats);
       } finally {
         setLoading(false);
       }
@@ -87,201 +124,216 @@ export function AttendanceView({
     [sb],
   );
 
-  const loadPeriod = useCallback(
-    async (p: Period) => {
-      setLoading(true);
-      try {
-        const range = getPeriodRange(p);
-        const data = await getAttendanceWithLesson(sb, range);
-        setPeriodRows(data);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [sb],
-  );
-
-  const prevMonth = () => {
-    const m = month === 0 ? 11 : month - 1;
-    const y = month === 0 ? year - 1 : year;
-    setMonth(m); setYear(y);
-    loadMonth(y, m);
+  const onSubjectChange = (s: string) => {
+    setSubject(s);
+    reload(s, month);
   };
 
-  const nextMonth = () => {
-    const m = month === 11 ? 0 : month + 1;
-    const y = month === 11 ? year + 1 : year;
-    setMonth(m); setYear(y);
-    loadMonth(y, m);
+  const onMonthChange = (m: string) => {
+    setMonth(m);
+    reload(subject, m);
   };
 
-  // Sync period rows when period tab changes
+  // Build subject list from all initial records (unfiltered)
+  const subjectOptions = useMemo(() => {
+    const set = new Set(initialRecords.map((r) => r.subject));
+    return Array.from(set).sort();
+  }, [initialRecords]);
+
+  // Calendar month derived from filter
+  const calYear = month ? parseInt(month.slice(0, 4)) : new Date().getFullYear();
+  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : new Date().getMonth();
+
+  const calendarDays = useMemo(() => getCalendarDays(calYear, calMonth), [calYear, calMonth]);
+
+  // Today key for highlight (set after mount to avoid hydration mismatch)
+  const [todayKey, setTodayKey] = useState("");
   useEffect(() => {
-    if (period === "month") {
-      setPeriodRows(rows);
-    } else {
-      loadPeriod(period);
-    }
-  }, [period, rows]);
+    const t = new Date();
+    setTodayKey(t.toISOString().slice(0, 10));
+  }, []);
 
-  // Realtime for calendar rows
-  useEffect(() => {
-    const range = monthRange(year, month);
-    const channel = sb
-      .channel("attendance-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, async () => {
-        const fresh = await getAttendanceWithLesson(sb, range);
-        setRows(fresh);
-      })
-      .subscribe();
-    return () => { sb.removeChannel(channel); };
-  }, [year, month, sb]);
-
-  const stats = useMemo(() => attendanceCalcAll(rows), [rows]);
-
-  // KPI for period tab
-  const periodStats = useMemo(() => {
-    const present = periodRows.filter((r) => r.status === "present").length;
-    const excused = periodRows.filter((r) => r.status === "absent_excused").length;
-    const unexcused = periodRows.filter((r) => r.status === "absent_unexcused").length;
-    const total = periodRows.length;
-    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-    return { present, excused, unexcused, total, pct };
-  }, [periodRows]);
+  const monthOptions = useMemo(() => getMonthOptions(12), []);
 
   const kpiCards = [
-    { label: d.attendance.kpiOverall, value: `${stats.overall}%`, color: colors.success },
-    { label: d.attendance.kpiDays, value: `${stats.daysWithoutAbsence} ${d.attendance.daysUnit}`, color: colors.primary },
-    { label: d.attendance.kpiMissed, value: `${stats.missed} ${d.attendance.lessonsUnit}`, color: colors.warning },
+    { label: d.attendance.kpiTotal, value: allStats.total, color: "#6366f1" },
+    { label: d.attendance.kpiPresent, value: allStats.present, color: "#22c55e", pct: allStats.percentage },
+    { label: d.attendance.kpiLate, value: allStats.late, color: "#f59e0b" },
+    { label: d.attendance.kpiAbsent, value: allStats.absent, color: "#ef4444" },
   ];
 
-  const periodKpis = [
-    { label: d.attendance.kpiPresent, value: String(periodStats.present), color: colors.success },
-    { label: d.attendance.kpiExcused, value: String(periodStats.excused), color: colors.warning },
-    { label: d.attendance.kpiUnexcused, value: String(periodStats.unexcused), color: colors.danger },
-    { label: d.attendance.kpiTotal, value: String(periodStats.total), color: colors.primary },
-  ];
-
-  const periodTabs: { key: Period; label: string }[] = [
-    { key: "month", label: d.attendance.periodMonth },
-    { key: "semester", label: d.attendance.periodSemester },
-    { key: "year", label: d.attendance.periodYear },
-  ];
-
-  // Sort lesson list newest first
-  const sortedPeriodRows = useMemo(
-    () => [...periodRows].sort((a, b) => b.lesson.starts_at.localeCompare(a.lesson.starts_at)),
-    [periodRows],
+  const sortedRecords = useMemo(
+    () => [...allRecords].sort((a, b) => b.lesson_date.localeCompare(a.lesson_date)),
+    [allRecords],
   );
+
+  const selectedMonthLabel = monthOptions.find((o) => o.value === month)?.label ?? month;
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight text-gray-900">{d.attendance.title}</h1>
 
-      {/* Month nav for calendar */}
-      <div className="flex items-center gap-3">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Subject filter */}
+        <div className="relative">
+          <select
+            value={subject}
+            onChange={(e) => onSubjectChange(e.target.value)}
+            className="appearance-none rounded-full border border-white/60 bg-white/70 px-4 py-1.5 pr-8 text-[13px] font-semibold text-gray-700 shadow-sm backdrop-blur-md outline-none cursor-pointer"
+          >
+            <option value="">{d.attendance.filterAllSubjects}</option>
+            {subjectOptions.map((s) => (
+              <option key={s} value={s}>{getSubjectStyle(s).label}</option>
+            ))}
+          </select>
+          <ChevronRight className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rotate-90 h-3.5 w-3.5 text-gray-400" />
+        </div>
+
+        {/* Month filter */}
         <div className="flex items-center gap-1 rounded-full border border-white/60 bg-white/70 px-1 py-1 shadow-sm backdrop-blur-md">
-          <button onClick={prevMonth} aria-label={d.attendance.prevMonth}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 transition hover:bg-white/80">
-            <ChevronLeft size={16} />
+          <button
+            onClick={() => {
+              const idx = monthOptions.findIndex((o) => o.value === month);
+              const next = monthOptions[idx + 1];
+              if (idx < monthOptions.length - 1 && next) onMonthChange(next.value);
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 transition hover:bg-white/80"
+          >
+            <ChevronLeft size={14} />
           </button>
-          <span className="min-w-[140px] text-center text-[14px] font-semibold text-gray-800">
-            {MONTH_NAMES_RU[month]} {year}
+          <span className="min-w-[140px] text-center text-[13px] font-semibold text-gray-800">
+            {selectedMonthLabel}
           </span>
-          <button onClick={nextMonth} aria-label={d.attendance.nextMonth}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 transition hover:bg-white/80">
-            <ChevronRight size={16} />
+          <button
+            onClick={() => {
+              const idx = monthOptions.findIndex((o) => o.value === month);
+              const prev = monthOptions[idx - 1];
+              if (idx > 0 && prev) onMonthChange(prev.value);
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 transition hover:bg-white/80"
+          >
+            <ChevronRight size={14} />
           </button>
         </div>
-        {loading && <span className="text-[13px] text-gray-400">{d.common.loading}</span>}
+
+        {loading && <span className="text-[12px] text-gray-400">{d.common.loading}</span>}
       </div>
 
-      {/* KPI — month view */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* 4 KPI cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpiCards.map((card) => (
-          <div key={card.label}
-            className="relative overflow-hidden rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl p-5 flex flex-col gap-1">
-            <div className="pointer-events-none absolute -right-12 -top-12 h-24 w-24 rounded-full bg-white/40 blur-2xl" />
-            <span className="relative z-10 text-[12px] font-medium text-gray-500">{card.label}</span>
-            <span className="relative z-10 text-3xl font-bold leading-tight xl:text-4xl" style={{ color: card.color }}>
+          <div
+            key={card.label}
+            className="relative overflow-hidden rounded-[20px] border-[1.5px] border-white/80 bg-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] backdrop-blur-2xl p-5 flex flex-col gap-1"
+          >
+            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/40 blur-2xl" />
+            <span className="relative z-10 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              {card.label}
+            </span>
+            <span
+              className="relative z-10 text-3xl font-bold leading-tight"
+              style={{ color: card.color }}
+            >
               {card.value}
             </span>
+            {card.pct !== undefined && (
+              <span className="relative z-10 text-[12px] font-semibold text-gray-500">
+                {card.pct}%
+              </span>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Calendar + by-subject */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <GlassCard className="p-6">
-          <AttendanceCalendar rows={rows} year={year} month={month} />
-        </GlassCard>
-        <GlassCard className="flex flex-col gap-5 p-6">
-          <h3 className="text-[15px] font-bold text-gray-900">{d.attendance.bySubjectTitle}</h3>
-          <SubjectAttendanceList rows={rows} />
-        </GlassCard>
-      </div>
+      {/* Calendar + List */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        {/* Calendar */}
+        <div className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl p-5"
+          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+          <h3 className="mb-4 text-[14px] font-bold text-gray-800">{d.attendance.calendarTitle}</h3>
 
-      {/* Period tabs + lesson list */}
-      <div className="space-y-4">
-        {/* Period selector */}
-        <div className="flex items-center gap-2">
-          {periodTabs.map((t) => (
-            <button key={t.key} onClick={() => setPeriod(t.key)}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-all",
-                period === t.key
-                  ? "bg-[#185AF7] text-white shadow"
-                  : "border border-white/60 bg-white/70 text-gray-700 hover:bg-white/90",
-              )}>
-              {t.label}
-            </button>
-          ))}
+          {/* Legend */}
+          <div className="mb-3 flex flex-wrap gap-3">
+            {[
+              { color: "#22c55e", label: d.attendance.calendarLegendPresent },
+              { color: "#f59e0b", label: d.attendance.calendarLegendLate },
+              { color: "#ef4444", label: d.attendance.calendarLegendAbsent },
+            ].map((l) => (
+              <span key={l.label} className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+                {l.label}
+              </span>
+            ))}
+          </div>
+
+          {/* Grid */}
+          <div className="grid grid-cols-7 gap-x-1 gap-y-1">
+            {DAY_LABELS.map((label) => (
+              <div key={label} className="py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                {label}
+              </div>
+            ))}
+            {calendarDays.map((day) => {
+              const inMonth = day.getMonth() === calMonth;
+              const dayStr = day.toISOString().slice(0, 10);
+              const isToday = mounted && dayStr === todayKey;
+              const dotColor = inMonth ? getDotColor(allRecords, day) : null;
+
+              return (
+                <div key={dayStr} className="flex flex-col items-center gap-0.5 py-0.5">
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center text-[12px] font-medium rounded-full",
+                      isToday ? "bg-blue-600 text-white font-bold" : "",
+                      !inMonth ? "text-gray-300" : (!isToday ? "text-gray-700" : ""),
+                    )}
+                  >
+                    {day.getDate()}
+                  </span>
+                  {dotColor && inMonth && (
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dotColor }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Period KPI */}
-        <div className="grid grid-cols-4 gap-3">
-          {periodKpis.map((k) => (
-            <div key={k.label}
-              className="flex flex-col rounded-[16px] border border-white/80 bg-white/70 px-4 py-3 backdrop-blur-xl"
-              style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.05)" }}>
-              <span className="text-[22px] font-bold leading-tight" style={{ color: k.color }}>{k.value}</span>
-              <span className="text-[12px] font-medium text-gray-500">{k.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Lesson list */}
+        {/* Detail list */}
         <div className="rounded-[20px] border border-white/80 bg-white/70 backdrop-blur-xl overflow-hidden"
           style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
           <div className="px-5 py-4 border-b border-slate-100">
-            <h3 className="text-[15px] font-bold text-gray-900">{d.attendance.lessonListTitle}</h3>
+            <h3 className="text-[14px] font-bold text-gray-800">{d.attendance.lessonListTitle}</h3>
           </div>
 
-          {sortedPeriodRows.length === 0 ? (
+          {sortedRecords.length === 0 ? (
             <div className="px-5 py-10 text-center text-[14px] text-gray-400">{d.attendance.empty}</div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {sortedPeriodRows.map((row) => {
-                const subject = row.lesson.group.subject;
-                const style = getSubjectStyle(subject);
-                const dateLbl = new Date(row.lesson.starts_at).toLocaleDateString("ru-RU", {
+            <div className="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
+              {sortedRecords.map((row) => {
+                const style = getSubjectStyle(row.subject);
+                const dateLbl = new Date(row.lesson_date).toLocaleDateString("ru-RU", {
                   day: "numeric", month: "short", timeZone: "Asia/Tashkent",
                 });
-                const { label: badgeLbl, cls: badgeCls } = statusBadge(row.status);
+                const sColor = statusColor(row.status);
+                const sLabel = statusLabel(row.status, d);
                 return (
-                  <Link key={row.id} href={`/lessons/${row.lesson_id}`}
-                    className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-blue-50/30">
-                    <SubjectIcon subject={subject} size={36} />
+                  <div key={row.id} className="flex items-center gap-3 px-5 py-3">
+                    <SubjectIcon subject={row.subject} size={36} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-semibold text-slate-800">
-                        {row.lesson.topic ?? style.label}
+                        {row.lesson_topic || style.label}
                       </div>
                       <div className="text-[11px] text-slate-400">{style.label} · {dateLbl}</div>
                     </div>
-                    <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold", badgeCls)}>
-                      {badgeLbl}
+                    <span
+                      className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white"
+                      style={{ backgroundColor: sColor }}
+                    >
+                      {sLabel}
                     </span>
-                  </Link>
+                  </div>
                 );
               })}
             </div>

@@ -8,7 +8,7 @@
 
 export type StudentStatus = "active" | "debtor" | "frozen";
 export type LessonStatus = "scheduled" | "in_progress" | "completed";
-export type AttendanceStatus = "present" | "absent_excused" | "absent_unexcused";
+export type AttendanceStatus = "present" | "late" | "absent_excused" | "absent_unexcused";
 export type SubmissionStatus = "submitted" | "checking" | "graded";
 export type PaymentStatus = "completed" | "pending" | "canceled";
 export type PaymentKind = "subscription" | "one_time";

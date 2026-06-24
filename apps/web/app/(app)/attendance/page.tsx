@@ -1,4 +1,4 @@
-import { getAttendanceWithLesson } from "@snr/core";
+import { getStudentAttendance } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { AttendanceView } from "./AttendanceView";
 
@@ -6,19 +6,15 @@ export default async function AttendancePage() {
   const db = await createClient();
 
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const from = new Date(year, month, 1).toISOString();
-  const to = new Date(year, month + 1, 1).toISOString();
-
-  const rows = await getAttendanceWithLesson(db, { from, to });
+  const { records, stats } = await getStudentAttendance(db);
 
   return (
     <AttendanceView
-      initialRows={rows}
-      initialYear={year}
-      initialMonth={month}
+      initialRecords={records}
+      initialStats={stats}
+      defaultMonth={defaultMonth}
     />
   );
 }

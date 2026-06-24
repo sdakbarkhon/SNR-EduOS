@@ -88,10 +88,11 @@ export interface Dictionary {
     calendarTitle: string;
     legendPresent: string;
     legendAbsent: string;
-    legendLate: string;   // reused as "Уваж. пропуск" in new scheme
+    legendLate: string;
     legendExcused: string;
     legendUnexcused: string;
     statusPresent: string;
+    statusLate: string;
     statusExcused: string;
     statusUnexcused: string;
     periodMonth: string;
@@ -100,6 +101,100 @@ export interface Dictionary {
     lessonListTitle: string;
     bySubjectTitle: string;
     empty: string;
+    // new keys for redesigned UI
+    kpiLate: string;
+    kpiAbsent: string;
+    kpiPercentage: string;
+    filterSubject: string;
+    filterAllSubjects: string;
+    filterMonth: string;
+    calendarLegendPresent: string;
+    calendarLegendLate: string;
+    calendarLegendAbsent: string;
+    calendarLegendNone: string;
+    // teacher attendance
+    teacherTitle: string;
+    teacherGroupLabel: string;
+    teacherAllGroups: string;
+    teacherAvgPct: string;
+    teacherMatrixEmpty: string;
+    teacherLegendPresent: string;
+    teacherLegendLate: string;
+    teacherLegendAbsent: string;
+    teacherLegendNone: string;
+  };
+  admin: {
+    title: string;
+    navDashboard: string;
+    navStudents: string;
+    navTeachers: string;
+    navGroups: string;
+    navProfile: string;
+    role: string;
+    // dashboard
+    statStudents: string;
+    statTeachers: string;
+    statGroups: string;
+    statLessons: string;
+    quickActions: string;
+    addStudent: string;
+    addTeacher: string;
+    addGroup: string;
+    recentActivity: string;
+    noActivity: string;
+    // students
+    studentsTitle: string;
+    searchPlaceholder: string;
+    tableFullName: string;
+    tableUsername: string;
+    tableGroup: string;
+    tableCreated: string;
+    tableActions: string;
+    editBtn: string;
+    resetPasswordBtn: string;
+    deleteBtn: string;
+    addStudentTitle: string;
+    editStudentTitle: string;
+    fieldFullName: string;
+    fieldUsername: string;
+    fieldPassword: string;
+    fieldGroup: string;
+    generatePassword: string;
+    createBtn: string;
+    saveBtn: string;
+    cancelBtn: string;
+    usernameExists: string;
+    createdMsg: string;
+    resetPasswordTitle: string;
+    resetPasswordConfirm: string;
+    newPasswordLabel: string;
+    resetBtn: string;
+    passwordResetMsg: string;
+    deleteStudentTitle: string;
+    deleteStudentConfirm: string;
+    deleteWarning: string;
+    confirmDeleteBtn: string;
+    deletedMsg: string;
+    // teachers
+    teachersTitle: string;
+    addTeacherTitle: string;
+    editTeacherTitle: string;
+    deleteTeacherTitle: string;
+    deleteTeacherConfirm: string;
+    deleteTeacherBlocked: string;
+    // groups
+    groupsTitle: string;
+    addGroupTitle: string;
+    editGroupTitle: string;
+    deleteGroupTitle: string;
+    deleteGroupConfirm: string;
+    fieldGroupName: string;
+    fieldSubject: string;
+    fieldTeacher: string;
+    fieldDescription: string;
+    tableStudentCount: string;
+    tableTeacher: string;
+    loading: string;
   };
   homework: {
     title: string;
