@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(151);
+select plan(155);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1195,6 +1195,59 @@ select ok(
   (select count(*)::int > 0 from public.kahoot_sessions
     where stage_id = '99990001-0000-0000-0000-000000000000'),
   'M39: student sees kahoot_session of own group stage'
+);
+
+-- ============ Migration 40: lesson_grades ============
+
+-- teacher_ivan session
+reset role;
+select set_config('request.jwt.claims','{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 152: teacher inserts lesson_grade for a student in own group
+select lives_ok(
+  $$ insert into public.lesson_grades (lesson_id, student_id, grade, comment, graded_by)
+     values ('aa000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111',
+             5, 'Отлично!',
+             public.current_teacher_id()) $$,
+  'M40: teacher inserts lesson_grade for student in own group'
+);
+
+-- Test 153: teacher cannot insert lesson_grade in a lesson from another group
+select throws_ok(
+  $$ insert into public.lesson_grades (lesson_id, student_id, grade, graded_by)
+     values ('dd000001-0000-0000-0000-000000000000',
+             'a1111111-1111-1111-1111-111111111111',
+             4,
+             public.current_teacher_id()) $$,
+  '42501', NULL,
+  'M40: teacher cannot insert lesson_grade in another group lesson'
+);
+
+-- student A session
+reset role;
+select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 154: student A sees their own lesson_grade
+select ok(
+  (select count(*)::int > 0 from public.lesson_grades
+    where student_id = public.current_student_id()),
+  'M40: student sees own lesson_grade'
+);
+
+-- student B session
+reset role;
+select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Test 155: student B cannot see student A's lesson_grade
+select is(
+  (select count(*)::int from public.lesson_grades
+    where student_id = 'a1111111-1111-1111-1111-111111111111'),
+  0,
+  'M40: student B cannot see student A lesson_grade'
 );
 
 reset role;

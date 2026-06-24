@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -354,7 +354,7 @@ export const getTeacherAttendance = (db: Db) =>
 /** Одна оценка ученика (файл, тест, классная, этап урока), нормализованная для журнала. */
 export type StudentGradeItem = {
   id: string;
-  kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external";
+  kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson";
   title: string;
   subject: string;
   groupName: string;
@@ -490,6 +490,29 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
       });
     }
   } catch { /* lesson_stage_progress join may not be available on older instances */ }
+
+  // Lesson grades (migration 40)
+  try {
+    const lgSel =
+      "id, grade, comment, graded_at, lesson:lessons!inner(title, group:groups!inner(subject, name))";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lgRes = await (db as any).from("lesson_grades").select(lgSel);
+    for (const r of (lgRes.data ?? []) as unknown as Array<{
+      id: string; grade: number; comment: string | null; graded_at: string;
+      lesson: { title: string | null; group: { subject: string; name: string } | null } | null;
+    }>) {
+      items.push({
+        id: r.id, kind: "lesson",
+        title: r.lesson?.title ?? "Урок",
+        subject: r.lesson?.group?.subject ?? "",
+        groupName: r.lesson?.group?.name ?? "",
+        date: r.graded_at,
+        grade5: r.grade,
+        display: `${r.grade}/5`,
+        comment: r.comment,
+      });
+    }
+  } catch { /* lesson_grades may not exist on older hosted instances */ }
 
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;
@@ -1919,6 +1942,74 @@ export const finishKahootGame = async (db: Db, sessionId: string): Promise<void>
       submission_data: { kind: "kahoot", correct, total, total_score: totalScore },
     }, { onConflict: "stage_id,student_id", ignoreDuplicates: false });
   }
+};
+
+// --- Оценки за урок (migration 40) ---
+
+/** Все оценки урока (для перекличкu: учитель видит оценки всех своих учеников). */
+export const getLessonGrades = async (db: Db, lessonId: string): Promise<LessonGrade[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("lesson_grades").select("*").eq("lesson_id", lessonId);
+  return (data ?? []) as LessonGrade[];
+};
+
+/** Одна оценка ученика за урок (для student view). */
+export const getStudentLessonGrade = async (db: Db, lessonId: string, studentId: string): Promise<LessonGrade | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("lesson_grades").select("*")
+    .eq("lesson_id", lessonId).eq("student_id", studentId).maybeSingle();
+  return (data as LessonGrade | null) ?? null;
+};
+
+/** Upsert: создаёт или обновляет оценку ученика за урок. */
+export const gradeStudentForLesson = async (
+  db: Db, lessonId: string, teacherId: string, studentId: string, grade: number, comment: string | null,
+): Promise<LessonGrade> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("lesson_grades").upsert({
+    lesson_id: lessonId, student_id: studentId, grade, comment: comment ?? null,
+    graded_by: teacherId, graded_at: new Date().toISOString(),
+  }, { onConflict: "lesson_id,student_id", ignoreDuplicates: false }).select("*").single();
+  if (error) throw error;
+  return data as LessonGrade;
+};
+
+/** Удалить оценку (на случай ошибки). */
+export const deleteLessonGrade = async (db: Db, lessonId: string, studentId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db as any).from("lesson_grades").delete()
+    .eq("lesson_id", lessonId).eq("student_id", studentId);
+};
+
+export type LessonGradeRow = {
+  id: string; lesson_id: string; student_id: string; grade: number; comment: string | null;
+  graded_at: string;
+  student_name: string;
+  lesson_no: number | null;
+  lesson_topic: string | null;
+  lesson_starts_at: string;
+};
+
+/** Все оценки за уроки по группе (для матрицы учителя). */
+export const getLessonGradesForGroup = async (db: Db, groupId: string): Promise<LessonGradeRow[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any).from("lesson_grades")
+    .select("id, lesson_id, student_id, grade, comment, graded_at, lesson:lessons!inner(lesson_no, topic, starts_at, group_id), student:students!inner(full_name)")
+    .eq("lesson.group_id", groupId)
+    .order("graded_at", { ascending: false });
+  type Raw = {
+    id: string; lesson_id: string; student_id: string; grade: number; comment: string | null; graded_at: string;
+    lesson: { lesson_no: number | null; topic: string | null; starts_at: string } | null;
+    student: { full_name: string } | null;
+  };
+  return ((data ?? []) as Raw[]).map((r) => ({
+    id: r.id, lesson_id: r.lesson_id, student_id: r.student_id,
+    grade: r.grade, comment: r.comment, graded_at: r.graded_at,
+    student_name: r.student?.full_name ?? "—",
+    lesson_no: r.lesson?.lesson_no ?? null,
+    lesson_topic: r.lesson?.topic ?? null,
+    lesson_starts_at: r.lesson?.starts_at ?? "",
+  }));
 };
 
 type TeacherLessonListItem = {

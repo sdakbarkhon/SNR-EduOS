@@ -648,6 +648,21 @@ export interface Dictionary {
       kindKahoot: string;        // grade badge: kahoot game
       kindExternal: string;      // grade badge: external service stage
     };
+    // Lesson grade modal (teacher, migration 40)
+    gradeStudent: string;          // modal title prefix "Оценить ученика:"
+    gradeChoose: string;           // "Выбери оценку"
+    gradeComments: {
+      "1": string[];               // 3 preset comments for grade 1
+      "2": string[];
+      "3": string[];
+      "4": string[];
+      "5": string[];
+    };
+    gradeOther: string;            // "Другое"
+    gradeOtherPlaceholder: string; // textarea placeholder
+    gradeSave: string;             // "Сохранить оценку"
+    gradeSaved: string;            // toast "Оценка сохранена"
+    kindLesson: string;            // grade badge in /grades + filter pill
   };
   teacher: {
     role: string;

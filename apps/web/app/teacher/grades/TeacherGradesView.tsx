@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   getDictionary, getSubjectConfig, getTeacherGradeMatrix, getTestQuestions,
+  getLessonGradesForGroup, type LessonGradeRow,
 } from "@snr/core";
 import type {
   Locale, GradeMatrixData, GradeMatrixFileSub, GradeMatrixTestSub,
@@ -62,6 +63,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
   const [matrix, setMatrix] = useState<GradeMatrixData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [lessonGrades, setLessonGrades] = useState<LessonGradeRow[]>([]);
 
   // Review modal state
   const [reviewSub, setReviewSub] = useState<ReviewSubmission | null>(null);
@@ -82,6 +84,12 @@ export function TeacherGradesView({ groups, stats }: Props) {
   }, []);
 
   useEffect(() => { loadMatrix(groupId); }, [groupId, loadMatrix]);
+
+  useEffect(() => {
+    if (!groupId) return;
+    getLessonGradesForGroup(supabase as never, groupId).then(setLessonGrades).catch(() => null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
 
   const kpis = [
     { label: "Всего оценил", value: stats.totalGraded },
@@ -304,6 +312,48 @@ export function TeacherGradesView({ groups, stats }: Props) {
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {/* Lesson grades section */}
+      {lessonGrades.length > 0 && (
+        <div className="overflow-hidden rounded-[20px] border border-white/80 bg-white/70 p-4 backdrop-blur-xl"
+          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-slate-400">
+            Оценки за уроки
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400">Ученик</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400">Урок</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400">Тема</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-400">Оценка</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400">Комментарий</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lessonGrades.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-semibold text-slate-800">{r.student_name}</td>
+                    <td className="px-3 py-2 text-slate-500">
+                      {r.lesson_no ? `Урок ${r.lesson_no}` : new Date(r.lesson_starts_at).toLocaleDateString("ru", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" })}
+                    </td>
+                    <td className="px-3 py-2 max-w-[180px] truncate text-slate-600">{r.lesson_topic ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-700">
+                        {r.grade}/5
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 max-w-[200px] truncate text-slate-500 italic">
+                      {r.comment ? `«${r.comment}»` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

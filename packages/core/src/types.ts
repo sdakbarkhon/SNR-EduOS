@@ -697,3 +697,15 @@ export type RaisedHand = {
 export type RaisedHandWithStudent = RaisedHand & {
   student: { id: string; full_name: string; avatar_url: string | null };
 };
+
+/** Оценка за урок (migration 40), выставляется учителем через перекличку. */
+export type LessonGrade = {
+  id: string;
+  lesson_id: string;
+  student_id: string;
+  grade: number;
+  comment: string | null;
+  graded_by: string;
+  graded_at: string;
+  updated_at: string;
+};

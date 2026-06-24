@@ -12,7 +12,7 @@ interface Props {
   grades: StudentGradeItem[];
 }
 
-type TypeFilter = "all" | "file" | "test" | "classwork" | "quiz" | "kahoot";
+type TypeFilter = "all" | "file" | "test" | "classwork" | "quiz" | "kahoot" | "lesson";
 type SortKey = "subject" | "date" | "grade";
 
 /** Цвет оценки по проценту: >=80% зелёный, 50-79% жёлтый, <50% красный. */
@@ -101,6 +101,7 @@ export function GradesView({ grades }: Props) {
     { key: "classwork", label: d.classwork.title },
     { key: "quiz", label: d.lesson.quiz.kindQuiz },
     { key: "kahoot", label: d.lesson.quiz.kindKahoot },
+    { key: "lesson", label: d.lesson.kindLesson },
   ];
 
   return (
@@ -204,6 +205,8 @@ export function GradesView({ grades }: Props) {
                             ? "bg-amber-100 text-amber-700"
                             : g.kind === "external"
                             ? "bg-cyan-100 text-cyan-700"
+                            : g.kind === "lesson"
+                            ? "bg-violet-100 text-violet-700"
                             : "bg-blue-100 text-blue-700")}>
                           {g.kind === "classwork"
                             ? d.classwork.title
@@ -219,10 +222,14 @@ export function GradesView({ grades }: Props) {
                             ? d.lesson.quiz.kindKahoot
                             : g.kind === "external"
                             ? d.lesson.quiz.kindExternal
+                            : g.kind === "lesson"
+                            ? d.lesson.kindLesson
                             : d.homework.typeFile}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-[14px] font-semibold text-brand-ink">{g.title}</td>
+                      <td className="px-4 py-3 text-[14px] font-semibold text-brand-ink">
+                        {g.kind === "lesson" ? `${d.lesson.kindLesson}: ${g.title}` : g.title}
+                      </td>
                       <td className={cn("whitespace-nowrap px-4 py-3 text-right text-[18px] font-bold", gradeColor(g.grade5))}>
                         {g.display}
                       </td>

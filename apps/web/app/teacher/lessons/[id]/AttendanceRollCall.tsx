@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, UserX, BookMarked, Lock } from "lucide-react";
+import { Check, UserX, BookMarked, Lock, Star } from "lucide-react";
 import {
   getTeacherLessonAttendance,
   markStudentAttendance,
+  getLessonGrades,
   getDictionary,
   type AttendanceRollCallRow,
   type AttendanceStatus,
+  type LessonGrade,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
+import { GradeModal } from "./GradeModal";
 
 type Props = {
   lessonId: string;
@@ -33,9 +36,14 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   const [rows, setRows] = useState<AttendanceRollCallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savedId, setSavedId] = useState<string | null>(null);
+  // Grades map: studentId → LessonGrade
+  const [gradesMap, setGradesMap] = useState<Record<string, LessonGrade>>({});
+  // Grade modal state
+  const [gradeTarget, setGradeTarget] = useState<{ id: string; name: string } | null>(null);
 
   const isFinalized = lessonStatus === "completed" || rows.some((r) => r.is_finalized);
   const readOnly = isFinalized;
+  // Grade button is ALWAYS active regardless of lesson status
 
   // Notify parent whenever rows change. The callback is kept in a ref and is NOT
   // an effect dependency: callers often pass an inline arrow (new reference every
@@ -57,6 +65,17 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
       .finally(() => setLoading(false));
   }, [lessonId]);
 
+  useEffect(() => {
+    getLessonGrades(db, lessonId)
+      .then((grades) => {
+        const map: Record<string, LessonGrade> = {};
+        grades.forEach((g) => { map[g.student_id] = g; });
+        setGradesMap(map);
+      })
+      .catch(() => null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId]);
+
   async function setStatus(studentId: string, oldStatus: AttendanceStatus | null, next: AttendanceStatus) {
     if (readOnly || next === oldStatus) return;
     setRows((prev) =>
@@ -74,6 +93,8 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
       );
     }
   }
+
+  const [gradeSavedToast, setGradeSavedToast] = useState(false);
 
   const present     = rows.filter((r) => r.status === "present").length;
   const excusedCount = rows.filter((r) => r.status === "absent_excused").length;
@@ -128,6 +149,13 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
         </div>
       )}
 
+      {/* Grade saved toast */}
+      {gradeSavedToast && (
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700">
+          ✓ {d.lesson.gradeSaved}
+        </div>
+      )}
+
       {/* Student list */}
       {rows.length === 0 ? (
         <p className="text-sm text-gray-400">{d.common.none}</p>
@@ -163,6 +191,27 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                 {savedId === row.student_id && (
                   <span className="text-[11px] font-semibold text-emerald-500">{dt.rollCallSaved}</span>
                 )}
+                {/* Grade button — always active */}
+                {(() => {
+                  const lg = gradesMap[row.student_id];
+                  return lg ? (
+                    <button
+                      onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
+                      className="flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-200 transition-colors"
+                    >
+                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                      {lg.grade} ✓
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                    >
+                      <Star className="h-3 w-3" />
+                      Оценить
+                    </button>
+                  );
+                })()}
                 <div className="flex shrink-0 gap-1">
                   <button
                     onClick={() => setStatus(row.student_id, st, "present")}
@@ -211,6 +260,24 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
             );
           })}
         </div>
+      )}
+
+      {/* Grade modal */}
+      {gradeTarget && (
+        <GradeModal
+          lessonId={lessonId}
+          teacherId={teacherId}
+          studentId={gradeTarget.id}
+          studentName={gradeTarget.name}
+          existing={gradesMap[gradeTarget.id] ?? null}
+          onClose={() => setGradeTarget(null)}
+          onSaved={(saved) => {
+            setGradesMap((prev) => ({ ...prev, [saved.student_id]: saved }));
+            setGradeTarget(null);
+            setGradeSavedToast(true);
+            setTimeout(() => setGradeSavedToast(false), 2500);
+          }}
+        />
       )}
     </section>
   );
