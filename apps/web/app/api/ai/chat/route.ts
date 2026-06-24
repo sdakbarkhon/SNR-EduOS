@@ -156,15 +156,7 @@ ${stageCtx}
 
   if (error) {
     console.error("[ai-chat] callGemini returned error:", error);
-    // Still save the user message so the limit counts it
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db as any).from("ai_chat_messages").insert({
-      student_id: student.id,
-      lesson_id: body.lesson_id,
-      stage_id: body.stage_id ?? null,
-      role: "user",
-      content: body.user_message,
-    });
+    // Do NOT insert to DB on error — counter must not increment for failed requests
     return NextResponse.json({ error }, { status: 500 });
   }
 

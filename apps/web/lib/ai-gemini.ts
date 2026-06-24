@@ -1,6 +1,7 @@
-// Gemini API — server-side only. Key never reaches the browser.
-const MODEL = "gemini-2.0-flash";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+// Server-side only — API key never reaches the browser.
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const MODEL = "gemini-1.5-flash";
 
 export async function callGemini(
   systemInstruction: string,
@@ -8,76 +9,65 @@ export async function callGemini(
   options?: { temperature?: number; responseMimeType?: string },
 ): Promise<{ text: string; error: string | null }> {
   const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
-
-  console.log("[ai-gemini] key present:", !!apiKey, "key length:", apiKey?.length ?? 0);
+  console.log("[ai-gemini] model:", MODEL, "| key present:", !!apiKey, "| key length:", apiKey?.length ?? 0);
 
   if (!apiKey) {
-    return { text: "", error: "GEMINI_API_KEY not configured on server" };
-  }
-
-  // Gemini REST API requires at least one content item.
-  // When there are no chat messages (e.g. generate-stages) we send the
-  // system instruction as a user turn so the array is never empty.
-  const contents =
-    messages.length > 0
-      ? messages.map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        }))
-      : [{ role: "user", parts: [{ text: systemInstruction }] }];
-
-  // camelCase field names as required by the Gemini REST API
-  const body: Record<string, unknown> = {
-    contents,
-    generationConfig: {
-      temperature: options?.temperature ?? 0.7,
-      ...(options?.responseMimeType
-        ? { responseMimeType: options.responseMimeType }
-        : {}),
-    },
-  };
-
-  // Only add systemInstruction when we also have real chat messages
-  // (when messages is empty we already embedded the instruction as a user turn above)
-  if (messages.length > 0 && systemInstruction) {
-    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+    console.error("[ai-gemini] GEMINI_API_KEY missing on server");
+    return { text: "", error: "API key not configured" };
   }
 
   try {
-    const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    if (messages.length === 0) {
+      // No chat history (e.g. generate-stages): send the whole prompt as generateContent
+      const model = genAI.getGenerativeModel({
+        model: MODEL,
+        generationConfig: {
+          temperature: options?.temperature ?? 0.7,
+          ...(options?.responseMimeType ? { responseMimeType: options.responseMimeType } : {}),
+        },
+      });
+      const result = await model.generateContent(systemInstruction);
+      const text = result.response.text();
+      console.log("[ai-gemini] generateContent done, response length:", text.length);
+      return { text, error: null };
+    }
+
+    // Chat with history: set system instruction at model level
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      systemInstruction,
+      generationConfig: {
+        temperature: options?.temperature ?? 0.7,
+        ...(options?.responseMimeType ? { responseMimeType: options.responseMimeType } : {}),
+      },
     });
 
-    console.log("[ai-gemini] response status:", res.status);
+    // history = everything except the last message
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === "assistant" ? "model" : ("user" as const),
+      parts: [{ text: m.content }],
+    }));
 
-    if (!res.ok) {
-      let errBody = "(could not read body)";
-      try {
-        errBody = await res.text();
-      } catch { /* noop */ }
-      console.error("[ai-gemini] non-OK response:", res.status, errBody.slice(0, 500));
-
-      if (res.status === 429) {
-        return { text: "", error: "Сейчас много запросов, попробуй через минуту" };
-      }
-      return { text: "", error: `Ошибка Gemini API ${res.status}: ${errBody.slice(0, 120)}` };
-    }
-
-    const data = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    console.log("[ai-gemini] candidates count:", data?.candidates?.length ?? 0);
-
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    if (!text) {
-      console.error("[ai-gemini] empty text in response:", JSON.stringify(data).slice(0, 300));
-    }
-    return { text, error: text ? null : "Пустой ответ от ИИ. Попробуй ещё раз." };
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return { text: "", error: "No message to send" };
+    const chat = model.startChat({ history });
+    const result = await chat.sendMessage(lastMessage.content);
+    const text = result.response.text();
+    console.log("[ai-gemini] chat done, response length:", text.length);
+    return { text, error: null };
   } catch (e: unknown) {
-    const err = e as Error;
-    console.error("[ai-gemini] fetch error:", err?.message, err?.stack);
-    return { text: "", error: "Ошибка соединения. Попробуй ещё раз." };
+    const err = e as Error & { status?: number; statusText?: string; errorDetails?: unknown };
+    console.error("[ai-gemini] SDK error:", {
+      message: err?.message,
+      status: err?.status,
+      statusText: err?.statusText,
+      errorDetails: JSON.stringify(err?.errorDetails ?? "").slice(0, 200),
+    });
+    if (err?.message?.includes("429")) {
+      return { text: "", error: "Сейчас много запросов, попробуй через минуту" };
+    }
+    return { text: "", error: err?.message || "AI request failed" };
   }
 }
