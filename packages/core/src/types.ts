@@ -494,7 +494,8 @@ export type StudentAnnouncement = Announcement & {
 };
 export type NotificationKind =
   | "announcement" | "new_homework" | "new_grade" | "homework_graded"
-  | "lesson_material" | "student_excused" | "student_submitted";
+  | "lesson_material" | "student_excused" | "student_submitted"
+  | "leave_request" | "leave_decision" | "lesson_starting_soon";
 export type AppNotification = {
   id: string;
   recipient_user_id: string;

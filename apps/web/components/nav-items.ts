@@ -1,5 +1,6 @@
 import {
   Award,
+  Bell,
   BookOpen,
   Briefcase,
   CheckSquare,
@@ -7,7 +8,6 @@ import {
   FolderOpen,
   Home,
   Library,
-  Megaphone,
   Settings,
   Sparkles,
   type LucideIcon,
@@ -30,7 +30,7 @@ export const navItems: NavItem[] = [
   { key: "attendance", href: "/attendance", icon: CheckSquare, label: (d) => d.nav.attendance },
   { key: "materials", href: "/materials", icon: FolderOpen, label: (d) => d.nav.materials },
   { key: "books", href: "/books", icon: Library, label: (d) => d.nav.books },
-  { key: "announcements", href: "/announcements", icon: Megaphone, label: (d) => d.announcements.title },
+  { key: "notifications", href: "/notifications", icon: Bell, label: (d) => d.nav.notifications },
   { key: "projects", href: "/projects", icon: Briefcase, label: (d) => d.nav.projects },
   { key: "ai", href: "/ai-assistant", icon: Sparkles, label: (d) => d.nav.aiAssistant },
   { key: "profile", href: "/profile", icon: Settings, label: (d) => d.nav.profile },

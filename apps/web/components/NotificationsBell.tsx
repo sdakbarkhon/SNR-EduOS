@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, FolderOpen, Check, ChevronRight,
+  Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, FolderOpen, Check, ChevronRight, Clock,
 } from "lucide-react";
 import {
   getDictionary, getMyNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead,
@@ -23,6 +23,9 @@ const ICONS: Record<NotificationKind, typeof Bell> = {
   lesson_material: FolderOpen,
   student_excused: CalendarX,
   student_submitted: CheckCircle,
+  leave_request: CalendarX,
+  leave_decision: CheckCircle,
+  lesson_starting_soon: Clock,
 };
 
 export const NotificationsBell = memo(function NotificationsBell() {

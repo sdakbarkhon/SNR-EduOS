@@ -44,9 +44,10 @@ export const uz: Dictionary = {
     grades: "Baholar",
     profile: "Profil",
     settings: "Sozlamalar",
+    notifications: "Bildirishnomalar",
   },
   auth: {
-    title: "O‘quvchi uchun kirish",
+    title: "O’quvchi uchun kirish",
     usernameLabel: "Login",
     usernamePlaceholder: "Loginni kiriting",
     passwordLabel: "Parol",
@@ -358,6 +359,8 @@ export const uz: Dictionary = {
     today: "Bugun",
     yesterday: "Kecha",
     agoSeconds: "{n} soniya oldin", agoMinutes: "{n} daqiqa oldin", agoHours: "{n} soat oldin", agoDays: "{n} kun oldin",
+    tabNotifications: "Bildirishnomalar",
+    tabAnnouncements: "E'lonlar",
   },
   payments: {
     title: "To’lovlar va balans",

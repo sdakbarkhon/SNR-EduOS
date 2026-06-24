@@ -44,6 +44,7 @@ export const ru: Dictionary = {
     grades: "Оценки",
     profile: "Профиль",
     settings: "Настройки",
+    notifications: "Уведомления",
   },
   auth: {
     title: "Вход для ученика",
@@ -358,6 +359,8 @@ export const ru: Dictionary = {
     today: "Сегодня",
     yesterday: "Вчера",
     agoSeconds: "{n} сек назад", agoMinutes: "{n} мин назад", agoHours: "{n} ч назад", agoDays: "{n} дн назад",
+    tabNotifications: "Уведомления",
+    tabAnnouncements: "Объявления",
   },
   payments: {
     title: "Оплаты и баланс",

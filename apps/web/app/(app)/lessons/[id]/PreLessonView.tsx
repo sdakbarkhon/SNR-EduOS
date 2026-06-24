@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, MapPin, Clock, CalendarX, X } from "lucide-react";
-import { getSubjectStyle, formatTime, getDictionary } from "@snr/core";
+import { ChevronLeft, MapPin, Clock, CalendarX, Calendar, X } from "lucide-react";
+import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale } from "@snr/core";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest,
@@ -12,16 +12,6 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
-
-function initials(name: string): string {
-  return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
-}
-
-function fullDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric", month: "long", year: "numeric", weekday: "long", timeZone: "Asia/Tashkent",
-  });
-}
 
 export function PreLessonView({
   lesson,
@@ -34,16 +24,11 @@ export function PreLessonView({
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
   const router = useRouter();
-  const db = createClient();
+  const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
   const style = getSubjectStyle(lesson.group.subject);
 
-  // Live clock (client-only → null on first paint to avoid hydration mismatch)
+  // Live clock (client-only — null on SSR to avoid hydration mismatch)
   const [nowMs, setNowMs] = useState<number | null>(null);
-  useEffect(() => {
-    setNowMs(Date.now());
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   // Excuse request state
   const [excuse, setExcuse] = useState<ExcuseRequest | null | undefined>(undefined);
@@ -53,15 +38,27 @@ export function PreLessonView({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!studentId) { setExcuse(null); return; }
-    getMyExcuseRequest(db as never, lesson.id, studentId)
-      .then((e) => setExcuse(e))
-      .catch(() => setExcuse(null));
+    // createClient() must run only in the browser (accesses document.cookie)
+    const db = createClient();
+    dbRef.current = db;
+
+    setNowMs(Date.now());
+    const clockId = setInterval(() => setNowMs(Date.now()), 1000);
+
+    if (studentId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getMyExcuseRequest(db as any, lesson.id, studentId)
+        .then((e) => setExcuse(e))
+        .catch(() => setExcuse(null));
+    } else {
+      setExcuse(null);
+    }
+
+    return () => clearInterval(clockId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id, studentId]);
 
-  // Realtime: when the teacher starts the lesson (status → in_progress), refresh
-  // so the page re-renders into the live-lesson workspace.
+  // Realtime: when teacher starts the lesson (status → in_progress), refresh
   useRealtimeChannel(`lesson-status-${lesson.id}`, "lessons", `id=eq.${lesson.id}`, () => {
     router.refresh();
   });
@@ -69,7 +66,7 @@ export function PreLessonView({
   const startMs = new Date(lesson.starts_at).getTime();
   const secsUntil = nowMs === null ? null : Math.max(0, Math.floor((startMs - nowMs) / 1000));
 
-  // When the countdown hits zero, refresh once (teacher may have just started).
+  // When countdown reaches zero, refresh once
   const firedRef = useRef(false);
   useEffect(() => {
     if (secsUntil === 0 && !firedRef.current) {
@@ -79,13 +76,16 @@ export function PreLessonView({
   }, [secsUntil, router]);
 
   async function submitExcuse() {
-    if (!studentId) return;
+    const db = dbRef.current;
+    if (!studentId || !db) return;
     if (reason.trim().length < 5) { setError(dl.excuse.minLengthError); return; }
     setSubmitting(true);
     setError("");
     try {
-      await createExcuseRequest(db as never, lesson.id, studentId, reason);
-      const e = await getMyExcuseRequest(db as never, lesson.id, studentId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await createExcuseRequest(db as any, lesson.id, studentId, reason);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const e = await getMyExcuseRequest(db as any, lesson.id, studentId);
       setExcuse(e);
       setModalOpen(false);
       setReason("");
@@ -97,9 +97,11 @@ export function PreLessonView({
   }
 
   async function cancelExcuse() {
-    if (!studentId) return;
+    const db = dbRef.current;
+    if (!studentId || !db) return;
     try {
-      await deleteExcuseRequest(db as never, lesson.id, studentId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await deleteExcuseRequest(db as any, lesson.id, studentId);
       setExcuse(null);
     } catch { /* noop */ }
   }
@@ -108,6 +110,7 @@ export function PreLessonView({
   const timeRange = lesson.ends_at
     ? `${formatTime(lesson.starts_at)} — ${formatTime(lesson.ends_at)}`
     : formatTime(lesson.starts_at);
+  const dateStr = formatDate(lesson.starts_at);
 
   // Countdown display
   const isUrgent = secsUntil !== null && secsUntil < 60;
@@ -121,106 +124,103 @@ export function PreLessonView({
     : hours > 0 ? `${hours} ч ${Math.floor((secsUntil % 3600) / 60)} м`
     : `${mm} м`;
 
-  // Ring progress (fraction of the final hour remaining)
-  const R = 70;
+  // SVG ring (r=140 for the larger w-96 circle)
+  const R = 140;
   const C = 2 * Math.PI * R;
   const frac = secsUntil === null ? 1 : Math.min(1, secsUntil / 3600);
-  const dash = C * frac;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center text-white"
-      style={{
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)",
-      }}
-    >
-      {/* Glow blobs */}
-      <div className="pointer-events-none absolute -left-40 top-1/4 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute -right-40 bottom-1/4 h-96 w-96 rounded-full bg-violet-500/20 blur-3xl" />
-
+    <div className="relative min-h-screen w-full bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
       {/* Back link */}
       <Link
         href="/schedule"
-        className="absolute left-6 top-6 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white/80 backdrop-blur-md transition hover:bg-white/20"
+        className="absolute left-6 top-6 z-10 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white/80 backdrop-blur-md transition hover:bg-white/20"
       >
         <ChevronLeft className="h-4 w-4" />
         {dl.back}
       </Link>
 
-      {/* Live badge */}
-      <span className="mb-8 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-cyan-300 backdrop-blur-md">
-        <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
-        {dl.nowStarting}
-      </span>
+      {/* 2-column grid */}
+      <div className="grid min-h-screen grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
 
-      {/* Subject */}
-      <p className="mb-2 text-3xl font-bold tracking-tight">{heroTitle}</p>
-
-      {/* Group · Teacher */}
-      <p className="mb-10 text-xl font-medium text-white/60">
-        {lesson.group.name}
-        {lesson.teacher ? ` · ${lesson.teacher.full_name}` : ""}
-      </p>
-
-      {/* Countdown ring + text-8xl number */}
-      <div className="relative mb-8 flex h-64 w-64 items-center justify-center">
-        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full -rotate-90">
-          <circle cx="100" cy="100" r="90" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="6" />
-          <circle
-            cx="100" cy="100" r="90" fill="none"
-            stroke={isUrgent ? "#fb7185" : "#67e8f9"}
-            strokeWidth="6" strokeLinecap="round"
-            strokeDasharray={2 * Math.PI * 90}
-            strokeDashoffset={2 * Math.PI * 90 * (1 - frac)}
-            className="transition-all duration-1000 ease-linear"
-          />
-        </svg>
-        <span className={`font-mono text-8xl font-extrabold tabular-nums leading-none ${isUrgent ? "animate-pulse text-rose-300" : "text-white"}`}>
-          {counterText}
-        </span>
-      </div>
-
-      {/* Room + time */}
-      <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur-md">
-          <Clock className="h-4 w-4 text-white/60" />
-          {timeRange}
-        </span>
-        {lesson.room && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur-md">
-            <MapPin className="h-4 w-4 text-white/60" />
-            {dl.cabinet} {lesson.room}
+        {/* LEFT: Info */}
+        <div className="flex flex-col">
+          {/* Live badge */}
+          <span className="mb-6 inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-cyan-200 backdrop-blur-md">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+            {dl.nowStarting}
           </span>
-        )}
-      </div>
 
-      {/* Refresh + excuse actions */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.refresh()}
-          className="rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-cyan-500/30 transition-transform hover:scale-105 active:scale-95"
-        >
-          {dl.goToLesson} <span className="opacity-80">{dl.goToLessonNow}</span>
-        </button>
+          {/* Subject name */}
+          <h1 className="mb-4 text-5xl font-black leading-tight tracking-tight md:text-6xl lg:text-7xl">
+            {heroTitle}
+          </h1>
 
-        {studentId && excuse !== undefined && !excuse && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur-md transition hover:bg-white/20"
-          >
-            <CalendarX className="h-4 w-4" />
-            {dl.excuse.button}
-          </button>
-        )}
-        {studentId && excuse && (
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md">
-            <CalendarX className="h-4 w-4 text-white/50" />
-            {dl.excuse.requestedTitle}
-            <button onClick={cancelExcuse} className="ml-1 text-white/40 hover:text-white/80">
-              <X className="h-3.5 w-3.5" />
-            </button>
+          {/* Group · Teacher */}
+          <p className="mb-8 text-xl font-medium text-white/70 md:text-2xl">
+            {lesson.group.name}
+            {lesson.teacher ? ` · ${lesson.teacher.full_name}` : ""}
+          </p>
+
+          {/* Date / Time / Room pills */}
+          <div className="flex flex-wrap gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-5 py-2 text-sm font-medium backdrop-blur-md">
+              <Calendar className="h-4 w-4 text-white/60" />
+              {dateStr}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-5 py-2 text-sm font-medium backdrop-blur-md">
+              <Clock className="h-4 w-4 text-white/60" />
+              {timeRange}
+            </span>
+            {lesson.room && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-5 py-2 text-sm font-medium backdrop-blur-md">
+                <MapPin className="h-4 w-4 text-white/60" />
+                {dl.cabinet} {lesson.room}
+              </span>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* RIGHT: Timer + excuse */}
+        <div className="flex flex-col items-center gap-6">
+          {/* Countdown ring */}
+          <div className="relative flex h-72 w-72 items-center justify-center md:h-96 md:w-96">
+            <svg viewBox="0 0 320 320" className="absolute inset-0 h-full w-full -rotate-90">
+              <circle cx="160" cy="160" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="8" />
+              <circle
+                cx="160" cy="160" r={R} fill="none"
+                stroke={isUrgent ? "#fb7185" : "#67e8f9"}
+                strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={C}
+                strokeDashoffset={C * (1 - frac)}
+                className="transition-all duration-1000 ease-linear"
+              />
+            </svg>
+            <span className={`font-mono text-7xl font-extrabold tabular-nums leading-none md:text-8xl ${isUrgent ? "animate-pulse text-rose-300" : "text-white"}`}>
+              {counterText}
+            </span>
+          </div>
+
+          {/* Excuse button (replaces the old "Перейти сейчас") */}
+          {studentId && excuse !== undefined && !excuse && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full border border-cyan-300/40 bg-cyan-400/20 px-6 py-2.5 text-sm font-semibold text-cyan-200 backdrop-blur-md transition hover:bg-cyan-400/30"
+            >
+              <CalendarX className="h-4 w-4" />
+              {dl.excuse.button}
+            </button>
+          )}
+          {studentId && excuse && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm text-white/80 backdrop-blur-md">
+              <CalendarX className="h-4 w-4 text-white/50" />
+              {dl.excuse.requestedTitle}
+              <button onClick={cancelExcuse} className="ml-1 text-white/40 hover:text-white/80">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Excuse modal */}

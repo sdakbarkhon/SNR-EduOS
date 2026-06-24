@@ -33,6 +33,7 @@ export interface Dictionary {
     grades: string;
     profile: string;
     settings: string;
+    notifications: string;
   };
   auth: {
     title: string;
@@ -355,6 +356,8 @@ export interface Dictionary {
     today: string;
     yesterday: string;
     agoSeconds: string; agoMinutes: string; agoHours: string; agoDays: string;
+    tabNotifications: string;
+    tabAnnouncements: string;
   };
   payments: {
     title: string;

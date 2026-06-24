@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GraduationCap, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { getDictionary } from "@snr/core";
+import { getDictionary, getUnreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { navItems } from "./nav-items";
@@ -19,12 +20,29 @@ export function Sidebar() {
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
 
   useEffect(() => {
     setMounted(true);
     try {
       if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
     } catch { /* blocked */ }
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    try {
+      const db = createClient();
+      dbRef.current = db;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getUnreadCount(db as any).then(setUnreadCount).catch(() => null);
+      intervalId = setInterval(() => {
+        const d = dbRef.current;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (d) getUnreadCount(d as any).then(setUnreadCount).catch(() => null);
+      }, 30000);
+    } catch { /* noop */ }
+
+    return () => { if (intervalId) clearInterval(intervalId); };
   }, []);
 
   function toggle() {
@@ -85,7 +103,7 @@ export function Sidebar() {
               href={item.href}
               title={item.label(d)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
+                "relative flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
                 active
                   ? "bg-white/25 text-white shadow-sm backdrop-blur-sm"
                   : "text-white/80 hover:bg-white/10 hover:text-white",
@@ -99,6 +117,14 @@ export function Sidebar() {
               />
               {!isCollapsed && (
                 <span className="whitespace-nowrap">{item.label(d)}</span>
+              )}
+              {item.key === "notifications" && unreadCount > 0 && !isCollapsed && (
+                <span className="ml-auto min-w-[20px] rounded-full bg-red-500 px-1.5 text-center text-[10px] font-bold leading-[20px] text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+              {item.key === "notifications" && unreadCount > 0 && isCollapsed && (
+                <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500" />
               )}
             </Link>
           );

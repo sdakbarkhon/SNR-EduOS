@@ -44,6 +44,7 @@ export const en: Dictionary = {
     grades: "Grades",
     profile: "Profile",
     settings: "Settings",
+    notifications: "Notifications",
   },
   auth: {
     title: "Student sign in",
@@ -358,6 +359,8 @@ export const en: Dictionary = {
     today: "Today",
     yesterday: "Yesterday",
     agoSeconds: "{n} sec ago", agoMinutes: "{n} min ago", agoHours: "{n} h ago", agoDays: "{n} d ago",
+    tabNotifications: "Notifications",
+    tabAnnouncements: "Announcements",
   },
   payments: {
     title: "Payments & balance",
