@@ -44,6 +44,11 @@ export function KahootTeacherModal({
       const [qs, s] = await Promise.all([getQuizQuestions(db, stage.id), createKahootSession(db, stage.id)]);
       setQuestions(qs);
       setSession(s);
+      // If reopening a finished session, pre-populate leaderboard
+      if ((s as KahootSession | null)?.status === "finished") {
+        const lb = await getKahootLeaderboard(db, stage.id);
+        setBoard(lb);
+      }
     })().catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
