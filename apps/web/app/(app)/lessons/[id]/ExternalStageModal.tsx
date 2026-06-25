@@ -57,11 +57,12 @@ export function ExternalStageModal({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // iframe load tracking (10s timeout fallback for embeddable services)
+  // iframe load tracking (30s timeout fallback for embeddable services —
+  // Scratch's player can be slow on first load, so give it room).
   const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">(embeddable && embedUrl ? "loading" : "error");
   useEffect(() => {
     if (!embeddable || !embedUrl) return;
-    const t = setTimeout(() => setIframeState((s) => (s === "loading" ? "error" : s)), 10000);
+    const t = setTimeout(() => setIframeState((s) => (s === "loading" ? "error" : s)), 30000);
     return () => clearTimeout(t);
   }, [embeddable, embedUrl]);
 
@@ -175,8 +176,9 @@ export function ExternalStageModal({
                       title={serviceName}
                       onLoad={() => setIframeState("ok")}
                       onError={() => setIframeState("error")}
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                      allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
+                      allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
+                      referrerPolicy="no-referrer-when-downgrade"
                       style={{ width: "100%", height: "100%", border: "none", minHeight: 420 }}
                     />
                   </>
@@ -195,17 +197,24 @@ export function ExternalStageModal({
                 )}
               </div>
             ) : (
-              /* Non-embeddable: Globe placeholder + open button */
-              <div className="m-5 flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-8 text-center">
-                <Globe className="h-12 w-12 text-blue-500" />
-                <p className="text-sm font-medium text-slate-600">{dx.opensInNewTab}</p>
+              /* Non-embeddable (App Inventor / Code Monkey send X-Frame-Options: DENY).
+                 We don't fight the server header — we present a friendly, neutral
+                 "opens in a new tab" card instead of an error. */
+              <div className="m-5 flex flex-1 flex-col items-center justify-center gap-5 rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/60 to-violet-50/40 p-10 text-center">
+                <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30">
+                  <Globe className="h-12 w-12 text-white" strokeWidth={1.75} />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-2xl font-extrabold tracking-tight text-slate-800">{serviceName}</h3>
+                  <p className="mx-auto max-w-sm text-base font-medium text-slate-600">{dx.opensInNewTab}</p>
+                </div>
                 <button
                   onClick={handleOpenService}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
+                  className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-8 py-4 text-base font-bold text-white shadow-xl shadow-blue-500/30 transition-transform hover:scale-[1.03] active:scale-95"
                 >
-                  <ExternalLink className="h-4 w-4" /> {dx.openService} {serviceName}
+                  <ExternalLink className="h-5 w-5" /> {dx.openService} {serviceName}
                 </button>
-                <p className="text-xs text-slate-400">{dx.afterWork}</p>
+                <p className="text-sm text-slate-400">{dx.afterWork}</p>
               </div>
             )}
 

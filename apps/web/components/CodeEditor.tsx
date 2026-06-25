@@ -1,49 +1,54 @@
 "use client";
 
-import Editor from "react-simple-code-editor";
-import Prism from "prismjs";
-import "prismjs/components/prism-clike";
-import "prismjs/components/prism-c";
-import "prismjs/components/prism-cpp";
-import "prismjs/components/prism-python";
+// Monaco-based code editor (Prompt 16). Replaces the previous Prism/textarea
+// editor so Python/C++ behave like a real IDE: auto-indent after `:` / `{`,
+// Tab = 4 spaces, bracket matching, auto-close, Ctrl+/ comment, Ctrl+F search.
+//
+// Monaco is heavy, so it is loaded lazily (dynamic import, ssr:false) and pulls
+// its core from a CDN — the app bundle does not grow by ~2 MB.
+
+import dynamic from "next/dynamic";
+import type { EditorProps } from "@monaco-editor/react";
 
 type Lang = "python" | "cpp";
 
-const MONO = "'JetBrains Mono','Fira Code','SF Mono',Monaco,Consolas,monospace";
-const FS = 13;
-const LH = 1.55;
-
-function grammar(lang: Lang): Prism.Grammar {
-  return (lang === "cpp" ? Prism.languages.cpp : Prism.languages.python) as Prism.Grammar;
-}
-
-// VSCode-dark token colors, scoped under .snr-code (avoids importing a global theme).
-function TokenStyles() {
-  return (
-    <style>{`
-      .snr-code .token.comment,.snr-code .token.prolog,.snr-code .token.doctype,.snr-code .token.cdata{color:#6a9955}
-      .snr-code .token.punctuation{color:#d4d4d4}
-      .snr-code .token.keyword,.snr-code .token.boolean{color:#569cd6}
-      .snr-code .token.string,.snr-code .token.char,.snr-code .token.attr-value{color:#ce9178}
-      .snr-code .token.number{color:#b5cea8}
-      .snr-code .token.function{color:#dcdcaa}
-      .snr-code .token.operator{color:#d4d4d4}
-      .snr-code .token.builtin,.snr-code .token.class-name,.snr-code .token.macro{color:#4ec9b0}
-      .snr-code .token.preprocessor,.snr-code .token.directive{color:#c586c0}
-    `}</style>
-  );
-}
-
-function Gutter({ count }: { count: number }) {
+function Skeleton({ minHeight }: { minHeight: number }) {
   return (
     <div
-      aria-hidden
-      className="select-none py-3 pl-3 pr-2 text-right"
-      style={{ color: "#5a5a5a", fontFamily: MONO, fontSize: FS, lineHeight: LH, background: "#1a1a1a" }}
+      className="flex items-center justify-center rounded-xl border border-slate-700 text-sm text-slate-400"
+      style={{ background: "#1e1e1e", minHeight }}
     >
-      {Array.from({ length: count }, (_, i) => <div key={i}>{i + 1}</div>)}
+      <span className="inline-flex items-center gap-2">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
+        Загрузка редактора…
+      </span>
     </div>
   );
+}
+
+const MonacoEditor = dynamic(
+  () => import("@monaco-editor/react").then((m) => m.default),
+  { ssr: false, loading: () => <Skeleton minHeight={300} /> },
+);
+
+const BASE_OPTIONS: EditorProps["options"] = {
+  minimap: { enabled: false },
+  fontSize: 14,
+  lineNumbers: "on",
+  tabSize: 4,
+  insertSpaces: true,
+  automaticLayout: true,
+  wordWrap: "on",
+  scrollBeyondLastLine: false,
+  renderWhitespace: "selection",
+  fontFamily: "'JetBrains Mono','Fira Code','SF Mono',Monaco,Consolas,monospace",
+  padding: { top: 10, bottom: 10 },
+  smoothScrolling: true,
+  matchBrackets: "always",
+};
+
+function monacoLang(lang: Lang): string {
+  return lang === "cpp" ? "cpp" : "python";
 }
 
 export function CodeEditor({
@@ -54,21 +59,17 @@ export function CodeEditor({
   language: Lang;
   minHeight?: number;
 }) {
-  const lines = Math.max(1, value.split("\n").length);
   return (
-    <div className="snr-code overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
-      <TokenStyles />
-      <div className="flex" style={{ minHeight }}>
-        <Gutter count={lines} />
-        <Editor
-          value={value}
-          onValueChange={onChange}
-          highlight={(code) => Prism.highlight(code, grammar(language), language)}
-          padding={12}
-          textareaClassName="focus:outline-none"
-          style={{ fontFamily: MONO, fontSize: FS, lineHeight: LH, color: "#d4d4d4", flex: 1, minHeight }}
-        />
-      </div>
+    <div className="overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
+      <MonacoEditor
+        height={minHeight}
+        language={monacoLang(language)}
+        value={value}
+        onChange={(v) => onChange(v ?? "")}
+        theme="vs-dark"
+        loading={<Skeleton minHeight={minHeight} />}
+        options={BASE_OPTIONS}
+      />
     </div>
   );
 }
@@ -80,17 +81,17 @@ export function CodeViewer({
   language: Lang;
   minHeight?: number;
 }) {
-  const lines = Math.max(1, value.split("\n").length);
-  const html = Prism.highlight(value || "", grammar(language), language);
+  const h = minHeight || 240;
   return (
-    <div className="snr-code overflow-auto rounded-xl border border-slate-700" style={{ background: "#1e1e1e", minHeight }}>
-      <TokenStyles />
-      <div className="flex">
-        <Gutter count={lines} />
-        <pre className="flex-1 py-3 pr-3 pl-3" style={{ fontFamily: MONO, fontSize: FS, lineHeight: LH, color: "#d4d4d4", margin: 0 }}>
-          <code dangerouslySetInnerHTML={{ __html: html }} />
-        </pre>
-      </div>
+    <div className="overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
+      <MonacoEditor
+        height={h}
+        language={monacoLang(language)}
+        value={value}
+        theme="vs-dark"
+        loading={<Skeleton minHeight={h} />}
+        options={{ ...BASE_OPTIONS, readOnly: true, domReadOnly: true }}
+      />
     </div>
   );
 }

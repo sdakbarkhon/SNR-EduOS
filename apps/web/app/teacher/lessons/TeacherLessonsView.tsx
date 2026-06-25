@@ -13,6 +13,7 @@ import {
   getTeacherLessonsByMonth,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { IosTimePicker } from "@/components/IosTimePicker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -288,49 +289,6 @@ function DatePickerField({
   );
 }
 
-// ── TimePickerField ───────────────────────────────────────────────────────────
-function TimePickerField({
-  value, onChange,
-}: {
-  value: string; onChange: (v: string) => void;
-}) {
-  const [hh, mm] = value ? value.split(":") : ["", ""];
-
-  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-  const minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
-  // Preserve a legacy minute value that isn't a multiple of 5 (old lessons).
-  if (mm && !minutes.includes(mm)) { minutes.push(mm); minutes.sort(); }
-
-  const selectCls =
-    "flex-1 cursor-pointer appearance-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 " +
-    "text-center text-lg font-bold text-[#1D1D1F] outline-none transition-all " +
-    "hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
-
-  return (
-    <div className="flex items-center gap-2">
-      <select
-        value={hh}
-        onChange={(e) => onChange(`${e.target.value}:${mm || "00"}`)}
-        className={selectCls}
-        aria-label="Часы"
-      >
-        <option value="" disabled>чч</option>
-        {hours.map((h) => <option key={h} value={h}>{h}</option>)}
-      </select>
-      <span className="text-xl font-bold text-gray-400">:</span>
-      <select
-        value={mm}
-        onChange={(e) => onChange(`${hh || "00"}:${e.target.value}`)}
-        className={selectCls}
-        aria-label="Минуты"
-      >
-        <option value="" disabled>мм</option>
-        {minutes.map((m) => <option key={m} value={m}>{m}</option>)}
-      </select>
-    </div>
-  );
-}
-
 // ── LessonFormModal ───────────────────────────────────────────────────────────
 function LessonFormModal({
   mode, groups, initial, onClose, onSave,
@@ -380,17 +338,15 @@ function LessonFormModal({
             <label className={labelCls}>Дата *</label>
             <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={`${labelCls} flex items-center gap-1.5`}>
-                <Clock className="h-3.5 w-3.5" /> Время *
-              </label>
-              <TimePickerField value={form.startTime} onChange={v => set("startTime", v)} />
-            </div>
-            <div>
-              <label className={labelCls}>Длительность (мин.)</label>
-              <input type="number" min="5" max="240" value={form.durationMinutes} onChange={e => set("durationMinutes", e.target.value)} className={inputCls} />
-            </div>
+          <div>
+            <label className={`${labelCls} flex items-center gap-1.5`}>
+              <Clock className="h-3.5 w-3.5" /> Время начала *
+            </label>
+            <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} />
+          </div>
+          <div>
+            <label className={labelCls}>Длительность (мин.)</label>
+            <input type="number" min="5" max="240" value={form.durationMinutes} onChange={e => set("durationMinutes", e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Кабинет</label>

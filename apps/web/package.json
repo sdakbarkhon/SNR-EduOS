@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@monaco-editor/react": "^4.7.0",
     "@snr/core": "workspace:*",
     "@snr/ui-tokens": "workspace:*",
     "@supabase/ssr": "^0.5.2",

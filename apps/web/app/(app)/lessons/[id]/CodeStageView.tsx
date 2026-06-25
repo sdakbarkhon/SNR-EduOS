@@ -9,6 +9,7 @@ import type {
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
+import { StdinInput } from "@/components/StdinInput";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
 import { runCpp } from "@/lib/piston";
@@ -44,7 +45,11 @@ export function CodeStageView({
   const isGraded = grade != null;
 
   const [code, setCode] = useState(existingSub?.code ?? starter);
-  const [stdin, setStdin] = useState(existingSub?.stdin ?? "");
+  // stdin is stored as a newline-joined string but edited as one value per cell.
+  const [stdinValues, setStdinValues] = useState<string[]>(
+    existingSub?.stdin ? existingSub.stdin.split("\n") : [""],
+  );
+  const stdin = stdinValues.join("\n");
   const [result, setResult] = useState<RunResult | null>(
     existingSub?.last_output ? { stdout: existingSub.last_output, stderr: "", error: null } : null,
   );
@@ -158,13 +163,7 @@ export function CodeStageView({
       {/* Stdin */}
       <section>
         <h3 className="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400">{dc.stdin}</h3>
-        <textarea
-          value={stdin}
-          onChange={(e) => setStdin(e.target.value)}
-          readOnly={readOnly}
-          placeholder={dc.stdinPlaceholder}
-          className="h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 read-only:opacity-70"
-        />
+        <StdinInput value={stdinValues} onChange={setStdinValues} readOnly={readOnly} />
       </section>
 
       {/* Actions */}

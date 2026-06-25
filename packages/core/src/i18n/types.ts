@@ -614,6 +614,9 @@ export interface Dictionary {
       editorLabel: string;
       stdin: string;
       stdinPlaceholder: string;
+      stdinPaste: string;
+      stdinAdd: string;
+      stdinTotal: string;
       run: string;
       running: string;
       runFirst: string;       // first Pyodide load (5–15s)
