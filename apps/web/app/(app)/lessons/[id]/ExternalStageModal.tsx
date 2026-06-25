@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  X, Globe, AlertTriangle, ExternalLink, Upload, Check, Loader2, Save, Image as ImageIcon,
+  X, Globe, AlertTriangle, ExternalLink, Upload, Check, Loader2, Save,
 } from "lucide-react";
-import { getDictionary, submitStageTask, uploadStageAttachment, getStageAttachmentUrl } from "@snr/core";
+import { getDictionary, uploadStageAttachment, getStageAttachmentUrl, submitStageTask } from "@snr/core";
 import type {
   Locale, LessonStageWithProgress, LessonStageProgress,
   ExternalServiceConfig, ExternalServiceSubmission, ExternalServiceType,
@@ -13,7 +13,7 @@ import type {
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG } from "@/lib/external-services";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { FullscreenStageView } from "./FullscreenStageView";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -34,6 +34,7 @@ export function ExternalStageModal({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dx = d.lesson.external;
+  const w = d.lesson.workspace;
   const db = createClient();
 
   const service = stage.content_type as ExternalServiceType;
@@ -54,11 +55,10 @@ export function ExternalStageModal({
   const [lastOpenedAt, setLastOpenedAt] = useState<string | null>(existingSub?.last_opened_at ?? null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // iframe load tracking (30s timeout fallback for embeddable services —
-  // Scratch's player can be slow on first load, so give it room).
+  // iframe load tracking (30s timeout fallback for embeddable services).
   const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">(embeddable && embedUrl ? "loading" : "error");
   useEffect(() => {
     if (!embeddable || !embedUrl) return;
@@ -97,7 +97,6 @@ export function ExternalStageModal({
     ((!cfg.requires_link || link.trim().length > 0) && (!cfg.requires_screenshot || !!screenshotPath));
 
   async function handleSubmit() {
-    setConfirmOpen(false);
     setSubmitting(true);
     try {
       const submission: ExternalServiceSubmission = {
@@ -113,199 +112,186 @@ export function ExternalStageModal({
     }
   }
 
-  if (typeof document === "undefined") return null;
-
   const serviceName = meta.name;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex flex-col"
-      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+  const headerRight = readOnly ? (
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+      <Check className="h-4 w-4" /> {w.submitted}
+    </span>
+  ) : (
+    <button
+      onClick={() => setAttachOpen(true)}
+      className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 transition-all hover:from-violet-700 hover:to-purple-700 active:scale-95"
     >
-      <div className="mx-auto flex h-full w-full max-w-6xl flex-col p-3 sm:p-5">
-        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-          {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
-            <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
-              <X className="h-5 w-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-bold text-slate-700">{stage.title}</span>
-              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-violet-700">
-                {dx.service}: {serviceName}
-              </span>
-            </div>
-          </div>
+      <Save className="h-4 w-4" /> {w.submit}
+    </button>
+  );
 
-          <div className="flex flex-1 flex-col overflow-y-auto">
-            {/* Grade / submitted banners */}
-            {isGraded && (
-              <div className={`mx-5 mt-4 rounded-xl border px-4 py-2.5 ${GRADE_COLORS[grade] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
-                <p className="text-sm font-bold">{dx.graded}: {grade}/5</p>
-                {stage.progress?.teacher_comment && (
-                  <p className="mt-1 text-sm opacity-90"><span className="font-semibold">{dx.teacherComment}:</span> {stage.progress.teacher_comment}</p>
-                )}
-              </div>
+  return (
+    <FullscreenStageView title={stage.title} backLabel={w.backToLesson} onClose={onClose} headerRight={headerRight}>
+      {/* Grade / submitted strip */}
+      {isGraded && (
+        <div className={`shrink-0 border-b px-5 py-2.5 ${GRADE_COLORS[grade] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
+          <p className="text-sm font-bold">{dx.graded}: {grade}/5
+            {stage.progress?.teacher_comment && (
+              <span className="ml-2 font-normal opacity-90">— {stage.progress.teacher_comment}</span>
             )}
-            {isSubmitted && !isGraded && (
-              <div className="mx-5 mt-4 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700">
-                <Check className="h-4 w-4" /> {dx.submittedWaiting}
-              </div>
-            )}
+          </p>
+        </div>
+      )}
+      {isSubmitted && !isGraded && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-700">
+          <Check className="h-4 w-4" /> {dx.submittedWaiting}
+        </div>
+      )}
 
-            {/* Problem statement */}
-            {stage.description && (
-              <div className="px-5 pt-4">
-                <h3 className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">{d.lesson.code.problemStatement}</h3>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{stage.description}</p>
-              </div>
-            )}
-
-            {/* Embeddable: iframe (or error plate) */}
-            {embeddable ? (
-              <div className="relative m-5 min-h-[420px] flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                {iframeState !== "error" && embedUrl ? (
-                  <>
-                    {iframeState === "loading" && (
-                      <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                      </div>
-                    )}
-                    <iframe
-                      src={embedUrl}
-                      title={serviceName}
-                      onLoad={() => setIframeState("ok")}
-                      onError={() => setIframeState("error")}
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
-                      allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      style={{ width: "100%", height: "100%", border: "none", minHeight: 420 }}
-                    />
-                  </>
-                ) : (
-                  <div className="flex h-full min-h-[420px] flex-col items-center justify-center gap-3 p-6 text-center">
-                    <AlertTriangle className="h-10 w-10 text-orange-500" />
-                    <h4 className="text-base font-bold text-slate-800">{dx.loadError}</h4>
-                    <p className="max-w-md text-sm text-slate-500">{dx.loadErrorBody}</p>
-                    <button
-                      onClick={() => window.open(cfg.url, "_blank", "noopener,noreferrer")}
-                      className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
-                    >
-                      <ExternalLink className="h-4 w-4" /> {dx.openInNewTab}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Non-embeddable (App Inventor / Code Monkey send X-Frame-Options: DENY).
-                 We don't fight the server header — we present a friendly, neutral
-                 "opens in a new tab" card instead of an error. */
-              <div className="m-5 flex flex-1 flex-col items-center justify-center gap-5 rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/60 to-violet-50/40 p-10 text-center">
-                <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30">
-                  <Globe className="h-12 w-12 text-white" strokeWidth={1.75} />
+      {/* Body: edge-to-edge iframe (or fallback card) */}
+      {embeddable ? (
+        <div className="relative flex-1 overflow-hidden bg-slate-50 dark:bg-slate-900">
+          {iframeState !== "error" && embedUrl ? (
+            <>
+              {iframeState === "loading" && (
+                <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-2xl font-extrabold tracking-tight text-slate-800">{serviceName}</h3>
-                  <p className="mx-auto max-w-sm text-base font-medium text-slate-600">{dx.opensInNewTab}</p>
-                </div>
-                <button
-                  onClick={handleOpenService}
-                  className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-8 py-4 text-base font-bold text-white shadow-xl shadow-blue-500/30 transition-transform hover:scale-[1.03] active:scale-95"
-                >
-                  <ExternalLink className="h-5 w-5" /> {dx.openService} {serviceName}
-                </button>
-                <p className="text-sm text-slate-400">{dx.afterWork}</p>
-              </div>
-            )}
-
-            {/* Attach result */}
-            {!readOnly && (
-              <div className="border-t border-slate-100 px-5 py-4">
-                <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                  {embeddable ? dx.attachResultOptional : dx.attachResult}
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-600">
-                      {dx.attachLink}{!embeddable && cfg.requires_link ? <span className="text-red-500"> *</span> : null}
-                    </label>
-                    <input
-                      type="url"
-                      value={link}
-                      onChange={(e) => setLink(e.target.value)}
-                      placeholder="https://…"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-600">
-                      {dx.attachScreenshot}{!embeddable && cfg.requires_screenshot ? <span className="text-red-500"> *</span> : null}
-                    </label>
-                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => fileRef.current?.click()}
-                        disabled={uploading}
-                        className="inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:border-blue-300 hover:text-blue-500 disabled:opacity-60"
-                      >
-                        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                        {dx.chooseFile}
-                      </button>
-                      {previewUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={previewUrl} alt="" className="h-12 w-12 rounded-lg object-cover ring-1 ring-slate-200" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Read-only: show what was attached */}
-            {readOnly && (link || previewUrl) && (
-              <div className="border-t border-slate-100 px-5 py-4">
-                <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{dx.attachResult}</h3>
-                {link && (
-                  <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
-                    <ExternalLink className="h-4 w-4" /> {link}
-                  </a>
-                )}
-                {previewUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={previewUrl} alt="" className="mt-2 max-h-48 rounded-lg ring-1 ring-slate-200" />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer: submit */}
-          {!readOnly && (
-            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-5 py-3">
-              {!requiredOk && <span className="text-xs text-slate-400">{dx.mustAttachHint}</span>}
+              )}
+              <iframe
+                src={embedUrl}
+                title={serviceName}
+                onLoad={() => setIframeState("ok")}
+                onError={() => setIframeState("error")}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
+                allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="h-full w-full border-none"
+              />
+            </>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+              <AlertTriangle className="h-10 w-10 text-orange-500" />
+              <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">{dx.loadError}</h4>
+              <p className="max-w-md text-sm text-slate-500">{dx.loadErrorBody}</p>
               <button
-                onClick={() => setConfirmOpen(true)}
+                onClick={() => window.open(cfg.url, "_blank", "noopener,noreferrer")}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+              >
+                <ExternalLink className="h-4 w-4" /> {dx.openInNewTab}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Non-embeddable services: a friendly "opens in a new tab" card. */
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 bg-gradient-to-b from-blue-50/60 to-violet-50/40 p-10 text-center dark:from-blue-500/5 dark:to-violet-500/5">
+          <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30">
+            <Globe className="h-12 w-12 text-white" strokeWidth={1.75} />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-2xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">{serviceName}</h3>
+            <p className="mx-auto max-w-sm text-base font-medium text-slate-600 dark:text-slate-300">{dx.opensInNewTab}</p>
+          </div>
+          <button
+            onClick={handleOpenService}
+            className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-8 py-4 text-base font-bold text-white shadow-xl shadow-blue-500/30 transition-transform hover:scale-[1.03] active:scale-95"
+          >
+            <ExternalLink className="h-5 w-5" /> {dx.openService} {serviceName}
+          </button>
+          <p className="text-sm text-slate-400">{dx.afterWork}</p>
+        </div>
+      )}
+
+      {/* Read-only: slim bar showing what was attached */}
+      {readOnly && (link || previewUrl) && (
+        <div className="flex shrink-0 items-center gap-4 border-t border-slate-100 bg-white px-5 py-2.5 dark:border-white/10 dark:bg-slate-900">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{dx.attachResult}</span>
+          {link && (
+            <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 truncate text-sm font-semibold text-blue-600 hover:underline">
+              <ExternalLink className="h-4 w-4 shrink-0" /> <span className="truncate">{link}</span>
+            </a>
+          )}
+          {previewUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt="" className="h-9 w-9 rounded-lg object-cover ring-1 ring-slate-200" />
+          )}
+        </div>
+      )}
+
+      {/* Attach + submit mini-modal */}
+      {attachOpen && !readOnly && createPortal(
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAttachOpen(false); }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{w.submit}</h3>
+              <button onClick={() => setAttachOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+              {embeddable ? dx.attachResultOptional : dx.attachResult}
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                  {dx.attachLink}{!embeddable && cfg.requires_link ? <span className="text-red-500"> *</span> : null}
+                </label>
+                <input
+                  type="url"
+                  value={link}
+                  onChange={(e) => setLink(e.target.value)}
+                  placeholder="https://…"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                  {dx.attachScreenshot}{!embeddable && cfg.requires_screenshot ? <span className="text-red-500"> *</span> : null}
+                </label>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:border-blue-300 hover:text-blue-500 disabled:opacity-60 dark:border-white/10"
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {dx.chooseFile}
+                  </button>
+                  {previewUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewUrl} alt="" className="h-12 w-12 rounded-lg object-cover ring-1 ring-slate-200" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {!requiredOk && <p className="mt-3 text-xs text-slate-400">{dx.mustAttachHint}</p>}
+
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setAttachOpen(false)}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+              >
+                {d.common.cancel}
+              </button>
+              <button
+                onClick={handleSubmit}
                 disabled={!requiredOk || submitting || uploading}
-                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:opacity-50"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:opacity-50"
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {dx.submitAndSave}
               </button>
             </div>
-          )}
-        </div>
-      </div>
-
-      <ConfirmModal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={handleSubmit}
-        title={dx.submitAndSave}
-        message={dx.confirmSubmit}
-        variant="warning"
-        confirmText={dx.submitAndSave}
-        cancelText={d.common.cancel}
-      />
-    </div>,
-    document.body,
+          </div>
+        </div>,
+        document.body,
+      )}
+    </FullscreenStageView>
   );
 }

@@ -79,12 +79,6 @@ const TASK_CONTENT_TYPES: LessonContentType[] = [
   "code", "scratch", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
 ];
 
-const CONTENT_DESCRIPTIONS: Partial<Record<LessonContentType, string>> = {
-  wokwi:       "Симулятор электронных схем Arduino, ESP32, Raspberry Pi",
-  codesandbox: "Создание веб-приложений в браузере (React, Vue и др.)",
-  makecode:    "Создание ретро-игр через блоки или TypeScript",
-};
-
 function StageModal({
   modalState,
   onClose,
@@ -285,28 +279,20 @@ function StageModal({
                 <>
                   <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep2Title}</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {availableContentTypes.map((ct) => {
-                      const desc = CONTENT_DESCRIPTIONS[ct];
-                      return (
-                        <button
-                          key={ct}
-                          onClick={() => setContentType(ct === contentType ? null : ct)}
-                          className={`flex flex-col gap-0.5 rounded-xl border-2 px-3 py-2 text-left text-sm transition-all ${
-                            contentType === ct
-                              ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
-                              : "border-slate-200 dark:border-white/10 hover:border-slate-300 text-slate-700 dark:text-slate-200"
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <span className="shrink-0 text-slate-500">{CONTENT_ICONS[ct]}</span>
-                            <span>{contentLabel(ct)}</span>
-                          </span>
-                          {desc && (
-                            <span className="pl-6 text-[10px] font-normal leading-tight text-slate-400 dark:text-slate-500">{desc}</span>
-                          )}
-                        </button>
-                      );
-                    })}
+                    {availableContentTypes.map((ct) => (
+                      <button
+                        key={ct}
+                        onClick={() => setContentType(ct === contentType ? null : ct)}
+                        className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm transition-all ${
+                          contentType === ct
+                            ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 text-slate-700 dark:text-slate-200"
+                        }`}
+                      >
+                        <span className="shrink-0 text-slate-500">{CONTENT_ICONS[ct]}</span>
+                        <span>{contentLabel(ct)}</span>
+                      </button>
+                    ))}
                   </div>
                 </>
               )}

@@ -567,6 +567,9 @@ export interface Dictionary {
       aiPrompt: string;           // "Затрудняешься? Чем я могу помочь тебе сегодня?"
       aiAsk: string;              // "Задать вопрос"
       soon: string;               // "Скоро будет доступно"
+      backToLesson: string;       // fullscreen stage: "← Назад к уроку"
+      submit: string;             // fullscreen stage: "Сдать"
+      submitted: string;          // fullscreen stage: "✓ Сдано"
     };
     // Stage constructor v2 (migration 35)
     stageStartLabel: string;           // "Старт"

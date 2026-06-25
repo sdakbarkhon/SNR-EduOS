@@ -59,33 +59,18 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
   makecode: {
     name: "MakeCode",
     embedSupported: true,
-    // Accepts:
+    // Accepts every MakeCode share format:
     // - makecode.com/_xyz   (short share URL from the Share button)
     // - arcade.makecode.com/12345-67890-... or arcade.makecode.com/_xyz
-    // - makecode.microbit.org/_xyz or microbit.makecode.com/<id>  (micro:bit)
+    // - makecode.microbit.org/_xyz, microbit.makecode.com/<id>  (micro:bit)
     // - minecraft.makecode.com/<id>
     urlPattern:
       /^https?:\/\/(?:(?:[\w-]+\.)?makecode\.com|makecode\.microbit\.org)\/[\w-]+/,
-    extractEmbedUrl: (url) => {
-      // Short share URL: makecode.com/_xyz → arcade embed
-      const shortMatch = url.match(/(?<![.\w])makecode\.com\/(_[\w-]+)/);
-      if (shortMatch) {
-        return `https://arcade.makecode.com/---codeembed?pub=${shortMatch[1]}`;
-      }
-      // Arcade full URL
-      const arcadeMatch = url.match(/arcade\.makecode\.com\/([\w-]+)/);
-      if (arcadeMatch) {
-        return `https://arcade.makecode.com/---codeembed?pub=${arcadeMatch[1]}`;
-      }
-      // micro:bit
-      const microbitMatch = url.match(
-        /(?:makecode\.microbit\.org|microbit\.makecode\.com)\/([\w-]+)/,
-      );
-      if (microbitMatch) {
-        return `https://makecode.microbit.org/---codeembed?pub=${microbitMatch[1]}`;
-      }
-      return null;
-    },
+    // The previous `---codeembed?pub=` form gave a white screen + JS error for
+    // short share URLs (the arcade host can't resolve a foreign project id).
+    // MakeCode share pages detect the iframe context themselves and switch to
+    // embed mode, so we just hand back the share URL with query/hash stripped.
+    extractEmbedUrl: (url) => url.trim().split("?")[0]?.split("#")[0] ?? null,
     placeholder: "https://makecode.com/_xyz123 или https://arcade.makecode.com/12345-67890-...",
     errorMsg:
       "Неверная ссылка. Ожидается ссылка на проект MakeCode (makecode.com или arcade.makecode.com)",

@@ -427,20 +427,6 @@ export function LessonWorkspaceView({
     ...(summaryStage ? [summaryStage] : []),
   ];
 
-  // Code-task stage opens as a full-width inline IDE, replacing the stepper view.
-  if (activeCodeStage && studentId) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-5">
-        <CodeStageView
-          stage={activeCodeStage}
-          studentId={studentId}
-          onBack={() => setActiveCodeStageId(null)}
-          onSubmitted={handleStageSubmitted}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <Link
@@ -875,6 +861,16 @@ export function LessonWorkspaceView({
       {/* Material viewer modal */}
       {mounted && viewerMat && (
         <MaterialViewerModal mat={viewerMat} onClose={() => setViewerMat(null)} />
+      )}
+
+      {/* Code-task stage → fullscreen IDE overlay */}
+      {mounted && activeCodeStage && studentId && (
+        <CodeStageView
+          stage={activeCodeStage}
+          studentId={studentId}
+          onBack={() => setActiveCodeStageId(null)}
+          onSubmitted={(progress) => { handleStageSubmitted(progress); setActiveCodeStageId(null); }}
+        />
       )}
 
       {/* External service modal (scratch/wokwi/codesandbox/makecode) */}
