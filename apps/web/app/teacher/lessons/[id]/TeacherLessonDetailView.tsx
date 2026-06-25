@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
-  ChevronUp, ChevronDown, Monitor, Code2, Puzzle, Wrench, Bot,
+  ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut,
 } from "lucide-react";
 import {
@@ -46,9 +46,9 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   presentation: <Presentation className="h-4 w-4" />,
   code:         <Code2 className="h-4 w-4" />,
   scratch:      <Puzzle className="h-4 w-4" />,
-  tinkercad:    <Wrench className="h-4 w-4" />,
-  app_inventor: <Bot className="h-4 w-4" />,
-  code_monkey:  <Monitor className="h-4 w-4" />,
+  wokwi:        <CircuitBoard className="h-4 w-4" />,
+  codesandbox:  <Code2 className="h-4 w-4" />,
+  makecode:     <Gamepad2 className="h-4 w-4" />,
   quiz_qia:     <TestTube2 className="h-4 w-4" />,
   quiz_kahoot:  <Gamepad2 className="h-4 w-4" />,
 };
@@ -76,9 +76,14 @@ type ModalStep = 1 | 2 | 3;
 
 const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
-  "code", "scratch", "tinkercad",
-  "app_inventor", "code_monkey", "quiz_qia", "quiz_kahoot",
+  "code", "scratch", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
 ];
+
+const CONTENT_DESCRIPTIONS: Partial<Record<LessonContentType, string>> = {
+  wokwi:       "Симулятор электронных схем Arduino, ESP32, Raspberry Pi",
+  codesandbox: "Создание веб-приложений в браузере (React, Vue и др.)",
+  makecode:    "Создание ретро-игр через блоки или TypeScript",
+};
 
 function StageModal({
   modalState,
@@ -122,7 +127,7 @@ function StageModal({
   const [expectedOutput, setExpectedOutput] = useState(existingCfg.expected_output ?? "");
   const isCode = contentType === "code";
 
-  // external-service config (scratch/tinkercad/app_inventor/code_monkey)
+  // external-service config (scratch/wokwi/codesandbox/makecode)
   const existingExtCfg = (existing?.config ?? {}) as Partial<ExternalServiceConfig>;
   const isExternal = isExternalService(contentType);
   const externalMeta = isExternal ? SERVICE_CONFIG[contentType as ExternalServiceType] : null;
@@ -280,20 +285,28 @@ function StageModal({
                 <>
                   <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep2Title}</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {availableContentTypes.map((ct) => (
-                      <button
-                        key={ct}
-                        onClick={() => setContentType(ct === contentType ? null : ct)}
-                        className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm transition-all ${
-                          contentType === ct
-                            ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
-                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 text-slate-700 dark:text-slate-200"
-                        }`}
-                      >
-                        <span className="shrink-0 text-slate-500">{CONTENT_ICONS[ct]}</span>
-                        <span>{contentLabel(ct)}</span>
-                      </button>
-                    ))}
+                    {availableContentTypes.map((ct) => {
+                      const desc = CONTENT_DESCRIPTIONS[ct];
+                      return (
+                        <button
+                          key={ct}
+                          onClick={() => setContentType(ct === contentType ? null : ct)}
+                          className={`flex flex-col gap-0.5 rounded-xl border-2 px-3 py-2 text-left text-sm transition-all ${
+                            contentType === ct
+                              ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                              : "border-slate-200 dark:border-white/10 hover:border-slate-300 text-slate-700 dark:text-slate-200"
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="shrink-0 text-slate-500">{CONTENT_ICONS[ct]}</span>
+                            <span>{contentLabel(ct)}</span>
+                          </span>
+                          {desc && (
+                            <span className="pl-6 text-[10px] font-normal leading-tight text-slate-400 dark:text-slate-500">{desc}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -788,9 +801,9 @@ export function TeacherLessonDetailView({
       presentation: dl.stageContentPresentation,
       code:         dl.stageContentCode,
       scratch:      dl.stageContentScratch,
-      tinkercad:    dl.stageContentTinkercad,
-      app_inventor: dl.stageContentAppInventor,
-      code_monkey:  dl.stageContentCodeMonkey,
+      wokwi:        dl.stageContentWokwi,
+      codesandbox:  dl.stageContentCodesandbox,
+      makecode:     dl.stageContentMakecode,
       quiz_qia:     dl.stageContentQuizQia,
       quiz_kahoot:  dl.stageContentQuizKahoot,
     };

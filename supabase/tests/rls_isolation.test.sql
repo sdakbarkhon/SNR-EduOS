@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(171);
+select plan(174);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1492,6 +1492,52 @@ reset role;
 delete from public.leave_requests
   where lesson_id = 'aa000001-0000-0000-0000-000000000000'
     and reason = 'M47-test reason';
+
+-- ============ Migration 51: new external services content types ============
+reset role;
+
+-- Test 172: INSERT lesson_stage with content_type='wokwi' succeeds
+select lives_ok(
+  $$ insert into public.lesson_stages
+       (id, lesson_id, position, stage_role, stage_type, content_type, title)
+     values
+       ('aaaa0001-0001-0001-0001-000000000001',
+        'aa000001-0000-0000-0000-000000000000',
+        91, 'middle', 'task', 'wokwi', 'WOKWI-TEST')
+     on conflict (id) do nothing $$,
+  'M51: insert lesson_stage content_type=wokwi succeeds'
+);
+
+-- Test 173: INSERT lesson_stage with content_type='codesandbox' succeeds
+select lives_ok(
+  $$ insert into public.lesson_stages
+       (id, lesson_id, position, stage_role, stage_type, content_type, title)
+     values
+       ('aaaa0001-0001-0001-0001-000000000002',
+        'aa000001-0000-0000-0000-000000000000',
+        92, 'middle', 'task', 'codesandbox', 'CODESANDBOX-TEST')
+     on conflict (id) do nothing $$,
+  'M51: insert lesson_stage content_type=codesandbox succeeds'
+);
+
+-- Test 174: INSERT lesson_stage with content_type='makecode' succeeds
+select lives_ok(
+  $$ insert into public.lesson_stages
+       (id, lesson_id, position, stage_role, stage_type, content_type, title)
+     values
+       ('aaaa0001-0001-0001-0001-000000000003',
+        'aa000001-0000-0000-0000-000000000000',
+        93, 'middle', 'task', 'makecode', 'MAKECODE-TEST')
+     on conflict (id) do nothing $$,
+  'M51: insert lesson_stage content_type=makecode succeeds'
+);
+
+-- cleanup
+delete from public.lesson_stages where id in (
+  'aaaa0001-0001-0001-0001-000000000001',
+  'aaaa0001-0001-0001-0001-000000000002',
+  'aaaa0001-0001-0001-0001-000000000003'
+);
 
 select * from finish();
 rollback;

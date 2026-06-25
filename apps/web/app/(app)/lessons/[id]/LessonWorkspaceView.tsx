@@ -69,9 +69,9 @@ function TaskStubModal({
         presentation: d.stageContentPresentation,
         code:         d.stageContentCode,
         scratch:      d.stageContentScratch,
-        tinkercad:    d.stageContentTinkercad,
-        app_inventor: d.stageContentAppInventor,
-        code_monkey:  d.stageContentCodeMonkey,
+        wokwi:        d.stageContentWokwi,
+        codesandbox:  d.stageContentCodesandbox,
+        makecode:     d.stageContentMakecode,
         quiz_qia:     d.stageContentQuizQia,
         quiz_kahoot:  d.stageContentQuizKahoot,
       }[stage.content_type] ?? stage.content_type
@@ -877,7 +877,7 @@ export function LessonWorkspaceView({
         <MaterialViewerModal mat={viewerMat} onClose={() => setViewerMat(null)} />
       )}
 
-      {/* External service modal (scratch/tinkercad/app_inventor/code_monkey) */}
+      {/* External service modal (scratch/wokwi/codesandbox/makecode) */}
       {mounted && externalStage && studentId && (
         <ExternalStageModal
           stage={externalStage}

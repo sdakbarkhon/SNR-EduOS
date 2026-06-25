@@ -71,8 +71,9 @@ export type Lesson = {
 export type LessonStageRole = 'start' | 'middle' | 'summary';
 export type LessonStageType = 'theory' | 'task';
 export type LessonContentType =
-  | 'presentation' | 'code' | 'scratch' | 'tinkercad'
-  | 'app_inventor' | 'code_monkey' | 'quiz_qia' | 'quiz_kahoot';
+  | 'presentation' | 'code' | 'scratch'
+  | 'wokwi' | 'codesandbox' | 'makecode'
+  | 'quiz_qia' | 'quiz_kahoot';
 
 export type LessonStage = {
   id: string;
@@ -123,14 +124,14 @@ export type CodeSubmission = {
   language: CodeLanguage;
 };
 
-export type ExternalServiceType = 'scratch' | 'tinkercad' | 'app_inventor' | 'code_monkey';
+export type ExternalServiceType = 'scratch' | 'wokwi' | 'codesandbox' | 'makecode';
 
-/** Stored in lesson_stages.config for external-service stages (Prompt 5). */
+/** Stored in lesson_stages.config for external-service stages. */
 export interface ExternalServiceConfig {
   url: string;                   // original project link the teacher entered
-  embed_url?: string | null;     // computed embed URL (scratch/tinkercad only)
-  requires_link?: boolean;       // app_inventor/code_monkey: student must attach a link
-  requires_screenshot?: boolean; // app_inventor/code_monkey: student must attach a screenshot
+  embed_url?: string | null;     // computed embed URL
+  requires_link?: boolean;
+  requires_screenshot?: boolean;
 }
 
 /** Stored in lesson_stage_progress.submission_data for external-service stages. */

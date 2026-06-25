@@ -576,9 +576,9 @@ export interface Dictionary {
     stageContentPresentation: string;  // "Презентация"
     stageContentCode: string;          // "Программирование (код)"
     stageContentScratch: string;       // "Scratch"
-    stageContentTinkercad: string;     // "Tinkercad"
-    stageContentAppInventor: string;   // "App Inventor"
-    stageContentCodeMonkey: string;    // "Code Monkey"
+    stageContentWokwi: string;         // "Wokwi"
+    stageContentCodesandbox: string;   // "CodeSandbox"
+    stageContentMakecode: string;      // "MakeCode Arcade"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"
     stageStepLabel: string;            // "Этап {n}"
@@ -676,12 +676,15 @@ export interface Dictionary {
       gradeSaved: string;
       submittedAt: string;
     };
-    // External services: scratch / tinkercad / app_inventor / code_monkey (Prompt 5)
+    // External services: scratch / wokwi / codesandbox / makecode
     external: {
       scratch: string;
-      tinkercad: string;
-      appInventor: string;
-      codeMonkey: string;
+      wokwi: string;
+      codesandbox: string;
+      makecode: string;
+      wokwiDesc: string;
+      codesandboxDesc: string;
+      makecodeDesc: string;
       service: string;            // "Сервис"
       projectLink: string;        // teacher config field
       open: string;               // student stage open button
