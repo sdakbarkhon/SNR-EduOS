@@ -627,6 +627,14 @@ export interface Dictionary {
     reminderBody: string;              // "У вас осталась неоконченная перекличка..."
     reminderUnmarked: string;          // "Не отмечены:"
     reminderGoToRollCall: string;      // "Перейти к перекличке"
+    // Inline attendance reminder banner (replaces modal)
+    attendanceReminderTitle: string;   // "До конца урока осталось {minutes} мин."
+    attendanceReminderHint: string;    // "Не забудьте сделать перекличку"
+    attendanceReminderUrgent: string;  // "Скоро урок закончится — пожалуйста сделайте перекличку"
+    attendanceMadeCheckOthers: string; // "Перекличка сделана. Проверьте оценки и задачи"
+    makeAttendance: string;            // "Сделать перекличку"
+    openAttendance: string;            // "Открыть посещаемость"
+    openGrades: string;                // "Оценки"
     // Lesson auto-status (pg_cron, no manual start/end)
     scheduledAutoNote: string;         // "Урок начнётся автоматически по расписанию"
     inProgressAutoNote: string;        // "Урок идёт."

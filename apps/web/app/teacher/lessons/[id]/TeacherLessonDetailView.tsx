@@ -34,7 +34,7 @@ import { AttendanceRollCall } from "./AttendanceRollCall";
 import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
-import { LessonEndReminderModal } from "./LessonEndReminderModal";
+import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
@@ -539,10 +539,6 @@ export function TeacherLessonDetailView({
   const [endedAt] = useState<string | null>(lesson.ended_at);
   const [elapsedMin, setElapsedMin] = useState(0);
 
-  const [unmarkedNames, setUnmarkedNames] = useState<string[]>([]);
-  const handleAttendanceStatus = useCallback((_allDone: boolean, names: string[]) => {
-    setUnmarkedNames(names);
-  }, []);
 
   const [confirmDeleteMatOpen, setConfirmDeleteMatOpen] = useState(false);
   const [matToDelete, setMatToDelete] = useState<LessonMaterial | null>(null);
@@ -859,6 +855,18 @@ export function TeacherLessonDetailView({
           </p>
         </div>
       )}
+
+      {/* Inline attendance reminder (5–15 min before end) */}
+      {status === "in_progress" && (
+        <AttendanceReminderBanner
+          lessonId={lesson.id}
+          endsAt={lesson.ends_at}
+          status={status}
+          onScrollToRollCall={() =>
+            rollCallRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        />
+      )}
       {status === "completed" && (
         <div className="space-y-2">
           <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4">
@@ -882,7 +890,6 @@ export function TeacherLessonDetailView({
           teacherId={teacher.id}
           lessonStatus={status}
           excused={excusedMap}
-          onStatusChange={handleAttendanceStatus}
         />
         </div>
       )}
@@ -1349,19 +1356,6 @@ export function TeacherLessonDetailView({
             const fresh = await getLessonStages(db, lesson.id);
             setStages(fresh);
           }}
-        />
-      )}
-
-      {/* 5-min reminder modal (only while in_progress) */}
-      {status === "in_progress" && mounted && (
-        <LessonEndReminderModal
-          lessonId={lesson.id}
-          endsAt={lesson.ends_at}
-          unmarkedNames={unmarkedNames}
-          status={status}
-          onScrollToRollCall={() =>
-            rollCallRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
         />
       )}
 

@@ -35,7 +35,7 @@ export function TeacherShell({
   const d = getDictionary(locale as Locale);
 
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--shell-gradient)" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--shell-gradient)" }}>
       <TeacherSidebar />
 
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">

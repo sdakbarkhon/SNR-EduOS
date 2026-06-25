@@ -60,14 +60,14 @@ export function TeacherSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-screen overflow-y-auto sticky top-0",
+        "scrollbar-hide hidden shrink-0 flex-col py-4 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-screen overflow-y-auto sticky top-0",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #2563EB, #1E3A8A)" }}
     >
       {/* Branding + collapse */}
       <div className={cn(
-        "mb-8 px-3",
+        "mb-3 px-3",
         isCollapsed ? "flex flex-col items-center gap-3" : "flex items-center justify-between gap-2",
       )}>
         <div className="flex min-w-0 items-center gap-3">
@@ -86,15 +86,6 @@ export function TeacherSidebar() {
           {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
         </button>
       </div>
-
-      {/* Role pill */}
-      {!isCollapsed && (
-        <div className="mb-8 px-3">
-          <div className="w-fit rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm">
-            {d.teacher.role}
-          </div>
-        </div>
-      )}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">

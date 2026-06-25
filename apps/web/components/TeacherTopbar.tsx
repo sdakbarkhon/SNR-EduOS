@@ -19,7 +19,7 @@ export function TeacherTopbar({
   const showSearch = pathname !== "/teacher/lessons";
 
   return (
-    <header className="relative z-10 flex h-20 w-full shrink-0 items-center justify-between px-4 md:px-8">
+    <header className="sticky top-0 z-30 flex h-20 w-full shrink-0 items-center justify-between bg-white/20 px-4 backdrop-blur-sm md:px-8">
       {/* Search (hidden on /teacher/lessons) */}
       <div className={`group relative max-w-sm flex-1 ${showSearch ? "" : "invisible pointer-events-none"}`}>
         <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">

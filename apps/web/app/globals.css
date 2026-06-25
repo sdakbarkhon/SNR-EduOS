@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbars while keeping scroll functionality */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+
 /* ─── CSS custom properties: light (default) and dark ─── */
 :root {
   --shell-gradient: linear-gradient(135deg, #E2EDFF 0%, #F3E5F5 50%, #CFE2FF 100%);

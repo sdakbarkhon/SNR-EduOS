@@ -14,7 +14,7 @@ export function Topbar({
   avatarUrl?: string | null;
 }) {
   return (
-    <header className="flex items-center justify-between border-b px-5 py-3 backdrop-blur-md md:px-8" style={{ background: "var(--topbar-bg)", borderColor: "var(--topbar-border)" }}>
+    <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between border-b px-5 py-3 backdrop-blur-md md:px-8" style={{ background: "var(--topbar-bg)", borderColor: "var(--topbar-border)" }}>
       <h1 className="text-[18px] font-semibold text-gray-800 dark:text-slate-100 md:text-[20px]">
         {title}
       </h1>

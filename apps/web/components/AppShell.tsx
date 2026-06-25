@@ -39,7 +39,7 @@ export function AppShell({
 
   return (
     <div
-      className="flex min-h-screen"
+      className="flex h-screen overflow-hidden"
       style={{ background: "var(--shell-gradient)" }}
     >
       <LessonStartBanner />
