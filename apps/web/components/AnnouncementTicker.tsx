@@ -5,7 +5,7 @@ import { Megaphone } from "lucide-react";
 import { getUnreadTickerAnnouncements, markTickerAnnouncementsRead, type Announcement } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 
-export function AnnouncementTicker() {
+export function AnnouncementTicker({ onlyFromAdmins = false }: { onlyFromAdmins?: boolean }) {
   const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
   const uidRef = useRef<string | null>(null);
   const [tickers, setTickers] = useState<Announcement[]>([]);
@@ -17,7 +17,7 @@ export function AnnouncementTicker() {
     const db = dbRef.current;
     const uid = uidRef.current;
     if (!db || !uid) return;
-    const list = await getUnreadTickerAnnouncements(db, uid).catch(() => [] as Announcement[]);
+    const list = await getUnreadTickerAnnouncements(db, uid, { onlyFromAdmins }).catch(() => [] as Announcement[]);
     setTickers(list);
     setIdx(0);
     setAnimKey((k) => k + 1);

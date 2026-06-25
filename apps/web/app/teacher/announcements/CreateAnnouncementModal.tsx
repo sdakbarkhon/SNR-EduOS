@@ -30,7 +30,7 @@ export function CreateAnnouncementModal({
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
   const [pinned, setPinned] = useState(false);
   const [category, setCategory] = useState<AnnouncementCategory>("general");
-  const [isTicker, setIsTicker] = useState(false);
+  const [isTicker, setIsTicker] = useState(true);
   const [validUntil, setValidUntil] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

@@ -905,12 +905,47 @@ export const getTeacherRecentSubmissions = async (db: Db, limit = 10) => {
   return data ?? [];
 };
 
-/** Обновить профиль учителя. */
+/** Загружает аватар учителя в avatars/teachers/<teacherId>/avatar.<ext>, возвращает signed URL. */
+export const uploadTeacherAvatar = async (
+  db: Db,
+  { teacherId, blob, fileName }: { teacherId: string; blob: Blob; fileName: string },
+): Promise<string> => {
+  const ext = fileName.split(".").pop() ?? "jpg";
+  const path = `teachers/${teacherId}/avatar.${ext}`;
+  const { error } = await db.storage
+    .from("avatars")
+    .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
+  if (error) throw error;
+  const { data, error: urlErr } = await db.storage
+    .from("avatars")
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (urlErr) throw urlErr;
+  return data!.signedUrl;
+};
+
+/** Обновить профиль учителя (имя, телефон, био). */
 export const updateTeacherProfile = (
   db: Db,
-  { teacherId, fullName }: { teacherId: string; fullName: string },
+  { teacherId, fullName, phone, bio }: { teacherId: string; fullName: string; phone?: string; bio?: string },
 ) =>
-  db.from("teachers").update({ full_name: fullName }).eq("id", teacherId).then(unwrap);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (db as any).from("teachers").update({ full_name: fullName, phone: phone ?? null, bio: bio ?? null }).eq("id", teacherId).then(unwrap);
+
+/** Обновить аватар учителя (avatar_url). */
+export const updateTeacherAvatar = (
+  db: Db,
+  { teacherId, avatarUrl }: { teacherId: string; avatarUrl: string | null },
+) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (db as any).from("teachers").update({ avatar_url: avatarUrl }).eq("id", teacherId).then(unwrap);
+
+/** Обновить настройки уведомлений учителя. */
+export const updateTeacherNotificationPrefs = (
+  db: Db,
+  { teacherId, prefs }: { teacherId: string; prefs: Record<string, boolean> },
+) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (db as any).from("teachers").update({ notification_preferences: prefs }).eq("id", teacherId).then(unwrap);
 
 /** Тип ответа для submitTest. */
 export type TestAnswerInput = {

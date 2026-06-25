@@ -28,7 +28,7 @@ const teacherNavItems = [
   { key: "announce",   href: "/teacher/announcements",icon: Megaphone,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.announcements.nav },
   { key: "projects",   href: "/teacher/projects",     icon: Briefcase,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.projects.nav },
   { key: "groups",     href: "/teacher/groups",       icon: Users,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
-  { key: "profile",    href: "/teacher/profile",      icon: Settings,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navProfile },
+  { key: "settings",   href: "/teacher/settings",     icon: Settings,      label: (d: ReturnType<typeof getDictionary>) => d.settings.title },
 ];
 
 export function TeacherSidebar() {
@@ -60,7 +60,7 @@ export function TeacherSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-screen sticky top-0",
+        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-screen overflow-y-auto sticky top-0",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #2563EB, #1E3A8A)" }}

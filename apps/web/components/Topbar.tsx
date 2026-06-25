@@ -7,9 +7,11 @@ import { AnnouncementTicker } from "./AnnouncementTicker";
 export function Topbar({
   title,
   studentName,
+  avatarUrl,
 }: {
   title: string;
   studentName?: string;
+  avatarUrl?: string | null;
 }) {
   return (
     <header className="flex items-center justify-between border-b px-5 py-3 backdrop-blur-md md:px-8" style={{ background: "var(--topbar-bg)", borderColor: "var(--topbar-border)" }}>
@@ -21,7 +23,7 @@ export function Topbar({
         <NotificationsBell />
         {studentName && (
           <Link href="/profile" className="transition-transform hover:scale-105">
-            <Avatar name={studentName} />
+            <Avatar name={studentName} src={avatarUrl ?? undefined} />
           </Link>
         )}
         <LogoutButton />

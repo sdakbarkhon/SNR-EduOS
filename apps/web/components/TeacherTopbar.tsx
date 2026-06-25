@@ -33,7 +33,7 @@ export function TeacherTopbar({
       </div>
 
       <div className="flex items-center gap-3 md:gap-5">
-        <AnnouncementTicker />
+        <AnnouncementTicker onlyFromAdmins />
         <NotificationsBell />
 
         <div className="flex items-center gap-3 rounded-[16px] border border-white/40 bg-white/60 py-2 pl-2 pr-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-xl">

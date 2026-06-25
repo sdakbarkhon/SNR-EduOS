@@ -126,7 +126,11 @@ export const getStudentAnnouncements = async (db: Db, _studentId: string): Promi
 
 // Returns live ticker announcements visible to the current user (RLS filters).
 // Sorted by pinned-first, then newest. Excludes expired (valid_until < now).
-export const getActiveTickerAnnouncements = async (db: Db): Promise<Announcement[]> => {
+// onlyFromAdmins=true → further filters to announcements where created_by is in admins.id.
+export const getActiveTickerAnnouncements = async (
+  db: Db,
+  options?: { onlyFromAdmins?: boolean },
+): Promise<Announcement[]> => {
   const now = new Date().toISOString();
   const { data, error } = await (db as any).from("announcements")
     .select("*")
@@ -135,12 +139,23 @@ export const getActiveTickerAnnouncements = async (db: Db): Promise<Announcement
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Announcement[];
+  let announcements = (data ?? []) as Announcement[];
+
+  if (options?.onlyFromAdmins && announcements.length > 0) {
+    const creatorIds = [...new Set(announcements.map((a) => a.created_by).filter(Boolean))];
+    const { data: admins } = await (db as any).from("admins").select("id").in("id", creatorIds);
+    const adminIds = new Set(((admins ?? []) as any[]).map((a) => a.id));
+    announcements = announcements.filter((a) => adminIds.has(a.created_by));
+  }
+
+  return announcements;
 };
 
 // Returns ticker announcements not yet seen by the current user (using announcement_user_reads).
-export const getUnreadTickerAnnouncements = async (db: Db, userId: string): Promise<Announcement[]> => {
-  const all = await getActiveTickerAnnouncements(db);
+export const getUnreadTickerAnnouncements = async (
+  db: Db, userId: string, options?: { onlyFromAdmins?: boolean },
+): Promise<Announcement[]> => {
+  const all = await getActiveTickerAnnouncements(db, options);
   if (all.length === 0) return [];
   const ids = all.map((a) => a.id);
   const { data: reads } = await (db as any).from("announcement_user_reads")

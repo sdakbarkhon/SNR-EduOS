@@ -6,7 +6,7 @@ import { AdminSidebar } from "@/components/AdminSidebar";
 export function AdminShell({ adminName, children }: { adminName: string; children: ReactNode }) {
   return (
     <div
-      className="flex min-h-screen overflow-hidden"
+      className="flex min-h-screen"
       style={{ background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 50%, #ddd6fe 100%)" }}
     >
       <AdminSidebar />

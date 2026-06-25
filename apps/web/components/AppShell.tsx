@@ -13,9 +13,11 @@ import { LessonStartBanner } from "./LessonStartBanner";
 
 export function AppShell({
   studentName,
+  avatarUrl,
   children,
 }: {
   studentName?: string;
+  avatarUrl?: string | null;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -37,11 +39,11 @@ export function AppShell({
 
   return (
     <div
-      className="flex min-h-screen overflow-hidden"
+      className="flex min-h-screen"
       style={{ background: "var(--shell-gradient)" }}
     >
       <LessonStartBanner />
-      <Sidebar />
+      <Sidebar studentName={studentName} avatarUrl={avatarUrl} />
 
       {/* Правая колонка */}
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -54,7 +56,7 @@ export function AppShell({
         {/* Стеклянная подложка */}
         <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-[60px]" style={{ background: "var(--shell-overlay)" }} />
 
-        <Topbar title={title} studentName={studentName} />
+        <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} />
         <main className="flex-1 overflow-y-auto px-4 pb-20 pt-5 md:px-8 md:pb-8 md:pt-6">
           {children}
         </main>

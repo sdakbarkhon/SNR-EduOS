@@ -54,7 +54,7 @@ export function AdminSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200",
+        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 sticky top-0 h-screen overflow-y-auto",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #7C3AED, #4C1D95)" }}

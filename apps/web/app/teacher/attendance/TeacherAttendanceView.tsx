@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDictionary, getGroupAttendance, getSubjectStyle, type AttendanceStatus } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -55,7 +55,7 @@ export function TeacherAttendanceView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const da = d.attendance;
-  const sb = useMemo(() => createClient(), []);
+  const sbRef = useRef<ReturnType<typeof createClient> | null>(null);
 
   const [groupId, setGroupId] = useState<string>(groups[0]?.id ?? "");
   const [month, setMonth] = useState<string>(defaultMonth);
@@ -66,27 +66,29 @@ export function TeacherAttendanceView({
 
   const monthOptions = useMemo(() => getMonthOptions(12), []);
 
-  const load = useCallback(
-    async (gId: string, m: string) => {
-      if (!gId) return;
-      setLoading(true);
-      try {
-        const result = await getGroupAttendance(sb, gId, m || undefined);
-        setData(result);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [sb],
-  );
+  const load = useCallback(async (gId: string, m: string) => {
+    const sb = sbRef.current;
+    if (!gId || !sb) return;
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await getGroupAttendance(sb as any, gId, m || undefined);
+      setData(result ?? { lessons: [], students: [], matrix: {}, groupAvgPct: 0 });
+    } catch {
+      setData({ lessons: [], students: [], matrix: {}, groupAvgPct: 0 });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Initial load on mount
-  const [initialized, setInitialized] = useState(false);
-  if (!initialized && groups.length > 0) {
-    setInitialized(true);
-    const firstGroup = groups[0];
-    if (firstGroup) load(firstGroup.id, defaultMonth);
-  }
+  useEffect(() => {
+    sbRef.current = createClient();
+    if (groups.length > 0) {
+      const firstGroup = groups[0];
+      if (firstGroup) load(firstGroup.id, defaultMonth);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onGroupChange = (gId: string) => {
     setGroupId(gId);

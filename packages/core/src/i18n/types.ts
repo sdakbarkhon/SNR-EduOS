@@ -404,6 +404,34 @@ export interface Dictionary {
     logout: string;
     edit: string;
   };
+  settings: {
+    title: string;
+    tabProfile: string;
+    tabSecurity: string;
+    tabNotifications: string;
+    tabInterface: string;
+    fullName: string;
+    username: string;
+    email: string;
+    phone: string;
+    bio: string;
+    avatar: string;
+    changeAvatar: string;
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+    passwordChanged: string;
+    passwordReset: string;
+    passwordMismatch: string;
+    saveChanges: string;
+    language: string;
+    darkThemeComingSoon: string;
+    notifySubmission: string;
+    notifyLessonSoon: string;
+    notifyAnnouncement: string;
+    notifyLeaveRequest: string;
+    notifyTitle: string;
+  };
   materials: {
     title: string;
     searchPlaceholder: string;

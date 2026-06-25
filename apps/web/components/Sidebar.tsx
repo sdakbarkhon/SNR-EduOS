@@ -10,10 +10,17 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { navItems } from "./nav-items";
+import { Avatar } from "./Avatar";
 
 const STORAGE_KEY = "sidebar-collapsed";
 
-export function Sidebar() {
+export function Sidebar({
+  studentName,
+  avatarUrl,
+}: {
+  studentName?: string;
+  avatarUrl?: string | null;
+} = {}) {
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -59,7 +66,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200",
+        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 sticky top-0 h-screen overflow-y-auto",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #2A75FF, #0A3CB4)" }}
@@ -91,6 +98,24 @@ export function Sidebar() {
           {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
         </button>
       </div>
+
+      {/* Профиль */}
+      {studentName && (
+        <div className="mb-4 px-3">
+          <Link
+            href="/profile"
+            className={cn(
+              "flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-white/10",
+              isCollapsed && "justify-center",
+            )}
+          >
+            <Avatar name={studentName} src={avatarUrl ?? undefined} size={32} />
+            {!isCollapsed && (
+              <span className="truncate text-sm font-semibold text-white/90">{studentName}</span>
+            )}
+          </Link>
+        </div>
+      )}
 
       {/* Навигация */}
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
