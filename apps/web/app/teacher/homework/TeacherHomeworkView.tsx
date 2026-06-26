@@ -30,7 +30,6 @@ interface Props {
 
 type StatusFilter = "all" | "active" | "done";
 type UrgencyFilter = "all" | "this_week" | "next_week" | "later";
-const HW_PAGE_SIZE = 10;
 
 function isActive(hw: HomeworkItem): boolean {
   const now = new Date().toISOString();
@@ -133,7 +132,6 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
-  const [visibleCount, setVisibleCount] = useState(HW_PAGE_SIZE);
   const [localHW, setLocalHW] = useState<HomeworkItem[]>(homework);
   const [busyId, setBusyId] = useState<string | null>(null);
   // null on server + first client render → no overdue counted until after mount,
@@ -161,10 +159,6 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, urgencyFilter, nowIso]);
 
-  useEffect(() => { setVisibleCount(HW_PAGE_SIZE); }, [groupFilter, statusFilter, urgencyFilter]);
-
-  const visibleItems = urgencyFiltered.slice(0, visibleCount);
-  const remaining = urgencyFiltered.length - visibleCount;
 
   // Tri-color donut over all works (file submissions + test attempts)
   let checked = 0, pending = 0, overdue = 0;
@@ -300,7 +294,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
         ) : (
           <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {visibleItems.map((hw) => {
+            {urgencyFiltered.map((hw) => {
               const cfg = getSubjectConfig(hw.group.subject);
               const total = hw.group.enrolled?.length ?? 0;
               const submitted = hw.submissions.length + hw.test_subs.length;
@@ -358,17 +352,6 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
               );
             })}
           </div>
-          {remaining > 0 && (
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => setVisibleCount((c) => c + HW_PAGE_SIZE)}
-                className="rounded-[14px] border border-white/60 bg-white/70 px-6 py-2.5 text-sm font-semibold text-gray-600 shadow-sm backdrop-blur transition-all hover:bg-white hover:text-blue-600"
-              >
-                Загрузить ещё ({remaining})
-              </button>
-            </div>
-          )}
           </>
         )}
       </div>

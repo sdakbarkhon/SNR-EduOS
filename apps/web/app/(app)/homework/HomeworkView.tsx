@@ -38,7 +38,6 @@ type ViewTab = null | "all" | HomeworkTab;
 type CardZone = "overdue" | "urgent" | "normal" | "review" | "completed";
 type UrgencyFilter = "all" | "this_week" | "next_week" | "later";
 
-const PAGE_SIZE = 10;
 
 function isUrgent(dueDate: string | null): boolean {
   if (!dueDate) return false;
@@ -216,7 +215,6 @@ export function HomeworkView({
   const [sortBy, setSortBy] = useState<SortMode>("deadline");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [query, setQuery] = useState("");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const counts = useMemo(() => homeworkCounts(rows), [rows]);
@@ -253,8 +251,6 @@ export function HomeworkView({
       return diff > 2 * week;
     });
   }, [baseFiltered, urgencyFilter]);
-
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [tab, typeFilter, subjectFilter, urgencyFilter, query]);
 
   const zonedItems = useMemo(() => {
     const overdueBucket: HomeworkWithSubmission[] = [];
@@ -311,11 +307,7 @@ export function HomeworkView({
     setSubjectFilter("all");
     setUrgencyFilter("all");
     setQuery("");
-    setVisibleCount(PAGE_SIZE);
   }
-
-  const visibleItems = zonedItems.slice(0, visibleCount);
-  const remaining = zonedItems.length - visibleCount;
 
   useEffect(() => {
     const channel = sb
@@ -456,20 +448,10 @@ export function HomeworkView({
           {zonedItems.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {visibleItems.map(({ hw, zone }) => (
+                {zonedItems.map(({ hw, zone }) => (
                   <HomeworkListCard key={hw.id} hw={hw} zone={zone} />
                 ))}
               </div>
-              {remaining > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                  className="mx-auto rounded-[14px] border border-white/80 bg-white/70 backdrop-blur-xl px-6 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:bg-white hover:text-brand-blue"
-                  style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
-                >
-                  Загрузить ещё ({remaining})
-                </button>
-              )}
             </>
           ) : noActiveWork ? (
             <div

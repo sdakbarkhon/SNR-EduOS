@@ -21,7 +21,6 @@ import { factBanner } from "@snr/ui-tokens";
 import { EmptyState, MaterialTile, RingProgress, SubjectIcon, useLocale } from "@/components";
 import { DashboardCard } from "@/components/DashboardCard";
 import type { Database } from "@snr/core";
-import { getDailyFact } from "@/app/actions/ai";
 import { FloatingActionButton } from "./FloatingActionButton";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
@@ -72,17 +71,12 @@ export function DashboardView({
 
   async function loadFact() {
     setFactLoading(true);
-    const today = new Date().toISOString().slice(0, 10);
-    const key = `daily_fact_${today}`;
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem(key);
-      if (cached) { setAiFactText(cached); setFactLoading(false); return; }
-    }
-    const r = await getDailyFact();
-    if ("text" in r) {
-      setAiFactText(r.text);
-      if (typeof window !== "undefined")
-        localStorage.setItem(`daily_fact_${new Date().toISOString().slice(0, 10)}`, r.text);
+    try {
+      const res = await fetch("/api/daily-fact");
+      const data = (await res.json()) as { text?: string; error?: string };
+      if (data.text) setAiFactText(data.text);
+    } catch {
+      // noop — fact stays null, banner hides
     }
     setFactLoading(false);
   }
