@@ -129,8 +129,22 @@ export interface Dictionary {
     navStudents: string;
     navTeachers: string;
     navGroups: string;
+    navSubjects: string;
     navAnnouncements: string;
     navProfile: string;
+    // subjects
+    subjectsTitle: string;
+    subjectsSelectGroup: string;
+    subjectsAdd: string;
+    subjectsEdit: string;
+    subjectsDeleteConfirm: string;
+    subjectsDeleteWarning: string;
+    subjectsName: string;
+    subjectsTeacher: string;
+    subjectsNotAssigned: string;
+    subjectsEmpty: string;
+    subjectsIcon: string;
+    subjectsColor: string;
     role: string;
     // dashboard
     statStudents: string;
@@ -486,6 +500,8 @@ export interface Dictionary {
     downloadReference: string;
   };
   lesson: {
+    createNoSubjects: string;
+    createSelectSubject: string;
     back: string;
     progressTitle: string;
     stagesTitle: string;

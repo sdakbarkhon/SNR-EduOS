@@ -9,30 +9,42 @@ function getTashkentDate(): string {
 }
 
 async function fetchGeminiFact(apiKey: string): Promise<string | null> {
-  const today = getTashkentDate();
+  const MAX_LEN = 80;
+  const prompt =
+    `Один короткий интересный факт для школьников. СТРОГО: 1 предложение, максимум 80 символов на русском языке. Без вступления, без кавычек, без тире в начале. Только сам факт.\n` +
+    `Примеры: "Сердце синего кита весит около 600 кг." / "Антарктида — самая большая пустыня мира."`;
   const body = JSON.stringify({
-    contents: [
-      { role: "user", parts: [{ text: `Дай один интересный факт из науки, истории или технологий — 1-2 предложения, живо и увлекательно. Только факт, без вводных слов. Дата: ${today}.` }] },
-    ],
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
+  let lastText: string | null = null;
   for (const model of GEMINI_MODELS) {
-    try {
-      const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
-        body,
-      });
-      if (!res.ok) continue;
-      const data = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (text) return text;
-    } catch {
-      continue;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
+          body,
+        });
+        if (!res.ok) break;
+        const data = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        if (!raw) continue;
+        // Clean leading/trailing markdown, quotes, dashes
+        const text = raw
+          .replace(/^["""«»'\-—\*\s]+/, "")
+          .replace(/["""«»'\*\s]+$/, "")
+          .trim();
+        if (text.length <= MAX_LEN) return text;
+        lastText = text;
+        console.warn(`[daily-fact] ${model} attempt ${attempt + 1}: ${text.length} chars, retrying`);
+      } catch {
+        break;
+      }
     }
   }
-  return null;
+  return lastText ? lastText.slice(0, 77) + "..." : null;
 }
 
 export async function GET() {

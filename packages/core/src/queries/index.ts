@@ -10,6 +10,7 @@ import { unwrap } from "./helpers";
 
 export * from "./projects";
 export * from "./announcements";
+export * from "./subjects";
 
 // --- Профиль / группы ---
 export const getMyStudent = (db: Db) =>
@@ -1388,6 +1389,7 @@ export const createLesson = async (
     room: string | null;
     title: string | null;
     description: string | null;
+    subjectId?: string | null;
   },
 ): Promise<{ id: string }> => {
   const dur = input.durationMinutes ?? 45;
@@ -1406,6 +1408,7 @@ export const createLesson = async (
       description: input.description,
       topic: null,
       status: "scheduled",
+      subject_id: input.subjectId ?? null,
     })
     .select("id")
     .single();

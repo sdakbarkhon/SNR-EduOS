@@ -12,7 +12,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(174);
+select plan(180);
 
 -- ============ УЧЕНИК A видит только своё ============
 reset role;
@@ -1537,6 +1537,60 @@ delete from public.lesson_stages where id in (
   'aaaa0001-0001-0001-0001-000000000001',
   'aaaa0001-0001-0001-0001-000000000002',
   'aaaa0001-0001-0001-0001-000000000003'
+);
+
+-- ======== M52: daily_facts ========
+-- Switch to student A context
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select lives_ok(
+  $$ select count(*) from public.daily_facts $$,
+  'M52: student A can select daily_facts'
+);
+
+select throws_ok(
+  $$ insert into public.daily_facts (fact_date, fact_text) values ('2099-01-01', 'test') $$,
+  '42501',
+  'M52: student A cannot insert into daily_facts'
+);
+
+-- ======== M53: subjects ========
+-- Under student A — can read, cannot write
+select ok(
+  (select count(*)::int from public.subjects) > 0,
+  'M53: student A sees subjects (seeded from groups)'
+);
+
+select throws_ok(
+  $$ insert into public.subjects (name, group_id) values ('Тест', 'a0000000-0000-0000-0000-000000000000') $$,
+  '42501',
+  'M53: student A cannot insert into subjects'
+);
+
+-- Switch to student B
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select ok(
+  (select count(*)::int from public.subjects) > 0,
+  'M53: student B sees subjects (seeded from groups)'
+);
+
+select throws_ok(
+  $$ insert into public.subjects (name, group_id) values ('Тест', 'b0000000-0000-0000-0000-000000000000') $$,
+  '42501',
+  'M53: student B cannot insert into subjects'
 );
 
 select * from finish();

@@ -10,8 +10,10 @@ import {
 } from "lucide-react";
 import {
   getSubjectStyle, createLesson, updateLesson, deleteLesson,
-  getTeacherLessonsByMonth,
+  getTeacherLessonsByMonth, getDictionary,
 } from "@snr/core";
+import type { SubjectWithGroup, Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
 
@@ -25,7 +27,7 @@ type LessonItem = {
   group: { id: string; name: string; subject: string };
 };
 type FormState = {
-  groupId: string; date: string; startTime: string;
+  groupId: string; subjectId: string; date: string; startTime: string;
   durationMinutes: string; room: string; title: string; desc: string;
 };
 type EffectiveStatus = "scheduled" | "in_progress" | "completed" | "missed";
@@ -128,11 +130,11 @@ function buildIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 function emptyForm(groupId = ""): FormState {
-  return { groupId, date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "" };
+  return { groupId, subjectId: "", date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "" };
 }
 function lessonToForm(l: LessonItem): FormState {
   return {
-    groupId: l.group_id,
+    groupId: l.group_id, subjectId: "",
     date: toLocalDateStr(l.starts_at),
     startTime: toLocalTimeStr(l.starts_at),
     durationMinutes: "45",
@@ -291,16 +293,25 @@ function DatePickerField({
 
 // ── LessonFormModal ───────────────────────────────────────────────────────────
 function LessonFormModal({
-  mode, groups, initial, onClose, onSave,
+  mode, groups, teacherSubjects, initial, onClose, onSave,
 }: {
-  mode: "create" | "edit"; groups: GroupItem[]; initial: FormState;
+  mode: "create" | "edit"; groups: GroupItem[];
+  teacherSubjects: SubjectWithGroup[];
+  initial: FormState;
   onClose: () => void; onSave: (f: FormState) => Promise<void>;
 }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale).lesson;
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   function set(key: keyof FormState, val: string) { setForm(p => ({ ...p, [key]: val })); }
+
+  // Subjects for the currently selected group (from teacher's subjects)
+  const groupSubjects = teacherSubjects.filter(s => s.group_id === form.groupId);
+  // Groups that have at least one subject assigned to this teacher
+  const groupsWithSubjects = groups.filter(g => teacherSubjects.some(s => s.group_id === g.id));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -314,6 +325,22 @@ function LessonFormModal({
 
   const inputCls = "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
   const labelCls = "mb-1 block text-xs font-semibold text-gray-600";
+
+  // No subjects assigned to this teacher at all
+  if (teacherSubjects.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-[#1D1D1F]">Новый урок</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          </div>
+          <p className="text-sm text-zinc-600">{d.createNoSubjects}</p>
+          <button onClick={onClose} className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Закрыть</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -329,11 +356,32 @@ function LessonFormModal({
         <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
           <div>
             <label className={labelCls}>Группа *</label>
-            <select value={form.groupId} onChange={e => set("groupId", e.target.value)} className={inputCls}>
+            <select
+              value={form.groupId}
+              onChange={e => { set("groupId", e.target.value); set("subjectId", ""); }}
+              className={inputCls}
+            >
               <option value="">Выберите группу</option>
-              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              {(groupsWithSubjects.length > 0 ? groupsWithSubjects : groups).map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
             </select>
           </div>
+          {form.groupId && (
+            <div>
+              <label className={labelCls}>{d.createSelectSubject} *</label>
+              {groupSubjects.length === 0 ? (
+                <p className="text-xs text-amber-600 mt-1">{d.createNoSubjects}</p>
+              ) : (
+                <select value={form.subjectId} onChange={e => set("subjectId", e.target.value)} className={inputCls}>
+                  <option value="">— выберите предмет —</option>
+                  {groupSubjects.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
           <div>
             <label className={labelCls}>Дата *</label>
             <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
@@ -414,9 +462,11 @@ function DeleteModal({ lesson, onClose, onConfirm }: {
 export function TeacherLessonsView({
   lessons: initialLessons,
   groups,
+  teacherSubjects,
 }: {
   lessons: LessonItem[];
   groups: GroupItem[];
+  teacherSubjects: SubjectWithGroup[];
 }) {
   const router = useRouter();
   const dbRef = useRef(createClient());
@@ -507,6 +557,7 @@ export function TeacherLessonsView({
       const created = await createLesson(db, {
         groupId: form.groupId, startsAt, durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
+        subjectId: form.subjectId || null,
       });
       setFormModal(null);
       router.push(`/teacher/lessons/${created.id}`);
@@ -680,6 +731,7 @@ export function TeacherLessonsView({
         <LessonFormModal
           mode={formModal}
           groups={groups}
+          teacherSubjects={teacherSubjects}
           initial={
             formModal === "edit" && editLesson
               ? lessonToForm(editLesson)

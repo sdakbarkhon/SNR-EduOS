@@ -44,6 +44,22 @@ export type Group = {
   created_at: string;
 };
 
+export type Subject = {
+  id: string;
+  name: string;
+  group_id: string;
+  teacher_id: string | null;
+  icon: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubjectWithGroup = Subject & {
+  group: { id: string; name: string };
+  teacher: { id: string; full_name: string } | null;
+};
+
 export type StudentGroup = {
   student_id: string;
   group_id: string;

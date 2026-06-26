@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, Settings,
-  LogOut, Shield, PanelLeftClose, PanelLeftOpen, Megaphone,
+  LogOut, Shield, PanelLeftClose, PanelLeftOpen, Megaphone, Library,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -47,6 +47,7 @@ export function AdminSidebar() {
     { key: "students",  href: "/admin/students",  icon: GraduationCap,   label: da.navStudents },
     { key: "teachers",  href: "/admin/teachers",  icon: Users,           label: da.navTeachers },
     { key: "groups",         href: "/admin/groups",         icon: BookOpen,   label: da.navGroups },
+    { key: "subjects",       href: "/admin/subjects",       icon: Library,    label: da.navSubjects },
     { key: "announcements",  href: "/admin/announcements",  icon: Megaphone,  label: da.navAnnouncements },
     { key: "profile",        href: "/admin/profile",        icon: Settings,   label: da.navProfile },
   ];
