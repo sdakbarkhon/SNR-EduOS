@@ -1257,7 +1257,7 @@ export const getTeacherLessonView = async (
 ): Promise<TeacherLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -1268,7 +1268,7 @@ export const getTeacherLessonView = async (
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
-    room: string | null;
+    room: string | null; active_stage_id: string | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -1291,6 +1291,7 @@ export const getTeacherLessonView = async (
     started_at: lesson.started_at, ended_at: lesson.ended_at,
     status: lesson.status as TeacherLessonView["status"],
     room: lesson.room,
+    active_stage_id: lesson.active_stage_id,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -1305,7 +1306,7 @@ export const getStudentLessonView = async (
 ): Promise<StudentLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -1316,7 +1317,7 @@ export const getStudentLessonView = async (
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
-    room: string | null;
+    room: string | null; active_stage_id: string | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -1347,12 +1348,27 @@ export const getStudentLessonView = async (
     started_at: lesson.started_at, ended_at: lesson.ended_at,
     status: lesson.status as StudentLessonView["status"],
     room: lesson.room,
+    active_stage_id: lesson.active_stage_id,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
     stages: stagesWithProgress as LessonStageWithProgress[],
   };
 };
+
+/** Учитель устанавливает активный этап урока (ученики видят синхронно). */
+export async function setActiveStage(
+  db: Db,
+  lessonId: string,
+  stageId: string | null,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lessons")
+    .update({ active_stage_id: stageId })
+    .eq("id", lessonId);
+  if (error) throw error;
+}
 
 /** Обновляет поля урока (учитель): title, description, starts_at, duration_minutes, room. */
 export const updateLesson = async (

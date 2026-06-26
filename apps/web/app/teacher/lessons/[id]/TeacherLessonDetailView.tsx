@@ -16,6 +16,7 @@ import {
   getSubjectStyle, getLessonExcuseRequests,
   getLeaveRequestsForLesson, decideLeaveRequest,
   getQuizQuestions, replaceQuizQuestions,
+  setActiveStage,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -513,6 +514,8 @@ export function TeacherLessonDetailView({
   const [infoSaved, setInfoSaved] = useState(false);
 
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
+  const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
+  const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
@@ -593,6 +596,9 @@ export function TeacherLessonDetailView({
       const newStatus = payload?.new?.status as LessonStatus | undefined;
       // eslint-disable-next-line no-console
       console.log("[lesson-realtime] event:", payload?.eventType, newStatus);
+      // Sync active_stage_id from other open tabs / auto-trigger
+      const newActiveStageId = payload?.new?.active_stage_id as string | null | undefined;
+      if (newActiveStageId !== undefined) setActiveStageId(newActiveStageId ?? null);
       if (newStatus && newStatus !== status) window.location.reload();
     },
   );
@@ -730,6 +736,19 @@ export function TeacherLessonDetailView({
     } finally {
       reorderingRef.current = false;
       setReorderingStageId(null);
+    }
+  }
+
+  // ── Active stage control ────────────────────────────────────────────────────
+
+  async function handleActivateStage(stageId: string) {
+    if (status !== "in_progress") return;
+    setActivatingStageId(stageId);
+    try {
+      await setActiveStage(db, lesson.id, stageId);
+      setActiveStageId(stageId);
+    } catch { /* noop */ } finally {
+      setActivatingStageId(null);
     }
   }
 
@@ -1011,6 +1030,88 @@ export function TeacherLessonDetailView({
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ── ACTIVE STAGE CONTROL (only during in_progress) ─────────────────── */}
+      {(status === "in_progress" || status === "scheduled") && middleStages.length > 0 && (
+        <section className="rounded-2xl border border-violet-100 bg-violet-50/50 p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-violet-500" />
+            <h2 className="text-sm font-bold uppercase tracking-widest text-violet-700">
+              {dl.activeStage.manageStages}
+            </h2>
+          </div>
+
+          <div className="flex flex-col divide-y divide-violet-100 rounded-xl border border-violet-100 bg-white overflow-hidden">
+            {middleStages.map((stage) => {
+              const isActive = stage.id === activeStageId;
+              const activePos = middleStages.find((s) => s.id === activeStageId)?.position ?? Infinity;
+              const isPassed = stage.position < activePos && activeStageId !== null;
+              const isActivating = activatingStageId === stage.id;
+
+              return (
+                <div
+                  key={stage.id}
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                    isActive ? "bg-violet-50" : ""
+                  }`}
+                >
+                  {/* State indicator */}
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    isActive
+                      ? "bg-violet-600 text-white"
+                      : isPassed
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
+                  </div>
+
+                  {/* Title + badge */}
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
+                      {stage.title}
+                    </span>
+                    {isActive && (
+                      <p className="mt-0.5 text-[11px] text-violet-500">{dl.activeStage.studentsSeeThis}</p>
+                    )}
+                  </div>
+
+                  {/* Status label or button */}
+                  {isActive ? (
+                    <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
+                      {dl.activeStage.activeNow}
+                    </span>
+                  ) : isPassed ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-[11px] font-semibold text-emerald-600">{dl.activeStage.passed}</span>
+                      <button
+                        onClick={() => handleActivateStage(stage.id)}
+                        disabled={status !== "in_progress" || isActivating}
+                        className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {isActivating ? "…" : dl.activeStage.activate}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleActivateStage(stage.id)}
+                      disabled={status !== "in_progress" || isActivating}
+                      title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
+                      className="shrink-0 flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {isActivating ? "…" : `▶ ${dl.activeStage.activate}`}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {status === "scheduled" && (
+            <p className="text-[11px] text-violet-400">{dl.activeStage.lessonNotStarted}</p>
+          )}
         </section>
       )}
 

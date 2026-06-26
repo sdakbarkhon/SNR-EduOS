@@ -853,6 +853,17 @@ export const uz: Dictionary = {
     gradeSave: "Bahoni saqlash",
     gradeSaved: "Baho saqlandi",
     kindLesson: "Dars",
+    activeStage: {
+      manageStages: "Bosqichlarni boshqarish",
+      activeNow: "Hozir faol",
+      activate: "Faollashtirish",
+      passed: "Bajarildi",
+      activatedToast: "Bosqich faollashtirildi",
+      teacherChangedStage: "O'qituvchi yangi bosqichga o'tdi",
+      lessonNotStarted: "Dars hali boshlanmagan",
+      waitingForTeacher: "O'qituvchi keyingi bosqichni tayyorlamoqda…",
+      studentsSeeThis: "Barcha o'quvchilar ushbu bosqichni ko'radi",
+    },
   },
   teacher: {
     role: "O'qituvchi",

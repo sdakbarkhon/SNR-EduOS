@@ -871,6 +871,18 @@ export interface Dictionary {
     gradeSave: string;             // "Сохранить оценку"
     gradeSaved: string;            // toast "Оценка сохранена"
     kindLesson: string;            // grade badge in /grades + filter pill
+    // Active stage control (migration 54)
+    activeStage: {
+      manageStages: string;        // "Управление этапами"
+      activeNow: string;           // "Активен сейчас"
+      activate: string;            // "Активировать"
+      passed: string;              // "Пройдено"
+      activatedToast: string;      // "Этап активирован"
+      teacherChangedStage: string; // "Учитель перешёл к новому этапу"
+      lessonNotStarted: string;    // "Урок ещё не начат"
+      waitingForTeacher: string;   // "Учитель готовит следующий этап…"
+      studentsSeeThis: string;     // "Все ученики видят этот этап"
+    };
   };
   teacher: {
     role: string;

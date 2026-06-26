@@ -853,6 +853,17 @@ export const ru: Dictionary = {
     gradeSave: "Сохранить оценку",
     gradeSaved: "Оценка сохранена",
     kindLesson: "Урок",
+    activeStage: {
+      manageStages: "Управление этапами",
+      activeNow: "Активен сейчас",
+      activate: "Активировать",
+      passed: "Пройдено",
+      activatedToast: "Этап активирован",
+      teacherChangedStage: "Учитель перешёл к новому этапу",
+      lessonNotStarted: "Урок ещё не начат",
+      waitingForTeacher: "Учитель готовит следующий этап…",
+      studentsSeeThis: "Все ученики видят этот этап",
+    },
   },
   teacher: {
     role: "Учитель",

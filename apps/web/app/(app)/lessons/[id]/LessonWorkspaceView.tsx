@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -307,6 +307,8 @@ export function LessonWorkspaceView({
   const style = getSubjectStyle(lesson.group.subject);
 
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
+  const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
+  const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
   const [activeCodeStageId, setActiveCodeStageId] = useState<string | null>(null);
   const [externalStageId, setExternalStageId] = useState<string | null>(null);
@@ -317,6 +319,18 @@ export function LessonWorkspaceView({
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveRequest, setLeaveRequest] = useState<LeaveRequest | null>(null);
+
+  // Refs for stable callback in realtime handler (avoid stale closure)
+  const activeStageIdRef = useRef(activeStageId);
+  const activeCodeStageIdRef = useRef(activeCodeStageId);
+  const externalStageIdRef = useRef(externalStageId);
+  const qiaStageIdRef = useRef(qiaStageId);
+  const kahootStageIdRef = useRef(kahootStageId);
+  useEffect(() => { activeStageIdRef.current = activeStageId; }, [activeStageId]);
+  useEffect(() => { activeCodeStageIdRef.current = activeCodeStageId; }, [activeCodeStageId]);
+  useEffect(() => { externalStageIdRef.current = externalStageId; }, [externalStageId]);
+  useEffect(() => { qiaStageIdRef.current = qiaStageId; }, [qiaStageId]);
+  useEffect(() => { kahootStageIdRef.current = kahootStageId; }, [kahootStageId]);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -341,10 +355,42 @@ export function LessonWorkspaceView({
       ? fmtElapsed(nowMs - new Date(lesson.started_at).getTime())
       : "00:00:00";
 
-  // Refresh when teacher ends lesson
-  useRealtimeChannel(`lesson-status-${lesson.id}`, "lessons", `id=eq.${lesson.id}`, () => {
-    router.refresh();
-  });
+  // Realtime: listen for lesson changes (status + active_stage_id)
+  useRealtimeChannel(
+    `lesson-student-${lesson.id}`,
+    "lessons",
+    `id=eq.${lesson.id}`,
+    useCallback((payload) => {
+      const newActiveStageId = payload?.new?.active_stage_id as string | null | undefined;
+      const newStatus = payload?.new?.status as string | undefined;
+
+      // Handle active_stage_id change
+      if (newActiveStageId !== undefined && newActiveStageId !== activeStageIdRef.current) {
+        setActiveStageId(newActiveStageId ?? null);
+
+        // Show "teacher moved to new stage" banner briefly
+        setStageChangedBanner(true);
+        setTimeout(() => setStageChangedBanner(false), 4000);
+
+        // Close fullscreen if student is viewing a stage that is no longer the active one
+        // (i.e., teacher jumped forward past it, or activated a different stage)
+        const openId = activeCodeStageIdRef.current ?? externalStageIdRef.current
+          ?? qiaStageIdRef.current ?? kahootStageIdRef.current;
+        if (openId && openId !== (newActiveStageId ?? null)) {
+          setActiveCodeStageId(null);
+          setExternalStageId(null);
+          setQiaStageId(null);
+          setKahootStageId(null);
+          setOpenTaskStageId(null);
+        }
+      }
+
+      // Reload when lesson ends (status changed)
+      if (newStatus && newStatus !== lesson.status) {
+        router.refresh();
+      }
+    }, [lesson.status, router]),
+  );
 
   const handleMarkStudied = useCallback(async (stageId: string) => {
     if (!studentId) return;
@@ -385,9 +431,24 @@ export function LessonWorkspaceView({
 
   const startStage   = stages.find((s) => s.stage_role === "start");
   const summaryStage = stages.find((s) => s.stage_role === "summary");
-  const middleStages = stages
+  const allMiddleStages = stages
     .filter((s) => s.stage_role === "middle")
     .sort((a, b) => a.position - b.position);
+
+  // Active-stage visibility: only show stages up to (and including) the active one,
+  // unless the lesson is completed (show all as read-only).
+  const activePos = allMiddleStages.find((s) => s.id === activeStageId)?.position ?? -1;
+  const isCompleted = lesson.status === "completed";
+  const middleStages = isCompleted
+    ? allMiddleStages
+    : allMiddleStages.filter((s) => activeStageId === null ? false : s.position <= activePos);
+
+  // A stage is read-only if it's a passed stage (position < active) or the lesson is completed
+  function isStageReadOnly(stage: LessonStageWithProgress): boolean {
+    if (isCompleted) return true;
+    if (activeStageId === null) return false;
+    return stage.position < activePos;
+  }
 
   const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
   const activeCodeStage = activeCodeStageId ? stages.find((s) => s.id === activeCodeStageId) : null;
@@ -421,11 +482,14 @@ export function LessonWorkspaceView({
     );
   }
 
+  // Stepper shows: start + visible middle stages + summary
   const allStepsForStepper = [
     ...(startStage ? [startStage] : []),
     ...middleStages,
     ...(summaryStage ? [summaryStage] : []),
   ];
+
+  const da = dl.activeStage;
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
@@ -472,6 +536,14 @@ export function LessonWorkspaceView({
           </div>
         </div>
       </header>
+
+      {/* Teacher changed stage banner */}
+      {stageChangedBanner && (
+        <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-800 shadow-sm">
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-violet-500" />
+          {da.teacherChangedStage}
+        </div>
+      )}
 
       {/* 3-column workspace */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
@@ -537,6 +609,10 @@ export function LessonWorkspaceView({
                             ? dl.stageBadgeTask
                             : dl.stageBadgeTheory}
                         </span>
+                      )}
+                      {/* Passed-stage label (position < active) */}
+                      {stage.stage_role === "middle" && isStageReadOnly(stage) && !isCompleted && (
+                        <span className="text-[10px] font-semibold text-emerald-500">{da.passed}</span>
                       )}
                     </div>
                   </li>
@@ -604,7 +680,15 @@ export function LessonWorkspaceView({
             </div>
           )}
 
-          {middleStages.length === 0 ? (
+          {/* Waiting for teacher state: in_progress but no active stage yet */}
+          {lesson.status === "in_progress" && activeStageId === null && allMiddleStages.length > 0 && (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-8 text-center shadow-sm">
+              <span className="flex h-3 w-3 animate-pulse rounded-full bg-violet-400" />
+              <p className="text-sm font-semibold text-violet-700">{da.waitingForTeacher}</p>
+            </div>
+          )}
+
+          {middleStages.length === 0 && !(lesson.status === "in_progress" && activeStageId === null && allMiddleStages.length > 0) ? (
             <div className="rounded-2xl border border-white/60 bg-white/60 p-6 shadow-sm backdrop-blur-xl">
               <p className="text-center text-sm text-slate-400">{w.noTask}</p>
             </div>
@@ -612,6 +696,7 @@ export function LessonWorkspaceView({
             middleStages.map((stage, idx) => {
               const unlocked = isMiddleStageUnlocked(idx);
               const prevStage = idx > 0 ? middleStages[idx - 1] : null;
+              const readOnly = isStageReadOnly(stage);
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
@@ -669,7 +754,7 @@ export function LessonWorkspaceView({
 
                   {/* Theory: "Изучил" button */}
                   {stage.stage_type === "theory" && (
-                    isStudied ? (
+                    (isStudied || readOnly) ? (
                       <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                         <Check className="h-4 w-4" />
                         {dl.stageStudiedDone}
@@ -699,6 +784,11 @@ export function LessonWorkspaceView({
                         <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                           {dl.stageTaskSubmittedLabel}
                         </div>
+                      ) : readOnly ? (
+                        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
+                          <Check className="h-4 w-4" />
+                          {w.submitted}
+                        </div>
                       ) : null}
 
                       {/* Code + external stages always offer an open button (open / view read-only) */}
@@ -726,7 +816,7 @@ export function LessonWorkspaceView({
                             onClick={() => setQiaStageId(stage.id)}
                             className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
                           >
-                            {dl.quiz.open}
+                            {(readOnly || stage.progress?.is_completed) ? dl.quiz.viewResult : dl.quiz.open}
                           </button>
                         )
                       ) : stage.content_type === "quiz_kahoot" ? (
@@ -735,11 +825,11 @@ export function LessonWorkspaceView({
                             onClick={() => setKahootStageId(stage.id)}
                             className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
                           >
-                            {stage.progress?.is_completed ? dl.quiz.viewResult : dl.quiz.open}
+                            {(readOnly || stage.progress?.is_completed) ? dl.quiz.viewResult : dl.quiz.open}
                           </button>
                         )
                       ) : (
-                        !isGraded && !isSubmitted && mounted && studentId && (
+                        !isGraded && !isSubmitted && !readOnly && mounted && studentId && (
                           <button
                             onClick={() => setOpenTaskStageId(stage.id)}
                             className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"

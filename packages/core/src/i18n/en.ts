@@ -853,6 +853,17 @@ export const en: Dictionary = {
     gradeSave: "Save grade",
     gradeSaved: "Grade saved",
     kindLesson: "Lesson",
+    activeStage: {
+      manageStages: "Manage stages",
+      activeNow: "Active now",
+      activate: "Activate",
+      passed: "Completed",
+      activatedToast: "Stage activated",
+      teacherChangedStage: "Teacher moved to a new stage",
+      lessonNotStarted: "Lesson hasn't started yet",
+      waitingForTeacher: "Teacher is preparing the next stage…",
+      studentsSeeThis: "All students see this stage",
+    },
   },
   teacher: {
     role: "Teacher",
