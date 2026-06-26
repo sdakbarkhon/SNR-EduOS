@@ -69,6 +69,20 @@ export interface Dictionary {
     teacher: string;
     online: string;
     noLessons: string;
+    // new in iter3-p2b
+    tabToday: string;
+    tabWeek: string;
+    todayNoLessons: string;
+    nextLessons: string;
+    scheduleEmpty: string;
+    scheduleEmptyHint: string;
+    prevWeek: string;
+    nextWeek: string;
+    thisWeek: string;
+    dayNoLessons: string;
+    statusScheduled: string;
+    statusInProgress: string;
+    statusCompleted: string;
   };
   attendance: {
     title: string;

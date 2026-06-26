@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -2929,3 +2929,69 @@ export const cancelLeaveRequest = async (
     .eq("id", leaveRequestId);
   if (error) throw error;
 };
+
+// ─── STUDENT SCHEDULE QUERIES (iter3-p2b) ────────────────────────────────────
+
+const LESSON_SUBJECT_SELECT =
+  "id, group_id, title, topic, starts_at, ends_at, duration_minutes, room, status, " +
+  "subject:subjects(id, name, icon, color), " +
+  "group:groups!inner(id, name, teacher:teachers(id, full_name, avatar_url))";
+
+/** Уроки ученика на конкретную дату (в Asia/Tashkent UTC+5).
+ *  RLS уже ограничивает выборку группами ученика. */
+export async function getStudentLessonsForDate(
+  db: Db,
+  date: string,
+): Promise<LessonWithSubject[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lessons")
+    .select(LESSON_SUBJECT_SELECT)
+    .gte("starts_at", `${date}T00:00:00+05:00`)
+    .lte("starts_at", `${date}T23:59:59+05:00`)
+    .order("starts_at");
+  if (error) throw error;
+  return (data ?? []) as LessonWithSubject[];
+}
+
+/** Уроки ученика за 7-дневную неделю начиная с weekStart (понедельник, YYYY-MM-DD). */
+export async function getStudentLessonsForWeek(
+  db: Db,
+  weekStart: string,
+): Promise<LessonWithSubject[]> {
+  // weekEnd = weekStart + 7 дней (исключительно)
+  const d = new Date(`${weekStart}T00:00:00+05:00`);
+  d.setDate(d.getDate() + 7);
+  const weekEnd = d.toISOString().slice(0, 10);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lessons")
+    .select(LESSON_SUBJECT_SELECT)
+    .gte("starts_at", `${weekStart}T00:00:00+05:00`)
+    .lt("starts_at",  `${weekEnd}T00:00:00+05:00`)
+    .order("starts_at");
+  if (error) throw error;
+  return (data ?? []) as LessonWithSubject[];
+}
+
+/** Дата (YYYY-MM-DD в Asia/Tashkent) ближайшего будущего урока ученика.
+ *  Возвращает null, если будущих уроков нет. */
+export async function getNextStudentLessonDate(
+  db: Db,
+  afterDate: string,
+): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lessons")
+    .select("starts_at")
+    .gt("starts_at", `${afterDate}T23:59:59+05:00`)
+    .order("starts_at")
+    .limit(1);
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  const first = (data as Array<{ starts_at: string }>)[0];
+  if (!first) return null;
+  const utcMs = new Date(first.starts_at).getTime();
+  const tashkentMs = utcMs + 5 * 60 * 60 * 1000;
+  return new Date(tashkentMs).toISOString().slice(0, 10);
+}

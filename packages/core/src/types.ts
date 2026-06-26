@@ -60,6 +60,25 @@ export type SubjectWithGroup = Subject & {
   teacher: { id: string; full_name: string } | null;
 };
 
+/** Урок с join'ами на subject и teacher (для экрана расписания). */
+export type LessonWithSubject = {
+  id: string;
+  group_id: string;
+  title: string | null;
+  topic: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  duration_minutes: number | null;
+  room: string | null;
+  status: LessonStatus;
+  subject: { id: string; name: string; icon: string; color: string } | null;
+  group: {
+    id: string;
+    name: string;
+    teacher: { id: string; full_name: string; avatar_url: string | null } | null;
+  };
+};
+
 export type StudentGroup = {
   student_id: string;
   group_id: string;

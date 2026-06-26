@@ -1,480 +1,347 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
-import { CheckCircle, ChevronLeft, ChevronRight, Coffee } from "lucide-react";
-import {
-  formatTime,
-  getDictionary,
-  getSubjectStyle,
-  lessonsOnDay,
-  type Group,
-  type Homework,
-  type HomeworkSubmission,
-  type Lesson,
-} from "@snr/core";
-import type { Locale } from "@snr/core";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
+import { getDictionary } from "@snr/core";
+import type { LessonWithSubject, Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
-import { SubjectIcon, useLocale } from "@/components";
+import { useLocale } from "@/components/LocaleProvider";
+import { LessonCard, lessonWithSubjectToCard } from "@/components/LessonCard";
 
-type TeacherMin = { id: string; full_name: string };
+type Tab = "today" | "week";
 
-// ─── Week helpers ─────────────────────────────────────────────────────────────
+// ── date helpers ──────────────────────────────────────────────────────────────
 
-function getWeekMonday(d: Date): Date {
-  const date = new Date(d);
-  date.setHours(0, 0, 0, 0);
-  const dow = date.getDay();
-  date.setDate(date.getDate() - (dow === 0 ? 6 : dow - 1));
-  return date;
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
-function addDays(d: Date, n: number): Date {
-  const date = new Date(d);
-  date.setDate(date.getDate() + n);
-  return date;
+function weekDates(monday: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function lessonDateKey(iso: string): string {
+  // Convert UTC → Tashkent (UTC+5), extract YYYY-MM-DD
+  const ms = new Date(iso).getTime() + 5 * 60 * 60 * 1000;
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
-function weekRangeLabel(ws: Date): string {
-  const we = addDays(ws, 6);
-  const sD = ws.getDate();
-  const eD = we.getDate();
-  const eM = we.toLocaleDateString("ru-RU", { month: "long" });
-  const eY = we.getFullYear();
+function fmtWeekRange(monday: string, locale: string): string {
+  const localeMap: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
+  const l = localeMap[locale] ?? "ru-RU";
+  const ws = new Date(`${monday}T12:00:00`);
+  const we = new Date(`${addDays(monday, 6)}T12:00:00`);
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long" };
   if (ws.getMonth() === we.getMonth()) {
-    return `${sD} — ${eD} ${eM} ${eY}`;
+    const start = ws.getDate();
+    const end = we.toLocaleDateString(l, opts);
+    return `${start} — ${end} ${ws.getFullYear()}`;
   }
-  const sM = ws.toLocaleDateString("ru-RU", { month: "long" });
-  return `${sD} ${sM} — ${eD} ${eM} ${eY}`;
+  return `${ws.toLocaleDateString(l, opts)} — ${we.toLocaleDateString(l, opts)} ${we.getFullYear()}`;
 }
 
-const DAY_ABBREVS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
-
-// ─── Lesson card style ────────────────────────────────────────────────────────
-
-type CardStyle = {
-  cls: string;
-  badge: { label: string; ping?: boolean; cls: string } | null;
-};
-
-function getLessonCardStyle(lesson: Lesson, nowMs: number): CardStyle {
-  if (lesson.status === "in_progress")
-    return {
-      cls: "bg-yellow-50 border-l-4 border-yellow-400",
-      badge: { label: "Идёт", ping: true, cls: "bg-yellow-100 text-yellow-700" },
-    };
-  if (lesson.status === "completed")
-    return {
-      cls: "bg-emerald-50 border-l-4 border-emerald-400",
-      badge: { label: "Завершён", cls: "bg-emerald-100 text-emerald-700" },
-    };
-  if (new Date(lesson.starts_at).getTime() < nowMs)
-    return {
-      cls: "bg-red-50 border-l-4 border-red-400",
-      badge: { label: "Пропущен", cls: "bg-red-100 text-red-600" },
-    };
-  return {
-    cls: "border border-white/80 bg-white/70 backdrop-blur-xl",
-    badge: null,
-  };
+function fmtDayHeader(dateStr: string, locale: string): string {
+  const localeMap: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
+  const l = localeMap[locale] ?? "ru-RU";
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d.toLocaleDateString(l, { weekday: "long", day: "numeric", month: "long" });
 }
 
-// ─── Homework zone ────────────────────────────────────────────────────────────
-
-type HwZone = "overdue" | "urgent" | "active";
-
-const ZONE_ORDER: Record<HwZone, number> = { overdue: 0, urgent: 1, active: 2 };
-
-function getHwZone(
-  hw: Homework,
-  submittedIds: Set<string>,
-  nowMs: number,
-): HwZone | null {
-  if (submittedIds.has(hw.id)) return null;
-  const due = hw.due_date ? new Date(hw.due_date).setHours(23, 59, 59, 999) : null;
-  if (!due) return "active";
-  if (due < nowMs) return "overdue";
-  if (due - nowMs <= 24 * 3_600_000) return "urgent";
-  return "active";
+function fmtNextDate(dateStr: string, locale: string): string {
+  const localeMap: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
+  const l = localeMap[locale] ?? "ru-RU";
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d.toLocaleDateString(l, { weekday: "long", day: "numeric", month: "long" });
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ── sub-components ────────────────────────────────────────────────────────────
 
-export function ScheduleView({
-  initialLessons,
-  groups,
-  teachers: _teachers,
-  homework,
-  submissions,
+function TabBar({
+  active,
+  onChange,
+  labelToday,
+  labelWeek,
 }: {
-  initialLessons: Lesson[];
-  groups: Group[];
-  teachers: TeacherMin[];
-  homework: Homework[];
-  submissions: HomeworkSubmission[];
+  active: Tab;
+  onChange: (t: Tab) => void;
+  labelToday: string;
+  labelWeek: string;
 }) {
-  const { locale } = useLocale();
-  const dict = getDictionary(locale as Locale);
-
-  const [lessons, setLessons] = useState<Lesson[]>(initialLessons);
-  const [weekStart, setWeekStart] = useState<Date>(() => getWeekMonday(new Date()));
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
-  // Gate time-dependent UI until after mount: Vercel renders in UTC, the client in
-  // local TZ, so "today"/current-week would differ and trigger hydration error #418.
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const id = setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    const sb = createClient();
-    const channel = sb
-      .channel("schedule-lessons-rt")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "lessons" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setLessons((prev) =>
-              [...prev, payload.new as Lesson].sort((a, b) =>
-                a.starts_at.localeCompare(b.starts_at),
-              ),
-            );
-          } else if (payload.eventType === "UPDATE") {
-            const upd = payload.new as Lesson;
-            setLessons((prev) =>
-              prev.map((l) => (l.id === upd.id ? { ...l, ...upd } : l)),
-            );
-          } else if (payload.eventType === "DELETE") {
-            setLessons((prev) =>
-              prev.filter((l) => l.id !== (payload.old as { id: string }).id),
-            );
-          }
-        },
-      )
-      .subscribe();
-    return () => {
-      sb.removeChannel(channel);
-    };
-  }, []);
-
-  const groupById = useMemo(
-    () => new Map(groups.map((g) => [g.id, g])),
-    [groups],
+  return (
+    <div className="flex gap-1 rounded-2xl bg-zinc-100 p-1 w-fit">
+      {(["today", "week"] as Tab[]).map((t) => (
+        <button
+          key={t}
+          onClick={() => onChange(t)}
+          className={cn(
+            "rounded-xl px-5 py-2 text-sm font-semibold transition-all",
+            active === t
+              ? "bg-violet-600 text-white shadow-sm"
+              : "text-zinc-600 hover:text-violet-600",
+          )}
+        >
+          {t === "today" ? labelToday : labelWeek}
+        </button>
+      ))}
+    </div>
   );
+}
 
-  const today = useMemo(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    return t;
-  }, []);
-
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
-    [weekStart],
+function EmptyDay({ text }: { text: string }) {
+  return (
+    <p className="py-2 text-sm text-zinc-400 italic">{text}</p>
   );
+}
 
-  const submittedIds = useMemo(
-    () => new Set(submissions.map((s) => s.homework_id)),
-    [submissions],
-  );
+// ── TODAY view ────────────────────────────────────────────────────────────────
 
-  const activeHw = useMemo(() => {
-    const zoned: Array<{ hw: Homework; zone: HwZone }> = [];
-    for (const hw of homework) {
-      const zone = getHwZone(hw, submittedIds, nowMs);
-      if (zone) zoned.push({ hw, zone });
-    }
-    zoned.sort((a, b) => {
-      const o = ZONE_ORDER[a.zone] - ZONE_ORDER[b.zone];
-      if (o !== 0) return o;
-      return (a.hw.due_date ?? "9999").localeCompare(b.hw.due_date ?? "9999");
-    });
-    return zoned;
-  }, [homework, submittedIds, nowMs]);
+function TodayView({
+  todayLessons,
+  nextDayDate,
+  nextDayLessons,
+  locale,
+  d,
+}: {
+  todayLessons: LessonWithSubject[];
+  nextDayDate: string | null;
+  nextDayLessons: LessonWithSubject[];
+  locale: string;
+  d: ReturnType<typeof getDictionary>["schedule"];
+}) {
+  if (todayLessons.length > 0) {
+    return (
+      <div className="space-y-3">
+        {todayLessons.map((l) => (
+          <LessonCard key={l.id} lesson={lessonWithSubjectToCard(l)} />
+        ))}
+      </div>
+    );
+  }
 
-  const visibleHw = activeHw.slice(0, 5);
-  const navBtnCls =
-    "flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-white/70 text-slate-700 shadow-sm backdrop-blur-md transition hover:bg-white/90";
-
+  // Empty today
   return (
     <div className="space-y-6">
-      <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">
-        {dict.schedule.title}
-      </h1>
-
-      {!mounted ? (
-        <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-        </div>
-      ) : (
-      <>
-      {/* ── Week navigation ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4">
-        <button
-          className={navBtnCls}
-          onClick={() => setWeekStart((ws) => addDays(ws, -7))}
-          aria-label="Предыдущая неделя"
-        >
-          <ChevronLeft size={18} />
-        </button>
-
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-[15px] font-semibold text-slate-700">
-            {weekRangeLabel(weekStart)}
-          </span>
-          <button
-            onClick={() => setWeekStart(getWeekMonday(new Date()))}
-            className="text-[12px] font-medium text-blue-600 transition-colors hover:underline"
-          >
-            Сегодня
-          </button>
-        </div>
-
-        <button
-          className={navBtnCls}
-          onClick={() => setWeekStart((ws) => addDays(ws, 7))}
-          aria-label="Следующая неделя"
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
-
-      {/* ── 7-column weekly grid ─────────────────────────────────────── */}
-      <div className="overflow-x-auto">
-        <div className="grid min-w-[700px] grid-cols-7 gap-1.5">
-          {weekDays.map((day, i) => {
-            const isToday = isSameDay(day, today);
-            const isPast = !isToday && day < today;
-            const isWeekend = i >= 5;
-            const dayLessons = lessonsOnDay(lessons, day);
-
-            return (
-              <div
-                key={day.toISOString()}
-                className={cn("flex flex-col gap-1.5", isWeekend && "opacity-75")}
-              >
-                {/* Column header */}
-                <div
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 rounded-2xl py-2",
-                    isToday && "bg-blue-600",
-                    isPast && "opacity-60",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "text-[11px] font-bold uppercase tracking-wide",
-                      isToday ? "text-blue-200" : "text-slate-400",
-                    )}
-                  >
-                    {DAY_ABBREVS[i]}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-[22px] font-bold leading-none",
-                      isToday ? "text-white" : "text-slate-800",
-                    )}
-                  >
-                    {day.getDate()}
-                  </span>
-                </div>
-
-                {/* Lessons */}
-                {dayLessons.length === 0 ? (
-                  <div className="flex flex-col items-center py-3 text-slate-200">
-                    <Coffee size={16} />
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {dayLessons.map((lesson) => {
-                      const group = groupById.get(lesson.group_id);
-                      const subject = group?.subject ?? null;
-                      const style = getSubjectStyle(subject);
-                      const { cls, badge } = getLessonCardStyle(lesson, nowMs);
-                      const title =
-                        lesson.topic ??
-                        (lesson.lesson_no != null
-                          ? `Урок ${lesson.lesson_no}`
-                          : style.label);
-
-                      return (
-                        <Link
-                          key={lesson.id}
-                          href={`/lessons/${lesson.id}`}
-                          className={cn(
-                            "block overflow-hidden rounded-[12px] p-2 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-                            cls,
-                          )}
-                        >
-                          <div className="font-mono text-[10px] font-semibold text-slate-500">
-                            {formatTime(lesson.starts_at)}
-                            {lesson.ends_at && ` — ${formatTime(lesson.ends_at)}`}
-                          </div>
-                          <div className="mt-1 flex items-center gap-1">
-                            <SubjectIcon subject={subject} size={14} />
-                            <span className="truncate text-[10px] text-slate-500">
-                              {style.label}
-                            </span>
-                          </div>
-                          <div className="mt-0.5 line-clamp-2 text-[11px] font-semibold text-slate-800">
-                            {title}
-                          </div>
-                          <div className="mt-1 flex items-center justify-between gap-1">
-                            {lesson.room ? (
-                              <span className="truncate text-[9px] text-slate-400">
-                                Каб. {lesson.room}
-                              </span>
-                            ) : (
-                              <span />
-                            )}
-                            {badge && (
-                              <span
-                                className={cn(
-                                  "ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1 py-0.5 text-[8px] font-bold whitespace-nowrap",
-                                  badge.cls,
-                                )}
-                              >
-                                {badge.ping && (
-                                  <span className="h-1 w-1 animate-ping rounded-full bg-yellow-500" />
-                                )}
-                                {badge.label}
-                              </span>
-                            )}
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Мои задания ──────────────────────────────────────────────── */}
-      <div className="rounded-[24px] border border-white bg-white/70 p-5 shadow-sm backdrop-blur-xl">
-        <div className="mb-4 flex items-center gap-2">
-          <Link
-            href="/homework"
-            className="text-[16px] font-bold text-slate-800 transition-colors hover:text-blue-600 hover:underline"
-          >
-            {dict.homework.title}
-          </Link>
-          {activeHw.length > 0 && (
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[12px] font-bold text-blue-700">
-              {activeHw.length}
-            </span>
-          )}
-        </div>
-
-        {visibleHw.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <CheckCircle className="h-8 w-8 text-emerald-400" />
-            <p className="text-[14px] font-semibold text-slate-600">
-              Все задания выполнены!
-            </p>
-            <Link
-              href="/homework"
-              className="text-[12px] text-blue-600 hover:underline"
-            >
-              Посмотреть выполненные →
-            </Link>
-          </div>
-        ) : (
+      {/* Empty state */}
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/60 py-12 text-center">
+        <CalendarDays className="h-12 w-12 text-zinc-300" strokeWidth={1.5} />
+        <p className="text-lg font-semibold text-zinc-700">{d.todayNoLessons}</p>
+        {nextDayDate && (
+          <p className="text-sm text-zinc-500">
+            {d.nextLessons.replace("{date}", fmtNextDate(nextDayDate, locale))}
+          </p>
+        )}
+        {!nextDayDate && (
           <>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleHw.map(({ hw, zone }) => {
-                const subject = groupById.get(hw.group_id)?.subject ?? null;
-                const style = getSubjectStyle(subject);
-                const dueLbl = hw.due_date
-                  ? new Date(hw.due_date).toLocaleDateString("ru-RU", {
-                      day: "numeric",
-                      month: "long",
-                      timeZone: "Asia/Tashkent",
-                    })
-                  : null;
-
-                const cardCls =
-                  zone === "overdue"
-                    ? "bg-red-50 border-l-4 border-red-400"
-                    : zone === "urgent"
-                      ? "bg-orange-50 border-l-4 border-orange-400"
-                      : "border border-white/80 bg-white/60 backdrop-blur-xl";
-
-                const badgeCls =
-                  zone === "overdue"
-                    ? "bg-red-100 text-red-600"
-                    : zone === "urgent"
-                      ? "bg-orange-100 text-orange-600"
-                      : "";
-
-                const badgeLbl =
-                  zone === "overdue"
-                    ? "Просрочено"
-                    : zone === "urgent"
-                      ? "Срочно"
-                      : null;
-
-                return (
-                  <Link
-                    key={hw.id}
-                    href={`/homework/${hw.id}`}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-[14px] p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-                      cardCls,
-                    )}
-                  >
-                    <SubjectIcon subject={subject} size={20} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-semibold text-slate-800">
-                        {hw.title}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        {style.label}
-                        {dueLbl && ` · до ${dueLbl}`}
-                      </div>
-                    </div>
-                    {badgeLbl && (
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap",
-                          badgeCls,
-                        )}
-                      >
-                        {badgeLbl}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {activeHw.length > 5 && (
-              <Link
-                href="/homework"
-                className="mt-3 block text-center text-[12px] font-semibold text-blue-600 hover:underline"
-              >
-                Ещё {activeHw.length - 5} заданий →
-              </Link>
-            )}
+            <p className="text-base font-semibold text-zinc-600">{d.scheduleEmpty}</p>
+            <p className="text-sm text-zinc-400">{d.scheduleEmptyHint}</p>
           </>
         )}
       </div>
-      </>
+
+      {/* Next day's lessons */}
+      {nextDayDate && nextDayLessons.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+            {fmtDayHeader(nextDayDate, locale)}
+          </h3>
+          {nextDayLessons.map((l) => (
+            <LessonCard key={l.id} lesson={lessonWithSubjectToCard(l)} />
+          ))}
+        </div>
+      )}
+
+      {/* Truly empty */}
+      {!nextDayDate && (
+        <div className="text-center">
+          <BookOpen className="mx-auto mb-3 h-10 w-10 text-zinc-200" />
+          <p className="text-sm text-zinc-400">{d.scheduleEmptyHint}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── WEEK view ─────────────────────────────────────────────────────────────────
+
+function WeekView({
+  weekStart,
+  weekLessons,
+  today,
+  locale,
+  d,
+  onPrev,
+  onNext,
+}: {
+  weekStart: string;
+  weekLessons: LessonWithSubject[];
+  today: string;
+  locale: string;
+  d: ReturnType<typeof getDictionary>["schedule"];
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const days = weekDates(weekStart);
+
+  // Group lessons by Tashkent date
+  const byDay = new Map<string, LessonWithSubject[]>();
+  for (const l of weekLessons) {
+    const key = lessonDateKey(l.starts_at);
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key)!.push(l);
+  }
+
+  const rangeLabel = fmtWeekRange(weekStart, locale);
+
+  return (
+    <div className="space-y-4">
+      {/* Week navigation */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-zinc-100 px-4 py-3 shadow-sm">
+        <button
+          onClick={onPrev}
+          className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          {d.prevWeek}
+        </button>
+        <span className="text-sm font-semibold text-zinc-800 text-center">{rangeLabel}</span>
+        <button
+          onClick={onNext}
+          className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 transition-colors"
+        >
+          {d.nextWeek}
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Days */}
+      <div className="space-y-5">
+        {days.map((dateStr) => {
+          const lessons = byDay.get(dateStr) ?? [];
+          const isToday = dateStr === today;
+
+          return (
+            <div key={dateStr}>
+              <h3
+                className={cn(
+                  "mb-2.5 text-sm font-bold capitalize",
+                  isToday ? "text-violet-600" : "text-zinc-500",
+                )}
+              >
+                {isToday && (
+                  <span className="mr-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                    Сегодня
+                  </span>
+                )}
+                {fmtDayHeader(dateStr, locale)}
+              </h3>
+
+              {lessons.length === 0 ? (
+                <EmptyDay text={d.dayNoLessons} />
+              ) : (
+                <div className="space-y-2">
+                  {lessons.map((l) => (
+                    <LessonCard key={l.id} lesson={lessonWithSubjectToCard(l)} variant="compact" />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN ──────────────────────────────────────────────────────────────────────
+
+export function ScheduleView({
+  initialTab,
+  today,
+  weekStart,
+  todayLessons,
+  weekLessons,
+  nextDayDate,
+  nextDayLessons,
+}: {
+  initialTab: Tab;
+  today: string;
+  weekStart: string;
+  todayLessons: LessonWithSubject[];
+  weekLessons: LessonWithSubject[];
+  nextDayDate: string | null;
+  nextDayLessons: LessonWithSubject[];
+}) {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const { locale }   = useLocale();
+  const d = getDictionary(locale as Locale).schedule;
+
+  // Hydration guard: server renders in UTC, client knows local TZ
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const activeTab = (searchParams.get("tab") as Tab | null) ?? initialTab;
+
+  function switchTab(tab: Tab) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    if (tab === "week") params.set("week", weekStart);
+    else params.delete("week");
+    router.push(`/schedule?${params.toString()}`);
+  }
+
+  function prevWeek() {
+    const prev = addDays(weekStart, -7);
+    router.push(`/schedule?tab=week&week=${prev}`);
+  }
+  function nextWeek() {
+    const next = addDays(weekStart, 7);
+    router.push(`/schedule?tab=week&week=${next}`);
+  }
+
+  if (!mounted) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <h1 className="text-2xl font-bold text-zinc-900">{d.title}</h1>
+        <TabBar
+          active={activeTab}
+          onChange={switchTab}
+          labelToday={d.tabToday}
+          labelWeek={d.tabWeek}
+        />
+      </div>
+
+      {/* Content */}
+      {activeTab === "today" ? (
+        <TodayView
+          todayLessons={todayLessons}
+          nextDayDate={nextDayDate}
+          nextDayLessons={nextDayLessons}
+          locale={locale}
+          d={d}
+        />
+      ) : (
+        <WeekView
+          weekStart={weekStart}
+          weekLessons={weekLessons}
+          today={today}
+          locale={locale}
+          d={d}
+          onPrev={prevWeek}
+          onNext={nextWeek}
+        />
       )}
     </div>
   );
