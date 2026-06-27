@@ -110,6 +110,9 @@ export type LessonContentType =
   | 'wokwi' | 'codesandbox' | 'makecode'
   | 'quiz_qia' | 'quiz_kahoot';
 
+// Сложность этапа (migration 55) — задаётся учителем или ИИ-генератором.
+export type StageDifficulty = 'easy' | 'medium' | 'hard';
+
 export type LessonStage = {
   id: string;
   lesson_id: string;
@@ -120,6 +123,9 @@ export type LessonStage = {
   title: string;
   description: string | null;
   config: Record<string, unknown>;
+  // migration 55
+  difficulty: StageDifficulty;
+  duration_min: number | null;   // длительность в минутах; видна только учителю
   is_completed: boolean;
   completed_at: string | null;
   created_at: string;

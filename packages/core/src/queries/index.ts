@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -1540,6 +1540,8 @@ export const addLessonStage = async (
     title: string;
     description: string | null;
     config?: Record<string, unknown>;
+    difficulty?: StageDifficulty;
+    durationMin?: number | null;
   },
 ): Promise<LessonStage> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1566,6 +1568,8 @@ export const addLessonStage = async (
       title: input.title,
       description: input.description ?? null,
       config: input.config ?? {},
+      ...(input.difficulty ? { difficulty: input.difficulty } : {}),
+      ...(input.durationMin !== undefined ? { duration_min: input.durationMin } : {}),
     })
     .select("*")
     .single();
@@ -1583,6 +1587,8 @@ export const updateLessonStage = async (
     stage_type?: LessonStageType;
     content_type?: LessonContentType | null;
     config?: Record<string, unknown>;
+    difficulty?: StageDifficulty;
+    duration_min?: number | null;
   },
 ): Promise<LessonStage> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
