@@ -6,10 +6,10 @@ const MODEL = "gemini-2.5-flash";
 export async function callGemini(
   systemInstruction: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
-  options?: { temperature?: number; responseMimeType?: string },
+  options?: { temperature?: number; responseMimeType?: string; useSearch?: boolean },
 ): Promise<{ text: string; error: string | null }> {
   const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
-  console.log("[ai-gemini] model:", MODEL, "| key present:", !!apiKey, "| key length:", apiKey?.length ?? 0);
+  console.log("[ai-gemini] model:", MODEL, "| key present:", !!apiKey, "| key length:", apiKey?.length ?? 0, "| search:", !!options?.useSearch);
 
   if (!apiKey) {
     console.error("[ai-gemini] GEMINI_API_KEY missing on server");
@@ -20,13 +20,19 @@ export async function callGemini(
     const genAI = new GoogleGenerativeAI(apiKey);
 
     if (messages.length === 0) {
-      // No chat history (e.g. generate-stages): send the whole prompt as generateContent
+      // No chat history (e.g. generate-stages): send the whole prompt as generateContent.
+      // Google Search grounding (googleSearch tool) can't be combined with forced
+      // JSON output, so when search is on we drop responseMimeType and rely on the
+      // prompt's "return only JSON" + fence-stripping at the call site.
+      const useSearch = !!options?.useSearch;
       const model = genAI.getGenerativeModel({
         model: MODEL,
         generationConfig: {
           temperature: options?.temperature ?? 0.7,
-          ...(options?.responseMimeType ? { responseMimeType: options.responseMimeType } : {}),
+          ...(options?.responseMimeType && !useSearch ? { responseMimeType: options.responseMimeType } : {}),
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(useSearch ? { tools: [{ googleSearch: {} } as any] } : {}),
       });
       const result = await model.generateContent(systemInstruction);
       const text = result.response.text();
