@@ -202,3 +202,10 @@ body {
 @keyframes growW {
   from { width: 0; }
 }
+
+/* ─── Активный этап урока (fade-in при смене учителем) ─── */
+@keyframes stageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-stage-in { animation: stageIn 300ms ease-out; }

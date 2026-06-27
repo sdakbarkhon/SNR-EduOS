@@ -309,6 +309,7 @@ export function LessonWorkspaceView({
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
+  const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
   const [activeCodeStageId, setActiveCodeStageId] = useState<string | null>(null);
   const [externalStageId, setExternalStageId] = useState<string | null>(null);
@@ -333,6 +334,7 @@ export function LessonWorkspaceView({
   useEffect(() => { kahootStageIdRef.current = kahootStageId; }, [kahootStageId]);
 
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { setAnimKey((k) => k + 1); }, [activeStageId]);
 
   // Load existing leave request on mount
   useEffect(() => {
@@ -437,11 +439,15 @@ export function LessonWorkspaceView({
 
   // Active-stage visibility: only show stages up to (and including) the active one,
   // unless the lesson is completed (show all as read-only).
-  const activePos = allMiddleStages.find((s) => s.id === activeStageId)?.position ?? -1;
+  const activeMiddleStage = allMiddleStages.find((s) => s.id === activeStageId) ?? null;
+  const activePos = activeMiddleStage?.position ?? -1;
   const isCompleted = lesson.status === "completed";
+  // middleStages: visible stages for sidebar stepper (position ≤ active, or all if completed)
   const middleStages = isCompleted
     ? allMiddleStages
     : allMiddleStages.filter((s) => activeStageId === null ? false : s.position <= activePos);
+  // centerStages: what the center panel renders — only active stage (in_progress) or all (completed)
+  const centerStages = isCompleted ? allMiddleStages : activeMiddleStage ? [activeMiddleStage] : [];
 
   // A stage is read-only if it's a passed stage (position < active) or the lesson is completed
   function isStageReadOnly(stage: LessonStageWithProgress): boolean {
@@ -475,9 +481,9 @@ export function LessonWorkspaceView({
   }
 
   function isMiddleStageUnlocked(idx: number): boolean {
+    if (isCompleted) return true;
     if (idx === 0) return true;
-    // All previous middle stages must be completed
-    return middleStages.slice(0, idx).every((s) =>
+    return centerStages.slice(0, idx).every((s) =>
       s.progress?.is_completed || s.progress?.submission_data != null
     );
   }
@@ -680,22 +686,20 @@ export function LessonWorkspaceView({
             </div>
           )}
 
-          {/* Waiting for teacher state: in_progress but no active stage yet */}
-          {lesson.status === "in_progress" && activeStageId === null && allMiddleStages.length > 0 && (
+          {/* Center panel: waiting / single active stage / all (completed) */}
+          {lesson.status === "in_progress" && activeStageId === null && allMiddleStages.length > 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-8 text-center shadow-sm">
               <span className="flex h-3 w-3 animate-pulse rounded-full bg-violet-400" />
               <p className="text-sm font-semibold text-violet-700">{da.waitingForTeacher}</p>
             </div>
-          )}
-
-          {middleStages.length === 0 && !(lesson.status === "in_progress" && activeStageId === null && allMiddleStages.length > 0) ? (
+          ) : centerStages.length === 0 && allMiddleStages.length === 0 ? (
             <div className="rounded-2xl border border-white/60 bg-white/60 p-6 shadow-sm backdrop-blur-xl">
               <p className="text-center text-sm text-slate-400">{w.noTask}</p>
             </div>
           ) : (
-            middleStages.map((stage, idx) => {
+            centerStages.map((stage, idx) => {
               const unlocked = isMiddleStageUnlocked(idx);
-              const prevStage = idx > 0 ? middleStages[idx - 1] : null;
+              const prevStage = idx > 0 ? centerStages[idx - 1] : null;
               const readOnly = isStageReadOnly(stage);
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
@@ -703,7 +707,7 @@ export function LessonWorkspaceView({
               const isLoading = studiedLoading === stage.id;
 
               return (
-                <div key={stage.id} className="relative">
+                <div key={isCompleted ? stage.id : `${stage.id}-${animKey}`} className={`relative${isCompleted ? "" : " animate-stage-in"}`}>
                 {/* Lock overlay for sequential unlock */}
                 {!unlocked && (
                   <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl backdrop-blur-sm"
