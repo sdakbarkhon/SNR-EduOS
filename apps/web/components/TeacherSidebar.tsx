@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, FolderOpen, Library, Briefcase,
-  Megaphone, Users, Settings, LogOut, CheckCircle, ClipboardList, Bell,
+  Megaphone, Users, Settings, LogOut, CheckCircle, Bell,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
@@ -21,7 +21,6 @@ const teacherNavItems = [
   { key: "lessons",    href: "/teacher/lessons",      icon: CalendarDays,  label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLessons },
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
-  { key: "attendance", href: "/teacher/attendance",   icon: ClipboardList, label: (d: ReturnType<typeof getDictionary>) => d.attendance.title },
   { key: "materials",  href: "/teacher/materials",    icon: FolderOpen,    label: (d: ReturnType<typeof getDictionary>) => d.teacher.navMaterials },
   { key: "books",      href: "/teacher/books",        icon: Library,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navBooks },
   { key: "notifications", href: "/teacher/notifications",  icon: Bell,      label: (d: ReturnType<typeof getDictionary>) => d.nav.notifications },

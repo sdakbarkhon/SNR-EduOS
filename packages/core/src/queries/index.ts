@@ -13,8 +13,13 @@ export * from "./announcements";
 export * from "./subjects";
 
 // --- Профиль / группы ---
-export const getMyStudent = (db: Db) =>
-  db.from("students").select("*").single().then(unwrap);
+// Explicit user_id filter + limit(1) prevents PGRST116 if RLS returns >1 row
+// (mirrors the pattern used in getMyTeacher).
+export const getMyStudent = async (db: Db) => {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  return db.from("students").select("*").eq("user_id", user.id).limit(1).single().then(unwrap);
+};
 
 export const getMyGroups = (db: Db) =>
   db.from("groups").select("*").order("name").then(unwrap);

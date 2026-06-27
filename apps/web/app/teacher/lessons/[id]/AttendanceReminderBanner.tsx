@@ -71,20 +71,12 @@ export function AttendanceReminderBanner({
           <p className="text-sm font-bold text-amber-800">{title}</p>
           <p className="text-sm text-amber-700">{dl.attendanceMadeCheckOthers}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/teacher/attendance"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800 transition-colors hover:bg-amber-200"
-          >
-            <ClipboardList className="h-3.5 w-3.5" /> {dl.openAttendance}
-          </Link>
-          <Link
-            href="/teacher/grades"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800 transition-colors hover:bg-amber-200"
-          >
-            <Award className="h-3.5 w-3.5" /> {dl.openGrades}
-          </Link>
-        </div>
+        <Link
+          href="/teacher/grades"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800 transition-colors hover:bg-amber-200"
+        >
+          <Award className="h-3.5 w-3.5" /> {dl.openGrades}
+        </Link>
       </div>
     );
   }
