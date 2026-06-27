@@ -3,7 +3,10 @@
 // Runs in the Node runtime only (never bundled — see serverExternalPackages).
 
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+// pdf-parse@1.1.1 — pure-Node (no pdfjs-dist/DOMMatrix), works in Vercel
+// serverless. Import the lib subpath directly to skip the package index.js
+// debug block (it reads a bundled test PDF when require.main is undefined).
+import pdf from "pdf-parse/lib/pdf-parse.js";
 
 const MAX_CHARS = 50_000;
 
@@ -27,14 +30,9 @@ export async function extractText(
 
   try {
     if (mt.includes("pdf") || ext === "pdf") {
-      const parser = new PDFParse({ data: buffer });
-      try {
-        const data = await parser.getText();
-        text = data.text;
-        pages = data.total;
-      } finally {
-        await parser.destroy().catch(() => {});
-      }
+      const data = await pdf(buffer);
+      text = data.text;
+      pages = data.numpages;
     } else if (
       mt.includes("wordprocessing") || mt.includes("msword") ||
       ext === "docx" || ext === "doc"
