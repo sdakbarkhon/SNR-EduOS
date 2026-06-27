@@ -23,7 +23,7 @@ import type {
   LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
   LeaveRequestWithStudent,
   CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
-  QuizQuestionInput, QuizConfigForStage, StageDifficulty,
+  QuizQuestionInput, QuizConfigForStage,
 } from "@snr/core";
 import { SERVICE_CONFIG, validateServiceUrl, isExternalService } from "@/lib/external-services";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
@@ -96,8 +96,6 @@ function StageModal({
     description: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
-    difficulty: StageDifficulty;
-    durationMin: number | null;
   }) => Promise<void>;
   contentLabel: (ct: LessonContentType) => string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,10 +113,6 @@ function StageModal({
   const [contentType, setContentType] = useState<LessonContentType | null>(existing?.content_type ?? null);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
-  const [difficulty, setDifficulty] = useState<StageDifficulty>(existing?.difficulty ?? "medium");
-  const [durationMin, setDurationMin] = useState<string>(
-    existing?.duration_min != null ? String(existing.duration_min) : "",
-  );
   const [saving, setSaving] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -207,14 +201,12 @@ function StageModal({
         options: q.options.map((o) => o.trim()).filter((_, i) => i < 4),
       }));
     }
-    const parsedDuration = durationMin.trim() === "" ? null : Math.max(1, Math.min(120, Number(durationMin) || 0)) || null;
     setSaving(true);
     try {
       await onSave({
         stageType: stageType as LessonStageType, contentType,
         title: title.trim(), description: desc.trim() || null, config,
         quizQuestions: quizQuestionsOut,
-        difficulty, durationMin: parsedDuration,
       });
     } finally {
       setSaving(false);
@@ -461,54 +453,6 @@ function StageModal({
                   />
                 </div>
 
-                {/* Difficulty (3 radios) */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    {d.stageDifficultyLabel}
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      ["easy", d.stageDifficultyEasy],
-                      ["medium", d.stageDifficultyMedium],
-                      ["hard", d.stageDifficultyHard],
-                    ] as [StageDifficulty, string][]).map(([val, label]) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setDifficulty(val)}
-                        className={`rounded-xl border-2 px-3 py-2 text-sm font-semibold transition-all ${
-                          difficulty === val
-                            ? val === "easy"
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-                              : val === "hard"
-                              ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"
-                              : "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
-                            : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-white/10 dark:text-slate-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Duration (optional minutes) */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    {d.stageDurationLabel}
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={durationMin}
-                    onChange={(e) => setDurationMin(e.target.value)}
-                    placeholder="10"
-                    className="w-28 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
-                  />
-                  <p className="mt-1 text-[11px] text-slate-400">{d.stageDurationHint}</p>
-                </div>
-
                 {/* Code stage: starter code + expected output */}
                 {isCode && (
                   <>
@@ -706,9 +650,8 @@ export function TeacherLessonDetailView({
     description: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
-    difficulty: StageDifficulty;
-    durationMin: number | null;
   }) {
+    // Manual stages: difficulty defaults to 'medium' and duration_min stays NULL (DB defaults).
     const newStage = await addLessonStage(db, lesson.id, data);
     if (data.quizQuestions) {
       await replaceQuizQuestions(db, newStage.id, data.quizQuestions).catch(() => null);
@@ -728,17 +671,14 @@ export function TeacherLessonDetailView({
     description: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
-    difficulty: StageDifficulty;
-    durationMin: number | null;
   }) {
     if (stageModal.mode !== "edit") return;
+    // difficulty/duration_min are not edited here — left untouched (AI stages keep theirs).
     const updated = await updateLessonStage(db, stageModal.stage.id, {
       title: data.title,
       description: data.description,
       stage_type: data.stageType,
       content_type: data.contentType,
-      difficulty: data.difficulty,
-      duration_min: data.durationMin,
       ...(data.config !== undefined ? { config: data.config } : {}),
     });
     if (data.quizQuestions) {
@@ -1268,26 +1208,27 @@ export function TeacherLessonDetailView({
                         {contentLabel(stage.content_type)}
                       </span>
                     )}
-                    {/* Difficulty badge (teacher only) */}
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                      stage.difficulty === "easy"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-                        : stage.difficulty === "hard"
-                        ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-                    }`}>
-                      {stage.difficulty === "easy"
-                        ? dl.stageDifficultyEasy
-                        : stage.difficulty === "hard"
-                        ? dl.stageDifficultyHard
-                        : dl.stageDifficultyMedium}
-                    </span>
-                    {/* Duration badge (teacher only) */}
+                    {/* Difficulty + duration badges: only for AI-generated stages (duration_min set) */}
                     {stage.duration_min != null && (
-                      <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
-                        <Clock className="h-3 w-3" />
-                        {stage.duration_min} {d.ai.generate.minutesShort}
-                      </span>
+                      <>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          stage.difficulty === "easy"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                            : stage.difficulty === "hard"
+                            ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                        }`}>
+                          {stage.difficulty === "easy"
+                            ? dl.stageDifficultyEasy
+                            : stage.difficulty === "hard"
+                            ? dl.stageDifficultyHard
+                            : dl.stageDifficultyMedium}
+                        </span>
+                        <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          {stage.duration_min} {d.ai.generate.minutesShort}
+                        </span>
+                      </>
                     )}
                   </div>
                   {stage.description && (
@@ -1539,6 +1480,13 @@ export function TeacherLessonDetailView({
         <AiGenerateStagesModal
           lessonId={lesson.id}
           lessonTopic={lesson.topic ?? lesson.title}
+          lessonDurationMin={
+            lesson.ends_at
+              ? Math.max(5, Math.round(
+                  (new Date(lesson.ends_at).getTime() - new Date(lesson.starts_at).getTime()) / 60000,
+                ))
+              : 45
+          }
           onClose={() => setAiGenerateOpen(false)}
           onAdded={async () => {
             const fresh = await getLessonStages(db, lesson.id);

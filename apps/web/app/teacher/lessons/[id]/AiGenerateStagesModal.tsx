@@ -234,11 +234,13 @@ function StageEditRow({
 export function AiGenerateStagesModal({
   lessonId,
   lessonTopic,
+  lessonDurationMin,
   onClose,
   onAdded,
 }: {
   lessonId: string;
   lessonTopic: string | null;
+  lessonDurationMin: number;
   onClose: () => void;
   onAdded: () => void;
 }) {
@@ -247,9 +249,11 @@ export function AiGenerateStagesModal({
   const t = d.ai.generate;
   const db = createClient();
 
+  // Lesson duration comes from the lesson settings (not entered here).
+  const duration = lessonDurationMin > 0 ? lessonDurationMin : 45;
+
   // Form state
   const [topic, setTopic] = useState(lessonTopic ?? "");
-  const [duration, setDuration] = useState(45);
   const [useWebSearch, setUseWebSearch] = useState(false);
 
   // Attached files (read once on open)
@@ -432,15 +436,12 @@ export function AiGenerateStagesModal({
                 />
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
-                  {t.duration}
-                </label>
-                <input
-                  type="number" min={5} max={240} value={duration}
-                  onChange={(e) => setDuration(Math.max(5, Math.min(240, Number(e.target.value) || 45)))}
-                  className="w-28 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                />
+              {/* Lesson duration is read-only (taken from the lesson settings) */}
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/10 dark:bg-white/5">
+                <Clock className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="text-sm text-slate-600 dark:text-slate-300">
+                  {t.durationFromLesson.replace("{n}", String(duration))}
+                </span>
               </div>
 
               {/* Web search toggle */}

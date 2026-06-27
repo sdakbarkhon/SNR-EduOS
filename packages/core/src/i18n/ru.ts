@@ -1152,6 +1152,7 @@ export const ru: Dictionary = {
       added: "Этапы добавлены!",
       stageQuestions: "{n} вопросов",
       duration: "Длительность урока (мин)",
+      durationFromLesson: "Длительность урока: {n} мин (из настроек урока)",
       useWebSearch: "Использовать поиск в интернете",
       useWebSearchHint: "ИИ найдёт актуальную информацию в Google",
       filesAttached: "{count} файлов прикреплено",

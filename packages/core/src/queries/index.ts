@@ -1464,8 +1464,15 @@ export const uploadLessonMaterial = async (
   },
 ): Promise<LessonMaterial> => {
   const materialId = crypto.randomUUID();
-  const ext = input.file.name.split(".").pop() ?? "bin";
-  const path = `${input.teacherId}/${input.lessonId}/${materialId}/${input.file.name}`;
+  // Supabase Storage object keys reject non-ASCII characters (e.g. Cyrillic file
+  // names) and many symbols with a 400 "Invalid key". Never put the raw filename
+  // in the key — derive an ASCII-safe extension and keep the original name only in
+  // the `file_original_name` column (used for display + download `downloadAs`).
+  const rawExt = input.file.name.includes(".") ? input.file.name.split(".").pop()! : "";
+  const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
+  const path = safeExt
+    ? `${input.teacherId}/${input.lessonId}/${materialId}.${safeExt}`
+    : `${input.teacherId}/${input.lessonId}/${materialId}`;
   const { error: uploadErr } = await db.storage
     .from("lesson-materials")
     .upload(path, input.file, { contentType: input.file.type || undefined });
@@ -1487,7 +1494,6 @@ export const uploadLessonMaterial = async (
     .select("*")
     .single();
   if (insertErr) throw insertErr;
-  void ext; // suppress unused
   return data as LessonMaterial;
 };
 

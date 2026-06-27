@@ -1152,6 +1152,7 @@ export const uz: Dictionary = {
       added: "Bosqichlar qo'shildi!",
       stageQuestions: "{n} ta savol",
       duration: "Dars davomiyligi (daq)",
+      durationFromLesson: "Dars davomiyligi: {n} daq (dars sozlamalaridan)",
       useWebSearch: "Internetdan qidiruvdan foydalanish",
       useWebSearchHint: "Sun’iy intellekt Google’dan dolzarb ma’lumot topadi",
       filesAttached: "{count} ta fayl biriktirilgan",

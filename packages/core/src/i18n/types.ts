@@ -1170,6 +1170,7 @@ export interface Dictionary {
       stageQuestions: string;    // "{n} вопросов"
       // Итерация 3, Промт 4 — расширенная генерация
       duration: string;          // "Длительность урока (мин)"
+      durationFromLesson: string; // "Длительность урока: {n} мин (из настроек урока)"
       useWebSearch: string;      // "Использовать поиск в интернете"
       useWebSearchHint: string;  // "ИИ найдёт актуальную информацию в Google"
       filesAttached: string;     // "{count} файлов прикреплено"

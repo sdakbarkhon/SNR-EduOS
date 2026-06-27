@@ -1152,6 +1152,7 @@ export const en: Dictionary = {
       added: "Stages added!",
       stageQuestions: "{n} questions",
       duration: "Lesson duration (min)",
+      durationFromLesson: "Lesson duration: {n} min (from lesson settings)",
       useWebSearch: "Use web search",
       useWebSearchHint: "The AI will find up-to-date info on Google",
       filesAttached: "{count} files attached",
