@@ -7,7 +7,7 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut, Monitor,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -16,7 +16,7 @@ import {
   getSubjectStyle, getLessonExcuseRequests,
   getLeaveRequestsForLesson, decideLeaveRequest,
   getQuizQuestions, replaceQuizQuestions,
-  setActiveStage,
+  setActiveStage, setDemoMaterial,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -532,6 +532,7 @@ export function TeacherLessonDetailView({
   const [reorderingStageId, setReorderingStageId] = useState<string | null>(null);
 
   const [materials, setMaterials] = useState<LessonMaterial[]>(lesson.materials);
+  const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
   const [uploadModal, setUploadModal] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -603,6 +604,9 @@ export function TeacherLessonDetailView({
       // Sync active_stage_id from other open tabs / auto-trigger
       const newActiveStageId = payload?.new?.active_stage_id as string | null | undefined;
       if (newActiveStageId !== undefined) setActiveStageId(newActiveStageId ?? null);
+      // Sync demo material (another tab / auto-clear on complete)
+      const newDemoId = payload?.new?.demo_material_id as string | null | undefined;
+      if (newDemoId !== undefined) setDemoMaterialId(newDemoId ?? null);
       if (newStatus && newStatus !== status) window.location.reload();
     },
   );
@@ -774,6 +778,19 @@ export function TeacherLessonDetailView({
       setUploadFile(null);
       setUploadVisibility('all');
     } catch { /* noop */ } finally { setUploading(false); }
+  }
+
+  // Toggle "show to class" for a material (teacher → all students via realtime).
+  async function handleToggleDemo(materialId: string) {
+    if (status !== "in_progress") return;
+    const prev = demoMaterialId;
+    const next = prev === materialId ? null : materialId;
+    setDemoMaterialId(next); // optimistic
+    try {
+      await setDemoMaterial(db, lesson.id, next);
+    } catch {
+      setDemoMaterialId(prev); // revert on failure
+    }
   }
 
   async function handleDeleteMaterial() {
@@ -1339,33 +1356,56 @@ export function TeacherLessonDetailView({
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {materials.map((mat) => (
-              <div key={mat.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                  <FileText className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{mat.title}</p>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
-                    {mat.visibility === 'teacher_only' && (
-                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                        {dl.materialTeacherOnlyBadge}
-                      </span>
+              <div key={mat.id} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{mat.title}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
+                      {mat.visibility === 'teacher_only' && (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                          {dl.materialTeacherOnlyBadge}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button onClick={() => handleDownloadMaterial(mat)}
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
+                      <Download className="h-4 w-4" />
+                    </button>
+                    {!isLessonCompleted && (
+                      <button onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title={dl.deleteConfirm}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     )}
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1">
-                  <button onClick={() => handleDownloadMaterial(mat)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
-                    <Download className="h-4 w-4" />
-                  </button>
-                  {!isLessonCompleted && (
-                    <button onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title={dl.deleteConfirm}>
-                      <Trash2 className="h-4 w-4" />
+
+                {/* Show-to-class control (only while the lesson is live) */}
+                {status === "in_progress" && (
+                  demoMaterialId === mat.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                        {d.demo.showingNow}
+                      </span>
+                      <button onClick={() => handleToggleDemo(mat.id)}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                        {d.demo.stopShowing}
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => handleToggleDemo(mat.id)}
+                      className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition-colors hover:bg-blue-100">
+                      <Monitor className="h-3.5 w-3.5" /> {d.demo.showToClass}
                     </button>
-                  )}
-                </div>
+                  )
+                )}
               </div>
             ))}
           </div>

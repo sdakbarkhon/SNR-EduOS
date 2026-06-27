@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Clock, Check, FileText, FileCode2, File,
-  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, LogOut,
+  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, LogOut, Monitor,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -42,6 +42,15 @@ function fmtElapsed(ms: number): string {
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
   return [h, m, s].map((x) => String(x).padStart(2, "0")).join(":");
+}
+
+// Demo block: how to render a shown material, by file extension.
+function demoKind(name: string): "pdf" | "video" | "image" | "other" {
+  const ext = (name.split(".").pop() ?? "").toLowerCase();
+  if (ext === "pdf") return "pdf";
+  if (["mp4", "webm", "ogg", "mov", "m4v"].includes(ext)) return "video";
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"].includes(ext)) return "image";
+  return "other";
 }
 
 function materialIcon(name: string): { Icon: typeof FileText; cls: string } {
@@ -308,6 +317,7 @@ export function LessonWorkspaceView({
 
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
+  const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
@@ -379,6 +389,20 @@ export function LessonWorkspaceView({
         const openId = activeCodeStageIdRef.current ?? externalStageIdRef.current
           ?? qiaStageIdRef.current ?? kahootStageIdRef.current;
         if (openId && openId !== (newActiveStageId ?? null)) {
+          setActiveCodeStageId(null);
+          setExternalStageId(null);
+          setQiaStageId(null);
+          setKahootStageId(null);
+          setOpenTaskStageId(null);
+        }
+      }
+
+      // Teacher "show to class": demo material toggled on/off.
+      const newDemoId = payload?.new?.demo_material_id as string | null | undefined;
+      if (newDemoId !== undefined) {
+        setDemoMaterialId(newDemoId ?? null);
+        // Starting a demo drops the student out of any open fullscreen stage.
+        if (newDemoId) {
           setActiveCodeStageId(null);
           setExternalStageId(null);
           setQiaStageId(null);
@@ -542,6 +566,42 @@ export function LessonWorkspaceView({
           </div>
         </div>
       </header>
+
+      {/* Teacher is showing a material to the whole class (Realtime broadcast) */}
+      {demoMaterialId && (() => {
+        const mat = lesson.materials.find((m) => m.id === demoMaterialId);
+        const url = mat ? materialUrls[mat.id] : undefined;
+        const name = mat?.file_original_name ?? mat?.title ?? "";
+        const kind = demoKind(name);
+        return (
+          <section className="overflow-hidden rounded-2xl border-2 border-violet-300 shadow-xl">
+            <div className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 px-5 py-3 text-white">
+              <Monitor className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-bold">{d.demo.teacherShowing}</span>
+              {mat?.title && <span className="truncate text-sm text-white/80">— {mat.title}</span>}
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> Live
+              </span>
+            </div>
+            <div className="bg-slate-900">
+              {mat && url && kind === "pdf" ? (
+                <iframe src={`${url}#toolbar=0`} title={name} className="h-[600px] w-full bg-white" />
+              ) : mat && url && kind === "video" ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={url} controls autoPlay className="mx-auto max-h-[600px] w-full bg-black" />
+              ) : mat && url && kind === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt={name} className="mx-auto max-h-[600px] w-full object-contain" />
+              ) : (
+                <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
+                  <p className="text-sm font-semibold text-white">{d.demo.unsupportedFormat}</p>
+                  <p className="text-xs text-white/60">{d.demo.supportedFormats}</p>
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Teacher changed stage banner */}
       {stageChangedBanner && (

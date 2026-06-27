@@ -1260,9 +1260,9 @@ export const getTeacherLessonView = async (
   db: Db,
   lessonId: string,
 ): Promise<TeacherLessonView | null> => {
-  const { data: lessonRaw, error: lessonErr } = await db
+  const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -1273,7 +1273,7 @@ export const getTeacherLessonView = async (
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
-    room: string | null; active_stage_id: string | null;
+    room: string | null; active_stage_id: string | null; demo_material_id: string | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -1297,6 +1297,7 @@ export const getTeacherLessonView = async (
     status: lesson.status as TeacherLessonView["status"],
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
+    demo_material_id: lesson.demo_material_id,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -1309,9 +1310,9 @@ export const getStudentLessonView = async (
   db: Db,
   lessonId: string,
 ): Promise<StudentLessonView | null> => {
-  const { data: lessonRaw, error: lessonErr } = await db
+  const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -1322,7 +1323,7 @@ export const getStudentLessonView = async (
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
-    room: string | null; active_stage_id: string | null;
+    room: string | null; active_stage_id: string | null; demo_material_id: string | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -1354,6 +1355,7 @@ export const getStudentLessonView = async (
     status: lesson.status as StudentLessonView["status"],
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
+    demo_material_id: lesson.demo_material_id,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -1371,6 +1373,23 @@ export async function setActiveStage(
   const { error } = await (db as any)
     .from("lessons")
     .update({ active_stage_id: stageId })
+    .eq("id", lessonId);
+  if (error) throw error;
+}
+
+/**
+ * Учитель показывает классу материал (или останавливает показ при null).
+ * Realtime на lessons доставляет изменение demo_material_id ученикам урока.
+ */
+export async function setDemoMaterial(
+  db: Db,
+  lessonId: string,
+  materialId: string | null,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lessons")
+    .update({ demo_material_id: materialId })
     .eq("id", lessonId);
   if (error) throw error;
 }
