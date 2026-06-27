@@ -6,8 +6,10 @@ import { Briefcase, Calendar } from "lucide-react";
 import { getDictionary, getSubjectStyle, type Locale, type StudentProjectListItem } from "@snr/core";
 import { SubjectIcon, useLocale } from "@/components";
 import { cn } from "@/lib/cn";
+import { SandboxView } from "./SandboxView";
 
 type Filter = "all" | "active" | "submitted" | "graded";
+type Mode = "projects" | "sandbox";
 
 function statusOf(p: StudentProjectListItem): "not_started" | "in_progress" | "awaiting" | "graded" {
   const s = p.submission;
@@ -21,6 +23,8 @@ export function ProjectsView({ projects }: { projects: StudentProjectListItem[] 
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.projects;
+  const ts = d.sandbox;
+  const [mode, setMode] = useState<Mode>("projects");
   const [filter, setFilter] = useState<Filter>("all");
 
   const pills: { key: Filter; label: string }[] = [
@@ -49,6 +53,24 @@ export function ProjectsView({ projects }: { projects: StudentProjectListItem[] 
   return (
     <div className="mx-auto w-full max-w-7xl text-slate-800">
       <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{t.title}</h1>
+
+      {/* Mode switch: оцениваемые проекты | песочница */}
+      <div className="mt-4 inline-flex rounded-full border border-white/60 bg-white/60 p-1 backdrop-blur-xl">
+        {([
+          { key: "projects" as Mode, label: ts.modeProjects },
+          { key: "sandbox" as Mode, label: ts.modeSandbox },
+        ]).map((m) => (
+          <button key={m.key} onClick={() => setMode(m.key)}
+            className={cn("rounded-full px-5 py-1.5 text-sm font-bold transition-all",
+              mode === m.key ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "text-slate-500 hover:text-slate-700")}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "sandbox" && <div className="mt-6"><SandboxView /></div>}
+
+      {mode === "projects" && (<>
       <div className="mt-4 flex flex-wrap gap-2">
         {pills.map((p) => (
           <button key={p.key} onClick={() => setFilter(p.key)}
@@ -100,6 +122,7 @@ export function ProjectsView({ projects }: { projects: StudentProjectListItem[] 
           })}
         </div>
       )}
+      </>)}
     </div>
   );
 }

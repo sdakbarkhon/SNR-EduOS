@@ -355,6 +355,29 @@ export interface Dictionary {
     teacherComment: string;
     deleteFile: string;
   };
+  sandbox: {
+    title: string;          // "Проекты (песочница)"
+    subtitle: string;
+    backToMenu: string;     // "← Вернуться в меню проектов"
+    modeProjects: string;   // вкладка "Проекты"
+    modeSandbox: string;    // вкладка "Песочница"
+    tools: {
+      scratch: { name: string; description: string };
+      wokwi: { name: string; description: string };
+      codesandbox: { name: string; description: string };
+      makecode: { name: string; description: string };
+      code: { name: string; description: string };
+    };
+  };
+  demo: {
+    showToClass: string;       // "Показать классу"
+    showingNow: string;        // "🔴 Демонстрируется"
+    stopShowing: string;       // "Остановить демонстрацию"
+    teacherShowing: string;    // "📺 Учитель показывает материал"
+    unsupportedFormat: string;
+    supportedFormats: string;
+    lessonMustBeActive: string;
+  };
   announcements: {
     title: string;
     empty: string;
