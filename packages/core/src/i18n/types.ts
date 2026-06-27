@@ -1168,9 +1168,8 @@ export interface Dictionary {
       adding: string;            // "Добавляю…"
       added: string;             // "Этапы добавлены!"
       stageQuestions: string;    // "{n} вопросов"
-      // Итерация 3, Промт 4 — расширенная генерация
+      // Итерация 3 — расширенная генерация
       duration: string;          // "Длительность урока (мин)"
-      durationFromLesson: string; // "Длительность урока: {n} мин (из настроек урока)"
       useWebSearch: string;      // "Использовать поиск в интернете"
       useWebSearchHint: string;  // "ИИ найдёт актуальную информацию в Google"
       filesAttached: string;     // "{count} файлов прикреплено"
@@ -1179,7 +1178,6 @@ export interface Dictionary {
       generatingLong: string;    // "ИИ работает… это может занять 30–60 секунд"
       recommendedMaterials: string; // "Рекомендуемые материалы для подготовки"
       searchQueries: string;     // "Поисковые запросы"
-      copyAll: string;           // "Скопировать все"
       copied: string;            // "Скопировано!"
       openInGoogle: string;      // "Открыть в Google"
       aiNotes: string;           // "Заметки от ИИ"
@@ -1188,6 +1186,16 @@ export interface Dictionary {
       difficultyMedium: string;  // "Средний"
       difficultyHard: string;    // "Сложный"
       minutesShort: string;      // "мин"
+      // Двухэтапный выбор (iter3 промт 5)
+      proposePlan: string;       // "Предложить план"
+      selectStages: string;      // "Выберите этапы для урока"
+      selectedCount: string;     // "Отмечено: {selected} из {total}"
+      totalSelected: string;     // "Общая длительность выбранных: {min} мин"
+      lessonDuration: string;    // "Длительность урока: {min} мин — будет пересчитано"
+      createSelected: string;    // "Создать выбранные ({count})"
+      overallDifficulty: string; // "Общий уровень сложности урока"
+      copyQuery: string;         // "Скопировать"
+      atLeastOneStage: string;   // "Выберите хотя бы один этап"
     };
   };
 }

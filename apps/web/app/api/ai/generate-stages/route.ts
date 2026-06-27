@@ -5,9 +5,6 @@ import { callGemini } from "@/lib/ai-gemini";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Content types the generator may emit. The first four are fully buildable
-// without extra teacher input; the external services are suggested as
-// placeholders (teacher adds the project link afterwards).
 const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
   "scratch", "wokwi", "codesandbox", "makecode",
@@ -21,6 +18,7 @@ function buildPrompt(input: {
   grade: number;
   subject: string;
   durationMin: number;
+  overallDifficulty: string;
   materials: AttachedMaterial[];
 }): string {
   const hasFiles = input.materials.length > 0;
@@ -32,74 +30,80 @@ function buildPrompt(input: {
 
   return `Ты — методический ассистент для учителя в школе Узбекистана.
 
-ЗАДАЧА: Создать структуру урока с этапами.
+ЗАДАЧА: Предложить 8–10 ВАРИАНТОВ этапов урока на выбор учителя.
 
 ВХОДНЫЕ ДАННЫЕ:
 - Класс: ${input.grade}
 - Предмет: ${input.subject}
 - Тема урока: ${input.topic}
 - Длительность урока: ${input.durationMin} минут
+- Общий уровень сложности: ${input.overallDifficulty}
 
 МАТЕРИАЛЫ ОТ УЧИТЕЛЯ:
 ${materialsContext}
 
-ИНСТРУКЦИИ:
-1. Если в материалах учителя есть информация по теме — используй её как ПРИОРИТЕТНЫЙ источник.
-2. Если материалов нет или их недостаточно — используй свои знания (и поиск, если доступен).
-3. Подбирай этапы и сложность с учётом КЛАССА (${input.grade}). Не давай слишком сложное младшим и слишком простое старшим.
-4. РАСПРЕДЕЛИ ВРЕМЯ так, чтобы СУММА duration_min всех этапов = ${input.durationMin}.
-5. ВЫБОР content_type:
-   - "presentation" — теория/объяснение (stage_type: "theory")
-   - "code" — программирование, классы с информатикой (stage_type: "task")
-   - "quiz_qia" — тест с вопросами (stage_type: "task")
-   - "quiz_kahoot" — синхронный live-квиз с таймером (stage_type: "task")
-   - "scratch" — визуальное программирование, 5–7 класс (stage_type: "task")
-   - "wokwi" — Arduino/электроника, 8–11 класс (stage_type: "task")
-   - "codesandbox" — веб-разработка, 9–11 класс (stage_type: "task")
-   - "makecode" — игровое программирование, 5–9 класс (stage_type: "task")
-   Внешние сервисы (scratch/wokwi/codesandbox/makecode) подбирай по соответствию класса и темы.
-6. КОЛИЧЕСТВО ВОПРОСОВ КВИЗА: реши сам по длительности этапа (5 мин→3, 10 мин→5, 15 мин→8, 20 мин→10).
-7. СЛОЖНОСТЬ (difficulty): "easy" / "medium" / "hard" — с учётом класса и темы.
-8. РЕКОМЕНДУЕМЫЕ МАТЕРИАЛЫ: предложи 3–5 ПОИСКОВЫХ ЗАПРОСОВ (не ссылок) для подготовки учителя.
+ВАЖНО: Ты создаёшь СПИСОК ВАРИАНТОВ для выбора учителем, а НЕ последовательность на ${input.durationMin} мин.
+НЕ пытайся сложить суммы длительности = ${input.durationMin}. Каждый этап — самостоятельный вариант.
+Каждый этап имеет разумную длительность 5–30 мин.
 
-ФОРМАТ КАЖДОГО ЭТАПА:
+ОБЯЗАТЕЛЬНО РАЗНООБРАЗИЕ ТИПОВ — используй разные content_type:
+- "presentation" — теория/объяснение (stage_type: theory)
+- "code" — программирование в Monaco редакторе
+- "quiz_qia" — асинхронный тест с вопросами
+- "quiz_kahoot" — синхронный live-квиз с таймером
+- "scratch" — визуальное программирование блоками
+- "makecode" — игровое программирование Microsoft
+- "wokwi" — Arduino/электроника симуляция
+- "codesandbox" — веб-разработка (HTML/CSS/JS)
+
+ПРАВИЛА ВЫБОРА ТИПА ПО КЛАССУ (${input.grade} класс):
+- scratch: классы 1–7 (игры, анимации, блочное программирование)
+- makecode: классы 5–9 (2D игры, micro:bit, переход от Scratch к коду)
+- wokwi: классы 7–11 (Arduino C++, электроника, физика, датчики)
+- codesandbox: классы 9–11 (HTML/CSS/JavaScript, React, сайты)
+- code: классы 7–11 (Python/JS/C++, алгоритмы)
+
+ОБЯЗАТЕЛЬНО в 8–10 вариантах должны быть:
+✓ Минимум 1 этап "presentation" (введение/теория)
+✓ Минимум 1 практический этап (code/scratch/wokwi/codesandbox/makecode)
+✓ Минимум 1 квиз (quiz_qia или quiz_kahoot)
+✓ Если класс подходит — 1–2 внешних сервиса (scratch/wokwi/codesandbox/makecode)
+
+СЛОЖНОСТЬ:
+Общий уровень: ${input.overallDifficulty}
+- easy: больше теории, базовые понятия, простые задачи
+- medium: баланс теории и практики, средние задачи
+- hard: упор на практику, сложные задачи, углубление
+Делай основную часть этапов уровня ${input.overallDifficulty}, допустимы 1–2 варианта смежного уровня.
+
+ФОРМАТ КАЖДОГО ЭТАПА (без config, без questions — только описание):
 {
-  "stage_type": "theory" | "task",
   "content_type": "presentation" | "code" | "quiz_qia" | "quiz_kahoot" | "scratch" | "wokwi" | "codesandbox" | "makecode",
-  "title": "Название этапа",
-  "description": "Описание/инструкция для школьников",
+  "title": "Короткое название этапа",
+  "description": "Что конкретно будет делать ученик на этом этапе",
   "difficulty": "easy" | "medium" | "hard",
-  "duration_min": 10,
-  "config": { "language": "python", "starter_code": "..." },
-  "questions": [ { "question_text": "...", "options": ["A","B","C","D"], "correct_option_index": 0 } ]
+  "duration_min": 10
 }
-("config" нужен только для code; "questions" — только для quiz_qia/quiz_kahoot.)
 
-ВЕРНИ СТРОГО JSON следующей структуры (без markdown, без вступления):
+ВЕРНИ СТРОГО JSON (без markdown, без вступления):
 {
-  "lesson_title_suggestion": "...",
-  "lesson_description_suggestion": "...",
-  "stages": [ ... ],
-  "recommendedSearches": ["запрос 1", "запрос 2", "запрос 3"],
+  "stages": [ ... 8–10 вариантов ... ],
+  "recommendedSearches": ["запрос 1", "запрос 2", "запрос 3", "запрос 4", "запрос 5"],
   "classGrade": ${input.grade},
-  "notes": "Короткий комментарий для учителя"
+  "notes": "Краткий комментарий для учителя о подборе этапов"
 }
 
-ВАЖНО:
-- ТОЛЬКО валидный JSON, без markdown-обёрток.
-- Сумма duration_min ВСЕХ этапов = ${input.durationMin}.
-- Заголовки и описания на русском.`;
+ВАЖНО: ТОЛЬКО валидный JSON. Заголовки и описания на русском.`;
 }
 
 interface GenStage {
-  stage_type?: string;
   content_type?: string;
   title?: string;
   description?: string;
   difficulty?: string;
   duration_min?: number;
-  config?: Record<string, unknown>;
-  questions?: unknown[];
+  // stage_type derived server-side
+  stage_type?: string;
 }
 
 interface GenResult {
@@ -117,32 +121,17 @@ function gradeFromGroupName(name: string | null | undefined, fallback: number): 
   return Number.isFinite(g) && g >= 1 && g <= 12 ? g : fallback;
 }
 
-/** Coerce/clean one stage; returns null to drop an invalid one. */
 function normalizeStage(s: GenStage): GenStage | null {
   if (!s || typeof s.title !== "string" || !s.title.trim()) return null;
   let ct = String(s.content_type ?? "presentation");
   if (!ALLOWED_CONTENT.includes(ct)) ct = "presentation";
   const stage_type = ct === "presentation" ? "theory" : "task";
   const difficulty = ["easy", "medium", "hard"].includes(String(s.difficulty)) ? s.difficulty : "medium";
-  const duration_min = Number.isFinite(s.duration_min) && (s.duration_min as number) > 0
-    ? Math.round(s.duration_min as number) : 5;
-  // Quizzes require questions; drop if missing.
-  if ((ct === "quiz_qia" || ct === "quiz_kahoot") && (!Array.isArray(s.questions) || s.questions.length === 0)) {
-    return null;
-  }
+  // Clamp per-stage duration to 5–45 min; default 10
+  const raw = Number(s.duration_min);
+  const duration_min = Number.isFinite(raw) && raw > 0
+    ? Math.max(5, Math.min(45, Math.round(raw))) : 10;
   return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min };
-}
-
-/** Rescale durations so they sum exactly to the lesson duration. */
-function normalizeDurations(stages: GenStage[], target: number): void {
-  const total = stages.reduce((sum, s) => sum + (s.duration_min ?? 0), 0);
-  if (total <= 0 || stages.length === 0) return;
-  if (Math.abs(total - target) <= 5) return;
-  const ratio = target / total;
-  for (const s of stages) s.duration_min = Math.max(1, Math.round((s.duration_min ?? 0) * ratio));
-  const newTotal = stages.reduce((sum, s) => sum + (s.duration_min ?? 0), 0);
-  const last = stages[stages.length - 1];
-  if (last) last.duration_min = Math.max(1, (last.duration_min ?? 0) + (target - newTotal));
 }
 
 function stripFences(text: string): string {
@@ -170,6 +159,7 @@ export async function POST(req: NextRequest) {
     grade?: number;
     duration_min?: number;
     use_web_search?: boolean;
+    overall_difficulty?: string;
     attached_materials?: AttachedMaterial[];
   };
 
@@ -177,7 +167,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing topic" }, { status: 400 });
   }
 
-  // Verify ownership + pull group name/subject to derive grade.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
@@ -192,21 +181,20 @@ export async function POST(req: NextRequest) {
   const grade = gradeFromGroupName(group.name, body.grade ?? 7);
   const subject = group.subject ?? "—";
   const durationMin = Math.max(5, Math.min(240, body.duration_min ?? 45));
+  const overallDifficulty = ["easy", "medium", "hard"].includes(body.overall_difficulty ?? "")
+    ? (body.overall_difficulty as string) : "medium";
   const materials = Array.isArray(body.attached_materials) ? body.attached_materials.slice(0, 10) : [];
-  // Grounding only makes sense when there are no teacher files (per spec default).
   const wantSearch = body.use_web_search ?? materials.length === 0;
 
-  const prompt = buildPrompt({ topic: body.topic.trim(), grade, subject, durationMin, materials });
+  const prompt = buildPrompt({ topic: body.topic.trim(), grade, subject, durationMin, overallDifficulty, materials });
 
   let result: GenResult | null = null;
   let lastError = "";
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
-    // First attempt honours the web-search flag; if grounding errors, later
-    // attempts fall back to plain JSON mode so generation still succeeds.
     const useSearch = wantSearch && attempt === 0;
     const { text, error } = await callGemini(prompt, [], {
-      temperature: 0.8,
+      temperature: 0.85,
       responseMimeType: "application/json",
       useSearch,
     });
@@ -227,7 +215,6 @@ export async function POST(req: NextRequest) {
         lastError = "Generated stages failed validation";
         continue;
       }
-      normalizeDurations(stages, durationMin);
       result = {
         lesson_title_suggestion: parsed.lesson_title_suggestion ?? "",
         lesson_description_suggestion: parsed.lesson_description_suggestion ?? "",
