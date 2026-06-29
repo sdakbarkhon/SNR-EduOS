@@ -20,10 +20,81 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 
 const PASSWORD = "password123";
 
+const DEMO_GROUPS = ["3-А класс", "7-А класс", "10-А класс"];
+const DEMO_STUDENTS = ["Aziz_03", "Nodira_07", "Sherzod_10"];
+
+async function getExistingGroupIds(): Promise<string[]> {
+  const { data } = await supabase
+    .from("groups")
+    .select("id")
+    .in("name", DEMO_GROUPS);
+  return (data ?? []).map((g: { id: string }) => g.id);
+}
+
 async function main() {
   console.log("=== Seeding demo data for Iteration 4 ===");
 
-  // 1. STORAGE CLEANUP
+  // ─── 0. PRE-CLEANUP (idempotent — можно перезапускать) ────────────────────
+  console.log("\n[0/8] Pre-cleanup (idempotent)...");
+
+  // Find existing teacher_demo
+  const { data: existingTeacher } = await supabase
+    .from("teachers")
+    .select("id, user_id")
+    .eq("username", "teacher_demo")
+    .maybeSingle();
+
+  if (existingTeacher) {
+    console.log("  Found existing teacher_demo, cleaning up...");
+
+    // Delete books and subjects linked to this teacher
+    await supabase.from("books").delete().eq("uploaded_by", existingTeacher.id);
+    await supabase.from("subjects").delete().eq("teacher_id", existingTeacher.id);
+  }
+
+  // Delete homework in demo groups (no teacher_id filter needed)
+  const existingGroupIds = await getExistingGroupIds();
+  if (existingGroupIds.length > 0) {
+    await supabase.from("homework").delete().in("group_id", existingGroupIds);
+  }
+
+  // Delete demo students + auth.users
+  const { data: existingStudents } = await supabase
+    .from("students")
+    .select("id, user_id")
+    .in("username", DEMO_STUDENTS);
+
+  if (existingStudents && existingStudents.length > 0) {
+    console.log(
+      `  Found ${existingStudents.length} existing demo students, cleaning up...`
+    );
+    await supabase
+      .from("student_groups")
+      .delete()
+      .in("student_id", existingStudents.map((s: { id: string }) => s.id));
+    await supabase
+      .from("students")
+      .delete()
+      .in("id", existingStudents.map((s: { id: string }) => s.id));
+    for (const s of existingStudents as { id: string; user_id: string }[]) {
+      if (s.user_id) await supabase.auth.admin.deleteUser(s.user_id);
+    }
+  }
+
+  // Delete teacher + auth.user
+  if (existingTeacher) {
+    await supabase.from("teachers").delete().eq("id", existingTeacher.id);
+    if (existingTeacher.user_id) {
+      await supabase.auth.admin.deleteUser(existingTeacher.user_id);
+    }
+  }
+
+  // Delete demo groups
+  await supabase.from("groups").delete().in("name", DEMO_GROUPS);
+
+  console.log("  Pre-cleanup done.");
+
+  // ─── 1. STORAGE CLEANUP ───────────────────────────────────────────────────
   console.log("\n[1/8] Cleaning storage buckets...");
   const buckets = [
     "lesson-materials",
@@ -46,9 +117,7 @@ async function main() {
       if (files && files.length > 0) {
         const allFiles = await listAllFiles(bucket);
         if (allFiles.length > 0) {
-          const { error } = await supabase.storage
-            .from(bucket)
-            .remove(allFiles);
+          const { error } = await supabase.storage.from(bucket).remove(allFiles);
           if (error) console.warn(`  Failed to clean ${bucket}:`, error.message);
           else console.log(`  Cleaned ${allFiles.length} files from ${bucket}`);
         }
@@ -59,7 +128,7 @@ async function main() {
     }
   }
 
-  // 2. CREATE TEACHER
+  // ─── 2. CREATE TEACHER ────────────────────────────────────────────────────
   console.log("\n[2/8] Creating teacher Karim Alisher...");
   const { data: teacherAuth, error: teacherAuthErr } =
     await supabase.auth.admin.createUser({
@@ -84,12 +153,12 @@ async function main() {
     .single();
   if (teacherErr) throw new Error(`Teacher row: ${teacherErr.message}`);
 
-  const teacherId = teacherRow.id as string;
+  const teacherId = (teacherRow as { id: string }).id;
   console.log(`  Teacher created: id=${teacherId}`);
 
-  // 3. CREATE GROUPS
-  // groups.subject is NOT NULL (migration 2 legacy field); use 'mixed' since
-  // actual subjects are created separately in the subjects table below.
+  // ─── 3. CREATE GROUPS ─────────────────────────────────────────────────────
+  // groups.subject is NOT NULL (migration 2 legacy field); 'mixed' is used
+  // because actual subjects are created separately in the subjects table.
   console.log("\n[3/8] Creating groups...");
   const groupsToCreate = [
     { name: "3-А класс", grade: 3, subject: "mixed" },
@@ -105,39 +174,19 @@ async function main() {
       .select()
       .single();
     if (error) throw new Error(`Group ${g.name}: ${error.message}`);
-    groups.push({ id: data.id as string, name: g.name, grade: g.grade });
+    groups.push({ id: (data as { id: string }).id, name: g.name, grade: g.grade });
     console.log(`  Group created: ${g.name}`);
   }
 
-  // 4. CREATE STUDENTS
+  // ─── 4. CREATE STUDENTS ───────────────────────────────────────────────────
   console.log("\n[4/8] Creating students...");
   const studentsToCreate = [
-    {
-      username: "Aziz_03",
-      fullName: "Aziz Karimov",
-      groupId: groups[0].id,
-      groupName: "3-А",
-    },
-    {
-      username: "Nodira_07",
-      fullName: "Nodira Yusupova",
-      groupId: groups[1].id,
-      groupName: "7-А",
-    },
-    {
-      username: "Sherzod_10",
-      fullName: "Sherzod Tashkenbaev",
-      groupId: groups[2].id,
-      groupName: "10-А",
-    },
+    { username: "Aziz_03",    fullName: "Aziz Karimov",        groupId: groups[0].id, groupName: "3-А" },
+    { username: "Nodira_07",  fullName: "Nodira Yusupova",      groupId: groups[1].id, groupName: "7-А" },
+    { username: "Sherzod_10", fullName: "Sherzod Tashkenbaev", groupId: groups[2].id, groupName: "10-А" },
   ];
 
-  const students: Array<{
-    userId: string;
-    studentId: string;
-    groupId: string;
-    name: string;
-  }> = [];
+  const students: Array<{ userId: string; studentId: string; groupId: string; name: string }> = [];
   for (const s of studentsToCreate) {
     const { data: studAuth, error: studAuthErr } =
       await supabase.auth.admin.createUser({
@@ -153,87 +202,68 @@ async function main() {
 
     const { data: studentRow, error: studentErr } = await supabase
       .from("students")
-      .insert({
-        user_id: studentUserId,
-        username: s.username,
-        full_name: s.fullName,
-      })
+      .insert({ user_id: studentUserId, username: s.username, full_name: s.fullName })
       .select()
       .single();
     if (studentErr)
       throw new Error(`Student row ${s.username}: ${studentErr.message}`);
 
-    const { error: sgErr } = await supabase.from("student_groups").insert({
-      student_id: studentRow.id,
-      group_id: s.groupId,
-    });
+    const { error: sgErr } = await supabase
+      .from("student_groups")
+      .insert({ student_id: (studentRow as { id: string }).id, group_id: s.groupId });
     if (sgErr)
       throw new Error(`Student-group ${s.username}: ${sgErr.message}`);
 
     students.push({
       userId: studentUserId,
-      studentId: studentRow.id as string,
+      studentId: (studentRow as { id: string }).id,
       groupId: s.groupId,
       name: s.fullName,
     });
     console.log(`  Student created: ${s.fullName} → ${s.groupName}`);
   }
 
-  // 5. CREATE SUBJECTS (subjects table — migration 53)
-  // Two subjects per group: Робототехника + Программирование
+  // ─── 5. CREATE SUBJECTS ───────────────────────────────────────────────────
   console.log("\n[5/8] Creating subjects...");
   const subjectConfigs = [
-    {
-      name: "Робототехника",
-      icon: "Cpu",
-      color: "#06B6D4",
-    },
-    {
-      name: "Программирование",
-      icon: "Code",
-      color: "#6366F1",
-    },
+    { name: "Робототехника",   icon: "Cpu",  color: "#06B6D4" },
+    { name: "Программирование", icon: "Code", color: "#6366F1" },
   ];
 
-  const subjects: Array<{ id: string; name: string; groupId: string }> = [];
+  const subjectIds: string[] = [];
   for (const g of groups) {
     for (const sc of subjectConfigs) {
       const { data, error } = await supabase
         .from("subjects")
-        .insert({
-          name: sc.name,
-          group_id: g.id,
-          teacher_id: teacherId,
-          icon: sc.icon,
-          color: sc.color,
-        })
+        .insert({ name: sc.name, group_id: g.id, teacher_id: teacherId, icon: sc.icon, color: sc.color })
         .select()
         .single();
       if (error)
         throw new Error(`Subject ${sc.name} in ${g.name}: ${error.message}`);
-      subjects.push({ id: data.id as string, name: sc.name, groupId: g.id });
+      subjectIds.push((data as { id: string }).id);
       console.log(`  Subject: ${sc.name} in ${g.name}`);
     }
   }
+  void subjectIds; // created for future reference; not linked to homework
 
-  // 6. CREATE HOMEWORK
-  // subjects[i*2 + j] where i=group index, j=subject (0=Робото, 1=Програм)
+  // ─── 6. CREATE HOMEWORK ───────────────────────────────────────────────────
+  // homework schema: teacher_id, group_id, title, description, due_date,
+  //   content_type ('file'|'test'|'programming'), source ('curriculum'|'teacher'),
+  //   attachments (jsonb []).  NO subject_id, NO max_grade, NO due_at.
   console.log("\n[6/8] Creating homework...");
-  // 2026-06-30 22:00 Asia/Tashkent = UTC+5 → 2026-06-30T17:00:00.000Z
-  const dueAt = "2026-06-30T17:00:00.000Z";
+  // 2026-07-07 22:00 Asia/Tashkent (UTC+5) = 2026-07-07T17:00:00.000Z
+  const dueDate = "2026-07-07T17:00:00.000Z";
 
   const homeworkConfig = [
     // 3-А (grade 3, Scratch)
     {
       groupIdx: 0,
-      subjectIdx: 0, // Робототехника
       title: "Создай в Scratch анимацию: кот ходит по экрану",
       description:
         "Используя блоки движения, заставь кота ходить от левого края до правого. Добавь смену костюма при движении.",
     },
     {
       groupIdx: 0,
-      subjectIdx: 1, // Программирование
       title: "Сделай в Scratch программу: при нажатии пробел кот говорит привет",
       description:
         "Добавь событие 'при нажатии клавиши пробел'. Используй блок 'говорить' чтобы кот сказал 'Привет!'",
@@ -241,14 +271,12 @@ async function main() {
     // 7-А (grade 7, Wokwi + Python)
     {
       groupIdx: 1,
-      subjectIdx: 0, // Робототехника
       title: "Wokwi: подключи светодиод к Arduino и заставь его мигать каждую секунду",
       description:
         "Создай схему в Wokwi: Arduino UNO + светодиод + резистор. Напиши код который мигает светодиодом с интервалом 1 секунда.",
     },
     {
       groupIdx: 1,
-      subjectIdx: 1, // Программирование
       title: "Python: напиши программу которая считает сумму чисел от 1 до N",
       description:
         "Программа принимает число N от пользователя и выводит сумму всех чисел от 1 до N включительно. Используй цикл for.",
@@ -256,14 +284,12 @@ async function main() {
     // 10-А (grade 10, advanced)
     {
       groupIdx: 2,
-      subjectIdx: 0, // Робототехника
       title: "Wokwi: сделай систему сигнализации с датчиком движения",
       description:
         "Используй PIR датчик движения в Wokwi. При обнаружении движения должен загораться красный светодиод и издаваться звук через пьезо.",
     },
     {
       groupIdx: 2,
-      subjectIdx: 1, // Программирование
       title: "Python: реализуй сортировку пузырьком и измерь время выполнения",
       description:
         "Реализуй алгоритм bubble sort. Измерь время сортировки массива из 1000 случайных чисел используя модуль time.",
@@ -272,99 +298,84 @@ async function main() {
 
   for (const hw of homeworkConfig) {
     const group = groups[hw.groupIdx];
-    const subjectIdx = hw.groupIdx * 2 + hw.subjectIdx;
-    const subject = subjects[subjectIdx];
-
-    const hwInsert: Record<string, unknown> = {
+    const { error } = await supabase.from("homework").insert({
       teacher_id: teacherId,
       group_id: group.id,
       title: hw.title,
       description: hw.description,
-      due_at: dueAt,
-      max_grade: 5,
-    };
-    // subject_id added if column exists (migration 53 adds it to lessons; homework
-    // may or may not have it depending on which migrations ran). Try with it first.
-    if (subject) hwInsert.subject_id = subject.id;
-
-    const { error } = await supabase.from("homework").insert(hwInsert);
-    if (error) {
-      // Retry without subject_id in case the column doesn't exist on homework
-      if (error.message.includes("subject_id")) {
-        delete hwInsert.subject_id;
-        const { error: err2 } = await supabase.from("homework").insert(hwInsert);
-        if (err2) throw new Error(`Homework "${hw.title}": ${err2.message}`);
-      } else {
-        throw new Error(`Homework "${hw.title}": ${error.message}`);
-      }
-    }
-    console.log(`  Homework: ${hw.title.slice(0, 50)}...`);
+      due_date: dueDate,
+      content_type: "file",
+      source: "teacher",
+      attachments: [],
+    });
+    if (error) throw new Error(`Homework "${hw.title}": ${error.message}`);
+    console.log(`  Homework: ${hw.title.slice(0, 55)}...`);
   }
 
-  // 7. CREATE BOOK CARDS (без реальных файлов)
-  // books table schema (migration 21): id, title, author, subject, book_type,
-  // description, cover_storage_path, file_storage_path (NOT NULL), uploaded_by
-  // NOTE: books are school-wide (no group_id); we just set the subject text field.
+  // ─── 7. CREATE BOOK CARDS ─────────────────────────────────────────────────
+  // books schema: title, author, description, subject (text), book_type (text),
+  //   file_storage_path (NOT NULL), uploaded_by, cover_storage_path.
+  // NO group_id — books are school-wide.
   console.log("\n[7/8] Creating book cards...");
   const booksConfig = [
-    // 3-А
     {
-      subject: "Программирование",
       title: "Scratch для детей: программирование без слёз",
       author: "Маджед Маржи",
       description:
-        "Книга-самоучитель для младших школьников. Объясняет основы программирования через визуальное программирование в Scratch.",
+        "Книга-самоучитель для младших школьников. Программирование через Scratch. (для 3 класса)",
+      subject: "Программирование",
+      bookType: "textbook",
     },
     {
-      subject: "Программирование",
       title: "Программирование в Scratch для начинающих",
       author: "Голиков Денис",
       description:
-        "Пошаговое руководство для детей 8-12 лет. Изучение программирования через создание игр и анимаций.",
-    },
-    // 7-А
-    {
+        "Пошаговое руководство для детей 8-12 лет. Программирование через создание игр. (для 3 класса)",
       subject: "Программирование",
+      bookType: "textbook",
+    },
+    {
       title: "Python для детей: самоучитель программирования",
       author: "Джейсон Бриггс",
-      description:
-        "Учебник Python для школьников 12-15 лет. От переменных до классов через интересные задачи.",
+      description: "Учебник Python для школьников 12-15 лет. (для 7 класса)",
+      subject: "Программирование",
+      bookType: "textbook",
     },
     {
-      subject: "Робототехника",
       title: "Простая электроника для начинающих",
       author: "Чарльз Платт",
-      description:
-        "Основы электроники и Arduino для школьников. Практические схемы и проекты.",
+      description: "Основы электроники и Arduino для школьников. (для 7 класса)",
+      subject: "Робототехника",
+      bookType: "textbook",
     },
-    // 10-А
     {
-      subject: "Программирование",
       title: "Изучаем Python",
       author: "Марк Лутц",
       description:
-        "Полное руководство по Python для старшеклассников. От основ до объектно-ориентированного программирования.",
+        "Полное руководство по Python для старшеклассников. (для 10 класса)",
+      subject: "Программирование",
+      bookType: "textbook",
     },
     {
-      subject: "Программирование",
       title: "Грокаем алгоритмы",
       author: "Адитья Бхаргава",
       description:
-        "Иллюстрированное пособие по алгоритмам. Сортировка, поиск, рекурсия, графы — простым языком.",
+        "Иллюстрированное пособие по алгоритмам. Сортировка, поиск, рекурсия, графы. (для 10 класса)",
+      subject: "Программирование",
+      bookType: "textbook",
     },
   ];
 
   for (const b of booksConfig) {
     const { error } = await supabase.from("books").insert({
-      uploaded_by: teacherId,
       title: b.title,
       author: b.author,
-      subject: b.subject,
       description: b.description,
-      book_type: "Учебник",
-      // file_storage_path is NOT NULL — use placeholder until teacher uploads real PDF
+      subject: b.subject,
+      book_type: b.bookType,
       file_storage_path: "placeholder/not-uploaded-yet",
       cover_storage_path: null,
+      uploaded_by: teacherId,
     });
     if (error) {
       console.warn(`  Book "${b.title}": ${error.message}`);
@@ -373,26 +384,14 @@ async function main() {
     }
   }
 
-  // 8. VERIFICATION
+  // ─── 8. VERIFICATION ──────────────────────────────────────────────────────
   console.log("\n[8/8] Verification...");
-  const { count: tc } = await supabase
-    .from("teachers")
-    .select("*", { count: "exact", head: true });
-  const { count: sc } = await supabase
-    .from("students")
-    .select("*", { count: "exact", head: true });
-  const { count: gc } = await supabase
-    .from("groups")
-    .select("*", { count: "exact", head: true });
-  const { count: subc } = await supabase
-    .from("subjects")
-    .select("*", { count: "exact", head: true });
-  const { count: hc } = await supabase
-    .from("homework")
-    .select("*", { count: "exact", head: true });
-  const { count: bc } = await supabase
-    .from("books")
-    .select("*", { count: "exact", head: true });
+  const { count: tc } = await supabase.from("teachers").select("*", { count: "exact", head: true });
+  const { count: sc } = await supabase.from("students").select("*", { count: "exact", head: true });
+  const { count: gc } = await supabase.from("groups").select("*", { count: "exact", head: true });
+  const { count: subc } = await supabase.from("subjects").select("*", { count: "exact", head: true });
+  const { count: hc } = await supabase.from("homework").select("*", { count: "exact", head: true });
+  const { count: bc } = await supabase.from("books").select("*", { count: "exact", head: true });
 
   console.log("\n=== SEED COMPLETE ===");
   console.log(`Teachers:  ${tc}`);
@@ -401,9 +400,11 @@ async function main() {
   console.log(`Subjects:  ${subc}`);
   console.log(`Homework:  ${hc}`);
   console.log(`Books:     ${bc}`);
-  console.log("\nLogin credentials:");
-  console.log(`  Teacher:  teacher_demo / ${PASSWORD}`);
-  console.log(`  Students: Aziz_03, Nodira_07, Sherzod_10 / ${PASSWORD}`);
+  console.log(`\nLogin credentials:`);
+  console.log(`  Teacher:  teacher_demo  / ${PASSWORD}`);
+  console.log(`  Students: Aziz_03       / ${PASSWORD}  (3-А)`);
+  console.log(`            Nodira_07     / ${PASSWORD}  (7-А)`);
+  console.log(`            Sherzod_10    / ${PASSWORD}  (10-А)`);
 }
 
 async function listAllFiles(bucket: string, path = ""): Promise<string[]> {
@@ -415,11 +416,8 @@ async function listAllFiles(bucket: string, path = ""): Promise<string[]> {
   const results: string[] = [];
   for (const item of data) {
     if (item.id === null) {
-      const subfiles = await listAllFiles(
-        bucket,
-        path ? `${path}/${item.name}` : item.name
-      );
-      results.push(...subfiles);
+      const sub = await listAllFiles(bucket, path ? `${path}/${item.name}` : item.name);
+      results.push(...sub);
     } else {
       results.push(path ? `${path}/${item.name}` : item.name);
     }
