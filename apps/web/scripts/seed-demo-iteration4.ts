@@ -324,7 +324,7 @@ async function main() {
       description:
         "Книга-самоучитель для младших школьников. Программирование через Scratch. (для 3 класса)",
       subject: "Программирование",
-      bookType: "textbook",
+      bookType: "Учебник",
     },
     {
       title: "Программирование в Scratch для начинающих",
@@ -332,21 +332,21 @@ async function main() {
       description:
         "Пошаговое руководство для детей 8-12 лет. Программирование через создание игр. (для 3 класса)",
       subject: "Программирование",
-      bookType: "textbook",
+      bookType: "Учебник",
     },
     {
       title: "Python для детей: самоучитель программирования",
       author: "Джейсон Бриггс",
       description: "Учебник Python для школьников 12-15 лет. (для 7 класса)",
       subject: "Программирование",
-      bookType: "textbook",
+      bookType: "Учебник",
     },
     {
       title: "Простая электроника для начинающих",
       author: "Чарльз Платт",
       description: "Основы электроники и Arduino для школьников. (для 7 класса)",
       subject: "Робототехника",
-      bookType: "textbook",
+      bookType: "Учебник",
     },
     {
       title: "Изучаем Python",
@@ -354,7 +354,7 @@ async function main() {
       description:
         "Полное руководство по Python для старшеклассников. (для 10 класса)",
       subject: "Программирование",
-      bookType: "textbook",
+      bookType: "Учебник",
     },
     {
       title: "Грокаем алгоритмы",
@@ -362,7 +362,7 @@ async function main() {
       description:
         "Иллюстрированное пособие по алгоритмам. Сортировка, поиск, рекурсия, графы. (для 10 класса)",
       subject: "Программирование",
-      bookType: "textbook",
+      bookType: "Учебник",
     },
   ];
 
