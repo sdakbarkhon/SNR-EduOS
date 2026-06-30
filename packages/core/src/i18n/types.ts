@@ -573,6 +573,23 @@ export interface Dictionary {
     teacherNotesLabel: string;
     teacherNotesPlaceholder: string;
     studentDescriptionLabel: string;
+    // migration 60 — слайды презентации (этап теории)
+    slides: {
+      back: string;
+      next: string;
+      of: string;
+      exportPptx: string;
+      empty: string;
+    };
+    contentSource: {
+      label: string;
+      ai: string;
+      aiDesc: string;
+      file: string;
+      fileDesc: string;
+      text: string;
+      textDesc: string;
+    };
     removeStageLabel: string;
     stagesHint: string;
     addMaterialLabel: string;
