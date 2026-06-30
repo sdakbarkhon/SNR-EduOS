@@ -14,6 +14,7 @@ export const ru: Dictionary = {
     week: "Неделя",
     minutes: "минут",
     seconds: "секунд",
+    download: "Скачать",
   },
   status: {
     now: "Сейчас",
@@ -587,6 +588,7 @@ export const ru: Dictionary = {
     goToLesson: "Перейти",
     goToLessonNow: "сейчас",
     countdownNote: "Переход в режим урока через",
+    teacherLabel: "Учитель",
     excuse: {
       button: "Отпроситься",
       title: "Отпроситься с урока",
@@ -626,6 +628,8 @@ export const ru: Dictionary = {
       submitted: "Сдано",
       collapse: "Свернуть",
       expand: "Развернуть",
+      stages: "Этапы",
+      noMaterials: "Нет материалов",
     },
     stageStartLabel: "Старт",
     stageSummaryLabel: "Итог",

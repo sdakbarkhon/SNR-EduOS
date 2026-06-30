@@ -14,6 +14,7 @@ export const uz: Dictionary = {
     week: "Hafta",
     minutes: "daqiqa",
     seconds: "soniya",
+    download: "Yuklab olish",
   },
   status: {
     now: "Hozir",
@@ -587,6 +588,7 @@ export const uz: Dictionary = {
     goToLesson: "O'tish",
     goToLessonNow: "hozir",
     countdownNote: "Dars rejimiga o'tiladi",
+    teacherLabel: "O'qituvchi",
     excuse: {
       button: "Ruxsat so'rash",
       title: "Darsdan ruxsat so'rash",
@@ -626,6 +628,8 @@ export const uz: Dictionary = {
       submitted: "Topshirildi",
       collapse: "Yopish",
       expand: "Ochish",
+      stages: "Bosqichlar",
+      noMaterials: "Materiallar yo'q",
     },
     stageStartLabel: "Boshlash",
     stageSummaryLabel: "Yakunlash",

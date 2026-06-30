@@ -20,6 +20,7 @@ export interface Dictionary {
     week: string;
     minutes: string;
     seconds: string;
+    download: string;
   };
   status: Record<StatusKey, string>;
   nav: {
@@ -588,6 +589,7 @@ export interface Dictionary {
     goToLesson: string;           // "Перейти"
     goToLessonNow: string;        // "сейчас"
     countdownNote: string;        // "Переход в режим урока через {n} секунд"
+    teacherLabel: string;         // "Учитель"
     excuse: {
       button: string;             // "Отпроситься"
       title: string;              // "Отпроситься с урока"
@@ -627,6 +629,8 @@ export interface Dictionary {
       submitted: string;          // fullscreen stage: "✓ Сдано"
       collapse: string;           // "Свернуть sidebar"
       expand: string;             // "Развернуть sidebar"
+      stages: string;             // "Этапы"
+      noMaterials: string;        // "Нет материалов"
     };
     // Stage constructor v2 (migration 35)
     stageStartLabel: string;           // "Старт"

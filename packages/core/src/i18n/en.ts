@@ -14,6 +14,7 @@ export const en: Dictionary = {
     week: "Week",
     minutes: "minutes",
     seconds: "seconds",
+    download: "Download",
   },
   status: {
     now: "Now",
@@ -587,6 +588,7 @@ export const en: Dictionary = {
     goToLesson: "Go",
     goToLessonNow: "now",
     countdownNote: "Switching to lesson mode",
+    teacherLabel: "Teacher",
     excuse: {
       button: "Ask to be excused",
       title: "Ask to be excused",
@@ -626,6 +628,8 @@ export const en: Dictionary = {
       submitted: "Submitted",
       collapse: "Collapse",
       expand: "Expand",
+      stages: "Stages",
+      noMaterials: "No materials",
     },
     stageStartLabel: "Start",
     stageSummaryLabel: "Summary",
