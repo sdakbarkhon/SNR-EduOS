@@ -195,9 +195,10 @@ export const NotificationsBell = memo(function NotificationsBell() {
         type="button"
         aria-label={t.title}
         onClick={toggle}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/70 text-blue-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-white/90 dark:border-slate-600 dark:bg-slate-700/70 dark:text-blue-300 dark:hover:bg-slate-700"
+        className="relative flex h-10 items-center gap-2 rounded-full border border-white/60 bg-white/70 px-3 text-blue-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-white/90 dark:border-slate-600 dark:bg-slate-700/70 dark:text-blue-300 dark:hover:bg-slate-700"
       >
         <Bell size={18} style={shake ? { animation: "bellshake 0.7s ease" } : undefined} />
+        <span className="text-sm font-medium">{d.nav.notifications}</span>
         {unread > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
             {unread > 99 ? "99+" : unread}

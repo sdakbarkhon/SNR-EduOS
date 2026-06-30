@@ -468,10 +468,12 @@ export function LessonWorkspaceView({
   const isCompleted = lesson.status === "completed";
   // middleStages: visible stages for sidebar stepper (position ≤ active, or all if completed)
   const middleStages = isCompleted
-    ? allMiddleStages
+    ? allMiddleStages.filter((s) => (s as any).was_activated === true)
     : allMiddleStages.filter((s) => activeStageId === null ? false : s.position <= activePos);
   // centerStages: what the center panel renders — only active stage (in_progress) or all (completed)
-  const centerStages = isCompleted ? allMiddleStages : activeMiddleStage ? [activeMiddleStage] : [];
+  const centerStages = isCompleted
+    ? allMiddleStages.filter((s) => (s as any).was_activated === true)
+    : activeMiddleStage ? [activeMiddleStage] : [];
 
   // A stage is read-only if it's a passed stage (position < active) or the lesson is completed
   function isStageReadOnly(stage: LessonStageWithProgress): boolean {
@@ -910,20 +912,9 @@ export function LessonWorkspaceView({
             })
           )}
 
-          {/* Summary stage — locked until lesson completed */}
+          {/* Summary stage */}
           {summaryStage && (
-            <div className="relative">
-              {lesson.status !== "completed" && (
-                <div
-                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl backdrop-blur-sm"
-                  style={{ background: "rgba(255,255,255,0.75)" }}
-                >
-                  <Lock className="h-5 w-5 text-gray-400" />
-                  <p className="text-sm font-medium text-gray-500 text-center px-4">
-                    {dl.stageLockedSummary}
-                  </p>
-                </div>
-              )}
+            <div>
               <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 shadow-sm backdrop-blur-xl">
                 <div className="mb-3 flex items-center gap-2">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">

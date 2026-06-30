@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Copy, RefreshCw } from "lucide-react";
+import {
+  Bot, BookOpen, Code, Calculator, Languages, Monitor, Atom, Leaf, FlaskConical, Scroll,
+  Copy, RefreshCw, type LucideIcon,
+} from "lucide-react";
 import {
   attendancePercent,
   format,
@@ -18,6 +21,7 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { factBanner } from "@snr/ui-tokens";
+import { createClient } from "@/lib/supabase/client";
 import { EmptyState, MaterialTile, RingProgress, SubjectIcon, useLocale } from "@/components";
 import { DashboardCard } from "@/components/DashboardCard";
 import type { Database } from "@snr/core";
@@ -26,6 +30,11 @@ import { FloatingActionButton } from "./FloatingActionButton";
 type Student = Database["public"]["Tables"]["students"]["Row"];
 type Material = Database["public"]["Tables"]["course_materials"]["Row"];
 type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
+type SubjectRow = { id: string; name: string; group_id: string; icon: string; color: string };
+
+const LUCIDE_ICONS: Record<string, LucideIcon> = {
+  Bot, BookOpen, Code, Calculator, Languages, Monitor, Atom, Leaf, FlaskConical, Scroll,
+};
 
 function getClassLabel(groups: Group[]): string {
   if (!groups.length) return "";
@@ -56,6 +65,11 @@ export function DashboardView({
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const db = createClient();
+
+  // Subjects loaded from subjects table (replaces groups.subject text key)
+  const [mySubjects, setMySubjects] = useState<SubjectRow[]>([]);
+  const stableLoadSubjects = useRef<() => Promise<void>>(undefined);
 
   // Live clock — null until client mounts to avoid hydration mismatch
   const [now, setNow] = useState<Date | null>(null);
@@ -63,6 +77,28 @@ export function DashboardView({
     setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    stableLoadSubjects.current = async () => {
+      if (!groups.length) return;
+      const groupIds = groups.map((g) => g.id);
+      const { data } = await (db as any).from("subjects").select("id, name, group_id, icon, color").in("group_id", groupIds);
+      if (data) setMySubjects(data as SubjectRow[]);
+    };
+    stableLoadSubjects.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
+
+  useEffect(() => {
+    const channel = db
+      .channel("dashboard-subjects")
+      .on("postgres_changes", { event: "*", schema: "public", table: "subjects" }, () => {
+        stableLoadSubjects.current?.();
+      })
+      .subscribe();
+    return () => { db.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // AI fact of day
@@ -89,17 +125,15 @@ export function DashboardView({
   const submittedIds = new Set(submissions.map((s) => s.homework_id));
   const activeCount = homework.filter((h) => !submittedIds.has(h.id)).length;
   const attPct = attendancePercent(attendance as any);
-  const subjects = Array.from(new Set(groups.map((g) => g.subject)));
   const recent = materials.slice(0, 4);
   const firstName = student.full_name.split(" ")[0] ?? student.full_name;
   const classLabel = getClassLabel(groups);
 
-  // Active homework count per subject (for badges)
-  const activeBySub = new Map<string, number>();
+  // Active homework count per group (badges on subject tiles)
+  const activeByGroup = new Map<string, number>();
   for (const h of homework) {
     if (!submittedIds.has(h.id)) {
-      const g = groupById.get(h.group_id);
-      if (g) activeBySub.set(g.subject, (activeBySub.get(g.subject) ?? 0) + 1);
+      activeByGroup.set(h.group_id, (activeByGroup.get(h.group_id) ?? 0) + 1);
     }
   }
 
@@ -221,15 +255,21 @@ export function DashboardView({
       {/* Предметы + Материалы */}
       <div className="grid gap-6 lg:grid-cols-3">
         <DashboardCard title={d.dashboard.mySubjects} className="lg:col-span-2">
-          {subjects.length ? (
+          {mySubjects.length ? (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-              {subjects.map((s) => {
-                const badge = activeBySub.get(s) ?? 0;
+              {mySubjects.map((sub) => {
+                const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
+                const badge = activeByGroup.get(sub.group_id) ?? 0;
                 return (
-                  <Link href={`/homework?subject=${encodeURIComponent(s)}`} key={s}>
+                  <Link href={`/homework?subject=${encodeURIComponent(sub.name)}`} key={sub.id}>
                     <div className="relative flex flex-col items-center gap-2 rounded-2xl p-3 transition-all hover:scale-[1.02] hover:bg-slate-50 cursor-pointer">
                       <div className="relative">
-                        <SubjectIcon subject={s} size={60} />
+                        <div
+                          className="flex items-center justify-center rounded-2xl"
+                          style={{ width: 60, height: 60, background: sub.color + "22", color: sub.color }}
+                        >
+                          <SubIcon size={26} />
+                        </div>
                         {badge > 0 && (
                           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
                             {badge}
@@ -237,7 +277,7 @@ export function DashboardView({
                         )}
                       </div>
                       <span className="w-full truncate text-center text-[13px] font-semibold text-gray-800">
-                        {getSubjectStyle(s).label}
+                        {sub.name}
                       </span>
                     </div>
                   </Link>

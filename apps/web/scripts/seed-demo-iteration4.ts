@@ -132,7 +132,7 @@ async function main() {
   console.log("\n[2/8] Creating teacher Karim Alisher...");
   const { data: teacherAuth, error: teacherAuthErr } =
     await supabase.auth.admin.createUser({
-      email: "teacher_demo@snr.local",
+      email: "teacher_demo@teachers.snr.local",
       password: PASSWORD,
       email_confirm: true,
       user_metadata: { username: "teacher_demo" },
@@ -190,7 +190,7 @@ async function main() {
   for (const s of studentsToCreate) {
     const { data: studAuth, error: studAuthErr } =
       await supabase.auth.admin.createUser({
-        email: `${s.username.toLowerCase()}@snr.local`,
+        email: `${s.username.toLowerCase()}@students.snr.local`,
         password: PASSWORD,
         email_confirm: true,
         user_metadata: { username: s.username },

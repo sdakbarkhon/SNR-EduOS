@@ -1225,6 +1225,12 @@ export function TeacherLessonDetailView({
                         {contentLabel(stage.content_type)}
                       </span>
                     )}
+                    {/* Пропущен badge: stage was never activated during the completed lesson */}
+                    {isLessonCompleted && !(stage as any).was_activated && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                        Пропущен
+                      </span>
+                    )}
                     {/* Difficulty + duration badges: only for AI-generated stages (duration_min set) */}
                     {stage.duration_min != null && (
                       <>
