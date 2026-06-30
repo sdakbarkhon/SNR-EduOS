@@ -1,4 +1,3 @@
-import pptxgen from "pptxgenjs";
 import type { LessonSlide } from "@snr/core";
 
 /** Strip markdown markers to plain text for PPTX body (pptxgenjs has no md support). */
@@ -17,6 +16,8 @@ export async function exportSlidesToPptx(
   slides: LessonSlide[],
   presentationTitle: string,
 ): Promise<void> {
+  // Lazy-load — keeps pptxgenjs (large, browser-only) out of the initial bundle.
+  const { default: pptxgen } = await import("pptxgenjs");
   const pres = new pptxgen();
   pres.layout = "LAYOUT_WIDE"; // 16:9
   pres.title = presentationTitle;

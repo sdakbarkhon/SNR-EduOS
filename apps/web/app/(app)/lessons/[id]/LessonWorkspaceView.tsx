@@ -16,6 +16,8 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
 import { AiChatPanel } from "./AiChatPanel";
+import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
+import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
 import { ExternalStageModal } from "./ExternalStageModal";
 import { QiaQuizModal } from "./QiaQuizModal";
@@ -748,9 +750,18 @@ export function LessonWorkspaceView({
                     )}
                   </div>
 
-                  {stage.description && (
+                  {/* Theory: full presentation (slides) when generated, else plain text */}
+                  {stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
+                    <div className="mb-3 h-[70vh] min-h-[460px]">
+                      <SlideViewer
+                        slides={stage.slides}
+                        canExport
+                        onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                      />
+                    </div>
+                  ) : stage.description ? (
                     <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
-                  )}
+                  ) : null}
 
 
                   {/* Task */}

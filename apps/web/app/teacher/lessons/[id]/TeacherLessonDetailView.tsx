@@ -7,7 +7,7 @@ import {
   ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
-  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut, Monitor,
+  TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut, Monitor, Type,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -115,6 +115,9 @@ function StageModal({
   const [title, setTitle] = useState(existing?.title ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
   const [teacherNotes, setTeacherNotes] = useState(existing?.teacher_notes ?? "");
+  const hasSlides = !!(existing?.slides && existing.slides.length > 0);
+  // Content source for theory stages: 'ai' (slides via ✨) or 'text' (manual description).
+  const [contentSource, setContentSource] = useState<"ai" | "text">(hasSlides ? "ai" : "text");
   const [saving, setSaving] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -444,18 +447,67 @@ function StageModal({
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    {isCode ? dc.problemStatement : d.studentDescriptionLabel}
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={desc}
-                    onChange={(e) => setDesc(e.target.value)}
-                    placeholder={d.stageDescPlaceholder2}
-                    className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
-                  />
-                </div>
+                {/* Theory content source: AI slides vs manual text */}
+                {stageType === "theory" && !isCode && !isExternal && !isQuiz && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      {d.contentSource.label}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setContentSource("ai")}
+                        className={`flex flex-col items-center gap-1 rounded-xl border-2 p-3 transition ${
+                          contentSource === "ai"
+                            ? "border-violet-500 bg-violet-50 dark:bg-violet-500/10"
+                            : "border-slate-200 hover:border-slate-300 dark:border-white/10"
+                        }`}
+                      >
+                        <Presentation className="h-5 w-5 text-violet-600" />
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{d.contentSource.ai}</span>
+                        <span className="text-[10px] text-slate-400">{d.contentSource.aiDesc}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContentSource("text")}
+                        className={`flex flex-col items-center gap-1 rounded-xl border-2 p-3 transition ${
+                          contentSource === "text"
+                            ? "border-violet-500 bg-violet-50 dark:bg-violet-500/10"
+                            : "border-slate-200 hover:border-slate-300 dark:border-white/10"
+                        }`}
+                      >
+                        <Type className="h-5 w-5 text-slate-600" />
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{d.contentSource.text}</span>
+                        <span className="text-[10px] text-slate-400">{d.contentSource.textDesc}</span>
+                      </button>
+                    </div>
+                    {contentSource === "ai" && (
+                      <div className="mt-2 flex items-start gap-2 rounded-xl border border-violet-100 bg-violet-50 p-3 text-xs text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/5 dark:text-violet-300">
+                        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {hasSlides
+                            ? `${existing?.slides?.length} ${d.slides.of} — слайды готовы. Перегенерировать можно кнопкой «✨».`
+                            : "Слайды генерируются кнопкой «✨ Сгенерировать этапы» из плана урока."}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(stageType !== "theory" || contentSource === "text" || isCode) && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      {isCode ? dc.problemStatement : d.studentDescriptionLabel}
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={desc}
+                      onChange={(e) => setDesc(e.target.value)}
+                      placeholder={d.stageDescPlaceholder2}
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-amber-600 dark:text-amber-400">
                     {d.teacherNotesLabel}
