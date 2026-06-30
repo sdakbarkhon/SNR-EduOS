@@ -8,7 +8,7 @@ import {
   Paperclip, Search, Copy, ExternalLink,
 } from "lucide-react";
 import { addLessonStage, getDictionary } from "@snr/core";
-import type { Locale, StageDifficulty, LessonContentType, LessonStageType } from "@snr/core";
+import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 
@@ -21,6 +21,7 @@ interface GeneratedStage {
   description?: string;
   teacher_notes?: string;
   starter_code?: string;
+  slides?: LessonSlide[];
   difficulty: StageDifficulty;
   duration_min: number;
 }
@@ -180,6 +181,7 @@ export function AiGenerateStagesModal({
           title: s.title,
           description: s.description ?? null,
           teacherNotes: s.teacher_notes ?? null,
+          slides: s.slides && s.slides.length > 0 ? s.slides : null,
           config,
           difficulty: s.difficulty,
           durationMin: s.duration_min,

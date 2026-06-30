@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -1582,6 +1582,7 @@ export const addLessonStage = async (
     title: string;
     description: string | null;
     teacherNotes?: string | null;
+    slides?: LessonSlide[] | null;
     config?: Record<string, unknown>;
     difficulty?: StageDifficulty;
     durationMin?: number | null;
@@ -1611,6 +1612,7 @@ export const addLessonStage = async (
       title: input.title,
       description: input.description ?? null,
       ...(input.teacherNotes !== undefined ? { teacher_notes: input.teacherNotes } : {}),
+      ...(input.slides !== undefined ? { slides: input.slides } : {}),
       config: input.config ?? {},
       ...(input.difficulty ? { difficulty: input.difficulty } : {}),
       ...(input.durationMin !== undefined ? { duration_min: input.durationMin } : {}),
@@ -1629,6 +1631,7 @@ export const updateLessonStage = async (
     title?: string;
     description?: string | null;
     teacher_notes?: string | null;
+    slides?: LessonSlide[] | null;
     stage_type?: LessonStageType;
     content_type?: LessonContentType | null;
     config?: Record<string, unknown>;

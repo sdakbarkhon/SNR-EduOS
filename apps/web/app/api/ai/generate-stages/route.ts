@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { callGemini } from "@/lib/ai-gemini";
+import { generateSlideImage } from "@/lib/ai-imagen";
+
+// Hard cap on Imagen calls per generation (keeps us within maxDuration).
+const MAX_SLIDE_IMAGES = 6;
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -80,6 +85,20 @@ ${programmingSection}
 - medium: баланс теории и практики
 - hard: упор на практику, сложные задачи, углубление
 
+ДЛЯ ЭТАПОВ ТЕОРИИ (content_type='presentation'):
+Сгенерируй массив слайдов презентации в поле "slides".
+Каждый слайд содержит:
+- title: заголовок слайда (текст)
+- content: содержимое в формате markdown (заголовки ##, списки -, **жирный**, параграфы)
+- image_prompt: описание картинки НА АНГЛИЙСКОМ для генерации (опционально)
+
+ВАЖНО ДЛЯ СЛАЙДОВ:
+- НИКАКИХ эмодзи в контенте
+- Академический стиль, понятные формулировки для школьников
+- Сам реши сколько слайдов нужно (обычно 3–6 на тему)
+- Если тема визуальная (схемы, объекты, диаграммы) — добавь image_prompt
+- Если тема абстрактная (определения, правила) — image_prompt опусти
+
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
   "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"scratch"|"wokwi"|"codesandbox"|"makecode",
@@ -88,9 +107,11 @@ ${programmingSection}
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",
   "teacher_notes": "Педагогические подсказки для учителя: на что обратить внимание, типичные ошибки, решение, эталонный код",
   "starter_code": "Стартовый код для code-этапов (скелет или только комментарии — только для PRACTICE/TASK)",
+  "slides": [{ "title": "...", "content": "## ...\\n- ...", "image_prompt": "..." }],
   "difficulty": "easy"|"medium"|"hard",
   "duration_min": число
 }
+(поле slides — ТОЛЬКО для content_type='presentation'; для остальных опусти)
 
 ВЕРНИ СТРОГО JSON (без markdown, без вступления):
 {
@@ -103,12 +124,20 @@ ${programmingSection}
 ВАЖНО: ТОЛЬКО валидный JSON. Заголовки и описания на русском. starter_code только для code-этапов.`;
 }
 
+interface GenSlide {
+  title?: string;
+  content?: string;
+  image_prompt?: string;
+  image_url?: string;
+}
+
 interface GenStage {
   content_type?: string;
   title?: string;
   description?: string;
   teacher_notes?: string;
   starter_code?: string;
+  slides?: GenSlide[];
   difficulty?: string;
   duration_min?: number;
   stage_type?: string;
@@ -146,7 +175,19 @@ function normalizeStage(s: GenStage): GenStage | null {
     ? s.teacher_notes.trim() : undefined;
   const starter_code = typeof s.starter_code === "string" && s.starter_code.trim()
     ? s.starter_code.trim() : undefined;
-  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code };
+  // Slides only meaningful for presentation stages
+  const slides = ct === "presentation" && Array.isArray(s.slides)
+    ? s.slides
+        .filter((sl): sl is GenSlide => !!sl && typeof sl.title === "string" && typeof sl.content === "string")
+        .map((sl) => ({
+          title: sl.title!.trim(),
+          content: sl.content!.trim(),
+          ...(typeof sl.image_prompt === "string" && sl.image_prompt.trim()
+            ? { image_prompt: sl.image_prompt.trim() } : {}),
+        }))
+        .slice(0, 8)
+    : undefined;
+  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, slides };
 }
 
 function stripFences(text: string): string {
@@ -248,6 +289,44 @@ export async function POST(req: NextRequest) {
 
   if (!result) {
     return NextResponse.json({ error: lastError || "Generation failed" }, { status: 500 });
+  }
+
+  // ── Imagen: generate slide illustrations in parallel, upload to storage ──────
+  // Collect every slide that requested an image (capped). Failures are silent —
+  // the slide just renders without an image and stage creation is never blocked.
+  const slideTasks: GenSlide[] = [];
+  for (const stage of result.stages ?? []) {
+    if (stage.content_type !== "presentation" || !Array.isArray(stage.slides)) continue;
+    for (const slide of stage.slides) {
+      if (slide.image_prompt && slideTasks.length < MAX_SLIDE_IMAGES) slideTasks.push(slide);
+    }
+  }
+
+  if (slideTasks.length > 0) {
+    let admin: ReturnType<typeof createAdminClient> | null = null;
+    try { admin = createAdminClient(); } catch { admin = null; }
+
+    if (admin) {
+      const adminClient = admin;
+      await Promise.all(
+        slideTasks.map(async (slide, idx) => {
+          try {
+            const base64 = await generateSlideImage(slide.image_prompt!);
+            if (!base64) return;
+            const buffer = Buffer.from(base64, "base64");
+            const filename = `${body.lesson_id}/${Date.now()}-${idx}.png`;
+            const { error: upErr } = await adminClient.storage
+              .from("slide-images")
+              .upload(filename, buffer, { contentType: "image/png", upsert: false });
+            if (upErr) { console.warn("[ai-generate] slide upload failed:", upErr.message); return; }
+            const { data: pub } = adminClient.storage.from("slide-images").getPublicUrl(filename);
+            if (pub?.publicUrl) slide.image_url = pub.publicUrl;
+          } catch (e) {
+            console.warn("[ai-generate] slide image error:", (e as Error)?.message);
+          }
+        }),
+      );
+    }
   }
 
   return NextResponse.json({ ...result, external: EXTERNAL });
