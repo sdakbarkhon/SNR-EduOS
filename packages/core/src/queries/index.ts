@@ -1335,7 +1335,7 @@ export const getStudentLessonView = async (
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
-    db3.from("lesson_stages").select("*, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     db3.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle(),
   ]);
 
@@ -1571,6 +1571,7 @@ export const addLessonStage = async (
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    teacherNotes?: string | null;
     config?: Record<string, unknown>;
     difficulty?: StageDifficulty;
     durationMin?: number | null;
@@ -1599,6 +1600,7 @@ export const addLessonStage = async (
       content_type: input.contentType ?? null,
       title: input.title,
       description: input.description ?? null,
+      ...(input.teacherNotes !== undefined ? { teacher_notes: input.teacherNotes } : {}),
       config: input.config ?? {},
       ...(input.difficulty ? { difficulty: input.difficulty } : {}),
       ...(input.durationMin !== undefined ? { duration_min: input.durationMin } : {}),
@@ -1616,6 +1618,7 @@ export const updateLessonStage = async (
   data: {
     title?: string;
     description?: string | null;
+    teacher_notes?: string | null;
     stage_type?: LessonStageType;
     content_type?: LessonContentType | null;
     config?: Record<string, unknown>;

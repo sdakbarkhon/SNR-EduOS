@@ -5,10 +5,10 @@ import { createPortal } from "react-dom";
 import {
   X, Sparkles, Loader2, Check, Clock,
   BookOpen, Code2, TestTube2, Gamepad2, Puzzle, CircuitBoard, Globe,
-  Paperclip, Search, Copy, ExternalLink, ChevronLeft,
+  Paperclip, Search, Copy, ExternalLink,
 } from "lucide-react";
 import { addLessonStage, getDictionary } from "@snr/core";
-import type { Locale, StageDifficulty, LessonContentType } from "@snr/core";
+import type { Locale, StageDifficulty, LessonContentType, LessonStageType } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 
@@ -19,6 +19,8 @@ interface GeneratedStage {
   content_type: string;
   title: string;
   description?: string;
+  teacher_notes?: string;
+  starter_code?: string;
   difficulty: StageDifficulty;
   duration_min: number;
 }
@@ -107,11 +109,10 @@ export function AiGenerateStagesModal({
   const [materials, setMaterials] = useState<Array<{ title: string; text: string }>>([]);
 
   // Generation state
-  const [phase, setPhase] = useState<"form" | "select" | "added">("form");
+  const [phase, setPhase] = useState<"form" | "added">("form");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState("");
   const [result, setResult] = useState<GenerateResult | null>(null);
-  const [checked, setChecked] = useState<boolean[]>([]);
   const [adding, setAdding] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
@@ -142,6 +143,57 @@ export function AiGenerateStagesModal({
     return () => { cancelled = true; };
   }, [lessonId]);
 
+  const addToLesson = useCallback(async (stages: GeneratedStage[]) => {
+    const toAdd = stages.map((s) => ({ ...s }));
+    // Rescale durations to fit lesson duration
+    const total = toAdd.reduce((s, x) => s + x.duration_min, 0);
+    if (total > 0 && total !== duration) {
+      for (const s of toAdd) {
+        s.duration_min = Math.max(1, Math.round((s.duration_min * duration) / total));
+      }
+      const newTotal = toAdd.reduce((s, x) => s + x.duration_min, 0);
+      const last = toAdd[toAdd.length - 1];
+      if (last && newTotal !== duration) {
+        last.duration_min = Math.max(1, last.duration_min + (duration - newTotal));
+      }
+    }
+    setAdding(true);
+    setGenError("");
+    try {
+      for (const s of toAdd) {
+        const config: Record<string, unknown> = {};
+        if (s.content_type === "code") {
+          config.language = "python";
+          config.starter_code = s.starter_code ?? "";
+          config.expected_output = "";
+        } else if (s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot") {
+          config.time_limit_minutes = null;
+          config.points_per_question = 1;
+        } else if (EXTERNAL.includes(s.content_type)) {
+          config.url = "";
+          config.requires_link = true;
+          config.requires_screenshot = false;
+        }
+        await addLessonStage(db, lessonId, {
+          stageType: s.stage_type as LessonStageType,
+          contentType: s.content_type as LessonContentType,
+          title: s.title,
+          description: s.description ?? null,
+          teacherNotes: s.teacher_notes ?? null,
+          config,
+          difficulty: s.difficulty,
+          durationMin: s.duration_min,
+        });
+      }
+      setPhase("added");
+      setTimeout(() => { onAdded(); onClose(); }, 1200);
+    } catch {
+      setGenError(t.error);
+    } finally {
+      setAdding(false);
+    }
+  }, [db, lessonId, duration, onAdded, onClose, t.error]);
+
   const generate = useCallback(async () => {
     if (!topic.trim()) return;
     setGenerating(true);
@@ -165,71 +217,13 @@ export function AiGenerateStagesModal({
         return;
       }
       setResult(data);
-      setChecked(new Array(data.stages?.length ?? 0).fill(true));
-      setPhase("select");
+      await addToLesson(data.stages);
     } catch {
       setGenError(t.error);
     } finally {
       setGenerating(false);
     }
-  }, [topic, duration, useWebSearch, overallDifficulty, materials, lessonId, t.error]);
-
-  const addToLesson = useCallback(async () => {
-    if (!result) return;
-    const selectedStages = result.stages
-      .filter((_, i) => checked[i])
-      .map((s) => ({ ...s }));
-    if (selectedStages.length === 0) {
-      setGenError(t.atLeastOneStage);
-      return;
-    }
-    // Rescale durations to fit lesson duration
-    const total = selectedStages.reduce((s, x) => s + x.duration_min, 0);
-    if (total > 0 && total !== duration) {
-      for (const s of selectedStages) {
-        s.duration_min = Math.max(1, Math.round((s.duration_min * duration) / total));
-      }
-      const newTotal = selectedStages.reduce((s, x) => s + x.duration_min, 0);
-      const last = selectedStages[selectedStages.length - 1];
-      if (last && newTotal !== duration) {
-        last.duration_min = Math.max(1, last.duration_min + (duration - newTotal));
-      }
-    }
-    setAdding(true);
-    setGenError("");
-    try {
-      for (const s of selectedStages) {
-        const config: Record<string, unknown> = {};
-        if (s.content_type === "code") {
-          config.language = "python";
-          config.starter_code = "";
-          config.expected_output = "";
-        } else if (s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot") {
-          config.time_limit_minutes = null;
-          config.points_per_question = 1;
-        } else if (EXTERNAL.includes(s.content_type)) {
-          config.url = "";
-          config.requires_link = true;
-          config.requires_screenshot = false;
-        }
-        await addLessonStage(db, lessonId, {
-          stageType: s.stage_type,
-          contentType: s.content_type as LessonContentType,
-          title: s.title,
-          description: s.description ?? null,
-          config,
-          difficulty: s.difficulty,
-          durationMin: s.duration_min,
-        });
-      }
-      setPhase("added");
-      setTimeout(() => { onAdded(); onClose(); }, 1200);
-    } catch {
-      setGenError(t.error);
-    } finally {
-      setAdding(false);
-    }
-  }, [db, lessonId, result, checked, duration, onAdded, onClose, t]);
+  }, [topic, duration, useWebSearch, overallDifficulty, materials, lessonId, t.error, addToLesson]);
 
   const copyQuery = useCallback(async (query: string, idx: number) => {
     try {
@@ -240,11 +234,6 @@ export function AiGenerateStagesModal({
   }, []);
 
   if (typeof document === "undefined") return null;
-
-  const selectedCount = checked.filter(Boolean).length;
-  const selectedDuration = result
-    ? result.stages.filter((_, i) => checked[i]).reduce((s, x) => s + x.duration_min, 0)
-    : 0;
 
   const diffLabel = (dv: string) =>
     dv === "easy" ? t.difficultyEasy : dv === "hard" ? t.difficultyHard : t.difficultyMedium;
@@ -364,136 +353,6 @@ export function AiGenerateStagesModal({
             </div>
           )}
 
-          {/* ── SELECT ── */}
-          {phase === "select" && result && (
-            <div className="space-y-4">
-              {/* Stats header */}
-              <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {t.selectStages}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {t.selectedCount
-                    .replace("{selected}", String(selectedCount))
-                    .replace("{total}", String(result.stages.length))}
-                  {" · "}
-                  {t.totalSelected.replace("{min}", String(selectedDuration))}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {t.lessonDuration.replace("{min}", String(duration))}
-                </p>
-              </div>
-
-              {/* Checkbox list */}
-              <div className="space-y-2">
-                {result.stages.map((s, i) => (
-                  <label
-                    key={i}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
-                      checked[i]
-                        ? "border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/5"
-                        : "border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-transparent"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked[i] ?? false}
-                      onChange={(e) => {
-                        const next = [...checked];
-                        next[i] = e.target.checked;
-                        setChecked(next);
-                      }}
-                      className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600"
-                    />
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10">
-                      {stageIcon(s.content_type)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                          {ctLabel(s.content_type, t)}
-                        </span>
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase ${diffChipCls(s.difficulty)}`}>
-                          {diffLabel(s.difficulty)}
-                        </span>
-                        <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
-                          <Clock className="h-2.5 w-2.5" /> {s.duration_min} {t.minutesShort}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-sm font-semibold text-slate-800 dark:text-slate-100 line-clamp-1">
-                        {s.title}
-                      </p>
-                      {s.description && (
-                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                          {s.description}
-                        </p>
-                      )}
-                      {EXTERNAL.includes(s.content_type) && (
-                        <p className="mt-0.5 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
-                          <Globe className="h-3 w-3" /> {ctLabel(s.content_type, t)} — добавьте ссылку после создания
-                        </p>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
-
-              {/* Recommended searches — per-query buttons */}
-              {result.recommendedSearches.length > 0 && (
-                <div className="rounded-xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-500/20 dark:bg-violet-500/5">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300">
-                    <Search className="h-3.5 w-3.5" /> {t.recommendedMaterials}
-                  </p>
-                  <ul className="space-y-1.5">
-                    {result.recommendedSearches.map((q, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 text-xs text-violet-700 dark:text-violet-300 line-clamp-1">
-                          <span className="mr-1 text-violet-400">•</span>{q}
-                        </span>
-                        <div className="flex shrink-0 gap-1">
-                          <button
-                            type="button"
-                            onClick={() => void copyQuery(q, i)}
-                            title={t.copyQuery}
-                            className="flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-500/30 dark:bg-transparent dark:text-violet-300"
-                          >
-                            {copiedIdx === i
-                              ? <><Check className="h-3 w-3" /> {t.copied}</>
-                              : <><Copy className="h-3 w-3" /> {t.copyQuery}</>
-                            }
-                          </button>
-                          <a
-                            href={`https://www.google.com/search?q=${encodeURIComponent(q)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={t.openInGoogle}
-                            className="flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-500/30 dark:bg-transparent dark:text-violet-300"
-                          >
-                            <ExternalLink className="h-3 w-3" /> {t.openInGoogle}
-                          </a>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* AI notes */}
-              {result.notes && (
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/5">
-                  <p className="mb-1 text-xs font-bold text-blue-700 dark:text-blue-300">📝 {t.aiNotes}</p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400">{result.notes}</p>
-                </div>
-              )}
-
-              {genError && (
-                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                  {genError}
-                </p>
-              )}
-            </div>
-          )}
-
           {/* ── ADDED ── */}
           {phase === "added" && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
@@ -516,40 +375,16 @@ export function AiGenerateStagesModal({
             </button>
 
             <div className="flex gap-2">
-              {phase === "select" && (
-                <button
-                  onClick={() => { setPhase("form"); setGenError(""); }}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  {t.regenerate}
-                </button>
-              )}
-
               {phase === "form" && (
                 <button
                   onClick={() => void generate()}
-                  disabled={generating || !topic.trim() || filesLoading}
+                  disabled={generating || adding || !topic.trim() || filesLoading}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md hover:opacity-90 disabled:opacity-50"
                 >
-                  {generating ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> {t.generatingLong}</>
+                  {(generating || adding) ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> {t.creating}</>
                   ) : (
                     <><Sparkles className="h-4 w-4" /> {t.proposePlan}</>
-                  )}
-                </button>
-              )}
-
-              {phase === "select" && (
-                <button
-                  onClick={() => void addToLesson()}
-                  disabled={adding || selectedCount === 0}
-                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {adding ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> {t.adding}</>
-                  ) : (
-                    t.createSelected.replace("{count}", String(selectedCount))
                   )}
                 </button>
               )}

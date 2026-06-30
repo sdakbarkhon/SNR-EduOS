@@ -28,9 +28,30 @@ function buildPrompt(input: {
         .join("\n\n")
     : "Материалы не прикреплены.";
 
+  // Optimal stage count based on lesson duration
+  const stageCount = input.durationMin <= 30 ? "2–3" :
+    input.durationMin <= 45 ? "3–4" :
+    input.durationMin <= 60 ? "4–5" :
+    input.durationMin <= 90 ? "5–6" : "6–8";
+
+  const isProgramming = ["programming", "информатика", "робототехника", "informatika", "robotics", "code", "python", "web"].some(
+    (kw) => input.subject.toLowerCase().includes(kw) || input.topic.toLowerCase().includes(kw),
+  );
+
+  const programmingSection = isProgramming ? `
+
+СПЕЦИАЛЬНЫЕ ПРАВИЛА ДЛЯ ПРОГРАММИРОВАНИЯ (subject = "${input.subject}"):
+Для этапов content_type="code" используй паттерн прогрессии:
+1. DEMO-этап: stage_type="theory", title начинается с "Демо:", teacher_notes содержит ПОЛНЫЙ рабочий код примера, description объясняет что происходит в коде.
+2. PRACTICE-этап: stage_type="task", title начинается с "Практика:", starter_code = скелет с TODO-комментариями для ученика, description = что нужно дополнить, teacher_notes = готовое решение.
+3. TASK-этап (если время позволяет): stage_type="task", title начинается с "Задание:", starter_code = только комментарии-инструкции (без кода), description = условие задачи, teacher_notes = эталонное решение.
+
+ОБЯЗАТЕЛЬНО заполняй starter_code для PRACTICE и TASK этапов code!` : "";
+
   return `Ты — методический ассистент для учителя в школе Узбекистана.
 
-ЗАДАЧА: Предложить 8–10 ВАРИАНТОВ этапов урока на выбор учителя.
+ЗАДАЧА: Создать ОПТИМАЛЬНЫЙ ПЛАН урока из ${stageCount} последовательных этапов на ${input.durationMin} минут.
+Суммарная длительность всех этапов должна быть РОВНО ${input.durationMin} минут.
 
 ВХОДНЫЕ ДАННЫЕ:
 - Класс: ${input.grade}
@@ -41,68 +62,55 @@ function buildPrompt(input: {
 
 МАТЕРИАЛЫ ОТ УЧИТЕЛЯ:
 ${materialsContext}
+${programmingSection}
 
-ВАЖНО: Ты создаёшь СПИСОК ВАРИАНТОВ для выбора учителем, а НЕ последовательность на ${input.durationMin} мин.
-НЕ пытайся сложить суммы длительности = ${input.durationMin}. Каждый этап — самостоятельный вариант.
-Каждый этап имеет разумную длительность 5–30 мин.
-
-ОБЯЗАТЕЛЬНО РАЗНООБРАЗИЕ ТИПОВ — используй разные content_type:
-- "presentation" — теория/объяснение (stage_type: theory)
-- "code" — программирование в Monaco редакторе
-- "quiz_qia" — асинхронный тест с вопросами
-- "quiz_kahoot" — синхронный live-квиз с таймером
-- "scratch" — визуальное программирование блоками
-- "makecode" — игровое программирование Microsoft
-- "wokwi" — Arduino/электроника симуляция
-- "codesandbox" — веб-разработка (HTML/CSS/JS)
-
-ПРАВИЛА ВЫБОРА ТИПА ПО КЛАССУ (${input.grade} класс):
-- scratch: классы 1–7 (игры, анимации, блочное программирование)
-- makecode: классы 5–9 (2D игры, micro:bit, переход от Scratch к коду)
-- wokwi: классы 7–11 (Arduino C++, электроника, физика, датчики)
-- codesandbox: классы 9–11 (HTML/CSS/JavaScript, React, сайты)
-- code: классы 7–11 (Python/JS/C++, алгоритмы)
-
-ОБЯЗАТЕЛЬНО в 8–10 вариантах должны быть:
-✓ Минимум 1 этап "presentation" (введение/теория)
-✓ Минимум 1 практический этап (code/scratch/wokwi/codesandbox/makecode)
-✓ Минимум 1 квиз (quiz_qia или quiz_kahoot)
-✓ Если класс подходит — 1–2 внешних сервиса (scratch/wokwi/codesandbox/makecode)
+ТИПЫ КОНТЕНТА (выбирай по предмету и классу):
+- "presentation" — теория/объяснение (stage_type: "theory")
+- "code" — программирование в Monaco редакторе (stage_type: "task")
+- "quiz_qia" — асинхронный тест с вопросами (stage_type: "task")
+- "quiz_kahoot" — синхронный live-квиз с таймером (stage_type: "task")
+- "scratch" — визуальное блочное программирование, классы 1–7
+- "makecode" — игровое программирование Microsoft, классы 5–9
+- "wokwi" — Arduino/электроника симуляция, классы 7–11
+- "codesandbox" — веб-разработка HTML/CSS/JS, классы 9–11
 
 СЛОЖНОСТЬ:
-Общий уровень: ${input.overallDifficulty}
+Уровень: ${input.overallDifficulty}
 - easy: больше теории, базовые понятия, простые задачи
-- medium: баланс теории и практики, средние задачи
+- medium: баланс теории и практики
 - hard: упор на практику, сложные задачи, углубление
-Делай основную часть этапов уровня ${input.overallDifficulty}, допустимы 1–2 варианта смежного уровня.
 
-ФОРМАТ КАЖДОГО ЭТАПА (без config, без questions — только описание):
+ФОРМАТ КАЖДОГО ЭТАПА:
 {
-  "content_type": "presentation" | "code" | "quiz_qia" | "quiz_kahoot" | "scratch" | "wokwi" | "codesandbox" | "makecode",
-  "title": "Короткое название этапа",
-  "description": "Что конкретно будет делать ученик на этом этапе",
-  "difficulty": "easy" | "medium" | "hard",
-  "duration_min": 10
+  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"scratch"|"wokwi"|"codesandbox"|"makecode",
+  "stage_type": "theory"|"task",
+  "title": "Короткое название",
+  "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",
+  "teacher_notes": "Педагогические подсказки для учителя: на что обратить внимание, типичные ошибки, решение, эталонный код",
+  "starter_code": "Стартовый код для code-этапов (скелет или только комментарии — только для PRACTICE/TASK)",
+  "difficulty": "easy"|"medium"|"hard",
+  "duration_min": число
 }
 
 ВЕРНИ СТРОГО JSON (без markdown, без вступления):
 {
-  "stages": [ ... 8–10 вариантов ... ],
-  "recommendedSearches": ["запрос 1", "запрос 2", "запрос 3", "запрос 4", "запрос 5"],
+  "stages": [ ... ${stageCount} этапов ... ],
+  "recommendedSearches": ["запрос 1", "запрос 2", "запрос 3"],
   "classGrade": ${input.grade},
-  "notes": "Краткий комментарий для учителя о подборе этапов"
+  "notes": "Краткий комментарий учителю о структуре урока"
 }
 
-ВАЖНО: ТОЛЬКО валидный JSON. Заголовки и описания на русском.`;
+ВАЖНО: ТОЛЬКО валидный JSON. Заголовки и описания на русском. starter_code только для code-этапов.`;
 }
 
 interface GenStage {
   content_type?: string;
   title?: string;
   description?: string;
+  teacher_notes?: string;
+  starter_code?: string;
   difficulty?: string;
   duration_min?: number;
-  // stage_type derived server-side
   stage_type?: string;
 }
 
@@ -125,13 +133,20 @@ function normalizeStage(s: GenStage): GenStage | null {
   if (!s || typeof s.title !== "string" || !s.title.trim()) return null;
   let ct = String(s.content_type ?? "presentation");
   if (!ALLOWED_CONTENT.includes(ct)) ct = "presentation";
-  const stage_type = ct === "presentation" ? "theory" : "task";
+  // Honour stage_type from AI (theory/task), fallback to ct-based
+  const stage_type = ["theory", "task"].includes(String(s.stage_type ?? ""))
+    ? s.stage_type
+    : ct === "presentation" ? "theory" : "task";
   const difficulty = ["easy", "medium", "hard"].includes(String(s.difficulty)) ? s.difficulty : "medium";
-  // Clamp per-stage duration to 5–45 min; default 10
+  // Clamp per-stage duration to 5–60 min; default 10
   const raw = Number(s.duration_min);
   const duration_min = Number.isFinite(raw) && raw > 0
-    ? Math.max(5, Math.min(45, Math.round(raw))) : 10;
-  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min };
+    ? Math.max(5, Math.min(60, Math.round(raw))) : 10;
+  const teacher_notes = typeof s.teacher_notes === "string" && s.teacher_notes.trim()
+    ? s.teacher_notes.trim() : undefined;
+  const starter_code = typeof s.starter_code === "string" && s.starter_code.trim()
+    ? s.starter_code.trim() : undefined;
+  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code };
 }
 
 function stripFences(text: string): string {

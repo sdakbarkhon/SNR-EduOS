@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Hand, Eye } from "lucide-react";
+import { Hand } from "lucide-react";
 import { getMyRaisedHand, raiseHand, getDictionary } from "@snr/core";
 import type { RaisedHand, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -43,27 +43,17 @@ export function RaiseHandButton({ lessonId, studentId }: { lessonId: string; stu
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/60 bg-white/60 p-6 shadow-sm backdrop-blur-xl">
-      <button
-        onClick={onRaise}
-        disabled={raised || busy}
-        className={`flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-full transition-all ${
-          raised
-            ? "bg-yellow-100 text-yellow-600 shadow-lg shadow-yellow-300/40 cursor-default"
-            : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:scale-105 active:scale-95"
-        }`}
-      >
-        <Hand className={`h-9 w-9 ${raised ? "animate-pulse" : ""}`} />
-      </button>
-      <p className={`text-sm font-semibold ${raised ? "text-yellow-600" : "text-slate-600"}`}>
-        {raised ? t.raised : t.raise}
-      </p>
-      {raised && (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-50 px-3 py-1 text-[11px] font-medium text-yellow-600">
-          <Eye className="h-3.5 w-3.5" />
-          {t.teacherSees}
-        </span>
-      )}
-    </div>
+    <button
+      onClick={onRaise}
+      disabled={raised || busy}
+      className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-200 disabled:opacity-50 ${
+        raised
+          ? "border-yellow-400/50 bg-yellow-400/20 text-yellow-200"
+          : "border-white/20 bg-white/10 text-white hover:border-white/30 hover:bg-white/20"
+      }`}
+    >
+      <Hand className={`h-3.5 w-3.5 ${raised ? "animate-pulse" : ""}`} />
+      <span>{raised ? t.raised : t.raise}</span>
+    </button>
   );
 }

@@ -94,6 +94,7 @@ function StageModal({
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    teacherNotes?: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
   }) => Promise<void>;
@@ -113,6 +114,7 @@ function StageModal({
   const [contentType, setContentType] = useState<LessonContentType | null>(existing?.content_type ?? null);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [desc, setDesc] = useState(existing?.description ?? "");
+  const [teacherNotes, setTeacherNotes] = useState(existing?.teacher_notes ?? "");
   const [saving, setSaving] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -205,7 +207,9 @@ function StageModal({
     try {
       await onSave({
         stageType: stageType as LessonStageType, contentType,
-        title: title.trim(), description: desc.trim() || null, config,
+        title: title.trim(), description: desc.trim() || null,
+        teacherNotes: teacherNotes.trim() || null,
+        config,
         quizQuestions: quizQuestionsOut,
       });
     } finally {
@@ -442,7 +446,7 @@ function StageModal({
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    {isCode ? dc.problemStatement : d.stageDescLabel2}
+                    {isCode ? dc.problemStatement : d.studentDescriptionLabel}
                   </label>
                   <textarea
                     rows={3}
@@ -450,6 +454,18 @@ function StageModal({
                     onChange={(e) => setDesc(e.target.value)}
                     placeholder={d.stageDescPlaceholder2}
                     className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    {d.teacherNotesLabel}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={teacherNotes}
+                    onChange={(e) => setTeacherNotes(e.target.value)}
+                    placeholder={d.teacherNotesPlaceholder}
+                    className="w-full resize-none rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-slate-100"
                   />
                 </div>
 
@@ -652,6 +668,7 @@ export function TeacherLessonDetailView({
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    teacherNotes?: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
   }) {
@@ -673,6 +690,7 @@ export function TeacherLessonDetailView({
     contentType: LessonContentType | null;
     title: string;
     description: string | null;
+    teacherNotes?: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
   }) {
@@ -681,6 +699,7 @@ export function TeacherLessonDetailView({
     const updated = await updateLessonStage(db, stageModal.stage.id, {
       title: data.title,
       description: data.description,
+      teacher_notes: data.teacherNotes,
       stage_type: data.stageType,
       content_type: data.contentType,
       ...(data.config !== undefined ? { config: data.config } : {}),

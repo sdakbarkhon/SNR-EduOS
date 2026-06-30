@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Clock, Check, FileText, FileCode2, File, ChevronLeft, ChevronRight,
+  Clock, Check, FileText, FileCode2, File, Menu,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Monitor,
 } from "lucide-react";
 import {
@@ -524,14 +524,14 @@ export function LessonWorkspaceView({
         </div>
       )}
 
-      {/* Fixed expand tab — desktop only, visible when sidebar is collapsed */}
-      {sidebarCollapsed && mounted && (
+      {/* Fixed sidebar toggle — burger/X, desktop only */}
+      {mounted && (
         <button
-          onClick={() => setSidebarCollapsed(false)}
-          className="fixed left-0 top-1/2 z-30 hidden h-16 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-white/40 bg-white/70 shadow-lg backdrop-blur-md transition-all duration-200 hover:w-10 hover:bg-white/90 hover:shadow-xl lg:flex group"
-          title={w.expand}
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="fixed left-4 top-4 z-40 hidden h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 lg:flex"
+          title={sidebarCollapsed ? w.expand : w.collapse}
         >
-          <ChevronRight className="h-5 w-5 text-violet-700 transition-colors group-hover:text-violet-900" />
+          {sidebarCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
         </button>
       )}
 
@@ -540,16 +540,6 @@ export function LessonWorkspaceView({
 
         {/* Left: stages stepper — collapsible on desktop */}
         <aside className={`relative lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-0 lg:overflow-hidden" : "lg:w-80"}`}>
-          {/* Collapse button — desktop only */}
-          {!sidebarCollapsed && (
-            <button
-              onClick={() => setSidebarCollapsed(true)}
-              className="absolute right-0 top-1/2 z-20 hidden h-12 w-8 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-r-xl border border-white/40 bg-white/70 shadow-lg backdrop-blur-md transition-all duration-200 hover:bg-white/90 hover:shadow-xl lg:flex group"
-              title={w.collapse}
-            >
-              <ChevronLeft className="h-5 w-5 text-violet-700 transition-colors group-hover:text-violet-900" />
-            </button>
-          )}
 
           <div className={`space-y-5 lg:transition-opacity lg:duration-200 ${sidebarCollapsed ? "lg:opacity-0" : "opacity-100"}`}>
           <section className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
@@ -837,8 +827,8 @@ export function LessonWorkspaceView({
             })
           )}
 
-          {/* Summary stage */}
-          {summaryStage && (
+          {/* Summary stage — only show when lesson is completed */}
+          {summaryStage && isCompleted && (
             <div>
               <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 shadow-sm backdrop-blur-xl">
                 <div className="mb-3 flex items-center gap-2">

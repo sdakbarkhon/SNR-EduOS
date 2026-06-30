@@ -572,6 +572,7 @@ export interface Dictionary {
     stageCompletedLabel: string;
     teacherNotesLabel: string;
     teacherNotesPlaceholder: string;
+    studentDescriptionLabel: string;
     removeStageLabel: string;
     stagesHint: string;
     addMaterialLabel: string;
@@ -1226,14 +1227,14 @@ export interface Dictionary {
       minutesShort: string;      // "мин"
       // Двухэтапный выбор (iter3 промт 5)
       proposePlan: string;       // "Предложить план"
-      selectStages: string;      // "Выберите этапы для урока"
       selectedCount: string;     // "Отмечено: {selected} из {total}"
       totalSelected: string;     // "Общая длительность выбранных: {min} мин"
       lessonDuration: string;    // "Длительность урока: {min} мин — будет пересчитано"
-      createSelected: string;    // "Создать выбранные ({count})"
       overallDifficulty: string; // "Общий уровень сложности урока"
       copyQuery: string;         // "Скопировать"
-      atLeastOneStage: string;   // "Выберите хотя бы один этап"
+      // iter4 промт 8 — авто-создание без выбора
+      creating: string;          // "Этапы создаются..."
+      createAll: string;         // "Создать этапы"
     };
   };
 }

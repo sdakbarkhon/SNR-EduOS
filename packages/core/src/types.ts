@@ -129,6 +129,8 @@ export type LessonStage = {
   is_completed: boolean;
   completed_at: string | null;
   created_at: string;
+  // migration 59 — только для учителя, никогда не показывать ученику
+  teacher_notes?: string | null;
 };
 
 export type LessonStageProgress = {
