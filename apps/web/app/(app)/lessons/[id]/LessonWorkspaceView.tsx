@@ -324,7 +324,6 @@ export function LessonWorkspaceView({
   const [externalStageId, setExternalStageId] = useState<string | null>(null);
   const [qiaStageId, setQiaStageId] = useState<string | null>(null);
   const [kahootStageId, setKahootStageId] = useState<string | null>(null);
-  const [studiedLoading, setStudiedLoading] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -347,6 +346,34 @@ export function LessonWorkspaceView({
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setAnimKey((k) => k + 1); }, [activeStageId]);
+
+  // Auto-mark theory stages as studied when teacher activates them
+  useEffect(() => {
+    if (!studentId || !activeStageId) return;
+    const s = stages.find((st) => st.id === activeStageId);
+    if (s?.stage_type !== "theory" || s.progress?.is_completed) return;
+    markTheoryStudied(db, activeStageId, studentId).catch(() => null);
+    setStages((prev) =>
+      prev.map((st) =>
+        st.id !== activeStageId ? st : {
+          ...st,
+          progress: {
+            id: st.progress?.id ?? "",
+            stage_id: activeStageId,
+            student_id: studentId,
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+            submission_data: st.progress?.submission_data ?? null,
+            grade: st.progress?.grade ?? null,
+            teacher_comment: st.progress?.teacher_comment ?? null,
+            graded_at: st.progress?.graded_at ?? null,
+            graded_by: st.progress?.graded_by ?? null,
+          } as LessonStageProgress,
+        }
+      ),
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStageId, studentId]);
 
   // Load existing leave request on mount
   useEffect(() => {
@@ -441,37 +468,6 @@ export function LessonWorkspaceView({
     }, [lesson.status, router]),
   );
 
-  const handleMarkStudied = useCallback(async (stageId: string) => {
-    if (!studentId) return;
-    setStudiedLoading(stageId);
-    try {
-      await markTheoryStudied(db, stageId, studentId);
-      setStages((prev) =>
-        prev.map((s) =>
-          s.id === stageId
-            ? {
-                ...s,
-                progress: {
-                  ...s.progress,
-                  id: s.progress?.id ?? "",
-                  stage_id: stageId,
-                  student_id: studentId,
-                  is_completed: true,
-                  completed_at: new Date().toISOString(),
-                  submission_data: s.progress?.submission_data ?? null,
-                  grade: s.progress?.grade ?? null,
-                  teacher_comment: s.progress?.teacher_comment ?? null,
-                  graded_at: s.progress?.graded_at ?? null,
-                  graded_by: s.progress?.graded_by ?? null,
-                },
-              }
-            : s,
-        ),
-      );
-    } catch { /* noop */ } finally {
-      setStudiedLoading(null);
-    }
-  }, [db, studentId]);
 
   const heroTitle = lesson.title ?? lesson.topic ?? style.label;
   const timeRange = lesson.ends_at
@@ -515,17 +511,13 @@ export function LessonWorkspaceView({
     setStages((prev) => prev.map((s) => s.id === progress.stage_id ? { ...s, progress } : s));
   }, []);
 
-  // Compute stepper state
+  // Compute stepper state based on teacher-set active stage
   type StepState = "done" | "active" | "upcoming";
-  function getStepState(stage: LessonStageWithProgress, idx: number): StepState {
-    if (stage.is_completed) return "done";
-    if (stage.stage_role === "start" && lesson.status === "in_progress") return "done";
-    if (stage.progress?.is_completed) return "done";
-    // first non-done middle stage is active
-    const prevAllDone = middleStages.slice(0, idx).every(
-      (s) => s.is_completed || s.progress?.is_completed,
-    );
-    if (prevAllDone) return "active";
+  function getStepState(stage: LessonStageWithProgress): StepState {
+    if (isCompleted) return "done";
+    if (activeStageId === null) return "upcoming";
+    if (stage.id === activeStageId) return "active";
+    if (stage.position < activePos) return "done";
     return "upcoming";
   }
 
@@ -537,17 +529,17 @@ export function LessonWorkspaceView({
     );
   }
 
-  // Stepper shows: start + visible middle stages + summary
+  // Stepper shows: start + all middle stages + summary
   const allStepsForStepper = [
     ...(startStage ? [startStage] : []),
-    ...middleStages,
+    ...allMiddleStages,
     ...(summaryStage ? [summaryStage] : []),
   ];
 
   const da = dl.activeStage;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="w-full px-4 md:px-6 space-y-5">
       {/* Header bar */}
       <header
         className="relative overflow-hidden rounded-2xl px-6 py-4 text-white shadow-xl"
@@ -560,7 +552,7 @@ export function LessonWorkspaceView({
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-300" />
               {w.live}
             </span>
-            <h1 className="mt-1.5 truncate text-xl font-bold leading-tight md:text-2xl">{style.label}</h1>
+            <h1 className="mt-1.5 truncate text-xl font-bold leading-tight md:text-2xl">{lesson.subjectName ?? style.label}</h1>
             <p className="truncate text-sm text-white/75">{heroTitle}</p>
           </div>
 
@@ -640,7 +632,6 @@ export function LessonWorkspaceView({
             <ul className="relative flex flex-col gap-4">
               {allStepsForStepper.map((stage, i) => {
                 const isLast = i === allStepsForStepper.length - 1;
-                const middleIdx = middleStages.findIndex((s) => s.id === stage.id);
                 const stepState: StepState =
                   stage.stage_role === "start"
                     ? lesson.status === "in_progress" || lesson.status === "completed"
@@ -650,7 +641,7 @@ export function LessonWorkspaceView({
                     ? lesson.status === "completed"
                       ? "done"
                       : "upcoming"
-                    : getStepState(stage, middleIdx);
+                    : getStepState(stage);
 
                 return (
                   <li key={stage.id} className="relative flex gap-3">
@@ -662,7 +653,7 @@ export function LessonWorkspaceView({
                         stepState === "done"
                           ? "border-emerald-500 bg-emerald-100 text-emerald-600"
                           : stepState === "active"
-                          ? "border-blue-600 bg-blue-600 ring-4 ring-blue-200"
+                          ? "animate-pulse border-violet-600 bg-violet-600 ring-4 ring-violet-200"
                           : "border-slate-300 bg-white"
                       }`}
                     >
@@ -670,6 +661,8 @@ export function LessonWorkspaceView({
                         <Check className="h-3.5 w-3.5" strokeWidth={3} />
                       ) : stepState === "active" ? (
                         <span className="h-2 w-2 rounded-full bg-white" />
+                      ) : stage.stage_role === "middle" ? (
+                        <span className="text-[9px] font-bold text-slate-400">{stage.position}</span>
                       ) : null}
                     </span>
                     <div className="flex flex-1 flex-col gap-0.5 pt-0.5">
@@ -678,7 +671,7 @@ export function LessonWorkspaceView({
                           stepState === "done"
                             ? "font-medium text-slate-500"
                             : stepState === "active"
-                            ? "font-bold text-blue-600"
+                            ? "font-bold text-violet-600"
                             : "font-medium text-slate-400"
                         }`}
                       >
@@ -781,7 +774,6 @@ export function LessonWorkspaceView({
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
-              const isLoading = studiedLoading === stage.id;
 
               return (
                 <div key={isCompleted ? stage.id : `${stage.id}-${animKey}`} className={`relative${isCompleted ? "" : " animate-stage-in"}`}>
@@ -833,25 +825,6 @@ export function LessonWorkspaceView({
                     <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
                   )}
 
-                  {/* Theory: "Изучил" button */}
-                  {stage.stage_type === "theory" && (
-                    (isStudied || readOnly) ? (
-                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                        <Check className="h-4 w-4" />
-                        {dl.stageStudiedDone}
-                      </div>
-                    ) : (
-                      studentId && (
-                        <button
-                          onClick={() => handleMarkStudied(stage.id)}
-                          disabled={isLoading}
-                          className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-60"
-                        >
-                          {isLoading ? "…" : dl.stageStudiedBtn}
-                        </button>
-                      )
-                    )
-                  )}
 
                   {/* Task */}
                   {stage.stage_type === "task" && (

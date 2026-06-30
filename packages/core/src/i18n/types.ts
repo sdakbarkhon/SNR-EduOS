@@ -668,8 +668,9 @@ export interface Dictionary {
     stageMoveUp: string;               // "Выше"
     stageMoveDown: string;             // "Ниже"
     // Student stage progress
-    stageStudiedBtn: string;           // "Изучил"
-    stageStudiedDone: string;          // "Изучено"
+    stagePassed: string;               // "Пройдено"
+    stageCurrent: string;              // "Текущий"
+    stageUpcoming: string;             // "Предстоящий"
     stageTaskStubPrefix: string;       // "Здесь будет: "
     stageTaskSubmittedLabel: string;   // "Сдано"
     stageTaskGradedLabel: string;      // "Оценка"
