@@ -12,6 +12,8 @@ export const ru: Dictionary = {
     none: "Нет данных",
     today: "Сегодня",
     week: "Неделя",
+    minutes: "минут",
+    seconds: "секунд",
   },
   status: {
     now: "Сейчас",
@@ -893,6 +895,11 @@ export const ru: Dictionary = {
       waitingForTeacher: "Учитель готовит следующий этап…",
       studentsSeeThis: "Все ученики видят этот этап",
     },
+    completedTitle: "Урок завершён!",
+    completedTopic: "Тема",
+    completedDuration: "Длительность",
+    completedRedirect: "Переход к расписанию через",
+    completedGoNow: "Перейти сейчас",
   },
   teacher: {
     role: "Учитель",

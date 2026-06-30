@@ -12,6 +12,8 @@ export const en: Dictionary = {
     none: "No data",
     today: "Today",
     week: "Week",
+    minutes: "minutes",
+    seconds: "seconds",
   },
   status: {
     now: "Now",
@@ -893,6 +895,11 @@ export const en: Dictionary = {
       waitingForTeacher: "Teacher is preparing the next stage…",
       studentsSeeThis: "All students see this stage",
     },
+    completedTitle: "Lesson complete!",
+    completedTopic: "Topic",
+    completedDuration: "Duration",
+    completedRedirect: "Redirecting to schedule in",
+    completedGoNow: "Go now",
   },
   teacher: {
     role: "Teacher",

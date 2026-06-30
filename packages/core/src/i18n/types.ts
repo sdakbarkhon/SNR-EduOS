@@ -18,6 +18,8 @@ export interface Dictionary {
     none: string;
     today: string;
     week: string;
+    minutes: string;
+    seconds: string;
   };
   status: Record<StatusKey, string>;
   nav: {
@@ -913,6 +915,12 @@ export interface Dictionary {
       waitingForTeacher: string;   // "Учитель готовит следующий этап…"
       studentsSeeThis: string;     // "Все ученики видят этот этап"
     };
+    // Completion modal (Iter4 Prompt 3)
+    completedTitle: string;
+    completedTopic: string;
+    completedDuration: string;
+    completedRedirect: string;
+    completedGoNow: string;
   };
   teacher: {
     role: string;

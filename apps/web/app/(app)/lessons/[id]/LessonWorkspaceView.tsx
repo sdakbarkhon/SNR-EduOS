@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
-  ChevronLeft, Clock, Check, FileText, FileCode2, File,
+  Clock, Check, FileText, FileCode2, File,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, LogOut, Monitor,
 } from "lucide-react";
 import {
@@ -330,6 +329,9 @@ export function LessonWorkspaceView({
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveRequest, setLeaveRequest] = useState<LeaveRequest | null>(null);
+  const [showCompletedModal, setShowCompletedModal] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const [completedElapsed, setCompletedElapsed] = useState("");
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
@@ -354,6 +356,14 @@ export function LessonWorkspaceView({
       .catch(() => null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId, lesson.id]);
+
+  // Completion modal countdown → redirect to /schedule at 0
+  useEffect(() => {
+    if (!showCompletedModal) return;
+    if (countdown <= 0) { router.push("/schedule"); return; }
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [showCompletedModal, countdown, router]);
 
   // Live elapsed timer (client-only → "00:00:00" until mounted)
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -411,9 +421,22 @@ export function LessonWorkspaceView({
         }
       }
 
-      // Reload when lesson ends (status changed)
+      // When lesson ends, show completion modal (intercepts router.refresh)
       if (newStatus && newStatus !== lesson.status) {
-        router.refresh();
+        if (newStatus === "completed") {
+          const duration = lesson.started_at
+            ? Date.now() - new Date(lesson.started_at).getTime()
+            : 0;
+          if (duration > 60000) {
+            setCompletedElapsed(fmtElapsed(duration));
+            setShowCompletedModal(true);
+            setCountdown(5);
+          } else {
+            router.push("/schedule");
+          }
+        } else {
+          router.refresh();
+        }
       }
     }, [lesson.status, router]),
   );
@@ -525,14 +548,6 @@ export function LessonWorkspaceView({
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
-      <Link
-        href="/schedule"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        {dl.back}
-      </Link>
-
       {/* Header bar */}
       <header
         className="relative overflow-hidden rounded-2xl px-6 py-4 text-white shadow-xl"
@@ -1058,6 +1073,49 @@ export function LessonWorkspaceView({
           onClose={() => setShowLeaveModal(false)}
           onSubmitted={(req) => { setLeaveRequest(req); setShowLeaveModal(false); }}
         />
+      )}
+
+      {/* Lesson completion modal */}
+      {mounted && showCompletedModal && createPortal(
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(12px)" }}
+        >
+          <div
+            className="animate-scale-in w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl"
+            style={{ background: "var(--surface-1, #fff)" }}
+          >
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+              <Check className="h-10 w-10 text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">{dl.completedTitle}</h2>
+            <div className="mt-4 space-y-2">
+              <div className="rounded-xl bg-gray-50 px-4 py-3 text-left">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{dl.completedTopic}</p>
+                <p className="mt-0.5 text-sm font-medium text-gray-800">{lesson.title}</p>
+              </div>
+              {completedElapsed && (
+                <div className="rounded-xl bg-gray-50 px-4 py-3 text-left">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{dl.completedDuration}</p>
+                  <p className="mt-0.5 text-sm font-medium text-gray-800">{completedElapsed}</p>
+                </div>
+              )}
+            </div>
+            <p className="mt-5 text-sm text-gray-500">
+              {dl.completedRedirect}{" "}
+              <span className="font-bold text-gray-800">{countdown}</span>{" "}
+              {d.common.seconds}
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/schedule")}
+              className="mt-4 w-full rounded-2xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg transition-colors hover:bg-blue-700 active:scale-95"
+            >
+              {dl.completedGoNow}
+            </button>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

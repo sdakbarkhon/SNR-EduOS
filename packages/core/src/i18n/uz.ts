@@ -12,6 +12,8 @@ export const uz: Dictionary = {
     none: "Ma’lumot yo‘q",
     today: "Bugun",
     week: "Hafta",
+    minutes: "daqiqa",
+    seconds: "soniya",
   },
   status: {
     now: "Hozir",
@@ -893,6 +895,11 @@ export const uz: Dictionary = {
       waitingForTeacher: "O'qituvchi keyingi bosqichni tayyorlamoqda…",
       studentsSeeThis: "Barcha o'quvchilar ushbu bosqichni ko'radi",
     },
+    completedTitle: "Dars tugadi!",
+    completedTopic: "Mavzu",
+    completedDuration: "Davomiyligi",
+    completedRedirect: "Jadvalga o'tish",
+    completedGoNow: "Hozir o'tish",
   },
   teacher: {
     role: "O'qituvchi",
