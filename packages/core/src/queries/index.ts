@@ -1330,12 +1330,13 @@ export const getStudentLessonView = async (
   const teacherId = lesson.group.teacher_id;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db3 = db as any;
-  const [teacherRes, materialsRes, stagesRaw] = await Promise.all([
+  const [teacherRes, materialsRes, stagesRaw, subjectRes] = await Promise.all([
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
     db3.from("lesson_stages").select("*, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    db3.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle(),
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;
@@ -1356,6 +1357,7 @@ export const getStudentLessonView = async (
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
+    subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],

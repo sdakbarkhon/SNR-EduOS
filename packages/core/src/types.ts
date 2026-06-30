@@ -297,6 +297,7 @@ export type StudentLessonView = {
   ends_at: string | null;
   started_at: string | null;
   ended_at: string | null;
+  subjectName: string | null;
   status: LessonStatus;
   room: string | null;
   active_stage_id: string | null;

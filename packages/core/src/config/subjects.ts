@@ -20,7 +20,7 @@ export const subjects: Record<string, SubjectStyle> = {
 };
 
 export const defaultSubjectStyle: SubjectStyle = {
-  label: "Subject",
+  label: "Предмет",
   color: colors.primary,
   icon: "book-open",
   emoji: "📚",
