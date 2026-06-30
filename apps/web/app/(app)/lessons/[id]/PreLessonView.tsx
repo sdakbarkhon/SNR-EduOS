@@ -106,7 +106,7 @@ export function PreLessonView({
     } catch { /* noop */ }
   }
 
-  const heroTitle = style.label;
+  const heroTitle = lesson.subjectName ?? style.label;
   const timeRange = lesson.ends_at
     ? `${formatTime(lesson.starts_at)} — ${formatTime(lesson.ends_at)}`
     : formatTime(lesson.starts_at);

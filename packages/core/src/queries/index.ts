@@ -1262,14 +1262,14 @@ export const getTeacherLessonView = async (
 ): Promise<TeacherLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
   if (!lessonRaw) return null;
 
   const lesson = lessonRaw as unknown as {
-    id: string; group_id: string; lesson_no: number | null; topic: string | null;
+    id: string; group_id: string; subject_id: string | null; lesson_no: number | null; topic: string | null;
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
@@ -1280,12 +1280,16 @@ export const getTeacherLessonView = async (
   const teacherId = lesson.group.teacher_id;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
-  const [teacherRes, materialsRes, stagesRes] = await Promise.all([
+  const subjectQuery = lesson.subject_id
+    ? db2.from("subjects").select("name").eq("id", lesson.subject_id).maybeSingle()
+    : db2.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle();
+  const [teacherRes, materialsRes, stagesRes, subjectRes] = await Promise.all([
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db2.from("lesson_materials").select("*").eq("lesson_id", lessonId).order("created_at"),
     db2.from("lesson_stages").select("*").eq("lesson_id", lessonId).order("position"),
+    subjectQuery,
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;
@@ -1298,6 +1302,7 @@ export const getTeacherLessonView = async (
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
+    subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -1312,14 +1317,14 @@ export const getStudentLessonView = async (
 ): Promise<StudentLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
   if (!lessonRaw) return null;
 
   const lesson = lessonRaw as unknown as {
-    id: string; group_id: string; lesson_no: number | null; topic: string | null;
+    id: string; group_id: string; subject_id: string | null; lesson_no: number | null; topic: string | null;
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
@@ -1330,13 +1335,18 @@ export const getStudentLessonView = async (
   const teacherId = lesson.group.teacher_id;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db3 = db as any;
+  // Subject name: prefer the lesson's actual subject_id FK; fall back to the
+  // group's (legacy lessons without subject_id may have NULL).
+  const subjectQuery = lesson.subject_id
+    ? db3.from("subjects").select("name").eq("id", lesson.subject_id).maybeSingle()
+    : db3.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle();
   const [teacherRes, materialsRes, stagesRaw, subjectRes] = await Promise.all([
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
-    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
-    db3.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle(),
+    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    subjectQuery,
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;

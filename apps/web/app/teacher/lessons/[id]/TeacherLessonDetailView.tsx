@@ -881,7 +881,7 @@ export function TeacherLessonDetailView({
         return (
           <div className="flex flex-col gap-2 rounded-2xl p-6 text-white shadow-xl" style={{ background: bg }}>
             <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
-              {style.label} · {lesson.group.name}
+              {(lesson.subjectName ?? style.label)} · {lesson.group.name}
             </p>
             {lesson.lesson_no && <p className="text-xs text-white/60">Урок №{lesson.lesson_no}</p>}
             <h1 className="text-2xl font-bold">

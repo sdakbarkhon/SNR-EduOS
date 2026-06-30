@@ -131,6 +131,16 @@ export type LessonStage = {
   created_at: string;
   // migration 59 — только для учителя, никогда не показывать ученику
   teacher_notes?: string | null;
+  // migration 60 — слайды презентации для этапа теории
+  slides?: LessonSlide[] | null;
+};
+
+/** Слайд презентации (этап теории). Хранится в lesson_stages.slides (jsonb). */
+export type LessonSlide = {
+  title: string;
+  content: string;
+  image_url?: string;
+  image_prompt?: string;
 };
 
 export type LessonStageProgress = {
@@ -282,6 +292,7 @@ export type TeacherLessonView = {
   room: string | null;
   active_stage_id: string | null;
   demo_material_id: string | null;
+  subjectName: string | null;
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;
   materials: LessonMaterial[];
