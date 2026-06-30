@@ -624,6 +624,8 @@ export const uz: Dictionary = {
       backToLesson: "Darsga qaytish",
       submit: "Topshirish",
       submitted: "Topshirildi",
+      collapse: "Yopish",
+      expand: "Ochish",
     },
     stageStartLabel: "Boshlash",
     stageSummaryLabel: "Yakunlash",

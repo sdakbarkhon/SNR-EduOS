@@ -624,6 +624,8 @@ export const en: Dictionary = {
       backToLesson: "Back to lesson",
       submit: "Submit",
       submitted: "Submitted",
+      collapse: "Collapse",
+      expand: "Expand",
     },
     stageStartLabel: "Start",
     stageSummaryLabel: "Summary",

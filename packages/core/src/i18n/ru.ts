@@ -624,6 +624,8 @@ export const ru: Dictionary = {
       backToLesson: "Назад к уроку",
       submit: "Сдать",
       submitted: "Сдано",
+      collapse: "Свернуть",
+      expand: "Развернуть",
     },
     stageStartLabel: "Старт",
     stageSummaryLabel: "Итог",

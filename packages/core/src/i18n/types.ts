@@ -625,6 +625,8 @@ export interface Dictionary {
       backToLesson: string;       // fullscreen stage: "← Назад к уроку"
       submit: string;             // fullscreen stage: "Сдать"
       submitted: string;          // fullscreen stage: "✓ Сдано"
+      collapse: string;           // "Свернуть sidebar"
+      expand: string;             // "Развернуть sidebar"
     };
     // Stage constructor v2 (migration 35)
     stageStartLabel: string;           // "Старт"

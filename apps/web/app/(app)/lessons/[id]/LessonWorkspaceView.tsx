@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Clock, Check, FileText, FileCode2, File,
+  Clock, Check, FileText, FileCode2, File, ChevronLeft, ChevronRight,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, LogOut, Monitor,
 } from "lucide-react";
 import {
@@ -331,6 +331,7 @@ export function LessonWorkspaceView({
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [completedElapsed, setCompletedElapsed] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
@@ -346,6 +347,14 @@ export function LessonWorkspaceView({
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setAnimKey((k) => k + 1); }, [activeStageId]);
+  // Read sidebar state from localStorage after mount (avoids hydration mismatch)
+  useEffect(() => {
+    const stored = localStorage.getItem("lesson-sidebar-collapsed");
+    if (stored !== null) setSidebarCollapsed(stored === "true");
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("lesson-sidebar-collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   // Auto-mark theory stages as studied when teacher activates them
   useEffect(() => {
@@ -620,11 +629,34 @@ export function LessonWorkspaceView({
         </div>
       )}
 
-      {/* 3-column workspace */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+      {/* Fixed expand tab — desktop only, visible when sidebar is collapsed */}
+      {sidebarCollapsed && mounted && (
+        <button
+          onClick={() => setSidebarCollapsed(false)}
+          className="fixed left-0 top-1/2 z-30 hidden h-16 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-white/40 bg-white/70 shadow-lg backdrop-blur-md transition-all duration-200 hover:w-10 hover:bg-white/90 hover:shadow-xl lg:flex group"
+          title={w.expand}
+        >
+          <ChevronRight className="h-5 w-5 text-violet-700 transition-colors group-hover:text-violet-900" />
+        </button>
+      )}
 
-        {/* Left: stages stepper */}
-        <aside className="space-y-5 lg:col-span-3">
+      {/* 3-column workspace */}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+
+        {/* Left: stages stepper — collapsible on desktop */}
+        <aside className={`relative lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-0 lg:overflow-hidden" : "lg:w-80"}`}>
+          {/* Collapse button — desktop only */}
+          {!sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(true)}
+              className="absolute right-0 top-1/2 z-20 hidden h-12 w-8 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-r-xl border border-white/40 bg-white/70 shadow-lg backdrop-blur-md transition-all duration-200 hover:bg-white/90 hover:shadow-xl lg:flex group"
+              title={w.collapse}
+            >
+              <ChevronLeft className="h-5 w-5 text-violet-700 transition-colors group-hover:text-violet-900" />
+            </button>
+          )}
+
+          <div className={`space-y-5 lg:transition-opacity lg:duration-200 ${sidebarCollapsed ? "lg:opacity-0" : "opacity-100"}`}>
           <section className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
             <h2 className="mb-4 text-sm font-bold uppercase tracking-widest text-gray-500">
               {dl.stagesTitle}
@@ -746,10 +778,11 @@ export function LessonWorkspaceView({
               )}
             </div>
           )}
+          </div>
         </aside>
 
         {/* Center: active middle stages content */}
-        <section className="space-y-4 lg:col-span-6">
+        <section className="flex-1 min-w-0 space-y-4">
           {lesson.description && (
             <div className="rounded-2xl border border-white/60 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
               <p className="text-[15px] leading-relaxed text-slate-600">{lesson.description}</p>
@@ -919,7 +952,7 @@ export function LessonWorkspaceView({
         </section>
 
         {/* Right: materials + AI */}
-        <aside className="space-y-5 lg:col-span-3">
+        <aside className="space-y-5 lg:w-72 lg:flex-shrink-0">
           <section className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
             <h3 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-500">{w.materials}</h3>
             {lesson.materials.length === 0 ? (
