@@ -634,6 +634,9 @@ export interface Dictionary {
       lower: string;              // "Опустить руку"
       agoSeconds: string;         // "{n} сек назад"
       agoMinutes: string;         // "{n} мин назад"
+      error: string;              // "Не удалось поднять руку"
+      studentRaisedHand: string;  // "{name} поднял(а) руку"
+      acknowledge: string;        // "Обратил внимание"
     };
     workspace: {
       live: string;               // "Урок идёт"

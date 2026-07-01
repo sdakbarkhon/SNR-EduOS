@@ -632,6 +632,9 @@ export const ru: Dictionary = {
       lower: "Опустить руку",
       agoSeconds: "{n} сек назад",
       agoMinutes: "{n} мин назад",
+      error: "Не удалось поднять руку",
+      studentRaisedHand: "{name} поднял(а) руку",
+      acknowledge: "Обратил внимание",
     },
     workspace: {
       live: "Урок идёт",

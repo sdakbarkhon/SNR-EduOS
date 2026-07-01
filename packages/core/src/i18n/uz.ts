@@ -632,6 +632,9 @@ export const uz: Dictionary = {
       lower: "Qo'lni tushirish",
       agoSeconds: "{n} soniya oldin",
       agoMinutes: "{n} daqiqa oldin",
+      error: "Qo'lni ko'tarib bo'lmadi",
+      studentRaisedHand: "{name} qo'l ko'tardi",
+      acknowledge: "E'tibor berdim",
     },
     workspace: {
       live: "Dars davom etmoqda",

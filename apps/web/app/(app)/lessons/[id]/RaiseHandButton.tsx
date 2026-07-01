@@ -16,6 +16,7 @@ export function RaiseHandButton({ lessonId, studentId }: { lessonId: string; stu
 
   const [hand, setHand] = useState<RaisedHand | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const reload = useCallback(() => {
     getMyRaisedHand(db as never, lessonId, studentId)
@@ -33,27 +34,41 @@ export function RaiseHandButton({ lessonId, studentId }: { lessonId: string; stu
 
   async function onRaise() {
     if (raised || busy) return;
+    // eslint-disable-next-line no-console
+    console.log("[RaiseHand] Clicked for lesson:", lessonId, "student:", studentId);
     setBusy(true);
+    setError("");
     try {
-      await raiseHand(db as never, lessonId, studentId);
+      const result = await raiseHand(db as never, lessonId, studentId);
+      console.log("[RaiseHand] Result:", result);
       reload();
-    } catch { /* noop */ } finally {
+    } catch (e) {
+      console.error("[RaiseHand] error:", e);
+      setError(t.error);
+    } finally {
       setBusy(false);
     }
   }
 
   return (
-    <button
-      onClick={onRaise}
-      disabled={raised || busy}
-      className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-200 disabled:opacity-50 ${
-        raised
-          ? "border-yellow-400/50 bg-yellow-400/20 text-yellow-200"
-          : "border-white/20 bg-white/10 text-white hover:border-white/30 hover:bg-white/20"
-      }`}
-    >
-      <Hand className={`h-3.5 w-3.5 ${raised ? "animate-pulse" : ""}`} />
-      <span>{raised ? t.raised : t.raise}</span>
-    </button>
+    <div className="relative flex items-center">
+      <button
+        onClick={onRaise}
+        disabled={raised || busy}
+        className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-200 disabled:opacity-50 ${
+          raised
+            ? "border-yellow-400/50 bg-yellow-400/20 text-yellow-200"
+            : "border-white/20 bg-white/10 text-white hover:border-white/30 hover:bg-white/20"
+        }`}
+      >
+        <Hand className={`h-3.5 w-3.5 ${raised ? "animate-pulse" : ""}`} />
+        <span>{raised ? t.raised : t.raise}</span>
+      </button>
+      {error && (
+        <span className="absolute right-0 top-full mt-1 whitespace-nowrap rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }

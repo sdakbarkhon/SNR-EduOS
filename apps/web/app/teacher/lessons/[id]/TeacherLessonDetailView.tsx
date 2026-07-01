@@ -16,7 +16,7 @@ import {
   getSubjectStyle, getLessonExcuseRequests,
   getLeaveRequestsForLesson, decideLeaveRequest,
   getQuizQuestions, replaceQuizQuestions,
-  setActiveStage, setDemoMaterial,
+  setActiveStage, setDemoMaterial, lowerHand,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -643,6 +643,36 @@ export function TeacherLessonDetailView({
     getLeaveRequestsForLesson(db as never, lesson.id).then(setLeaveReqs).catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id]);
+
+  // Blocking "student raised hand" notification — separate from the always-
+  // visible RaisedHandsBlock list, fires only on a fresh INSERT so it doesn't
+  // reappear on every re-render or when a hand is lowered.
+  const [raisedHandModal, setRaisedHandModal] = useState<{ studentName: string; handId: string } | null>(null);
+  const handleRaisedHandInsert = useCallback((payload: { eventType: string; new: Record<string, unknown> }) => {
+    if (payload.eventType !== "INSERT") return;
+    const studentId = payload.new.student_id as string | undefined;
+    const handId = payload.new.id as string | undefined;
+    if (!studentId || !handId) return;
+    (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { single: () => Promise<{ data: { full_name: string } | null }> } } } })
+      .from("students").select("full_name").eq("id", studentId).single()
+      .then(({ data }) => setRaisedHandModal({ studentName: data?.full_name ?? "Ученик", handId }))
+      .catch(() => setRaisedHandModal({ studentName: "Ученик", handId }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useRealtimeChannel(
+    status === "in_progress" ? `lesson-hand-modal-${lesson.id}` : null,
+    "lesson_raised_hands",
+    `lesson_id=eq.${lesson.id}`,
+    handleRaisedHandInsert,
+  );
+
+  async function handleAcknowledgeRaisedHand() {
+    if (!raisedHandModal) return;
+    const handId = raisedHandModal.handId;
+    setRaisedHandModal(null);
+    await lowerHand(db as never, handId, teacher.id).catch(() => null);
+  }
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -1604,6 +1634,25 @@ export function TeacherLessonDetailView({
         confirmText="Удалить"
         cancelText={d.common.cancel}
       />
+
+      {/* Student raised hand — blocking notification */}
+      {mounted && raisedHandModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="mb-4 text-center text-6xl">✋</div>
+            <h3 className="mb-6 text-center text-xl font-bold text-slate-900">
+              {dl.raisedHand.studentRaisedHand.replace("{name}", raisedHandModal.studentName)}
+            </h3>
+            <button
+              onClick={handleAcknowledgeRaisedHand}
+              className="w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
+            >
+              {dl.raisedHand.acknowledge}
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Submissions review — code vs external service */}
       {mounted && reviewStage && (

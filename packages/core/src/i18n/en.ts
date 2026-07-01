@@ -632,6 +632,9 @@ export const en: Dictionary = {
       lower: "Lower hand",
       agoSeconds: "{n} sec ago",
       agoMinutes: "{n} min ago",
+      error: "Failed to raise hand",
+      studentRaisedHand: "{name} raised their hand",
+      acknowledge: "Acknowledged",
     },
     workspace: {
       live: "Lesson in progress",
