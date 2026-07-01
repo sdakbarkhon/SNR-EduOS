@@ -10,6 +10,14 @@
 -- exist to be the "Demo Mode" button's destination.
 -- =====================================================================
 
+-- pgcrypto IS already installed on this project, but in the `extensions`
+-- schema (Supabase's convention for hosted projects) — not `public`, and not
+-- necessarily on the search_path a migration runs with. Unqualified crypt()/
+-- gen_salt() calls therefore fail with "function does not exist" (42883).
+-- `IF NOT EXISTS` makes this a no-op if it's already there; the schema calls
+-- below are qualified explicitly so this works regardless of search_path.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 -- 1. Unflag the old accounts — they keep their data, just stop being "demo".
 UPDATE auth.users
 SET raw_user_meta_data = raw_user_meta_data - 'is_demo'
@@ -41,7 +49,7 @@ BEGIN
       phone_change, phone_change_token, email_change_token_current, reauthentication_token
     ) VALUES (
       '00000000-0000-0000-0000-000000000000', v_teacher_user, 'authenticated', 'authenticated',
-      'demo_teacher@demo.snr.local', crypt('demo2026', gen_salt('bf')), now(),
+      'demo_teacher@demo.snr.local', extensions.crypt('demo2026', extensions.gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}'::jsonb, '{"is_demo":true}'::jsonb,
       now(), now(), '', '', '', '', '', '', '', ''
     );
@@ -72,7 +80,7 @@ BEGIN
       phone_change, phone_change_token, email_change_token_current, reauthentication_token
     ) VALUES (
       '00000000-0000-0000-0000-000000000000', v_student_user, 'authenticated', 'authenticated',
-      'demo_student@demo.snr.local', crypt('demo2026', gen_salt('bf')), now(),
+      'demo_student@demo.snr.local', extensions.crypt('demo2026', extensions.gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}'::jsonb, '{"is_demo":true}'::jsonb,
       now(), now(), '', '', '', '', '', '', '', ''
     );
