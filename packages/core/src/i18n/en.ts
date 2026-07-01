@@ -382,6 +382,8 @@ export const en: Dictionary = {
     supportedFormats: "Supported: PDF, video, images",
     lessonMustBeActive: "The lesson must be started",
     onlyTeacherCanClose: "Only the teacher can close this",
+    minimizeDemo: "Minimize",
+    maximizeDemo: "Expand",
   },
   announcements: {
     title: "Announcements",

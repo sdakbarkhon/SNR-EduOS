@@ -382,6 +382,8 @@ export const ru: Dictionary = {
     supportedFormats: "Поддерживаются: PDF, видео, картинки",
     lessonMustBeActive: "Урок должен быть начат",
     onlyTeacherCanClose: "Только учитель может закрыть",
+    minimizeDemo: "Свернуть",
+    maximizeDemo: "Развернуть",
   },
   announcements: {
     title: "Объявления",

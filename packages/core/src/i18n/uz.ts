@@ -382,6 +382,8 @@ export const uz: Dictionary = {
     supportedFormats: "Qo'llab-quvvatlanadi: PDF, video, rasmlar",
     lessonMustBeActive: "Dars boshlangan bo'lishi kerak",
     onlyTeacherCanClose: "Faqat o'qituvchi yopa oladi",
+    minimizeDemo: "Yig'ish",
+    maximizeDemo: "Yoyish",
   },
   announcements: {
     title: "E'lonlar",

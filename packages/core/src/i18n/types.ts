@@ -381,6 +381,8 @@ export interface Dictionary {
     supportedFormats: string;
     lessonMustBeActive: string;
     onlyTeacherCanClose: string; // "Только учитель может закрыть"
+    minimizeDemo: string;       // "Свернуть"
+    maximizeDemo: string;       // "Развернуть"
   };
   announcements: {
     title: string;

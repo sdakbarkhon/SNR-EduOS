@@ -8,6 +8,7 @@ import {
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, LogOut, Monitor, Type,
+  Minimize2, Maximize2,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -40,6 +41,7 @@ import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
+import { demoKind } from "@/lib/material-kind";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
@@ -617,6 +619,25 @@ export function TeacherLessonDetailView({
 
   const [materials, setMaterials] = useState<LessonMaterial[]>(lesson.materials);
   const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
+  // Teacher sees the same material they're broadcasting — fetched lazily
+  // (view-only URL, no forced download — see Prompt 11 Part 1) whenever
+  // demoMaterialId changes. Minimize is teacher-only UI state; it never
+  // touches demo_material_id, so students are unaffected either way.
+  const [demoMaterialUrl, setDemoMaterialUrl] = useState<string | null>(null);
+  const [demoMinimized, setDemoMinimized] = useState(false);
+  useEffect(() => {
+    setDemoMinimized(false);
+    if (!demoMaterialId) { setDemoMaterialUrl(null); return; }
+    const mat = materials.find((m) => m.id === demoMaterialId);
+    if (!mat) { setDemoMaterialUrl(null); return; }
+    let cancelled = false;
+    getLessonMaterialUrl(db, mat.file_storage_path)
+      .then((url) => { if (!cancelled) setDemoMaterialUrl(url); })
+      .catch(() => { if (!cancelled) setDemoMaterialUrl(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoMaterialId]);
+
   const [uploadModal, setUploadModal] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -1637,6 +1658,91 @@ export function TeacherLessonDetailView({
         confirmText="Удалить"
         cancelText={d.common.cancel}
       />
+
+      {/* Teacher's own preview of the material being demonstrated to the class.
+          Minimize is local UI state only — it never touches demo_material_id,
+          so students keep seeing the fullscreen broadcast regardless. Stopping
+          the demo (for everyone) stays the existing materials-list toggle. */}
+      {mounted && demoMaterialId && demoMaterialUrl && typeof document !== "undefined" && (() => {
+        const mat = materials.find((m) => m.id === demoMaterialId);
+        const name = mat?.file_original_name ?? mat?.title ?? "";
+        const kind = demoKind(name);
+
+        if (demoMinimized) {
+          return createPortal(
+            <div className="fixed bottom-6 right-6 z-[9999] flex w-72 flex-col overflow-hidden rounded-2xl border border-violet-300 bg-white shadow-2xl">
+              <div className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 px-3 py-2 text-white">
+                <Monitor className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-xs font-bold">{mat?.title ?? d.demo.showingNow}</span>
+                <button
+                  onClick={() => setDemoMinimized(false)}
+                  title={d.demo.maximizeDemo}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white/80 hover:bg-white/20 hover:text-white"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="flex h-32 items-center justify-center bg-slate-900">
+                {kind === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={demoMaterialUrl} alt={name} className="h-full w-full object-cover" />
+                ) : (
+                  <Monitor className="h-8 w-8 text-white/40" />
+                )}
+              </div>
+              <button
+                onClick={() => demoMaterialId && handleToggleDemo(demoMaterialId)}
+                className="border-t border-slate-100 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+              >
+                {d.demo.stopShowing}
+              </button>
+            </div>,
+            document.body,
+          );
+        }
+
+        return createPortal(
+          <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
+            <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />
+              <span className="truncate text-sm font-medium">
+                {d.demo.teacherShowing}{mat?.title ? `: ${mat.title}` : ""}
+              </span>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => setDemoMinimized(true)}
+                  className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+                >
+                  <Minimize2 className="h-3.5 w-3.5" /> {d.demo.minimizeDemo}
+                </button>
+                <button
+                  onClick={() => demoMaterialId && handleToggleDemo(demoMaterialId)}
+                  className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                >
+                  {d.demo.stopShowing}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-white">
+              {kind === "pdf" ? (
+                <iframe src={`${demoMaterialUrl}#toolbar=0`} title={name} className="h-full w-full" />
+              ) : kind === "video" ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={demoMaterialUrl} controls autoPlay className="mx-auto h-full max-h-full w-full bg-black object-contain" />
+              ) : kind === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={demoMaterialUrl} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
+                  <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>
+                  <p className="text-xs text-slate-400">{d.demo.supportedFormats}</p>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        );
+      })()}
 
       {/* Student raised hand — blocking notification */}
       {mounted && raisedHandModal && typeof document !== "undefined" && createPortal(

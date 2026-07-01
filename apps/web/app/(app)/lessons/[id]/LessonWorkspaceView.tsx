@@ -23,6 +23,7 @@ import { ExternalStageModal } from "./ExternalStageModal";
 import { QiaQuizModal } from "./QiaQuizModal";
 import { KahootStudentModal } from "./KahootStudentModal";
 import { isExternalService } from "@/lib/external-services";
+import { demoKind } from "@/lib/material-kind";
 import { createClient } from "@/lib/supabase/client";
 
 function initials(name: string): string {
@@ -44,14 +45,6 @@ function fmtElapsed(ms: number): string {
   return [h, m, s].map((x) => String(x).padStart(2, "0")).join(":");
 }
 
-// Demo block: how to render a shown material, by file extension.
-function demoKind(name: string): "pdf" | "video" | "image" | "other" {
-  const ext = (name.split(".").pop() ?? "").toLowerCase();
-  if (ext === "pdf") return "pdf";
-  if (["mp4", "webm", "ogg", "mov", "m4v"].includes(ext)) return "video";
-  if (["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"].includes(ext)) return "image";
-  return "other";
-}
 
 function materialIcon(name: string): { Icon: typeof FileText; cls: string } {
   const ext = (name.split(".").pop() ?? "").toLowerCase();
