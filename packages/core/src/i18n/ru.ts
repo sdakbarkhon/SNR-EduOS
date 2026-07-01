@@ -579,6 +579,8 @@ export const ru: Dictionary = {
       of: "из",
       exportPptx: "Скачать PPTX",
       empty: "Контент этапа не подготовлен",
+      slideOf: "Слайд {current} из {total}",
+      teacherOnly: "Только учитель может переключать слайды",
     },
     contentSource: {
       label: "Источник контента",

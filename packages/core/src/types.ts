@@ -133,6 +133,8 @@ export type LessonStage = {
   teacher_notes?: string | null;
   // migration 60 — слайды презентации для этапа теории
   slides?: LessonSlide[] | null;
+  // migration 61 — синхронный показ: какой слайд сейчас открыт (управляет учитель)
+  current_slide_index?: number;
 };
 
 /** Слайд презентации (этап теории). Хранится в lesson_stages.slides (jsonb). */

@@ -579,6 +579,8 @@ export const en: Dictionary = {
       of: "of",
       exportPptx: "Download PPTX",
       empty: "Stage content is not ready yet",
+      slideOf: "Slide {current} of {total}",
+      teacherOnly: "Only the teacher can switch slides",
     },
     contentSource: {
       label: "Content source",

@@ -1345,7 +1345,7 @@ export const getStudentLessonView = async (
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
-    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
   ]);
 
@@ -1386,6 +1386,23 @@ export async function setActiveStage(
     .from("lessons")
     .update({ active_stage_id: stageId })
     .eq("id", lessonId);
+  if (error) throw error;
+}
+
+/**
+ * Учитель переключает слайд презентации (этап теории). Realtime на lesson_stages
+ * доставляет изменение current_slide_index ученикам — они синхронно следуют.
+ */
+export async function setCurrentSlide(
+  db: Db,
+  stageId: string,
+  slideIndex: number,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lesson_stages")
+    .update({ current_slide_index: slideIndex })
+    .eq("id", stageId);
   if (error) throw error;
 }
 

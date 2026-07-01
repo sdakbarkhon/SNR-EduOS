@@ -579,6 +579,8 @@ export const uz: Dictionary = {
       of: "/",
       exportPptx: "PPTX yuklab olish",
       empty: "Bosqich kontenti hali tayyor emas",
+      slideOf: "Slayd {current} / {total}",
+      teacherOnly: "Faqat o'qituvchi slaydlarni almashtira oladi",
     },
     contentSource: {
       label: "Kontent manbasi",

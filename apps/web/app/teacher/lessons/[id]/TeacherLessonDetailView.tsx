@@ -38,6 +38,8 @@ import { useRealtimeChannel } from "@/lib/realtime";
 import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
+import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
+import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
@@ -1144,59 +1146,76 @@ export function TeacherLessonDetailView({
               const isPassed = stage.position < activePos && activeStageId !== null;
               const isActivating = activatingStageId === stage.id;
 
+              const hasSlides = isActive && stage.slides && stage.slides.length > 0;
+
               return (
-                <div
-                  key={stage.id}
-                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                    isActive ? "bg-violet-50" : ""
-                  }`}
-                >
-                  {/* State indicator */}
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    isActive
-                      ? "bg-violet-600 text-white"
-                      : isPassed
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-100 text-slate-500"
-                  }`}>
-                    {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
-                  </div>
+                <div key={stage.id}>
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                      isActive ? "bg-violet-50" : ""
+                    }`}
+                  >
+                    {/* State indicator */}
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      isActive
+                        ? "bg-violet-600 text-white"
+                        : isPassed
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}>
+                      {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
+                    </div>
 
-                  {/* Title + badge */}
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
-                      {stage.title}
-                    </span>
-                    {isActive && (
-                      <p className="mt-0.5 text-[11px] text-violet-500">{dl.activeStage.studentsSeeThis}</p>
-                    )}
-                  </div>
+                    {/* Title + badge */}
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
+                        {stage.title}
+                      </span>
+                      {isActive && (
+                        <p className="mt-0.5 text-[11px] text-violet-500">{dl.activeStage.studentsSeeThis}</p>
+                      )}
+                    </div>
 
-                  {/* Status label or button */}
-                  {isActive ? (
-                    <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
-                      {dl.activeStage.activeNow}
-                    </span>
-                  ) : isPassed ? (
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-[11px] font-semibold text-emerald-600">{dl.activeStage.passed}</span>
+                    {/* Status label or button */}
+                    {isActive ? (
+                      <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
+                        {dl.activeStage.activeNow}
+                      </span>
+                    ) : isPassed ? (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-[11px] font-semibold text-emerald-600">{dl.activeStage.passed}</span>
+                        <button
+                          onClick={() => handleActivateStage(stage.id)}
+                          disabled={status !== "in_progress" || isActivating}
+                          className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isActivating ? "…" : dl.activeStage.activate}
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         onClick={() => handleActivateStage(stage.id)}
                         disabled={status !== "in_progress" || isActivating}
-                        className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
+                        className="shrink-0 flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {isActivating ? "…" : dl.activeStage.activate}
+                        {isActivating ? "…" : `▶ ${dl.activeStage.activate}`}
                       </button>
+                    )}
+                  </div>
+
+                  {/* Teacher presentation control — drives students' current_slide_index via Realtime */}
+                  {hasSlides && (
+                    <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
+                      <SlideViewer
+                        slides={stage.slides ?? []}
+                        canExport
+                        onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                        isTeacher
+                        stageId={stage.id}
+                        initialSlide={stage.current_slide_index ?? 0}
+                      />
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => handleActivateStage(stage.id)}
-                      disabled={status !== "in_progress" || isActivating}
-                      title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
-                      className="shrink-0 flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {isActivating ? "…" : `▶ ${dl.activeStage.activate}`}
-                    </button>
                   )}
                 </div>
               );

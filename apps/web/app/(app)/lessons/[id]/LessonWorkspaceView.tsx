@@ -750,13 +750,18 @@ export function LessonWorkspaceView({
                     )}
                   </div>
 
-                  {/* Theory: full presentation (slides) when generated, else plain text */}
+                  {/* Theory: full presentation (slides) when generated, else plain text.
+                      Students never drive navigation — they follow the teacher's
+                      current_slide_index via Realtime inside SlideViewer. */}
                   {stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
                     <div className="mb-3 h-[70vh] min-h-[460px]">
                       <SlideViewer
                         slides={stage.slides}
                         canExport
                         onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                        isTeacher={false}
+                        stageId={stage.id}
+                        initialSlide={stage.current_slide_index ?? 0}
                       />
                     </div>
                   ) : stage.description ? (

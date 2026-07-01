@@ -580,6 +580,8 @@ export interface Dictionary {
       of: string;
       exportPptx: string;
       empty: string;
+      slideOf: string;
+      teacherOnly: string;
     };
     contentSource: {
       label: string;
