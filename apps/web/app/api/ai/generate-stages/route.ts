@@ -46,12 +46,13 @@ function buildPrompt(input: {
   const programmingSection = isProgramming ? `
 
 СПЕЦИАЛЬНЫЕ ПРАВИЛА ДЛЯ ПРОГРАММИРОВАНИЯ (subject = "${input.subject}"):
-Для этапов content_type="code" используй паттерн прогрессии:
-1. DEMO-этап: stage_type="theory", title начинается с "Демо:", teacher_notes содержит ПОЛНЫЙ рабочий код примера, description объясняет что происходит в коде.
+Используй паттерн прогрессии из 3 этапов, ВСЕ с content_type="code" (student увидит редактор кода на каждом):
+1. DEMO-этап: stage_type="theory", title начинается с "Демо:", starter_code = ПОЛНЫЙ рабочий код примера (ученик видит и может запустить), description объясняет что происходит в коде, teacher_notes = краткие педагогические подсказки (не дублируй код сюда).
 2. PRACTICE-этап: stage_type="task", title начинается с "Практика:", starter_code = скелет с TODO-комментариями для ученика, description = что нужно дополнить, teacher_notes = готовое решение.
 3. TASK-этап (если время позволяет): stage_type="task", title начинается с "Задание:", starter_code = только комментарии-инструкции (без кода), description = условие задачи, teacher_notes = эталонное решение.
 
-ОБЯЗАТЕЛЬНО заполняй starter_code для PRACTICE и TASK этапов code!` : "";
+Для КАЖДОГО из 3 этапов заполняй programming_language ("python" или "cpp" — по умолчанию "python").
+ОБЯЗАТЕЛЬНО заполняй starter_code для ВСЕХ трёх этапов (включая DEMO — это код, который увидит ученик)!` : "";
 
   return `Ты — методический ассистент для учителя в школе Узбекистана.
 
@@ -117,7 +118,8 @@ ${programmingSection}
   "title": "Короткое название",
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",
   "teacher_notes": "Педагогические подсказки для учителя: на что обратить внимание, типичные ошибки, решение, эталонный код",
-  "starter_code": "Стартовый код для code-этапов (скелет или только комментарии — только для PRACTICE/TASK)",
+  "starter_code": "Код для этапа content_type='code' — полный для DEMO, скелет для PRACTICE, только комментарии для TASK",
+  "programming_language": "python"|"cpp",
   "slides": [
     { "layout": "title", "title": "...", "content": "..." },
     { "layout": "split", "title": "...", "content": "## ...\\n- ...", "image_prompt": "..." },
@@ -164,11 +166,14 @@ interface GenStage {
   description?: string;
   teacher_notes?: string;
   starter_code?: string;
+  programming_language?: string;
   slides?: GenSlide[];
   difficulty?: string;
   duration_min?: number;
   stage_type?: string;
 }
+
+const RUNNABLE_LANGUAGES = ["python", "cpp"];
 
 interface GenResult {
   lesson_title_suggestion?: string;
@@ -202,6 +207,9 @@ function normalizeStage(s: GenStage): GenStage | null {
     ? s.teacher_notes.trim() : undefined;
   const starter_code = typeof s.starter_code === "string" && s.starter_code.trim()
     ? s.starter_code.trim() : undefined;
+  const programming_language = ct === "code"
+    ? (RUNNABLE_LANGUAGES.includes(String(s.programming_language)) ? String(s.programming_language) : "python")
+    : undefined;
   // Slides only meaningful for presentation stages
   const slides = ct === "presentation" && Array.isArray(s.slides)
     ? s.slides
@@ -232,7 +240,7 @@ function normalizeStage(s: GenStage): GenStage | null {
         })
         .slice(0, 8)
     : undefined;
-  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, slides };
+  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, programming_language, slides };
 }
 
 function stripFences(text: string): string {

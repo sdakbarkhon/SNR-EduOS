@@ -97,6 +97,9 @@ function StageModal({
     title: string;
     description: string | null;
     teacherNotes?: string | null;
+    starterCode?: string | null;
+    programmingLanguage?: string | null;
+    expectedOutput?: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
   }) => Promise<void>;
@@ -123,10 +126,13 @@ function StageModal({
   const [saving, setSaving] = useState(false);
   const [stepError, setStepError] = useState("");
 
-  // code-stage config
-  const [codeLang, setCodeLang] = useState<CodeLanguage>(existingCfg.language ?? "python");
-  const [starterCode, setStarterCode] = useState(existingCfg.starter_code ?? "");
-  const [expectedOutput, setExpectedOutput] = useState(existingCfg.expected_output ?? "");
+  // code-stage — migration 62 promoted these to top-level columns; config is
+  // read as a fallback for stages saved before the migration.
+  const [codeLang, setCodeLang] = useState<CodeLanguage>(
+    (existing?.programming_language as CodeLanguage | undefined) ?? existingCfg.language ?? "python",
+  );
+  const [starterCode, setStarterCode] = useState(existing?.starter_code ?? existingCfg.starter_code ?? "");
+  const [expectedOutput, setExpectedOutput] = useState(existing?.expected_output ?? existingCfg.expected_output ?? "");
   const isCode = contentType === "code";
 
   // external-service config (scratch/wokwi/codesandbox/makecode)
@@ -192,7 +198,7 @@ function StageModal({
     let config: Record<string, unknown> | undefined;
     let quizQuestionsOut: QuizQuestionInput[] | undefined;
     if (isCode) {
-      config = { language: codeLang, starter_code: starterCode, expected_output: expectedOutput.trim() || undefined };
+      config = {};
     } else if (isExternal) {
       config = {
         url: extUrl.trim(),
@@ -214,6 +220,11 @@ function StageModal({
         stageType: stageType as LessonStageType, contentType,
         title: title.trim(), description: desc.trim() || null,
         teacherNotes: teacherNotes.trim() || null,
+        ...(isCode ? {
+          starterCode: starterCode || null,
+          programmingLanguage: codeLang,
+          expectedOutput: expectedOutput.trim() || null,
+        } : {}),
         config,
         quizQuestions: quizQuestionsOut,
       });
@@ -723,6 +734,9 @@ export function TeacherLessonDetailView({
     title: string;
     description: string | null;
     teacherNotes?: string | null;
+    starterCode?: string | null;
+    programmingLanguage?: string | null;
+    expectedOutput?: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
   }) {
@@ -745,6 +759,9 @@ export function TeacherLessonDetailView({
     title: string;
     description: string | null;
     teacherNotes?: string | null;
+    starterCode?: string | null;
+    programmingLanguage?: string | null;
+    expectedOutput?: string | null;
     config?: Record<string, unknown>;
     quizQuestions?: QuizQuestionInput[];
   }) {
@@ -756,6 +773,9 @@ export function TeacherLessonDetailView({
       teacher_notes: data.teacherNotes,
       stage_type: data.stageType,
       content_type: data.contentType,
+      ...(data.starterCode !== undefined ? { starter_code: data.starterCode } : {}),
+      ...(data.programmingLanguage !== undefined ? { programming_language: data.programmingLanguage } : {}),
+      ...(data.expectedOutput !== undefined ? { expected_output: data.expectedOutput } : {}),
       ...(data.config !== undefined ? { config: data.config } : {}),
     });
     if (data.quizQuestions) {

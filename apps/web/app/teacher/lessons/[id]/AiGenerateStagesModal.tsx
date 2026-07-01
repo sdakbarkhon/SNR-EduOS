@@ -21,6 +21,7 @@ interface GeneratedStage {
   description?: string;
   teacher_notes?: string;
   starter_code?: string;
+  programming_language?: string;
   slides?: LessonSlide[];
   difficulty: StageDifficulty;
   duration_min: number;
@@ -163,11 +164,7 @@ export function AiGenerateStagesModal({
     try {
       for (const s of toAdd) {
         const config: Record<string, unknown> = {};
-        if (s.content_type === "code") {
-          config.language = "python";
-          config.starter_code = s.starter_code ?? "";
-          config.expected_output = "";
-        } else if (s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot") {
+        if (s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot") {
           config.time_limit_minutes = null;
           config.points_per_question = 1;
         } else if (EXTERNAL.includes(s.content_type)) {
@@ -182,6 +179,10 @@ export function AiGenerateStagesModal({
           description: s.description ?? null,
           teacherNotes: s.teacher_notes ?? null,
           slides: s.slides && s.slides.length > 0 ? s.slides : null,
+          ...(s.content_type === "code" ? {
+            starterCode: s.starter_code ?? "",
+            programmingLanguage: s.programming_language ?? "python",
+          } : {}),
           config,
           difficulty: s.difficulty,
           durationMin: s.duration_min,

@@ -135,6 +135,11 @@ export type LessonStage = {
   slides?: LessonSlide[] | null;
   // migration 61 — синхронный показ: какой слайд сейчас открыт (управляет учитель)
   current_slide_index?: number;
+  // migration 62 — code-этапы: раньше жили только в config, теперь top-level
+  // (видны ученику, включая demo-этапы с stage_type='theory')
+  starter_code?: string | null;
+  programming_language?: string | null;
+  expected_output?: string | null;
 };
 
 export type LessonSlideLayout = "title" | "split" | "quote" | "code" | "default";

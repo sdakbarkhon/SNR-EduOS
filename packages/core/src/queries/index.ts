@@ -1345,7 +1345,7 @@ export const getStudentLessonView = async (
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
-    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
   ]);
 
@@ -1600,6 +1600,9 @@ export const addLessonStage = async (
     description: string | null;
     teacherNotes?: string | null;
     slides?: LessonSlide[] | null;
+    starterCode?: string | null;
+    programmingLanguage?: string | null;
+    expectedOutput?: string | null;
     config?: Record<string, unknown>;
     difficulty?: StageDifficulty;
     durationMin?: number | null;
@@ -1630,6 +1633,9 @@ export const addLessonStage = async (
       description: input.description ?? null,
       ...(input.teacherNotes !== undefined ? { teacher_notes: input.teacherNotes } : {}),
       ...(input.slides !== undefined ? { slides: input.slides } : {}),
+      ...(input.starterCode !== undefined ? { starter_code: input.starterCode } : {}),
+      ...(input.programmingLanguage !== undefined ? { programming_language: input.programmingLanguage } : {}),
+      ...(input.expectedOutput !== undefined ? { expected_output: input.expectedOutput } : {}),
       config: input.config ?? {},
       ...(input.difficulty ? { difficulty: input.difficulty } : {}),
       ...(input.durationMin !== undefined ? { duration_min: input.durationMin } : {}),
@@ -1649,6 +1655,9 @@ export const updateLessonStage = async (
     description?: string | null;
     teacher_notes?: string | null;
     slides?: LessonSlide[] | null;
+    starter_code?: string | null;
+    programming_language?: string | null;
+    expected_output?: string | null;
     stage_type?: LessonStageType;
     content_type?: LessonContentType | null;
     config?: Record<string, unknown>;
