@@ -380,6 +380,7 @@ export interface Dictionary {
     unsupportedFormat: string;
     supportedFormats: string;
     lessonMustBeActive: string;
+    onlyTeacherCanClose: string; // "Только учитель может закрыть"
   };
   announcements: {
     title: string;

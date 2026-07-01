@@ -381,6 +381,7 @@ export const en: Dictionary = {
     unsupportedFormat: "This format is not supported for showing",
     supportedFormats: "Supported: PDF, video, images",
     lessonMustBeActive: "The lesson must be started",
+    onlyTeacherCanClose: "Only the teacher can close this",
   },
   announcements: {
     title: "Announcements",

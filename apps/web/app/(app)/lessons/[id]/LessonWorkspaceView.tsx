@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Clock, Check, FileText, FileCode2, File, Menu,
-  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Monitor,
+  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -482,39 +482,42 @@ export function LessonWorkspaceView({
         </div>
       </header>
 
-      {/* Teacher is showing a material to the whole class (Realtime broadcast) */}
-      {demoMaterialId && (() => {
+      {/* Teacher is showing a material to the whole class (Realtime broadcast).
+          Fullscreen — no sidebar/topbar/scroll, and no close control on the
+          student side. Only the teacher stopping the demo (demo_material_id
+          → null, synced via Realtime) can dismiss it. */}
+      {mounted && demoMaterialId && (() => {
         const mat = lesson.materials.find((m) => m.id === demoMaterialId);
         const url = mat ? materialUrls[mat.id] : undefined;
         const name = mat?.file_original_name ?? mat?.title ?? "";
         const kind = demoKind(name);
-        return (
-          <section className="overflow-hidden rounded-2xl border-2 border-violet-300 shadow-xl">
-            <div className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 px-5 py-3 text-white">
-              <Monitor className="h-5 w-5 shrink-0" />
-              <span className="text-sm font-bold">{d.demo.teacherShowing}</span>
-              {mat?.title && <span className="truncate text-sm text-white/80">— {mat.title}</span>}
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> Live
+        return createPortal(
+          <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
+            <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />
+              <span className="truncate text-sm font-medium">
+                {d.demo.teacherShowing}{mat?.title ? `: ${mat.title}` : ""}
               </span>
+              <span className="ml-auto shrink-0 text-xs text-white/60">{d.demo.onlyTeacherCanClose}</span>
             </div>
-            <div className="bg-slate-900">
+            <div className="flex-1 overflow-auto bg-white">
               {mat && url && kind === "pdf" ? (
-                <iframe src={`${url}#toolbar=0`} title={name} className="h-[600px] w-full bg-white" />
+                <iframe src={`${url}#toolbar=0`} title={name} className="h-full w-full" />
               ) : mat && url && kind === "video" ? (
                 // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={url} controls autoPlay className="mx-auto max-h-[600px] w-full bg-black" />
+                <video src={url} controls autoPlay className="mx-auto h-full max-h-full w-full bg-black object-contain" />
               ) : mat && url && kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt={name} className="mx-auto max-h-[600px] w-full object-contain" />
+                <img src={url} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
               ) : (
-                <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
-                  <p className="text-sm font-semibold text-white">{d.demo.unsupportedFormat}</p>
-                  <p className="text-xs text-white/60">{d.demo.supportedFormats}</p>
+                <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
+                  <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>
+                  <p className="text-xs text-slate-400">{d.demo.supportedFormats}</p>
                 </div>
               )}
             </div>
-          </section>
+          </div>,
+          document.body,
         );
       })()}
 
