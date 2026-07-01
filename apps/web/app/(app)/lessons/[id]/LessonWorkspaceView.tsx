@@ -769,8 +769,10 @@ export function LessonWorkspaceView({
                   ) : null}
 
 
-                  {/* Task */}
-                  {stage.stage_type === "task" && (
+                  {/* Task — also shown for stage_type='theory' code stages (AI "Демо:"
+                      stages): a code editor is a valid thing to open regardless of
+                      whether the stage counts as a gradable task. */}
+                  {(stage.stage_type === "task" || stage.content_type === "code") && (
                     <div className="space-y-2">
                       {isGraded ? (
                         <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">

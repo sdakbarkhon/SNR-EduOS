@@ -37,9 +37,11 @@ export function CodeStageView({
   const w = d.lesson.workspace;
   const db = createClient();
 
+  // migration 62 promoted these to top-level columns; config is a fallback
+  // for stages created before the migration.
   const cfg = (stage.config ?? {}) as Partial<CodeStageConfig>;
-  const language: CodeLanguage = cfg.language ?? "python";
-  const starter = cfg.starter_code ?? "";
+  const language: CodeLanguage = (stage.programming_language as CodeLanguage | null) ?? cfg.language ?? "python";
+  const starter = stage.starter_code ?? cfg.starter_code ?? "";
 
   const existingSub = (stage.progress?.submission_data ?? null) as CodeSubmission | null;
   const isSubmitted = !!stage.progress?.submission_data;
