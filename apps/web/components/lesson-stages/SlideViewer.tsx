@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { getDictionary, setCurrentSlide } from "@snr/core";
 import type { Locale, LessonSlide } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { SlideBody } from "./SlideBody";
 
 export function SlideViewer({
   slides,
@@ -66,29 +65,10 @@ export function SlideViewer({
   if (!slide) return null;
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
-      {/* Slide body */}
-      <div className="flex-1 overflow-auto p-8 md:p-12">
-        <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-slate-100 md:text-4xl">
-          {slide.title}
-        </h2>
-
-        <div className="grid items-start gap-8 md:grid-cols-2">
-          <div className="prose prose-slate max-w-none text-lg leading-relaxed dark:prose-invert">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{slide.content}</ReactMarkdown>
-          </div>
-
-          {slide.image_url && (
-            <div className="flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={slide.image_url}
-                alt={slide.title}
-                className="h-auto max-w-full rounded-xl shadow-lg"
-              />
-            </div>
-          )}
-        </div>
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl shadow-xl">
+      {/* Slide body — layout-specific rendering (title/split/quote/code/default) */}
+      <div className="flex-1 overflow-auto">
+        <SlideBody slide={slide} current={current} total={slides.length} />
       </div>
 
       {/* Navigation */}

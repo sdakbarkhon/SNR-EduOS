@@ -88,16 +88,27 @@ ${programmingSection}
 ДЛЯ ЭТАПОВ ТЕОРИИ (content_type='presentation'):
 Сгенерируй массив слайдов презентации в поле "slides".
 Каждый слайд содержит:
+- layout: ОДИН ИЗ "title" | "split" | "quote" | "code" | "default" (см. правила ниже)
 - title: заголовок слайда (текст)
 - content: содержимое в формате markdown (заголовки ##, списки -, **жирный**, параграфы)
-- image_prompt: описание картинки НА АНГЛИЙСКОМ для генерации (опционально)
+- image_prompt: описание картинки НА АНГЛИЙСКОМ для генерации (только для layout='split')
+- code: { language, content } — только для layout='code'
+- quote: { text, author? } — только для layout='quote'
+
+ПРАВИЛА ВЫБОРА layout:
+- 'title' — ПЕРВЫЙ слайд урока: крупный заголовок темы + короткое вводное описание
+- 'split' — визуальная концепция (объект, схема, процесс) — ОБЯЗАТЕЛЬНО заполни image_prompt
+- 'code' — есть фрагмент кода для показа (для программирования/информатики) — заполни code.language и code.content
+- 'quote' — важное определение или ключевая мысль крупным текстом — заполни quote.text (и quote.author, если это цитата человека, иначе не указывай)
+- 'default' — обычный слайд с заголовком и текстом/списком (используй чаще всего)
+
+Типичная структура: 1 слайд 'title' в начале, затем 3–5 слайдов 'default'/'split'/'code' по содержимому,
+изредка один 'quote' для ключевого определения. НЕ делай все слайды одного layout.
 
 ВАЖНО ДЛЯ СЛАЙДОВ:
 - НИКАКИХ эмодзи в контенте
 - Академический стиль, понятные формулировки для школьников
 - Сам реши сколько слайдов нужно (обычно 3–6 на тему)
-- Если тема визуальная (схемы, объекты, диаграммы) — добавь image_prompt
-- Если тема абстрактная (определения, правила) — image_prompt опусти
 
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
@@ -107,7 +118,12 @@ ${programmingSection}
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",
   "teacher_notes": "Педагогические подсказки для учителя: на что обратить внимание, типичные ошибки, решение, эталонный код",
   "starter_code": "Стартовый код для code-этапов (скелет или только комментарии — только для PRACTICE/TASK)",
-  "slides": [{ "title": "...", "content": "## ...\\n- ...", "image_prompt": "..." }],
+  "slides": [
+    { "layout": "title", "title": "...", "content": "..." },
+    { "layout": "split", "title": "...", "content": "## ...\\n- ...", "image_prompt": "..." },
+    { "layout": "code", "title": "...", "content": "Пояснение к коду", "code": { "language": "python", "content": "def f():\\n    pass" } },
+    { "layout": "quote", "title": "...", "content": "", "quote": { "text": "...", "author": "..." } }
+  ],
   "difficulty": "easy"|"medium"|"hard",
   "duration_min": число
 }
@@ -125,10 +141,21 @@ ${programmingSection}
 }
 
 interface GenSlide {
+  layout?: string;
   title?: string;
   content?: string;
   image_prompt?: string;
   image_url?: string;
+  code?: { language?: string; content?: string };
+  quote?: { text?: string; author?: string };
+}
+
+const SLIDE_LAYOUTS = ["title", "split", "quote", "code", "default"];
+const CODE_LANGUAGES = ["python", "javascript", "typescript", "cpp", "html", "css"];
+
+function normalizeSlideLayout(raw: unknown): string {
+  const layout = String(raw ?? "default");
+  return SLIDE_LAYOUTS.includes(layout) ? layout : "default";
 }
 
 interface GenStage {
@@ -179,12 +206,30 @@ function normalizeStage(s: GenStage): GenStage | null {
   const slides = ct === "presentation" && Array.isArray(s.slides)
     ? s.slides
         .filter((sl): sl is GenSlide => !!sl && typeof sl.title === "string" && typeof sl.content === "string")
-        .map((sl) => ({
-          title: sl.title!.trim(),
-          content: sl.content!.trim(),
-          ...(typeof sl.image_prompt === "string" && sl.image_prompt.trim()
-            ? { image_prompt: sl.image_prompt.trim() } : {}),
-        }))
+        .map((sl) => {
+          const layout = normalizeSlideLayout(sl.layout);
+          const code = layout === "code" && sl.code && typeof sl.code.content === "string" && sl.code.content.trim()
+            ? {
+                language: CODE_LANGUAGES.includes(String(sl.code.language)) ? String(sl.code.language) : "python",
+                content: sl.code.content.trim(),
+              }
+            : undefined;
+          const quote = layout === "quote" && sl.quote && typeof sl.quote.text === "string" && sl.quote.text.trim()
+            ? {
+                text: sl.quote.text.trim(),
+                ...(typeof sl.quote.author === "string" && sl.quote.author.trim() ? { author: sl.quote.author.trim() } : {}),
+              }
+            : undefined;
+          return {
+            layout,
+            title: sl.title!.trim(),
+            content: sl.content!.trim(),
+            ...(layout === "split" && typeof sl.image_prompt === "string" && sl.image_prompt.trim()
+              ? { image_prompt: sl.image_prompt.trim() } : {}),
+            ...(code ? { code } : {}),
+            ...(quote ? { quote } : {}),
+          };
+        })
         .slice(0, 8)
     : undefined;
   return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, slides };

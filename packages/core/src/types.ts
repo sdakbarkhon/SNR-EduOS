@@ -137,12 +137,27 @@ export type LessonStage = {
   current_slide_index?: number;
 };
 
+export type LessonSlideLayout = "title" | "split" | "quote" | "code" | "default";
+
+export type LessonSlideCode = {
+  language: "python" | "javascript" | "typescript" | "cpp" | "html" | "css";
+  content: string;
+};
+
+export type LessonSlideQuote = {
+  text: string;
+  author?: string;
+};
+
 /** Слайд презентации (этап теории). Хранится в lesson_stages.slides (jsonb). */
 export type LessonSlide = {
+  layout?: LessonSlideLayout;
   title: string;
   content: string;
   image_url?: string;
   image_prompt?: string;
+  code?: LessonSlideCode;
+  quote?: LessonSlideQuote;
 };
 
 export type LessonStageProgress = {
