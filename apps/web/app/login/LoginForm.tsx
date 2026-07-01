@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { defaultLocale, getDictionary, signInWithUsername } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { DemoRoleModal } from "@/components/DemoRoleModal";
 
 export function LoginForm() {
   const d = getDictionary(defaultLocale);
@@ -15,6 +16,7 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -153,6 +155,19 @@ export function LoginForm() {
         </div>
       </form>
 
+      <div className="mt-6 border-t border-white/30 pt-6">
+        <button
+          type="button"
+          onClick={() => setShowDemoModal(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-violet-200 bg-violet-50 px-4 py-3 font-medium text-violet-700 transition-all hover:bg-violet-100"
+        >
+          <Sparkles className="h-5 w-5" />
+          {d.demoMode.buttonLabel}
+        </button>
+        <p className="mt-2 text-center text-xs text-slate-500">{d.demoMode.buttonHint}</p>
+      </div>
+
+      {showDemoModal && <DemoRoleModal onClose={() => setShowDemoModal(false)} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getMyTeacher, getTeacherGroups, getSubjectConfig } from "@snr/core";
 import { TeacherShell } from "@/components/TeacherShell";
+import { DemoBanner } from "@/components/DemoBanner";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/auth";
 
@@ -12,6 +13,8 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   if (!user) redirect("/login");
   const role = await getCurrentUserRole(supabase, user.id);
   if (role !== "teacher") redirect("/login");
+
+  const isDemo = user.user_metadata?.is_demo === true;
 
   let teacherName = "";
   let avatarUrl: string | null = null;
@@ -34,8 +37,11 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   }
 
   return (
-    <TeacherShell teacherName={teacherName} teacherSubtitle={teacherSubtitle} avatarUrl={avatarUrl}>
-      {children}
-    </TeacherShell>
+    <>
+      <DemoBanner isDemo={isDemo} />
+      <TeacherShell teacherName={teacherName} teacherSubtitle={teacherSubtitle} avatarUrl={avatarUrl}>
+        {children}
+      </TeacherShell>
+    </>
   );
 }

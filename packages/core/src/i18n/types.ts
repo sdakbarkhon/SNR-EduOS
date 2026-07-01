@@ -384,6 +384,19 @@ export interface Dictionary {
     minimizeDemo: string;       // "Свернуть"
     maximizeDemo: string;       // "Развернуть"
   };
+  // Публичный "Демо-режим" на /login (Iter4 Prompt 14) — отдельный неймспейс
+  // от "demo" выше: тот про показ материала классу, этот про пробный вход.
+  demoMode: {
+    buttonLabel: string;   // "Демо-режим"
+    buttonHint: string;    // "Попробуйте платформу без регистрации"
+    modalTitle: string;    // "Демо-режим"
+    modalSubtitle: string; // "Выберите роль чтобы попробовать платформу"
+    loginBtn: string;      // "Войти"
+    loginProgress: string; // "Вход..."
+    bannerText: string;    // "Вы в демо-режиме. ..."
+    bannerLogout: string;  // "Выйти"
+    resetNote: string;     // "Данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент)."
+  };
   announcements: {
     title: string;
     empty: string;

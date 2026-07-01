@@ -385,6 +385,17 @@ export const uz: Dictionary = {
     minimizeDemo: "Yig'ish",
     maximizeDemo: "Yoyish",
   },
+  demoMode: {
+    buttonLabel: "Demo rejim",
+    buttonHint: "Ro'yxatdan o'tmasdan platformani sinab ko'ring",
+    modalTitle: "Demo rejim",
+    modalSubtitle: "Rolni tanlang va platformani sinab ko'ring",
+    loginBtn: "Kirish",
+    loginProgress: "Kirilmoqda...",
+    bannerText: "Siz demo rejimdasiz. Barcha ma'lumotlar sinov uchun. Har kuni Toshkent vaqti bilan soat 3:00 da qayta tiklash.",
+    bannerLogout: "Chiqish",
+    resetNote: "Sinov ma'lumotlari. Har kuni Toshkent vaqti bilan soat 3:00 da qayta tiklash.",
+  },
   announcements: {
     title: "E'lonlar",
     empty: "E'lonlar yo'q",

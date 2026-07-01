@@ -385,6 +385,17 @@ export const en: Dictionary = {
     minimizeDemo: "Minimize",
     maximizeDemo: "Expand",
   },
+  demoMode: {
+    buttonLabel: "Demo Mode",
+    buttonHint: "Try the platform without registration",
+    modalTitle: "Demo Mode",
+    modalSubtitle: "Choose a role to try the platform",
+    loginBtn: "Enter",
+    loginProgress: "Entering...",
+    bannerText: "You are in demo mode. All data is test data. Resets daily at 3 AM Tashkent time.",
+    bannerLogout: "Log out",
+    resetNote: "Test data. Resets daily at 3 AM Tashkent time.",
+  },
   announcements: {
     title: "Announcements",
     empty: "No announcements",

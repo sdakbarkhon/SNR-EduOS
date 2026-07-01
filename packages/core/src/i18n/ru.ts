@@ -385,6 +385,17 @@ export const ru: Dictionary = {
     minimizeDemo: "Свернуть",
     maximizeDemo: "Развернуть",
   },
+  demoMode: {
+    buttonLabel: "Демо-режим",
+    buttonHint: "Попробуйте платформу без регистрации",
+    modalTitle: "Демо-режим",
+    modalSubtitle: "Выберите роль чтобы попробовать платформу",
+    loginBtn: "Войти",
+    loginProgress: "Вход...",
+    bannerText: "Вы в демо-режиме. Все данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент).",
+    bannerLogout: "Выйти",
+    resetNote: "Данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент).",
+  },
   announcements: {
     title: "Объявления",
     empty: "Объявлений нет",
