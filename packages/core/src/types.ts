@@ -314,10 +314,6 @@ export type TeacherLessonView = {
   room: string | null;
   active_stage_id: string | null;
   demo_material_id: string | null;
-  // migration 63 — синхронное состояние демонстрации (PDF-страница/видео)
-  demo_current_page: number;
-  demo_video_time: number;
-  demo_video_playing: boolean;
   subjectName: string | null;
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;
@@ -341,9 +337,6 @@ export type StudentLessonView = {
   room: string | null;
   active_stage_id: string | null;
   demo_material_id: string | null;
-  demo_current_page: number;
-  demo_video_time: number;
-  demo_video_playing: boolean;
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;
   materials: LessonMaterial[];

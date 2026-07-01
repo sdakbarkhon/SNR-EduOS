@@ -1,8 +1,3 @@
-// pdfjs-dist worker (public/pdf.worker.min.mjs) is copied by the
-// "prebuild"/"predev" npm scripts (scripts/copy-pdf-worker.js), not here —
-// a next.config.mjs side effect runs too late for Vercel's build pipeline,
-// which collects public/ before this module is evaluated.
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -30,12 +25,6 @@ const nextConfig = {
         https: false,
         os: false,
         path: false,
-      };
-      // react-pdf/pdfjs-dist probe for node-canvas (server-side rendering
-      // fallback) even though we only ever render client-side.
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        canvas: false,
       };
     }
     return config;

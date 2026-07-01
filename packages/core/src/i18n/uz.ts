@@ -384,9 +384,6 @@ export const uz: Dictionary = {
     onlyTeacherCanClose: "Faqat o'qituvchi yopa oladi",
     minimizeDemo: "Yig'ish",
     maximizeDemo: "Yoyish",
-    pageOf: "{current} / {total} sahifa",
-    loading: "PDF yuklanmoqda...",
-    loadError: "PDF yuklanmadi",
   },
   announcements: {
     title: "E'lonlar",
