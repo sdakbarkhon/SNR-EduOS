@@ -227,8 +227,6 @@ export function LessonWorkspaceView({
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
-  const [activeCodeStageId, setActiveCodeStageId] = useState<string | null>(null);
-  const [externalStageId, setExternalStageId] = useState<string | null>(null);
   const [qiaStageId, setQiaStageId] = useState<string | null>(null);
   const [kahootStageId, setKahootStageId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -240,13 +238,9 @@ export function LessonWorkspaceView({
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
-  const activeCodeStageIdRef = useRef(activeCodeStageId);
-  const externalStageIdRef = useRef(externalStageId);
   const qiaStageIdRef = useRef(qiaStageId);
   const kahootStageIdRef = useRef(kahootStageId);
   useEffect(() => { activeStageIdRef.current = activeStageId; }, [activeStageId]);
-  useEffect(() => { activeCodeStageIdRef.current = activeCodeStageId; }, [activeCodeStageId]);
-  useEffect(() => { externalStageIdRef.current = externalStageId; }, [externalStageId]);
   useEffect(() => { qiaStageIdRef.current = qiaStageId; }, [qiaStageId]);
   useEffect(() => { kahootStageIdRef.current = kahootStageId; }, [kahootStageId]);
 
@@ -327,12 +321,11 @@ export function LessonWorkspaceView({
         setTimeout(() => setStageChangedBanner(false), 4000);
 
         // Close fullscreen if student is viewing a stage that is no longer the active one
-        // (i.e., teacher jumped forward past it, or activated a different stage)
-        const openId = activeCodeStageIdRef.current ?? externalStageIdRef.current
-          ?? qiaStageIdRef.current ?? kahootStageIdRef.current;
+        // (i.e., teacher jumped forward past it, or activated a different stage).
+        // Code/external stages are embedded inline now — they unmount on their
+        // own when centerStages changes, no explicit close needed here.
+        const openId = qiaStageIdRef.current ?? kahootStageIdRef.current;
         if (openId && openId !== (newActiveStageId ?? null)) {
-          setActiveCodeStageId(null);
-          setExternalStageId(null);
           setQiaStageId(null);
           setKahootStageId(null);
           setOpenTaskStageId(null);
@@ -345,8 +338,6 @@ export function LessonWorkspaceView({
         setDemoMaterialId(newDemoId ?? null);
         // Starting a demo drops the student out of any open fullscreen stage.
         if (newDemoId) {
-          setActiveCodeStageId(null);
-          setExternalStageId(null);
           setQiaStageId(null);
           setKahootStageId(null);
           setOpenTaskStageId(null);
@@ -407,8 +398,6 @@ export function LessonWorkspaceView({
   }
 
   const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
-  const activeCodeStage = activeCodeStageId ? stages.find((s) => s.id === activeCodeStageId) : null;
-  const externalStage = externalStageId ? stages.find((s) => s.id === externalStageId) : null;
   const qiaStage = qiaStageId ? stages.find((s) => s.id === qiaStageId) : null;
   const kahootStage = kahootStageId ? stages.find((s) => s.id === kahootStageId) : null;
 
@@ -777,40 +766,43 @@ export function LessonWorkspaceView({
                       whether the stage counts as a gradable task. */}
                   {(stage.stage_type === "task" || stage.content_type === "code") && (
                     <div className="space-y-2">
-                      {isGraded ? (
-                        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                          <Check className="h-4 w-4" />
-                          {dl.stageTaskGradedLabel}: {stage.progress?.grade}/5
-                        </div>
-                      ) : isSubmitted ? (
-                        <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                          {dl.stageTaskSubmittedLabel}
-                        </div>
-                      ) : readOnly ? (
-                        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
-                          <Check className="h-4 w-4" />
-                          {w.submitted}
-                        </div>
-                      ) : null}
+                      {/* CodeStageView/ExternalStageModal render their own (richer, with
+                          teacher_comment) grade/submitted banner — skip this compact one
+                          for them to avoid showing status twice. */}
+                      {stage.content_type !== "code" && !isExternalService(stage.content_type) && (
+                        isGraded ? (
+                          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                            <Check className="h-4 w-4" />
+                            {dl.stageTaskGradedLabel}: {stage.progress?.grade}/5
+                          </div>
+                        ) : isSubmitted ? (
+                          <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                            {dl.stageTaskSubmittedLabel}
+                          </div>
+                        ) : readOnly ? (
+                          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
+                            <Check className="h-4 w-4" />
+                            {w.submitted}
+                          </div>
+                        ) : null
+                      )}
 
-                      {/* Code + external stages always offer an open button (open / view read-only) */}
+                      {/* Code + external stages are embedded directly — no "open" gate/modal */}
                       {stage.content_type === "code" ? (
                         mounted && studentId && (
-                          <button
-                            onClick={() => setActiveCodeStageId(stage.id)}
-                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
-                          >
-                            {dl.code.openEditor}
-                          </button>
+                          <CodeStageView
+                            stage={stage}
+                            studentId={studentId}
+                            onSubmitted={handleStageSubmitted}
+                          />
                         )
                       ) : isExternalService(stage.content_type) ? (
                         mounted && studentId && (
-                          <button
-                            onClick={() => setExternalStageId(stage.id)}
-                            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95"
-                          >
-                            {dl.external.open}
-                          </button>
+                          <ExternalStageModal
+                            stage={stage}
+                            studentId={studentId}
+                            onSubmitted={handleStageSubmitted}
+                          />
                         )
                       ) : stage.content_type === "quiz_qia" ? (
                         mounted && studentId && (
@@ -873,8 +865,7 @@ export function LessonWorkspaceView({
         <AiChatPanel
           lessonId={lesson.id}
           stageId={
-            openTaskStageId ?? activeCodeStageId ?? externalStageId ??
-            qiaStageId ?? kahootStageId ?? null
+            openTaskStageId ?? qiaStageId ?? kahootStageId ?? activeStageId ?? null
           }
         />
       )}
@@ -890,26 +881,6 @@ export function LessonWorkspaceView({
       {/* Material viewer modal */}
       {mounted && viewerMat && (
         <MaterialViewerModal mat={viewerMat} onClose={() => setViewerMat(null)} />
-      )}
-
-      {/* Code-task stage → fullscreen IDE overlay */}
-      {mounted && activeCodeStage && studentId && (
-        <CodeStageView
-          stage={activeCodeStage}
-          studentId={studentId}
-          onBack={() => setActiveCodeStageId(null)}
-          onSubmitted={(progress) => { handleStageSubmitted(progress); setActiveCodeStageId(null); }}
-        />
-      )}
-
-      {/* External service modal (scratch/wokwi/codesandbox/makecode) */}
-      {mounted && externalStage && studentId && (
-        <ExternalStageModal
-          stage={externalStage}
-          studentId={studentId}
-          onClose={() => setExternalStageId(null)}
-          onSubmitted={handleStageSubmitted}
-        />
       )}
 
       {/* QIA quiz modal */}

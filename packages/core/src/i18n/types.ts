@@ -793,6 +793,7 @@ export interface Dictionary {
       makecodeDesc: string;
       service: string;            // "Сервис"
       projectLink: string;        // teacher config field
+      leaveEmptyHint: string;     // "Оставьте пустым для открытия чистого редактора"
       open: string;               // student stage open button
       openService: string;        // "Открыть" (+ service name)
       openInNewTab: string;

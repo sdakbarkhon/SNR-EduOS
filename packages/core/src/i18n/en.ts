@@ -781,6 +781,7 @@ export const en: Dictionary = {
       makecodeDesc: "Games, micro:bit, Minecraft via Microsoft MakeCode",
       service: "Service",
       projectLink: "Project link",
+      leaveEmptyHint: "Leave empty to open a blank editor",
       open: "Open",
       openService: "Open",
       openInNewTab: "Open in a new tab",

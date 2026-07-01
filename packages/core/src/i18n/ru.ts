@@ -781,6 +781,7 @@ export const ru: Dictionary = {
       makecodeDesc: "Создание игр, micro:bit, Minecraft через Microsoft MakeCode",
       service: "Сервис",
       projectLink: "Ссылка на проект",
+      leaveEmptyHint: "Оставьте пустым для открытия чистого редактора",
       open: "Открыть",
       openService: "Открыть",
       openInNewTab: "Открыть в новой вкладке",

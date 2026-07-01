@@ -781,6 +781,7 @@ export const uz: Dictionary = {
       makecodeDesc: "Microsoft MakeCode orqali o'yinlar, micro:bit, Minecraft",
       service: "Servis",
       projectLink: "Loyiha havolasi",
+      leaveEmptyHint: "Toza muharrirni ochish uchun bo'sh qoldiring",
       open: "Ochish",
       openService: "Ochish",
       openInNewTab: "Yangi oynada ochish",

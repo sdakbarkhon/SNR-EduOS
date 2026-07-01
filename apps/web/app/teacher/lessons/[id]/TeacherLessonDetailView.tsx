@@ -154,9 +154,9 @@ function StageModal({
     setExtEmbedUrl(res.embedUrl);
   }
 
-  const externalReady = !isExternal || (
-    extUrlValid && (externalMeta?.embedSupported || reqLink || reqScreenshot)
-  );
+  // URL is optional — an empty field falls back to a blank editor for the
+  // service at render time. Only a *provided* URL must pass validation.
+  const externalReady = !isExternal || !extUrl.trim() || extUrlValid;
 
   // quiz config (quiz_qia / quiz_kahoot)
   const isQqia = contentType === "quiz_qia";
@@ -341,7 +341,7 @@ function StageModal({
                 <div className="mb-4 space-y-3">
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      {d.external.projectLink} <span className="text-red-500">*</span>
+                      {d.external.projectLink}
                     </label>
                     <div className="relative">
                       <input
@@ -363,6 +363,9 @@ function StageModal({
                       )}
                     </div>
                     {extUrlError && <p className="mt-1 text-xs text-red-500">{extUrlError}</p>}
+                    {!extUrlError && !extUrl.trim() && (
+                      <p className="mt-1 text-xs text-slate-400">{d.external.leaveEmptyHint}</p>
+                    )}
                   </div>
 
                   {/* Non-embeddable: attachment requirements */}
