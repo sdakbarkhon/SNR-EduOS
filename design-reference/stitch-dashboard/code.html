@@ -1,0 +1,554 @@
+<!DOCTYPE html><html lang="ru" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>SNR EduOS Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "error": "#ba1a1a",
+                      "on-primary": "#ffffff",
+                      "on-surface-variant": "#464554",
+                      "surface-tint": "#494bd6",
+                      "secondary-container": "#fd761a",
+                      "surface-variant": "#e0e3e5",
+                      "secondary-fixed-dim": "#ffb690",
+                      "surface-container-lowest": "#ffffff",
+                      "tertiary": "#006c49",
+                      "on-primary-fixed": "#07006c",
+                      "surface-container": "#eceef0",
+                      "tertiary-fixed-dim": "#4edea3",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed": "#002113",
+                      "on-primary-fixed-variant": "#2f2ebe",
+                      "primary-container": "#6063ee",
+                      "surface-bright": "#f7f9fb",
+                      "surface": "#f7f9fb",
+                      "surface-dim": "#d8dadc",
+                      "surface-container-highest": "#e0e3e5",
+                      "on-surface": "#191c1e",
+                      "outline": "#767586",
+                      "on-primary-container": "#fffbff",
+                      "primary": "#4648d4",
+                      "surface-container-low": "#f2f4f6",
+                      "on-secondary-fixed-variant": "#783200",
+                      "on-background": "#191c1e",
+                      "on-tertiary-fixed-variant": "#005236",
+                      "on-secondary-container": "#5c2400",
+                      "tertiary-container": "#00885d",
+                      "primary-fixed": "#e1e0ff",
+                      "secondary": "#9d4300",
+                      "inverse-surface": "#2d3133",
+                      "on-error-container": "#93000a",
+                      "inverse-on-surface": "#eff1f3",
+                      "background": "#f7f9fb",
+                      "on-error": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "secondary-fixed": "#ffdbca",
+                      "tertiary-fixed": "#6ffbbe",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed": "#341100",
+                      "inverse-primary": "#c0c1ff",
+                      "primary-fixed-dim": "#c0c1ff",
+                      "surface-container-high": "#e6e8ea",
+                      "on-tertiary-container": "#000703",
+                      "outline-variant": "#c7c4d7"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "2xl": "1rem",
+                      "3xl": "1.5rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "20px",
+                      "container-padding": "24px",
+                      "base": "8px",
+                      "card-gap": "16px",
+                      "margin-page": "32px"
+              },
+              "fontFamily": {
+                      "headline-sm": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-md-mobile": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-sm": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md-mobile": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        body {
+            background-color: #f7f9fb; /* fallback to match surface bright */
+        }
+        /* Neomorphic soft shadow for cards */
+        .neo-card {
+            box-shadow: 10px 10px 30px rgba(190, 190, 190, 0.2), 
+                        -10px -10px 30px rgba(255, 255, 255, 0.8);
+        }
+        .neo-inset {
+            box-shadow: inset 5px 5px 10px rgba(190, 190, 190, 0.2), 
+                        inset -5px -5px 10px rgba(255, 255, 255, 0.8);
+        }
+      </style>
+</head>
+<body class="bg-surface-bright text-on-surface font-body-md min-h-screen overflow-x-hidden">
+<div class="flex h-screen overflow-hidden">
+<!-- Left Sidebar: SideNavBar -->
+<aside class="hidden md:flex flex-col w-64 h-screen sticky left-0 top-0 bg-surface-container-low shadow-[20px_20px_60px_#bebebe,-20px_-20px_60px_#ffffff] py-base z-20">
+<!-- Logo Area -->
+<div class="px-container-padding py-card-gap flex items-center justify-between">
+<div class="font-headline-md text-headline-md font-bold flex items-baseline">
+<span class="text-on-surface">SNR</span>
+<span class="text-secondary-container ml-1">EduOS</span>
+</div>
+<button class="w-8 h-8 rounded-full bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm hover:bg-surface-container-high transition-all">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 overflow-y-auto mt-4 px-2 space-y-1">
+<!-- Active Item -->
+<a class="flex items-center gap-3 bg-secondary-fixed text-on-secondary-container rounded-xl p-3 mx-2 transition-all duration-300 scale-95 font-medium" href="#">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+</div>
+<span class="">Главная</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+</div>
+<span class="">Уроки</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300 relative" href="#">
+<div class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">assignment</span>
+</div>
+<span class="">Задания</span>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-error text-on-error rounded-full flex items-center justify-center text-[10px] font-bold">6</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">deployed_code</span>
+</div>
+<span class="">Проекты</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+</div>
+<span class="">Достижения</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-error-container flex items-center justify-center text-error">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">folder</span>
+</div>
+<span class="">Материалы</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-primary-fixed-dim flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">stars</span>
+</div>
+<span class="">Кружки</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<span class="">AI-помощник</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-3 mx-2 rounded-xl transition-all duration-300" href="#">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+</div>
+<span class="">Профиль</span>
+</a>
+</nav>
+<!-- Bottom Profile Widget -->
+<div class="px-4 pb-4">
+
+</div>
+</aside>
+<!-- Main Workspace -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden bg-surface-bright relative">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-container-padding py-4 w-full bg-surface shadow-sm z-10 shrink-0">
+<!-- Search -->
+<div class="flex-1 max-w-xl">
+
+</div>
+<!-- Right Actions -->
+<div class="flex items-center gap-6 ml-6">
+<!-- Coin Balance -->
+
+<!-- Icons -->
+<div class="flex gap-3">
+<button class="h-10 px-4 rounded-full bg-surface-container-lowest flex items-center gap-2 text-primary relative neo-card hover:bg-surface-container transition-colors">
+  <div class="relative flex items-center">
+    <span class="material-symbols-outlined">notifications</span>
+    <span class="absolute -top-2 -right-2 w-4 h-4 bg-error text-on-error rounded-full flex items-center justify-center text-[10px] font-bold">3</span>
+  </div>
+  <span class="font-label-md font-medium">Уведомление</span>
+</button>
+
+</div>
+<!-- User Profile -->
+<div class="flex items-center gap-3 pl-4 border-l border-surface-variant cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed overflow-hidden border-2 border-surface-container-lowest shadow-sm flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="A small 3D avatar of a young boy with brown hair smiling, soft claymorphism style, high quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-PZGDIM9tVqp-tUlikjoN8yBXnoguvZdq1Vu4vBhmMFwfDkhNd135v_uzSsSJlXnUPg1Q3l2HKY5KGIL_WQw0jJDt6qMjC1fhwNyPkuQOM3ePkapXpKqtyOSYnAnNPoiikBbdI5a5NNc2vJNshvMd3G7mWMOoZjbVwD1eDC-z-339fn0baF-gQo9lAJEQNtg0oHFqWlX9seLc5aF8IW_ADCcUrHuOUEFDxY95LwgUnmFNsuDFpuW9eOEWeRMe2Oug9DMnS5dO3hI">
+</div>
+<div class="hidden lg:block">
+<p class="font-body-md text-body-md font-bold text-on-surface">Привет, Адилбек!</p>
+<p class="font-label-md text-label-md text-on-surface-variant">7А класс</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+</div>
+</header>
+<!-- Scrollable Content Canvas -->
+<div class="flex-1 overflow-y-auto p-container-padding flex flex-col lg:flex-row gap-gutter">
+<!-- Left/Center Column (Main Dashboard Content) -->
+<div class="flex-1 flex flex-col gap-8 min-w-[60%]">
+<!-- Greeting -->
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface mb-2 flex items-center gap-2">
+                        Привет, Адилбек! <span class="text-4xl">👋</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Ты отлично справляешься! Продолжай в том же духе!</p>
+</div>
+<!-- Top Cards Row -->
+<div class="grid grid-cols-1 gap-card-gap">
+<!-- Fact of the day Card -->
+<div class="bg-gradient-to-br from-primary-fixed to-primary rounded-[2rem] p-6 relative overflow-hidden text-on-primary shadow-lg group hover:shadow-xl transition-all cursor-pointer h-64"><div class="flex flex-col md:flex-row items-center justify-between h-full relative z-10">
+  <div class="flex-1">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-secondary-container" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+      <span class="font-headline-sm text-headline-sm font-medium">Факт дня</span>
+    </div>
+    <p class="font-headline-md text-headline-md max-w-xl leading-tight mb-6">Пчёлы могут узнавать лица людей и запоминать их</p>
+    <button class="px-6 py-2.5 bg-surface-container-lowest/20 backdrop-blur-md rounded-full font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container-lowest/30 transition-colors">
+      Узнать больше <span class="material-symbols-outlined text-sm">arrow_forward</span>
+    </button>
+  </div>
+  <div class="w-48 h-48 shrink-0">
+    
+  </div>
+</div>
+<!-- Decorative elements -->
+<div class="absolute top-1/4 right-1/2 w-2 h-2 bg-white rounded-full opacity-50 blur-[1px]"></div>
+<div class="absolute bottom-1/4 right-1/4 w-3 h-3 bg-white rounded-full opacity-30 blur-[2px]"></div></div>
+<!-- Streak Card -->
+
+</div>
+<!-- Quick Actions Section -->
+<div>
+<h2 class="font-headline-sm text-headline-sm font-semibold mb-4 text-on-surface">Быстрые действия</h2>
+<div class="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+
+<button class="min-w-[120px] flex flex-col items-center justify-center gap-3 p-4 bg-surface-container-lowest rounded-2xl neo-card hover:bg-surface-container transition-colors relative">
+<span class="absolute -top-2 -right-2 w-6 h-6 bg-error text-on-error rounded-full flex items-center justify-center text-[12px] font-bold shadow-sm">6</span>
+<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-secondary-fixed to-secondary-container flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-3xl text-on-primary">assignment</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium text-center">Моё задание</span>
+</button>
+<button class="min-w-[120px] flex flex-col items-center justify-center gap-3 p-4 bg-surface-container-lowest rounded-2xl neo-card hover:bg-surface-container transition-colors">
+<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-fixed to-surface-tint flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-3xl text-on-primary" style="font-variation-settings: 'FILL' 1;">folder</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium text-center">Мои файлы</span>
+</button>
+<button class="min-w-[120px] flex flex-col items-center justify-center gap-3 p-4 bg-surface-container-lowest rounded-2xl neo-card hover:bg-surface-container transition-colors">
+<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-error-container to-[#ff8da1] flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-3xl text-on-error" style="font-variation-settings: 'FILL' 1;">group</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium text-center">Связь с учителем</span>
+</button>
+<button class="min-w-[120px] flex flex-col items-center justify-center gap-3 p-4 bg-surface-container-lowest rounded-2xl neo-card hover:bg-surface-container transition-colors">
+<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-tertiary-fixed to-tertiary-container flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-3xl text-on-primary" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-medium text-center">Спросить AI</span>
+</button>
+</div>
+</div>
+<!-- Progress & Subjects Row -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-card-gap pb-8">
+<!-- My Progress -->
+<div class="bg-surface-container-lowest rounded-[2rem] p-6 neo-card relative xl:col-span-1 overflow-hidden h-64">
+<h2 class="font-headline-sm text-headline-sm font-semibold mb-4 text-on-surface relative z-10">Мой прогресс</h2>
+<div class="flex justify-center items-center h-full -mt-6">
+<!-- Circular Progress -->
+<div class="relative w-36 h-36 flex items-center justify-center rounded-full bg-surface-container-lowest neo-inset z-10">
+<svg class="absolute inset-0 w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="45" stroke="#eceef0" stroke-width="10"></circle>
+<circle class="transition-all duration-1000" cx="50" cy="50" fill="none" r="45" stroke="#6063ee" stroke-dasharray="283" stroke-dashoffset="70" stroke-linecap="round" stroke-width="10"></circle>
+</svg>
+<div class="flex flex-col items-center">
+<span class="font-display-lg text-display-lg font-black text-primary leading-none">75%</span>
+<span class="text-[10px] text-on-surface-variant mt-1">Всего за неделю</span>
+</div>
+</div>
+</div>
+<!-- 3D Astronaut overlapping -->
+
+</div>
+<!-- My Subjects -->
+<div class="bg-surface-container-lowest rounded-[2rem] p-6 neo-card xl:col-span-2 h-64 flex flex-col">
+<div class="flex justify-between items-center mb-4">
+<h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Мои предметы</h2>
+<button class="text-primary font-label-md text-label-md hover:underline">Смотреть все</button>
+</div>
+<div class="flex gap-4 overflow-x-auto hide-scrollbar flex-1 items-center">
+<!-- Subject Card 1 -->
+<div class="min-w-[110px] bg-primary-fixed-dim/20 rounded-2xl p-4 flex flex-col items-center gap-3 border border-surface-container-high hover:bg-primary-fixed-dim/40 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-sm">
+<span class="material-symbols-outlined">code</span>
+</div>
+<div class="text-center">
+<p class="text-[11px] text-on-surface font-medium truncate w-[90px]">Программирование</p>
+<p class="text-xs font-bold text-on-surface-variant mt-1">60%</p>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-1">
+<div class="bg-primary h-1.5 rounded-full" style="width: 60%;"></div>
+</div>
+</div>
+<!-- Subject Card 2 -->
+<div class="min-w-[110px] bg-primary-container/10 rounded-2xl p-4 flex flex-col items-center gap-3 border border-surface-container-high hover:bg-primary-container/20 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-[#3b82f6] flex items-center justify-center text-on-primary shadow-sm">
+<span class="material-symbols-outlined">science</span>
+</div>
+<div class="text-center">
+<p class="text-[11px] text-on-surface font-medium truncate w-[90px]">Физика</p>
+<p class="text-xs font-bold text-on-surface-variant mt-1">40%</p>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-1">
+<div class="bg-[#3b82f6] h-1.5 rounded-full" style="width: 40%;"></div>
+</div>
+</div>
+<!-- Subject Card 3 -->
+<div class="min-w-[110px] bg-secondary-fixed/30 rounded-2xl p-4 flex flex-col items-center gap-3 border border-surface-container-high hover:bg-secondary-fixed/50 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-secondary-container flex items-center justify-center text-on-primary shadow-sm">
+<span class="font-bold text-lg">Aa</span>
+</div>
+<div class="text-center">
+<p class="text-[11px] text-on-surface font-medium truncate w-[90px]">Английский</p>
+<p class="text-xs font-bold text-on-surface-variant mt-1">80%</p>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-1">
+<div class="bg-secondary-container h-1.5 rounded-full" style="width: 80%;"></div>
+</div>
+</div>
+<!-- Subject Card 4 -->
+<div class="min-w-[110px] bg-tertiary-fixed/20 rounded-2xl p-4 flex flex-col items-center gap-3 border border-surface-container-high hover:bg-tertiary-fixed/40 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-tertiary-container flex items-center justify-center text-on-primary shadow-sm">
+<span class="material-symbols-outlined">smart_toy</span>
+</div>
+<div class="text-center">
+<p class="text-[11px] text-on-surface font-medium truncate w-[90px]">Робототехника</p>
+<p class="text-xs font-bold text-on-surface-variant mt-1">70%</p>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-1">
+<div class="bg-tertiary-container h-1.5 rounded-full" style="width: 70%;"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Sidebar (Schedule & Achievements) -->
+<aside class="w-full lg:w-80 flex flex-col gap-8 pb-8 shrink-0">
+<!-- Schedule -->
+<div class="bg-surface-container-lowest rounded-[2rem] p-6 neo-card">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">calendar_month</span>
+<h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Расписание на сегодня</h2>
+</div>
+<div class="space-y-4">
+<!-- Item 1 (Active) -->
+<div class="flex items-center gap-4 p-3 bg-primary-fixed-dim/20 rounded-2xl border border-primary-fixed">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">calculate</span>
+</div>
+<div class="flex-1">
+<p class="text-[13px] font-bold text-on-surface">Математика</p>
+<p class="text-[11px] text-on-surface-variant flex gap-2"><span class="">09:00</span> <span class="">Каб. 305</span></p>
+</div>
+<span class="text-[10px] font-bold text-error bg-error-container px-2 py-1 rounded-full">Сейчас</span>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center gap-4 p-2 hover:bg-surface-container-low rounded-xl transition-colors cursor-pointer group">
+<div class="w-2 h-2 rounded-full bg-secondary-container"></div>
+<div class="w-10 h-10 rounded-xl bg-secondary-container flex items-center justify-center text-on-primary shrink-0 shadow-sm opacity-90 group-hover:opacity-100">
+<span class="font-bold text-[16px]">Aa</span>
+</div>
+<div class="flex-1">
+<p class="text-[13px] font-bold text-on-surface">Английский язык</p>
+<p class="text-[11px] text-on-surface-variant flex gap-2"><span class="">10:00</span> <span class="">Каб. 102</span></p>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center gap-4 p-2 hover:bg-surface-container-low rounded-xl transition-colors cursor-pointer group">
+<div class="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
+<div class="w-10 h-10 rounded-xl bg-[#3b82f6] flex items-center justify-center text-on-primary shrink-0 shadow-sm opacity-90 group-hover:opacity-100">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</div>
+<div class="flex-1">
+<p class="text-[13px] font-bold text-on-surface">Информатика</p>
+<p class="text-[11px] text-on-surface-variant flex gap-2"><span class="">11:00</span> <span class="">Каб. 207</span></p>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex items-center gap-4 p-2 hover:bg-surface-container-low rounded-xl transition-colors cursor-pointer group">
+<div class="w-2 h-2 rounded-full bg-tertiary-container"></div>
+<div class="w-10 h-10 rounded-xl bg-tertiary-container flex items-center justify-center text-on-primary shrink-0 shadow-sm opacity-90 group-hover:opacity-100">
+<span class="material-symbols-outlined text-[18px]">science</span>
+</div>
+<div class="flex-1">
+<p class="text-[13px] font-bold text-on-surface">Физика</p>
+<p class="text-[11px] text-on-surface-variant flex gap-2"><span class="">12:00</span> <span class="">Каб. 301</span></p>
+</div>
+</div>
+<!-- Item 5 -->
+<div class="flex items-center gap-4 p-2 hover:bg-surface-container-low rounded-xl transition-colors cursor-pointer group">
+<div class="w-2 h-2 rounded-full bg-secondary-fixed-dim"></div>
+<div class="w-10 h-10 rounded-xl bg-secondary-fixed-dim flex items-center justify-center text-on-secondary-fixed-variant shrink-0 shadow-sm opacity-90 group-hover:opacity-100">
+<span class="material-symbols-outlined text-[18px]">smart_toy</span>
+</div>
+<div class="flex-1">
+<p class="text-[13px] font-bold text-on-surface">Робототехника</p>
+<p class="text-[11px] text-on-surface-variant flex gap-2"><span class="">13:30</span> <span class="">Лаб. 2</span></p>
+</div>
+</div>
+</div>
+<button class="w-full mt-4 py-2 flex items-center justify-center gap-2 text-primary font-label-md hover:bg-surface-container-low rounded-xl transition-colors">
+                        Всё расписание <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+<!-- Achievements -->
+<div class="bg-surface-container-lowest rounded-[2rem] p-6 neo-card">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Мои достижения</h2>
+<button class="text-primary font-label-md text-label-md hover:underline">Все</button>
+</div>
+<div class="flex justify-between items-start mb-6">
+<div class="flex flex-col items-center gap-2 relative">
+<span class="absolute -top-2 bg-error text-on-error text-[8px] font-bold px-1.5 py-0.5 rounded-full z-10">NEW</span>
+<div class="w-16 h-16 rounded-full to-secondary-fixed-dim flex items-center justify-center shadow-inner relative overflow-hidden"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaS0fJA9NGcjK-ENAokPxZ-imh1U5J1YnB_kE02dmOIl-jNqAc0fPM1Xbz4REFpJmEMFUQEqmc954Dxq5Z0mw2YoxjIy8EhEytqXBZtuhnu7U-SOI4zGhInFaihkfM084I1jrCefMS1QumvO5fwTiItHwuFP71lGkxoi1UYq5pbM8H1gVBXtiFAApcUHtsmSKBt2iJx_PxW53wf0PeGyvJUpq2VQLdNQLhN_Y4mGzTWdathlMCTkpywaHW4dYsbC9JMt7NZPSQc7c" alt="Исследователь" class="w-full h-full object-cover"></div>
+<span class="text-[10px] text-center font-medium">Исследователь</span>
+</div>
+<div class="flex flex-col items-center gap-2 relative">
+<span class="absolute -top-2 bg-error text-on-error text-[8px] font-bold px-1.5 py-0.5 rounded-full z-10">NEW</span>
+<div class="w-16 h-16 rounded-full to-primary-fixed-dim flex items-center justify-center shadow-inner relative overflow-hidden"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuArb0ft119bUUuFMz6R1cHXIOurVssD-tmUAKZHAG3wG9PQVJr4mVJ1dnTlz3_pYi8gwrwoSLNvEbmeokhpObaje3ZfPGRa_h3MJUjhRsTLHIca_Iyu0t4ZjpZr7DL6_TxBxLNaM7EsdBw7BH9jSvWXFmKXlUPhKX24YmWHmm0e8PRUhISGkyf1Sro4yK6341RlCiX0JtISt3yy_9IXL8QWrZuNV1-i2Unrf4FlAHUOqxs4TLZ4kylQwOjn9FKIpwQAW-5xY8IAAsU" alt="Трудолюбивый" class="w-full h-full object-cover"></div>
+<span class="text-[10px] text-center font-medium">Трудолюбивый</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-16 h-16 rounded-full to-tertiary-fixed-dim flex items-center justify-center shadow-inner relative overflow-hidden"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5Q9YxLP-PtFYp9Co2eLpj-AMyH3VTmclA7VxtdLU_4PKN4mswuZ6YV-H1tQLKh7B8uPymNNP2da3Eeq7UYjelhzpAvxgcO8tOIx2SIBf90IsOVQ8kVvuOxbJHYLGngfw_ViR31fjs2DR7L8Sz7l2P5Q-Tey4lgo6TRVRfkRS8Zi46Y1veaYWUGrPmO3uvafKXACi_y6-P8AIWAocL5K3g-mnNsaQrEQklJ23u7fSHFpd0it5kLUwqq5R8qjiNTAWNITH70vo7Rb0" alt="Целеустремлённый" class="w-full h-full object-cover"></div>
+<span class="text-[10px] text-center font-medium">Целеустремлённый</span>
+</div>
+</div>
+<!-- Next reward progress -->
+<div>
+<div class="flex justify-between text-[11px] mb-2 text-on-surface-variant font-medium">
+<span class="">До следующей награды</span>
+<span class="">150 XP</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex-1 bg-surface-container-highest rounded-full h-2">
+<div class="bg-primary h-2 rounded-full" style="width: 70%;"></div>
+</div>
+<div class="w-6 h-6 text-xl">🎁</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+<!-- Bottom Banner (Sticky or floating at bottom of main content if needed, putting it inline at bottom of scroll area for now) -->
+<div class="px-container-padding pb-8 mt-auto w-full">
+
+</div>
+</main>
+</div>
+
+
+</body></html>
