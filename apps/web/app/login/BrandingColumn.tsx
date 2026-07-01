@@ -28,20 +28,22 @@ export function BrandingColumn({ locale }: { locale: Locale }) {
   const t = getDictionary(locale).auth;
 
   return (
-    <div className="z-10 flex w-full max-w-2xl flex-col items-start justify-center">
-      <Image
-        src="/login/logo.png"
-        alt="SNR EduOS"
-        width={512}
-        height={227}
-        priority
-        className="h-28 w-auto object-contain lg:h-36"
-      />
-      <p className="mt-4 text-2xl font-medium tracking-wide text-slate-800 lg:text-[32px]">
-        {t.tagline}
-      </p>
+    <div className="z-10 flex h-full w-full max-w-2xl flex-col justify-between">
+      <div>
+        <Image
+          src="/login/logo.png"
+          alt="SNR EduOS"
+          width={512}
+          height={227}
+          priority
+          className="h-28 w-auto object-contain lg:h-36"
+        />
+        <p className="mt-4 text-2xl font-medium tracking-wide text-slate-800 lg:text-[32px]">
+          {t.tagline}
+        </p>
+      </div>
 
-      <div className="mt-12 grid w-full max-w-[600px] grid-cols-2 gap-6 md:grid-cols-4">
+      <div className="grid w-full max-w-[600px] grid-cols-2 gap-6 md:grid-cols-4">
         <FeatureItem
           icon={<Star className="h-8 w-8 text-[#FFB020]" fill="#FFB020" />}
           title={t.features.learn}

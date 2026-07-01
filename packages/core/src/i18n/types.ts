@@ -405,6 +405,7 @@ export interface Dictionary {
   // от "demo" выше: тот про показ материала классу, этот про пробный вход.
   demoMode: {
     buttonLabel: string;   // "Демо-режим"
+    shortLabel: string;    // "Демо" — for the compact OAuth-row button
     buttonHint: string;    // "Попробуйте платформу без регистрации"
     modalTitle: string;    // "Демо-режим"
     modalSubtitle: string; // "Выберите роль чтобы попробовать платформу"

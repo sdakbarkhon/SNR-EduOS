@@ -403,6 +403,7 @@ export const en: Dictionary = {
   },
   demoMode: {
     buttonLabel: "Demo Mode",
+    shortLabel: "Demo",
     buttonHint: "Try the platform without registration",
     modalTitle: "Demo Mode",
     modalSubtitle: "Choose a role to try the platform",

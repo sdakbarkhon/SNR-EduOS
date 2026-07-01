@@ -403,6 +403,7 @@ export const uz: Dictionary = {
   },
   demoMode: {
     buttonLabel: "Demo rejim",
+    shortLabel: "Demo",
     buttonHint: "Ro'yxatdan o'tmasdan platformani sinab ko'ring",
     modalTitle: "Demo rejim",
     modalSubtitle: "Rolni tanlang va platformani sinab ko'ring",

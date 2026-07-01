@@ -87,149 +87,156 @@ export function LoginForm({ locale }: { locale: Locale }) {
   }
 
   return (
-    <div className="relative z-30 w-full max-w-[480px]">
+    <div className="relative z-30 w-full max-w-md">
       <div
-        className="relative overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 p-8 backdrop-blur-xl sm:p-10"
-        style={{ boxShadow: "0 20px 60px -15px rgba(0,0,0,0.15)" }}
+        className="relative overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 backdrop-blur-xl"
+        style={{ boxShadow: "0 20px 60px -15px rgba(0,0,0,0.15)", maxHeight: "calc(100vh - 8rem)" }}
       >
         <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/30 blur-3xl" />
 
-        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/70 shadow-sm">
-          <GraduationCap className="h-8 w-8 text-[#FFB020]" strokeWidth={2.5} />
-        </div>
+        {/* Only scrolls internally, and only if the card genuinely doesn't
+            fit (very short viewports) — the page itself never scrolls. */}
+        <div className="overflow-y-auto p-6" style={{ maxHeight: "calc(100vh - 8rem)" }}>
+          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
+            <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
+          </div>
 
-        <h1 className="mb-8 text-[28px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[32px]">
-          {t.title}
-        </h1>
+          <h1 className="mb-4 text-2xl font-bold leading-tight tracking-tight text-slate-900">
+            {t.title}
+          </h1>
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-5">
-          {/* Логин */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">{t.usernameLabel}</label>
-            <div className="relative">
-              <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" strokeWidth={2} />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={t.usernamePlaceholder}
-                autoCapitalize="none"
-                autoComplete="username"
-                required
-                className="block w-full rounded-xl border border-slate-200 bg-white/50 py-3.5 pl-11 pr-3 text-sm text-slate-900 placeholder-slate-500 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-[#FF8A45]"
-              />
+          <form onSubmit={onSubmit} className="flex flex-col gap-3">
+            {/* Логин */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">{t.usernameLabel}</label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" strokeWidth={2} />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={t.usernamePlaceholder}
+                  autoCapitalize="none"
+                  autoComplete="username"
+                  required
+                  className="block w-full rounded-xl border border-slate-200 bg-white/50 py-2.5 pl-11 pr-3 text-sm text-slate-900 placeholder-slate-500 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-[#FF8A45]"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Пароль */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">{t.passwordLabel}</label>
-            <div className="relative">
-              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" strokeWidth={2} />
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t.passwordPlaceholder}
-                autoComplete="current-password"
-                required
-                className="block w-full rounded-xl border border-slate-200 bg-white/50 py-3.5 pl-11 pr-10 text-sm text-slate-900 placeholder-slate-500 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-[#FF8A45]"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? t.hidePassword : t.showPassword}
-                className="absolute right-0 top-0 flex h-full items-center px-3 text-slate-500 hover:text-slate-700"
-              >
-                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </button>
+            {/* Пароль */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">{t.passwordLabel}</label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" strokeWidth={2} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t.passwordPlaceholder}
+                  autoComplete="current-password"
+                  required
+                  className="block w-full rounded-xl border border-slate-200 bg-white/50 py-2.5 pl-11 pr-10 text-sm text-slate-900 placeholder-slate-500 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-[#FF8A45]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t.hidePassword : t.showPassword}
+                  className="absolute right-0 top-0 flex h-full items-center px-3 text-slate-500 hover:text-slate-700"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Запомнить меня */}
-          <div className="mt-1 flex items-center">
-            <input
-              type="checkbox"
-              id="remember-me"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-              className="h-4 w-4 cursor-pointer rounded border-slate-300 bg-white/50 text-[#FFC145] focus:ring-[#FFC145]"
-            />
-            <label htmlFor="remember-me" className="ml-2 cursor-pointer select-none text-sm font-medium text-slate-700">
-              {t.rememberMe}
-            </label>
-          </div>
+            {/* Запомнить меня */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="remember-me"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-4 w-4 cursor-pointer rounded border-slate-300 bg-white/50 text-[#FFC145] focus:ring-[#FFC145]"
+              />
+              <label htmlFor="remember-me" className="ml-2 cursor-pointer select-none text-sm font-medium text-slate-700">
+                {t.rememberMe}
+              </label>
+            </div>
 
-          {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {error}
-            </p>
-          )}
+            {error && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                {error}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-transparent bg-gradient-to-r from-[#FFC145] to-[#FF6B6B] px-4 py-4 text-base font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <span className="relative z-10 flex items-center gap-2">
-              {loading ? t.signingIn : (
-                <>
-                  {t.submit}
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" strokeWidth={2} />
-                </>
-              )}
-            </span>
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-transparent bg-gradient-to-r from-[#FFC145] to-[#FF6B6B] px-4 py-3 text-base font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                {loading ? t.signingIn : (
+                  <>
+                    {t.submit}
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" strokeWidth={2} />
+                  </>
+                )}
+              </span>
+            </button>
+          </form>
 
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => showNotice(t.comingSoon)}
-            className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
-          >
-            {t.forgot}
-          </button>
-        </div>
-
-        <div className="mt-8 border-t border-white/40 pt-6">
-          <p className="mb-4 text-center text-xs font-medium text-slate-600">{t.orLoginWith}</p>
-          <div className="flex justify-center gap-4">
+          <div className="mt-3 text-center">
             <button
               type="button"
               onClick={() => showNotice(t.comingSoon)}
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/50 bg-white/80 shadow-sm transition-colors hover:bg-white"
+              className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
+            >
+              {t.forgot}
+            </button>
+          </div>
+
+          <div className="my-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-white/40" />
+            <span className="text-xs font-medium text-slate-600">{t.orLoginWith}</span>
+            <div className="h-px flex-1 bg-white/40" />
+          </div>
+
+          {/* OAuth row — Demo Mode is folded in as the first button (not part
+              of the Stitch design, added per explicit spec). */}
+          <div className="grid grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDemoModal(true)}
+              title={d.demoMode.buttonLabel}
+              className="group flex items-center justify-center gap-1 rounded-xl border border-white/80 bg-white/70 py-3 shadow-sm backdrop-blur-sm transition hover:bg-white hover:shadow-md"
+            >
+              <Sparkles className="h-4 w-4 text-violet-500 group-hover:text-violet-600" />
+              <span className="text-xs font-medium text-slate-700 group-hover:text-slate-900">
+                {d.demoMode.shortLabel}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => showNotice(t.comingSoon)}
+              className="flex items-center justify-center rounded-xl border border-white/50 bg-white/80 py-3 shadow-sm transition-colors hover:bg-white"
             >
               <GoogleIcon />
             </button>
             <button
               type="button"
               onClick={() => showNotice(t.comingSoon)}
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/50 bg-white/80 shadow-sm transition-colors hover:bg-white"
+              className="flex items-center justify-center rounded-xl border border-white/50 bg-white/80 py-3 shadow-sm transition-colors hover:bg-white"
             >
-              <Image src="/oauth/oneid.jpg" alt="OneID" width={32} height={32} className="h-8 w-8 object-contain" />
+              <Image src="/oauth/oneid.jpg" alt="OneID" width={32} height={32} className="h-6 w-6 object-contain" />
             </button>
             <button
               type="button"
               onClick={() => showNotice(t.comingSoon)}
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/50 bg-white/80 shadow-sm transition-colors hover:bg-white"
+              className="flex items-center justify-center rounded-xl border border-white/50 bg-white/80 py-3 shadow-sm transition-colors hover:bg-white"
             >
               <MicrosoftIcon />
             </button>
           </div>
-        </div>
-
-        {/* Демо-режим — отсутствует в дизайне Stitch, добавлено по явному ТЗ */}
-        <div className="mt-8 border-t border-slate-200/60 pt-6">
-          <button
-            type="button"
-            onClick={() => setShowDemoModal(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-violet-200 bg-violet-50/80 px-4 py-3 font-medium text-violet-700 backdrop-blur-sm transition-all hover:bg-violet-100"
-          >
-            <Sparkles className="h-4 w-4" />
-            {d.demoMode.buttonLabel}
-          </button>
-          <p className="mt-2 text-center text-xs text-slate-500">{d.demoMode.buttonHint}</p>
         </div>
       </div>
 

@@ -17,15 +17,15 @@ export default function LoginPage() {
   const { locale } = useLocale();
 
   return (
-    <div className={`${montserrat.className} relative min-h-screen w-full overflow-x-hidden`}>
+    <div className={`${montserrat.className} relative h-screen w-full overflow-hidden`}>
       <BackgroundArt />
 
-      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
-        <div className="hidden flex-col justify-center px-16 py-12 lg:flex">
+      <div className="relative z-10 grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-2">
+        <div className="hidden h-full flex-col overflow-hidden px-16 py-12 lg:flex">
           <BrandingColumn locale={locale} />
         </div>
 
-        <div className="flex items-center justify-center p-6 pb-40 lg:p-12">
+        <div className="flex items-center justify-center overflow-hidden p-6 lg:p-12">
           <LoginForm locale={locale} />
         </div>
       </div>

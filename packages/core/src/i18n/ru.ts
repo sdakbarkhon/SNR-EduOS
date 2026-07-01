@@ -403,6 +403,7 @@ export const ru: Dictionary = {
   },
   demoMode: {
     buttonLabel: "Демо-режим",
+    shortLabel: "Демо",
     buttonHint: "Попробуйте платформу без регистрации",
     modalTitle: "Демо-режим",
     modalSubtitle: "Выберите роль чтобы попробовать платформу",
