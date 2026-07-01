@@ -17,16 +17,18 @@ export default async function LessonPage({
   ]);
   if (!lesson) notFound();
 
-  // Pre-generate signed URLs for all lesson materials
+  // Pre-generate signed URLs for all lesson materials. No `downloadAs` here —
+  // these are used for inline viewing (iframe/img/video in the demo overlay
+  // and MaterialViewerModal); passing a filename forces
+  // Content-Disposition: attachment on the signed URL, which makes browsers
+  // download the file instead of rendering it (white screen for PDFs). The
+  // explicit "Download" link in MaterialViewerModal uses the HTML5 `download`
+  // attribute instead, so it doesn't need a forced-attachment URL.
   const materialUrls: Record<string, string> = {};
   await Promise.all(
     lesson.materials.map(async (m) => {
       try {
-        materialUrls[m.id] = await getLessonMaterialUrl(
-          db,
-          m.file_storage_path,
-          m.file_original_name ?? m.title,
-        );
+        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path);
       } catch { /* skip if URL generation fails */ }
     }),
   );
