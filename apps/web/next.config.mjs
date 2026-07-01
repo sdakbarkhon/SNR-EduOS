@@ -1,3 +1,12 @@
+// Self-host the pdfjs-dist worker (public/pdf.worker.min.mjs) instead of
+// pointing at a CDN — cdnjs lags behind fresh npm releases and 404s on the
+// exact patch version react-pdf enforces. Runs on every `next dev`/`build`/
+// `start`, not just install, so it can't go stale or get skipped by a CI
+// that doesn't honor postinstall hooks for workspace packages.
+import { createRequire } from "module";
+const { copyPdfWorker } = createRequire(import.meta.url)("./scripts/copy-pdf-worker.js");
+copyPdfWorker();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

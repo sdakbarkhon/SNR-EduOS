@@ -9,8 +9,10 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 
-pdfjs.GlobalWorkerOptions.workerSrc =
-  `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+// Self-hosted (public/pdf.worker.min.mjs, copied from pdfjs-dist at build
+// time by next.config.mjs) — cdnjs lags behind fresh npm releases and 404s
+// on the exact patch version react-pdf enforces must match.
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 /**
  * PDF page synced across teacher/students during a live class demo. The
