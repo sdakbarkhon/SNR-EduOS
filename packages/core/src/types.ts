@@ -87,6 +87,7 @@ export type StudentGroup = {
 export type Lesson = {
   id: string;
   group_id: string;
+  subject_id?: string | null;   // added in migration 53
   lesson_no: number | null;
   topic: string | null;
   title?: string | null;        // added in migration 24

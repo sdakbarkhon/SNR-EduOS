@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { getMyStudent } from "@snr/core";
+import { getMyStudent, getMyGroups } from "@snr/core";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
+import { getClassLabel } from "@/lib/student-class-label";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -17,10 +18,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   let studentName = "";
   let avatarUrl: string | null = null;
+  let classLabel = "";
   try {
-    const student = await getMyStudent(supabase);
+    const [student, groups] = await Promise.all([getMyStudent(supabase), getMyGroups(supabase)]);
     studentName = student.full_name;
     avatarUrl = (student as { avatar_url?: string | null }).avatar_url ?? null;
+    classLabel = getClassLabel(groups);
   } catch {
     // профиль не найден — оставим пустым
   }
@@ -29,7 +32,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <>
       <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
-      <AppShell studentName={studentName} avatarUrl={avatarUrl}>{children}</AppShell>
+      <AppShell studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel}>{children}</AppShell>
     </>
   );
 }

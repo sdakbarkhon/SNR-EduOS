@@ -1810,6 +1810,38 @@ export const getLessonStagesForStudent = async (
   });
 };
 
+export interface WeeklyStageProgress {
+  done: number;
+  total: number;
+  percent: number;
+}
+
+/**
+ * "Мой прогресс" ring on the dashboard: done/total middle-stage count for
+ * lessons within `lessonIds` (caller passes lessons from the last 7 days
+ * that have already started — see DashboardView).
+ *
+ * Counts from lesson_stages (LEFT JOIN-equivalent via embedded progress),
+ * NOT from lesson_stage_progress — a stage the student never opened has no
+ * progress row at all, so joining the other way around would silently drop
+ * it from "total" and inflate the percentage.
+ */
+export async function getWeeklyStageProgress(db: Db, lessonIds: string[]): Promise<WeeklyStageProgress> {
+  if (lessonIds.length === 0) return { done: 0, total: 0, percent: 0 };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_stages")
+    .select("id, progress:lesson_stage_progress(is_completed)")
+    .eq("stage_role", "middle")
+    .in("lesson_id", lessonIds);
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ id: string; progress: { is_completed: boolean }[] | null }>;
+  const total = rows.length;
+  const done = rows.filter((r) => (r.progress ?? []).some((p) => p.is_completed)).length;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { done, total, percent };
+}
+
 /** Ученик отмечает теорию "Изучил". */
 export const markTheoryStudied = async (
   db: Db,

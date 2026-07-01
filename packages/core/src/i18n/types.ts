@@ -37,6 +37,8 @@ export interface Dictionary {
     profile: string;
     settings: string;
     notifications: string;
+    achievements: string; // stub — Iter5 P4
+    clubs: string;        // stub — Iter5 P4
   };
   auth: {
     title: string;
@@ -78,6 +80,24 @@ export interface Dictionary {
     mySubjects: string;
     recentMaterials: string;
     room: string;
+    // Iter5 P4 — Stitch dashboard redesign
+    greetings: string[];       // 10 rotating subtitle phrases, one per day-of-year
+    learnMore: string;         // "Узнать больше" (fact-of-day card)
+    quickActions: string;      // "Быстрые действия"
+    qaHomework: string;        // "Моё задание"
+    qaFiles: string;           // "Мои файлы"
+    qaTeacher: string;         // "Связь с учителем" (stub)
+    qaAI: string;              // "Спросить AI"
+    myProgress: string;        // "Мой прогресс"
+    progressWeekly: string;    // "Всего за неделю"
+    seeAll: string;            // "Смотреть все" (subjects card)
+    todaySchedule: string;     // "Расписание на сегодня"
+    noLessonsToday: string;
+    fullSchedule: string;      // "Всё расписание"
+    now: string;               // "Сейчас" (active-lesson chip)
+    myAchievements: string;    // "Мои достижения"
+    allAchievements: string;   // "Все" (stub)
+    nextReward: string;        // "До следующей награды"
   };
   schedule: {
     title: string;

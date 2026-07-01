@@ -6,18 +6,21 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
 import { BottomNav } from "./BottomNav";
-import { Sidebar } from "./Sidebar";
+import { StudentSidebar } from "./StudentSidebar";
 import { Topbar } from "./Topbar";
+import { ToastProvider } from "./Toast";
 import { navItems } from "./nav-items";
 import { LessonStartBanner } from "./LessonStartBanner";
 
 export function AppShell({
   studentName,
   avatarUrl,
+  classLabel,
   children,
 }: {
   studentName?: string;
   avatarUrl?: string | null;
+  classLabel?: string;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -38,30 +41,20 @@ export function AppShell({
   }
 
   return (
-    <div
-      className="flex h-screen overflow-hidden"
-      style={{ background: "var(--shell-gradient)" }}
-    >
-      <LessonStartBanner />
-      <Sidebar studentName={studentName} avatarUrl={avatarUrl} />
+    <ToastProvider>
+      <div className="flex h-screen overflow-hidden bg-slate-50">
+        <LessonStartBanner />
+        <StudentSidebar />
 
-      {/* Правая колонка */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Фоновые свечения */}
-        <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
-          <div className="absolute -left-[10%] -top-[10%] h-[50%] w-[50%] rounded-full blur-[100px]" style={{ background: "var(--shell-blob-1)" }} />
-          <div className="absolute -right-[10%] top-[20%] h-[50%] w-[50%] rounded-full blur-[100px]" style={{ background: "var(--shell-blob-2)" }} />
-          <div className="absolute bottom-[-10%] left-[20%] h-[60%] w-[60%] rounded-full blur-[100px]" style={{ background: "var(--shell-blob-3)" }} />
+        {/* Правая колонка */}
+        <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
+          <main className="flex-1 overflow-y-auto px-4 pb-20 pt-5 md:px-8 md:pb-8 md:pt-6">
+            {children}
+          </main>
+          <BottomNav />
         </div>
-        {/* Стеклянная подложка */}
-        <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-[60px]" style={{ background: "var(--shell-overlay)" }} />
-
-        <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} />
-        <main className="flex-1 overflow-y-auto px-4 pb-20 pt-5 md:px-8 md:pb-8 md:pt-6">
-          {children}
-        </main>
-        <BottomNav />
       </div>
-    </div>
+    </ToastProvider>
   );
 }
