@@ -21,7 +21,7 @@ export default function LoginPage() {
       <BackgroundArt />
 
       <div className="relative z-10 grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-2">
-        <div className="hidden h-full flex-col overflow-hidden px-16 py-12 lg:flex">
+        <div className="hidden flex-col justify-center overflow-hidden px-16 py-12 lg:flex">
           <BrandingColumn locale={locale} />
         </div>
 
