@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play, Save, Trash2, Loader2, Check } from "lucide-react";
 import { getDictionary, submitStageTask } from "@snr/core";
 import type {
@@ -13,6 +13,8 @@ import { StdinInput } from "@/components/StdinInput";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
 import { runCpp } from "@/lib/piston";
+import { useRealtimeChannel } from "@/lib/realtime";
+import { StudentLiveViewer } from "@/components/lesson-stages/StudentLiveViewer";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -65,7 +67,40 @@ export function CodeStageView({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  const [isLive, setIsLive] = useState(!!stage.is_live_active);
+  const [liveCode, setLiveCodeValue] = useState(stage.live_code ?? "");
+
   const readOnly = isSubmitted;
+
+  const draftKey = `code-${stage.id}`;
+
+  // Restore the student's own draft after mount (client-only — localStorage
+  // isn't available during SSR, and reading it in the initializer would
+  // desync server/client render output).
+  useEffect(() => {
+    if (isSubmitted) return;
+    const saved = localStorage.getItem(draftKey);
+    if (saved) setCode(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleCodeChange(v: string) {
+    setCode(v);
+    if (!isSubmitted) localStorage.setItem(draftKey, v);
+  }
+
+  // Follow the teacher's live-coding broadcast for this stage via Realtime.
+  useRealtimeChannel(
+    `stage-live-${stage.id}`,
+    "lesson_stages",
+    `id=eq.${stage.id}`,
+    (payload) => {
+      const active = payload.new?.is_live_active;
+      if (typeof active === "boolean") setIsLive(active);
+      const lc = payload.new?.live_code;
+      if (typeof lc === "string" || lc === null) setLiveCodeValue(lc ?? "");
+    },
+  );
 
   function errMessage(err: string): string {
     if (err === "compile") return dc.compileError;
@@ -183,7 +218,7 @@ export function CodeStageView({
       <div className="min-h-0 flex-1">
         {readOnly
           ? <CodeViewer value={code} language={language} minHeight={300} />
-          : <CodeEditor value={code} onChange={setCode} language={language} height="100%" />}
+          : <CodeEditor value={code} onChange={handleCodeChange} language={language} height="100%" />}
       </div>
 
       {/* Stdin */}
@@ -238,6 +273,8 @@ export function CodeStageView({
         confirmText={dc.submit}
         cancelText={d.common.cancel}
       />
+
+      {isLive && <StudentLiveViewer code={liveCode} language={language} />}
     </div>
   );
 }

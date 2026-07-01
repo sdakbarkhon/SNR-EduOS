@@ -930,6 +930,13 @@ export const en: Dictionary = {
       waitingForTeacher: "Teacher is preparing the next stage…",
       studentsSeeThis: "All students see this stage",
     },
+    live: {
+      start: "Start Live",
+      stop: "Stop Live",
+      liveOn: "🔴 LIVE — students see your code",
+      liveOff: "Live coding is off",
+      title: "Teacher is coding live",
+    },
     completedTitle: "Lesson complete!",
     completedTopic: "Topic",
     completedDuration: "Duration",

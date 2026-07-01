@@ -951,6 +951,14 @@ export interface Dictionary {
       waitingForTeacher: string;   // "Учитель готовит следующий этап…"
       studentsSeeThis: string;     // "Все ученики видят этот этап"
     };
+    // Live coding (migration 64) — учитель пишет код в реальном времени
+    live: {
+      start: string;        // "Начать Live"
+      stop: string;         // "Остановить Live"
+      liveOn: string;       // "🔴 LIVE — ученики видят ваш код"
+      liveOff: string;      // "Live-демонстрация выключена"
+      title: string;        // fullscreen student modal: "Учитель показывает код вживую"
+    };
     // Completion modal (Iter4 Prompt 3)
     completedTitle: string;
     completedTopic: string;

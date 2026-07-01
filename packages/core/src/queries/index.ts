@@ -1345,7 +1345,7 @@ export const getStudentLessonView = async (
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
-    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
   ]);
 
@@ -1420,6 +1420,50 @@ export async function setDemoMaterial(
     .from("lessons")
     .update({ demo_material_id: materialId })
     .eq("id", lessonId);
+  if (error) throw error;
+}
+
+/**
+ * Учитель обновляет код live-демонстрации (throttled на вызывающей стороне).
+ * Realtime на lesson_stages доставляет изменение ученикам, следящим за этапом.
+ */
+export async function setLiveCode(
+  db: Db,
+  stageId: string,
+  code: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lesson_stages")
+    .update({ live_code: code })
+    .eq("id", stageId);
+  if (error) throw error;
+}
+
+/** Учитель включает live-демонстрацию кода для этапа. */
+export async function startLive(
+  db: Db,
+  stageId: string,
+  initialCode: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lesson_stages")
+    .update({ is_live_active: true, live_code: initialCode })
+    .eq("id", stageId);
+  if (error) throw error;
+}
+
+/** Учитель выключает live-демонстрацию кода для этапа. */
+export async function stopLive(
+  db: Db,
+  stageId: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lesson_stages")
+    .update({ is_live_active: false })
+    .eq("id", stageId);
   if (error) throw error;
 }
 

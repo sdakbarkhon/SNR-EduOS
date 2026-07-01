@@ -930,6 +930,13 @@ export const ru: Dictionary = {
       waitingForTeacher: "Учитель готовит следующий этап…",
       studentsSeeThis: "Все ученики видят этот этап",
     },
+    live: {
+      start: "Начать Live",
+      stop: "Остановить Live",
+      liveOn: "🔴 LIVE — ученики видят ваш код",
+      liveOff: "Live-демонстрация выключена",
+      title: "Учитель показывает код вживую",
+    },
     completedTitle: "Урок завершён!",
     completedTopic: "Тема",
     completedDuration: "Длительность",

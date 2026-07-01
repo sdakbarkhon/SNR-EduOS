@@ -40,6 +40,7 @@ import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
+import { TeacherLiveCodeControl } from "@/components/lesson-stages/TeacherLiveCodeControl";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { demoKind } from "@/lib/material-kind";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
@@ -1221,6 +1222,7 @@ export function TeacherLessonDetailView({
               const isActivating = activatingStageId === stage.id;
 
               const hasSlides = isActive && stage.slides && stage.slides.length > 0;
+              const hasLiveCode = isActive && stage.content_type === "code";
 
               return (
                 <div key={stage.id}>
@@ -1289,6 +1291,13 @@ export function TeacherLessonDetailView({
                         stageId={stage.id}
                         initialSlide={stage.current_slide_index ?? 0}
                       />
+                    </div>
+                  )}
+
+                  {/* Live coding — drives students' fullscreen read-only view via Realtime */}
+                  {hasLiveCode && (
+                    <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
+                      <TeacherLiveCodeControl stage={stage} />
                     </div>
                   )}
                 </div>

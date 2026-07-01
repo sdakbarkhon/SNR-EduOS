@@ -930,6 +930,13 @@ export const uz: Dictionary = {
       waitingForTeacher: "O'qituvchi keyingi bosqichni tayyorlamoqda…",
       studentsSeeThis: "Barcha o'quvchilar ushbu bosqichni ko'radi",
     },
+    live: {
+      start: "Live boshlash",
+      stop: "Live to'xtatish",
+      liveOn: "🔴 LIVE — o'quvchilar kodingizni ko'rmoqda",
+      liveOff: "Live-kod demonstratsiyasi o'chirilgan",
+      title: "O'qituvchi jonli kod yozmoqda",
+    },
     completedTitle: "Dars tugadi!",
     completedTopic: "Mavzu",
     completedDuration: "Davomiyligi",

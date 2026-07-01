@@ -140,6 +140,9 @@ export type LessonStage = {
   starter_code?: string | null;
   programming_language?: string | null;
   expected_output?: string | null;
+  // migration 64 — live coding: учитель транслирует код в реальном времени
+  live_code?: string | null;
+  is_live_active?: boolean | null;
 };
 
 export type LessonSlideLayout = "title" | "split" | "quote" | "code" | "default";

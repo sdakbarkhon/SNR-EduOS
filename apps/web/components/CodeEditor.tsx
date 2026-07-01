@@ -77,21 +77,23 @@ export function CodeEditor({
 }
 
 export function CodeViewer({
-  value, language, minHeight = 0,
+  value, language, minHeight = 0, height,
 }: {
   value: string;
   language: Lang;
   minHeight?: number;
+  /** Overrides minHeight — e.g. "100%" to fill a sized flex parent. */
+  height?: number | string;
 }) {
-  const h = minHeight || 240;
+  const h = height ?? (minHeight || 240);
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
+    <div className="h-full overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
       <MonacoEditor
         height={h}
         language={monacoLang(language)}
         value={value}
         theme="vs-dark"
-        loading={<Skeleton minHeight={h} />}
+        loading={<Skeleton minHeight={typeof minHeight === "number" ? minHeight : 240} />}
         options={{ ...BASE_OPTIONS, readOnly: true, domReadOnly: true }}
       />
     </div>
