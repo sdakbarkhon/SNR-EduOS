@@ -408,9 +408,12 @@ export const ru: Dictionary = {
     modalSubtitle: "Выберите роль чтобы попробовать платформу",
     loginBtn: "Войти",
     loginProgress: "Вход...",
-    bannerText: "Вы в демо-режиме. Все данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент).",
+    bannerText: "Вы в демо-режиме. Все данные тестовые.",
     bannerLogout: "Выйти",
     resetNote: "Данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент).",
+    welcomeTitle: "Вы в демо-режиме",
+    welcomeText: "Все данные тестовые.",
+    welcomeOk: "Понятно",
   },
   announcements: {
     title: "Объявления",

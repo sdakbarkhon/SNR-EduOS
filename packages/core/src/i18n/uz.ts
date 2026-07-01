@@ -408,9 +408,12 @@ export const uz: Dictionary = {
     modalSubtitle: "Rolni tanlang va platformani sinab ko'ring",
     loginBtn: "Kirish",
     loginProgress: "Kirilmoqda...",
-    bannerText: "Siz demo rejimdasiz. Barcha ma'lumotlar sinov uchun. Har kuni Toshkent vaqti bilan soat 3:00 da qayta tiklash.",
+    bannerText: "Siz demo rejimdasiz. Barcha ma'lumotlar sinov uchun.",
     bannerLogout: "Chiqish",
     resetNote: "Sinov ma'lumotlari. Har kuni Toshkent vaqti bilan soat 3:00 da qayta tiklash.",
+    welcomeTitle: "Demo rejim",
+    welcomeText: "Barcha ma'lumotlar sinov uchun.",
+    welcomeOk: "Tushundim",
   },
   announcements: {
     title: "E'lonlar",

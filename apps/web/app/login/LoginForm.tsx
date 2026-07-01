@@ -76,6 +76,12 @@ export function LoginForm({ locale }: { locale: Locale }) {
       if (adminRes.data) dest = "/admin";
       else if (teacherRes.data) dest = "/teacher/dashboard";
     }
+    // A direct username/password login into a demo account (e.g. typing
+    // "demo_teacher" instead of using the Demo Mode button) should still
+    // get the welcome modal + banner — same flag the DemoRoleModal sets.
+    if (data?.user?.user_metadata?.is_demo === true) {
+      sessionStorage.setItem("show-demo-welcome", "true");
+    }
     router.push(dest);
     router.refresh();
   }

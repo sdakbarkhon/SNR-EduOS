@@ -408,9 +408,12 @@ export const en: Dictionary = {
     modalSubtitle: "Choose a role to try the platform",
     loginBtn: "Enter",
     loginProgress: "Entering...",
-    bannerText: "You are in demo mode. All data is test data. Resets daily at 3 AM Tashkent time.",
+    bannerText: "You are in demo mode. All data is test data.",
     bannerLogout: "Log out",
     resetNote: "Test data. Resets daily at 3 AM Tashkent time.",
+    welcomeTitle: "Demo mode",
+    welcomeText: "All data is test data.",
+    welcomeOk: "Got it",
   },
   announcements: {
     title: "Announcements",

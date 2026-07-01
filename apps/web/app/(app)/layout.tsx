@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getMyStudent } from "@snr/core";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
+import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
+      <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
       <AppShell studentName={studentName} avatarUrl={avatarUrl}>{children}</AppShell>
     </>

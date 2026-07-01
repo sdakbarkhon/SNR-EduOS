@@ -3,6 +3,7 @@ import type { Db } from "../supabase/factory";
 export const DEFAULT_STUDENT_EMAIL_DOMAIN = "students.snr.local";
 export const TEACHER_EMAIL_DOMAIN = "teachers.snr.local";
 export const ADMIN_EMAIL_DOMAIN = "admins.snr.local";
+export const DEMO_EMAIL_DOMAIN = "demo.snr.local";
 
 export function usernameToEmail(
   username: string,
@@ -59,6 +60,19 @@ export async function signInWithUsername(
     password,
   });
   if (!adminResult.error) return { ...adminResult, role: "admin" as const };
+
+  // demo_teacher/demo_student (migration 66) share one domain, so role can't
+  // be derived from the domain the way it is above — go by exact username.
+  const lower = input.toLowerCase();
+  if (lower === "demo_teacher" || lower === "demo_student") {
+    const demoResult = await db.auth.signInWithPassword({
+      email: usernameToEmail(input, DEMO_EMAIL_DOMAIN),
+      password,
+    });
+    if (!demoResult.error) {
+      return { ...demoResult, role: lower === "demo_teacher" ? "teacher" as const : "student" as const };
+    }
+  }
 
   return { ...studentResult, role: null };
 }

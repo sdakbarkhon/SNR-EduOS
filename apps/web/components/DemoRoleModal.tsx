@@ -17,44 +17,27 @@ interface DemoAccount {
   redirectTo: string;
 }
 
-// Same 4 demo accounts created by supabase/migrations/20260702000065_demo_reset.sql
-// (flagged raw_user_meta_data.is_demo=true — see that migration for why detection
-// isn't based on the email domain).
+// 2 accounts dedicated to the "Demo Mode" button (migration 66) — separate
+// from teacher_demo/aziz_03/nodira_07/sherzod_10, which used to double as
+// both real test accounts AND the demo-button destination, causing the demo
+// banner to show up on ordinary logins to those accounts.
 const DEMO_ACCOUNTS: DemoAccount[] = [
   {
-    email: "teacher_demo@teachers.snr.local",
-    password: "password123",
+    email: "demo_teacher@demo.snr.local",
+    password: "demo2026",
     role: "Учитель",
-    name: "Карим Алишер",
+    name: "Демо Учитель",
     avatar: "👨‍🏫",
     color: "from-violet-500 to-purple-600",
     redirectTo: "/teacher/dashboard",
   },
   {
-    email: "aziz_03@students.snr.local",
-    password: "password123",
-    role: "Ученик 3-А",
-    name: "Aziz Karimov",
+    email: "demo_student@demo.snr.local",
+    password: "demo2026",
+    role: "Ученик",
+    name: "Демо Ученик",
     avatar: "👦",
     color: "from-blue-500 to-cyan-600",
-    redirectTo: "/dashboard",
-  },
-  {
-    email: "nodira_07@students.snr.local",
-    password: "password123",
-    role: "Ученица 7-А",
-    name: "Nodira Yusupova",
-    avatar: "👧",
-    color: "from-pink-500 to-rose-600",
-    redirectTo: "/dashboard",
-  },
-  {
-    email: "sherzod_10@students.snr.local",
-    password: "password123",
-    role: "Ученик 10-А",
-    name: "Sherzod Tashkenbaev",
-    avatar: "🧑",
-    color: "from-emerald-500 to-teal-600",
     redirectTo: "/dashboard",
   },
 ];
@@ -75,6 +58,7 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
         password: account.password,
       });
       if (authError) throw authError;
+      sessionStorage.setItem("show-demo-welcome", "true");
       router.push(account.redirectTo);
       router.refresh();
     } catch (err) {
@@ -104,7 +88,7 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="mx-auto grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
           {DEMO_ACCOUNTS.map((account) => (
             <button
               key={account.email}

@@ -410,9 +410,12 @@ export interface Dictionary {
     modalSubtitle: string; // "Выберите роль чтобы попробовать платформу"
     loginBtn: string;      // "Войти"
     loginProgress: string; // "Вход..."
-    bannerText: string;    // "Вы в демо-режиме. ..."
+    bannerText: string;    // "Вы в демо-режиме. Все данные тестовые."
     bannerLogout: string;  // "Выйти"
     resetNote: string;     // "Данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент)."
+    welcomeTitle: string;  // "Вы в демо-режиме"
+    welcomeText: string;   // "Все данные тестовые."
+    welcomeOk: string;     // "Понятно"
   };
   announcements: {
     title: string;
