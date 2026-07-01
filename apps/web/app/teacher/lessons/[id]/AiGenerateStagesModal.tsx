@@ -7,8 +7,8 @@ import {
   BookOpen, Code2, TestTube2, Gamepad2, Puzzle, CircuitBoard, Globe,
   Paperclip, Search, Copy, ExternalLink,
 } from "lucide-react";
-import { addLessonStage, getDictionary } from "@snr/core";
-import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide } from "@snr/core";
+import { addLessonStage, replaceQuizQuestions, getDictionary } from "@snr/core";
+import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide, QuizQuestionInput } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 
@@ -23,6 +23,7 @@ interface GeneratedStage {
   starter_code?: string;
   programming_language?: string;
   slides?: LessonSlide[];
+  quiz?: { questions: Array<{ text: string; options: string[]; correct_index: number }> };
   difficulty: StageDifficulty;
   duration_min: number;
 }
@@ -172,7 +173,7 @@ export function AiGenerateStagesModal({
           config.requires_link = true;
           config.requires_screenshot = false;
         }
-        await addLessonStage(db, lessonId, {
+        const newStage = await addLessonStage(db, lessonId, {
           stageType: s.stage_type as LessonStageType,
           contentType: s.content_type as LessonContentType,
           title: s.title,
@@ -187,6 +188,14 @@ export function AiGenerateStagesModal({
           difficulty: s.difficulty,
           durationMin: s.duration_min,
         });
+        if (s.content_type === "quiz_qia" && s.quiz?.questions.length) {
+          const questions: QuizQuestionInput[] = s.quiz.questions.map((q) => ({
+            question_text: q.text,
+            options: q.options,
+            correct_option_index: q.correct_index,
+          }));
+          await replaceQuizQuestions(db, newStage.id, questions).catch(() => null);
+        }
       }
       setPhase("added");
       setTimeout(() => { onAdded(); onClose(); }, 1200);

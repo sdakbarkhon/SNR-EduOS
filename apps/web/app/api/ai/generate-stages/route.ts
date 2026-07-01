@@ -39,20 +39,42 @@ function buildPrompt(input: {
     input.durationMin <= 60 ? "4–5" :
     input.durationMin <= 90 ? "5–6" : "6–8";
 
-  const isProgramming = ["programming", "информатика", "робототехника", "informatika", "robotics", "code", "python", "web"].some(
-    (kw) => input.subject.toLowerCase().includes(kw) || input.topic.toLowerCase().includes(kw),
-  );
+  // Minimum DISTINCT content_type values expected across the lesson (repeats within
+  // a demo→practice→task code progression don't count against this).
+  const varietyMin = input.durationMin <= 30 ? 2 :
+    input.durationMin <= 60 ? 3 : 4;
+
+  // IMPORTANT: this must be driven by the TOPIC, never by the subject name alone.
+  // Subjects like "Информатика"/"Робототехника"/"Программирование" also cover
+  // Scratch/Arduino/web topics — matching on the subject string used to force
+  // EVERY lesson under those subjects into an all-Python "code" progression,
+  // which is exactly why the AI never proposed scratch/wokwi/codesandbox/makecode.
+  const topicLower = input.topic.toLowerCase();
+  const PYTHON_TOPIC_HINTS = [
+    "python", "питон", "цикл", "функци", "алгоритм", "перемен", "массив",
+    "список", "рекурси", "условн", "структур данн",
+  ];
+  const OTHER_TOOL_HINTS = [
+    "scratch", "скретч", "блочн", "кот", "arduino", "ардуино", "светодиод", "датчик",
+    "схем", "wokwi", "микроконтроллер", "html", "css", "javascript", "сайт", "веб",
+    "makecode", "аркада", "приставка", "квиз", "kahoot", "qia", "повторени",
+  ];
+  const mentionsPython = PYTHON_TOPIC_HINTS.some((kw) => topicLower.includes(kw));
+  const mentionsOtherTool = OTHER_TOOL_HINTS.some((kw) => topicLower.includes(kw));
+  const isProgramming = mentionsPython && !mentionsOtherTool;
 
   const programmingSection = isProgramming ? `
 
-СПЕЦИАЛЬНЫЕ ПРАВИЛА ДЛЯ ПРОГРАММИРОВАНИЯ (subject = "${input.subject}"):
+СПЕЦИАЛЬНЫЕ ПРАВИЛА ДЛЯ ЭТАПОВ PYTHON (тема урока про циклы/функции/алгоритмы/переменные):
 Используй паттерн прогрессии из 3 этапов, ВСЕ с content_type="code" (student увидит редактор кода на каждом):
 1. DEMO-этап: stage_type="theory", title начинается с "Демо:", starter_code = ПОЛНЫЙ рабочий код примера (ученик видит и может запустить), description объясняет что происходит в коде, teacher_notes = краткие педагогические подсказки (не дублируй код сюда).
 2. PRACTICE-этап: stage_type="task", title начинается с "Практика:", starter_code = скелет с TODO-комментариями для ученика, description = что нужно дополнить, teacher_notes = готовое решение.
 3. TASK-этап (если время позволяет): stage_type="task", title начинается с "Задание:", starter_code = только комментарии-инструкции (без кода), description = условие задачи, teacher_notes = эталонное решение.
 
 Для КАЖДОГО из 3 этапов заполняй programming_language ("python" или "cpp" — по умолчанию "python").
-ОБЯЗАТЕЛЬНО заполняй starter_code для ВСЕХ трёх этапов (включая DEMO — это код, который увидит ученик)!` : "";
+ОБЯЗАТЕЛЬНО заполняй starter_code для ВСЕХ трёх этапов (включая DEMO — это код, который увидит ученик)!
+Это правило действует ТОЛЬКО для этих 2–3 этапов практики — остальные этапы урока (введение, квиз) всё равно
+должны быть presentation/quiz_qia, а не code.` : "";
 
   return `Ты — методический ассистент для учителя в школе Узбекистана.
 
@@ -70,7 +92,7 @@ function buildPrompt(input: {
 ${materialsContext}
 ${programmingSection}
 
-ТИПЫ КОНТЕНТА (выбирай по предмету и классу):
+ТИПЫ КОНТЕНТА (выбирай по ТЕМЕ урока и классу — НЕ только по названию предмета):
 - "presentation" — теория/объяснение (stage_type: "theory")
 - "code" — программирование в Monaco редакторе (stage_type: "task")
 - "quiz_qia" — асинхронный тест с вопросами (stage_type: "task")
@@ -79,6 +101,26 @@ ${programmingSection}
 - "makecode" — игровое программирование Microsoft, классы 5–9
 - "wokwi" — Arduino/электроника симуляция, классы 7–11
 - "codesandbox" — веб-разработка HTML/CSS/JS, классы 9–11
+
+ВАЖНО: название предмета ("Информатика", "Робототехника", "Программирование") само по себе
+НЕ означает что все этапы должны быть "code" — эти предметы охватывают ВСЕ инструменты выше
+(Scratch, Arduino/Wokwi, веб, Python). Решает ТЕМА урока, а не название предмета.
+
+ПОДСКАЗКА ПО КЛЮЧЕВЫМ СЛОВАМ В ТЕМЕ:
+- "Scratch", "блоки", "кот", "анимация", "игра" (младшие классы) → content_type="scratch"
+- "Arduino", "светодиод", "датчик", "схема", "робот", "микроконтроллер" → content_type="wokwi"
+- "HTML", "CSS", "JavaScript", "веб", "сайт", "страница" → content_type="codesandbox"
+- "аркада", "приставка", "MakeCode", "игра" (младшие классы) → content_type="makecode"
+- "Python", "циклы", "функции", "алгоритмы", "переменные" → content_type="code"
+- "квиз", "тест", "проверка", "повторение" → content_type="quiz_qia" или "quiz_kahoot"
+
+ОБЯЗАТЕЛЬНОЕ РАЗНООБРАЗИЕ ЭТАПОВ:
+- В плане урока должно быть МИНИМУМ ${varietyMin} РАЗНЫХ content_type (повторы одного типа
+  внутри демо→практика→задание прогрессии не считаются — это один "тип" по смыслу).
+- НЕЛЬЗЯ делать урок только из presentation+code, если тема подсказывает другой инструмент
+  (см. подсказку по ключевым словам выше) — это скучно и не соответствует теме.
+- КАЖДЫЙ урок обязан содержать хотя бы один этап content_type="quiz_qia" или "quiz_kahoot"
+  для проверки понимания (обычно в середине или конце урока), кроме уроков короче 20 минут.
 
 СЛОЖНОСТЬ:
 Уровень: ${input.overallDifficulty}
@@ -111,6 +153,27 @@ ${programmingSection}
 - Академический стиль, понятные формулировки для школьников
 - Сам реши сколько слайдов нужно (обычно 3–6 на тему)
 
+ДЛЯ ЭТАПОВ КВИЗА (content_type='quiz_qia'):
+Обязательно заполни поле "quiz" с 3–5 вопросами:
+{
+  "quiz": {
+    "questions": [
+      { "text": "Что такое переменная?", "options": ["Место в памяти для значения", "Функция для вычислений", "Тип данных", "Оператор сравнения"], "correct_index": 0 }
+    ]
+  }
+}
+- correct_index — индекс правильного варианта в "options", начиная с 0. Ровно один правильный вариант.
+- Вопросы проверяют ПОНИМАНИЕ концепции темы урока, а не запоминание синтаксиса.
+- Для content_type='quiz_kahoot' поле "quiz" НЕ заполняй — учитель добавит вопросы вручную позже.
+
+ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='scratch'|'wokwi'|'codesandbox'|'makecode'):
+- Ссылку (URL) НЕ указывай — система сама подставит редактор по умолчанию.
+- Обязательно заполни description (что именно должен сделать ученик в редакторе) и teacher_notes
+  (на что учителю обратить внимание при демонстрации/проверке), например:
+  - scratch: teacher_notes = "Начни с показа готового кота на своём экране, потом дай ученикам самим экспериментировать"
+  - wokwi: teacher_notes = "Проверь понимание: попроси ученика объяснить что делает каждый провод"
+  - quiz_qia: teacher_notes = "Разбери каждую ошибку — вопросы про смысл понятия, а не про синтаксис"
+
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
   "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"scratch"|"wokwi"|"codesandbox"|"makecode",
@@ -126,14 +189,15 @@ ${programmingSection}
     { "layout": "code", "title": "...", "content": "Пояснение к коду", "code": { "language": "python", "content": "def f():\\n    pass" } },
     { "layout": "quote", "title": "...", "content": "", "quote": { "text": "...", "author": "..." } }
   ],
+  "quiz": { "questions": [ { "text": "...", "options": ["...", "...", "...", "..."], "correct_index": 0 } ] },
   "difficulty": "easy"|"medium"|"hard",
   "duration_min": число
 }
-(поле slides — ТОЛЬКО для content_type='presentation'; для остальных опусти)
+(поле slides — ТОЛЬКО для content_type='presentation'; поле quiz — ТОЛЬКО для content_type='quiz_qia'; для остальных опусти оба)
 
 ВЕРНИ СТРОГО JSON (без markdown, без вступления):
 {
-  "stages": [ ... ${stageCount} этапов ... ],
+  "stages": [ ... ${stageCount} этапов, МИНИМУМ ${varietyMin} разных content_type ... ],
   "recommendedSearches": ["запрос 1", "запрос 2", "запрос 3"],
   "classGrade": ${input.grade},
   "notes": "Краткий комментарий учителю о структуре урока"
@@ -160,6 +224,16 @@ function normalizeSlideLayout(raw: unknown): string {
   return SLIDE_LAYOUTS.includes(layout) ? layout : "default";
 }
 
+interface GenQuizQuestion {
+  text?: string;
+  options?: string[];
+  correct_index?: number;
+}
+
+interface GenQuiz {
+  questions?: GenQuizQuestion[];
+}
+
 interface GenStage {
   content_type?: string;
   title?: string;
@@ -168,9 +242,31 @@ interface GenStage {
   starter_code?: string;
   programming_language?: string;
   slides?: GenSlide[];
+  quiz?: GenQuiz;
   difficulty?: string;
   duration_min?: number;
   stage_type?: string;
+}
+
+const MAX_QUIZ_QUESTIONS = 8;
+
+function normalizeQuiz(raw: GenQuiz | undefined): { questions: { text: string; options: string[]; correct_index: number }[] } | undefined {
+  if (!raw || !Array.isArray(raw.questions)) return undefined;
+  const questions = raw.questions
+    .filter((q): q is Required<GenQuizQuestion> => {
+      if (!q || typeof q.text !== "string" || !q.text.trim()) return false;
+      if (!Array.isArray(q.options)) return false;
+      const validOptions = q.options.filter((o) => typeof o === "string" && o.trim());
+      if (validOptions.length < 2) return false;
+      return Number.isInteger(q.correct_index) && q.correct_index! >= 0 && q.correct_index! < q.options.length;
+    })
+    .map((q) => ({
+      text: q.text.trim(),
+      options: q.options.map((o) => String(o).trim()),
+      correct_index: q.correct_index,
+    }))
+    .slice(0, MAX_QUIZ_QUESTIONS);
+  return questions.length > 0 ? { questions } : undefined;
 }
 
 const RUNNABLE_LANGUAGES = ["python", "cpp"];
@@ -240,7 +336,10 @@ function normalizeStage(s: GenStage): GenStage | null {
         })
         .slice(0, 8)
     : undefined;
-  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, programming_language, slides };
+  // Quiz questions only meaningful for quiz_qia (quiz_kahoot questions are added
+  // manually by the teacher via KahootTeacherModal, matching the existing flow).
+  const quiz = ct === "quiz_qia" ? normalizeQuiz(s.quiz) : undefined;
+  return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, programming_language, slides, quiz };
 }
 
 function stripFences(text: string): string {
