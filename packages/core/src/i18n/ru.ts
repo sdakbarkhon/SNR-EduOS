@@ -60,6 +60,22 @@ export const ru: Dictionary = {
     forgot: "Забыли пароль?",
     invalid: "Неверный логин или пароль",
     tagline: "Платформа твоего будущего",
+    signingIn: "Вход...",
+    orLoginWith: "Или войдите через",
+    comingSoon: "Функция будет доступна скоро",
+    rightsReserved: "Все права защищены.",
+    showPassword: "Показать пароль",
+    hidePassword: "Скрыть пароль",
+    features: {
+      learn: "Учись", learnDesc: "Доступ к материалам и заданиям",
+      grow: "Развивайся", growDesc: "Отслеживай прогресс и достижения",
+      connect: "Общайся", connectDesc: "Будь на связи с учителями и классом",
+      create: "Создавай", createDesc: "Проекты, идеи и будущее",
+    },
+    security: {
+      title: "Безопасно. Надёжно. Современное.",
+      subtitle: "Ваши данные под защитой.",
+    },
   },
   dashboard: {
     greeting: "Привет, {name}!",

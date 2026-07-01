@@ -1,14 +1,39 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Sparkles } from "lucide-react";
-import { defaultLocale, getDictionary, signInWithUsername } from "@snr/core";
+import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
+import { getDictionary, signInWithUsername } from "@snr/core";
+import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 
-export function LoginForm() {
-  const d = getDictionary(defaultLocale);
+function GoogleIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.16v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+    </svg>
+  );
+}
+
+function MicrosoftIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 23 23">
+      <path fill="#f35325" d="M1 1h10v10H1z" />
+      <path fill="#81bc06" d="M12 1h10v10H12z" />
+      <path fill="#05a6f0" d="M1 12h10v10H1z" />
+      <path fill="#ffba08" d="M12 12h10v10H12z" />
+    </svg>
+  );
+}
+
+export function LoginForm({ locale }: { locale: Locale }) {
+  const d = getDictionary(locale);
+  const t = d.auth;
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +42,16 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+
+  function showNotice(msg: string) {
+    setNotice(msg);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 2500);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -26,7 +61,7 @@ export function LoginForm() {
     const { error: authError, data } = await signInWithUsername(supabase, username, password);
     setLoading(false);
     if (authError) {
-      setError(d.auth.invalid);
+      setError(t.invalid);
       return;
     }
     // Determine destination from DB (admin > teacher > student) so that a
@@ -46,126 +81,159 @@ export function LoginForm() {
   }
 
   return (
-    <div className="relative z-10 mx-auto w-full max-w-[380px] shrink-0 md:max-w-[440px] lg:mx-0 lg:max-w-[420px]">
-      <form
-        onSubmit={onSubmit}
-        className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-white/60 via-white/40 to-white/20 p-7 ring-1 ring-white/50 backdrop-blur-[40px] sm:p-8 md:rounded-[28px] md:p-10"
-        style={{
-          boxShadow:
-            "0 32px 80px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.8)",
-        }}
+    <div className="relative z-30 w-full max-w-[480px]">
+      <div
+        className="relative overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 p-8 backdrop-blur-xl sm:p-10"
+        style={{ boxShadow: "0 20px 60px -15px rgba(0,0,0,0.15)" }}
       >
-        <h2 className="mb-6 text-center text-[22px] font-bold tracking-tight text-brand-ink md:mb-8 md:text-[26px] lg:text-left">
-          {d.auth.title}
-        </h2>
+        <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/30 blur-3xl" />
 
-        <div className="relative z-10 space-y-4 md:space-y-6">
+        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/70 shadow-sm">
+          <GraduationCap className="h-8 w-8 text-[#FFB020]" strokeWidth={2.5} />
+        </div>
+
+        <h1 className="mb-8 text-[28px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[32px]">
+          {t.title}
+        </h1>
+
+        <form onSubmit={onSubmit} className="flex flex-col gap-5">
           {/* Логин */}
-          <div className="flex flex-col gap-1.5 md:gap-2">
-            <label className="text-[13px] font-medium tracking-wide text-brand-ink-muted md:text-[14px]">
-              {d.auth.usernameLabel}
-            </label>
-            <div className="overflow-hidden rounded-[10px] border border-transparent bg-brand-field transition-all focus-within:border-brand-blue/30 focus-within:ring-2 focus-within:ring-brand-blue/40 md:rounded-xl">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-700">{t.usernameLabel}</label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" strokeWidth={2} />
               <input
+                type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={d.auth.usernamePlaceholder}
+                placeholder={t.usernamePlaceholder}
                 autoCapitalize="none"
                 autoComplete="username"
-                className="w-full bg-transparent px-3 py-3 text-[15px] font-medium text-brand-ink outline-none placeholder:text-slate-400 md:px-4 md:py-3.5 md:text-[16px]"
+                required
+                className="block w-full rounded-xl border border-slate-200 bg-white/50 py-3.5 pl-11 pr-3 text-sm text-slate-900 placeholder-slate-500 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-[#FF8A45]"
               />
             </div>
           </div>
 
           {/* Пароль */}
-          <div className="flex flex-col gap-1.5 md:gap-2">
-            <label className="text-[13px] font-medium tracking-wide text-brand-ink-muted md:text-[14px]">
-              {d.auth.passwordLabel}
-            </label>
-            <div className="relative flex items-center overflow-hidden rounded-[10px] border border-transparent bg-brand-field transition-all focus-within:border-brand-blue/30 focus-within:ring-2 focus-within:ring-brand-blue/40 md:rounded-xl">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-700">{t.passwordLabel}</label>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" strokeWidth={2} />
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.passwordPlaceholder}
                 autoComplete="current-password"
-                placeholder={d.auth.passwordPlaceholder}
-                className="w-full bg-transparent px-3 py-3 pr-10 text-[16px] font-medium text-brand-ink outline-none placeholder:text-slate-400 md:px-4 md:py-3.5 md:pr-12"
+                required
+                className="block w-full rounded-xl border border-slate-200 bg-white/50 py-3.5 pl-11 pr-10 text-sm text-slate-900 placeholder-slate-500 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-[#FF8A45]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                className="absolute right-0 top-0 flex h-full items-center justify-center px-3 text-slate-400 transition-colors hover:text-brand-ink-muted focus-visible:outline-none md:px-4"
+                aria-label={showPassword ? t.hidePassword : t.showPassword}
+                className="absolute right-0 top-0 flex h-full items-center px-3 text-slate-500 hover:text-slate-700"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
           </div>
 
           {/* Запомнить меня */}
-          <div className="pt-1 md:pt-2">
-            <label className="group inline-flex cursor-pointer items-center gap-3">
-              <div className="relative flex h-[16px] w-[16px] items-center justify-center rounded-[4px] border-[1.5px] border-[#CBD5E1] bg-white shadow-sm transition-colors group-hover:border-brand-blue has-[:checked]:border-transparent has-[:checked]:bg-brand-blue md:h-[18px] md:w-[18px]">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="peer sr-only"
-                />
-                <svg
-                  className="h-[9px] w-[9px] text-white opacity-0 transition-opacity peer-checked:opacity-100 md:h-[10px] md:w-[10px]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={3.5}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-[13px] font-medium text-brand-ink-muted transition-colors group-hover:text-brand-ink md:text-[14px]">
-                {d.auth.rememberMe}
-              </span>
+          <div className="mt-1 flex items-center">
+            <input
+              type="checkbox"
+              id="remember-me"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4 cursor-pointer rounded border-slate-300 bg-white/50 text-[#FFC145] focus:ring-[#FFC145]"
+            />
+            <label htmlFor="remember-me" className="ml-2 cursor-pointer select-none text-sm font-medium text-slate-700">
+              {t.rememberMe}
             </label>
           </div>
 
-          {error && <p className="text-[13px] font-medium text-danger">{error}</p>}
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
+          )}
 
-          {/* Войти */}
           <button
             type="submit"
             disabled={loading}
-            className="mt-1 w-full rounded-[12px] py-[13px] text-[15px] font-bold tracking-wide text-white transition-all hover:-translate-y-[1px] hover:brightness-110 active:translate-y-0 active:scale-[0.98] disabled:opacity-60 md:mt-2 md:rounded-[14px] md:py-[15px] md:text-[16px]"
-            style={{
-              background: "linear-gradient(135deg, #1D6FF5 0%, #0B3EDB 100%)",
-              boxShadow: "0 10px 28px rgba(11, 62, 219, 0.5)",
-            }}
+            className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-transparent bg-gradient-to-r from-[#FFC145] to-[#FF6B6B] px-4 py-4 text-base font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? d.common.loading : d.auth.submit}
+            <span className="relative z-10 flex items-center gap-2">
+              {loading ? t.signingIn : (
+                <>
+                  {t.submit}
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" strokeWidth={2} />
+                </>
+              )}
+            </span>
           </button>
+        </form>
 
-          {/* Забыли пароль */}
-          <div className="mt-3 text-center md:mt-4">
-            <a
-              href="#"
-              className="text-[13px] font-medium text-brand-blue transition-colors hover:underline md:text-[14px]"
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => showNotice(t.comingSoon)}
+            className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
+          >
+            {t.forgot}
+          </button>
+        </div>
+
+        <div className="mt-8 border-t border-white/40 pt-6">
+          <p className="mb-4 text-center text-xs font-medium text-slate-600">{t.orLoginWith}</p>
+          <div className="flex justify-center gap-4">
+            <button
+              type="button"
+              onClick={() => showNotice(t.comingSoon)}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/50 bg-white/80 shadow-sm transition-colors hover:bg-white"
             >
-              {d.auth.forgot}
-            </a>
+              <GoogleIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => showNotice(t.comingSoon)}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/50 bg-white/80 shadow-sm transition-colors hover:bg-white"
+            >
+              <Image src="/oauth/oneid.jpg" alt="OneID" width={32} height={32} className="h-8 w-8 object-contain" />
+            </button>
+            <button
+              type="button"
+              onClick={() => showNotice(t.comingSoon)}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/50 bg-white/80 shadow-sm transition-colors hover:bg-white"
+            >
+              <MicrosoftIcon />
+            </button>
           </div>
         </div>
-      </form>
 
-      <div className="mt-6 border-t border-white/30 pt-6">
-        <button
-          type="button"
-          onClick={() => setShowDemoModal(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-violet-200 bg-violet-50 px-4 py-3 font-medium text-violet-700 transition-all hover:bg-violet-100"
-        >
-          <Sparkles className="h-5 w-5" />
-          {d.demoMode.buttonLabel}
-        </button>
-        <p className="mt-2 text-center text-xs text-slate-500">{d.demoMode.buttonHint}</p>
+        {/* Демо-режим — отсутствует в дизайне Stitch, добавлено по явному ТЗ */}
+        <div className="mt-8 border-t border-slate-200/60 pt-6">
+          <button
+            type="button"
+            onClick={() => setShowDemoModal(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-violet-200 bg-violet-50/80 px-4 py-3 font-medium text-violet-700 backdrop-blur-sm transition-all hover:bg-violet-100"
+          >
+            <Sparkles className="h-4 w-4" />
+            {d.demoMode.buttonLabel}
+          </button>
+          <p className="mt-2 text-center text-xs text-slate-500">{d.demoMode.buttonHint}</p>
+        </div>
       </div>
+
+      {notice && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-8 z-50 flex justify-center px-4">
+          <div className="rounded-full bg-slate-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-xl backdrop-blur-sm">
+            {notice}
+          </div>
+        </div>
+      )}
 
       {showDemoModal && <DemoRoleModal onClose={() => setShowDemoModal(false)} />}
     </div>

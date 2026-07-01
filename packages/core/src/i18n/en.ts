@@ -60,6 +60,22 @@ export const en: Dictionary = {
     forgot: "Forgot password?",
     invalid: "Invalid username or password",
     tagline: "The platform of your future",
+    signingIn: "Signing in...",
+    orLoginWith: "Or sign in with",
+    comingSoon: "This feature will be available soon",
+    rightsReserved: "All rights reserved.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    features: {
+      learn: "Learn", learnDesc: "Access to materials and assignments",
+      grow: "Grow", growDesc: "Track progress and achievements",
+      connect: "Connect", connectDesc: "Stay in touch with teachers and class",
+      create: "Create", createDesc: "Projects, ideas and future",
+    },
+    security: {
+      title: "Safe. Reliable. Modern.",
+      subtitle: "Your data is protected.",
+    },
   },
   dashboard: {
     greeting: "Hi, {name}!",

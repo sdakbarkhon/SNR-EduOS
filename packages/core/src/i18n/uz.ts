@@ -60,6 +60,22 @@ export const uz: Dictionary = {
     forgot: "Parolni unutdingizmi?",
     invalid: "Login yoki parol noto‘g‘ri",
     tagline: "Kelajaging platformasi",
+    signingIn: "Kirilmoqda...",
+    orLoginWith: "Yoki quyidagilar orqali kiring",
+    comingSoon: "Bu funksiya tez orada mavjud bo'ladi",
+    rightsReserved: "Barcha huquqlar himoyalangan.",
+    showPassword: "Parolni ko'rsatish",
+    hidePassword: "Parolni yashirish",
+    features: {
+      learn: "O'rgan", learnDesc: "Materiallar va topshiriqlarga kirish",
+      grow: "Rivojlan", growDesc: "Progress va yutuqlarni kuzating",
+      connect: "Muloqot qil", connectDesc: "O'qituvchilar va sinf bilan aloqada bo'ling",
+      create: "Yarat", createDesc: "Loyihalar, g'oyalar va kelajak",
+    },
+    security: {
+      title: "Xavfsiz. Ishonchli. Zamonaviy.",
+      subtitle: "Ma'lumotlaringiz himoyalangan.",
+    },
   },
   dashboard: {
     greeting: "Salom, {name}!",

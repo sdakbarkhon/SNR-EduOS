@@ -49,6 +49,23 @@ export interface Dictionary {
     forgot: string;
     invalid: string;
     tagline: string;
+    // Iter5 P1 — Stitch login redesign
+    signingIn: string;    // "Вход..."
+    orLoginWith: string;  // "Или войдите через"
+    comingSoon: string;   // placeholder toast for OAuth/forgot-password
+    rightsReserved: string; // "Все права защищены."
+    showPassword: string; // aria-label
+    hidePassword: string; // aria-label
+    features: {
+      learn: string; learnDesc: string;
+      grow: string; growDesc: string;
+      connect: string; connectDesc: string;
+      create: string; createDesc: string;
+    };
+    security: {
+      title: string;    // "Безопасно. Надёжно. Современное."
+      subtitle: string; // "Ваши данные под защитой."
+    };
   };
   dashboard: {
     greeting: string; // "Привет, {name}! 👋"
