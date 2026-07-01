@@ -52,17 +52,19 @@ function monacoLang(lang: Lang): string {
 }
 
 export function CodeEditor({
-  value, onChange, language, minHeight = 400,
+  value, onChange, language, minHeight = 400, height,
 }: {
   value: string;
   onChange: (v: string) => void;
   language: Lang;
   minHeight?: number;
+  /** Overrides minHeight — e.g. "100%" to fill a sized flex parent. */
+  height?: number | string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
+    <div className="h-full overflow-hidden rounded-xl border border-slate-700" style={{ background: "#1e1e1e" }}>
       <MonacoEditor
-        height={minHeight}
+        height={height ?? minHeight}
         language={monacoLang(language)}
         value={value}
         onChange={(v) => onChange(v ?? "")}

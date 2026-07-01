@@ -789,7 +789,7 @@ export const en: Dictionary = {
       opensInNewTab: "This service opens in a separate tab",
       afterWork: "When you're done, come back here and attach the result",
       loadError: "Couldn't load the service",
-      loadErrorBody: "The service may be temporarily unavailable or the project is private. Try opening it in a new tab.",
+      loadErrorBody: "The service is unavailable — ask your teacher for help",
       attachResult: "Attach the result",
       attachResultOptional: "Attach the result (optional)",
       attachLink: "Link to your project",

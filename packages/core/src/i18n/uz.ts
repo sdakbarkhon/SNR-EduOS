@@ -789,7 +789,7 @@ export const uz: Dictionary = {
       opensInNewTab: "Bu servis alohida oynada ochiladi",
       afterWork: "Ishni tugatgach, bu yerga qaytib natijani biriktiring",
       loadError: "Servisni yuklab bo'lmadi",
-      loadErrorBody: "Servis vaqtincha ishlamayotgan yoki loyiha yopiq bo'lishi mumkin. Yangi oynada ochib ko'ring.",
+      loadErrorBody: "Servis mavjud emas — o'qituvchingizdan yordam so'rang",
       attachResult: "Natijani biriktiring",
       attachResultOptional: "Natijani biriktiring (ixtiyoriy)",
       attachLink: "Loyihangizga havola",

@@ -24,17 +24,22 @@ const GRADE_COLORS: Record<number, string> = {
 
 // Used when the teacher didn't attach a specific project URL — opens a
 // blank editor for the service instead of leaving the stage unusable.
+// scratch → TurboWarp: a Scratch-compatible fork that allows framing (the
+// real scratch.mit.edu editor sends X-Frame-Options and refuses to embed).
+// makecode → #editor forces the code/blocks editor tab instead of a blank
+// project chooser screen.
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
-  scratch: "https://scratch.mit.edu/projects/editor/",
+  scratch: "https://turbowarp.org/editor",
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
-  makecode: "https://arcade.makecode.com/",
+  makecode: "https://arcade.makecode.com/#editor",
 };
 
 /**
  * External-service (scratch/wokwi/codesandbox/makecode) embedded directly in
- * the stage card — no "Open" gate, no fullscreen modal. Falls back to a
- * blank editor URL when the teacher didn't attach a specific project.
+ * the stage card. Owns its full header (title/description/actions on one
+ * row), no "Open" gate, no fullscreen modal, no "open in new tab" fallback —
+ * all four services embed via iframe.
  */
 export function ExternalStageModal({
   stage, studentId, onSubmitted,
@@ -72,7 +77,7 @@ export function ExternalStageModal({
   const [attachOpen, setAttachOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // iframe load tracking (30s timeout fallback for embeddable services).
+  // iframe load tracking (30s timeout → error message, no open-elsewhere fallback).
   const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">(embeddable && embedUrl ? "loading" : "error");
   useEffect(() => {
     if (!embeddable || !embedUrl) return;
@@ -101,6 +106,7 @@ export function ExternalStageModal({
     }
   }
 
+  // Only used by the (currently unreachable — all 4 services embed) non-embeddable fallback below.
   function handleOpenService() {
     if (openUrl) window.open(openUrl, "_blank", "noopener,noreferrer");
     setLastOpenedAt(new Date().toISOString());
@@ -135,56 +141,58 @@ export function ExternalStageModal({
   const serviceName = meta.name;
 
   return (
-    <div className="space-y-4">
-      {/* Status + controls row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-          {serviceName}
-        </span>
-        {readOnly ? (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-            <Check className="h-3.5 w-3.5" /> {w.submitted}
-          </span>
-        ) : (
-          <button
-            onClick={() => setAttachOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:from-violet-700 hover:to-purple-700 active:scale-95"
-          >
-            <Save className="h-3.5 w-3.5" /> {w.submit}
-          </button>
-        )}
-        {openUrl && (
-          <a
-            href={openUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setLastOpenedAt(new Date().toISOString())}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
-          >
-            <ExternalLink className="h-3.5 w-3.5" /> {dx.openInNewTab}
-          </a>
-        )}
+    <div className="flex h-full flex-col gap-3">
+      {/* Header — one row: title/description | actions */}
+      <div className="flex items-center gap-4 border-b border-slate-200 pb-3 dark:border-white/10">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="truncate text-base font-bold text-slate-900 dark:text-slate-100" title={stage.title}>
+              {stage.title}
+            </h2>
+            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+              {serviceName}
+            </span>
+          </div>
+          {stage.description && (
+            <p className="truncate text-sm text-slate-500 dark:text-slate-400" title={stage.description}>
+              {stage.description}
+            </p>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {readOnly ? (
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <Check className="h-3.5 w-3.5" /> {w.submitted}
+            </span>
+          ) : (
+            <button
+              onClick={() => setAttachOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 transition-all hover:from-violet-700 hover:to-purple-700 active:scale-95"
+            >
+              <Save className="h-3.5 w-3.5" /> {w.submit}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Grade / submitted strip */}
-      {isGraded && (
-        <div className={`rounded-2xl border px-5 py-3 ${GRADE_COLORS[grade] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
-          <p className="text-sm font-bold">{dx.graded}: {grade}/5
-            {stage.progress?.teacher_comment && (
-              <span className="ml-2 font-normal opacity-90">— {stage.progress.teacher_comment}</span>
-            )}
-          </p>
+      {/* Grade / submitted banner — compact, only when relevant */}
+      {isGraded ? (
+        <div className={`shrink-0 rounded-xl border px-4 py-2 text-sm ${GRADE_COLORS[grade] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
+          <span className="font-bold">{dx.graded}: {grade}/5</span>
+          {stage.progress?.teacher_comment && (
+            <span className="ml-2 opacity-90">— {stage.progress.teacher_comment}</span>
+          )}
         </div>
-      )}
-      {isSubmitted && !isGraded && (
-        <div className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700">
+      ) : isSubmitted ? (
+        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
           <Check className="h-4 w-4" /> {dx.submittedWaiting}
         </div>
-      )}
+      ) : null}
 
-      {/* Body: embedded iframe (or fallback card) */}
+      {/* Body: embedded iframe fills remaining space (or non-embeddable fallback card) */}
       {embeddable ? (
-        <div className="relative min-h-[500px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-900">
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-900">
           {iframeState !== "error" && embedUrl ? (
             <>
               {iframeState === "loading" && (
@@ -200,28 +208,22 @@ export function ExternalStageModal({
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
                 allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
                 referrerPolicy="no-referrer-when-downgrade"
-                className="h-[500px] w-full border-none"
+                className="h-full w-full border-none"
               />
             </>
           ) : (
-            <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-3 p-6 text-center">
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
               <AlertTriangle className="h-10 w-10 text-orange-500" />
               <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">{dx.loadError}</h4>
               <p className="max-w-md text-sm text-slate-500">{dx.loadErrorBody}</p>
-              {openUrl && (
-                <button
-                  onClick={handleOpenService}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
-                >
-                  <ExternalLink className="h-4 w-4" /> {dx.openInNewTab}
-                </button>
-              )}
             </div>
           )}
         </div>
       ) : (
-        /* Non-embeddable services: a friendly "opens in a new tab" card. */
-        <div className="flex flex-col items-center justify-center gap-5 rounded-xl bg-gradient-to-b from-blue-50/60 to-violet-50/40 p-10 text-center dark:from-blue-500/5 dark:to-violet-500/5">
+        /* Non-embeddable services: a friendly "opens in a new tab" card.
+           Currently unreachable — every service in SERVICE_CONFIG embeds —
+           kept for forward-compat if a future service can't be framed. */
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 rounded-xl bg-gradient-to-b from-blue-50/60 to-violet-50/40 p-10 text-center dark:from-blue-500/5 dark:to-violet-500/5">
           <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30">
             <Globe className="h-12 w-12 text-white" strokeWidth={1.75} />
           </div>
@@ -241,7 +243,7 @@ export function ExternalStageModal({
 
       {/* Read-only: slim bar showing what was attached */}
       {readOnly && (link || previewUrl) && (
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-100 bg-white px-5 py-2.5 dark:border-white/10 dark:bg-slate-900">
+        <div className="flex shrink-0 flex-wrap items-center gap-4 rounded-xl border border-slate-100 bg-white px-5 py-2.5 dark:border-white/10 dark:bg-slate-900">
           <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{dx.attachResult}</span>
           {link && (
             <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 truncate text-sm font-semibold text-blue-600 hover:underline">

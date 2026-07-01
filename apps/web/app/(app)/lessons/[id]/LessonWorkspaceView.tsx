@@ -695,6 +695,7 @@ export function LessonWorkspaceView({
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
+              const isCodeOrExternal = stage.content_type === "code" || isExternalService(stage.content_type);
 
               return (
                 <div key={isCompleted ? stage.id : `${stage.id}-${animKey}`} className={`relative${isCompleted ? "" : " animate-stage-in"}`}>
@@ -709,67 +710,74 @@ export function LessonWorkspaceView({
                   </div>
                 )}
                 <div
-                  className={`rounded-2xl border p-5 shadow-sm backdrop-blur-xl transition-all ${
+                  className={`rounded-2xl border shadow-sm backdrop-blur-xl transition-all ${
                     stage.stage_type === "task"
                       ? "border-violet-100 bg-violet-50/40 dark:border-violet-500/20 dark:bg-violet-500/5"
                       : "border-blue-100 bg-blue-50/40 dark:border-blue-500/20 dark:bg-blue-500/5"
-                  }`}
+                  } ${isCodeOrExternal ? "flex h-[78vh] min-h-[560px] flex-col p-4" : "p-5"}`}
                 >
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-                      stage.stage_type === "task"
-                        ? "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300"
-                        : "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
-                    }`}>
-                      {stage.stage_type === "task"
-                        ? <ListChecks className="h-4 w-4" />
-                        : <BookOpen className="h-4 w-4" />}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-[15px] font-bold text-slate-800 dark:text-slate-100">{stage.title}</h3>
-                      {stage.content_type && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          {dl.stageContentPresentation && stage.content_type === "presentation"
-                            ? dl.stageContentPresentation
-                            : stage.content_type}
+                  {/* Icon+title header — CodeStageView/ExternalStageModal render their own
+                      compact title/description row instead, to save vertical space for
+                      the editor/iframe. */}
+                  {!isCodeOrExternal && (
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                        stage.stage_type === "task"
+                          ? "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300"
+                          : "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
+                      }`}>
+                        {stage.stage_type === "task"
+                          ? <ListChecks className="h-4 w-4" />
+                          : <BookOpen className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-[15px] font-bold text-slate-800 dark:text-slate-100">{stage.title}</h3>
+                        {stage.content_type && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {dl.stageContentPresentation && stage.content_type === "presentation"
+                              ? dl.stageContentPresentation
+                              : stage.content_type}
+                          </span>
+                        )}
+                      </div>
+                      {(isStudied || isSubmitted || isGraded) && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                          <Check className="h-3 w-3" strokeWidth={3} />
                         </span>
                       )}
                     </div>
-                    {(isStudied || isSubmitted || isGraded) && (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-                        <Check className="h-3 w-3" strokeWidth={3} />
-                      </span>
-                    )}
-                  </div>
+                  )}
 
                   {/* Theory: full presentation (slides) when generated, else plain text.
                       Students never drive navigation — they follow the teacher's
                       current_slide_index via Realtime inside SlideViewer. */}
-                  {stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
-                    <div className="mb-3 h-[70vh] min-h-[460px]">
-                      <SlideViewer
-                        slides={stage.slides}
-                        canExport
-                        onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
-                        isTeacher={false}
-                        stageId={stage.id}
-                        initialSlide={stage.current_slide_index ?? 0}
-                      />
-                    </div>
-                  ) : stage.description ? (
-                    <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
-                  ) : null}
+                  {!isCodeOrExternal && (
+                    stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
+                      <div className="mb-3 h-[70vh] min-h-[460px]">
+                        <SlideViewer
+                          slides={stage.slides}
+                          canExport
+                          onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                          isTeacher={false}
+                          stageId={stage.id}
+                          initialSlide={stage.current_slide_index ?? 0}
+                        />
+                      </div>
+                    ) : stage.description ? (
+                      <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
+                    ) : null
+                  )}
 
 
                   {/* Task — also shown for stage_type='theory' code stages (AI "Демо:"
                       stages): a code editor is a valid thing to open regardless of
                       whether the stage counts as a gradable task. */}
                   {(stage.stage_type === "task" || stage.content_type === "code") && (
-                    <div className="space-y-2">
+                    <div className={isCodeOrExternal ? "flex min-h-0 flex-1 flex-col" : "space-y-2"}>
                       {/* CodeStageView/ExternalStageModal render their own (richer, with
                           teacher_comment) grade/submitted banner — skip this compact one
                           for them to avoid showing status twice. */}
-                      {stage.content_type !== "code" && !isExternalService(stage.content_type) && (
+                      {!isCodeOrExternal && (
                         isGraded ? (
                           <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                             <Check className="h-4 w-4" />
