@@ -383,6 +383,9 @@ export interface Dictionary {
     onlyTeacherCanClose: string; // "Только учитель может закрыть"
     minimizeDemo: string;       // "Свернуть"
     maximizeDemo: string;       // "Развернуть"
+    pageOf: string;             // "Страница {current} из {total}"
+    loading: string;            // "Загрузка PDF..."
+    loadError: string;          // "Не удалось загрузить PDF"
   };
   announcements: {
     title: string;

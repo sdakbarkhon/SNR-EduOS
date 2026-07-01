@@ -384,6 +384,9 @@ export const en: Dictionary = {
     onlyTeacherCanClose: "Only the teacher can close this",
     minimizeDemo: "Minimize",
     maximizeDemo: "Expand",
+    pageOf: "Page {current} of {total}",
+    loading: "Loading PDF...",
+    loadError: "Couldn't load the PDF",
   },
   announcements: {
     title: "Announcements",

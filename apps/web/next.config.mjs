@@ -26,6 +26,12 @@ const nextConfig = {
         os: false,
         path: false,
       };
+      // react-pdf/pdfjs-dist probe for node-canvas (server-side rendering
+      // fallback) even though we only ever render client-side.
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        canvas: false,
+      };
     }
     return config;
   },

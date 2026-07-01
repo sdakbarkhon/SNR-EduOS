@@ -18,6 +18,9 @@ import {
   getLeaveRequestsForLesson, decideLeaveRequest,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
+  setDemoPage as setDemoPageQuery,
+  setDemoVideoTime as setDemoVideoTimeQuery,
+  setDemoVideoPlaying as setDemoVideoPlayingQuery,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -42,6 +45,8 @@ import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { demoKind } from "@/lib/material-kind";
+import { SyncedPdfViewer } from "@/components/demo/SyncedPdfViewer";
+import { SyncedVideoPlayer } from "@/components/demo/SyncedVideoPlayer";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
@@ -638,6 +643,37 @@ export function TeacherLessonDetailView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoMaterialId]);
 
+  // PDF page / video playback state synced to students (migration 63).
+  // Writes are throttled via lastPageWriteRef/lastVideoWriteRef so fast
+  // "Далее Далее Далее" clicks or continuous timeupdate events don't spam
+  // Realtime with one write per event.
+  const [demoCurrentPage, setDemoCurrentPage] = useState(lesson.demo_current_page);
+  const [demoVideoTime, setDemoVideoTime] = useState(lesson.demo_video_time);
+  const [demoVideoPlaying, setDemoVideoPlaying] = useState(lesson.demo_video_playing);
+  const lastPageWriteRef = useRef(0);
+  const lastVideoWriteRef = useRef(0);
+
+  function handleDemoPageChange(page: number) {
+    setDemoCurrentPage(page);
+    const now = Date.now();
+    if (now - lastPageWriteRef.current < 300) return;
+    lastPageWriteRef.current = now;
+    setDemoPageQuery(db, lesson.id, page).catch(() => null);
+  }
+
+  function handleDemoVideoTimeChange(time: number) {
+    setDemoVideoTime(time);
+    const now = Date.now();
+    if (now - lastVideoWriteRef.current < 500) return;
+    lastVideoWriteRef.current = now;
+    setDemoVideoTimeQuery(db, lesson.id, time).catch(() => null);
+  }
+
+  function handleDemoVideoPlayingChange(playing: boolean) {
+    setDemoVideoPlaying(playing);
+    setDemoVideoPlayingQuery(db, lesson.id, playing).catch(() => null);
+  }
+
   const [uploadModal, setUploadModal] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -742,6 +778,13 @@ export function TeacherLessonDetailView({
       // Sync demo material (another tab / auto-clear on complete)
       const newDemoId = payload?.new?.demo_material_id as string | null | undefined;
       if (newDemoId !== undefined) setDemoMaterialId(newDemoId ?? null);
+      // Sync PDF page / video state (another teacher tab) — migration 63
+      const newDemoPage = payload?.new?.demo_current_page as number | undefined;
+      if (newDemoPage !== undefined) setDemoCurrentPage(newDemoPage);
+      const newDemoVideoTime = payload?.new?.demo_video_time as number | undefined;
+      if (newDemoVideoTime !== undefined) setDemoVideoTime(newDemoVideoTime);
+      const newDemoVideoPlaying = payload?.new?.demo_video_playing as boolean | undefined;
+      if (newDemoVideoPlaying !== undefined) setDemoVideoPlaying(newDemoVideoPlaying);
       if (newStatus && newStatus !== status) window.location.reload();
     },
   );
@@ -935,6 +978,18 @@ export function TeacherLessonDetailView({
     setDemoMaterialId(next); // optimistic
     try {
       await setDemoMaterial(db, lesson.id, next);
+      // Starting a fresh demo resets page/video state — otherwise a new PDF
+      // or video would resume at whatever page/timestamp the last one left.
+      if (next) {
+        setDemoCurrentPage(1);
+        setDemoVideoTime(0);
+        setDemoVideoPlaying(false);
+        await Promise.all([
+          setDemoPageQuery(db, lesson.id, 1),
+          setDemoVideoTimeQuery(db, lesson.id, 0),
+          setDemoVideoPlayingQuery(db, lesson.id, false),
+        ]).catch(() => null);
+      }
     } catch {
       setDemoMaterialId(prev); // revert on failure
     }
@@ -1725,10 +1780,21 @@ export function TeacherLessonDetailView({
             </div>
             <div className="flex-1 overflow-auto bg-white">
               {kind === "pdf" ? (
-                <iframe src={`${demoMaterialUrl}#toolbar=0`} title={name} className="h-full w-full" />
+                <SyncedPdfViewer
+                  url={demoMaterialUrl}
+                  isTeacher
+                  currentPage={demoCurrentPage}
+                  onPageChange={handleDemoPageChange}
+                />
               ) : kind === "video" ? (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={demoMaterialUrl} controls autoPlay className="mx-auto h-full max-h-full w-full bg-black object-contain" />
+                <SyncedVideoPlayer
+                  url={demoMaterialUrl}
+                  isTeacher
+                  videoTime={demoVideoTime}
+                  videoPlaying={demoVideoPlaying}
+                  onTimeChange={handleDemoVideoTimeChange}
+                  onPlayingChange={handleDemoVideoPlayingChange}
+                />
               ) : kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={demoMaterialUrl} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />

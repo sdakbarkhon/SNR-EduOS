@@ -384,6 +384,9 @@ export const ru: Dictionary = {
     onlyTeacherCanClose: "Только учитель может закрыть",
     minimizeDemo: "Свернуть",
     maximizeDemo: "Развернуть",
+    pageOf: "Страница {current} из {total}",
+    loading: "Загрузка PDF...",
+    loadError: "Не удалось загрузить PDF",
   },
   announcements: {
     title: "Объявления",

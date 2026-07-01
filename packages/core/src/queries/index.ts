@@ -1262,7 +1262,7 @@ export const getTeacherLessonView = async (
 ): Promise<TeacherLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, demo_current_page, demo_video_time, demo_video_playing, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -1274,6 +1274,7 @@ export const getTeacherLessonView = async (
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
     room: string | null; active_stage_id: string | null; demo_material_id: string | null;
+    demo_current_page: number | null; demo_video_time: number | null; demo_video_playing: boolean | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -1302,6 +1303,9 @@ export const getTeacherLessonView = async (
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
+    demo_current_page: lesson.demo_current_page ?? 1,
+    demo_video_time: lesson.demo_video_time ?? 0,
+    demo_video_playing: lesson.demo_video_playing ?? false,
     subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
@@ -1317,7 +1321,7 @@ export const getStudentLessonView = async (
 ): Promise<StudentLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, demo_current_page, demo_video_time, demo_video_playing, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
@@ -1329,6 +1333,7 @@ export const getStudentLessonView = async (
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
     room: string | null; active_stage_id: string | null; demo_material_id: string | null;
+    demo_current_page: number | null; demo_video_time: number | null; demo_video_playing: boolean | null;
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
@@ -1367,6 +1372,9 @@ export const getStudentLessonView = async (
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
+    demo_current_page: lesson.demo_current_page ?? 1,
+    demo_video_time: lesson.demo_video_time ?? 0,
+    demo_video_playing: lesson.demo_video_playing ?? false,
     subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
@@ -1419,6 +1427,53 @@ export async function setDemoMaterial(
   const { error } = await (db as any)
     .from("lessons")
     .update({ demo_material_id: materialId })
+    .eq("id", lessonId);
+  if (error) throw error;
+}
+
+/**
+ * Учитель переключает страницу PDF во время демонстрации (migration 63).
+ * Realtime на lessons доставляет demo_current_page ученикам синхронно.
+ * Caller должен троттлить вызовы (~300ms) — быстрые клики "Далее" иначе
+ * шлют по событию на каждый клик.
+ */
+export async function setDemoPage(
+  db: Db,
+  lessonId: string,
+  page: number,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lessons")
+    .update({ demo_current_page: page })
+    .eq("id", lessonId);
+  if (error) throw error;
+}
+
+/** Учитель обновляет позицию видео (секунды) во время демонстрации. Caller должен троттлить (~500ms). */
+export async function setDemoVideoTime(
+  db: Db,
+  lessonId: string,
+  time: number,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lessons")
+    .update({ demo_video_time: time })
+    .eq("id", lessonId);
+  if (error) throw error;
+}
+
+/** Учитель переключает play/pause видео во время демонстрации. */
+export async function setDemoVideoPlaying(
+  db: Db,
+  lessonId: string,
+  playing: boolean,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("lessons")
+    .update({ demo_video_playing: playing })
     .eq("id", lessonId);
   if (error) throw error;
 }

@@ -24,6 +24,8 @@ import { QiaQuizModal } from "./QiaQuizModal";
 import { KahootStudentModal } from "./KahootStudentModal";
 import { isExternalService } from "@/lib/external-services";
 import { demoKind } from "@/lib/material-kind";
+import { SyncedPdfViewer } from "@/components/demo/SyncedPdfViewer";
+import { SyncedVideoPlayer } from "@/components/demo/SyncedVideoPlayer";
 import { createClient } from "@/lib/supabase/client";
 
 function initials(name: string): string {
@@ -217,6 +219,9 @@ export function LessonWorkspaceView({
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
   const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
+  const [demoCurrentPage, setDemoCurrentPage] = useState(lesson.demo_current_page);
+  const [demoVideoTime, setDemoVideoTime] = useState(lesson.demo_video_time);
+  const [demoVideoPlaying, setDemoVideoPlaying] = useState(lesson.demo_video_playing);
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
@@ -336,6 +341,14 @@ export function LessonWorkspaceView({
           setOpenTaskStageId(null);
         }
       }
+
+      // Demo PDF page / video position — teacher drives, student follows (migration 63).
+      const newDemoPage = payload?.new?.demo_current_page as number | undefined;
+      if (newDemoPage !== undefined) setDemoCurrentPage(newDemoPage);
+      const newDemoVideoTime = payload?.new?.demo_video_time as number | undefined;
+      if (newDemoVideoTime !== undefined) setDemoVideoTime(newDemoVideoTime);
+      const newDemoVideoPlaying = payload?.new?.demo_video_playing as boolean | undefined;
+      if (newDemoVideoPlaying !== undefined) setDemoVideoPlaying(newDemoVideoPlaying);
 
       // When lesson ends, show completion modal (intercepts router.refresh)
       if (newStatus && newStatus !== lesson.status) {
@@ -484,10 +497,9 @@ export function LessonWorkspaceView({
             </div>
             <div className="flex-1 overflow-auto bg-white">
               {mat && url && kind === "pdf" ? (
-                <iframe src={`${url}#toolbar=0`} title={name} className="h-full w-full" />
+                <SyncedPdfViewer url={url} isTeacher={false} currentPage={demoCurrentPage} />
               ) : mat && url && kind === "video" ? (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={url} controls autoPlay className="mx-auto h-full max-h-full w-full bg-black object-contain" />
+                <SyncedVideoPlayer url={url} isTeacher={false} videoTime={demoVideoTime} videoPlaying={demoVideoPlaying} />
               ) : mat && url && kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={url} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
