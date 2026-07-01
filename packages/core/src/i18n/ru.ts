@@ -645,6 +645,8 @@ export const ru: Dictionary = {
       backToLesson: "Назад к уроку",
       submit: "Сдать",
       submitted: "Сдано",
+      submittedSuccessfully: "Решение отправлено учителю",
+      submitError: "Ошибка отправки. Попробуйте ещё раз",
       collapse: "Свернуть",
       expand: "Развернуть",
       stages: "Этапы",

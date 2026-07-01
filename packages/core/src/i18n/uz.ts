@@ -645,6 +645,8 @@ export const uz: Dictionary = {
       backToLesson: "Darsga qaytish",
       submit: "Topshirish",
       submitted: "Topshirildi",
+      submittedSuccessfully: "Yechim o'qituvchiga yuborildi",
+      submitError: "Yuborishda xato. Qayta urinib ko'ring",
       collapse: "Yopish",
       expand: "Ochish",
       stages: "Bosqichlar",

@@ -645,6 +645,8 @@ export const en: Dictionary = {
       backToLesson: "Back to lesson",
       submit: "Submit",
       submitted: "Submitted",
+      submittedSuccessfully: "Solution sent to teacher",
+      submitError: "Error submitting. Try again",
       collapse: "Collapse",
       expand: "Expand",
       stages: "Stages",

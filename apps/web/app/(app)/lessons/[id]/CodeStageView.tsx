@@ -60,6 +60,7 @@ export function CodeStageView({
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const readOnly = isSubmitted;
 
@@ -92,15 +93,21 @@ export function CodeStageView({
   }
 
   async function handleSubmit() {
+    // eslint-disable-next-line no-console
+    console.log("[Submit] Clicked for stage:", stage.id);
     setConfirmOpen(false);
     setSubmitting(true);
+    setSubmitError("");
     try {
       const submission: CodeSubmission = {
         code, stdin, last_output: resultToString(result), language,
       };
       const progress = await submitStageTask(db, stage.id, studentId, submission as unknown as Record<string, unknown>);
       onSubmitted(progress);
-    } catch { /* noop */ } finally {
+    } catch (e) {
+      console.error("[Submit] error:", e);
+      setSubmitError(w.submitError);
+    } finally {
       setSubmitting(false);
     }
   }
@@ -221,6 +228,12 @@ export function CodeStageView({
               )}
             </div>
           </section>
+
+          {submitError && (
+            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+              {submitError}
+            </p>
+          )}
         </div>
       </div>
 

@@ -647,6 +647,8 @@ export interface Dictionary {
       backToLesson: string;       // fullscreen stage: "← Назад к уроку"
       submit: string;             // fullscreen stage: "Сдать"
       submitted: string;          // fullscreen stage: "✓ Сдано"
+      submittedSuccessfully: string; // "Решение отправлено учителю"
+      submitError: string;        // "Ошибка отправки. Попробуйте ещё раз"
       collapse: string;           // "Свернуть sidebar"
       expand: string;             // "Развернуть sidebar"
       stages: string;             // "Этапы"
