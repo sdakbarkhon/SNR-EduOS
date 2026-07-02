@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { X, Check, Loader2, Trophy, Hourglass, Gamepad2 } from "lucide-react";
+import { Check, Loader2, Trophy, Hourglass, Gamepad2, Triangle, Diamond, Circle, Square, Flame } from "lucide-react";
 import {
   getDictionary, getQuizQuestions, getKahootSession, startQuizAttempt,
   submitKahootAnswer, getKahootLeaderboard, gradeFromPercent,
@@ -16,19 +15,30 @@ import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 
 const OPT = [
-  { dot: "🔴", on: "bg-red-500 text-white border-red-500",       off: "bg-red-50 border-red-200 text-red-800 hover:border-red-400" },
-  { dot: "🔵", on: "bg-blue-500 text-white border-blue-500",     off: "bg-blue-50 border-blue-200 text-blue-800 hover:border-blue-400" },
-  { dot: "🟡", on: "bg-yellow-400 text-white border-yellow-400", off: "bg-yellow-50 border-yellow-200 text-yellow-800 hover:border-yellow-400" },
-  { dot: "🟢", on: "bg-green-500 text-white border-green-500",   off: "bg-green-50 border-green-200 text-green-800 hover:border-green-400" },
+  { Icon: Triangle, bg: "#E21B3C", shadow: "rgba(226,27,60,.45)" },
+  { Icon: Diamond, bg: "#1368CE", shadow: "rgba(19,104,206,.45)" },
+  { Icon: Circle, bg: "#E0A211", shadow: "rgba(224,162,17,.45)" },
+  { Icon: Square, bg: "#26890C", shadow: "rgba(38,137,12,.45)" },
 ];
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+function initials(name: string): string {
+  return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+}
+
+/**
+ * Inline-embedded Kahoot stage (Iter5 P13, Claude Design). Was previously a
+ * fullscreen dark-overlay modal; now rendered directly in the lesson's
+ * center-stage slot, same as CodeStageView/ExternalStageModal. Only the
+ * "question_active" stage has a Claude Design reference — lobby/revealed/
+ * finished are restyled lightly with the same color tokens, not redesigned
+ * wholesale (no source screens exist for them).
+ */
 export function KahootStudentModal({
-  stage, studentId, onClose, onSubmitted,
+  stage, studentId, onSubmitted,
 }: {
   stage: LessonStageWithProgress;
   studentId: string;
-  onClose: () => void;
   onSubmitted: (progress: LessonStageProgress) => void;
 }) {
   const { locale } = useLocale();
@@ -104,6 +114,15 @@ export function KahootStudentModal({
   const secsLeft = status === "question_active" && startedMs != null && nowMs != null
     ? Math.max(0, Math.ceil((startedMs + limitS * 1000 - nowMs) / 1000)) : null;
 
+  // Real streak: consecutive correct answers ending at the most recently answered question.
+  const answeredIdxs = Object.keys(answered).map(Number).sort((a, b) => a - b);
+  let streak = 0;
+  for (let i = answeredIdxs.length - 1; i >= 0; i--) {
+    const key = answeredIdxs[i];
+    if (key === undefined) break;
+    if (answered[key]?.correct) streak++; else break;
+  }
+
   async function answer(optIdx: number) {
     if (!attempt || !currentQ || answered[qIdx]) return;
     const correct = optIdx === currentQ.correct_option_index;
@@ -115,108 +134,162 @@ export function KahootStudentModal({
     setAnswered((a) => ({ ...a, [qIdx]: { selected: optIdx, score, correct } }));
   }
 
-  if (typeof document === "undefined") return null;
-
   const total = questions.length;
   const myAns = answered[qIdx];
   const me = board.find((e) => e.student_id === studentId);
   const myPlace = me ? board.findIndex((e) => e.student_id === studentId) + 1 : null;
+  const myName = me?.full_name ?? "";
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-      <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-3 sm:p-5">
-        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
-            <span className="truncate text-sm font-bold text-slate-700">Kahoot: {stage.title}</span>
-            <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button>
+  if (loading) {
+    return (
+      <div className="flex min-h-[300px] flex-1 items-center justify-center text-[#9CA0B4]">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === "lobby") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 rounded-[24px] border border-[#ECEDF4] bg-white p-10 text-center shadow-sm">
+        <Hourglass className="h-12 w-12 animate-pulse text-[#6A4FE6]" />
+        <h2 className="text-2xl font-black text-[#242A45]">{dq.waitingTeacher}</h2>
+        <p className="text-sm text-[#9CA0B4]">{dq.teacherWillStart}</p>
+        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2 text-sm font-extrabold text-emerald-700">
+          <Gamepad2 className="h-4 w-4" /> {dq.ready}
+        </span>
+      </div>
+    );
+  }
+
+  if (status === "question_active" && currentQ) {
+    if (myAns) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-[24px] border border-[#ECEDF4] bg-white p-10 text-center shadow-sm">
+          <Check className="h-12 w-12 text-emerald-500" />
+          <h2 className="text-xl font-black text-[#242A45]">{dq.answerRecorded}</h2>
+          <p className="text-sm text-[#9CA0B4]">{dq.waitingOthers}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-1 flex-col gap-4">
+        <div
+          className="relative flex flex-1 flex-col items-center overflow-hidden rounded-[24px] px-6 py-5"
+          style={{
+            background: "radial-gradient(circle at 14% 22%, rgba(124,99,240,.14), transparent 42%), " +
+              "radial-gradient(circle at 88% 82%, rgba(226,27,60,.08), transparent 46%), " +
+              "linear-gradient(155deg,#ECE7F7 0%,#F1E8F0 52%,#F7EEF0 100%)",
+          }}
+        >
+          <div className="relative z-[2] font-black text-[30px] tracking-tight text-[#46178F]" style={{ textShadow: "0 2px 0 rgba(70,23,143,.12)" }}>
+            Kahoot!
           </div>
 
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : status === "lobby" ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-5 p-8 text-center">
-              <Hourglass className="h-12 w-12 animate-pulse text-violet-500" />
-              <h2 className="text-2xl font-extrabold text-slate-800">{dq.waitingTeacher}</h2>
-              <p className="text-sm text-slate-500">{dq.teacherWillStart}</p>
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2 text-sm font-bold text-emerald-700">
-                <Gamepad2 className="h-4 w-4" /> {dq.ready}
-              </span>
+          <div className="relative z-[2] mt-3.5 flex w-full items-center justify-center gap-5">
+            <div
+              className="flex h-[92px] w-[92px] shrink-0 flex-col items-center justify-center rounded-full text-white"
+              style={{ background: "linear-gradient(135deg,#7C63F0,#5B3FD4)", boxShadow: "0 14px 30px -8px rgba(91,63,212,.6)" }}
+            >
+              <span className="text-[28px] font-black leading-none">{secsLeft ?? 0}</span>
+              <span className="mt-0.5 text-[11px] font-bold opacity-90">{dq.timeLabel.toLowerCase()}</span>
             </div>
-          ) : status === "question_active" && currentQ ? (
-            myAns ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-                <Check className="h-12 w-12 text-emerald-500" />
-                <h2 className="text-xl font-extrabold text-slate-800">{dq.answerRecorded}</h2>
-                <p className="text-sm text-slate-500">{dq.waitingOthers}</p>
-                <p className="text-sm font-semibold text-slate-700">
-                  {dq.yourAnswer}: {OPT[myAns.selected]?.dot} {currentQ.options[myAns.selected]}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-1 flex-col p-6">
-                <div className="mb-3 flex items-center justify-between text-sm font-bold text-slate-500">
-                  <span>{dq.questionOf.replace("{n}", String(qIdx + 1)).replace("{total}", String(total))}</span>
-                  <span className={`font-mono ${secsLeft != null && secsLeft <= 5 ? "text-red-500" : "text-slate-700"}`}>0:{String(secsLeft ?? 0).padStart(2, "0")}</span>
-                </div>
-                <h2 className="mb-6 text-center text-xl font-extrabold text-slate-800 md:text-2xl">{currentQ.question_text}</h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {currentQ.options.map((o, oi) => {
-                    const c = OPT[oi];
-                    if (!o || !c) return null;
-                    return (
-                      <button key={oi} onClick={() => answer(oi)}
-                        className={`flex items-center gap-3 rounded-2xl border-2 px-5 py-5 text-left text-base font-bold shadow-sm transition-all active:scale-95 ${c.off}`}>
-                        <span className="text-xl">{c.dot}</span> {o}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )
-          ) : status === "question_revealed" && currentQ ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-              <p className="text-sm font-bold uppercase tracking-widest text-slate-400">{dq.correctAnswer}</p>
-              <p className="text-2xl font-extrabold text-emerald-700">{OPT[currentQ.correct_option_index]?.dot} {currentQ.options[currentQ.correct_option_index]}</p>
-              {myAns ? (
-                myAns.correct ? (
-                  <p className="text-lg font-bold text-emerald-600">{dq.correctPlus.replace("{n}", String(myAns.score))}</p>
-                ) : (
-                  <p className="text-lg font-bold text-red-500">{dq.wrongAnswer}</p>
-                )
-              ) : <p className="text-sm text-slate-400">{dq.wrongAnswer}</p>}
-              {me && <p className="text-sm text-slate-600">{dq.totalScore}: <span className="font-bold">{me.total_score}</span></p>}
-              {myPlace && <p className="text-sm text-slate-600">{dq.yourPlace}: <span className="font-bold">{myPlace} / {board.length}</span></p>}
-              <p className="mt-2 text-xs text-slate-400">{dq.waitingNext}</p>
+            <div className="max-w-[560px] flex-1 rounded-[20px] bg-white px-6 py-4" style={{ boxShadow: "0 16px 40px -12px rgba(70,23,143,.22)" }}>
+              <p className="text-center text-[19px] font-black text-[#232A45]">{currentQ.question_text}</p>
             </div>
-          ) : (
-            /* finished */
-            <div className="flex flex-1 flex-col overflow-y-auto p-6">
-              <div className="mb-6 text-center">
-                <Trophy className="mx-auto h-10 w-10 text-amber-500" />
-                <h2 className="mt-2 text-2xl font-extrabold text-slate-800">{dq.gameOver}</h2>
-                {myPlace && <p className="mt-2 text-lg font-bold text-slate-700">{dq.yourResult}: {myPlace} {dq.place}</p>}
-                {me && <p className="text-amber-600 font-bold">{me.total_score} {dq.points}</p>}
-                {me && <p className={`font-bold`}>{dq.grade}: {gradeFromPercent(total > 0 ? (me.correct_count / total) * 100 : 0)}</p>}
-              </div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{dq.leaderboard}</h3>
-              <ul className="space-y-2">
-                {board.map((e, i) => {
-                  const isMe = e.student_id === studentId;
-                  return (
-                    <li key={e.student_id} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${isMe ? "bg-violet-100" : "bg-slate-50"}`}>
-                      <span className="w-6 text-center">{i < 3 ? MEDALS[i] : i + 1}</span>
-                      <span className="flex-1 text-sm font-semibold text-slate-800">{isMe ? dq.you : e.full_name}</span>
-                      <span className="font-mono text-sm font-bold text-slate-600">{e.total_score}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-              <button onClick={onClose} className="mt-6 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700">{dq.close}</button>
+            <div className="flex h-[78px] w-[78px] shrink-0 flex-col items-center justify-center rounded-full bg-white" style={{ boxShadow: "0 10px 26px -8px rgba(70,23,143,.2)" }}>
+              <span className="text-[24px] font-black leading-none text-[#242A45]">{qIdx + 1}</span>
+              <span className="text-[10.5px] font-bold text-[#9CA0B4]">/ {total}</span>
+            </div>
+          </div>
+
+          <div className="relative z-[2] mt-4 grid w-full max-w-[900px] grid-cols-1 gap-3 sm:grid-cols-2">
+            {currentQ.options.map((o, oi) => {
+              const c = OPT[oi];
+              if (!o || !c) return null;
+              const Icon = c.Icon;
+              return (
+                <button
+                  key={oi}
+                  onClick={() => answer(oi)}
+                  className="flex h-[72px] items-center gap-4 rounded-[14px] px-5 text-white transition-transform active:scale-[0.98]"
+                  style={{ background: c.bg, boxShadow: `inset 0 -5px 0 rgba(0,0,0,.18), 0 8px 18px -8px ${c.shadow}` }}
+                >
+                  <Icon className="h-5 w-5 shrink-0" fill="currentColor" />
+                  <span className="flex-1 text-left text-[16px] font-bold">{o}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-[16px] border border-[#ECEDF4] bg-white px-5 py-3 shadow-sm">
+          <div className="flex items-center gap-2.5 border-r border-[#EEF0F5] pr-4">
+            <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[10px] text-[13px] font-black text-white" style={{ background: "linear-gradient(135deg,#8B6BF0,#6A4FE6)" }}>
+              {initials(myName || dq.you)}
+            </div>
+            <div>
+              <p className="text-[10.5px] font-bold text-[#9CA0B4]">{myName || dq.you}</p>
+            </div>
+          </div>
+          {me && (
+            <div className="flex flex-1 items-center justify-around gap-3 text-center">
+              {myPlace && (
+                <div><p className="text-[10.5px] font-bold text-[#9CA0B4]">{dq.yourPlace}</p><p className="text-[14px] font-black text-[#242A45]">{myPlace} / {board.length}</p></div>
+              )}
+              <div><p className="text-[10.5px] font-bold text-[#9CA0B4]">{dq.points}</p><p className="text-[14px] font-black text-[#242A45]">{me.total_score}</p></div>
+              {streak > 0 && (
+                <div className="flex items-center gap-1.5"><Flame className="h-4 w-4 text-orange-500" /><span className="text-[14px] font-black text-[#242A45]">{streak}</span></div>
+              )}
             </div>
           )}
         </div>
       </div>
-    </div>,
-    document.body,
+    );
+  }
+
+  if (status === "question_revealed" && currentQ) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[24px] border border-[#ECEDF4] bg-white p-10 text-center shadow-sm">
+        <p className="text-sm font-extrabold uppercase tracking-widest text-[#9CA0B4]">{dq.correctAnswer}</p>
+        <p className="text-2xl font-black text-emerald-700">{currentQ.options[currentQ.correct_option_index]}</p>
+        {myAns ? (
+          myAns.correct ? (
+            <p className="text-lg font-extrabold text-emerald-600">{dq.correctPlus.replace("{n}", String(myAns.score))}</p>
+          ) : (
+            <p className="text-lg font-extrabold text-red-500">{dq.wrongAnswer}</p>
+          )
+        ) : <p className="text-sm text-[#9CA0B4]">{dq.wrongAnswer}</p>}
+        {me && <p className="text-sm text-[#5B6178]">{dq.totalScore}: <span className="font-extrabold">{me.total_score}</span></p>}
+        {myPlace && <p className="text-sm text-[#5B6178]">{dq.yourPlace}: <span className="font-extrabold">{myPlace} / {board.length}</span></p>}
+        <p className="mt-2 text-xs text-[#B0B4C6]">{dq.waitingNext}</p>
+      </div>
+    );
+  }
+
+  /* finished */
+  return (
+    <div className="flex flex-1 flex-col overflow-y-auto rounded-[24px] border border-[#ECEDF4] bg-white p-6 shadow-sm">
+      <div className="mb-6 text-center">
+        <Trophy className="mx-auto h-10 w-10 text-amber-500" />
+        <h2 className="mt-2 text-2xl font-black text-[#242A45]">{dq.gameOver}</h2>
+        {myPlace && <p className="mt-2 text-lg font-extrabold text-[#5B6178]">{dq.yourResult}: {myPlace} {dq.place}</p>}
+        {me && <p className="font-extrabold text-amber-600">{me.total_score} {dq.points}</p>}
+        {me && <p className="font-extrabold text-[#242A45]">{dq.grade}: {gradeFromPercent(total > 0 ? (me.correct_count / total) * 100 : 0)}</p>}
+      </div>
+      <h3 className="mb-2 text-xs font-extrabold uppercase tracking-widest text-[#9CA0B4]">{dq.leaderboard}</h3>
+      <ul className="space-y-2">
+        {board.map((e, i) => {
+          const isMe = e.student_id === studentId;
+          return (
+            <li key={e.student_id} className={`flex items-center gap-3 rounded-[14px] px-4 py-2.5 ${isMe ? "bg-[#F2EFFE]" : "bg-slate-50"}`}>
+              <span className="w-6 text-center">{i < 3 ? MEDALS[i] : i + 1}</span>
+              <span className="flex-1 text-sm font-bold text-[#242A45]">{isMe ? dq.you : e.full_name}</span>
+              <span className="font-mono text-sm font-extrabold text-[#5B6178]">{e.total_score}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

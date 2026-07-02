@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
-import { X, ChevronLeft, ChevronRight, Check, Clock, Loader2, PartyPopper } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Clock, Loader2, PartyPopper, Lightbulb } from "lucide-react";
 import {
   getDictionary, getQuizQuestions, getStudentQuizAttempt, startQuizAttempt,
   submitQuizAnswer, finalizeQuizAttempt, getQuizAttemptResults,
@@ -11,30 +10,47 @@ import type {
   Locale, LessonStageWithProgress, LessonStageProgress, QuizQuestion, QuizAttempt, QuizConfigForStage,
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { useToast } from "@/components/Toast";
+import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { createClient } from "@/lib/supabase/client";
 
-const OPT = [
-  { dot: "🔴", on: "bg-red-500 text-white border-red-500",       off: "bg-red-50 border-red-200 text-red-800 hover:border-red-400" },
-  { dot: "🔵", on: "bg-blue-500 text-white border-blue-500",     off: "bg-blue-50 border-blue-200 text-blue-800 hover:border-blue-400" },
-  { dot: "🟡", on: "bg-yellow-400 text-white border-yellow-400", off: "bg-yellow-50 border-yellow-200 text-yellow-800 hover:border-yellow-400" },
-  { dot: "🟢", on: "bg-green-500 text-white border-green-500",   off: "bg-green-50 border-green-200 text-green-800 hover:border-green-400" },
-];
-
+const LETTERS = ["A", "B", "C", "D"] as const;
 const GRADE_COLORS: Record<number, string> = {
   5: "text-emerald-600", 4: "text-blue-600", 3: "text-yellow-600", 2: "text-orange-600", 1: "text-red-600",
 };
 
+/** Renders as a dark monospace block when the question text looks like code
+ * (multi-line) — no fake syntax highlighting, just real question content in
+ * the visual treatment the Claude Design mock uses for code snippets. */
+function QuestionText({ text }: { text: string }) {
+  if (!text.includes("\n")) {
+    return <h2 className="mt-3.5 text-center text-[22px] font-black leading-snug text-[#232A45] md:text-[27px]">{text}</h2>;
+  }
+  return (
+    <div className="mt-4 rounded-2xl bg-[#0F1629] px-5 py-4">
+      <pre className="whitespace-pre-wrap font-mono text-[14px] leading-relaxed text-[#C7CCE0]">{text}</pre>
+    </div>
+  );
+}
+
+/**
+ * Inline-embedded QIA quiz stage (Iter5 P13, Claude Design). Was previously a
+ * fullscreen dark-overlay modal; now rendered directly in the lesson's
+ * center-stage slot, same as CodeStageView/ExternalStageModal, since the
+ * design shows the sidebar/header visible around it (not a modal).
+ */
 export function QiaQuizModal({
-  stage, studentId, onClose, onSubmitted,
+  stage, studentId, onSubmitted,
 }: {
   stage: LessonStageWithProgress;
   studentId: string;
-  onClose: () => void;
   onSubmitted: (progress: LessonStageProgress) => void;
 }) {
   const { locale } = useLocale();
   const dq = getDictionary(locale as Locale).lesson.quiz;
+  const dl = getDictionary(locale as Locale).lesson;
   const dCommon = getDictionary(locale as Locale).common;
+  const showToast = useToast();
   const db = createClient();
   const cfg = (stage.config ?? {}) as QuizConfigForStage;
   const limitMin = cfg.time_limit_minutes;
@@ -85,6 +101,8 @@ export function QiaQuizModal({
 
   const deadlineMs = limitMin != null && attempt ? new Date(attempt.started_at).getTime() + limitMin * 60000 : null;
   const secsLeft = deadlineMs != null && nowMs != null ? Math.max(0, Math.floor((deadlineMs - nowMs) / 1000)) : null;
+  const totalSecs = limitMin != null ? limitMin * 60 : null;
+  const ringDeg = totalSecs != null && secsLeft != null ? Math.max(0, Math.min(360, ((totalSecs - secsLeft) / totalSecs) * 360)) : 0;
 
   // auto-finalize on timeout
   useEffect(() => {
@@ -126,148 +144,176 @@ export function QiaQuizModal({
     }
   }
 
-  if (typeof document === "undefined") return null;
-
   const total = questions.length;
   const q = questions[idx];
   const answeredCount = Object.values(answers).filter((v) => v != null).length;
   const mm = secsLeft != null ? Math.floor(secsLeft / 60) : 0;
   const ss = secsLeft != null ? secsLeft % 60 : 0;
-  const timerColor = secsLeft == null ? "" : secsLeft < 30 ? "text-red-500" : secsLeft < 60 ? "text-orange-500" : "text-slate-600";
+  const timerColor = secsLeft == null ? "" : secsLeft < 30 ? "text-red-500" : secsLeft < 60 ? "text-orange-500" : "text-[#242A45]";
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-col p-3 sm:p-5">
-        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-          {/* Header */}
-          <div className="shrink-0 border-b border-slate-100 px-5 py-3">
-            <div className="flex items-center justify-between">
-              <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                <X className="h-5 w-5" />
-              </button>
-              <span className="truncate text-sm font-bold text-slate-700">{dq.test}: {stage.title}</span>
-              {secsLeft != null && !result ? (
-                <span className={`flex items-center gap-1 font-mono text-sm font-bold tabular-nums ${timerColor}`}>
-                  <Clock className="h-4 w-4" /> {mm}:{String(ss).padStart(2, "0")}
-                </span>
-              ) : <span className="w-8" />}
-            </div>
-            {!result && total > 0 && (
-              <div className="mt-2">
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all" style={{ width: `${((idx + 1) / total) * 100}%` }} />
-                </div>
-                <p className="mt-1 text-[11px] font-semibold text-slate-400">{dq.questionOf.replace("{n}", String(idx + 1)).replace("{total}", String(total))}</p>
-              </div>
-            )}
+  if (loading) {
+    return (
+      <div className="flex min-h-[300px] flex-1 items-center justify-center text-[#9CA0B4]">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  if (result) {
+    return <ResultView questions={questions} answers={answers} result={result} dq={dq} />;
+  }
+
+  if (!q) {
+    return <div className="flex flex-1 items-center justify-center text-[#9CA0B4]">—</div>;
+  }
+
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-1 flex-col gap-4 lg:flex-row">
+        {/* Question card */}
+        <div className="flex flex-1 flex-col rounded-[24px] border border-[#ECEDF4] bg-white p-6 shadow-sm">
+          <span className="self-center rounded-full bg-[#EEEAFD] px-4 py-1.5 text-[13px] font-extrabold text-[#6A4FE6]">
+            {dq.questionShort} {dq.questionOf.replace("{n}", String(idx + 1)).replace("{total}", String(total))}
+          </span>
+          <QuestionText text={q.question_text} />
+
+          <div className="mt-5 flex flex-1 flex-col gap-2.5">
+            {q.options.map((opt, oi) => {
+              const letter = LETTERS[oi];
+              if (!opt || !letter) return null;
+              const sel = answers[q.id] === oi;
+              return (
+                <button
+                  key={oi}
+                  onClick={() => choose(oi)}
+                  className={`flex items-center gap-4 rounded-[15px] border-2 px-5 py-3.5 text-left text-[16px] font-bold transition-all active:scale-[0.98] ${
+                    sel ? "border-[#6A4FE6] bg-gradient-to-b from-[#F7F5FF] to-white shadow-[0_10px_24px_-12px_rgba(106,79,230,0.5)]" : "border-[#ECEEF4] bg-white hover:border-[#D9C8FB]"
+                  }`}
+                >
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] font-extrabold ${
+                    sel ? "bg-[#6A4FE6] text-white" : "bg-[#F1F2F7] text-[#9096AC]"
+                  }`}>
+                    {letter}
+                  </span>
+                  <span className="flex-1 text-[#2B3149]">{opt}</span>
+                  {sel && (
+                    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#6A4FE6] text-white">
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : result ? (
-            <ResultView questions={questions} answers={answers} result={result} dq={dq} onClose={onClose} />
-          ) : q ? (
+        {/* Info card: timer ring + hint stub */}
+        <div className="flex w-full flex-col rounded-[24px] border border-[#ECEDF4] bg-white p-5 shadow-sm lg:w-[220px]">
+          {limitMin != null && (
             <>
-              <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto p-6">
-                <h2 className="text-center text-xl font-extrabold leading-snug text-slate-800 md:text-2xl">{q.question_text}</h2>
-                <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
-                  {q.options.map((opt, oi) => {
-                    const c = OPT[oi];
-                    if (!opt || !c) return null;
-                    const sel = answers[q.id] === oi;
-                    return (
-                      <button
-                        key={oi}
-                        onClick={() => choose(oi)}
-                        className={`flex items-center gap-3 rounded-2xl border-2 px-5 py-4 text-left text-base font-bold shadow-sm transition-all active:scale-95 ${sel ? c.on : c.off}`}
-                      >
-                        <span className="text-xl">{c.dot}</span>
-                        <span className="flex-1">{opt}</span>
-                        {sel && <Check className="h-5 w-5" strokeWidth={3} />}
-                      </button>
-                    );
-                  })}
+              <div
+                className="relative mx-auto h-[110px] w-[110px] shrink-0 rounded-full"
+                style={{ background: `conic-gradient(#6A4FE6 ${ringDeg}deg, #ECEAFB ${ringDeg}deg)` }}
+              >
+                <div className="absolute inset-[8px] flex flex-col items-center justify-center rounded-full bg-white">
+                  <span className="text-[11px] font-bold text-[#9CA0B4]">{dq.timeLabel}</span>
+                  <span className={`font-mono text-[20px] font-black tabular-nums ${timerColor}`}>{mm}:{String(ss).padStart(2, "0")}</span>
                 </div>
               </div>
-
-              {/* Footer nav — confirmStep collapses nav into confirm row */}
-              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
-                {confirmStep ? (
-                  <>
-                    <p className="text-sm font-semibold text-slate-600">{dq.confirmFinish}</p>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setConfirmStep(false)}
-                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                        {dCommon.cancel}
-                      </button>
-                      <button onClick={doFinalize} disabled={finalizing}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95 disabled:opacity-60">
-                        {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex gap-2">
-                      <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-                        <ChevronLeft className="h-4 w-4" /> {dq.prev}
-                      </button>
-                      <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))} disabled={idx >= total - 1}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-                        {dq.next} <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <button onClick={() => setConfirmStep(true)} disabled={finalizing}
-                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-md shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95 disabled:opacity-60">
-                      {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
-                      <span className="opacity-80">({answeredCount}/{total})</span>
-                    </button>
-                  </>
-                )}
-              </div>
+              <div className="my-4 h-px bg-[#EEF0F5]" />
             </>
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-slate-400">—</div>
           )}
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-[18px] w-[18px] shrink-0 text-[#F2B84B]" />
+            <span className="text-[13.5px] font-extrabold text-[#242A45]">{dl.showHint}</span>
+          </div>
+          <StageActionButton
+            variant="secondary"
+            size="sm"
+            className="mt-2.5"
+            onClick={() => showToast(dl.hintComingSoon)}
+          >
+            {dl.showHint}
+          </StageActionButton>
         </div>
       </div>
-    </div>,
-    document.body,
+
+      {/* Bottom nav */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#ECEDF4] bg-white px-5 py-3.5 shadow-sm">
+        {confirmStep ? (
+          <>
+            <p className="text-sm font-bold text-[#5B6178]">{dq.confirmFinish}</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setConfirmStep(false)}
+                className="rounded-[12px] border border-[#E6E7EF] px-4 py-2.5 text-sm font-bold text-[#5B6178] hover:bg-slate-50">
+                {dCommon.cancel}
+              </button>
+              <button onClick={doFinalize} disabled={finalizing}
+                className="inline-flex items-center gap-2 rounded-[12px] bg-emerald-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-md shadow-emerald-500/25 hover:bg-emerald-700 active:scale-95 disabled:opacity-60">
+                {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+              className="inline-flex items-center gap-1.5 rounded-[14px] border border-[#E6E7EF] px-4 py-3 text-[14.5px] font-extrabold text-[#5B6178] hover:bg-slate-50 disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" /> {dq.prev}
+            </button>
+            <div className="flex items-center gap-2">
+              {questions.map((qq, i) => (
+                <span key={qq.id} className={`rounded-full transition-all ${i === idx ? "h-2 w-[26px] bg-[#6A4FE6]" : "h-2 w-2 bg-[#D6D8E4]"}`} />
+              ))}
+            </div>
+            {idx >= total - 1 ? (
+              <button onClick={() => setConfirmStep(true)} disabled={finalizing}
+                className="inline-flex items-center gap-2 rounded-[14px] bg-[#6A4FE6] px-6 py-3 text-[14.5px] font-extrabold text-white shadow-[0_12px_24px_-10px_rgba(106,79,230,0.7)] active:scale-95 disabled:opacity-60">
+                {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {dq.finish}
+                <span className="opacity-80">({answeredCount}/{total})</span>
+              </button>
+            ) : (
+              <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
+                className="inline-flex items-center gap-1.5 rounded-[14px] bg-[#6A4FE6] px-6 py-3 text-[14.5px] font-extrabold text-white shadow-[0_12px_24px_-10px_rgba(106,79,230,0.7)] active:scale-95">
+                {dq.next} <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
 function ResultView({
-  questions, answers, result, dq, onClose,
+  questions, answers, result, dq,
 }: {
   questions: QuizQuestion[];
   answers: Record<string, number | null>;
   result: { correct: number; total: number; grade: number };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dq: any;
-  onClose: () => void;
 }) {
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto p-6">
+    <div className="flex flex-1 flex-col overflow-y-auto rounded-[24px] border border-[#ECEDF4] bg-white p-6 shadow-sm">
       <div className="mb-6 text-center">
-        <div className="mb-2 flex items-center justify-center gap-2 text-3xl font-extrabold text-slate-800">
+        <div className="mb-2 flex items-center justify-center gap-2 text-[28px] font-black text-[#242A45]">
           <PartyPopper className="h-8 w-8 text-amber-500" /> {dq.resultTitle}
         </div>
-        <p className="mt-3 text-sm text-slate-500">{dq.youAnsweredCorrectly}</p>
-        <p className="my-1 text-4xl font-extrabold text-slate-900">
+        <p className="mt-3 text-sm text-[#9CA0B4]">{dq.youAnsweredCorrectly}</p>
+        <p className="my-1 text-4xl font-black text-[#242A45]">
           {dq.ofTotal.replace("{correct}", String(result.correct)).replace("{total}", String(result.total))}
         </p>
-        <p className={`text-lg font-bold ${GRADE_COLORS[result.grade] ?? "text-slate-600"}`}>{dq.grade}: {result.grade}</p>
+        <p className={`text-lg font-extrabold ${GRADE_COLORS[result.grade] ?? "text-slate-600"}`}>{dq.grade}: {result.grade}</p>
       </div>
 
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{dq.review}</h3>
+      <h3 className="mb-2 text-xs font-extrabold uppercase tracking-widest text-[#9CA0B4]">{dq.review}</h3>
       <ul className="space-y-2">
         {questions.map((q, i) => {
           const sel = answers[q.id];
           const ok = sel === q.correct_option_index;
           return (
-            <li key={q.id} className={`rounded-xl border px-4 py-2.5 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-              <span className={`font-bold ${ok ? "text-emerald-700" : "text-red-700"}`}>
+            <li key={q.id} className={`rounded-[14px] border px-4 py-2.5 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+              <span className={`font-extrabold ${ok ? "text-emerald-700" : "text-red-700"}`}>
                 {ok ? "✓" : "✗"} {dq.question.replace("{n}", String(i + 1))}:
               </span>{" "}
               {ok ? (
@@ -279,10 +325,6 @@ function ResultView({
           );
         })}
       </ul>
-
-      <button onClick={onClose} className="mt-6 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700">
-        {dq.closeReturn}
-      </button>
     </div>
   );
 }

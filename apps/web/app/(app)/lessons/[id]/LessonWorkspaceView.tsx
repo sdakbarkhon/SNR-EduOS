@@ -222,8 +222,6 @@ export function LessonWorkspaceView({
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
-  const [qiaStageId, setQiaStageId] = useState<string | null>(null);
-  const [kahootStageId, setKahootStageId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [viewerMat, setViewerMat] = useState<ViewerMaterial | null>(null);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
@@ -233,11 +231,7 @@ export function LessonWorkspaceView({
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
-  const qiaStageIdRef = useRef(qiaStageId);
-  const kahootStageIdRef = useRef(kahootStageId);
   useEffect(() => { activeStageIdRef.current = activeStageId; }, [activeStageId]);
-  useEffect(() => { qiaStageIdRef.current = qiaStageId; }, [qiaStageId]);
-  useEffect(() => { kahootStageIdRef.current = kahootStageId; }, [kahootStageId]);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setAnimKey((k) => k + 1); }, [activeStageId]);
@@ -330,16 +324,10 @@ export function LessonWorkspaceView({
         setStageChangedBanner(true);
         setTimeout(() => setStageChangedBanner(false), 4000);
 
-        // Close fullscreen if student is viewing a stage that is no longer the active one
-        // (i.e., teacher jumped forward past it, or activated a different stage).
-        // Code/external stages are embedded inline now — they unmount on their
-        // own when centerStages changes, no explicit close needed here.
-        const openId = qiaStageIdRef.current ?? kahootStageIdRef.current;
-        if (openId && openId !== (newActiveStageId ?? null)) {
-          setQiaStageId(null);
-          setKahootStageId(null);
-          setOpenTaskStageId(null);
-        }
+        // Code/external/quiz stages are all embedded inline now — they
+        // unmount on their own when centerStages changes as the teacher
+        // moves the active stage forward, no explicit close needed here.
+        setOpenTaskStageId(null);
       }
 
       // Teacher "show to class": demo material toggled on/off.
@@ -348,8 +336,6 @@ export function LessonWorkspaceView({
         setDemoMaterialId(newDemoId ?? null);
         // Starting a demo drops the student out of any open fullscreen stage.
         if (newDemoId) {
-          setQiaStageId(null);
-          setKahootStageId(null);
           setOpenTaskStageId(null);
         }
       }
@@ -408,8 +394,6 @@ export function LessonWorkspaceView({
   }
 
   const openTaskStage = openTaskStageId ? stages.find((s) => s.id === openTaskStageId) : null;
-  const qiaStage = qiaStageId ? stages.find((s) => s.id === qiaStageId) : null;
-  const kahootStage = kahootStageId ? stages.find((s) => s.id === kahootStageId) : null;
 
   const handleStageSubmitted = useCallback((progress: LessonStageProgress) => {
     setStages((prev) => prev.map((s) => s.id === progress.stage_id ? { ...s, progress } : s));
@@ -839,7 +823,8 @@ export function LessonWorkspaceView({
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
-              const isCodeOrExternal = stage.content_type === "code" || isExternalService(stage.content_type);
+              const isCodeOrExternal = stage.content_type === "code" || isExternalService(stage.content_type)
+                || stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot";
 
               return (
                 <div key={isCompleted ? stage.id : `${stage.id}-${animKey}`} className={`relative${isCompleted ? "" : " animate-stage-in"}`}>
@@ -939,7 +924,7 @@ export function LessonWorkspaceView({
                         ) : null
                       )}
 
-                      {/* Code + external stages are embedded directly — no "open" gate/modal */}
+                      {/* Code, external, and quiz stages are all embedded directly — no "open" gate/modal */}
                       {stage.content_type === "code" ? (
                         mounted && studentId && (
                           <CodeStageView
@@ -958,15 +943,19 @@ export function LessonWorkspaceView({
                         )
                       ) : stage.content_type === "quiz_qia" ? (
                         mounted && studentId && (
-                          <StageActionButton onClick={() => setQiaStageId(stage.id)}>
-                            {(readOnly || stage.progress?.is_completed) ? dl.quiz.viewResult : dl.quiz.open}
-                          </StageActionButton>
+                          <QiaQuizModal
+                            stage={stage}
+                            studentId={studentId}
+                            onSubmitted={handleStageSubmitted}
+                          />
                         )
                       ) : stage.content_type === "quiz_kahoot" ? (
                         mounted && studentId && (
-                          <StageActionButton onClick={() => setKahootStageId(stage.id)}>
-                            {(readOnly || stage.progress?.is_completed) ? dl.quiz.viewResult : dl.quiz.open}
-                          </StageActionButton>
+                          <KahootStudentModal
+                            stage={stage}
+                            studentId={studentId}
+                            onSubmitted={handleStageSubmitted}
+                          />
                         )
                       ) : (
                         !isGraded && !isSubmitted && !readOnly && mounted && studentId && (
@@ -1007,9 +996,7 @@ export function LessonWorkspaceView({
       {mounted && studentId && (
         <AiChatPanel
           lessonId={lesson.id}
-          stageId={
-            openTaskStageId ?? qiaStageId ?? kahootStageId ?? activeStageId ?? null
-          }
+          stageId={openTaskStageId ?? activeStageId ?? null}
         />
       )}
 
@@ -1024,26 +1011,6 @@ export function LessonWorkspaceView({
       {/* Material viewer modal */}
       {mounted && viewerMat && (
         <MaterialViewerModal mat={viewerMat} onClose={() => setViewerMat(null)} />
-      )}
-
-      {/* QIA quiz modal */}
-      {mounted && qiaStage && studentId && (
-        <QiaQuizModal
-          stage={qiaStage}
-          studentId={studentId}
-          onClose={() => setQiaStageId(null)}
-          onSubmitted={handleStageSubmitted}
-        />
-      )}
-
-      {/* Kahoot live game (student) */}
-      {mounted && kahootStage && studentId && (
-        <KahootStudentModal
-          stage={kahootStage}
-          studentId={studentId}
-          onClose={() => setKahootStageId(null)}
-          onSubmitted={handleStageSubmitted}
-        />
       )}
 
       {/* Lesson completion modal */}
