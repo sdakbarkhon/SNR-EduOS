@@ -55,10 +55,10 @@ export function RaiseHandButton({ lessonId, studentId }: { lessonId: string; stu
       <button
         onClick={onRaise}
         disabled={raised || busy}
-        className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-200 disabled:opacity-50 ${
+        className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all duration-200 disabled:opacity-60 ${
           raised
-            ? "border-yellow-400/50 bg-yellow-400/20 text-yellow-200"
-            : "border-white/20 bg-white/10 text-white hover:border-white/30 hover:bg-white/20"
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
         }`}
       >
         <Hand className={`h-3.5 w-3.5 ${raised ? "animate-pulse" : ""}`} />

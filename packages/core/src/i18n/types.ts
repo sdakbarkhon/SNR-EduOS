@@ -728,6 +728,11 @@ export interface Dictionary {
       expand: string;             // "Развернуть sidebar"
       stages: string;             // "Этапы"
       noMaterials: string;        // "Нет материалов"
+      // Iter5 P6 — Stitch lesson workspace redesign
+      fullscreen: string;         // "Во весь экран"
+      fullscreenExit: string;     // "Выйти из полноэкранного режима"
+      helpTitle: string;          // sidebar tip card: "Нужна помощь?"
+      helpSubtitle: string;       // "Спроси учителя или подними руку"
     };
     // Stage constructor v2 (migration 35)
     stageStartLabel: string;           // "Старт"
