@@ -27,45 +27,48 @@ export function Topbar({
   const showToast = useToast();
 
   return (
-    <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3 md:px-8">
-      <h1 className="text-[18px] font-semibold text-gray-800 md:text-[20px]">
+    <header className="flex shrink-0 items-center justify-between gap-4 rounded-[20px] bg-white py-3 pl-6 pr-4 shadow-[0_8px_22px_rgba(93,80,150,0.05)]">
+      <h1 className="text-[20px] font-black tracking-tight text-[#2A2A45] md:text-[24px]">
         {title}
       </h1>
-      <div className="flex items-center gap-3">
-        <AnnouncementTicker />
 
-        {/* Баллы — заглушка без БД (Iter5 P5) */}
-        <div className="hidden items-center gap-1.5 rounded-full border border-slate-100 bg-white px-3 py-2 shadow-sm sm:flex">
-          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-          <span className="text-sm font-bold text-slate-800">1050</span>
+      <div className="flex min-w-0 flex-1 items-center justify-center">
+        <AnnouncementTicker />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        {/* Баллы — заглушка без БД */}
+        <div className="hidden items-center gap-1.5 rounded-2xl border border-[#EFEEF3] bg-white px-3.5 py-2 sm:flex">
+          <Star className="h-4 w-4 fill-[#FFB020] text-[#FFB020]" />
+          <span className="text-sm font-extrabold text-[#2A2A45]">1050</span>
         </div>
 
-        {/* Сообщения — заглушка (Iter5 P5) */}
+        {/* Сообщения — заглушка */}
         <button
           onClick={() => showToast(d.auth.comingSoon)}
           aria-label={d.nav.messages}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"
+          className="relative flex h-10 items-center gap-2 rounded-2xl border border-[#EFEEF3] bg-white px-3.5 text-[#6E6E8A] transition hover:bg-[#F4F2FC]"
         >
-          <MessageCircle className="h-5 w-5" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-red-500 text-[9px] font-bold text-white">
+          <MessageCircle className="h-[18px] w-[18px]" />
+          <span className="hidden text-sm font-extrabold text-[#2A2A45] sm:inline">{d.nav.messages}</span>
+          <span className="absolute -right-1 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#F5455C] px-1 text-[10px] font-extrabold text-white">
             5
           </span>
         </button>
 
         <NotificationsBell />
+
         {studentName && (
           <Link
             href="/profile"
-            className="flex items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-slate-50"
+            className="flex items-center gap-2.5 rounded-2xl px-2.5 py-1.5 transition hover:bg-[#F4F2FC]"
           >
             <Avatar name={studentName} src={avatarUrl ?? undefined} size={40} />
-            <div className="hidden flex-col items-start lg:flex">
-              <span className="text-sm font-semibold text-slate-900">
-                {studentName}
-              </span>
-              {classLabel && <span className="text-xs text-slate-500">{classLabel}</span>}
+            <div className="hidden flex-col items-start leading-tight lg:flex">
+              <span className="text-[14px] font-extrabold text-[#2A2A45]">{studentName}</span>
+              {classLabel && <span className="text-[12px] font-semibold text-[#9A9AB5]">{classLabel}</span>}
             </div>
-            <ChevronDown className="hidden h-4 w-4 text-slate-400 lg:block" />
+            <ChevronDown className="hidden h-[18px] w-[18px] text-[#B7B7CE] lg:block" />
           </Link>
         )}
         <LogoutButton />

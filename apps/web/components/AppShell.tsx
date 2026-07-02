@@ -44,17 +44,19 @@ export function AppShell({
 
   return (
     <ToastProvider>
-      <div className="flex h-screen overflow-hidden bg-slate-50">
+      <div className="h-screen overflow-hidden bg-[#F2F1FA]">
         <LessonStartBanner />
-        <StudentSidebar />
+        <div className="mx-auto flex h-full max-w-[1512px] gap-4 px-3 pb-4 pt-3 md:gap-[30px] md:px-[30px] md:pb-[34px] md:pt-[26px]">
+          <StudentSidebar />
 
-        {/* Правая колонка */}
-        <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
-          <main className="flex-1 overflow-y-auto px-4 pb-20 pt-5 md:px-8 md:pb-8 md:pt-6">
-            {children}
-          </main>
-          <BottomNav />
+          {/* Правая колонка */}
+          <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden md:gap-6">
+            <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
+            <main className="flex-1 overflow-y-auto pb-20 md:pb-1">
+              {children}
+            </main>
+            <BottomNav />
+          </div>
         </div>
       </div>
     </ToastProvider>
