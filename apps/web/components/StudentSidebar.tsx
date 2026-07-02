@@ -109,31 +109,30 @@ export function StudentSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col gap-[22px] rounded-[24px] bg-white p-[14px_10px] md:flex",
+        "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 md:flex",
         "shadow-[0_8px_24px_rgba(93,80,150,0.05)] transition-[width] duration-200 ease-in-out",
-        isCollapsed ? "w-[90px] px-3" : "w-[228px] px-3.5",
+        isCollapsed ? "w-16 px-2" : "w-80 px-4",
       )}
-      style={{ paddingTop: 20, paddingBottom: 20 }}
     >
       {/* Логотип + сворачивание */}
-      <div className={cn("flex items-center px-0.5 pt-0.5", isCollapsed ? "flex-col gap-2.5" : "justify-between")}>
+      <div className={cn("flex items-center", isCollapsed ? "flex-col gap-2" : "justify-between")}>
         {isCollapsed ? (
           <span className="text-[11px] font-extrabold tracking-[3px] text-[#FF9A3D]">SNR</span>
         ) : (
-          <Logo className="text-[22px]" />
+          <Logo className="text-xl" />
         )}
         <button
           onClick={toggle}
-          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#F4F2FC] text-[#7C5CFF] transition hover:bg-[#EBE7F8]"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F4F2FC] text-[#7C5CFF] transition hover:bg-[#EBE7F8]"
           title={isCollapsed ? "Развернуть" : "Свернуть"}
           aria-label={isCollapsed ? "Развернуть меню" : "Свернуть меню"}
         >
-          <ChevronLeft className={cn("h-[18px] w-[18px] transition-transform duration-200", isCollapsed && "rotate-180")} />
+          <ChevronLeft className={cn("h-4 w-4 transition-transform duration-200", isCollapsed && "rotate-180")} />
         </button>
       </div>
 
       {/* Пункты меню */}
-      <nav className="flex flex-1 flex-col gap-[5px] overflow-y-auto overflow-x-hidden">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = !item.isStub && pathname.startsWith(item.href);
           const Icon = item.icon as LucideIcon;
@@ -151,31 +150,31 @@ export function StudentSidebar() {
               onClick={item.isStub ? onStubClick : undefined}
               title={item.label(d)}
               className={cn(
-                "relative flex items-center gap-3.5 rounded-2xl py-[9px] transition-colors",
-                isCollapsed ? "justify-center px-0" : "px-3.5",
+                "relative flex items-center gap-3 rounded-xl py-1.5 transition-colors",
+                isCollapsed ? "justify-center px-0" : "px-2.5",
                 isActive ? "bg-[#FFF3D4]" : "hover:bg-[#F3EFFF]",
               )}
             >
               <span
-                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px] transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] transition-colors"
                 style={{
                   color: isActive ? "#fff" : style.color,
                   background: isActive ? style.color : style.bg,
-                  boxShadow: isActive ? `0 7px 16px ${hexToRgba(style.color, 0.4)}` : undefined,
+                  boxShadow: isActive ? `0 5px 12px ${hexToRgba(style.color, 0.4)}` : undefined,
                 }}
               >
-                <Icon className="h-[22px] w-[22px]" strokeWidth={2.2} />
+                <Icon className="h-5 w-5" strokeWidth={2.2} />
               </span>
               {!isCollapsed && (
                 <div className="flex min-w-0 flex-1 items-center justify-between">
                   <span
-                    className="truncate text-[15.5px]"
+                    className="truncate text-sm"
                     style={{ fontWeight: isActive ? 800 : 700, color: isActive ? "#2C2A48" : "#6F6F8C" }}
                   >
                     {item.label(d)}
                   </span>
                   {showBadge && (
-                    <span className="ml-2 flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[12px] font-extrabold text-white">
+                    <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[11px] font-extrabold text-white">
                       {badge}
                     </span>
                   )}
@@ -192,27 +191,27 @@ export function StudentSidebar() {
       {/* Карточка уровня — заглушка без БД */}
       <div
         className={cn(
-          "relative shrink-0 overflow-hidden rounded-[22px]",
+          "relative mt-auto shrink-0 overflow-hidden rounded-2xl",
           "shadow-[0_12px_26px_rgba(120,90,240,0.14)]",
-          isCollapsed ? "px-2 py-3.5 text-center" : "px-4 py-3.5 pb-3.5",
+          isCollapsed ? "px-1.5 py-2.5 text-center" : "px-3 py-2.5",
         )}
         style={{ background: "linear-gradient(160deg,#EFEBFF 0%,#E5DBFF 100%)" }}
       >
         {!isCollapsed && (
           <>
-            <span className="animate-twinkle absolute left-[96px] top-[14px] text-[13px] text-[#B79BFF]">✦</span>
-            <span className="animate-twinkle absolute left-[118px] top-[52px] text-[10px] text-[#FFC93C]" style={{ animationDelay: ".8s" }}>✦</span>
+            <span className="animate-twinkle absolute left-[96px] top-2 text-[13px] text-[#B79BFF]">✦</span>
+            <span className="animate-twinkle absolute left-[118px] top-9 text-[10px] text-[#FFC93C]" style={{ animationDelay: ".8s" }}>✦</span>
             <div className="max-w-[118px]">
-              <p className="text-xs font-extrabold text-[#9781CE]">{d.nav.myLevel}</p>
-              <p className="mt-[3px] text-[26px] font-black leading-none text-[#7C5CFF]">Lv. 12</p>
-              <div className="mt-[13px] h-[9px] overflow-hidden rounded-full bg-white shadow-[inset_0_1px_2px_rgba(120,90,240,0.1)]">
+              <p className="text-[11px] font-extrabold text-[#9781CE]">{d.nav.myLevel}</p>
+              <p className="text-lg font-black leading-none text-[#7C5CFF]">Lv. 12</p>
+              <div className="mt-1.5 h-[7px] overflow-hidden rounded-full bg-white shadow-[inset_0_1px_2px_rgba(120,90,240,0.1)]">
                 <div className="h-full rounded-full" style={{ width: "68%", background: "linear-gradient(90deg,#FFD24A,#FF9F2E)" }} />
               </div>
-              <p className="mt-[9px] text-xs font-extrabold text-[#6F6F8C]">820 / 1200 XP</p>
+              <p className="mt-1 text-[11px] font-extrabold text-[#6F6F8C]">820 / 1200 XP</p>
             </div>
           </>
         )}
-        <div className={cn("text-[54px] leading-none", isCollapsed ? "mt-1" : "absolute -bottom-1 right-0.5")}>
+        <div className={cn("text-[38px] leading-none", isCollapsed ? "mt-0.5" : "absolute -bottom-1 right-0.5")}>
           🧑‍🚀
         </div>
       </div>
