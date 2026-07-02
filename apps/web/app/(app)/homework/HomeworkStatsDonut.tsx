@@ -1,12 +1,13 @@
 import type { HomeworkCounts } from "@snr/core";
 
-// Цвета из domashnie_zadaniya.zip StatsCard
-const SEGMENTS = [
-  { key: "active" as const, color: "#3b82f6", label: "Активные" },
-  { key: "completed" as const, color: "#0ea5e9", label: "Выполненные" },
-  { key: "overdue" as const, color: "#ec4899", label: "Просроченные" },
-  { key: "review" as const, color: "#fbbf24", label: "На проверке" },
-];
+// Цвета по дизайну Assignments.dc.html (Iter5 P8)
+const SEGMENT_COLORS = {
+  active: "#4C9AFF",
+  completed: "#22B36B",
+  overdue: "#F63E75",
+  review: "#FDB022",
+} as const;
+const SEGMENT_ORDER = ["active", "completed", "overdue", "review"] as const;
 
 const R = 54;
 const CX = 70;
@@ -19,18 +20,21 @@ export function HomeworkStatsDonut({
   counts,
   statsLabel,
   totalLabel,
+  segmentLabels,
 }: {
   counts: HomeworkCounts;
   statsLabel: string;
   totalLabel: string;
+  segmentLabels: { active: string; completed: string; overdue: string; review: string };
 }) {
   const total = counts.total;
+  const segments = SEGMENT_ORDER.map((key) => ({ key, color: SEGMENT_COLORS[key], label: segmentLabels[key] }));
 
   // Строим дуги с зазорами
   type Arc = { color: string; arcLen: number; offset: number };
-  const nonZero = SEGMENTS.filter((s) => counts[s.key] > 0);
+  const nonZero = segments.filter((s) => counts[s.key] > 0);
   let prevSum = 0;
-  const arcs: Arc[] = SEGMENTS.map((s) => {
+  const arcs: Arc[] = segments.map((s) => {
     const count = counts[s.key];
     const frac = total > 0 ? count / total : 0;
     const gapToSubtract = nonZero.length > 1 && count > 0 ? GAP : 0;
@@ -72,7 +76,7 @@ export function HomeworkStatsDonut({
                       strokeWidth={SW}
                       strokeDasharray={`${arc.arcLen} ${CIRC - arc.arcLen}`}
                       strokeDashoffset={arc.offset}
-                      strokeLinecap="butt"
+                      strokeLinecap="round"
                     />
                   ),
                 )}
@@ -90,7 +94,7 @@ export function HomeworkStatsDonut({
 
         {/* Легенда */}
         <div className="flex flex-col gap-3 flex-1">
-          {SEGMENTS.map((s) => (
+          {segments.map((s) => (
             <div
               key={s.key}
               className="flex flex-row items-center justify-between text-sm"

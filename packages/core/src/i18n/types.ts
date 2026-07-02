@@ -337,6 +337,36 @@ export interface Dictionary {
     // Homework types (migration 31)
     typeLearning: string;
     typeProgramming: string;
+    // новые ключи — редизайн /homework (Iter5 P8)
+    searchPlaceholder: string;
+    typeAll: string;
+    typeProgrammingShort: string; // "Код" — короткая метка для компактного бейджа карточки
+    deadlineAll: string;
+    deadlineSoon: string;
+    sortDeadlineAsc: string;
+    sortDeadlineDesc: string;
+    sortTitle: string;
+    sortSubject: string;
+    notFoundTitle: string;
+    notFoundBody: string;
+    notFoundBtn: string;
+    noResultsTitle: string;
+    noResultsBody: string;
+    resetFilters: string;
+    noTasksBody: string;
+    allDoneTitle: string;
+    allDoneBody: string;
+    calendarTitle: string;
+    dueToday: string;          // "Сегодня"
+    dueTodayCount: string;     // "{n} заданий"
+    calendarEmpty: string;
+    calendarLink: string;
+    overdueBadge: string;      // "Просрочено"
+    activeBadge: string;       // "Активно"
+    submittedBadge: string;    // "Сдано"
+    gradedBadgeLabel: string;  // "Оценено"
+    dueUntil: string;          // "До {date}"
+    heroAlt: string;           // подпись для decorative hero-блока
     test: {
       durationLabel: string;       // "Длительность теста (минут)"
       autoGradeLabel: string;      // "Автоматически выставить оценку по результату"

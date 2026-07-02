@@ -3,6 +3,7 @@ import {
   Bot,
   BookOpen,
   Calculator,
+  Code2,
   FlaskConical,
   Languages,
   Leaf,
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   leaf: Leaf,
   "flask-conical": FlaskConical,
   "book-open": BookOpen,
+  "code-2": Code2,
 };
 
 export function SubjectIcon({
