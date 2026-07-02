@@ -1,128 +1,157 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Briefcase, Calendar } from "lucide-react";
-import { getDictionary, getSubjectStyle, type Locale, type StudentProjectListItem } from "@snr/core";
-import { SubjectIcon, useLocale } from "@/components";
+import { ArrowRight, Code2, Cpu, Globe, type LucideIcon } from "lucide-react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components";
 import { cn } from "@/lib/cn";
 import { SandboxView } from "./SandboxView";
+import type { SandboxToolId } from "@/lib/sandbox-tools";
 
-type Filter = "all" | "active" | "submitted" | "graded";
 type Mode = "projects" | "sandbox";
+type ProjectType = "python" | "arduino" | "web" | "scratch";
+type ProjectStatus = "not_started" | "in_progress" | "completed";
 
-function statusOf(p: StudentProjectListItem): "not_started" | "in_progress" | "awaiting" | "graded" {
-  const s = p.submission;
-  if (!s) return "not_started";
-  if (s.grade != null) return "graded";
-  if (s.is_submitted) return "awaiting";
-  return "in_progress";
-}
+type DemoProject = {
+  id: number;
+  title: string;
+  type: ProjectType;
+  icon: string;
+  description: string;
+  status: ProjectStatus;
+  progress: number;
+};
 
-export function ProjectsView({ projects }: { projects: StudentProjectListItem[] }) {
+// Заглушки — реальной таблицы "портфолио проектов" нет, только оцениваемые
+// проекты (см. getStudentProjects/[id]) и песочница. Карточки ведут в
+// песочницу с предвыбранным инструментом (Iter5 P10, вариант А).
+const DEMO_PROJECTS: DemoProject[] = [
+  { id: 1, title: "Игра змейка на Python", type: "python", icon: "🐍", description: "Классическая игра Змейка с использованием Pygame", status: "in_progress", progress: 60 },
+  { id: 2, title: "Мигающий светодиод Arduino", type: "arduino", icon: "💡", description: "Управление светодиодом через Wokwi симулятор", status: "completed", progress: 100 },
+  { id: 3, title: "Мой первый сайт", type: "web", icon: "🌐", description: "HTML + CSS страница про хобби", status: "in_progress", progress: 40 },
+  { id: 4, title: "Танцующий кот", type: "scratch", icon: "🐱", description: "Анимация в Scratch", status: "completed", progress: 100 },
+  { id: 5, title: "Калькулятор", type: "python", icon: "🧮", description: "Простой калькулятор на Python", status: "not_started", progress: 0 },
+  { id: 6, title: "Умный дом на Arduino", type: "arduino", icon: "🏠", description: "Датчики температуры и света через Wokwi", status: "in_progress", progress: 30 },
+  { id: 7, title: "Викторина на Scratch", type: "scratch", icon: "❓", description: "Интерактивная викторина по школьным предметам", status: "not_started", progress: 0 },
+];
+
+// Соответствует градиентам инструментов в SANDBOX_TOOLS — карточка ведёт
+// именно в этот инструмент, поэтому цвета совпадают.
+const TYPE_STYLE: Record<ProjectType, { tool: SandboxToolId; gradient: string; badgeBg: string; badgeText: string; Icon: LucideIcon }> = {
+  python: { tool: "code", gradient: "from-emerald-500 to-teal-600", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700", Icon: Code2 },
+  arduino: { tool: "wokwi", gradient: "from-sky-400 to-blue-500", badgeBg: "bg-sky-50", badgeText: "text-sky-700", Icon: Cpu },
+  web: { tool: "codesandbox", gradient: "from-slate-600 to-slate-800", badgeBg: "bg-slate-100", badgeText: "text-slate-700", Icon: Globe },
+  scratch: { tool: "scratch", gradient: "from-orange-400 to-amber-500", badgeBg: "bg-orange-50", badgeText: "text-orange-700", Icon: Code2 },
+};
+
+export function ProjectsView() {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.projects;
-  const ts = d.sandbox;
   const [mode, setMode] = useState<Mode>("projects");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [initialTool, setInitialTool] = useState<SandboxToolId | undefined>(undefined);
 
-  const pills: { key: Filter; label: string }[] = [
-    { key: "all", label: t.filterAll },
-    { key: "active", label: t.filterActive },
-    { key: "submitted", label: t.filterSubmitted },
-    { key: "graded", label: t.filterGraded },
-  ];
+  function openSandbox(toolId?: SandboxToolId) {
+    setInitialTool(toolId);
+    setMode("sandbox");
+  }
 
-  const filtered = projects.filter((p) => {
-    const s = statusOf(p);
-    if (filter === "active") return s === "not_started" || s === "in_progress";
-    if (filter === "submitted") return s === "awaiting";
-    if (filter === "graded") return s === "graded";
-    return true;
-  });
+  const typeLabels: Record<ProjectType, string> = {
+    python: t.typePython,
+    arduino: t.typeArduino,
+    web: t.typeWeb,
+    scratch: t.typeScratch,
+  };
 
-  function statusBadge(p: StudentProjectListItem) {
-    const s = statusOf(p);
-    if (s === "graded") return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{t.statusGraded}: {p.submission?.grade}</span>;
-    if (s === "awaiting") return <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-[10px] font-bold text-yellow-700">{t.statusAwaiting}</span>;
-    if (s === "in_progress") return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-700">{t.statusInProgress}</span>;
+  function statusBadge(p: DemoProject) {
+    if (p.status === "completed") return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{t.statusCompleted}</span>;
+    if (p.status === "in_progress") return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-700">{t.statusInProgress}</span>;
     return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>;
   }
 
   return (
     <div className="mx-auto w-full max-w-7xl text-slate-800">
-      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{t.title}</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{d.nav.projects}</h1>
+      <p className="mt-1.5 text-sm text-slate-500">{t.pageSubtitle}</p>
 
-      {/* Mode switch: оцениваемые проекты | песочница */}
-      <div className="mt-4 inline-flex rounded-full border border-white/60 bg-white/60 p-1 backdrop-blur-xl">
+      {/* Mode switch: демо-проекты | песочница */}
+      <div className="mt-5 inline-flex rounded-full border border-white/60 bg-white/60 p-1 backdrop-blur-xl">
         {([
-          { key: "projects" as Mode, label: ts.modeProjects },
-          { key: "sandbox" as Mode, label: ts.modeSandbox },
+          { key: "projects" as Mode, label: d.sandbox.modeProjects },
+          { key: "sandbox" as Mode, label: d.sandbox.modeSandbox },
         ]).map((m) => (
-          <button key={m.key} onClick={() => setMode(m.key)}
-            className={cn("rounded-full px-5 py-1.5 text-sm font-bold transition-all",
-              mode === m.key ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "text-slate-500 hover:text-slate-700")}>
+          <button
+            key={m.key}
+            onClick={() => { if (m.key === "projects") setMode("projects"); else openSandbox(undefined); }}
+            className={cn(
+              "rounded-full px-5 py-1.5 text-sm font-bold transition-all",
+              mode === m.key ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "text-slate-500 hover:text-slate-700",
+            )}
+          >
             {m.label}
           </button>
         ))}
       </div>
 
-      {mode === "sandbox" && <div className="mt-6"><SandboxView /></div>}
+      {mode === "sandbox" && <div className="mt-6"><SandboxView initialToolId={initialTool} /></div>}
 
-      {mode === "projects" && (<>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {pills.map((p) => (
-          <button key={p.key} onClick={() => setFilter(p.key)}
-            className={cn("rounded-full px-5 py-2 text-sm font-bold transition-all",
-              filter === p.key ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border border-white/50 bg-white/70 text-slate-600 backdrop-blur-xl hover:bg-white/90")}>
-            {p.label}
+      {mode === "projects" && (
+        <>
+          {/* Крупный CTA на песочницу */}
+          <button
+            type="button"
+            onClick={() => openSandbox(undefined)}
+            className="group mt-6 flex w-full items-center gap-5 rounded-[24px] bg-gradient-to-br from-violet-600 to-indigo-600 p-6 text-left shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+          >
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl">🧪</div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-extrabold text-white">{t.openSandboxBtn}</h2>
+              <p className="mt-0.5 text-sm text-violet-100">{d.sandbox.subtitle}</p>
+            </div>
+            <ArrowRight className="h-6 w-6 shrink-0 text-white transition-transform group-hover:translate-x-1" />
           </button>
-        ))}
-      </div>
 
-      {filtered.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center gap-3 rounded-[24px] border border-white/70 bg-white/60 py-20 text-center backdrop-blur-xl">
-          <Briefcase className="h-10 w-10 text-slate-300" />
-          <p className="text-sm text-slate-400">{t.empty}</p>
-        </div>
-      ) : (
-        <div className="mt-8 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((p) => {
-            const style = getSubjectStyle(p.subject);
-            const pct = p.stageCount > 0 ? Math.round((p.completedCount / p.stageCount) * 100) : 0;
-            const due = p.deadline ? new Date(p.deadline).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" }) : null;
-            const overdue = p.deadline ? new Date(p.deadline).getTime() < Date.now() && statusOf(p) !== "graded" : false;
-            return (
-              <Link key={p.id} href={`/projects/${p.id}`}
-                className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${style.color}1a` }}>
-                      <SubjectIcon subject={p.subject} size={20} />
+          <h2 className="mt-8 text-lg font-bold text-slate-900">{t.myProjectsSection}</h2>
+          <div className="mt-4 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
+            {DEMO_PROJECTS.map((p) => {
+              const style = TYPE_STYLE[p.type];
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => openSandbox(style.tool)}
+                  className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 text-left shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-xl shadow-sm", style.gradient)}>
+                        {p.icon}
+                      </div>
+                      <h3 className="font-bold text-slate-900">{p.title}</h3>
                     </div>
-                    <h3 className="font-bold text-slate-900">{p.title}</h3>
                   </div>
-                  {statusBadge(p)}
-                </div>
-                {p.description && <p className="mt-3 line-clamp-2 text-[13px] text-slate-500">{p.description}</p>}
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <div className={cn("h-full rounded-full", statusOf(p) === "graded" ? "bg-emerald-500" : "bg-blue-500")} style={{ width: `${pct}%` }} />
+                  <span className={cn("mt-3 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold", style.badgeBg, style.badgeText)}>
+                    <style.Icon className="h-3 w-3" /> {typeLabels[p.type]}
+                  </span>
+                  <p className="mt-3 line-clamp-2 flex-1 text-[13px] text-slate-500">{p.description}</p>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="flex flex-1 items-center gap-3">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={cn("h-full rounded-full bg-gradient-to-r", style.gradient)}
+                          style={{ width: `${p.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold tabular-nums text-slate-400">{p.progress}%</span>
+                    </div>
                   </div>
-                  <span className="text-[11px] font-bold tabular-nums text-slate-400">{p.completedCount}/{p.stageCount}</span>
-                </div>
-                {due && (
-                  <p className={cn("mt-3 flex items-center gap-1 text-[12px]", overdue ? "font-semibold text-red-500" : "text-slate-400")}>
-                    <Calendar size={12} /> {t.deadline}: {due}
-                  </p>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+                  <div className="mt-3">{statusBadge(p)}</div>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
-      </>)}
     </div>
   );
 }

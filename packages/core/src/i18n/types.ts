@@ -446,6 +446,15 @@ export interface Dictionary {
     gradedTitle: string;        // "Оценка: {grade}"
     teacherComment: string;
     deleteFile: string;
+    // Iter5 P10 — CD redesign: hardcoded demo project cards + sandbox CTA
+    pageSubtitle: string;       // "Создавай, экспериментируй и развивай свои навыки"
+    myProjectsSection: string; // "Мои проекты"
+    openSandboxBtn: string;    // "Открыть песочницу"
+    statusCompleted: string;   // "Завершён" (demo card, distinct from graded)
+    typePython: string;
+    typeArduino: string;
+    typeWeb: string;
+    typeScratch: string;
   };
   sandbox: {
     title: string;          // "Проекты (песочница)"

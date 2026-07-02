@@ -212,11 +212,13 @@ function CodeSandbox() {
 }
 
 // ── Main sandbox grid ──────────────────────────────────────────────────────────
-export function SandboxView() {
+export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId } = {}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.sandbox;
-  const [active, setActive] = useState<SandboxTool | null>(null);
+  const [active, setActive] = useState<SandboxTool | null>(
+    () => SANDBOX_TOOLS.find((tool) => tool.id === initialToolId) ?? null,
+  );
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
