@@ -23,7 +23,7 @@ export interface NavItem {
 /** Пункты навигации (sidebar на desktop, нижний таб-бар на мобиле). */
 export const navItems: NavItem[] = [
   { key: "home", href: "/dashboard", icon: Home, label: (d) => d.nav.home },
-  { key: "lessons", href: "/schedule", icon: BookOpen, label: (d) => d.nav.lessons },
+  { key: "lessons", href: "/lessons", icon: BookOpen, label: (d) => d.nav.lessons },
   { key: "homework", href: "/homework", icon: ClipboardList, label: (d) => d.nav.homework },
   { key: "grades", href: "/grades", icon: Award, label: (d) => d.nav.grades },
   { key: "attendance", href: "/attendance", icon: CheckSquare, label: (d) => d.nav.attendance },
