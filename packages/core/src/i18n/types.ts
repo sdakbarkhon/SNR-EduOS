@@ -801,6 +801,10 @@ export interface Dictionary {
       fullscreenExit: string;     // "Выйти из полноэкранного режима"
       helpTitle: string;          // sidebar tip card: "Нужна помощь?"
       helpSubtitle: string;       // "Спроси учителя или подними руку"
+      // Iter5 P13 — Claude Design header/sidebar redesign
+      lessonNumberLabel: string;  // "Урок {n}" pill in header
+      stagePlan: string;          // sidebar card title: "План урока"
+      stageLockedShort: string;   // upcoming-step sidebar label (lock icon)
     };
     // Stage constructor v2 (migration 35)
     stageStartLabel: string;           // "Старт"
@@ -1043,6 +1047,11 @@ export interface Dictionary {
       kindQuiz: string;          // grade badge: lesson quiz (QIA)
       kindKahoot: string;        // grade badge: kahoot game
       kindExternal: string;      // grade badge: external service stage
+      // Iter5 P13 — Claude Design QIA/Kahoot inline redesign
+      timeLabel: string;         // "Время" (QIA countdown ring)
+      kahootLiveNow: string;     // "Идёт сейчас" header pill while a kahoot session is active
+      yourStreak: string;        // "Серия" — consecutive correct answers (Kahoot stats bar)
+      questionShort: string;     // "Вопрос" — badge above the QIA question card
     };
     // Leave requests (migration 47) — student requests to leave during in_progress lesson
     leave: {

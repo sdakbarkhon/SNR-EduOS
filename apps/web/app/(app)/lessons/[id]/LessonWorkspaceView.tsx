@@ -4,15 +4,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Clock, Check, FileText, FileCode2, File, Menu,
-  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download,
+  Clock, Check, FileText, FileCode2, File, ChevronsLeft, ChevronsRight,
+  Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
   Maximize2, Minimize2, Bot,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
 } from "@snr/core";
-import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale } from "@snr/core";
+import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
@@ -467,19 +467,26 @@ export function LessonWorkspaceView({
     : 0;
 
   const da = dl.activeStage;
+  const currentCenterStage = centerStages[0] ?? null;
+  const currentCfg = currentCenterStage ? ((currentCenterStage.config ?? {}) as QuizConfigForStage) : null;
+  const currentIsQuiz = currentCenterStage?.content_type === "quiz_qia";
+  const currentIsKahoot = currentCenterStage?.content_type === "quiz_kahoot";
 
   return (
     <div className="w-full px-4 md:px-6 space-y-5">
       {/* Header bar */}
-      <header className="rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
+      <header className="rounded-2xl border border-[#ECEDF4] bg-white px-5 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-2xl">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-2xl"
+              style={{ background: "linear-gradient(135deg,#EEEAFD,#E6DEFC)" }}
+            >
               {style.emoji}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-slate-500">{lesson.subjectName ?? style.label}</p>
-              <h1 className="truncate text-lg font-bold leading-tight text-slate-900">{heroTitle}</h1>
+              <p className="truncate text-[11px] font-extrabold uppercase tracking-wide text-[#6A4FE6]">{lesson.subjectName ?? style.label}</p>
+              <h1 className="truncate text-lg font-black leading-tight text-[#242A45]">{heroTitle}</h1>
             </div>
           </div>
 
@@ -487,35 +494,60 @@ export function LessonWorkspaceView({
             {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
             <button
               onClick={toggleFullscreen}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+              className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
             >
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               <span className="hidden sm:inline">{isFullscreen ? w.fullscreenExit : w.fullscreen}</span>
             </button>
             {lesson.teacher && (
-              <div className="hidden items-center gap-2 rounded-full border border-slate-100 bg-slate-50 py-1 pl-1 pr-3 sm:flex">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-[11px] font-bold text-violet-700">
+              <div className="hidden items-center gap-2 rounded-[13px] border border-[#E6E7EF] bg-white py-1 pl-1 pr-3 sm:flex">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                  style={{ background: "linear-gradient(135deg,#7C63F0,#6A4FE6)" }}
+                >
                   {initials(lesson.teacher.full_name)}
                 </div>
                 <div className="flex flex-col leading-tight">
-                  <span className="text-[10px] text-slate-400">{dl.teacherLabel}</span>
-                  <span className="text-xs font-semibold text-slate-700">{lesson.teacher.full_name}</span>
+                  <span className="text-[10px] text-[#9CA0B4]">{dl.teacherLabel}</span>
+                  <span className="text-xs font-bold text-[#242A45]">{lesson.teacher.full_name}</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Toolbar row: elapsed timer + live status */}
+        {/* Pills row: elapsed timer, live status, group, lesson number, quiz/kahoot context */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm">
-            <Clock className="h-4 w-4 text-slate-400" />
+          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+            <Clock className="h-4 w-4 text-[#9CA0B4]" />
             <span className="font-mono tabular-nums">{elapsed}</span>
           </div>
           {!isCompleted && (
-            <div className="flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700">
+            <div className="flex items-center gap-2 rounded-[12px] border border-green-100 bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
               <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
               {w.live}
+            </div>
+          )}
+          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+            <Users className="h-4 w-4 text-[#9CA0B4]" />
+            {lesson.group.name}
+          </div>
+          {lesson.lesson_no != null && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+              <Hash className="h-4 w-4 text-[#9CA0B4]" />
+              {w.lessonNumberLabel.replace("{n}", String(lesson.lesson_no))}
+            </div>
+          )}
+          {currentIsQuiz && currentCfg?.time_limit_minutes != null && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+              <Clock className="h-4 w-4 text-[#9CA0B4]" />
+              {currentCfg.time_limit_minutes} {d.ai.generate.minutesShort}
+            </div>
+          )}
+          {currentIsKahoot && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-[#C9EEDA] bg-[#E7F7EE] px-3 py-2 text-sm font-extrabold text-[#1E9E63]">
+              <span className="h-2 w-2 rounded-full bg-[#22B573] animate-pulse" />
+              {dl.quiz.kahootLiveNow}
             </div>
           )}
         </div>
@@ -572,52 +604,52 @@ export function LessonWorkspaceView({
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
 
         {/* Left: stages stepper — collapsible on desktop (64px icon rail) */}
-        <aside className={`relative flex flex-col gap-5 lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-16" : "lg:w-80"}`}>
+        <aside className={`relative flex flex-col gap-3.5 lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-16" : "lg:w-[266px]"}`}>
 
-          {/* Logo + burger toggle — always visible */}
-          <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+          {/* Logo + collapse toggle — always visible */}
+          <div className="flex items-center justify-between rounded-2xl border border-[#ECEDF4] bg-white px-4 py-3 shadow-sm">
             {!sidebarCollapsed && (
-              <span className="truncate text-sm font-bold">
-                <span className="text-orange-500">SNR</span>{" "}
-                <span className="text-violet-600">EduOS</span>
+              <span className="truncate text-sm font-black">
+                <span className="text-[#FF9A3D]">SNR</span>{" "}
+                <span className="text-[#6A4FE6]">EduOS</span>
               </span>
             )}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-50"
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-[#ECEDF4] text-[#9A9FB4] transition-colors hover:bg-slate-50"
               title={sidebarCollapsed ? w.expand : w.collapse}
             >
-              <Menu className="h-5 w-5" />
+              {sidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
             </button>
           </div>
 
           {/* Collapsed: icon-only rail (stages then materials), hover tooltip via title */}
           {sidebarCollapsed ? (
-            <div className="hidden flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm lg:flex">
+            <div className="hidden flex-col items-center gap-2 rounded-[18px] border border-[#ECEDF4] bg-white p-3 shadow-sm lg:flex">
               {allStepsForStepper.map((stage, i) => {
                 const stepState = stepperStates[i];
                 return (
                   <span
                     key={stage.id}
                     title={stage.title}
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
                       stepState === "done"
-                        ? "border-white bg-emerald-500 text-white shadow-sm"
+                        ? "bg-[#33C27F] text-white"
                         : stepState === "active"
-                        ? "border-white bg-violet-600 text-white shadow-sm ring-4 ring-violet-100"
-                        : "border-white bg-slate-200 text-slate-500 shadow-sm"
+                        ? "bg-[#6A4FE6] text-white ring-4 ring-[#F2EFFE]"
+                        : "bg-[#EFEFF4] text-[#A6AABD]"
                     }`}
                   >
                     {stepState === "done" ? (
                       <Check className="h-3.5 w-3.5" strokeWidth={3} />
                     ) : stage.stage_role === "middle" ? (
-                      <span className="text-[10px] font-semibold">{stage.position}</span>
+                      stage.position
                     ) : null}
                   </span>
                 );
               })}
               {allStepsForStepper.length > 0 && lesson.materials.length > 0 && (
-                <div className="my-1 h-px w-8 shrink-0 bg-slate-100" />
+                <div className="my-1 h-px w-8 shrink-0 bg-[#ECEDF4]" />
               )}
               {lesson.materials.map((m) => {
                 const fname = m.file_original_name ?? m.title;
@@ -637,96 +669,98 @@ export function LessonWorkspaceView({
               })}
             </div>
           ) : (
-          <div className="flex flex-col gap-5">
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
-                {w.stages}
+          <div className="flex flex-col gap-3.5">
+          <section className="rounded-[18px] border border-[#ECEDF4] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[15px] font-extrabold text-[#242A45]">
+                {w.stagePlan}
               </h2>
-              <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-600">
+              <span className="rounded-[8px] bg-[#EEEAFD] px-2.5 py-0.5 text-[12.5px] font-extrabold text-[#6A4FE6]">
                 {stepperPercent}%
               </span>
             </div>
-            <ul className="relative flex flex-col gap-4">
+            <ul className="relative mt-2.5 flex flex-col gap-0.5">
               {allStepsForStepper.map((stage, i) => {
                 const isLast = i === allStepsForStepper.length - 1;
                 const stepState = stepperStates[i];
 
                 return (
-                  <li key={stage.id} className="relative flex gap-3">
+                  <li key={stage.id} className={`relative flex gap-2.5 rounded-xl p-1.5 ${stepState === "active" ? "bg-[#F2EFFE]" : ""}`}>
                     {!isLast && (
-                      <span className={`absolute left-[11px] top-6 h-[calc(100%+4px)] w-0.5 ${
-                        stepState === "done" ? "bg-emerald-400" : "bg-slate-200"
+                      <span className={`absolute left-[19px] top-8 h-[calc(100%-8px)] w-0.5 ${
+                        stepState === "done" ? "bg-[#BCE9CF]" : "bg-[#E4E7F0]"
                       }`} />
                     )}
                     <span
-                      className={`z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+                      className={`z-10 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold ${
                         stepState === "done"
-                          ? "border-white bg-emerald-500 text-white shadow-sm"
+                          ? "bg-[#33C27F] text-white"
                           : stepState === "active"
-                          ? "border-white bg-violet-600 text-white shadow-sm ring-4 ring-violet-100"
-                          : "border-white bg-slate-200 text-slate-500 shadow-sm"
+                          ? "bg-[#6A4FE6] text-white"
+                          : "bg-[#EFEFF4] text-[#A6AABD]"
                       }`}
                     >
                       {stepState === "done" ? (
                         <Check className="h-3.5 w-3.5" strokeWidth={3} />
                       ) : stage.stage_role === "middle" ? (
-                        <span className="text-[10px] font-semibold">{stage.position}</span>
+                        stage.position
                       ) : null}
                     </span>
-                    <div className={`flex flex-1 flex-col gap-0.5 rounded-xl pt-0.5 ${
-                      stepState === "active" ? "border border-violet-100 bg-violet-50 -m-2 p-2" : ""
-                    }`}>
+                    <div className="flex flex-1 flex-col gap-0.5 pt-0.5">
                       <span
-                        className={`text-sm ${
+                        className={`text-[13.5px] leading-tight ${
                           stepState === "done"
-                            ? "font-medium text-slate-900"
+                            ? "font-bold text-[#2C3350]"
                             : stepState === "active"
-                            ? "font-semibold text-violet-700"
-                            : "font-medium text-slate-400"
+                            ? "font-extrabold text-[#5A3FE0]"
+                            : "font-bold text-[#8A8FA4]"
                         }`}
                       >
                         {stage.title}
                       </span>
                       {stage.stage_role === "middle" && stage.stage_type && (
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                          stepState === "active"
-                            ? "text-violet-600/80"
-                            : stage.stage_type === "task" ? "text-violet-500" : "text-blue-400"
+                        <span className={`text-[11px] font-semibold ${
+                          stepState === "active" ? "text-[#8E86C0]" : "text-[#B0B4C6]"
                         }`}>
                           {stage.stage_type === "task"
                             ? dl.stageBadgeTask
                             : dl.stageBadgeTheory}
                         </span>
                       )}
-                      {/* Passed-stage label (position < active) */}
                       {stage.stage_role === "middle" && isStageReadOnly(stage) && !isCompleted && (
-                        <span className="text-[10px] font-semibold text-emerald-500">{da.passed}</span>
+                        <span className="text-[11px] font-semibold text-[#33C27F]">{da.passed}</span>
                       )}
                     </div>
+                    {stepState === "done" ? (
+                      <Check className="h-[15px] w-[15px] shrink-0 self-center text-[#33C27F]" strokeWidth={3} />
+                    ) : stepState === "upcoming" ? (
+                      <span className="shrink-0 self-center" title={w.stageLockedShort}>
+                        <Lock className="h-[15px] w-[15px] text-[#C2C6D6]" />
+                      </span>
+                    ) : null}
                   </li>
                 );
               })}
             </ul>
             {allStepsForStepper.length === 0 && (
-              <p className="text-center text-xs text-slate-400">—</p>
+              <p className="text-center text-xs text-[#9CA0B4]">—</p>
             )}
           </section>
 
           {/* Materials */}
-          <section className="mt-5 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">{w.materials}</h3>
+          <section className="rounded-[18px] border border-[#ECEDF4] bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[14px] font-extrabold text-[#242A45]">{w.materials}</h3>
               {lesson.materials.length > 0 && (
-                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600">
+                <span className="rounded-[7px] bg-[#F1F2F7] px-2 py-0.5 text-xs font-extrabold text-[#8A8FA6]">
                   {lesson.materials.length}
                 </span>
               )}
             </div>
             {lesson.materials.length === 0 ? (
-              <p className="text-sm text-gray-400">{w.noMaterials}</p>
+              <p className="mt-2 text-sm text-[#B0B4C6]">{w.noMaterials}</p>
             ) : (
-              <ul className="flex flex-col gap-1.5">
+              <ul className="mt-3 flex flex-col gap-2.5">
                 {lesson.materials.map((m) => {
                   const url = materialUrls[m.id];
                   const fname = m.file_original_name ?? m.title;
@@ -739,15 +773,15 @@ export function LessonWorkspaceView({
                       <button
                         onClick={() => openMaterial(m)}
                         disabled={!url}
-                        className="group flex w-full items-center gap-3 rounded-xl border border-transparent p-2 text-left transition-all hover:border-slate-100 hover:bg-slate-50 disabled:opacity-50"
+                        className="group flex w-full items-center gap-2.5 text-left transition-opacity disabled:opacity-50"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}>
+                        <div className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] ${cls}`}>
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-800 group-hover:text-violet-600">{m.title}</p>
-                          <p className="text-[11px] text-slate-400">
-                            {[ext, fmtBytes(m.file_size_bytes)].filter(Boolean).join(", ")}
+                          <p className="truncate text-[13px] font-bold text-[#2C3350] group-hover:text-[#6A4FE6]">{m.title}</p>
+                          <p className="text-[11.5px] text-[#9CA0B4]">
+                            {[ext, fmtBytes(m.file_size_bytes)].filter(Boolean).join(" · ")}
                           </p>
                         </div>
                       </button>
@@ -760,12 +794,18 @@ export function LessonWorkspaceView({
 
           {/* Help tip — static info card, not a second raise-hand entry point
               (the real action lives once, in the header, per Часть 2). */}
-          <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+          <div
+            className="mt-auto flex items-center gap-3 rounded-2xl border border-[#E7E1FB] p-3.5"
+            style={{ background: "linear-gradient(135deg,#F2EFFE,#EFEAFE)" }}
+          >
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-800">{w.helpTitle}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{w.helpSubtitle}</p>
+              <p className="text-[13.5px] font-extrabold text-[#3B2E7E]">{w.helpTitle}</p>
+              <p className="mt-0.5 text-xs text-[#8B85B8]">{w.helpSubtitle}</p>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+            <div
+              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] text-white"
+              style={{ background: "#6A4FE6", boxShadow: "0 6px 14px -4px rgba(106,79,230,.6)" }}
+            >
               <Bot className="h-5 w-5" />
             </div>
           </div>
