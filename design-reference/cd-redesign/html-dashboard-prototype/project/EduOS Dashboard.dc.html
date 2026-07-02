@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;0,900&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&amp;display=block">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:#F2F1FA;font-family:'Nunito',system-ui,-apple-system,sans-serif;color:#2A2A45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .msr{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;direction:ltr;font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24;-webkit-font-smoothing:antialiased;user-select:none;}
+  input::placeholder{color:#B7B7CE;font-weight:600;}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  @keyframes twinkle{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+  .float{animation:floaty 3.6s ease-in-out infinite;will-change:transform;}
+  .twinkle{animation:twinkle 2.6s ease-in-out infinite;}
+  body[data-reduce-motion="1"] .float,body[data-reduce-motion="1"] .twinkle{animation:none!important;}
+  @keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+  .td{display:inline-block;animation:tdot 1.1s ease-in-out infinite;}
+  body[data-reduce-motion="1"] .td{animation:none!important;}
+  #ai-messages::-webkit-scrollbar{width:8px;}
+  #ai-messages::-webkit-scrollbar-thumb{background:#E2DEF3;border-radius:8px;}
+  body[data-collapsed="1"] .side{width:90px!important;padding-left:12px!important;padding-right:12px!important;}
+  body[data-collapsed="1"] .logo-row{flex-direction:column;gap:10px;}
+  body[data-collapsed="1"] .logo-word,body[data-collapsed="1"] .level-detail{display:none!important;}
+  body[data-collapsed="1"] .collapse-chevron{transform:rotate(180deg);}
+  body[data-collapsed="1"] .level-card{padding:14px 8px!important;text-align:center;}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#F2F1FA;">
+  <div style="width:1512px;max-width:1512px;margin:0 auto;padding:26px 30px 34px;display:flex;gap:30px;box-sizing:border-box;">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="side" style="width:228px;flex-shrink:0;display:flex;flex-direction:column;gap:22px;background:#fff;border-radius:24px;padding:20px 14px;box-shadow:0 8px 24px rgba(93,80,150,.05);transition:width .22s ease;">
+      <div class="logo-row" style="display:flex;align-items:center;justify-content:space-between;padding:2px 4px 0;">
+        <div style="display:flex;flex-direction:column;line-height:1;">
+          <span style="font-size:11px;font-weight:800;letter-spacing:3px;color:#FF9A3D;margin-bottom:3px;">SNR</span>
+          <div class="logo-word" style="display:flex;align-items:center;font-size:25px;font-weight:900;color:#2A2A45;letter-spacing:-.5px;">Edu<span style="width:25px;height:25px;border-radius:50%;background:#FF9A3D;display:inline-flex;align-items:center;justify-content:center;margin:0 1px;box-shadow:0 5px 11px rgba(255,140,40,.42);"><span class="msr" style="font-size:17px;color:#fff;">play_arrow</span></span>S</div>
+        </div>
+        <button class="collapse-chevron" onClick="{{ toggleCollapse }}" style="width:34px;height:34px;border-radius:50%;border:none;background:#F4F2FC;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .22s ease,background .15s ease;" style-hover="background:#EBE7F8"><span class="msr" style="font-size:22px;color:#7C5CFF;">chevron_left</span></button>
+      </div>
+
+      <nav style="display:flex;flex-direction:column;gap:5px;">
+        <sc-for list="{{ nav }}" as="item" hint-placeholder-count="9">
+          <div onClick="{{ onNavClick }}" data-id="{{ item.id }}" style="{{ item.rowStyle }}" style-hover="{{ item.hoverStyle }}">
+            <span class="msr" style="{{ item.iconStyle }}">{{ item.icon }}</span>
+            <span style="{{ item.labelStyle }}">{{ item.label }}</span>
+            <sc-if value="{{ item.showBadge }}" hint-placeholder-val="{{ true }}">
+              <span style="{{ item.badgeStyle }}">{{ item.badge }}</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </nav>
+
+      <div style="flex:1;"></div>
+
+      <div class="level-card" style="position:relative;overflow:hidden;border-radius:22px;padding:16px 16px 14px;background:linear-gradient(160deg,#EFEBFF 0%,#E5DBFF 100%);box-shadow:0 12px 26px rgba(120,90,240,.14);">
+        <span class="twinkle" style="position:absolute;top:14px;left:96px;font-size:13px;color:#B79BFF;">✦</span>
+        <span class="twinkle" style="position:absolute;top:52px;left:118px;font-size:10px;color:#FFC93C;animation-delay:.8s;">✦</span>
+        <div style="max-width:118px;">
+          <div class="level-detail" style="font-size:12px;font-weight:800;color:#9781CE;">Мой уровень</div>
+          <div class="level-detail" style="font-size:26px;font-weight:900;color:#7C5CFF;line-height:1;margin-top:3px;">Lv. 12</div>
+          <div class="level-detail" style="height:9px;border-radius:6px;background:#fff;overflow:hidden;margin-top:13px;box-shadow:inset 0 1px 2px rgba(120,90,240,.1);"><div style="height:100%;width:68%;border-radius:6px;background:linear-gradient(90deg,#FFD24A,#FF9F2E);"></div></div>
+          <div class="level-detail" style="font-size:12px;font-weight:800;color:#6F6F8C;margin-top:9px;">820 / 1200 XP</div>
+        </div>
+        <div class="float" style="position:absolute;right:2px;bottom:-4px;font-size:62px;line-height:1;filter:drop-shadow(0 8px 12px rgba(90,60,180,.28));">🧑‍🚀</div>
+      </div>
+    </aside>
+
+    <!-- ============ CONTENT ============ -->
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:24px;">
+
+      <!-- TOP BAR -->
+      <header style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fff;border-radius:20px;padding:12px 16px 12px 26px;box-shadow:0 8px 22px rgba(93,80,150,.05);">
+        <span style="font-size:24px;font-weight:900;color:#2A2A45;letter-spacing:-.3px;">{{ activeLabel }}</span>
+
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button style="position:relative;display:flex;align-items:center;gap:10px;border:none;background:transparent;border-radius:14px;padding:10px 14px;cursor:pointer;transition:background .15s ease;" style-hover="background:#F4F2FC">
+            <span style="position:relative;display:inline-flex;align-items:center;justify-content:center;">
+              <span class="msr" style="font-size:24px;color:#6E6E8A;">notifications</span>
+              <sc-if value="{{ showBadges }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:-7px;right:-9px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#F5455C;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">3</span></sc-if>
+            </span>
+            <span style="font-size:15px;font-weight:800;color:#2A2A45;">Уведомление</span>
+          </button>
+
+          <div style="display:flex;align-items:center;gap:11px;background:transparent;border-radius:14px;padding:6px 10px 6px 6px;cursor:pointer;transition:background .15s ease;" style-hover="background:#F4F2FC">
+            <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#FFD9B0,#FFB98A);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">👦🏻</div>
+            <div style="display:flex;flex-direction:column;line-height:1.15;">
+              <span style="font-size:15px;font-weight:800;color:#2A2A45;">Привет, Адилбек!</span>
+              <span style="font-size:12.5px;font-weight:600;color:#9A9AB5;">7А класс</span>
+            </div>
+            <span class="msr" style="font-size:22px;color:#B7B7CE;">keyboard_arrow_down</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===== SCREEN: ГЛАВНАЯ ===== -->
+      <sc-if value="{{ showHome }}" hint-placeholder-val="{{ true }}">
+      <!-- MAIN + RAIL -->
+      <div style="display:flex;gap:24px;align-items:flex-start;">
+
+        <!-- MAIN COLUMN -->
+        <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:24px;">
+
+          <div>
+            <div style="font-size:36px;font-weight:900;color:#2A2A45;letter-spacing:-.5px;display:flex;align-items:center;gap:11px;">Привет, Адилбек! <span class="float" style="font-size:32px;">👋</span></div>
+            <div style="font-size:16px;font-weight:600;color:#9A9AB5;margin-top:6px;">Ты отлично справляешься! Продолжай в том же духе!</div>
+          </div>
+
+          <!-- HERO ROW -->
+          <div style="display:flex;gap:24px;">
+            <!-- Факт дня -->
+            <div style="flex:1.08;position:relative;overflow:hidden;border-radius:24px;padding:24px;background:linear-gradient(135deg,#8E74F2 0%,#6A48E4 100%);box-shadow:0 16px 34px rgba(107,74,230,.3);color:#fff;min-height:252px;display:flex;flex-direction:column;">
+              <span class="twinkle" style="position:absolute;top:78px;left:50%;font-size:15px;color:rgba(255,255,255,.9);">✦</span>
+              <span class="twinkle" style="position:absolute;top:150px;left:44%;font-size:11px;color:rgba(255,255,255,.75);animation-delay:.9s;">✦</span>
+              <span class="twinkle" style="position:absolute;top:40px;right:44px;font-size:13px;color:#FFE08A;animation-delay:.4s;">✦</span>
+              <div style="display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;"><span class="msr" style="font-size:22px;color:#FFE08A;">auto_awesome</span> Факт дня</div>
+              <div style="margin-top:16px;font-size:21px;font-weight:800;line-height:1.36;max-width:58%;">Пчёлы могут узнавать лица людей и запоминать их</div>
+              <button style="margin-top:auto;align-self:flex-start;display:flex;align-items:center;gap:8px;background:#fff;color:#6A48E4;border:none;border-radius:14px;padding:13px 20px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 18px rgba(40,20,90,.2);transition:transform .15s ease,box-shadow .15s ease;" style-hover="transform:translateY(-2px);box-shadow:0 13px 24px rgba(40,20,90,.28)" style-active="transform:scale(.97)">Узнать больше <span class="msr" style="font-size:19px;">arrow_forward</span></button>
+              <div class="float" style="position:absolute;right:64px;bottom:26px;font-size:56px;line-height:1;">🌸</div>
+              <div class="float" style="position:absolute;right:12px;bottom:8px;font-size:104px;line-height:1;filter:drop-shadow(0 12px 18px rgba(50,20,100,.32));">🐝</div>
+            </div>
+
+            <!-- Серия успехов -->
+            <div style="flex:1;position:relative;overflow:hidden;border-radius:24px;padding:22px;background:#fff;box-shadow:0 10px 30px rgba(93,80,150,.06);min-height:252px;display:flex;flex-direction:column;">
+              <div style="display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;color:#2A2A45;"><span class="msr" style="font-size:22px;color:#FF7A2E;">local_fire_department</span> Серия успехов</div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;"><span style="font-size:46px;font-weight:900;color:#7C5CFF;line-height:1;">7</span><span style="font-size:16px;font-weight:700;color:#8E8EA9;">дней подряд!</span></div>
+              <div style="position:relative;flex:1;margin-top:2px;">
+                
+                <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="none" style="display:block;overflow:visible;">
+                  <defs>
+                    <linearGradient id="streakLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFD36E"></stop><stop offset="1" stop-color="#FF9F2E"></stop></linearGradient>
+                    <linearGradient id="streakFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(255,183,62,.26)"></stop><stop offset="1" stop-color="rgba(255,183,62,0)"></stop></linearGradient>
+                  </defs>
+                  <path d="M4,104 C46,100 66,92 96,88 C132,83 152,68 192,58 C230,49 252,28 306,14 L306,118 L4,118 Z" fill="url(#streakFill)" stroke="none"></path>
+                  <path d="M4,104 C46,100 66,92 96,88 C132,83 152,68 192,58 C230,49 252,28 306,14" fill="none" stroke="url(#streakLine)" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+                </svg>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;">
+                <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:7px;">
+                    <div style="{{ d.dotStyle }}"><span class="msr" style="{{ d.iconStyle }}">{{ d.icon }}</span></div>
+                    <span style="font-size:12px;font-weight:700;color:#9A9AB5;">{{ d.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <!-- QUICK ACTIONS -->
+          <div>
+            <div style="font-size:18px;font-weight:800;color:#2A2A45;margin-bottom:14px;">Быстрые действия</div>
+            <div style="display:flex;gap:16px;">
+              <div style="flex:1;position:relative;border-radius:20px;padding:18px;background:#7B5CF7;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;box-shadow:0 12px 26px rgba(123,92,247,.28);transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 34px rgba(123,92,247,.4)" style-active="transform:translateY(-1px) scale(.99)">
+                <div style="width:52px;height:52px;border-radius:15px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;"><span class="msr" style="font-size:28px;color:#fff;">add</span></div>
+                <div style="font-size:15px;font-weight:800;color:#fff;">Новый урок</div>
+              </div>
+              <div style="flex:1;position:relative;border-radius:20px;padding:18px;background:#FFF3DE;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;box-shadow:0 8px 20px rgba(93,80,150,.05);transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 16px 30px rgba(255,176,32,.24)" style-active="transform:translateY(-1px) scale(.99)">
+                <div style="width:52px;height:52px;border-radius:15px;background:#FFB020;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 16px rgba(255,176,32,.4);"><span class="msr" style="font-size:26px;color:#fff;">assignment</span></div>
+                <div style="font-size:15px;font-weight:800;color:#2A2A45;">Моё задание</div>
+                <sc-if value="{{ showBadges }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:14px;right:14px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#F5455C;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;">6</span></sc-if>
+              </div>
+              <div style="flex:1;border-radius:20px;padding:18px;background:#E9F1FF;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;box-shadow:0 8px 20px rgba(93,80,150,.05);transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 16px 30px rgba(62,134,245,.22)" style-active="transform:translateY(-1px) scale(.99)">
+                <div style="width:52px;height:52px;border-radius:15px;background:#4E86F7;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 16px rgba(78,134,247,.4);"><span class="msr" style="font-size:26px;color:#fff;">folder</span></div>
+                <div style="font-size:15px;font-weight:800;color:#2A2A45;">Мои файлы</div>
+              </div>
+              <div style="flex:1;border-radius:20px;padding:18px;background:#FCE9F2;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;box-shadow:0 8px 20px rgba(93,80,150,.05);transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 16px 30px rgba(243,104,168,.24)" style-active="transform:translateY(-1px) scale(.99)">
+                <div style="width:52px;height:52px;border-radius:15px;background:#F368A8;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 16px rgba(243,104,168,.4);"><span class="msr" style="font-size:26px;color:#fff;">group</span></div>
+                <div style="font-size:15px;font-weight:800;color:#2A2A45;">Связь с учителем</div>
+              </div>
+              <div style="flex:1;border-radius:20px;padding:18px;background:#E4F7F1;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;box-shadow:0 8px 20px rgba(93,80,150,.05);transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 16px 30px rgba(35,196,163,.24)" style-active="transform:translateY(-1px) scale(.99)">
+                <div style="width:52px;height:52px;border-radius:15px;background:#23C4A3;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 16px rgba(35,196,163,.4);"><span class="msr" style="font-size:26px;color:#fff;">smart_toy</span></div>
+                <div style="font-size:15px;font-weight:800;color:#2A2A45;">Спросить AI</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PROGRESS + SUBJECTS -->
+          <div style="display:flex;gap:24px;">
+            <div style="flex:0.92;position:relative;overflow:hidden;border-radius:24px;padding:22px;background:#fff;box-shadow:0 10px 30px rgba(93,80,150,.06);">
+              <div style="font-size:18px;font-weight:800;color:#2A2A45;">Мой прогресс</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:14px;">
+                <div style="position:relative;width:148px;height:148px;flex-shrink:0;border-radius:50%;background:conic-gradient(#7C5CFF 0% 75%,#ECE7FB 75% 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 22px rgba(124,92,255,.18);">
+                  <div style="width:110px;height:110px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <span style="font-size:30px;font-weight:900;color:#2A2A45;line-height:1;">75<span style="font-size:18px;">%</span></span>
+                    <span style="font-size:11px;font-weight:700;color:#9A9AB5;margin-top:3px;text-align:center;line-height:1.2;">Всего<br>за неделю</span>
+                  </div>
+                </div>
+                <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;min-height:140px;">
+                  <span class="twinkle" style="position:absolute;top:18px;left:24px;font-size:12px;color:#FFC93C;">✦</span>
+                  <span class="twinkle" style="position:absolute;bottom:22px;right:14px;font-size:11px;color:#B79BFF;animation-delay:.7s;">✦</span>
+                  <div class="float" style="font-size:78px;line-height:1;filter:drop-shadow(0 10px 14px rgba(90,60,180,.24));">🧑‍🚀</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="flex:1.32;border-radius:24px;padding:22px;background:#fff;box-shadow:0 10px 30px rgba(93,80,150,.06);">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-size:18px;font-weight:800;color:#2A2A45;">Мои предметы</div>
+                <span style="font-size:13px;font-weight:800;color:#7C5CFF;cursor:pointer;" style-hover="text-decoration:underline">Смотреть все</span>
+              </div>
+              <div style="display:flex;gap:12px;margin-top:16px;">
+                <div style="flex:1;border-radius:18px;padding:14px;background:#F0ECFF;display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-3px);box-shadow:0 12px 22px rgba(124,92,255,.2)">
+                  <div style="width:44px;height:44px;border-radius:13px;background:#7C5CFF;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(124,92,255,.4);"><span class="msr" style="font-size:22px;color:#fff;">code</span></div>
+                  <div style="font-size:13px;font-weight:800;color:#2A2A45;line-height:1.2;min-height:31px;">Программирование</div>
+                  <div style="font-size:20px;font-weight:900;color:#7C5CFF;">60%</div>
+                  <div style="height:8px;border-radius:6px;background:#E2DAFB;overflow:hidden;"><div style="height:100%;width:60%;border-radius:6px;background:#7C5CFF;"></div></div>
+                </div>
+                <div style="flex:1;border-radius:18px;padding:14px;background:#E9F2FF;display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-3px);box-shadow:0 12px 22px rgba(62,134,245,.2)">
+                  <div style="width:44px;height:44px;border-radius:13px;background:#3E86F5;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(62,134,245,.4);"><span class="msr" style="font-size:22px;color:#fff;">science</span></div>
+                  <div style="font-size:13px;font-weight:800;color:#2A2A45;line-height:1.2;min-height:31px;">Физика</div>
+                  <div style="font-size:20px;font-weight:900;color:#3E86F5;">40%</div>
+                  <div style="height:8px;border-radius:6px;background:#D6E6FF;overflow:hidden;"><div style="height:100%;width:40%;border-radius:6px;background:#3E86F5;"></div></div>
+                </div>
+                <div style="flex:1;border-radius:18px;padding:14px;background:#FFF2E3;display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-3px);box-shadow:0 12px 22px rgba(255,159,46,.24)">
+                  <div style="width:44px;height:44px;border-radius:13px;background:#FF9F2E;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(255,159,46,.42);"><span style="font-size:19px;font-weight:900;color:#fff;">Aa</span></div>
+                  <div style="font-size:13px;font-weight:800;color:#2A2A45;line-height:1.2;min-height:31px;">Английский</div>
+                  <div style="font-size:20px;font-weight:900;color:#FF9F2E;">80%</div>
+                  <div style="height:8px;border-radius:6px;background:#FCE3C7;overflow:hidden;"><div style="height:100%;width:80%;border-radius:6px;background:#FF9F2E;"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BANNER -->
+          <div style="position:relative;overflow:hidden;border-radius:22px;padding:22px 28px;background:linear-gradient(100deg,#FFE7D6 0%,#FFDCE6 52%,#F4E1FF 100%);display:flex;align-items:center;gap:20px;min-height:104px;">
+            <span class="twinkle" style="position:absolute;right:150px;top:26px;font-size:13px;color:#C89BE8;">✦</span>
+            <span class="twinkle" style="position:absolute;right:44px;top:16px;font-size:11px;color:#F49AC0;animation-delay:.6s;">✦</span>
+            <div style="flex:1;">
+              <div style="font-size:20px;font-weight:900;color:#3A2B45;">Ты на пути к новым вершинам!</div>
+              <div style="font-size:14px;font-weight:600;color:#8A7A90;margin-top:5px;">Ещё немного, и ты получишь новую награду 🏆</div>
+            </div>
+            <button style="margin-right:76px;display:flex;align-items:center;gap:8px;background:#fff;color:#E5772E;border:none;border-radius:14px;padding:14px 22px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 8px 18px rgba(200,120,60,.2);transition:transform .15s ease,box-shadow .15s ease;white-space:nowrap;" style-hover="transform:translateY(-2px);box-shadow:0 13px 24px rgba(200,120,60,.28)" style-active="transform:scale(.97)">Смотреть цели <span class="msr" style="font-size:19px;">arrow_forward</span></button>
+            <div class="float" style="position:absolute;right:22px;bottom:-8px;font-size:74px;line-height:1;filter:drop-shadow(0 8px 12px rgba(180,110,40,.3));">🏆</div>
+          </div>
+
+        </main>
+
+        <!-- RIGHT RAIL -->
+        <aside style="width:340px;flex-shrink:0;display:flex;flex-direction:column;gap:24px;">
+
+          <!-- SCHEDULE -->
+          <div style="border-radius:24px;padding:22px;background:#fff;box-shadow:0 10px 30px rgba(93,80,150,.06);">
+            <div style="display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;color:#2A2A45;margin-bottom:8px;"><span class="msr" style="font-size:22px;color:#7C5CFF;">calendar_today</span> Расписание на сегодня</div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <sc-for list="{{ schedule }}" as="s" hint-placeholder-count="5">
+                <div style="{{ s.rowStyle }}" style-hover="{{ s.hoverStyle }}">
+                  <span style="{{ s.dotStyle }}"></span>
+                  <div style="{{ s.tileStyle }}"><span class="msr" style="{{ s.iconStyle }}" hidden="{{ s.hideIcon }}">{{ s.icon }}</span><span style="{{ s.textIconStyle }}">{{ s.textIcon }}</span></div>
+                  <div style="display:flex;flex-direction:column;line-height:1.15;flex-shrink:0;width:46px;">
+                    <span style="font-size:14px;font-weight:800;color:#2A2A45;">{{ s.start }}</span>
+                    <span style="font-size:12px;font-weight:600;color:#B4B4C8;">{{ s.end }}</span>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:14.5px;font-weight:800;color:#2A2A45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ s.name }}</div>
+                    <div style="font-size:12.5px;font-weight:600;color:#9A9AB5;">{{ s.room }}</div>
+                  </div>
+                  <sc-if value="{{ s.now }}" hint-placeholder-val="{{ false }}"><span style="background:#FFE1EA;color:#F5455C;font-size:11px;font-weight:800;padding:5px 10px;border-radius:10px;flex-shrink:0;">Сейчас</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <button style="margin-top:12px;width:100%;background:#F1EDFF;color:#7C5CFF;border:none;border-radius:14px;padding:13px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s ease;" style-hover="background:#E6DDFF" style-active="transform:scale(.99)">Всё расписание <span class="msr" style="font-size:18px;">arrow_forward</span></button>
+          </div>
+
+          <!-- ACHIEVEMENTS -->
+          <div style="border-radius:24px;padding:22px;background:#fff;box-shadow:0 10px 30px rgba(93,80,150,.06);">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div style="font-size:18px;font-weight:800;color:#2A2A45;">Мои достижения</div>
+              <span style="font-size:13px;font-weight:800;color:#7C5CFF;cursor:pointer;" style-hover="text-decoration:underline">Все</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;margin-top:18px;">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;transition:transform .16s ease;" style-hover="transform:translateY(-4px)">
+                <div style="position:relative;width:72px;height:72px;border-radius:22px;background:linear-gradient(150deg,#FFD24A,#FF9F2E);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 20px rgba(255,159,46,.34);"><span class="msr" style="font-size:34px;color:#fff;">star</span><span style="position:absolute;top:-6px;right:-6px;background:#F5455C;color:#fff;font-size:9px;font-weight:800;padding:3px 6px;border-radius:8px;letter-spacing:.3px;">NEW</span></div>
+                <span style="font-size:12px;font-weight:700;color:#6F6F8C;text-align:center;">Исследователь</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;transition:transform .16s ease;" style-hover="transform:translateY(-4px)">
+                <div style="position:relative;width:72px;height:72px;border-radius:22px;background:linear-gradient(150deg,#9C6BFF,#7A4DF6);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 20px rgba(124,77,246,.34);"><span class="msr" style="font-size:34px;color:#fff;">local_fire_department</span><span style="position:absolute;top:-6px;right:-6px;background:#F5455C;color:#fff;font-size:9px;font-weight:800;padding:3px 6px;border-radius:8px;letter-spacing:.3px;">NEW</span></div>
+                <span style="font-size:12px;font-weight:700;color:#6F6F8C;text-align:center;">Трудолюбивый</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;transition:transform .16s ease;" style-hover="transform:translateY(-4px)">
+                <div style="position:relative;width:72px;height:72px;border-radius:22px;background:linear-gradient(150deg,#38D6BE,#20B6C6);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 20px rgba(45,190,198,.34);"><span class="msr" style="font-size:34px;color:#fff;">track_changes</span></div>
+                <span style="font-size:12px;font-weight:700;color:#6F6F8C;text-align:center;">Целеустремлённый</span>
+              </div>
+            </div>
+            <div style="margin-top:20px;display:flex;align-items:center;gap:14px;">
+              <div style="flex:1;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:13px;font-weight:700;color:#8E8EA9;">До следующей награды</span><span style="font-size:13px;font-weight:800;color:#2A2A45;">150 XP</span></div>
+                <div style="height:10px;border-radius:6px;background:#F1EDF3;overflow:hidden;"><div style="height:100%;width:62%;border-radius:6px;background:linear-gradient(90deg,#FF9F6E,#FF7EA8);"></div></div>
+              </div>
+              <span class="float" style="font-size:40px;line-height:1;">🎁</span>
+            </div>
+          </div>
+
+        </aside>
+      </div>
+      </sc-if>
+
+      <!-- ===== SCREEN: ПРОЕКТЫ И PLAYGROUND ===== -->
+      <sc-if value="{{ showProjects }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:26px;">
+
+        <div>
+          <div style="font-size:34px;font-weight:900;color:#2A2A45;letter-spacing:-.5px;">Проекты и Playground</div>
+          <div style="font-size:16px;font-weight:600;color:#9A9AB5;margin-top:6px;">Создавай, экспериментируй и развивай свои навыки</div>
+        </div>
+
+        <!-- Мои проекты -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:20px;font-weight:800;color:#2A2A45;">Мои проекты</div>
+            <div style="display:flex;align-items:center;gap:16px;">
+              <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#7C5CFF;cursor:pointer;">Все проекты <span class="msr" style="font-size:18px;">arrow_forward</span></span>
+              <button style="display:flex;align-items:center;gap:7px;background:#7B5CF7;color:#fff;border:none;border-radius:14px;padding:12px 18px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 10px 22px rgba(123,92,247,.3);transition:transform .15s ease;" style-hover="transform:translateY(-2px)" style-active="transform:scale(.97)"><span class="msr" style="font-size:19px;">add</span> Новый проект</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:20px;">
+
+            <!-- Python -->
+            <div style="flex:1;background:#fff;border-radius:22px;padding:14px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="position:relative;height:150px;border-radius:16px;overflow:hidden;background:#0E1526;">
+                <div style="position:absolute;top:10px;left:10px;width:38px;height:38px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.22);z-index:2;"><span class="msr" style="font-size:22px;color:#3776AB;">code</span></div>
+                <div style="position:absolute;inset:0;padding:52px 16px 16px 18px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;line-height:1.7;">
+                  <div><span style="color:#C792EA;">for</span> <span style="color:#F78C6C;">i</span> <span style="color:#C792EA;">in</span> <span style="color:#82AAFF;">range</span><span style="color:#89DDFF;">(</span><span style="color:#F78C6C;">5</span><span style="color:#89DDFF;">):</span></div>
+                  <div style="padding-left:28px;"><span style="color:#82AAFF;">print</span><span style="color:#89DDFF;">(</span><span style="color:#E6E6EC;">i</span><span style="color:#89DDFF;">)</span></div>
+                </div>
+              </div>
+              <div style="padding:14px 6px 4px;">
+                <div style="font-size:16px;font-weight:800;color:#2A2A45;">Счётчик чисел</div>
+                <div style="margin-top:9px;"><span style="display:inline-block;background:#EFE9FF;color:#7C5CFF;font-size:12px;font-weight:800;padding:5px 11px;border-radius:9px;">Python</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+                  <span style="font-size:12.5px;font-weight:600;color:#A6A6BE;">Обновлён 2 дня назад</span>
+                  <span class="msr" style="font-size:20px;color:#C2C2D4;cursor:pointer;">more_horiz</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- JavaScript -->
+            <div style="flex:1;background:#fff;border-radius:22px;padding:14px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="position:relative;height:150px;border-radius:16px;overflow:hidden;background:#0E1526;">
+                <div style="position:absolute;top:10px;left:10px;width:38px;height:38px;border-radius:11px;background:#F7DF1E;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.22);z-index:2;"><span style="font-size:15px;font-weight:900;color:#15150F;">JS</span></div>
+                <div style="position:absolute;inset:0;padding:52px 14px 16px 18px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.7;">
+                  <div><span style="color:#C792EA;">function</span> <span style="color:#82AAFF;">hello</span><span style="color:#89DDFF;">(</span><span style="color:#F78C6C;">name</span><span style="color:#89DDFF;">) {</span></div>
+                  <div style="padding-left:20px;"><span style="color:#C792EA;">return</span> <span style="color:#C3E88D;">`Привет, </span><span style="color:#89DDFF;">${</span><span style="color:#F78C6C;">name</span><span style="color:#89DDFF;">}</span><span style="color:#C3E88D;">!`</span><span style="color:#89DDFF;">;</span></div>
+                  <div><span style="color:#89DDFF;">}</span></div>
+                </div>
+              </div>
+              <div style="padding:14px 6px 4px;">
+                <div style="font-size:16px;font-weight:800;color:#2A2A45;">Приветствие</div>
+                <div style="margin-top:9px;"><span style="display:inline-block;background:#FFF4D6;color:#B8890B;font-size:12px;font-weight:800;padding:5px 11px;border-radius:9px;">JavaScript</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+                  <span style="font-size:12.5px;font-weight:600;color:#A6A6BE;">Обновлён 5 дней назад</span>
+                  <span class="msr" style="font-size:20px;color:#C2C2D4;cursor:pointer;">more_horiz</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Arduino -->
+            <div style="flex:1;background:#fff;border-radius:22px;padding:14px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="position:relative;height:150px;border-radius:16px;overflow:hidden;background:linear-gradient(140deg,#0B1F2A,#0F2E31);">
+                <div style="position:absolute;top:10px;left:10px;width:38px;height:38px;border-radius:11px;background:#12A19A;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.22);z-index:2;"><span class="msr" style="font-size:22px;color:#fff;">all_inclusive</span></div>
+                <div style="position:absolute;top:54px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:26px;">
+                  <span style="width:15px;height:15px;border-radius:50%;background:#FF5A5F;box-shadow:0 0 16px 5px rgba(255,90,95,.65);"></span>
+                  <span style="width:15px;height:15px;border-radius:50%;background:#4E9BFF;box-shadow:0 0 16px 5px rgba(78,155,255,.65);"></span>
+                  <span style="width:15px;height:15px;border-radius:50%;background:#46E08B;box-shadow:0 0 16px 5px rgba(70,224,139,.6);"></span>
+                </div>
+                <div style="position:absolute;left:16px;right:16px;bottom:16px;height:30px;border-radius:7px;background:#0A6E63;box-shadow:inset 0 1px 0 rgba(255,255,255,.12);display:flex;align-items:center;gap:6px;padding:0 10px;">
+                  <span style="width:5px;height:14px;border-radius:2px;background:#0E3F3A;"></span><span style="width:5px;height:14px;border-radius:2px;background:#0E3F3A;"></span><span style="width:5px;height:14px;border-radius:2px;background:#0E3F3A;"></span><span style="flex:1;"></span><span style="width:16px;height:16px;border-radius:4px;background:#083530;"></span>
+                </div>
+              </div>
+              <div style="padding:14px 6px 4px;">
+                <div style="font-size:16px;font-weight:800;color:#2A2A45;">Мигающий светодиод</div>
+                <div style="margin-top:9px;"><span style="display:inline-block;background:#DFF4F3;color:#128B84;font-size:12px;font-weight:800;padding:5px 11px;border-radius:9px;">Arduino</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+                  <span style="font-size:12.5px;font-weight:600;color:#A6A6BE;">Обновлён 1 неделю назад</span>
+                  <span class="msr" style="font-size:20px;color:#C2C2D4;cursor:pointer;">more_horiz</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HTML -->
+            <div style="flex:1;background:#fff;border-radius:22px;padding:14px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="position:relative;height:150px;border-radius:16px;overflow:hidden;background:#E9EDF5;">
+                <div style="position:absolute;top:10px;left:10px;width:38px;height:38px;border-radius:11px;background:#E5772E;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.22);z-index:3;"><span class="msr" style="font-size:22px;color:#fff;">html</span></div>
+                <div style="position:absolute;top:0;left:0;right:0;height:28px;background:#fff;display:flex;align-items:center;gap:5px;padding:0 12px 0 56px;border-bottom:1px solid #E4E8F0;z-index:2;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#FF5F57;"></span><span style="width:8px;height:8px;border-radius:50%;background:#FEBC2E;"></span><span style="width:8px;height:8px;border-radius:50%;background:#28C840;"></span>
+                  <div style="flex:1;height:12px;border-radius:6px;background:#EEF1F6;margin-left:6px;"></div>
+                </div>
+                <div style="position:absolute;top:28px;left:0;right:0;bottom:0;overflow:hidden;">
+                  <div style="position:absolute;inset:0;background:linear-gradient(180deg,#C6D8FF,#93B4F2);"></div>
+                  <div style="position:absolute;bottom:0;left:0;right:0;height:56%;background:linear-gradient(180deg,#5B77C9,#3E5AAE);clip-path:polygon(0 62%,20% 34%,38% 56%,58% 22%,78% 50%,100% 30%,100% 100%,0 100%);"></div>
+                  <div style="position:absolute;top:12px;left:14px;font-size:13px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.2);">My Site</div>
+                </div>
+              </div>
+              <div style="padding:14px 6px 4px;">
+                <div style="font-size:16px;font-weight:800;color:#2A2A45;">Мой первый сайт</div>
+                <div style="margin-top:9px;"><span style="display:inline-block;background:#FFE9DC;color:#E5772E;font-size:12px;font-weight:800;padding:5px 11px;border-radius:9px;">HTML</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+                  <span style="font-size:12.5px;font-weight:600;color:#A6A6BE;">Обновлён 2 недели назад</span>
+                  <span class="msr" style="font-size:20px;color:#C2C2D4;cursor:pointer;">more_horiz</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Playground -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:20px;font-weight:800;color:#2A2A45;">Playground</div>
+            <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#7C5CFF;cursor:pointer;">Все платформы <span class="msr" style="font-size:18px;">arrow_forward</span></span>
+          </div>
+          <div style="font-size:14px;font-weight:600;color:#9A9AB5;margin-top:4px;margin-bottom:16px;">Выбери платформу и начинай практиковаться прямо сейчас</div>
+          <div style="display:flex;gap:16px;">
+
+            <div style="flex:1;background:#fff;border-radius:20px;padding:22px 18px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;align-items:center;text-align:center;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="width:60px;height:60px;border-radius:18px;background:#EAF1FB;display:flex;align-items:center;justify-content:center;margin-bottom:16px;"><span class="msr" style="font-size:32px;color:#3776AB;">code</span></div>
+              <div style="font-size:16px;font-weight:800;color:#2A2A45;">Python IDE</div>
+              <div style="font-size:13px;font-weight:600;color:#9A9AB5;line-height:1.45;margin-top:8px;min-height:38px;">Пиши, запускай и тестируй Python код онлайн.</div>
+              <button style="margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#7C5CFF;border:1.5px solid #EAE5FA;border-radius:13px;padding:11px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s ease;" style-hover="background:#F4F0FF;border-color:#D6CBF7">Открыть <span class="msr" style="font-size:16px;">open_in_new</span></button>
+            </div>
+
+            <div style="flex:1;background:#fff;border-radius:20px;padding:22px 18px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;align-items:center;text-align:center;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="height:60px;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">
+                <span style="width:40px;height:40px;border-radius:12px;background:#FFEAE0;display:flex;align-items:center;justify-content:center;"><span class="msr" style="font-size:22px;color:#E44D26;">html</span></span>
+                <span style="width:40px;height:40px;border-radius:12px;background:#E3EAFF;display:flex;align-items:center;justify-content:center;"><span class="msr" style="font-size:22px;color:#264DE4;">css</span></span>
+                <span style="width:40px;height:40px;border-radius:12px;background:#FFF7D6;display:flex;align-items:center;justify-content:center;"><span class="msr" style="font-size:22px;color:#C99700;">javascript</span></span>
+              </div>
+              <div style="font-size:16px;font-weight:800;color:#2A2A45;">Web Dev</div>
+              <div style="font-size:13px;font-weight:600;color:#9A9AB5;line-height:1.45;margin-top:8px;min-height:38px;">Создавай сайты с помощью HTML, CSS и JavaScript.</div>
+              <button style="margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#7C5CFF;border:1.5px solid #EAE5FA;border-radius:13px;padding:11px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s ease;" style-hover="background:#F4F0FF;border-color:#D6CBF7">Открыть <span class="msr" style="font-size:16px;">open_in_new</span></button>
+            </div>
+
+            <div style="flex:1;background:#fff;border-radius:20px;padding:22px 18px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;align-items:center;text-align:center;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="width:60px;height:60px;border-radius:18px;background:#E1F3F2;display:flex;align-items:center;justify-content:center;margin-bottom:16px;"><span class="msr" style="font-size:34px;color:#12A19A;">all_inclusive</span></div>
+              <div style="font-size:16px;font-weight:800;color:#2A2A45;">Arduino Simulator</div>
+              <div style="font-size:13px;font-weight:600;color:#9A9AB5;line-height:1.45;margin-top:8px;min-height:38px;">Пиши код и тестируй проекты для Arduino онлайн.</div>
+              <button style="margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#7C5CFF;border:1.5px solid #EAE5FA;border-radius:13px;padding:11px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s ease;" style-hover="background:#F4F0FF;border-color:#D6CBF7">Открыть <span class="msr" style="font-size:16px;">open_in_new</span></button>
+            </div>
+
+            <div style="flex:1;background:#fff;border-radius:20px;padding:22px 18px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;align-items:center;text-align:center;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="width:60px;height:60px;border-radius:18px;background:#FFF1E0;display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:34px;line-height:1;">🐱</div>
+              <div style="font-size:16px;font-weight:800;color:#2A2A45;">Scratch</div>
+              <div style="font-size:13px;font-weight:600;color:#9A9AB5;line-height:1.45;margin-top:8px;min-height:38px;">Создавай игры и анимации в визуальном редакторе.</div>
+              <button style="margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#7C5CFF;border:1.5px solid #EAE5FA;border-radius:13px;padding:11px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s ease;" style-hover="background:#F4F0FF;border-color:#D6CBF7">Открыть <span class="msr" style="font-size:16px;">open_in_new</span></button>
+            </div>
+
+            <div style="flex:1;background:#fff;border-radius:20px;padding:22px 18px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;align-items:center;text-align:center;transition:transform .16s ease,box-shadow .16s ease;" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px rgba(93,80,150,.13)">
+              <div style="width:60px;height:60px;border-radius:18px;background:#FDE9DF;display:flex;align-items:center;justify-content:center;margin-bottom:16px;"><span class="msr" style="font-size:32px;color:#F26207;">terminal</span></div>
+              <div style="font-size:16px;font-weight:800;color:#2A2A45;">Replit</div>
+              <div style="font-size:13px;font-weight:600;color:#9A9AB5;line-height:1.45;margin-top:8px;min-height:38px;">Полноценная среда разработки в облаке.</div>
+              <button style="margin-top:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#7C5CFF;border:1.5px solid #EAE5FA;border-radius:13px;padding:11px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s ease;" style-hover="background:#F4F0FF;border-color:#D6CBF7">Открыть <span class="msr" style="font-size:16px;">open_in_new</span></button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Недавняя активность + достижение -->
+        <div style="display:flex;gap:24px;align-items:stretch;">
+          <div style="flex:1.9;background:#fff;border-radius:22px;padding:22px;box-shadow:0 10px 30px rgba(93,80,150,.06);">
+            <div style="font-size:20px;font-weight:800;color:#2A2A45;margin-bottom:12px;">Недавняя активность</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 10px;border-radius:14px;cursor:pointer;transition:background .15s ease;" style-hover="background:#F7F5FF">
+                <div style="width:38px;height:38px;border-radius:11px;background:#EEF4FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="msr" style="font-size:20px;color:#3776AB;">code</span></div>
+                <div style="flex:1;font-size:14.5px;font-weight:700;color:#2A2A45;">Ты обновил проект «Счётчик чисел»</div>
+                <span style="font-size:13px;font-weight:600;color:#A6A6BE;white-space:nowrap;">2 дня назад</span>
+                <span class="msr" style="font-size:20px;color:#C7C7D8;">chevron_right</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 10px;border-radius:14px;cursor:pointer;transition:background .15s ease;" style-hover="background:#F7F5FF">
+                <div style="width:38px;height:38px;border-radius:11px;background:#E1F3F2;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="msr" style="font-size:20px;color:#12A19A;">all_inclusive</span></div>
+                <div style="flex:1;font-size:14.5px;font-weight:700;color:#2A2A45;">Ты запустил код в Arduino Simulator</div>
+                <span style="font-size:13px;font-weight:600;color:#A6A6BE;white-space:nowrap;">3 дня назад</span>
+                <span class="msr" style="font-size:20px;color:#C7C7D8;">chevron_right</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 10px;border-radius:14px;cursor:pointer;transition:background .15s ease;" style-hover="background:#F7F5FF">
+                <div style="width:38px;height:38px;border-radius:11px;background:#FFF7D6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="msr" style="font-size:20px;color:#C99700;">javascript</span></div>
+                <div style="flex:1;font-size:14.5px;font-weight:700;color:#2A2A45;">Ты создал проект «Приветствие»</div>
+                <span style="font-size:13px;font-weight:600;color:#A6A6BE;white-space:nowrap;">5 дней назад</span>
+                <span class="msr" style="font-size:20px;color:#C7C7D8;">chevron_right</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;position:relative;overflow:hidden;border-radius:22px;padding:22px;background:linear-gradient(140deg,#EFEBFF,#EAE1FF);box-shadow:0 10px 30px rgba(120,90,240,.1);display:flex;align-items:center;gap:16px;">
+            <span class="twinkle" style="position:absolute;top:20px;left:120px;font-size:13px;color:#B79BFF;">✦</span>
+            <span class="twinkle" style="position:absolute;bottom:22px;left:96px;font-size:10px;color:#FFC93C;animation-delay:.7s;">✦</span>
+            <div class="float" style="font-size:74px;line-height:1;flex-shrink:0;filter:drop-shadow(0 10px 14px rgba(160,120,40,.3));">🏆</div>
+            <div>
+              <div style="font-size:19px;font-weight:900;color:#2A2A45;">Отличная работа!</div>
+              <div style="font-size:13.5px;font-weight:600;color:#7A6F98;margin-top:5px;line-height:1.45;">Продолжай создавать и достигай новых целей 🚀</div>
+              <button style="margin-top:14px;display:flex;align-items:center;gap:7px;background:#7B5CF7;color:#fff;border:none;border-radius:13px;padding:11px 18px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 10px 22px rgba(123,92,247,.3);transition:transform .15s ease;" style-hover="transform:translateY(-2px)" style-active="transform:scale(.97)">Мои достижения <span class="msr" style="font-size:18px;">arrow_forward</span></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      </sc-if>
+
+      <!-- ===== SCREEN: AI-ПОМОЩНИК ===== -->
+      <sc-if value="{{ showAI }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:22px;">
+        <div>
+          <div style="font-size:34px;font-weight:900;color:#2A2A45;letter-spacing:-.5px;display:flex;align-items:center;gap:11px;">AI-помощник <span class="float" style="font-size:30px;">🤖</span></div>
+          <div style="font-size:16px;font-weight:600;color:#9A9AB5;margin-top:6px;">Твой умный помощник в учёбе — спрашивай что угодно</div>
+        </div>
+
+        <div style="display:flex;gap:24px;align-items:stretch;">
+          <!-- Chat -->
+          <div style="flex:1;min-width:0;background:#fff;border-radius:24px;box-shadow:0 10px 30px rgba(93,80,150,.06);display:flex;flex-direction:column;height:640px;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid #F0EEF8;">
+              <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#8064F5,#6A48E4);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(106,72,228,.32);"><span class="msr" style="font-size:26px;color:#fff;">smart_toy</span></div>
+              <div style="flex:1;">
+                <div style="font-size:16px;font-weight:800;color:#2A2A45;">EduOS AI</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#46C06B;"><span style="width:8px;height:8px;border-radius:50%;background:#46C06B;display:inline-block;"></span> В сети</div>
+              </div>
+              <span class="msr" style="font-size:24px;color:#C2C2D4;cursor:pointer;">more_horiz</span>
+            </div>
+
+            <div id="ai-messages" style="flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:16px;">
+              <sc-for list="{{ messages }}" as="m" hint-placeholder-count="3">
+                <div style="{{ m.rowStyle }}">
+                  <sc-if value="{{ m.isAI }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#8064F5,#6A48E4);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="msr" style="font-size:20px;color:#fff;">smart_toy</span></div>
+                  </sc-if>
+                  <div style="{{ m.bubbleStyle }}">{{ m.text }}</div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:12px;align-items:flex-end;">
+                  <div style="width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#8064F5,#6A48E4);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="msr" style="font-size:20px;color:#fff;">smart_toy</span></div>
+                  <div style="background:#F3F1FB;border-radius:6px 20px 20px 20px;padding:16px 18px;display:flex;gap:6px;align-items:center;">
+                    <span class="td" style="width:8px;height:8px;border-radius:50%;background:#B9B4D6;"></span>
+                    <span class="td" style="width:8px;height:8px;border-radius:50%;background:#B9B4D6;animation-delay:.18s;"></span>
+                    <span class="td" style="width:8px;height:8px;border-radius:50%;background:#B9B4D6;animation-delay:.36s;"></span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="padding:16px 18px;border-top:1px solid #F0EEF8;display:flex;align-items:center;gap:12px;">
+              <input value="{{ inputValue }}" onChange="{{ onInput }}" onKeyDown="{{ onInputKey }}" placeholder="Спроси что-нибудь..." style="flex:1;border:none;outline:none;background:#F4F2FC;border-radius:14px;padding:14px 18px;font-family:inherit;font-size:15px;font-weight:600;color:#2A2A45;">
+              <button onClick="{{ onSend }}" style="width:50px;height:50px;border-radius:14px;border:none;background:linear-gradient(135deg,#8064F5,#6A48E4);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 22px rgba(106,72,228,.32);transition:transform .15s ease;flex-shrink:0;" style-hover="transform:translateY(-2px)" style-active="transform:scale(.94)"><span class="msr" style="font-size:24px;color:#fff;">send</span></button>
+            </div>
+          </div>
+
+          <!-- Suggestions rail -->
+          <aside style="width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:24px;">
+            <div style="background:#fff;border-radius:24px;padding:22px;box-shadow:0 10px 30px rgba(93,80,150,.06);">
+              <div style="font-size:17px;font-weight:800;color:#2A2A45;margin-bottom:4px;">Быстрые темы</div>
+              <div style="font-size:13px;font-weight:600;color:#9A9AB5;margin-bottom:14px;">Нажми, чтобы спросить</div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+                  <div onClick="{{ s.onClick }}" style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:#F7F5FF;cursor:pointer;transition:background .15s ease,transform .15s ease;" style-hover="background:#EFE9FF;transform:translateX(3px)">
+                    <span class="msr" style="font-size:21px;color:#7C5CFF;">{{ s.icon }}</span>
+                    <span style="font-size:14px;font-weight:700;color:#2A2A45;">{{ s.text }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:linear-gradient(140deg,#EFEBFF,#EAE1FF);border-radius:24px;padding:22px;box-shadow:0 10px 30px rgba(120,90,240,.1);">
+              <div style="font-size:16px;font-weight:900;color:#2A2A45;">Совет дня 💡</div>
+              <div style="font-size:13.5px;font-weight:600;color:#7A6F98;line-height:1.5;margin-top:8px;">Задавай вопросы по частям — так проще разобраться в сложной теме шаг за шагом.</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ===== SCREEN: PLACEHOLDER ===== -->
+      <sc-if value="{{ showPlaceholder }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:560px;">
+        <div style="text-align:center;max-width:440px;">
+          <div style="width:96px;height:96px;border-radius:28px;background:#fff;box-shadow:0 12px 30px rgba(93,80,150,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 22px;"><span class="msr" style="font-size:48px;color:#B9B0E8;">construction</span></div>
+          <div style="font-size:24px;font-weight:900;color:#2A2A45;">Раздел «{{ activeLabel }}»</div>
+          <div style="font-size:15px;font-weight:600;color:#9A9AB5;margin-top:8px;line-height:1.5;">Мы уже работаем над этим разделом. Совсем скоро он появится здесь!</div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1512,&quot;height&quot;:1024},&quot;reduceMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;showBadges&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;compactSidebar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      active: 'home',
+      collapsed: !!(props && props.compactSidebar),
+      messages: [
+        { role: 'ai', text: 'Привет, Адилбек! 👋 Я твой AI-помощник. Спрашивай что угодно — помогу с уроками, задачами и проектами.' },
+        { role: 'user', text: 'Объясни, что такое цикл for в Python.' },
+        { role: 'ai', text: 'Цикл for повторяет действия для каждого элемента последовательности. Пример:\n\nfor i in range(5):\n    print(i)\n\nЭто выведет числа от 0 до 4: range(5) создаёт набор 0,1,2,3,4, а print(i) печатает каждое из них.' },
+      ],
+      input: '',
+      typing: false,
+    };
+  }
+  componentDidMount() { this.sync(); }
+  componentDidUpdate(prev) {
+    if (prev.compactSidebar !== this.props.compactSidebar) {
+      this.setState({ collapsed: !!this.props.compactSidebar });
+    }
+    this.sync();
+    try {
+      const el = document.getElementById('ai-messages');
+      if (el) el.scrollTop = el.scrollHeight;
+    } catch (e) {}
+  }
+  sync() {
+    try {
+      document.body.setAttribute('data-reduce-motion', this.props.reduceMotion ? '1' : '0');
+      document.body.setAttribute('data-collapsed', this.state.collapsed ? '1' : '0');
+    } catch (e) {}
+  }
+  handleNav = (e) => {
+    const id = e && e.currentTarget && e.currentTarget.getAttribute('data-id');
+    if (id) this.setState({ active: id });
+  };
+  setInput = (e) => this.setState({ input: e.target.value });
+  onInputKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); }
+  };
+  send = () => {
+    const t = (this.state.input || '').trim();
+    if (!t) return;
+    this.setState((s) => ({ messages: [...s.messages, { role: 'user', text: t }], input: '' }));
+    this.aiReply(t);
+  };
+  sendSuggestion = (t) => {
+    this.setState((s) => ({ messages: [...s.messages, { role: 'user', text: t }] }));
+    this.aiReply(t);
+  };
+  aiReply = (t) => {
+    this.setState({ typing: true });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => {
+      const reply = this.canned(t);
+      this.setState((s) => ({ typing: false, messages: [...s.messages, { role: 'ai', text: reply }] }));
+    }, 950);
+  };
+  canned = (t) => {
+    const q = (t || '').toLowerCase();
+    if (q.includes('python') || q.includes('питон')) return 'Python — отличный язык для старта! Он читается почти как обычный английский. Хочешь, разберём переменные, циклы или функции на простом примере?';
+    if (q.includes('уравнен') || q.includes('реши') || q.includes('матем')) return 'Давай решим по шагам. Пришли условие полностью — я распишу каждый шаг и объясню, почему он нужен.';
+    if (q.includes('англ') || q.includes('перевед')) return 'Готов помочь с английским! Напиши текст, который нужно перевести или проверить, и укажи направление перевода.';
+    if (q.includes('ошибк') || q.includes('код') || q.includes('баг')) return 'Скинь код и текст ошибки — я найду причину и подскажу, как исправить. Чаще всего дело в опечатке, типе данных или отступах.';
+    if (q.includes('план') || q.includes('тем')) return 'Составлю план! Назови тему и сколько у тебя времени — разобью её на понятные шаги с примерами и мини-заданиями.';
+    if (q.includes('привет') || q.includes('здравств')) return 'Привет! 😊 Чем помочь сегодня — уроки, задачи или новый проект?';
+    return 'Понял! Давай разберёмся вместе. Уточни детали — предмет, тему или что именно нужно сделать, — и я дам понятный ответ по шагам.';
+  };
+  rgba(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  renderVals() {
+    const collapsed = this.state.collapsed;
+    const active = this.state.active;
+    const showBadges = this.props.showBadges !== false;
+
+    const defs = [
+      { id: 'home',      icon: 'home',          label: 'Главная',     color: '#FF9A3D', bg: '#FFE9CC' },
+      { id: 'lessons',   icon: 'menu_book',     label: 'Уроки',       color: '#7C5CFF', bg: '#ECE6FF' },
+      { id: 'tasks',     icon: 'assignment',    label: 'Задания',     color: '#3E86F5', bg: '#E3EDFF', badge: '6' },
+      { id: 'projects',  icon: 'deployed_code', label: 'Проекты',     color: '#46C06B', bg: '#E2F5E9' },
+      { id: 'achv',      icon: 'emoji_events',  label: 'Достижения',  color: '#FFB020', bg: '#FFF0CE' },
+      { id: 'materials', icon: 'folder',        label: 'Материалы',   color: '#F368A8', bg: '#FDE6F0' },
+      { id: 'clubs',     icon: 'star',          label: 'Кружки',      color: '#8A5CF6', bg: '#EFE7FF' },
+      { id: 'ai',        icon: 'smart_toy',     label: 'AI-помощник', color: '#3E86F5', bg: '#E3EDFF' },
+      { id: 'profile',   icon: 'person',        label: 'Профиль',     color: '#9A9AB5', bg: '#ECECF3' },
+    ];
+
+    const nav = defs.map((it) => {
+      const on = it.id === active;
+      return {
+        id: it.id,
+        icon: it.icon,
+        label: it.label,
+        badge: it.badge,
+        showBadge: !!it.badge && showBadges && !collapsed,
+        rowStyle: {
+          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: collapsed ? '9px 0' : '9px 14px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          borderRadius: '16px', cursor: 'pointer', position: 'relative',
+          background: on ? '#FFF3D4' : 'transparent',
+          transition: 'background .15s ease',
+        },
+        hoverStyle: on ? { background: '#FFF3D4' } : { background: '#F3EFFF' },
+        iconStyle: {
+          width: '42px', height: '42px', borderRadius: '13px', fontSize: '23px', flexShrink: 0,
+          color: on ? '#fff' : it.color,
+          background: on ? it.color : it.bg,
+          boxShadow: on ? '0 7px 16px ' + this.rgba(it.color, 0.4) : 'none',
+          transition: 'all .15s ease',
+        },
+        labelStyle: {
+          fontSize: '15.5px', fontWeight: on ? 800 : 700,
+          color: on ? '#2C2A48' : '#6F6F8C',
+          flex: 1, whiteSpace: 'nowrap',
+          display: collapsed ? 'none' : 'block',
+        },
+        badgeStyle: {
+          minWidth: '22px', height: '22px', padding: '0 6px', borderRadius: '11px',
+          background: '#F5455C', color: '#fff', fontSize: '12px', fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        },
+      };
+    });
+
+    const week = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((label, i) => {
+      const done = i < 6;
+      return {
+        label,
+        icon: done ? 'check' : 'keyboard_arrow_down',
+        dotStyle: {
+          width: '30px', height: '30px', borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: done ? '#4E86F7' : '#EEF0F6',
+          boxShadow: done ? '0 4px 10px rgba(78,134,247,.3)' : 'none',
+        },
+        iconStyle: { fontSize: '18px', color: done ? '#fff' : '#B7B7CE' },
+      };
+    });
+
+    const rows = [
+      { name: 'Математика',      room: 'Каб. 305', start: '09:00', end: '09:45', tile: '#7C5CFF', dot: '#7C5CFF', icon: 'calculate', now: true },
+      { name: 'Английский язык', room: 'Каб. 102', start: '10:00', end: '10:45', tile: '#FF9F2E', dot: '#FFC048', textIcon: 'Aa' },
+      { name: 'Информатика',     room: 'Каб. 207', start: '11:00', end: '11:45', tile: '#3E86F5', dot: '#4E86F7', icon: 'code' },
+      { name: 'Физика',          room: 'Каб. 301', start: '12:00', end: '12:45', tile: '#35C08E', dot: '#35C08E', icon: 'science' },
+      { name: 'Робототехника',   room: 'Лаб. 2',   start: '13:30', end: '14:15', tile: '#FF7A3D', dot: '#FF7A3D', icon: 'smart_toy' },
+    ];
+    const schedule = rows.map((r) => {
+      const hasText = !!r.textIcon;
+      return {
+        name: r.name, room: r.room, start: r.start, end: r.end,
+        now: !!r.now, icon: r.icon || 'circle', textIcon: r.textIcon || '',
+        hideIcon: hasText,
+        rowStyle: {
+          display: 'flex', alignItems: 'center', gap: '11px',
+          padding: '11px 12px', borderRadius: '16px', cursor: 'pointer',
+          background: r.now ? '#F4F0FF' : 'transparent',
+          transition: 'background .15s ease',
+        },
+        hoverStyle: r.now ? { background: '#EFE9FF' } : { background: '#F7F5FF' },
+        dotStyle: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: r.dot },
+        tileStyle: {
+          width: '44px', height: '44px', borderRadius: '13px', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: r.tile, boxShadow: '0 6px 14px ' + this.rgba(r.tile, 0.36),
+        },
+        iconStyle: { fontSize: '22px', color: '#fff', display: hasText ? 'none' : 'inline-flex' },
+        textIconStyle: { fontSize: '18px', fontWeight: 900, color: '#fff', display: hasText ? 'inline' : 'none' },
+      };
+    });
+
+    const messages = this.state.messages.map((m) => {
+      const ai = m.role === 'ai';
+      return {
+        text: m.text,
+        isAI: ai,
+        rowStyle: { display: 'flex', gap: '12px', alignItems: 'flex-end', justifyContent: ai ? 'flex-start' : 'flex-end' },
+        bubbleStyle: {
+          maxWidth: '78%', padding: '13px 16px', fontSize: '15px', fontWeight: 600, lineHeight: 1.5,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          color: ai ? '#2A2A45' : '#fff',
+          background: ai ? '#F3F1FB' : 'linear-gradient(135deg,#8064F5,#6A48E4)',
+          borderRadius: ai ? '6px 20px 20px 20px' : '20px 20px 6px 20px',
+          boxShadow: ai ? 'none' : '0 8px 18px rgba(106,72,228,.28)',
+        },
+      };
+    });
+    const suggestions = [
+      { icon: 'calculate', text: 'Помоги решить уравнение' },
+      { icon: 'translate', text: 'Переведи текст на английский' },
+      { icon: 'bug_report', text: 'Найди ошибку в коде' },
+      { icon: 'menu_book', text: 'Составь план по теме' },
+    ].map((s) => ({ icon: s.icon, text: s.text, onClick: () => this.sendSuggestion(s.text) }));
+
+    return {
+      nav, week, schedule, showBadges,
+      activeLabel: (defs.find((d) => d.id === active) || {}).label || 'Главная',
+      showHome: active === 'home',
+      showProjects: active === 'projects',
+      showAI: active === 'ai',
+      showPlaceholder: ['home', 'projects', 'ai'].indexOf(active) === -1,
+      messages, suggestions,
+      typing: this.state.typing,
+      inputValue: this.state.input,
+      onInput: this.setInput,
+      onInputKey: this.onInputKey,
+      onSend: this.send,
+      onNavClick: this.handleNav,
+      toggleCollapse: () => this.setState((s) => ({ collapsed: !s.collapsed })),
+    };
+  }
+}
+</script>
+</body>
+</html>
