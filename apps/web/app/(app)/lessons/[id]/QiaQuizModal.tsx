@@ -173,7 +173,7 @@ export function QiaQuizModal({
         {/* Question card */}
         <div className="flex flex-1 flex-col rounded-[24px] border border-[#ECEDF4] bg-white p-6 shadow-sm">
           <span className="self-center rounded-full bg-[#EEEAFD] px-4 py-1.5 text-[13px] font-extrabold text-[#6A4FE6]">
-            {dq.questionShort} {dq.questionOf.replace("{n}", String(idx + 1)).replace("{total}", String(total))}
+            {dq.questionOf.replace("{n}", String(idx + 1)).replace("{total}", String(total))}
           </span>
           <QuestionText text={q.question_text} />
 
