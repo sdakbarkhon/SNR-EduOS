@@ -3,7 +3,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, Trophy, CircleDot, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trophy, CircleDot, MessageCircle, type LucideIcon } from "lucide-react";
 import { getDictionary, getHomework, getMySubmissions } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -25,7 +25,11 @@ interface SidebarItem extends NavItem {
 const STUB_ITEMS: SidebarItem[] = [
   { key: "achievements", href: "#", icon: Trophy, label: (d) => d.nav.achievements, isStub: true },
   { key: "clubs", href: "#", icon: CircleDot, label: (d) => d.nav.clubs, isStub: true },
+  { key: "messages", href: "#", icon: MessageCircle, label: (d) => d.nav.messages, isStub: true },
 ];
+
+// Заглушечный бейдж «Сообщения» (реального счётчика нет — Iter5 P5)
+const MESSAGES_STUB_BADGE = 3;
 
 function buildItems(): SidebarItem[] {
   const projectsIdx = baseNavItems.findIndex((i) => i.key === "projects");
@@ -105,7 +109,10 @@ export function StudentSidebar() {
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = !item.isStub && pathname.startsWith(item.href);
           const Icon = item.icon as LucideIcon;
-          const badge = item.key === "homework" ? homeworkCount : undefined;
+          const badge =
+            item.key === "homework" ? homeworkCount
+            : item.key === "messages" ? MESSAGES_STUB_BADGE
+            : undefined;
 
           return (
             <Link
@@ -137,6 +144,21 @@ export function StudentSidebar() {
           );
         })}
       </nav>
+
+      {/* Карточка уровня — заглушка без БД (Iter5 P5) */}
+      {!isCollapsed && (
+        <div className="mt-2 shrink-0 px-3">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-xs font-semibold text-slate-500">{d.nav.myLevel}</p>
+            <p className="mt-0.5 text-xl font-extrabold text-blue-600">Lv. 12</p>
+            <div className="mt-2 h-1.5 w-3/4 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full rounded-full bg-orange-500" style={{ width: "68%" }} />
+            </div>
+            <p className="mt-1.5 text-[11px] font-semibold text-slate-400">820 / 1200 XP</p>
+            <span className="absolute -bottom-1 -right-1 text-4xl drop-shadow-sm">🤖</span>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

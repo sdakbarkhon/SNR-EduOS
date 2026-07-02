@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Bot, BookOpen, Code, Calculator, Languages, Monitor, Atom, Leaf, FlaskConical, Scroll,
-  Sparkles, ArrowRight, FileText, Folder, UserPlus, Calendar, type LucideIcon,
+  Bot, BookOpen,
+  Sparkles, ArrowRight, FileText, Folder, UserPlus, Calendar,
 } from "lucide-react";
 import {
   formatTime,
@@ -20,15 +20,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components";
 import { useToast } from "@/components/Toast";
 import { getClassLabel } from "@/lib/student-class-label";
+import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import type { Database } from "@snr/core";
 import { FloatingActionButton } from "./FloatingActionButton";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
 type SubjectRow = { id: string; name: string; group_id: string; icon: string; color: string };
-
-const LUCIDE_ICONS: Record<string, LucideIcon> = {
-  Bot, BookOpen, Code, Calculator, Languages, Monitor, Atom, Leaf, FlaskConical, Scroll,
-};
 
 function dayOfYear(d: Date): number {
   return Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
@@ -231,7 +228,7 @@ export function DashboardView({
             <div className="rounded-2xl border border-slate-100 bg-white p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-base font-bold text-slate-900">{t.mySubjects}</h3>
-                <Link href="/schedule" className="text-sm text-orange-500 hover:text-orange-600">
+                <Link href="/lessons" className="text-sm text-orange-500 hover:text-orange-600">
                   {t.seeAll}
                 </Link>
               </div>
@@ -312,7 +309,7 @@ export function DashboardView({
             </div>
 
             <Link
-              href="/schedule"
+              href="/lessons"
               className="mt-4 flex items-center justify-center gap-1 text-sm font-medium text-orange-500 hover:text-orange-600"
             >
               {t.fullSchedule}

@@ -39,6 +39,8 @@ export interface Dictionary {
     notifications: string;
     achievements: string; // stub — Iter5 P4
     clubs: string;        // stub — Iter5 P4
+    messages: string;     // stub — Iter5 P5
+    myLevel: string;      // sidebar level-card stub — Iter5 P5
   };
   auth: {
     title: string;
@@ -123,6 +125,19 @@ export interface Dictionary {
     statusScheduled: string;
     statusInProgress: string;
     statusCompleted: string;
+    // Iter5 P5 — Stitch lessons page redesign
+    greetingSub: string;      // "Готов к новым знаниям?"
+    weekHeading: string;      // "Расписание на неделю"
+    weekSub: string;          // "Будь в ритме и всё успевай!"
+    next: string;             // "Далее" (upcoming-lesson badge)
+    weekend: string;          // "Выходной"
+    viewWeek: string;         // "Посмотреть неделю" (empty-today CTA)
+    nextLessonIn: string;     // "Не пропусти! Твой следующий урок через {time}."
+    allDoneToday: string;     // "На сегодня всё! Отличная работа 👏"
+    myAssignments: string;    // "Мои задания" (banner button)
+    planLearnAchieve: string; // week-mode banner motto
+    minShort: string;         // "мин"
+    hourShort: string;        // "ч"
   };
   attendance: {
     title: string;
