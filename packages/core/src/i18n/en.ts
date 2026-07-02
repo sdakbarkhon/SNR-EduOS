@@ -686,6 +686,9 @@ export const en: Dictionary = {
     goToLessonNow: "now",
     countdownNote: "Switching to lesson mode",
     teacherLabel: "Teacher",
+    needHelp: "Need help with the task?",
+    showHint: "Hint",
+    hintComingSoon: "Coming soon",
     excuse: {
       button: "Ask to be excused",
       title: "Ask to be excused",

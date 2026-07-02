@@ -12,7 +12,7 @@ import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
 } from "@snr/core";
-import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, Locale } from "@snr/core";
+import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { RaiseHandButton } from "./RaiseHandButton";
@@ -415,6 +415,22 @@ export function LessonWorkspaceView({
     setStages((prev) => prev.map((s) => s.id === progress.stage_id ? { ...s, progress } : s));
   }, []);
 
+  // Shared by the expanded materials list and the collapsed (64px) icon rail.
+  function openMaterial(m: LessonMaterial) {
+    const url = materialUrls[m.id];
+    if (!url) return;
+    const fname = m.file_original_name ?? m.title;
+    const rawExt = (fname.split(".").pop() ?? "").toLowerCase();
+    const isPdf = rawExt === "pdf";
+    const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(rawExt);
+    const viewerType: ViewerMaterial["type"] = isPdf ? "pdf" : isImage ? "image" : "other";
+    if (viewerType === "other") {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      setViewerMat({ url, type: viewerType, title: m.title });
+    }
+  }
+
   // Compute stepper state based on teacher-set active stage
   type StepState = "done" | "active" | "upcoming";
   function getStepState(stage: LessonStageWithProgress): StepState {
@@ -468,6 +484,7 @@ export function LessonWorkspaceView({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
             <button
               onClick={toggleFullscreen}
               className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
@@ -486,7 +503,6 @@ export function LessonWorkspaceView({
                 </div>
               </div>
             )}
-            {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
           </div>
         </div>
 
@@ -552,24 +568,76 @@ export function LessonWorkspaceView({
         </div>
       )}
 
-      {/* Fixed sidebar toggle — burger/X, desktop only */}
-      {mounted && (
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="fixed left-4 top-4 z-40 hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 hover:bg-slate-50 lg:flex"
-          title={sidebarCollapsed ? w.expand : w.collapse}
-        >
-          {sidebarCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
-        </button>
-      )}
-
       {/* 3-column workspace */}
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
 
-        {/* Left: stages stepper — collapsible on desktop */}
-        <aside className={`relative lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-0 lg:overflow-hidden" : "lg:w-80"}`}>
+        {/* Left: stages stepper — collapsible on desktop (64px icon rail) */}
+        <aside className={`relative flex flex-col gap-5 lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-16" : "lg:w-80"}`}>
 
-          <div className={`lg:transition-opacity lg:duration-200 ${sidebarCollapsed ? "lg:opacity-0" : "opacity-100"}`}>
+          {/* Logo + burger toggle — always visible */}
+          <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+            {!sidebarCollapsed && (
+              <span className="truncate text-sm font-bold">
+                <span className="text-orange-500">SNR</span>{" "}
+                <span className="text-violet-600">EduOS</span>
+              </span>
+            )}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-50"
+              title={sidebarCollapsed ? w.expand : w.collapse}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Collapsed: icon-only rail (stages then materials), hover tooltip via title */}
+          {sidebarCollapsed ? (
+            <div className="hidden flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm lg:flex">
+              {allStepsForStepper.map((stage, i) => {
+                const stepState = stepperStates[i];
+                return (
+                  <span
+                    key={stage.id}
+                    title={stage.title}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${
+                      stepState === "done"
+                        ? "border-white bg-emerald-500 text-white shadow-sm"
+                        : stepState === "active"
+                        ? "border-white bg-violet-600 text-white shadow-sm ring-4 ring-violet-100"
+                        : "border-white bg-slate-200 text-slate-500 shadow-sm"
+                    }`}
+                  >
+                    {stepState === "done" ? (
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    ) : stage.stage_role === "middle" ? (
+                      <span className="text-[10px] font-semibold">{stage.position}</span>
+                    ) : null}
+                  </span>
+                );
+              })}
+              {allStepsForStepper.length > 0 && lesson.materials.length > 0 && (
+                <div className="my-1 h-px w-8 shrink-0 bg-slate-100" />
+              )}
+              {lesson.materials.map((m) => {
+                const fname = m.file_original_name ?? m.title;
+                const { Icon, cls } = materialIcon(fname);
+                const url = materialUrls[m.id];
+                return (
+                  <button
+                    key={m.id}
+                    title={m.title}
+                    onClick={() => openMaterial(m)}
+                    disabled={!url}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-opacity disabled:opacity-50 ${cls}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+          <div className="flex flex-col gap-5">
           <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
@@ -665,23 +733,11 @@ export function LessonWorkspaceView({
                   const rawExt = (fname.split(".").pop() ?? "").toLowerCase();
                   const ext = rawExt.toUpperCase();
                   const { Icon, cls } = materialIcon(fname);
-                  const isPdf = rawExt === "pdf";
-                  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(rawExt);
-                  const viewerType: ViewerMaterial["type"] = isPdf ? "pdf" : isImage ? "image" : "other";
-
-                  function handleOpen() {
-                    if (!url) return;
-                    if (viewerType === "other") {
-                      window.open(url, "_blank", "noopener,noreferrer");
-                    } else {
-                      setViewerMat({ url, type: viewerType, title: m.title });
-                    }
-                  }
 
                   return (
                     <li key={m.id}>
                       <button
-                        onClick={handleOpen}
+                        onClick={() => openMaterial(m)}
                         disabled={!url}
                         className="group flex w-full items-center gap-3 rounded-xl border border-transparent p-2 text-left transition-all hover:border-slate-100 hover:bg-slate-50 disabled:opacity-50"
                       >
@@ -714,6 +770,7 @@ export function LessonWorkspaceView({
             </div>
           </div>
           </div>
+          )}
         </aside>
 
         {/* Center: active middle stages content */}

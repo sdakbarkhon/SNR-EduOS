@@ -686,6 +686,9 @@ export const ru: Dictionary = {
     goToLessonNow: "сейчас",
     countdownNote: "Переход в режим урока через",
     teacherLabel: "Учитель",
+    needHelp: "Нужна помощь с задачей?",
+    showHint: "Подсказка",
+    hintComingSoon: "Скоро будет доступно",
     excuse: {
       button: "Отпроситься",
       title: "Отпроситься с урока",

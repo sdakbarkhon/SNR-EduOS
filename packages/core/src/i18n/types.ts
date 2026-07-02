@@ -682,6 +682,10 @@ export interface Dictionary {
     goToLessonNow: string;        // "сейчас"
     countdownNote: string;        // "Переход в режим урока через {n} секунд"
     teacherLabel: string;         // "Учитель"
+    // Iter5 P7 — hint stub card (code stage)
+    needHelp: string;             // "Нужна помощь с задачей?"
+    showHint: string;             // "Подсказка"
+    hintComingSoon: string;       // "Скоро будет доступно"
     excuse: {
       button: string;             // "Отпроситься"
       title: string;              // "Отпроситься с урока"

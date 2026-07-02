@@ -33,10 +33,12 @@ export function AppShell({
   const isFullscreenLesson = /^\/lessons\/[^/]+/.test(pathname);
   if (isFullscreenLesson) {
     return (
-      <div className="min-h-screen" style={{ background: "var(--shell-gradient)" }}>
-        <LessonStartBanner />
-        {children}
-      </div>
+      <ToastProvider>
+        <div className="min-h-screen" style={{ background: "var(--shell-gradient)" }}>
+          <LessonStartBanner />
+          {children}
+        </div>
+      </ToastProvider>
     );
   }
 

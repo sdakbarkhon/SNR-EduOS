@@ -686,6 +686,9 @@ export const uz: Dictionary = {
     goToLessonNow: "hozir",
     countdownNote: "Dars rejimiga o'tiladi",
     teacherLabel: "O'qituvchi",
+    needHelp: "Topshiriqda yordam kerakmi?",
+    showHint: "Maslahat",
+    hintComingSoon: "Tez orada",
     excuse: {
       button: "Ruxsat so'rash",
       title: "Darsdan ruxsat so'rash",
