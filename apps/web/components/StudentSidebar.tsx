@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { useToast } from "./Toast";
+import { Logo } from "./Logo";
 import { navItems as baseNavItems, type NavItem } from "./nav-items";
 
 const STORAGE_KEY = "student-sidebar-collapsed";
@@ -116,18 +117,11 @@ export function StudentSidebar() {
     >
       {/* Логотип + сворачивание */}
       <div className={cn("flex items-center px-0.5 pt-0.5", isCollapsed ? "flex-col gap-2.5" : "justify-between")}>
-        <div className="flex flex-col leading-none">
-          <span className="mb-[3px] text-[11px] font-extrabold tracking-[3px] text-[#FF9A3D]">SNR</span>
-          {!isCollapsed && (
-            <div className="flex items-center text-[22px] font-black tracking-tight text-[#2A2A45]">
-              Edu
-              <span className="mx-px inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#FF9A3D] shadow-[0_5px_11px_rgba(255,140,40,0.42)]">
-                <span className="ml-[2px] h-0 w-0 border-y-[4px] border-l-[7px] border-y-transparent border-l-white" />
-              </span>
-              S
-            </div>
-          )}
-        </div>
+        {isCollapsed ? (
+          <span className="text-[11px] font-extrabold tracking-[3px] text-[#FF9A3D]">SNR</span>
+        ) : (
+          <Logo className="text-[22px]" />
+        )}
         <button
           onClick={toggle}
           className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#F4F2FC] text-[#7C5CFF] transition hover:bg-[#EBE7F8]"

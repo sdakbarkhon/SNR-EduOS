@@ -1,8 +1,8 @@
-import Image from "next/image";
 import type { ReactNode } from "react";
 import { Star, Presentation, Users, Box } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
+import { Logo } from "@/components/Logo";
 
 function FeatureItem({
   icon, title, description,
@@ -29,14 +29,7 @@ export function BrandingColumn({ locale }: { locale: Locale }) {
 
   return (
     <div className="z-10 flex w-full max-w-[600px] flex-col items-start">
-      <Image
-        src="/login/logo.png"
-        alt="SNR EduOS"
-        width={512}
-        height={227}
-        priority
-        className="h-32 w-auto object-contain lg:h-40"
-      />
+      <Logo className="text-[106px] lg:text-[142px]" />
       <p className="mt-4 text-2xl font-medium tracking-wide text-slate-800 lg:text-[32px]">
         {t.tagline}
       </p>
