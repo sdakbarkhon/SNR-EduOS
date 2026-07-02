@@ -470,6 +470,24 @@ export interface Dictionary {
       code: { name: string; description: string };
     };
   };
+  // Iter5 P10 — standalone /ai-assistant page (Claude Design redesign);
+  // separate from `ai.chat` above, which is the in-lesson "Робокот" panel.
+  aiAssistant: {
+    title: string;             // "AI-помощник"
+    subtitle: string;          // "Твой умный помощник в учёбе — спрашивай что угодно"
+    chatName: string;          // "EduOS AI"
+    onlineStatus: string;      // "В сети"
+    welcomeTitle: string;      // "Привет! Я твой помощник по учёбе."
+    welcomeSubtitle: string;   // "Спроси меня про любой предмет или попроси объяснить тему."
+    inputPlaceholder: string;  // "Спроси что-нибудь..."
+    disclaimer: string;        // "AI может ошибаться. Проверяй важную информацию."
+    errorFallback: string;     // "AI временно недоступен, попробуй позже"
+    quickTopicsTitle: string;  // "Быстрые темы"
+    quickTopicsSubtitle: string; // "Нажми, чтобы спросить"
+    tipTitle: string;          // "Совет дня"
+    tipBody: string;
+    suggestions: string[];     // 4 quick-prompt chips
+  };
   demo: {
     showToClass: string;       // "Показать классу"
     showingNow: string;        // "🔴 Демонстрируется"
