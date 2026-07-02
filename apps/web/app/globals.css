@@ -226,3 +226,10 @@ body {
   50% { transform: rotate(10deg); }
 }
 .animate-wave { animation: wave 2.5s ease-in-out infinite; transform-origin: 70% 70%; }
+
+/* ─── Дашборд v2 — декоративные звёзды-искры (Iter5 P9, CD-редизайн) ─── */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.animate-twinkle { animation: twinkle 2.6s ease-in-out infinite; }
