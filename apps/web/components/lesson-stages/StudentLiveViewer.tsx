@@ -19,11 +19,17 @@ export function StudentLiveViewer({ code, language }: { code: string; language: 
   const d = getDictionary(locale as Locale);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
-      <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">
-        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />
-        <span className="truncate text-sm font-medium">{d.lesson.live.title}</span>
-        <span className="ml-auto shrink-0 text-xs text-white/60">{d.demo.onlyTeacherCanClose}</span>
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-900">
+      <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-slate-900/95 px-6 py-3 backdrop-blur">
+        <span className="relative flex h-2.5 w-2.5 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+        </span>
+        <span className="shrink-0 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-red-300">
+          LIVE
+        </span>
+        <span className="truncate text-sm font-medium text-white">{d.lesson.live.title}</span>
+        <span className="ml-auto shrink-0 text-xs text-white/50">{d.demo.onlyTeacherCanClose}</span>
       </div>
       <div className="min-h-0 flex-1">
         <CodeViewer value={code} language={language} height="100%" />

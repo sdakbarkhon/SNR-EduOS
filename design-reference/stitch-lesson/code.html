@@ -1,0 +1,405 @@
+<!DOCTYPE html><html lang="ru" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Циклы в Python - EduOS</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Phosphor Icons -->
+<script src="https://unpkg.com/@phosphor-icons/web"></script><link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css"><link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/thin/style.css"><link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/light/style.css"><link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/bold/style.css"><link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/fill/style.css"><link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/duotone/style.css">
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Fira+Code:wght@400;500&amp;display=swap" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+          colors: {
+            primary: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              200: '#ddd6fe',
+              300: '#c4b5fd',
+              400: '#a78bfa',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              800: '#5b21b6',
+              900: '#4c1d95',
+            },
+            surface: '#f9fafb',
+            sidebar: '#ffffff',
+            editor: '#ffffff',
+            terminal: '#1a1b26',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-utilities">
+    /* Custom Scrollbar for editor */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #e5e7eb;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #d1d5db;
+    }
+
+    /* Code editor line numbers */
+    .line-numbers {
+      counter-reset: line;
+    }
+    .line-number {
+      display: block;
+    }
+    .line-number::before {
+      counter-increment: line;
+      content: counter(line);
+      display: inline-block;
+      width: 1.5rem;
+      text-align: right;
+      color: #9ca3af;
+      margin-right: 1rem;
+    }
+
+    /* Syntax Highlighting Colors */
+    .syntax-comment { color: #10b981; }
+    .syntax-keyword { color: #6366f1; font-weight: 500; }
+    .syntax-variable { color: #111827; }
+    .syntax-number { color: #06b6d4; }
+    .syntax-string { color: #f59e0b; }
+    .syntax-function { color: #8b5cf6; }
+    .syntax-punctuation { color: #6b7280; }
+  </style>
+</head>
+<body class="bg-surface text-gray-800 font-sans h-screen flex overflow-hidden selection:bg-primary-200 selection:text-primary-900">
+<!-- BEGIN: Main Layout -->
+<div class="flex w-full h-full">
+<!-- BEGIN: Sidebar -->
+<aside class="w-[300px] bg-sidebar border-r border-gray-100 flex flex-col h-full flex-shrink-0 z-20 shadow-[2px_0_10px_rgba(0,0,0,0.02)]" data-purpose="left-sidebar">
+<!-- Logo Area -->
+
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+<!-- Lesson Plan Section -->
+<section data-purpose="lesson-plan">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">План урока</h2>
+<span class="text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-100">65%</span>
+</div>
+<div class="space-y-1 relative">
+<!-- Progress Line Background -->
+<div class="absolute left-[11px] top-4 bottom-8 w-0.5 bg-gray-100 z-0"></div>
+<!-- Active Progress Line -->
+<div class="absolute left-[11px] top-4 h-[120px] w-0.5 bg-green-500 z-0"></div>
+<!-- Step 1: Completed -->
+<div class="relative z-10 flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
+<div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-sm mt-0.5">
+<i class="ph-bold ph-check text-white text-xs"></i>
+</div>
+<div>
+<h3 class="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">1. Введение</h3>
+<p class="text-xs text-gray-500 mt-0.5">Что такое цикл?</p>
+</div>
+</div>
+<!-- Step 2: Completed -->
+<div class="relative z-10 flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
+<div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-sm mt-0.5">
+<i class="ph-bold ph-check text-white text-xs"></i>
+</div>
+<div>
+<h3 class="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">2. Цикл for</h3>
+<p class="text-xs text-gray-500 mt-0.5">Как работает цикл for</p>
+</div>
+</div>
+<!-- Step 3: Active -->
+<div class="relative z-10 flex items-start gap-4 p-3 rounded-xl bg-primary-50 border border-primary-100 cursor-pointer">
+<div class="w-6 h-6 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-sm mt-0.5 text-white text-xs font-semibold">
+                3
+              </div>
+<div>
+<h3 class="text-sm font-semibold text-primary-700">3. Цикл while</h3>
+<p class="text-xs text-primary-600/80 mt-0.5">Условный цикл while</p>
+</div>
+</div>
+<!-- Step 4: Locked -->
+<div class="relative z-10 flex items-start gap-4 p-3 rounded-xl opacity-60">
+<div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-sm mt-0.5 text-gray-500 text-xs font-medium">
+                4
+              </div>
+<div class="flex-1 flex items-center justify-between">
+<div>
+<h3 class="text-sm font-medium text-gray-600">4. Практика</h3>
+<p class="text-xs text-gray-400 mt-0.5">Решаем задачи</p>
+</div>
+<i class="ph ph-lock-key text-gray-400"></i>
+</div>
+</div>
+<!-- Step 5: Locked -->
+<div class="relative z-10 flex items-start gap-4 p-3 rounded-xl opacity-60">
+<div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-sm mt-0.5 text-gray-500 text-xs font-medium">
+                5
+              </div>
+<div class="flex-1 flex items-center justify-between">
+<div>
+<h3 class="text-sm font-medium text-gray-600">5. Итоги</h3>
+<p class="text-xs text-gray-400 mt-0.5">Что мы узнали?</p>
+</div>
+<i class="ph ph-lock-key text-gray-400"></i>
+</div>
+</div>
+</div>
+</section>
+<!-- Materials Section -->
+<section data-purpose="lesson-materials">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Материалы к уроку</h2>
+<span class="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">3</span>
+</div>
+<div class="space-y-3">
+<!-- Material 1 -->
+<a class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100 group" href="#">
+<div class="w-8 h-8 rounded bg-rose-50 flex items-center justify-center flex-shrink-0 text-rose-500 group-hover:bg-rose-100 transition-colors">
+<i class="ph-fill ph-file-pdf text-lg"></i>
+</div>
+<div>
+<h4 class="text-sm font-medium text-gray-800">Презентация</h4>
+<p class="text-xs text-gray-500 mt-0.5">PDF • 2.4 МБ</p>
+</div>
+</a>
+<!-- Material 2 -->
+<a class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100 group" href="#">
+<div class="w-8 h-8 rounded bg-blue-50 flex items-center justify-center flex-shrink-0 text-blue-500 group-hover:bg-blue-100 transition-colors">
+<i class="ph-fill ph-file-code text-lg"></i>
+</div>
+<div>
+<h4 class="text-sm font-medium text-gray-800">Примеры кода</h4>
+<p class="text-xs text-gray-500 mt-0.5">PY • 1.1 КБ</p>
+</div>
+</a>
+<!-- Material 3 -->
+<a class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100 group" href="#">
+<div class="w-8 h-8 rounded bg-rose-50 flex items-center justify-center flex-shrink-0 text-rose-500 group-hover:bg-rose-100 transition-colors">
+<i class="ph-fill ph-file-pdf text-lg"></i>
+</div>
+<div>
+<h4 class="text-sm font-medium text-gray-800">Шпаргалка по циклам</h4>
+<p class="text-xs text-gray-500 mt-0.5">PDF • 890 КБ</p>
+</div>
+</a>
+</div>
+</section>
+</div>
+<!-- Help Widget -->
+<div class="p-6 border-t border-gray-100 bg-gray-50/50">
+<div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow">
+<div class="flex-1">
+<h4 class="text-sm font-semibold text-gray-900">Нужна помощь?</h4>
+<p class="text-xs text-gray-500 mt-0.5">Задай вопрос учителю</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+<i class="ph-fill ph-robot text-xl"></i>
+</div>
+</div>
+</div>
+<!-- Bottom Left Nav Icons (Collapsed Sidebar Simulation) -->
+<div class="absolute left-[-60px] top-[72px] bottom-0 w-[60px] bg-white border-r border-gray-100 flex flex-col items-center py-6 gap-6 z-30 transition-transform">
+<button class="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center"><i class="ph ph-house text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-calendar-blank text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-book-open text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-bookmark-simple text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-folder text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-envelope-simple text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-chart-bar text-xl"></i></button>
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-gear text-xl"></i></button>
+<div class="mt-auto">
+<button class="w-10 h-10 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 flex items-center justify-center"><i class="ph ph-sign-out text-xl"></i></button>
+</div>
+</div>
+</aside>
+<!-- END: Sidebar -->
+<!-- BEGIN: Main Content Area -->
+<main class="flex-1 flex flex-col h-full overflow-hidden bg-surface relative" data-purpose="main-workspace">
+<!-- BEGIN: Top Navigation -->
+<header class="h-[72px] bg-white border-b border-gray-100 flex items-center justify-between px-6 flex-shrink-0 z-10" data-purpose="top-header">
+<div class="flex items-center gap-6">
+
+<div class="h-6 w-px bg-gray-200"></div>
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-600">
+<i class="ph-bold ph-code text-xl"></i>
+</div>
+<div>
+<div class="text-xs text-gray-500 font-medium">Программирование</div>
+<h1 class="text-lg font-bold text-gray-900 leading-tight">Циклы в Python</h1>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-100">
+
+<button class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-md hover:bg-white hover:shadow-sm transition-all">
+<i class="ph ph-corners-out text-lg"></i>
+              Во весь экран
+            </button>
+</div>
+<div class="h-8 w-px bg-gray-200 mx-2"></div>
+<!-- User Profile -->
+
+</div>
+</header>
+<!-- END: Top Navigation -->
+<!-- BEGIN: Workspace Toolbar -->
+<div class="px-6 py-4 flex items-center gap-4 flex-shrink-0" data-purpose="workspace-toolbar">
+
+<div class="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg shadow-sm text-sm font-medium text-gray-700">
+<i class="ph ph-clock text-gray-400"></i>
+          45 мин
+        </div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-100 rounded-lg shadow-sm text-sm font-medium text-green-700">
+<div class="w-2 h-2 rounded-full bg-green-500"></div>
+          Идёт сейчас
+        </div>
+</div>
+<!-- END: Workspace Toolbar -->
+<!-- BEGIN: Main Grid (Editor + Output) -->
+<div class="flex-1 flex gap-6 px-6 pb-6 overflow-hidden min-h-0" data-purpose="editor-output-grid">
+<!-- Left Column: Editor & Hint -->
+<div class="flex-1 flex flex-col gap-6 min-w-0">
+<!-- Code Editor Panel -->
+<div class="flex-1 bg-editor rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden relative">
+<!-- Editor Header -->
+<div class="h-14 border-b border-gray-100 flex items-center justify-between px-4 bg-white/50 backdrop-blur-sm z-10">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-blue-50/50 rounded-lg border border-blue-100/50">
+<i class="ph-fill ph-file-code text-blue-500"></i>
+<span class="text-sm font-medium text-gray-700">main.py</span>
+</div>
+<div class="flex items-center gap-3">
+<!-- Theme Toggle (Visual only) -->
+<div class="flex items-center bg-gray-100 rounded-lg p-1">
+<button class="p-1.5 rounded-md bg-white shadow-sm text-gray-700"><i class="ph-fill ph-sun text-sm"></i></button>
+<button class="p-1.5 rounded-md text-gray-400 hover:text-gray-600"><i class="ph-fill ph-moon text-sm"></i></button>
+</div>
+<button class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 bg-white shadow-sm">
+<i class="ph-bold ph-arrows-clockwise"></i>
+</button>
+<button class="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm shadow-primary-500/30">
+                  Запустить
+                  <i class="ph-fill ph-play text-xs"></i>
+</button>
+</div>
+</div>
+<!-- Editor Content (Mockup) -->
+<div class="flex-1 flex overflow-hidden bg-white">
+<!-- Line Numbers -->
+<div class="w-12 bg-gray-50 border-r border-gray-100 py-4 flex flex-col text-right pr-3 text-xs text-gray-400 font-mono select-none">
+<span class="">1</span>
+<span class="">2</span>
+<span class="">3</span>
+<span class="">4</span>
+<span class="">5</span>
+<span class="text-gray-300">6</span>
+<span class="text-gray-300">7</span>
+<span class="text-gray-300">8</span>
+<span></span>
+<span class="text-gray-300">10</span>
+<span class="text-gray-300">11</span>
+<span class="text-gray-300">12</span>
+</div>
+<!-- Code Area -->
+<div class="flex-1 p-4 font-mono text-sm leading-relaxed overflow-auto custom-scrollbar relative">
+<!-- Active line highlight -->
+<div class="absolute left-0 right-0 top-[148px] h-[28px] bg-primary-50/50 pointer-events-none -z-10 border-l-2 border-primary-500"></div>
+<pre class="m-0"><code class="language-python">
+<span class="syntax-comment"># Посчитаем числа от 1 до 5 с помощью цикла while</span>
+
+<span class="syntax-variable">count</span> <span class="syntax-punctuation">=</span> <span class="syntax-number">1</span>
+
+<span class="syntax-keyword">while</span> <span class="syntax-variable">count</span> <span class="syntax-punctuation">&lt;=</span> <span class="syntax-number">5</span><span class="syntax-punctuation">:</span>
+    <span class="syntax-function">print</span><span class="syntax-punctuation">(</span><span class="syntax-string">f"Счёт: {</span><span class="syntax-variable">count</span><span class="syntax-string">}"</span><span class="syntax-punctuation">)</span>
+    <span class="syntax-variable">count</span> <span class="syntax-punctuation">+=</span> <span class="syntax-number">1</span>
+
+<span class="animate-pulse font-bold text-gray-400">|</span>
+                </code></pre>
+</div>
+</div>
+</div>
+<!-- End Code Editor Panel -->
+<!-- Hint Section -->
+<div class="bg-white border border-primary-100 rounded-2xl shadow-sm overflow-hidden flex-shrink-0 relative">
+<!-- Top Tab -->
+<div class="absolute -top-[1px] left-6">
+<div class="bg-primary-50 text-primary-600 px-4 py-1.5 rounded-t-lg border-t border-l border-r border-primary-100 flex items-center gap-2 text-sm font-medium">
+<i class="ph-bold ph-lightbulb"></i>
+                   Подсказка
+                   <i class="ph-bold ph-caret-up ml-1 text-xs"></i>
+</div>
+</div>
+<div class="p-6 bg-primary-50/30 flex items-start gap-6 pt-10">
+<!-- Robot Illustration Placeholder -->
+<div class="w-24 h-24 flex-shrink-0 relative">
+<img alt="Hint Bot" class="w-full h-full object-contain drop-shadow-md rounded-xl bg-white p-2 border border-primary-100" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0uSHS58YnScS4cP4lKKPXGI36HvRmA2be37kmjLMc64lJJ68ANQlVuEJcLcTOrXElPMNwLKgMBmqPCwMNkCjSBzv8x6NJJVyThc-S_5fu66XJXq8i-KUIW7TLeUqXOKE7SZx75eiDU7jWiuKG-YAper3H1GdacKSNZ86vS3FeAtZ8BJvGTVVbm-TxZB7ZZa0j9Z7AsZMWcZabuBh_x_PXKkSOXuJI4RYSINiRV58r6b-nlqr31yeAYPyyQVGxUiywn7FvW5zJQxRO">
+<!-- Tiny lightbulb absolute positioned -->
+<div class="absolute -top-2 -right-2 w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center border border-yellow-200">
+<i class="ph-fill ph-lightbulb text-yellow-500 text-xs"></i>
+</div>
+</div>
+<div class="flex-1">
+<h4 class="text-sm font-semibold text-primary-700 mb-1">Подсказка</h4>
+<p class="text-sm text-gray-700 leading-relaxed mb-4">
+                  Цикл <code class="bg-white text-primary-600 px-1.5 py-0.5 rounded border border-primary-100 font-mono text-xs">while</code> будет выполняться, пока значение переменной <code class="bg-white text-primary-600 px-1.5 py-0.5 rounded border border-primary-100 font-mono text-xs">count</code> меньше или равно 5.
+                </p>
+<button class="bg-white border border-primary-200 text-primary-600 hover:bg-primary-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                  Понятно!
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Terminal/Output -->
+<div class="w-[340px] flex flex-col gap-4 flex-shrink-0 h-full">
+<!-- Terminal Header -->
+<div class="flex items-center justify-between px-2">
+<h3 class="text-sm font-bold text-gray-900">Вывод</h3>
+<button class="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors">
+<i class="ph ph-trash"></i>
+              Очистить
+            </button>
+</div>
+<!-- Terminal Body -->
+<div class="flex-1 bg-terminal rounded-2xl shadow-inner border border-gray-800 p-5 font-mono text-sm flex flex-col relative overflow-hidden">
+<div class="text-green-400 mb-4 opacity-80">Программа запущена...</div>
+<div class="text-gray-300 space-y-2 mb-auto">
+<div class="">Счёт: 1</div>
+<div class="">Счёт: 2</div>
+<div class="">Счёт: 3</div>
+<div class="">Счёт: 4</div>
+<div class="">Счёт: 5</div>
+</div>
+<!-- Success Overlay -->
+
+</div>
+</div>
+</div>
+<!-- END: Main Grid -->
+<!-- BEGIN: Bottom Navigation Bar -->
+
+<!-- END: Bottom Navigation Bar -->
+</main>
+<!-- END: Main Content Area -->
+</div>
+<!-- END: Main Layout -->
+
+
+</body></html>

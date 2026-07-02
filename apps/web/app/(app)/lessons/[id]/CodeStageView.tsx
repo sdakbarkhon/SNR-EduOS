@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Play, Save, Trash2, Loader2, Check } from "lucide-react";
+import { Play, Send, Trash2, Check, FileCode2 } from "lucide-react";
 import { getDictionary, submitStageTask } from "@snr/core";
 import type {
   Locale, LessonStageWithProgress, CodeStageConfig, CodeSubmission, CodeLanguage, LessonStageProgress,
@@ -15,6 +15,7 @@ import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
 import { runCpp } from "@/lib/piston";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { StudentLiveViewer } from "@/components/lesson-stages/StudentLiveViewer";
+import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -24,10 +25,15 @@ const GRADE_COLORS: Record<number, string> = {
   1: "bg-red-100 text-red-700 border-red-200",
 };
 
+const FILE_NAMES: Record<CodeLanguage, string> = {
+  python: "main.py",
+  cpp: "main.cpp",
+};
+
 /**
- * Monaco editor embedded directly in the stage card. Owns its full header
- * (title/description/actions on one row) instead of relying on the parent
- * card, so the editor gets the maximum vertical space below it.
+ * Monaco editor embedded directly in the stage card. Task info + editor +
+ * stdin live in the left column, output in a dark terminal-style right
+ * column (Iter5 P6 — Stitch lesson redesign, Часть 3).
  */
 export function CodeStageView({
   stage, studentId, onSubmitted,
@@ -155,11 +161,14 @@ export function CodeStageView({
     : dc.run;
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      {/* Header — one row: title/description | actions */}
-      <div className="flex items-center gap-4 border-b border-slate-200 pb-3 dark:border-white/10">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      {/* Task info strip */}
+      <div className="flex shrink-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+          <FileCode2 className="h-5 w-5" />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-base font-bold text-slate-900 dark:text-slate-100" title={stage.title}>
               {stage.title}
             </h2>
@@ -168,100 +177,117 @@ export function CodeStageView({
             </span>
           </div>
           {stage.description && (
-            <p className="truncate text-sm text-slate-500 dark:text-slate-400" title={stage.description}>
+            <p className="mt-0.5 line-clamp-2 text-sm text-slate-500 dark:text-slate-400" title={stage.description}>
               {stage.description}
             </p>
           )}
         </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={handleRun}
-            disabled={running}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-1.5 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
-          >
-            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-            {runLabel}
-          </button>
-          {readOnly ? (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-              <Check className="h-3.5 w-3.5" /> {w.submitted}
-            </span>
-          ) : (
-            <button
-              onClick={() => setConfirmOpen(true)}
-              disabled={submitting || running || !code.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 transition-all hover:from-violet-700 hover:to-purple-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              {w.submit}
-            </button>
-          )}
-        </div>
       </div>
 
-      {/* Grade / submitted banner — compact, only when relevant */}
-      {isGraded ? (
-        <div className={`shrink-0 rounded-xl border px-4 py-2 text-sm ${GRADE_COLORS[grade] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
-          <span className="font-bold">{dc.graded}: {grade}/5</span>
-          {stage.progress?.teacher_comment && (
-            <span className="ml-2 opacity-90">— {stage.progress.teacher_comment}</span>
-          )}
-        </div>
-      ) : isSubmitted ? (
-        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-          <Check className="h-4 w-4" /> {dc.submittedWaiting}
-        </div>
-      ) : null}
-
-      {/* Editor — fills remaining space */}
-      <div className="min-h-0 flex-1">
-        {readOnly
-          ? <CodeViewer value={code} language={language} minHeight={300} />
-          : <CodeEditor value={code} onChange={handleCodeChange} language={language} height="100%" />}
-      </div>
-
-      {/* Stdin */}
-      <section className="shrink-0">
-        <h3 className="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400">{dc.stdin}</h3>
-        <StdinInput value={stdinValues} onChange={setStdinValues} readOnly={readOnly} />
-      </section>
-
-      {/* Output */}
-      {(result || submitError) && (
-        <section className="shrink-0">
-          {result && (
-            <>
-              <div className="mb-1.5 flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">{dc.output}</h3>
-                <button
-                  onClick={() => setResult(null)}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-600"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {dc.clear}
-                </button>
+      {/* Editor + output grid */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+        {/* Left: editor + stdin */}
+        <div className="flex min-h-0 min-w-0 flex-[3] flex-col gap-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
+            {/* Editor header */}
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-100 px-4 dark:border-white/10">
+              <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-1.5 dark:border-blue-500/20 dark:bg-blue-500/10">
+                <FileCode2 className="h-4 w-4 text-blue-500 dark:text-blue-300" />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{FILE_NAMES[language]}</span>
               </div>
-              <div
-                className="max-h-[200px] overflow-auto rounded-lg p-3 font-mono text-sm leading-relaxed"
-                style={{ background: "#1a1a1a" }}
+              <StageActionButton
+                variant="secondary"
+                size="sm"
+                icon={Play}
+                loading={running}
+                onClick={handleRun}
               >
+                {runLabel}
+              </StageActionButton>
+            </div>
+            {/* Editor body */}
+            <div className="min-h-0 flex-1">
+              {readOnly
+                ? <CodeViewer value={code} language={language} minHeight={300} />
+                : <CodeEditor value={code} onChange={handleCodeChange} language={language} height="100%" />}
+            </div>
+          </div>
+
+          {/* Stdin — compact strip */}
+          <section className="shrink-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <h3 className="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400">{dc.stdin}</h3>
+            <StdinInput value={stdinValues} onChange={setStdinValues} readOnly={readOnly} />
+          </section>
+        </div>
+
+        {/* Right: output terminal */}
+        <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[300px]">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{dc.output}</h3>
+            {result && (
+              <button
+                onClick={() => setResult(null)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <Trash2 className="h-3 w-3" />
+                {dc.clear}
+              </button>
+            )}
+          </div>
+          <div
+            className="min-h-[180px] flex-1 overflow-auto rounded-2xl border border-slate-800 p-4 font-mono text-sm leading-relaxed shadow-inner"
+            style={{ background: "#1a1b26" }}
+          >
+            {result ? (
+              <>
                 {result.stdout && <pre className="whitespace-pre-wrap text-slate-100">{result.stdout}</pre>}
                 {result.stderr && <pre className="whitespace-pre-wrap text-red-400">{result.stderr}</pre>}
                 {result.error && <pre className="whitespace-pre-wrap text-orange-400">{errMessage(result.error)}</pre>}
                 {!result.stdout && !result.stderr && !result.error && (
                   <span className="text-slate-500">{dc.emptyOutput}</span>
                 )}
-              </div>
-            </>
-          )}
-          {submitError && (
-            <p className="mt-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
-              {submitError}
-            </p>
-          )}
-        </section>
-      )}
+              </>
+            ) : (
+              <span className="text-slate-500">{dc.emptyOutput}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom bar: grade / submitted status ← → Submit button */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <div className="min-w-0 flex-1">
+          {isGraded ? (
+            <div className={`inline-flex items-center rounded-xl border px-3 py-1.5 text-sm ${GRADE_COLORS[grade] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
+              <span className="font-bold">{dc.graded}: {grade}/5</span>
+              {stage.progress?.teacher_comment && (
+                <span className="ml-2 opacity-90">— {stage.progress.teacher_comment}</span>
+              )}
+            </div>
+          ) : isSubmitted ? (
+            <div className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">
+              <Check className="h-4 w-4" /> {dc.submittedWaiting}
+            </div>
+          ) : submitError ? (
+            <p className="text-sm text-red-600 dark:text-red-400">{submitError}</p>
+          ) : null}
+        </div>
+
+        {readOnly ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+            <Check className="h-4 w-4" /> {w.submitted}
+          </span>
+        ) : (
+          <StageActionButton
+            icon={Send}
+            loading={submitting}
+            disabled={running || !code.trim()}
+            onClick={() => setConfirmOpen(true)}
+          >
+            {w.submit}
+          </StageActionButton>
+        )}
+      </div>
 
       <ConfirmModal
         open={confirmOpen}

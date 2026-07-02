@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  X, Globe, AlertTriangle, ExternalLink, Upload, Check, Loader2, Save,
+  X, Globe, AlertTriangle, ExternalLink, Upload, Check, Loader2, Save, Send,
 } from "lucide-react";
 import { getDictionary, uploadStageAttachment, getStageAttachmentUrl, submitStageTask } from "@snr/core";
 import type {
@@ -13,6 +13,7 @@ import type {
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG } from "@/lib/external-services";
+import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -142,10 +143,13 @@ export function ExternalStageModal({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      {/* Header — one row: title/description | actions */}
-      <div className="flex items-center gap-4 border-b border-slate-200 pb-3 dark:border-white/10">
+      {/* Task info strip — mirrors CodeStageView (Iter5 P6) */}
+      <div className="flex shrink-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+          <Globe className="h-5 w-5" />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-base font-bold text-slate-900 dark:text-slate-100" title={stage.title}>
               {stage.title}
             </h2>
@@ -154,7 +158,7 @@ export function ExternalStageModal({
             </span>
           </div>
           {stage.description && (
-            <p className="truncate text-sm text-slate-500 dark:text-slate-400" title={stage.description}>
+            <p className="mt-0.5 line-clamp-2 text-sm text-slate-500 dark:text-slate-400" title={stage.description}>
               {stage.description}
             </p>
           )}
@@ -166,12 +170,9 @@ export function ExternalStageModal({
               <Check className="h-3.5 w-3.5" /> {w.submitted}
             </span>
           ) : (
-            <button
-              onClick={() => setAttachOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 transition-all hover:from-violet-700 hover:to-purple-700 active:scale-95"
-            >
-              <Save className="h-3.5 w-3.5" /> {w.submit}
-            </button>
+            <StageActionButton size="sm" icon={Send} onClick={() => setAttachOpen(true)}>
+              {w.submit}
+            </StageActionButton>
           )}
         </div>
       </div>
