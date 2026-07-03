@@ -1,5 +1,5 @@
 // Whitelist + URL validation for the external-service lesson stages.
-// All four services (scratch, wokwi, codesandbox, makecode) support iframe embed.
+// All four services (turbowarp, wokwi, codesandbox, makecode) support iframe embed.
 
 import type { ExternalServiceType } from "@snr/core";
 
@@ -14,7 +14,7 @@ type ServiceMeta = {
 };
 
 export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
-  scratch: {
+  turbowarp: {
     name: "TurboWarp",
     embedSupported: true,
     urlPattern: /^https?:\/\/(www\.)?scratch\.mit\.edu\/projects\/(\d+)/,
@@ -79,7 +79,7 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
 };
 
 export function isExternalService(ct: string | null | undefined): ct is ExternalServiceType {
-  return ct === "scratch" || ct === "wokwi" || ct === "codesandbox" || ct === "makecode";
+  return ct === "turbowarp" || ct === "wokwi" || ct === "codesandbox" || ct === "makecode";
 }
 
 export function validateServiceUrl(

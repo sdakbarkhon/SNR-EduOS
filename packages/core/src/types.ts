@@ -107,7 +107,7 @@ export type Lesson = {
 export type LessonStageRole = 'start' | 'middle' | 'summary';
 export type LessonStageType = 'theory' | 'task';
 export type LessonContentType =
-  | 'presentation' | 'code' | 'scratch'
+  | 'presentation' | 'code' | 'turbowarp'
   | 'wokwi' | 'codesandbox' | 'makecode'
   | 'quiz_qia' | 'quiz_kahoot';
 
@@ -203,7 +203,7 @@ export type CodeSubmission = {
   language: CodeLanguage;
 };
 
-export type ExternalServiceType = 'scratch' | 'wokwi' | 'codesandbox' | 'makecode';
+export type ExternalServiceType = 'turbowarp' | 'wokwi' | 'codesandbox' | 'makecode';
 
 /** Stored in lesson_stages.config for external-service stages. */
 export interface ExternalServiceConfig {

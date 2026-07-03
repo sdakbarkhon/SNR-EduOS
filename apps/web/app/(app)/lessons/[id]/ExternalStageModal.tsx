@@ -25,23 +25,23 @@ const GRADE_COLORS: Record<number, string> = {
 
 // Used when the teacher didn't attach a specific project URL — opens a
 // blank editor for the service instead of leaving the stage unusable.
-// scratch → TurboWarp needs an actual shared Scratch project id at
-// /<id>/embed (an "editor" or blank route has no id and TurboWarp reports
-// "Invalid TurboWarp Embed"); 60917032 is griffpatch's public "Appel" demo,
-// used on TurboWarp's own docs as a known-good embeddable project.
+// turbowarp needs an actual shared Scratch project id at /<id>/embed (an
+// "editor" or blank route has no id and TurboWarp reports "Invalid TurboWarp
+// Embed"); 60917032 is griffpatch's public "Appel" demo, used on TurboWarp's
+// own docs as a known-good embeddable project.
 // makecode → the "#editor" hash opens a blank *chooser* screen (no project
 // loaded → blank iframe); the embeddable form is a real share id with no
 // query/hash (host detects the iframe context and switches to sim mode) —
 // see the identical convention in lib/external-services.ts extractEmbedUrl.
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
-  scratch: "https://turbowarp.org/60917032/embed",
+  turbowarp: "https://turbowarp.org/60917032/embed",
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
   makecode: "https://arcade.makecode.com/99842-77365-57673-38391",
 };
 
 /**
- * External-service (scratch/wokwi/codesandbox/makecode) embedded directly in
+ * External-service (turbowarp/wokwi/codesandbox/makecode) embedded directly in
  * the stage card. Owns its full header (title/description/actions on one
  * row), no "Open" gate, no fullscreen modal, no "open in new tab" fallback —
  * all four services embed via iframe.

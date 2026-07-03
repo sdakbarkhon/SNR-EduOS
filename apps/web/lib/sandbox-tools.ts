@@ -3,7 +3,7 @@
 //
 // Adding a new tool later = append one entry here (+ its i18n in sandbox.tools).
 
-export type SandboxToolId = "scratch" | "wokwi" | "codesandbox" | "makecode" | "code";
+export type SandboxToolId = "turbowarp" | "wokwi" | "codesandbox" | "makecode" | "code";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -17,9 +17,9 @@ export type SandboxTool = {
 
 export const SANDBOX_TOOLS: SandboxTool[] = [
   {
-    id: "scratch",
+    id: "turbowarp",
     kind: "iframe",
-    embedUrl: "https://scratch.mit.edu/projects/editor/",
+    embedUrl: "https://turbowarp.org/editor",
     icon: "🎨",
     gradient: "from-orange-400 to-amber-500",
   },

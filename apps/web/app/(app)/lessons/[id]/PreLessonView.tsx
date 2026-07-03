@@ -23,7 +23,7 @@ function stageTypeIcon(ct: LessonContentType | null): LucideIcon {
     case "code": return Code2;
     case "quiz_qia": return ClipboardCheck;
     case "quiz_kahoot": return Trophy;
-    case "scratch": case "wokwi": case "codesandbox": case "makecode": return Puzzle;
+    case "turbowarp": case "wokwi": case "codesandbox": case "makecode": return Puzzle;
     default: return BookOpen;
   }
 }
@@ -34,7 +34,7 @@ function stageTypeLabel(ct: LessonContentType | null, dl: ReturnType<typeof getD
     case "code": return dl.stageContentCode;
     case "quiz_qia": return dl.stageContentQuizQia;
     case "quiz_kahoot": return dl.stageContentQuizKahoot;
-    case "scratch": return dl.stageContentScratch;
+    case "turbowarp": return dl.stageContentTurbowarp;
     case "wokwi": return dl.stageContentWokwi;
     case "codesandbox": return dl.stageContentCodesandbox;
     case "makecode": return dl.stageContentMakecode;
