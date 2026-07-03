@@ -159,17 +159,32 @@ export function PreLessonView({
     : formatTime(lesson.starts_at);
   const dateStr = formatDate(lesson.starts_at);
 
-  // Countdown display
+  // Countdown display. Format widens as the remaining time grows so the
+  // digits stay readable, but the string itself must also stay short enough
+  // to fit the ring (see counterSizeClass below) — long labels use a smaller
+  // font instead of overflowing the circle.
   const isUrgent = secsUntil !== null && secsUntil < 60;
   const showCounter = secsUntil !== null && secsUntil <= 3600;
-  const mm = secsUntil !== null ? Math.floor(secsUntil / 60) : 0;
-  const ss = secsUntil !== null ? secsUntil % 60 : 0;
-  const hours = secsUntil !== null ? Math.floor(secsUntil / 3600) : 0;
-  const counterText =
-    secsUntil === null ? "—:—"
-    : showCounter ? `${mm}:${String(ss).padStart(2, "0")}`
-    : hours > 0 ? `${hours} ч ${Math.floor((secsUntil % 3600) / 60)} м`
-    : `${mm} м`;
+  const counterText = (() => {
+    if (secsUntil === null) return "—:—";
+    if (secsUntil < 60) return `0:${String(secsUntil).padStart(2, "0")}`;
+    if (secsUntil < 3600) {
+      const mm = Math.floor(secsUntil / 60);
+      const ss = secsUntil % 60;
+      return `${mm}:${String(ss).padStart(2, "0")}`;
+    }
+    if (secsUntil < 86400) {
+      const hh = Math.floor(secsUntil / 3600);
+      const mm = Math.floor((secsUntil % 3600) / 60);
+      return `${hh}ч ${String(mm).padStart(2, "0")}м`;
+    }
+    const dd = Math.floor(secsUntil / 86400);
+    const hh = Math.floor((secsUntil % 86400) / 3600);
+    return `${dd}д ${String(hh).padStart(2, "0")}ч`;
+  })();
+  // 4–5 chars ("0:08", "12:34") get the large size; 6–7 chars ("19ч 31м",
+  // "2д 03ч") get a smaller one so they never overflow the ring.
+  const counterSizeClass = counterText.length <= 5 ? "text-7xl md:text-8xl" : "text-5xl md:text-6xl";
 
   // SVG ring (r=140 for the larger w-96 circle)
   const R = 140;
@@ -295,10 +310,10 @@ export function PreLessonView({
                 className="transition-all duration-1000 ease-linear"
               />
             </svg>
-            <div className="flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center justify-center px-6 text-center">
               <span className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">{dl.untilStart}</span>
               <span
-                className={`mt-1.5 font-mono text-7xl font-extrabold tabular-nums leading-none md:text-8xl ${isUrgent ? "animate-pulse text-rose-300" : ""}`}
+                className={`mt-1.5 whitespace-nowrap font-mono font-extrabold tabular-nums leading-none ${counterSizeClass} ${isUrgent ? "animate-pulse text-rose-300" : ""}`}
                 style={isUrgent ? undefined : { background: "linear-gradient(180deg,#FFCFB2,#FF7A4D)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}
               >
                 {counterText}
