@@ -25,16 +25,16 @@ const GRADE_COLORS: Record<number, string> = {
 
 // Used when the teacher didn't attach a specific project URL — opens a
 // blank editor for the service instead of leaving the stage unusable.
-// turbowarp needs an actual shared Scratch project id at /<id>/embed (an
-// "editor" or blank route has no id and TurboWarp reports "Invalid TurboWarp
-// Embed"); 60917032 is griffpatch's public "Appel" demo, used on TurboWarp's
-// own docs as a known-good embeddable project.
+// turbowarp → /editor is TurboWarp's own blank-project editor (verified live:
+// no X-Frame-Options/CSP header, real editor bundle in the response — not an
+// error page), so a student with no teacher-supplied project just gets a
+// fresh empty canvas instead of a specific pre-made demo project.
 // makecode → the "#editor" hash opens a blank *chooser* screen (no project
 // loaded → blank iframe); the embeddable form is a real share id with no
 // query/hash (host detects the iframe context and switches to sim mode) —
 // see the identical convention in lib/external-services.ts extractEmbedUrl.
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
-  turbowarp: "https://turbowarp.org/60917032/embed",
+  turbowarp: "https://turbowarp.org/editor",
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
   makecode: "https://arcade.makecode.com/99842-77365-57673-38391",

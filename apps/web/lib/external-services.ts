@@ -17,13 +17,24 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
   turbowarp: {
     name: "TurboWarp",
     embedSupported: true,
-    urlPattern: /^https?:\/\/(www\.)?scratch\.mit\.edu\/projects\/(\d+)/,
+    // Accepts a direct TurboWarp link (blank editor or a specific project by
+    // id) as well as a real Scratch project link — TurboWarp doesn't host
+    // projects itself, so a scratch.mit.edu/projects/<id> link is still a
+    // legitimate way to point at a specific project (see extractEmbedUrl,
+    // which upgrades it to a turbowarp.org/<id>/embed URL either way).
+    urlPattern: /^https?:\/\/(www\.)?turbowarp\.org\/(editor|\d+\/(embed|fullscreen|editor))|^https?:\/\/(www\.)?scratch\.mit\.edu\/projects\/\d+/,
     extractEmbedUrl: (url) => {
-      const match = url.match(/projects\/(\d+)/);
+      const trimmed = url.trim();
+      if (/^https?:\/\/(www\.)?turbowarp\.org\/editor/.test(trimmed)) {
+        return "https://turbowarp.org/editor";
+      }
+      const twMatch = trimmed.match(/turbowarp\.org\/(\d+)\/(embed|fullscreen|editor)/);
+      if (twMatch) return `https://turbowarp.org/${twMatch[1]}/embed`;
+      const match = trimmed.match(/projects\/(\d+)/);
       return match ? `https://scratch.mit.edu/projects/${match[1]}/embed` : null;
     },
-    placeholder: "https://scratch.mit.edu/projects/123456789/",
-    errorMsg: "Неверная ссылка. Ожидается ссылка на Scratch проект (scratch.mit.edu/projects/...)",
+    placeholder: "https://turbowarp.org/editor или ссылка на проект",
+    errorMsg: "Неверная ссылка. Ожидается ссылка на TurboWarp (turbowarp.org/editor или turbowarp.org/<ID>) или проект Scratch (scratch.mit.edu/projects/...)",
     description: "Создание интерактивных историй и игр через блоки",
   },
 
