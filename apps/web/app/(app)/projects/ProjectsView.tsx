@@ -29,10 +29,10 @@ const DEMO_PROJECTS: DemoProject[] = [
   { id: 1, title: "Игра змейка на Python", type: "python", icon: "🐍", description: "Классическая игра Змейка с использованием Pygame", status: "in_progress", progress: 60 },
   { id: 2, title: "Мигающий светодиод Arduino", type: "arduino", icon: "💡", description: "Управление светодиодом через Wokwi симулятор", status: "completed", progress: 100 },
   { id: 3, title: "Мой первый сайт", type: "web", icon: "🌐", description: "HTML + CSS страница про хобби", status: "in_progress", progress: 40 },
-  { id: 4, title: "Танцующий кот", type: "scratch", icon: "🐱", description: "Анимация в Scratch", status: "completed", progress: 100 },
+  { id: 4, title: "Танцующий кот", type: "scratch", icon: "🐱", description: "Анимация в TurboWarp", status: "completed", progress: 100 },
   { id: 5, title: "Калькулятор", type: "python", icon: "🧮", description: "Простой калькулятор на Python", status: "not_started", progress: 0 },
   { id: 6, title: "Умный дом на Arduino", type: "arduino", icon: "🏠", description: "Датчики температуры и света через Wokwi", status: "in_progress", progress: 30 },
-  { id: 7, title: "Викторина на Scratch", type: "scratch", icon: "❓", description: "Интерактивная викторина по школьным предметам", status: "not_started", progress: 0 },
+  { id: 7, title: "Викторина на TurboWarp", type: "scratch", icon: "❓", description: "Интерактивная викторина по школьным предметам", status: "not_started", progress: 0 },
 ];
 
 // Соответствует градиентам инструментов в SANDBOX_TOOLS — карточка ведёт

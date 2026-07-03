@@ -15,7 +15,7 @@ type ServiceMeta = {
 
 export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
   scratch: {
-    name: "Scratch",
+    name: "TurboWarp",
     embedSupported: true,
     urlPattern: /^https?:\/\/(www\.)?scratch\.mit\.edu\/projects\/(\d+)/,
     extractEmbedUrl: (url) => {

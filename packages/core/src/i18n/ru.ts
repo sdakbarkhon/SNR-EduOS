@@ -462,7 +462,7 @@ export const ru: Dictionary = {
     typePython: "Python",
     typeArduino: "Arduino",
     typeWeb: "Web",
-    typeScratch: "Scratch",
+    typeScratch: "TurboWarp",
   },
   sandbox: {
     title: "Проекты (песочница)",
@@ -471,7 +471,7 @@ export const ru: Dictionary = {
     modeProjects: "Проекты",
     modeSandbox: "Песочница",
     tools: {
-      scratch: { name: "Scratch", description: "Визуальное программирование" },
+      scratch: { name: "TurboWarp", description: "Визуальное программирование" },
       wokwi: { name: "Wokwi", description: "Arduino симуляция" },
       codesandbox: { name: "CodeSandbox", description: "Веб-разработка" },
       makecode: { name: "MakeCode", description: "Создание игр" },
@@ -820,7 +820,7 @@ export const ru: Dictionary = {
     stageBadgeTask: "Задача",
     stageContentPresentation: "Презентация",
     stageContentCode: "Программирование (код)",
-    stageContentScratch: "Scratch",
+    stageContentScratch: "TurboWarp",
     stageContentWokwi: "Wokwi",
     stageContentCodesandbox: "CodeSandbox",
     stageContentMakecode: "MakeCode Arcade",
@@ -930,7 +930,7 @@ export const ru: Dictionary = {
       submittedAt: "Сдано",
     },
     external: {
-      scratch: "Scratch",
+      scratch: "TurboWarp",
       wokwi: "Wokwi",
       codesandbox: "CodeSandbox",
       makecode: "MakeCode",
