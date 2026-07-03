@@ -29,13 +29,15 @@ const GRADE_COLORS: Record<number, string> = {
 // /<id>/embed (an "editor" or blank route has no id and TurboWarp reports
 // "Invalid TurboWarp Embed"); 60917032 is griffpatch's public "Appel" demo,
 // used on TurboWarp's own docs as a known-good embeddable project.
-// makecode → #editor forces the code/blocks editor tab instead of a blank
-// project chooser screen.
+// makecode → the "#editor" hash opens a blank *chooser* screen (no project
+// loaded → blank iframe); the embeddable form is a real share id with no
+// query/hash (host detects the iframe context and switches to sim mode) —
+// see the identical convention in lib/external-services.ts extractEmbedUrl.
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   scratch: "https://turbowarp.org/60917032/embed",
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
-  makecode: "https://arcade.makecode.com/#editor",
+  makecode: "https://arcade.makecode.com/99842-77365-57673-38391",
 };
 
 /**
