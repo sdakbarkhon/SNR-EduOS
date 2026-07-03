@@ -946,6 +946,7 @@ export function LessonWorkspaceView({
                       ) : stage.content_type === "quiz_qia" ? (
                         mounted && studentId && (
                           <QiaQuizModal
+                            key={stage.id}
                             stage={stage}
                             studentId={studentId}
                             onSubmitted={handleStageSubmitted}
@@ -954,6 +955,7 @@ export function LessonWorkspaceView({
                       ) : stage.content_type === "quiz_kahoot" ? (
                         mounted && studentId && (
                           <KahootStudentModal
+                            key={stage.id}
                             stage={stage}
                             studentId={studentId}
                             onSubmitted={handleStageSubmitted}
