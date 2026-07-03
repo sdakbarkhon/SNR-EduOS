@@ -753,6 +753,11 @@ export const ru: Dictionary = {
     needHelp: "Нужна помощь с задачей?",
     showHint: "Подсказка",
     hintComingSoon: "Скоро будет доступно",
+    untilStart: "до начала",
+    autoOpen: "Урок откроется автоматически",
+    planStagesSummary: "{count} этапов · {minutes} мин",
+    planStagesSummaryNoDuration: "{count} этапов",
+    planTopicPrefix: "Тема ·",
     excuse: {
       button: "Отпроситься",
       title: "Отпроситься с урока",

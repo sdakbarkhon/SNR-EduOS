@@ -753,6 +753,11 @@ export const en: Dictionary = {
     needHelp: "Need help with the task?",
     showHint: "Hint",
     hintComingSoon: "Coming soon",
+    untilStart: "until start",
+    autoOpen: "The lesson will open automatically",
+    planStagesSummary: "{count} stages · {minutes} min",
+    planStagesSummaryNoDuration: "{count} stages",
+    planTopicPrefix: "Topic ·",
     excuse: {
       button: "Ask to be excused",
       title: "Ask to be excused",

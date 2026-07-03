@@ -750,6 +750,12 @@ export interface Dictionary {
     needHelp: string;             // "Нужна помощь с задачей?"
     showHint: string;             // "Подсказка"
     hintComingSoon: string;       // "Скоро будет доступно"
+    // Iter5 P14 — waiting screen (scheduled lesson)
+    untilStart: string;           // "до начала" (countdown label)
+    autoOpen: string;             // "Урок откроется автоматически"
+    planStagesSummary: string;    // "{count} этапов · {minutes} мин"
+    planStagesSummaryNoDuration: string; // "{count} этапов" (no duration_min set)
+    planTopicPrefix: string;      // "Тема ·"
     excuse: {
       button: string;             // "Отпроситься"
       title: string;              // "Отпроситься с урока"

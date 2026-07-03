@@ -1375,6 +1375,32 @@ export const getStudentLessonView = async (
   };
 };
 
+/** Безопасный превью-список этапов для экрана ожидания (scheduled) — только
+ * заголовок/тип/позиция/длительность, без config/slides/starter_code/quiz —
+ * чтобы не спойлерить содержимое квизов и задач до начала урока. */
+export type LessonStagePreview = {
+  id: string;
+  title: string;
+  content_type: LessonContentType | null;
+  position: number;
+  duration_min: number | null;
+};
+
+export const getLessonStagesPreview = async (
+  db: Db,
+  lessonId: string,
+): Promise<LessonStagePreview[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_stages")
+    .select("id, title, content_type, position, duration_min")
+    .eq("lesson_id", lessonId)
+    .eq("stage_role", "middle")
+    .order("position");
+  if (error) throw error;
+  return (data ?? []) as LessonStagePreview[];
+};
+
 /** Учитель устанавливает активный этап урока (ученики видят синхронно). */
 export async function setActiveStage(
   db: Db,

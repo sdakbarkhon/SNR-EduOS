@@ -753,6 +753,11 @@ export const uz: Dictionary = {
     needHelp: "Topshiriqda yordam kerakmi?",
     showHint: "Maslahat",
     hintComingSoon: "Tez orada",
+    untilStart: "boshlanishiga",
+    autoOpen: "Dars avtomatik ravishda ochiladi",
+    planStagesSummary: "{count} bosqich · {minutes} daq",
+    planStagesSummaryNoDuration: "{count} bosqich",
+    planTopicPrefix: "Mavzu ·",
     excuse: {
       button: "Ruxsat so'rash",
       title: "Darsdan ruxsat so'rash",
