@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMyStudent, getProjectDetailForStudent } from "@snr/core";
+import { getProjectDetailForStudent } from "@snr/core";
+import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { ProjectDetailView } from "./ProjectDetailView";
 

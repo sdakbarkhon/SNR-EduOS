@@ -1,10 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import {
-  getMyStudent,
-  getMyGroups,
   getNotificationSettings,
   getTeachers,
 } from "@snr/core";
+import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
 import { ProfileView } from "./ProfileView";
 
 export default async function ProfilePage() {

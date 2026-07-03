@@ -1,10 +1,16 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { Database, Db } from "@snr/core";
 import { getSupabaseEnv } from "../env";
 
-/** Клиент Supabase для сервера (Server Components / Route Handlers). Cookie-сессия. */
-export async function createClient(): Promise<Db> {
+/**
+ * Клиент Supabase для сервера (Server Components / Route Handlers). Cookie-сессия.
+ * Обёрнут в React `cache()` — один и тот же клиент переиспользуется всеми вызовами
+ * в рамках одного запроса (layout + page), это даёт стабильную ссылку, необходимую
+ * для дедупликации запросов через cache() в lib/cached-queries.ts.
+ */
+export const createClient = cache(async (): Promise<Db> => {
   const cookieStore = await cookies();
   const { url, anonKey } = getSupabaseEnv();
 
@@ -26,4 +32,4 @@ export async function createClient(): Promise<Db> {
       },
     },
   }) as unknown as Db;
-}
+});

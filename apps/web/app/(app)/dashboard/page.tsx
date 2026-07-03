@@ -1,12 +1,11 @@
 import {
   getHomework,
   getLessons,
-  getMyGroups,
-  getMyStudent,
   getMySubmissions,
   getWeeklyStageProgress,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
+import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
 import { DashboardView } from "./DashboardView";
 
 export default async function DashboardPage() {

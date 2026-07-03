@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMyNotifications, getMyStudent } from "@snr/core";
+import { getMyNotifications } from "@snr/core";
+import { getMyStudent } from "@/lib/cached-queries";
 import { NotificationsView } from "./NotificationsView";
 
 export const metadata = { title: "Уведомления" };

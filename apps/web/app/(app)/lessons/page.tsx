@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import {
-  getMyStudent,
   getStudentLessonsForDate,
   getStudentLessonsForWeek,
 } from "@snr/core";
+import { getMyStudent } from "@/lib/cached-queries";
 import { LessonsView } from "./LessonsView";
 
 // ── Tashkent date helpers (UTC+5) ─────────────────────────────────────────────

@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { getMyStudent, getMyGroups } from "@snr/core";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
+import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
 import { getClassLabel } from "@/lib/student-class-label";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {

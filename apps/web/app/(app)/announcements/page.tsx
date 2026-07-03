@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMyStudent, getStudentAnnouncements } from "@snr/core";
+import { getStudentAnnouncements } from "@snr/core";
+import { getMyStudent } from "@/lib/cached-queries";
 import { AnnouncementsView } from "./AnnouncementsView";
 
 export default async function AnnouncementsPage() {

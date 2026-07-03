@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStudentLessonView, getLessonMaterialUrl, getMyStudent } from "@snr/core";
+import { getStudentLessonView, getLessonMaterialUrl } from "@snr/core";
+import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { LessonView } from "./LessonView";
 
