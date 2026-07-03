@@ -29,7 +29,7 @@ export function BrandingColumn({ locale }: { locale: Locale }) {
 
   return (
     <div className="z-10 flex w-full max-w-[600px] flex-col items-start">
-      <Logo priority className="h-[90px] lg:h-[120px]" />
+      <Logo priority className="h-[90px] lg:h-[170px]" />
       <p className="mt-4 text-2xl font-medium tracking-wide text-slate-800 lg:text-[32px]">
         {t.tagline}
       </p>
