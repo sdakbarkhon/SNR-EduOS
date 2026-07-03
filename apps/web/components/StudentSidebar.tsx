@@ -119,7 +119,7 @@ export function StudentSidebar() {
         {isCollapsed ? (
           <span className="text-[11px] font-extrabold tracking-[3px] text-[#FF9A3D]">SNR</span>
         ) : (
-          <Logo className="text-xl" />
+          <Logo priority className="h-7" />
         )}
         <button
           onClick={toggle}

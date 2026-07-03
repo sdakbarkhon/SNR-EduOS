@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, FolderOpen, Library, Briefcase,
-  Megaphone, Users, Settings, LogOut, CheckCircle, Bell,
+  Megaphone, Users, Settings, LogOut, Bell,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
@@ -13,6 +13,7 @@ import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { signOut } from "@/app/actions/auth";
+import { Logo } from "./Logo";
 
 const STORAGE_KEY = "teacher_sidebar_collapsed";
 
@@ -70,11 +71,12 @@ export function TeacherSidebar() {
         isCollapsed ? "flex flex-col items-center gap-3" : "flex items-center justify-between gap-2",
       )}>
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 shadow-inner">
-            <CheckCircle className="h-6 w-6 text-white" strokeWidth={2.5} />
-          </div>
-          {!isCollapsed && (
-            <span className="whitespace-nowrap text-[17px] font-bold tracking-wide text-white">SNR EduOS</span>
+          {isCollapsed ? (
+            <span className="text-[11px] font-extrabold tracking-[3px] text-white">SNR</span>
+          ) : (
+            <div className="rounded-xl bg-white/90 px-2.5 py-1.5 shadow-inner">
+              <Logo priority className="h-6" />
+            </div>
           )}
         </div>
         <button
