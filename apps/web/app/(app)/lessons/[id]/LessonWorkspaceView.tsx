@@ -457,138 +457,11 @@ export function LessonWorkspaceView({
   const currentIsKahoot = currentCenterStage?.content_type === "quiz_kahoot";
 
   return (
-    <div className="w-full px-4 md:px-6 space-y-5">
-      {/* Header bar */}
-      <header className="rounded-2xl border border-[#ECEDF4] bg-white px-5 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-2xl"
-              style={{ background: "linear-gradient(135deg,#EEEAFD,#E6DEFC)" }}
-            >
-              {style.emoji}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[11px] font-extrabold uppercase tracking-wide text-[#6A4FE6]">{lesson.subjectName ?? style.label}</p>
-              <h1 className="truncate text-lg font-black leading-tight text-[#242A45]">{heroTitle}</h1>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
-            <button
-              onClick={toggleFullscreen}
-              className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
-            >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              <span className="hidden sm:inline">{isFullscreen ? w.fullscreenExit : w.fullscreen}</span>
-            </button>
-            {lesson.teacher && (
-              <div className="hidden items-center gap-2 rounded-[13px] border border-[#E6E7EF] bg-white py-1 pl-1 pr-3 sm:flex">
-                <div
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                  style={{ background: "linear-gradient(135deg,#7C63F0,#6A4FE6)" }}
-                >
-                  {initials(lesson.teacher.full_name)}
-                </div>
-                <div className="flex flex-col leading-tight">
-                  <span className="text-[10px] text-[#9CA0B4]">{dl.teacherLabel}</span>
-                  <span className="text-xs font-bold text-[#242A45]">{lesson.teacher.full_name}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Pills row: elapsed timer, live status, group, lesson number, quiz/kahoot context */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-            <Clock className="h-4 w-4 text-[#9CA0B4]" />
-            <span className="font-mono tabular-nums">{elapsed}</span>
-          </div>
-          {!isCompleted && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-green-100 bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-              {w.live}
-            </div>
-          )}
-          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-            <Users className="h-4 w-4 text-[#9CA0B4]" />
-            {lesson.group.name}
-          </div>
-          {lesson.lesson_no != null && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-              <Hash className="h-4 w-4 text-[#9CA0B4]" />
-              {w.lessonNumberLabel.replace("{n}", String(lesson.lesson_no))}
-            </div>
-          )}
-          {currentIsQuiz && currentCfg?.time_limit_minutes != null && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-              <Clock className="h-4 w-4 text-[#9CA0B4]" />
-              {currentCfg.time_limit_minutes} {d.ai.generate.minutesShort}
-            </div>
-          )}
-          {currentIsKahoot && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-[#C9EEDA] bg-[#E7F7EE] px-3 py-2 text-sm font-extrabold text-[#1E9E63]">
-              <span className="h-2 w-2 rounded-full bg-[#22B573] animate-pulse" />
-              {dl.quiz.kahootLiveNow}
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Teacher is showing a material to the whole class (Realtime broadcast).
-          Fullscreen — no sidebar/topbar/scroll, and no close control on the
-          student side. Only the teacher stopping the demo (demo_material_id
-          → null, synced via Realtime) can dismiss it. */}
-      {mounted && demoMaterialId && (() => {
-        const mat = lesson.materials.find((m) => m.id === demoMaterialId);
-        const url = mat ? materialUrls[mat.id] : undefined;
-        const name = mat?.file_original_name ?? mat?.title ?? "";
-        const kind = demoKind(name);
-        return createPortal(
-          <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
-            <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">
-              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />
-              <span className="truncate text-sm font-medium">
-                {d.demo.teacherShowing}{mat?.title ? `: ${mat.title}` : ""}
-              </span>
-              <span className="ml-auto shrink-0 text-xs text-white/60">{d.demo.onlyTeacherCanClose}</span>
-            </div>
-            <div className="flex-1 overflow-auto bg-white">
-              {mat && url && kind === "pdf" ? (
-                <iframe src={url} className="h-full w-full border-0" title={mat.title} />
-              ) : mat && url && kind === "video" ? (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={url} controls className="h-full w-full object-contain" />
-              ) : mat && url && kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
-                  <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>
-                  <p className="text-xs text-slate-400">{d.demo.supportedFormats}</p>
-                </div>
-              )}
-            </div>
-          </div>,
-          document.body,
-        );
-      })()}
-
-      {/* Teacher changed stage banner */}
-      {stageChangedBanner && (
-        <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-800 shadow-sm">
-          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-violet-500" />
-          {da.teacherChangedStage}
-        </div>
-      )}
-
-      {/* 3-column workspace */}
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-
-        {/* Left: stages stepper — collapsible on desktop (64px icon rail) */}
-        <aside className={`relative flex flex-col gap-3.5 lg:flex-shrink-0 lg:transition-all lg:duration-300 lg:ease-out ${sidebarCollapsed ? "lg:w-16" : "lg:w-[266px]"}`}>
+    <div className="flex h-screen">
+      {/* Left: full-height lesson sidebar (Iter5 P13.A — spans the whole
+          left column top-to-bottom; the top panel lives only in the right
+          column, per Часть 7). */}
+      <aside className={`relative flex h-full shrink-0 flex-col gap-3.5 overflow-y-auto p-3 transition-all duration-300 ease-out ${sidebarCollapsed ? "w-16" : "w-[266px]"}`}>
 
           {/* Logo + collapse toggle — always visible */}
           <div className="flex items-center justify-between rounded-2xl border border-[#ECEDF4] bg-white px-4 py-3 shadow-sm">
@@ -796,6 +669,135 @@ export function LessonWorkspaceView({
           </div>
           )}
         </aside>
+
+      {/* Right column: top panel + stage content, scrolls independently
+          of the full-height sidebar above. */}
+      <div className="flex min-w-0 flex-1 flex-col space-y-5 overflow-y-auto px-4 py-5 md:px-6">
+      {/* Header bar */}
+      <header className="rounded-2xl border border-[#ECEDF4] bg-white px-5 py-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-2xl"
+              style={{ background: "linear-gradient(135deg,#EEEAFD,#E6DEFC)" }}
+            >
+              {style.emoji}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-extrabold uppercase tracking-wide text-[#6A4FE6]">{lesson.subjectName ?? style.label}</p>
+              <h1 className="truncate text-lg font-black leading-tight text-[#242A45]">{heroTitle}</h1>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <span className="hidden sm:inline">{isFullscreen ? w.fullscreenExit : w.fullscreen}</span>
+            </button>
+            {lesson.teacher && (
+              <div className="hidden items-center gap-2 rounded-[13px] border border-[#E6E7EF] bg-white py-1 pl-1 pr-3 sm:flex">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                  style={{ background: "linear-gradient(135deg,#7C63F0,#6A4FE6)" }}
+                >
+                  {initials(lesson.teacher.full_name)}
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[10px] text-[#9CA0B4]">{dl.teacherLabel}</span>
+                  <span className="text-xs font-bold text-[#242A45]">{lesson.teacher.full_name}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pills row: elapsed timer, live status, group, lesson number, quiz/kahoot context */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+            <Clock className="h-4 w-4 text-[#9CA0B4]" />
+            <span className="font-mono tabular-nums">{elapsed}</span>
+          </div>
+          {!isCompleted && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-green-100 bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+              {w.live}
+            </div>
+          )}
+          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+            <Users className="h-4 w-4 text-[#9CA0B4]" />
+            {lesson.group.name}
+          </div>
+          {lesson.lesson_no != null && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+              <Hash className="h-4 w-4 text-[#9CA0B4]" />
+              {w.lessonNumberLabel.replace("{n}", String(lesson.lesson_no))}
+            </div>
+          )}
+          {currentIsQuiz && currentCfg?.time_limit_minutes != null && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
+              <Clock className="h-4 w-4 text-[#9CA0B4]" />
+              {currentCfg.time_limit_minutes} {d.ai.generate.minutesShort}
+            </div>
+          )}
+          {currentIsKahoot && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-[#C9EEDA] bg-[#E7F7EE] px-3 py-2 text-sm font-extrabold text-[#1E9E63]">
+              <span className="h-2 w-2 rounded-full bg-[#22B573] animate-pulse" />
+              {dl.quiz.kahootLiveNow}
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Teacher is showing a material to the whole class (Realtime broadcast).
+          Fullscreen — no sidebar/topbar/scroll, and no close control on the
+          student side. Only the teacher stopping the demo (demo_material_id
+          → null, synced via Realtime) can dismiss it. */}
+      {mounted && demoMaterialId && (() => {
+        const mat = lesson.materials.find((m) => m.id === demoMaterialId);
+        const url = mat ? materialUrls[mat.id] : undefined;
+        const name = mat?.file_original_name ?? mat?.title ?? "";
+        const kind = demoKind(name);
+        return createPortal(
+          <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
+            <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />
+              <span className="truncate text-sm font-medium">
+                {d.demo.teacherShowing}{mat?.title ? `: ${mat.title}` : ""}
+              </span>
+              <span className="ml-auto shrink-0 text-xs text-white/60">{d.demo.onlyTeacherCanClose}</span>
+            </div>
+            <div className="flex-1 overflow-auto bg-white">
+              {mat && url && kind === "pdf" ? (
+                <iframe src={url} className="h-full w-full border-0" title={mat.title} />
+              ) : mat && url && kind === "video" ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={url} controls className="h-full w-full object-contain" />
+              ) : mat && url && kind === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
+                  <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>
+                  <p className="text-xs text-slate-400">{d.demo.supportedFormats}</p>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        );
+      })()}
+
+      {/* Teacher changed stage banner */}
+      {stageChangedBanner && (
+        <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-800 shadow-sm">
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-violet-500" />
+          {da.teacherChangedStage}
+        </div>
+      )}
 
         {/* Center: active middle stages content */}
         <section className="flex-1 min-w-0 space-y-4">
