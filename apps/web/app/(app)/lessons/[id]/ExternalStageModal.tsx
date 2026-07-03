@@ -25,12 +25,14 @@ const GRADE_COLORS: Record<number, string> = {
 
 // Used when the teacher didn't attach a specific project URL — opens a
 // blank editor for the service instead of leaving the stage unusable.
-// scratch → TurboWarp: a Scratch-compatible fork that allows framing (the
-// real scratch.mit.edu editor sends X-Frame-Options and refuses to embed).
+// scratch → TurboWarp needs an actual shared Scratch project id at
+// /<id>/embed (an "editor" or blank route has no id and TurboWarp reports
+// "Invalid TurboWarp Embed"); 60917032 is griffpatch's public "Appel" demo,
+// used on TurboWarp's own docs as a known-good embeddable project.
 // makecode → #editor forces the code/blocks editor tab instead of a blank
 // project chooser screen.
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
-  scratch: "https://turbowarp.org/editor",
+  scratch: "https://turbowarp.org/60917032/embed",
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
   makecode: "https://arcade.makecode.com/#editor",
