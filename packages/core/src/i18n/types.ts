@@ -97,6 +97,8 @@ export interface Dictionary {
     noLessonsToday: string;
     fullSchedule: string;      // "Всё расписание"
     now: string;               // "Сейчас" (active-lesson chip)
+    next: string;              // "Скоро" (upcoming within 15 min)
+    finished: string;          // "Завершён" (past lesson today)
     myAchievements: string;    // "Мои достижения"
     allAchievements: string;   // "Все" (stub)
     nextReward: string;        // "До следующей награды"

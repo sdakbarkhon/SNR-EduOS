@@ -117,6 +117,8 @@ export const uz: Dictionary = {
     noLessonsToday: "Bugun darslar yo'q",
     fullSchedule: "To'liq jadval",
     now: "Hozir",
+    next: "Tez orada",
+    finished: "Tugagan",
     myAchievements: "Mening yutuqlarim",
     allAchievements: "Barchasi",
     nextReward: "Keyingi mukofotgacha",

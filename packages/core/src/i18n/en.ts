@@ -117,6 +117,8 @@ export const en: Dictionary = {
     noLessonsToday: "No lessons today",
     fullSchedule: "Full schedule",
     now: "Now",
+    next: "Soon",
+    finished: "Finished",
     myAchievements: "My achievements",
     allAchievements: "All",
     nextReward: "Until next reward",

@@ -117,6 +117,8 @@ export const ru: Dictionary = {
     noLessonsToday: "Нет уроков на сегодня",
     fullSchedule: "Всё расписание",
     now: "Сейчас",
+    next: "Скоро",
+    finished: "Завершён",
     myAchievements: "Мои достижения",
     allAchievements: "Все",
     nextReward: "До следующей награды",

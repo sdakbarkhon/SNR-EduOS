@@ -64,8 +64,14 @@ export function DashboardView({
 
   // null until client mounts — avoids a UTC(server)/local(client) hydration mismatch
   // when deciding which lessons count as "today" (project-wide rule, see memory).
+  // Recomputed every 30s (same pattern as /lessons — LessonsView.tsx) so the
+  // "Сейчас"/"Скоро" badges don't get stuck once a lesson's ends_at passes.
   const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => { setNow(new Date()); }, []);
+  useEffect(() => {
+    setNow(new Date());
+    const interval = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     stableLoadSubjects.current = async () => {
@@ -347,12 +353,15 @@ export function DashboardView({
                 const start = new Date(lesson.starts_at);
                 const end = lesson.ends_at ? new Date(lesson.ends_at) : null;
                 const isNow = now !== null && now >= start && (!end || now <= end);
+                const isNext = !isNow && now !== null && start.getTime() - now.getTime() > 0
+                  && start.getTime() - now.getTime() < 15 * 60 * 1000;
+                const isPast = !isNow && !isNext && now !== null && !!end && now > end;
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
                   <div
                     key={lesson.id}
                     className="flex items-center gap-2.5 rounded-2xl p-2.5 transition"
-                    style={{ background: isNow ? "#F4F0FF" : undefined }}
+                    style={{ background: isNow ? "#F4F0FF" : undefined, opacity: isPast ? 0.6 : 1 }}
                   >
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tileColor }} />
                     <div
@@ -371,11 +380,19 @@ export function DashboardView({
                       </p>
                       {lesson.room && <p className="text-[12.5px] font-semibold text-[#9A9AB5]">{t.room} {lesson.room}</p>}
                     </div>
-                    {isNow && (
-                      <span className="shrink-0 rounded-[10px] bg-[#FFE1EA] px-2.5 py-1 text-[11px] font-extrabold text-[#F5455C]">
+                    {isNow ? (
+                      <span className="shrink-0 rounded-[10px] bg-[#F1EDFF] px-2.5 py-1 text-[11px] font-extrabold text-[#7C5CFF]">
                         {t.now}
                       </span>
-                    )}
+                    ) : isNext ? (
+                      <span className="shrink-0 rounded-[10px] bg-[#FFF3DE] px-2.5 py-1 text-[11px] font-extrabold text-[#FFB020]">
+                        {t.next}
+                      </span>
+                    ) : isPast ? (
+                      <span className="shrink-0 rounded-[10px] bg-[#F1F1F5] px-2.5 py-1 text-[11px] font-extrabold text-[#9A9AB5]">
+                        {t.finished}
+                      </span>
+                    ) : null}
                   </div>
                 );
               })}
