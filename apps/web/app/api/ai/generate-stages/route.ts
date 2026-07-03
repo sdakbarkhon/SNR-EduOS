@@ -12,9 +12,9 @@ export const maxDuration = 60;
 
 const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
-  "scratch", "wokwi", "codesandbox", "makecode",
+  "turbowarp", "wokwi", "codesandbox", "makecode",
 ];
-const EXTERNAL = ["scratch", "wokwi", "codesandbox", "makecode"];
+const EXTERNAL = ["turbowarp", "wokwi", "codesandbox", "makecode"];
 
 type AttachedMaterial = { title: string; text: string };
 
@@ -46,18 +46,19 @@ function buildPrompt(input: {
 
   // IMPORTANT: this must be driven by the TOPIC, never by the subject name alone.
   // Subjects like "Информатика"/"Робототехника"/"Программирование" also cover
-  // Scratch/Arduino/web topics — matching on the subject string used to force
+  // TurboWarp/Arduino/web topics — matching on the subject string used to force
   // EVERY lesson under those subjects into an all-Python "code" progression,
-  // which is exactly why the AI never proposed scratch/wokwi/codesandbox/makecode.
+  // which is exactly why the AI never proposed turbowarp/wokwi/codesandbox/makecode.
   const topicLower = input.topic.toLowerCase();
   const PYTHON_TOPIC_HINTS = [
     "python", "питон", "цикл", "функци", "алгоритм", "перемен", "массив",
     "список", "рекурси", "условн", "структур данн",
   ];
   const OTHER_TOOL_HINTS = [
-    "scratch", "скретч", "блочн", "кот", "arduino", "ардуино", "светодиод", "датчик",
-    "схем", "wokwi", "микроконтроллер", "html", "css", "javascript", "сайт", "веб",
-    "makecode", "аркада", "приставка", "квиз", "kahoot", "qia", "повторени",
+    "scratch", "скретч", "turbowarp", "турбоворп", "блочн", "кот", "arduino", "ардуино",
+    "светодиод", "датчик", "схем", "wokwi", "микроконтроллер", "html", "css",
+    "javascript", "сайт", "веб", "makecode", "аркада", "приставка", "квиз", "kahoot",
+    "qia", "повторени",
   ];
   const mentionsPython = PYTHON_TOPIC_HINTS.some((kw) => topicLower.includes(kw));
   const mentionsOtherTool = OTHER_TOOL_HINTS.some((kw) => topicLower.includes(kw));
@@ -97,17 +98,17 @@ ${programmingSection}
 - "code" — программирование в Monaco редакторе (stage_type: "task")
 - "quiz_qia" — асинхронный тест с вопросами (stage_type: "task")
 - "quiz_kahoot" — синхронный live-квиз с таймером (stage_type: "task")
-- "scratch" — визуальное блочное программирование, классы 1–7
+- "turbowarp" — визуальное блочное программирование, классы 1–7
 - "makecode" — игровое программирование Microsoft, классы 5–9
 - "wokwi" — Arduino/электроника симуляция, классы 7–11
 - "codesandbox" — веб-разработка HTML/CSS/JS, классы 9–11
 
 ВАЖНО: название предмета ("Информатика", "Робототехника", "Программирование") само по себе
 НЕ означает что все этапы должны быть "code" — эти предметы охватывают ВСЕ инструменты выше
-(Scratch, Arduino/Wokwi, веб, Python). Решает ТЕМА урока, а не название предмета.
+(TurboWarp, Arduino/Wokwi, веб, Python). Решает ТЕМА урока, а не название предмета.
 
 ПОДСКАЗКА ПО КЛЮЧЕВЫМ СЛОВАМ В ТЕМЕ:
-- "Scratch", "блоки", "кот", "анимация", "игра" (младшие классы) → content_type="scratch"
+- "TurboWarp", "блоки", "кот", "анимация", "игра" (младшие классы) → content_type="turbowarp"
 - "Arduino", "светодиод", "датчик", "схема", "робот", "микроконтроллер" → content_type="wokwi"
 - "HTML", "CSS", "JavaScript", "веб", "сайт", "страница" → content_type="codesandbox"
 - "аркада", "приставка", "MakeCode", "игра" (младшие классы) → content_type="makecode"
@@ -166,17 +167,17 @@ ${programmingSection}
 - Вопросы проверяют ПОНИМАНИЕ концепции темы урока, а не запоминание синтаксиса.
 - Для content_type='quiz_kahoot' поле "quiz" НЕ заполняй — учитель добавит вопросы вручную позже.
 
-ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='scratch'|'wokwi'|'codesandbox'|'makecode'):
+ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='turbowarp'|'wokwi'|'codesandbox'|'makecode'):
 - Ссылку (URL) НЕ указывай — система сама подставит редактор по умолчанию.
 - Обязательно заполни description (что именно должен сделать ученик в редакторе) и teacher_notes
   (на что учителю обратить внимание при демонстрации/проверке), например:
-  - scratch: teacher_notes = "Начни с показа готового кота на своём экране, потом дай ученикам самим экспериментировать"
+  - turbowarp: teacher_notes = "Начни с показа готового кота на своём экране, потом дай ученикам самим экспериментировать"
   - wokwi: teacher_notes = "Проверь понимание: попроси ученика объяснить что делает каждый провод"
   - quiz_qia: teacher_notes = "Разбери каждую ошибку — вопросы про смысл понятия, а не про синтаксис"
 
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
-  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"scratch"|"wokwi"|"codesandbox"|"makecode",
+  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"turbowarp"|"wokwi"|"codesandbox"|"makecode",
   "stage_type": "theory"|"task",
   "title": "Короткое название",
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",

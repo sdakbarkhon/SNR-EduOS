@@ -462,7 +462,7 @@ export const uz: Dictionary = {
     typePython: "Python",
     typeArduino: "Arduino",
     typeWeb: "Web",
-    typeScratch: "TurboWarp",
+    typeTurbowarp: "TurboWarp",
   },
   sandbox: {
     title: "Loyihalar (mashq maydoni)",
@@ -471,7 +471,7 @@ export const uz: Dictionary = {
     modeProjects: "Loyihalar",
     modeSandbox: "Mashq maydoni",
     tools: {
-      scratch: { name: "TurboWarp", description: "Vizual dasturlash" },
+      turbowarp: { name: "TurboWarp", description: "Vizual dasturlash" },
       wokwi: { name: "Wokwi", description: "Arduino simulyatsiyasi" },
       codesandbox: { name: "CodeSandbox", description: "Veb-dasturlash" },
       makecode: { name: "MakeCode", description: "O'yinlar yaratish" },
@@ -820,7 +820,7 @@ export const uz: Dictionary = {
     stageBadgeTask: "Topshiriq",
     stageContentPresentation: "Taqdimot",
     stageContentCode: "Dasturlash (kod)",
-    stageContentScratch: "TurboWarp",
+    stageContentTurbowarp: "TurboWarp",
     stageContentWokwi: "Wokwi",
     stageContentCodesandbox: "CodeSandbox",
     stageContentMakecode: "MakeCode Arcade",
@@ -930,7 +930,7 @@ export const uz: Dictionary = {
       submittedAt: "Topshirildi",
     },
     external: {
-      scratch: "TurboWarp",
+      turbowarp: "TurboWarp",
       wokwi: "Wokwi",
       codesandbox: "CodeSandbox",
       makecode: "MakeCode",
