@@ -15,7 +15,7 @@
 -- names differ from what an earlier draft spec assumed; corrected here:
 --   - lessons.duration_minutes (not duration_min)
 --   - lesson_stages.position   (not order_index)
---   - lesson_stages content config for scratch/wokwi/codesandbox uses key
+--   - lesson_stages content config for turbowarp/wokwi/codesandbox uses key
 --     "embed_url" (not "external_url") — see ExternalStageModal.tsx. An
 --     empty config `{}` is fine too: the UI falls back to a sensible default
 --     editor URL per service (TurboWarp / wokwi new-project / CodeSandbox).
@@ -282,13 +282,13 @@ BEGIN
 
   -- ── Lesson 4 — +2 days, scheduled ────────────────────────────────────
   SELECT id INTO v_lesson_id FROM public.lessons
-    WHERE group_id = v_group_id AND title = 'Танцующий кот в Scratch'
+    WHERE group_id = v_group_id AND title = 'Танцующий кот в TurboWarp'
       AND starts_at::date = (CURRENT_DATE + INTERVAL '2 days')::date;
   IF v_lesson_id IS NULL THEN
     INSERT INTO public.lessons (
       group_id, subject_id, title, topic, room, starts_at, duration_minutes, status
     ) VALUES (
-      v_group_id, v_subject_id, 'Танцующий кот в Scratch', 'Танцующий кот в Scratch', 'Каб. 207',
+      v_group_id, v_subject_id, 'Танцующий кот в TurboWarp', 'Танцующий кот в TurboWarp', 'Каб. 207',
       CURRENT_DATE + INTERVAL '2 days' + INTERVAL '9 hours', 45, 'scheduled'
     ) RETURNING id INTO v_lesson_id;
   END IF;
@@ -296,14 +296,14 @@ BEGIN
   SELECT id INTO v_stage_id FROM public.lesson_stages WHERE lesson_id = v_lesson_id AND position = 1;
   IF v_stage_id IS NULL THEN
     INSERT INTO public.lesson_stages (lesson_id, position, stage_role, stage_type, content_type, title, slides)
-    VALUES (v_lesson_id, 1, 'middle', 'theory', 'presentation', 'Знакомство со Scratch',
-      '[{"layout":"title","title":"Танцующий кот","content":"Анимация в Scratch"}]'::jsonb);
+    VALUES (v_lesson_id, 1, 'middle', 'theory', 'presentation', 'Знакомство с TurboWarp',
+      '[{"layout":"title","title":"Танцующий кот","content":"Анимация в TurboWarp"}]'::jsonb);
   END IF;
 
   SELECT id INTO v_stage_id FROM public.lesson_stages WHERE lesson_id = v_lesson_id AND position = 2;
   IF v_stage_id IS NULL THEN
     INSERT INTO public.lesson_stages (lesson_id, position, stage_role, stage_type, content_type, title)
-    VALUES (v_lesson_id, 2, 'middle', 'task', 'scratch', 'Анимация кота');
+    VALUES (v_lesson_id, 2, 'middle', 'task', 'turbowarp', 'Анимация кота');
   END IF;
 
   -- ── Lesson 5 — +3 days, scheduled ────────────────────────────────────
