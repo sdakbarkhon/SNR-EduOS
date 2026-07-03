@@ -65,6 +65,7 @@ export const uz: Dictionary = {
     invalid: "Login yoki parol noto‘g‘ri",
     tagline: "Kelajaging platformasi",
     signingIn: "Kirilmoqda...",
+    enteringApp: "Kirilyapti...",
     orLoginWith: "Yoki quyidagilar orqali kiring",
     comingSoon: "Bu funksiya tez orada mavjud bo'ladi",
     rightsReserved: "Barcha huquqlar himoyalangan.",
@@ -760,6 +761,7 @@ export const uz: Dictionary = {
     planStagesSummary: "{count} bosqich · {minutes} daq",
     planStagesSummaryNoDuration: "{count} bosqich",
     planTopicPrefix: "Mavzu ·",
+    planEmptyPlaceholder: "O'qituvchi hali dars rejasini qo'shmagan",
     excuse: {
       button: "Ruxsat so'rash",
       title: "Darsdan ruxsat so'rash",

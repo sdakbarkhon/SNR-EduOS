@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -48,6 +48,7 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const router = useRouter();
   const supabase = createClient();
+  const [isPending, startTransition] = useTransition();
 
   async function handleLogin(account: DemoAccount) {
     setLoading(account.email);
@@ -59,8 +60,13 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
       });
       if (authError) throw authError;
       sessionStorage.setItem("show-demo-welcome", "true");
-      router.push(account.redirectTo);
-      router.refresh();
+      // `loading` is intentionally never cleared here — it (and isPending)
+      // stay true straight through the navigation so the button keeps its
+      // spinner until the destination page is actually on screen.
+      startTransition(() => {
+        router.replace(account.redirectTo);
+        router.refresh();
+      });
     } catch (err) {
       console.error("[demo-login] error:", err);
       setError(String((err as Error)?.message ?? err));
@@ -93,7 +99,7 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
             <button
               key={account.email}
               onClick={() => handleLogin(account)}
-              disabled={loading !== null}
+              disabled={loading !== null || isPending}
               className="group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-6 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
             >
               <div className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${account.color} text-3xl`}>

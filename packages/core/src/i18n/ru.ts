@@ -65,6 +65,7 @@ export const ru: Dictionary = {
     invalid: "Неверный логин или пароль",
     tagline: "Платформа твоего будущего",
     signingIn: "Вход...",
+    enteringApp: "Входим...",
     orLoginWith: "Или войдите через",
     comingSoon: "Функция будет доступна скоро",
     rightsReserved: "Все права защищены.",
@@ -760,6 +761,7 @@ export const ru: Dictionary = {
     planStagesSummary: "{count} этапов · {minutes} мин",
     planStagesSummaryNoDuration: "{count} этапов",
     planTopicPrefix: "Тема ·",
+    planEmptyPlaceholder: "Учитель ещё не добавил план урока",
     excuse: {
       button: "Отпроситься",
       title: "Отпроситься с урока",

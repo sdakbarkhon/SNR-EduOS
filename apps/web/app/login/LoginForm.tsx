@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
@@ -44,8 +44,16 @@ export function LoginForm({ locale }: { locale: Locale }) {
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+
+  // Warm the two most likely post-login route bundles so the RSC payload
+  // isn't fetched cold the instant login succeeds (Iter5 hotfix P14.1).
+  useEffect(() => {
+    router.prefetch("/dashboard");
+    router.prefetch("/teacher/dashboard");
+  }, [router]);
 
   function showNotice(msg: string) {
     setNotice(msg);
@@ -59,8 +67,8 @@ export function LoginForm({ locale }: { locale: Locale }) {
     setError(null);
     const supabase = createClient();
     const { error: authError, data } = await signInWithUsername(supabase, username, password);
-    setLoading(false);
     if (authError) {
+      setLoading(false);
       setError(t.invalid);
       return;
     }
@@ -82,8 +90,16 @@ export function LoginForm({ locale }: { locale: Locale }) {
     if (data?.user?.user_metadata?.is_demo === true) {
       sessionStorage.setItem("show-demo-welcome", "true");
     }
-    router.push(dest);
-    router.refresh();
+    // `loading` stays true straight through the navigation below (it's only
+    // ever reset to false on the error path above) — the button never goes
+    // idle between "auth succeeded" and "new page is actually on screen".
+    // isPending (true for the duration of the transition) switches the
+    // button label to a distinct "entering" phase so the two waits read
+    // differently, and prevents React from painting the old page as stale.
+    startTransition(() => {
+      router.replace(dest);
+      router.refresh();
+    });
   }
 
   return (
@@ -171,11 +187,11 @@ export function LoginForm({ locale }: { locale: Locale }) {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isPending}
               className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-transparent bg-gradient-to-r from-[#FFC145] to-[#FF6B6B] px-4 py-3 text-base font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="relative z-10 flex items-center gap-2">
-                {loading ? t.signingIn : (
+                {isPending ? t.enteringApp : loading ? t.signingIn : (
                   <>
                     {t.submit}
                     <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" strokeWidth={2} />

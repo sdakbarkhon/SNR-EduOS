@@ -55,6 +55,8 @@ export interface Dictionary {
     tagline: string;
     // Iter5 P1 — Stitch login redesign
     signingIn: string;    // "Вход..."
+    // Iter5 hotfix P14.1 — phase-2 button text while router transition is pending (after auth succeeds, before navigation completes)
+    enteringApp: string;  // "Входим..."
     orLoginWith: string;  // "Или войдите через"
     comingSoon: string;   // placeholder toast for OAuth/forgot-password
     rightsReserved: string; // "Все права защищены."
@@ -758,6 +760,7 @@ export interface Dictionary {
     planStagesSummary: string;    // "{count} этапов · {minutes} мин"
     planStagesSummaryNoDuration: string; // "{count} этапов" (no duration_min set)
     planTopicPrefix: string;      // "Тема ·"
+    planEmptyPlaceholder: string; // "Учитель ещё не добавил план урока" (Iter5 hotfix P14.1)
     excuse: {
       button: string;             // "Отпроситься"
       title: string;              // "Отпроситься с урока"

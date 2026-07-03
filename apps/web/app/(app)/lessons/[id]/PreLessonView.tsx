@@ -182,9 +182,13 @@ export function PreLessonView({
     const hh = Math.floor((secsUntil % 86400) / 3600);
     return `${dd}д ${String(hh).padStart(2, "0")}ч`;
   })();
-  // 4–5 chars ("0:08", "12:34") get the large size; 6–7 chars ("19ч 31м",
-  // "2д 03ч") get a smaller one so they never overflow the ring.
-  const counterSizeClass = counterText.length <= 5 ? "text-7xl md:text-8xl" : "text-5xl md:text-6xl";
+  // 3 size tiers by string length so longer formats never overflow the ring:
+  // 4 chars ("0:08") → largest; 5 chars ("12:34") → one step down;
+  // 6–7 chars ("2д 03ч", "19ч 31м") → smallest.
+  const counterSizeClass =
+    counterText.length <= 4 ? "text-7xl md:text-8xl"
+    : counterText.length === 5 ? "text-6xl md:text-7xl"
+    : "text-5xl md:text-6xl";
 
   // SVG ring (r=140 for the larger w-96 circle)
   const R = 140;
@@ -248,43 +252,54 @@ export function PreLessonView({
           </div>
 
           {/* Stage plan preview — titles + type icons only, no content (not
-              clickable — nothing to open before the lesson actually starts). */}
-          {stages !== null && stages.length > 0 && (
+              clickable — nothing to open before the lesson actually starts).
+              Rendered for every student once stages have loaded, even when
+              empty (placeholder instead), so the layout never differs by
+              how much data a given lesson happens to have. */}
+          {stages !== null && (
             <div className="mt-8 rounded-2xl border border-white/15 bg-white/[0.07] p-6 backdrop-blur-md">
               <div className="flex items-center gap-2.5">
                 <ListChecks className="h-[21px] w-[21px] text-orange-300" />
                 <span className="font-semibold text-[15px] uppercase tracking-wide text-white/80">
                   {dl.workspace.stagePlan}
                 </span>
-                {(lesson.title || lesson.topic) && (
+                {stages.length > 0 && (lesson.title || lesson.topic) && (
                   <span className="ml-auto truncate text-sm font-extrabold text-orange-300">
                     {dl.planTopicPrefix} {lesson.title ?? lesson.topic}
                   </span>
                 )}
               </div>
               <div className="my-4 h-px bg-white/10" />
-              <div className="flex flex-col gap-4">
-                {stages.map((stage) => {
-                  const Icon = stageTypeIcon(stage.content_type);
-                  return (
-                    <div key={stage.id} className="flex items-center gap-3.5">
-                      <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] bg-orange-400/20 text-orange-200">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[17px] font-extrabold text-white">{stage.title}</p>
-                        <p className="text-[13px] font-semibold text-white/55">
-                          {stageTypeLabel(stage.content_type, dl)}
-                          {stage.duration_min ? ` · ~${stage.duration_min} ${d.schedule.minShort}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 border-t border-white/10 pt-3.5 text-center text-xs font-bold uppercase tracking-wide text-white/45">
-                {planSummary}
-              </div>
+              {stages.length > 0 ? (
+                <>
+                  <div className="flex flex-col gap-4">
+                    {stages.map((stage) => {
+                      const Icon = stageTypeIcon(stage.content_type);
+                      return (
+                        <div key={stage.id} className="flex items-center gap-3.5">
+                          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] bg-orange-400/20 text-orange-200">
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[17px] font-extrabold text-white">{stage.title}</p>
+                            <p className="text-[13px] font-semibold text-white/55">
+                              {stageTypeLabel(stage.content_type, dl)}
+                              {stage.duration_min ? ` · ~${stage.duration_min} ${d.schedule.minShort}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 border-t border-white/10 pt-3.5 text-center text-xs font-bold uppercase tracking-wide text-white/45">
+                    {planSummary}
+                  </div>
+                </>
+              ) : (
+                <p className="py-2 text-center text-sm font-medium text-white/50">
+                  {dl.planEmptyPlaceholder}
+                </p>
+              )}
             </div>
           )}
         </div>

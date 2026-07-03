@@ -65,6 +65,7 @@ export const en: Dictionary = {
     invalid: "Invalid username or password",
     tagline: "The platform of your future",
     signingIn: "Signing in...",
+    enteringApp: "Signing in...",
     orLoginWith: "Or sign in with",
     comingSoon: "This feature will be available soon",
     rightsReserved: "All rights reserved.",
@@ -760,6 +761,7 @@ export const en: Dictionary = {
     planStagesSummary: "{count} stages · {minutes} min",
     planStagesSummaryNoDuration: "{count} stages",
     planTopicPrefix: "Topic ·",
+    planEmptyPlaceholder: "The teacher hasn't added a lesson plan yet",
     excuse: {
       button: "Ask to be excused",
       title: "Ask to be excused",
