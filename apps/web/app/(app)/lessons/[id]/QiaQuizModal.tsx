@@ -114,9 +114,22 @@ export function QiaQuizModal({
 
   async function choose(optIdx: number) {
     const q = questions[idx];
-    if (!q || !attempt || result || finalizing) return;
+    if (!q || result || finalizing) return;
+    // Defensive (Iter5 hotfix P14.2): `attempt` can still be null here if this
+    // stage only just became active — the mount-time startQuizAttempt() may
+    // have run before the teacher's activation was visible, or briefly
+    // failed. Retry inline instead of silently no-oping the click.
+    let att = attempt;
+    if (!att) {
+      try {
+        att = await startQuizAttempt(db, stage.id, studentId, questions.length);
+        setAttempt(att);
+      } catch {
+        return;
+      }
+    }
     setAnswers((a) => ({ ...a, [q.id]: optIdx }));
-    await submitQuizAnswer(db, attempt.id, q.id, optIdx).catch(() => null);
+    await submitQuizAnswer(db, att.id, q.id, optIdx).catch(() => null);
   }
 
   async function doFinalize() {

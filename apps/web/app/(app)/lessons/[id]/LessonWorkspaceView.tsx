@@ -307,58 +307,97 @@ export function LessonWorkspaceView({
       ? fmtElapsed(nowMs - new Date(lesson.started_at).getTime())
       : "00:00:00";
 
+  // Applies a lesson row's live-state fields (active_stage_id/demo_material_id/
+  // status) to local state — shared by the realtime handler below and the
+  // polling fallback, so both paths behave identically. A plain
+  // router.refresh() poll (the PreLessonView pattern) wouldn't actually fix
+  // anything here: activeStageId/demoMaterialId are local state seeded once
+  // from props, not re-synced on every re-render, so a fresh RSC prop alone
+  // never reaches them — this needs to explicitly call the setters.
+  const applyLessonLiveUpdate = useCallback((row: {
+    active_stage_id?: string | null;
+    demo_material_id?: string | null;
+    status?: string;
+  }) => {
+    const newActiveStageId = row.active_stage_id;
+    const newStatus = row.status;
+
+    // Handle active_stage_id change
+    if (newActiveStageId !== undefined && newActiveStageId !== activeStageIdRef.current) {
+      setActiveStageId(newActiveStageId ?? null);
+
+      // Show "teacher moved to new stage" banner briefly
+      setStageChangedBanner(true);
+      setTimeout(() => setStageChangedBanner(false), 4000);
+
+      // Code/external/quiz stages are all embedded inline now — they
+      // unmount on their own when centerStages changes as the teacher
+      // moves the active stage forward, no explicit close needed here.
+      setOpenTaskStageId(null);
+    }
+
+    // Teacher "show to class": demo material toggled on/off.
+    const newDemoId = row.demo_material_id;
+    if (newDemoId !== undefined) {
+      setDemoMaterialId(newDemoId ?? null);
+      // Starting a demo drops the student out of any open fullscreen stage.
+      if (newDemoId) {
+        setOpenTaskStageId(null);
+      }
+    }
+
+    // When lesson ends, show completion modal (intercepts router.refresh)
+    if (newStatus && newStatus !== lesson.status) {
+      if (newStatus === "completed") {
+        const duration = lesson.started_at
+          ? Date.now() - new Date(lesson.started_at).getTime()
+          : 0;
+        if (duration > 60000) {
+          setCompletedElapsed(fmtElapsed(duration));
+          setShowCompletedModal(true);
+          setCountdown(5);
+        } else {
+          router.push("/schedule");
+        }
+      } else {
+        router.refresh();
+      }
+    }
+  }, [lesson.status, lesson.started_at, router]);
+
   // Realtime: listen for lesson changes (status + active_stage_id)
   useRealtimeChannel(
     `lesson-student-${lesson.id}`,
     "lessons",
     `id=eq.${lesson.id}`,
     useCallback((payload) => {
-      const newActiveStageId = payload?.new?.active_stage_id as string | null | undefined;
-      const newStatus = payload?.new?.status as string | undefined;
-
-      // Handle active_stage_id change
-      if (newActiveStageId !== undefined && newActiveStageId !== activeStageIdRef.current) {
-        setActiveStageId(newActiveStageId ?? null);
-
-        // Show "teacher moved to new stage" banner briefly
-        setStageChangedBanner(true);
-        setTimeout(() => setStageChangedBanner(false), 4000);
-
-        // Code/external/quiz stages are all embedded inline now — they
-        // unmount on their own when centerStages changes as the teacher
-        // moves the active stage forward, no explicit close needed here.
-        setOpenTaskStageId(null);
-      }
-
-      // Teacher "show to class": demo material toggled on/off.
-      const newDemoId = payload?.new?.demo_material_id as string | null | undefined;
-      if (newDemoId !== undefined) {
-        setDemoMaterialId(newDemoId ?? null);
-        // Starting a demo drops the student out of any open fullscreen stage.
-        if (newDemoId) {
-          setOpenTaskStageId(null);
-        }
-      }
-
-      // When lesson ends, show completion modal (intercepts router.refresh)
-      if (newStatus && newStatus !== lesson.status) {
-        if (newStatus === "completed") {
-          const duration = lesson.started_at
-            ? Date.now() - new Date(lesson.started_at).getTime()
-            : 0;
-          if (duration > 60000) {
-            setCompletedElapsed(fmtElapsed(duration));
-            setShowCompletedModal(true);
-            setCountdown(5);
-          } else {
-            router.push("/schedule");
-          }
-        } else {
-          router.refresh();
-        }
-      }
-    }, [lesson.status, router]),
+      applyLessonLiveUpdate({
+        active_stage_id: payload?.new?.active_stage_id as string | null | undefined,
+        demo_material_id: payload?.new?.demo_material_id as string | null | undefined,
+        status: payload?.new?.status as string | undefined,
+      });
+    }, [applyLessonLiveUpdate]),
   );
+
+  // Belt-and-suspenders poll (Iter5 hotfix P14.2) — realtime can silently miss
+  // events (dropped connection, auth hiccup). Queries the live columns
+  // directly rather than router.refresh(), since local state here doesn't
+  // re-sync from a refreshed RSC prop on its own (see applyLessonLiveUpdate).
+  useEffect(() => {
+    const poll = setInterval(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db as any)
+        .from("lessons")
+        .select("active_stage_id, demo_material_id, status")
+        .eq("id", lesson.id)
+        .maybeSingle()
+        .then(({ data }: { data: { active_stage_id: string | null; demo_material_id: string | null; status: string } | null }) => {
+          if (data) applyLessonLiveUpdate(data);
+        })
+        .catch(() => null);
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [lesson.id, db, applyLessonLiveUpdate]);
 
 
   const heroTitle = lesson.title ?? lesson.topic ?? style.label;
@@ -404,10 +443,8 @@ export function LessonWorkspaceView({
     const url = materialUrls[m.id];
     if (!url) return;
     const fname = m.file_original_name ?? m.title;
-    const rawExt = (fname.split(".").pop() ?? "").toLowerCase();
-    const isPdf = rawExt === "pdf";
-    const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(rawExt);
-    const viewerType: ViewerMaterial["type"] = isPdf ? "pdf" : isImage ? "image" : "other";
+    const kind = demoKind(fname, url);
+    const viewerType: ViewerMaterial["type"] = kind === "pdf" ? "pdf" : kind === "image" ? "image" : "other";
     if (viewerType === "other") {
       window.open(url, "_blank", "noopener,noreferrer");
     } else {
@@ -760,7 +797,7 @@ export function LessonWorkspaceView({
         const mat = lesson.materials.find((m) => m.id === demoMaterialId);
         const url = mat ? materialUrls[mat.id] : undefined;
         const name = mat?.file_original_name ?? mat?.title ?? "";
-        const kind = demoKind(name);
+        const kind = demoKind(name, url);
         return createPortal(
           <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
             <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">

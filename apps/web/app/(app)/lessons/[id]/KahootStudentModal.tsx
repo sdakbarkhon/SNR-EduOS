@@ -124,11 +124,22 @@ export function KahootStudentModal({
   }
 
   async function answer(optIdx: number) {
-    if (!attempt || !currentQ || answered[qIdx]) return;
+    if (!currentQ || answered[qIdx]) return;
+    // Defensive (Iter5 hotfix P14.2): see QiaQuizModal's choose() for why
+    // `attempt` can still be null right after the stage becomes active.
+    let att = attempt;
+    if (!att) {
+      try {
+        att = await startQuizAttempt(db, stage.id, studentId, questions.length);
+        setAttempt(att);
+      } catch {
+        return;
+      }
+    }
     const correct = optIdx === currentQ.correct_option_index;
     const responseTimeMs = startedMs != null ? Date.now() - startedMs : limitS * 1000;
     const score = await submitKahootAnswer(db, {
-      stageId: stage.id, attemptId: attempt.id, questionId: currentQ.id,
+      stageId: stage.id, attemptId: att.id, questionId: currentQ.id,
       selectedIndex: optIdx, isCorrect: correct, responseTimeMs, timeLimitSeconds: limitS,
     }).catch(() => 0);
     setAnswered((a) => ({ ...a, [qIdx]: { selected: optIdx, score, correct } }));

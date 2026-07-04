@@ -1675,7 +1675,7 @@ export function TeacherLessonDetailView({
       {mounted && demoMaterialId && demoMaterialUrl && typeof document !== "undefined" && (() => {
         const mat = materials.find((m) => m.id === demoMaterialId);
         const name = mat?.file_original_name ?? mat?.title ?? "";
-        const kind = demoKind(name);
+        const kind = demoKind(name, demoMaterialUrl);
 
         if (demoMinimized) {
           return createPortal(
