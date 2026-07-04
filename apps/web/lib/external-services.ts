@@ -93,6 +93,24 @@ export function isExternalService(ct: string | null | undefined): ct is External
   return ct === "turbowarp" || ct === "wokwi" || ct === "codesandbox" || ct === "makecode";
 }
 
+// TurboWarp's iframe embed only renders correctly for a URL of the form
+// "https://turbowarp.org/<projectID>/embed" or a Scratch project id upgraded
+// to the same form — a bare "/editor" (the value stored when a teacher hasn't
+// picked a project, see extractEmbedUrl above) shows TurboWarp's own
+// "Invalid TurboWarp Embed :(" page when framed, even though it's a perfectly
+// valid full-page destination. This only affects what gets put in an
+// <iframe src> — it must NOT be used for validation or for the "open in a new
+// tab" link, both of which should keep accepting/using a bare /editor URL.
+export function toTurbowarpIframeSrc(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const twMatch = trimmed.match(/turbowarp\.org\/(\d+)\/(embed|fullscreen|editor)/);
+  if (twMatch) return `https://turbowarp.org/${twMatch[1]}/embed`;
+  const scratchMatch = trimmed.match(/scratch\.mit\.edu\/projects\/(\d+)/);
+  if (scratchMatch) return `https://scratch.mit.edu/projects/${scratchMatch[1]}/embed`;
+  return null;
+}
+
 export function validateServiceUrl(
   service: ExternalServiceType,
   url: string,

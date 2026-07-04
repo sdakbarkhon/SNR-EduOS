@@ -19,7 +19,10 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
   {
     id: "turbowarp",
     kind: "iframe",
-    embedUrl: "https://turbowarp.org/editor",
+    // A bare "/editor" (no project id) renders TurboWarp's own "Invalid
+    // Embed" page when framed — only a real project's /<id>/embed URL works
+    // inside an iframe. Points at a known-good public starter project.
+    embedUrl: "https://turbowarp.org/60917032/embed",
     icon: "🎨",
     gradient: "from-orange-400 to-amber-500",
   },

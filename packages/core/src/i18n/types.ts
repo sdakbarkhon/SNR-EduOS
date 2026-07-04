@@ -503,6 +503,9 @@ export interface Dictionary {
     onlyTeacherCanClose: string; // "Только учитель может закрыть"
     minimizeDemo: string;       // "Свернуть"
     maximizeDemo: string;       // "Развернуть"
+    pdfLoading: string;
+    pdfLoadError: string;
+    pdfPageOf: string;          // "{current} из {total}"
   };
   // Публичный "Демо-режим" на /login (Iter4 Prompt 14) — отдельный неймспейс
   // от "demo" выше: тот про показ материала классу, этот про пробный вход.
@@ -961,6 +964,9 @@ export interface Dictionary {
       afterWork: string;          // "После работы вернись и прикрепи результат"
       loadError: string;
       loadErrorBody: string;
+      noProjectTitle: string;
+      noProjectBody: string;
+      openEditor: string;
       attachResult: string;       // "Прикрепи результат"
       attachResultOptional: string;
       attachLink: string;

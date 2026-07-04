@@ -12,7 +12,7 @@ import type {
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { SERVICE_CONFIG } from "@/lib/external-services";
+import { SERVICE_CONFIG, toTurbowarpIframeSrc } from "@/lib/external-services";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 
 const GRADE_COLORS: Record<number, string> = {
@@ -65,6 +65,13 @@ export function ExternalStageModal({
   const embeddable = meta.embedSupported;
   const embedUrl = cfg.embed_url || DEFAULT_EXTERNAL_URLS[service] || null;
   const openUrl = cfg.url || DEFAULT_EXTERNAL_URLS[service] || null;
+  // TurboWarp's "/editor" (no project id) renders TurboWarp's own "Invalid
+  // Embed" page inside an iframe — only usable as a full-page destination.
+  // Normalize to a real /<id>/embed URL for the iframe; null means "no
+  // project id resolvable", handled by a dedicated fallback card below
+  // instead of attempting to frame it.
+  const iframeSrc = service === "turbowarp" ? toTurbowarpIframeSrc(embedUrl) : embedUrl;
+  const noProject = service === "turbowarp" && !iframeSrc;
 
   const existingSub = (stage.progress?.submission_data ?? null) as ExternalServiceSubmission | null;
   const isSubmitted = !!stage.progress?.submission_data;
@@ -83,12 +90,12 @@ export function ExternalStageModal({
   const fileRef = useRef<HTMLInputElement>(null);
 
   // iframe load tracking (30s timeout → error message, no open-elsewhere fallback).
-  const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">(embeddable && embedUrl ? "loading" : "error");
+  const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">(embeddable && iframeSrc ? "loading" : "error");
   useEffect(() => {
-    if (!embeddable || !embedUrl) return;
+    if (!embeddable || !iframeSrc) return;
     const t = setTimeout(() => setIframeState((s) => (s === "loading" ? "error" : s)), 30000);
     return () => clearTimeout(t);
-  }, [embeddable, embedUrl]);
+  }, [embeddable, iframeSrc]);
 
   // Resolve a signed URL for an already-submitted screenshot.
   useEffect(() => {
@@ -198,7 +205,7 @@ export function ExternalStageModal({
       {/* Body: embedded iframe fills remaining space (or non-embeddable fallback card) */}
       {embeddable ? (
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-900">
-          {iframeState !== "error" && embedUrl ? (
+          {iframeState !== "error" && iframeSrc ? (
             <>
               {iframeState === "loading" && (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-400">
@@ -206,7 +213,7 @@ export function ExternalStageModal({
                 </div>
               )}
               <iframe
-                src={embedUrl}
+                src={iframeSrc}
                 title={serviceName}
                 onLoad={() => setIframeState("ok")}
                 onError={() => setIframeState("error")}
@@ -216,6 +223,20 @@ export function ExternalStageModal({
                 className="h-full w-full border-none"
               />
             </>
+          ) : noProject ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+              <Globe className="h-10 w-10 text-blue-400" />
+              <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">{dx.noProjectTitle}</h4>
+              <p className="max-w-md text-sm text-slate-500">{dx.noProjectBody}</p>
+              <a
+                href={openUrl ?? "https://turbowarp.org/editor"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                <ExternalLink className="h-4 w-4" /> {dx.openEditor}
+              </a>
+            </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
               <AlertTriangle className="h-10 w-10 text-orange-500" />

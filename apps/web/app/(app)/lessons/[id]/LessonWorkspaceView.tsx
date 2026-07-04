@@ -26,6 +26,7 @@ import { QiaQuizModal } from "./QiaQuizModal";
 import { KahootStudentModal } from "./KahootStudentModal";
 import { isExternalService } from "@/lib/external-services";
 import { demoKind } from "@/lib/material-kind";
+import { PdfViewer } from "@/components/PdfViewer";
 import { createClient } from "@/lib/supabase/client";
 
 function initials(name: string): string {
@@ -177,11 +178,7 @@ function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: (
       {/* Content */}
       <div className="flex flex-1 items-center justify-center overflow-hidden">
         {mat.type === "pdf" && (
-          <iframe
-            src={`${mat.url}#toolbar=0`}
-            className="h-full w-full"
-            title={mat.title}
-          />
+          <PdfViewer url={mat.url} title={mat.title} />
         )}
         {mat.type === "image" && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -809,7 +806,7 @@ export function LessonWorkspaceView({
             </div>
             <div className="flex-1 overflow-auto bg-white">
               {mat && url && kind === "pdf" ? (
-                <iframe src={url} className="h-full w-full border-0" title={mat.title} />
+                <PdfViewer url={url} title={mat.title} />
               ) : mat && url && kind === "video" ? (
                 // eslint-disable-next-line jsx-a11y/media-has-caption
                 <video src={url} controls className="h-full w-full object-contain" />
@@ -967,6 +964,7 @@ export function LessonWorkspaceView({
                       {stage.content_type === "code" ? (
                         mounted && studentId && (
                           <CodeStageView
+                            key={stage.id}
                             stage={stage}
                             studentId={studentId}
                             onSubmitted={handleStageSubmitted}
@@ -975,6 +973,7 @@ export function LessonWorkspaceView({
                       ) : isExternalService(stage.content_type) ? (
                         mounted && studentId && (
                           <ExternalStageModal
+                            key={stage.id}
                             stage={stage}
                             studentId={studentId}
                             onSubmitted={handleStageSubmitted}
