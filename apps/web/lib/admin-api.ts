@@ -174,3 +174,55 @@ export async function deleteGroup(groupId: string) {
   const { error } = await sb.from("groups").delete().eq("id", groupId);
   if (error) throw error;
 }
+
+// ── SUPER ADMIN: SCHOOL ADMINS ───────────────────────────────────────────────
+
+export async function createSchoolAdmin(data: {
+  full_name: string;
+  username: string;
+  password: string;
+  school_id: string;
+}): Promise<{ userId: string; adminId: string }> {
+  const sb = getServiceClient();
+  const email = `${data.username.trim().toLowerCase()}@admins.snr.local`;
+
+  const { data: authUser, error: authErr } = await sb.auth.admin.createUser({
+    email,
+    password: data.password,
+    email_confirm: true,
+  });
+  if (authErr || !authUser.user) throw authErr ?? new Error("Auth user creation failed");
+
+  const userId = authUser.user.id;
+  const { data: admin, error: aErr } = await sb
+    .from("admins")
+    .insert({ user_id: userId, full_name: data.full_name, school_id: data.school_id })
+    .select("id")
+    .single();
+  if (aErr || !admin) {
+    await sb.auth.admin.deleteUser(userId);
+    throw aErr ?? new Error("Admin insert failed");
+  }
+
+  return { userId, adminId: (admin as { id: string }).id };
+}
+
+export async function changeOwnPassword(userId: string, newPassword: string) {
+  const sb = getServiceClient();
+  const { error } = await sb.auth.admin.updateUserById(userId, { password: newPassword });
+  if (error) throw error;
+}
+
+/** admins has no username column — the login email lives only in auth.users,
+ *  so the superadmin admins list resolves it via the service-role admin API. */
+export async function getUserEmails(userIds: string[]): Promise<Record<string, string>> {
+  if (userIds.length === 0) return {};
+  const sb = getServiceClient();
+  const results = await Promise.all(userIds.map((id) => sb.auth.admin.getUserById(id)));
+  const map: Record<string, string> = {};
+  results.forEach((r, i) => {
+    const id = userIds[i];
+    if (id && r.data.user?.email) map[id] = r.data.user.email;
+  });
+  return map;
+}

@@ -33,6 +33,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = pathname.startsWith("/login");
   const isTeacherRoute = pathname.startsWith("/teacher");
   const isAdminRoute = pathname.startsWith("/admin");
+  const isSuperadminRoute = pathname.startsWith("/superadmin");
 
   // Unauthenticated → login
   if (!user && !isAuthPage) {
@@ -43,8 +44,23 @@ export async function updateSession(request: NextRequest) {
 
   if (user) {
     const role = await getCurrentUserRole(supabase, user.id);
+    const isSuperAdmin = role === "super_admin";
     const isAdmin = role === "admin";
     const isTeacher = role === "teacher";
+
+    // Non-super_admin on /superadmin route → login
+    if (isSuperadminRoute && !isSuperAdmin) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/login";
+      return NextResponse.redirect(target);
+    }
+
+    // Super_admin on any other route → /superadmin/dashboard
+    if (isSuperAdmin && !isSuperadminRoute && !isAuthPage) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/superadmin/dashboard";
+      return NextResponse.redirect(target);
+    }
 
     // Non-admin on /admin route → login
     if (isAdminRoute && !isAdmin) {

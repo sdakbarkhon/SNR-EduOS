@@ -1,22 +1,24 @@
-/** DB-based role resolution. Admin wins over teacher wins over student.
+/** DB-based role resolution. Super_admin wins over admin wins over teacher wins over student.
  *  Works with both server and browser Supabase clients. */
 
-export type UserRole = "admin" | "teacher" | "student" | null;
+export type UserRole = "super_admin" | "admin" | "teacher" | "student" | null;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = { from: (table: string) => any };
 
-/** Queries admins → teachers → students in priority order.
+/** Queries super_admins → admins → teachers → students in priority order.
  *  Returns the highest-priority role the user belongs to. */
 export async function getCurrentUserRole(
   supabase: AnyClient,
   userId: string,
 ): Promise<UserRole> {
-  const [adminRes, teacherRes, studentRes] = await Promise.all([
+  const [superAdminRes, adminRes, teacherRes, studentRes] = await Promise.all([
+    supabase.from("super_admins").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("admins").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("teachers").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("students").select("id").eq("user_id", userId).maybeSingle(),
   ]);
+  if (superAdminRes.data) return "super_admin";
   if (adminRes.data) return "admin";
   if (teacherRes.data) return "teacher";
   if (studentRes.data) return "student";
@@ -24,6 +26,7 @@ export async function getCurrentUserRole(
 }
 
 export function roleToHome(role: UserRole): string {
+  if (role === "super_admin") return "/superadmin/dashboard";
   if (role === "admin") return "/admin";
   if (role === "teacher") return "/teacher/dashboard";
   return "/dashboard";

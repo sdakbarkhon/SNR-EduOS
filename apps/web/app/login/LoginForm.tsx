@@ -72,16 +72,18 @@ export function LoginForm({ locale }: { locale: Locale }) {
       setError(t.invalid);
       return;
     }
-    // Determine destination from DB (admin > teacher > student) so that a
+    // Determine destination from DB (super_admin > admin > teacher > student) so that a
     // user who appears in admins table always lands on /admin regardless of email domain.
     const userId = data?.user?.id;
     let dest = "/dashboard";
     if (userId) {
-      const [adminRes, teacherRes] = await Promise.all([
+      const [superAdminRes, adminRes, teacherRes] = await Promise.all([
+        supabase.from("super_admins" as any).select("id").eq("user_id", userId).maybeSingle(),
         supabase.from("admins" as any).select("id").eq("user_id", userId).maybeSingle(),
         supabase.from("teachers" as any).select("id").eq("user_id", userId).maybeSingle(),
       ]);
-      if (adminRes.data) dest = "/admin";
+      if (superAdminRes.data) dest = "/superadmin/dashboard";
+      else if (adminRes.data) dest = "/admin";
       else if (teacherRes.data) dest = "/teacher/dashboard";
     }
     // A direct username/password login into a demo account (e.g. typing
