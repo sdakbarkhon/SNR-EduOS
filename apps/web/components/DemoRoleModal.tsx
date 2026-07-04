@@ -17,10 +17,16 @@ interface DemoAccount {
   redirectTo: string;
 }
 
-// 2 accounts dedicated to the "Demo Mode" button (migration 66) — separate
+// Accounts dedicated to the "Demo Mode" button (migration 66) — separate
 // from teacher_demo/aziz_03/nodira_07/sherzod_10, which used to double as
 // both real test accounts AND the demo-button destination, causing the demo
 // banner to show up on ordinary logins to those accounts.
+//
+// Iter5 hotfix P14.3: the single demo_student was replaced here by three
+// grade-level demo students (migration 70), one per class level, all led by
+// the same demo_teacher. demo_student itself is untouched in the database —
+// it just stopped being one of these buttons; its credentials still work if
+// someone logs in with them directly on the main form.
 const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     email: "demo_teacher@demo.snr.local",
@@ -32,12 +38,30 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     redirectTo: "/teacher/dashboard",
   },
   {
-    email: "demo_student@demo.snr.local",
+    email: "demo_student_3@demo.snr.local",
     password: "demo2026",
-    role: "Ученик",
-    name: "Демо Ученик",
+    role: "3-А класс",
+    name: "Демо Ученик 3-А",
+    avatar: "🐣",
+    color: "from-emerald-500 to-teal-600",
+    redirectTo: "/dashboard",
+  },
+  {
+    email: "demo_student_7@demo.snr.local",
+    password: "demo2026",
+    role: "7-А класс",
+    name: "Демо Ученик 7-А",
     avatar: "👦",
     color: "from-blue-500 to-cyan-600",
+    redirectTo: "/dashboard",
+  },
+  {
+    email: "demo_student_10@demo.snr.local",
+    password: "demo2026",
+    role: "10-А класс",
+    name: "Демо Ученик 10-А",
+    avatar: "🧑‍💻",
+    color: "from-orange-500 to-red-600",
     redirectTo: "/dashboard",
   },
 ];
@@ -94,7 +118,7 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
         )}
 
-        <div className="mx-auto grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {DEMO_ACCOUNTS.map((account) => (
             <button
               key={account.email}
