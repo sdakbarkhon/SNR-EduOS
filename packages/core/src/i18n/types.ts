@@ -211,6 +211,7 @@ export interface Dictionary {
     navGroups: string;
     navSubjects: string;
     navAnnouncements: string;
+    navParents: string;
     navProfile: string;
     // subjects
     subjectsTitle: string;
@@ -326,6 +327,69 @@ export interface Dictionary {
     fieldNewPassword: string;
     saveBtn: string;
     passwordChangedMsg: string;
+  };
+  parent: {
+    title: string;
+    role: string;
+    navDashboard: string;
+  };
+  parentJoin: {
+    title: string;
+    codeLabel: string;
+    codePlaceholder: string;
+    checkCodeBtn: string;
+    checking: string;
+    invalidCode: string;
+    childrenLabel: string;
+    usernameLabel: string;
+    passwordLabel: string;
+    confirmPasswordLabel: string;
+    passwordMismatch: string;
+    usernameTaken: string;
+    serverError: string;
+    createAccountBtn: string;
+    creating: string;
+    successRedirecting: string;
+    changeCodeBtn: string;
+  };
+  adminParents: {
+    title: string;
+    addParent: string;
+    addParentTitle: string;
+    fieldFullName: string;
+    fieldPhone: string;
+    fieldChildren: string;
+    selectChildren: string;
+    createBtn: string;
+    creating: string;
+    cancelBtn: string;
+    inviteCreatedTitle: string;
+    inviteCodeLabel: string;
+    copyCode: string;
+    copyLink: string;
+    copied: string;
+    doneBtn: string;
+    tableFullName: string;
+    tablePhone: string;
+    tableChildren: string;
+    tableStatus: string;
+    tableCreated: string;
+    statusRegistered: string;
+    statusPending: string;
+    statusExpired: string;
+    copyCodeBtn: string;
+    regenerateCodeBtn: string;
+    deleteBtn: string;
+    deleteConfirm: string;
+    searchPlaceholder: string;
+    noParents: string;
+  };
+  parentDashboard: {
+    greeting: string;
+    comingSoon: string;
+    childrenTitle: string;
+    childProfileLink: string;
+    noChildren: string;
   };
   homework: {
     title: string;

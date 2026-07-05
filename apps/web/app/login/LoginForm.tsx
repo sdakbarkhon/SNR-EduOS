@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
 import { getDictionary, signInWithUsername } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -35,7 +35,10 @@ export function LoginForm({ locale }: { locale: Locale }) {
   const d = getDictionary(locale);
   const t = d.auth;
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const searchParams = useSearchParams();
+  // Pre-filled after a parent completes /parent/join, so they don't have to
+  // retype the username they just chose.
+  const [username, setUsername] = useState(() => searchParams.get("username") ?? "");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -72,18 +75,20 @@ export function LoginForm({ locale }: { locale: Locale }) {
       setError(t.invalid);
       return;
     }
-    // Determine destination from DB (super_admin > admin > teacher > student) so that a
-    // user who appears in admins table always lands on /admin regardless of email domain.
+    // Determine destination from DB (super_admin > admin > parent > teacher > student) so
+    // that a user who appears in admins table always lands on /admin regardless of email domain.
     const userId = data?.user?.id;
     let dest = "/dashboard";
     if (userId) {
-      const [superAdminRes, adminRes, teacherRes] = await Promise.all([
+      const [superAdminRes, adminRes, parentRes, teacherRes] = await Promise.all([
         supabase.from("super_admins" as any).select("id").eq("user_id", userId).maybeSingle(),
         supabase.from("admins" as any).select("id").eq("user_id", userId).maybeSingle(),
+        supabase.from("parents" as any).select("id").eq("user_id", userId).maybeSingle(),
         supabase.from("teachers" as any).select("id").eq("user_id", userId).maybeSingle(),
       ]);
       if (superAdminRes.data) dest = "/superadmin/dashboard";
       else if (adminRes.data) dest = "/admin";
+      else if (parentRes.data) dest = "/parent/dashboard";
       else if (teacherRes.data) dest = "/teacher/dashboard";
     }
     // A direct username/password login into a demo account (e.g. typing

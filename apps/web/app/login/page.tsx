@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { Montserrat } from "next/font/google";
 import { useLocale } from "@/components/LocaleProvider";
 import { BackgroundArt } from "./BackgroundArt";
@@ -26,7 +27,9 @@ export default function LoginPage() {
         </div>
 
         <div className="flex items-center justify-center overflow-hidden p-6 lg:p-12">
-          <LoginForm locale={locale} />
+          <Suspense fallback={null}>
+            <LoginForm locale={locale} />
+          </Suspense>
         </div>
       </div>
 

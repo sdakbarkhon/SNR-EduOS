@@ -31,9 +31,16 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname.startsWith("/login");
+  const isParentJoinRoute = pathname.startsWith("/parent/join");
   const isTeacherRoute = pathname.startsWith("/teacher");
   const isAdminRoute = pathname.startsWith("/admin");
   const isSuperadminRoute = pathname.startsWith("/superadmin");
+  const isParentRoute = pathname.startsWith("/parent") && !isParentJoinRoute;
+
+  // Public, unauthenticated invite-registration flow — no guard at all.
+  if (isParentJoinRoute) {
+    return response;
+  }
 
   // Unauthenticated → login
   if (!user && !isAuthPage) {
@@ -46,6 +53,7 @@ export async function updateSession(request: NextRequest) {
     const role = await getCurrentUserRole(supabase, user.id);
     const isSuperAdmin = role === "super_admin";
     const isAdmin = role === "admin";
+    const isParent = role === "parent";
     const isTeacher = role === "teacher";
 
     // Non-super_admin on /superadmin route → login
@@ -59,6 +67,20 @@ export async function updateSession(request: NextRequest) {
     if (isSuperAdmin && !isSuperadminRoute && !isAuthPage) {
       const target = request.nextUrl.clone();
       target.pathname = "/superadmin/dashboard";
+      return NextResponse.redirect(target);
+    }
+
+    // Non-parent on /parent route → login
+    if (isParentRoute && !isParent) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/login";
+      return NextResponse.redirect(target);
+    }
+
+    // Parent on any other route → /parent/dashboard
+    if (isParent && !isParentRoute && !isAuthPage) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/parent/dashboard";
       return NextResponse.redirect(target);
     }
 

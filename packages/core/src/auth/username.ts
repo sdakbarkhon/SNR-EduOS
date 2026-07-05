@@ -4,6 +4,7 @@ export const DEFAULT_STUDENT_EMAIL_DOMAIN = "students.snr.local";
 export const TEACHER_EMAIL_DOMAIN = "teachers.snr.local";
 export const ADMIN_EMAIL_DOMAIN = "admins.snr.local";
 export const DEMO_EMAIL_DOMAIN = "demo.snr.local";
+export const PARENT_EMAIL_DOMAIN = "parents.snr.local";
 
 export function usernameToEmail(
   username: string,
@@ -20,7 +21,11 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return !!email?.endsWith(`@${ADMIN_EMAIL_DOMAIN}`);
 }
 
-/** Tries student → teacher → admin domain. Returns role alongside auth result.
+export function isParentEmail(email: string | null | undefined): boolean {
+  return !!email?.endsWith(`@${PARENT_EMAIL_DOMAIN}`);
+}
+
+/** Tries student → teacher → admin → parent domain. Returns role alongside auth result.
  *  If username already contains "@" it is treated as a full email and tried directly first. */
 export async function signInWithUsername(
   db: Db,
@@ -38,6 +43,7 @@ export async function signInWithUsername(
     if (!direct.error) {
       const role = isAdminEmail(input) ? "admin" as const
         : isTeacherEmail(input) ? "teacher" as const
+        : isParentEmail(input) ? "parent" as const
         : "student" as const;
       return { ...direct, role };
     }
@@ -60,6 +66,12 @@ export async function signInWithUsername(
     password,
   });
   if (!adminResult.error) return { ...adminResult, role: "admin" as const };
+
+  const parentResult = await db.auth.signInWithPassword({
+    email: usernameToEmail(input, PARENT_EMAIL_DOMAIN),
+    password,
+  });
+  if (!parentResult.error) return { ...parentResult, role: "parent" as const };
 
   // demo_teacher/demo_student (migration 66) share one domain, so role can't
   // be derived from the domain the way it is above — go by exact username.
