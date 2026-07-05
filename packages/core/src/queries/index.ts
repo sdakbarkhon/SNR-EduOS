@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -59,10 +59,12 @@ export const getAttendanceWithLesson = (
       );
     });
 
-/** Посещаемость ученика с join урока/группы; фильтрация по предмету и месяцу (YYYY-MM). */
+/** Посещаемость ученика с join урока/группы; фильтрация по предмету и месяцу (YYYY-MM).
+ *  studentId — опционально: parent-контекст сужает до ОДНОГО выбранного ребёнка. */
 export const getStudentAttendance = async (
   db: Db,
   filters?: { subject?: string; month?: string },
+  studentId?: string,
 ): Promise<{
   records: Array<{
     id: string;
@@ -76,13 +78,15 @@ export const getStudentAttendance = async (
   }>;
   stats: { total: number; present: number; excused: number; unexcused: number; percentage: number };
 }> => {
-  const raw = await db
+  let attQuery = db
     .from("attendance")
     .select(
       "id, lesson_id, status, marked_at, lesson:lessons!inner(topic, starts_at, group:groups!inner(subject, name))",
     )
-    .order("marked_at", { ascending: false })
-    .then(unwrap);
+    .order("marked_at", { ascending: false });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (studentId) attQuery = (attQuery as any).eq("student_id", studentId);
+  const raw = await attQuery.then(unwrap);
 
   let rows = (raw as unknown as Array<{
     id: string;
@@ -178,12 +182,36 @@ export const getGroupAttendance = async (
 
 // --- Домашние задания ---
 
-/** Все ДЗ для групп ученика + join группы + LEFT JOIN собственной сдачи (RLS). */
-export const getHomeworkWithSubmissions = (db: Db) =>
-  db
+/** ID групп, в которых состоит ученик (для parent-контекста: сузить group-level выборки до одного ребёнка). */
+export const getStudentGroupIds = async (db: Db, studentId: string): Promise<string[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("student_groups")
+    .select("group_id")
+    .eq("student_id", studentId);
+  if (error) throw error;
+  return ((data ?? []) as Array<{ group_id: string }>).map((r) => r.group_id);
+};
+
+/** Все ДЗ для групп ученика + join группы + LEFT JOIN собственной сдачи (RLS).
+ *  studentId — опционально: для parent-контекста сужает ДЗ до групп ОДНОГО
+ *  выбранного ребёнка (без него RLS отдало бы объединение по всем детям). */
+export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => {
+  let query = db
     .from("homework")
     .select("*, content_type, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
-    .order("due_date", { ascending: true })
+    .order("due_date", { ascending: true });
+
+  if (studentId) {
+    const groupIds = await getStudentGroupIds(db, studentId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = (query as any)
+      .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
+      .eq("submissions.student_id", studentId)
+      .eq("test_subs.student_id", studentId);
+  }
+
+  return query
     .then(unwrap)
     .then((rows) =>
       (rows as unknown as Array<{
@@ -217,6 +245,7 @@ export const getHomeworkWithSubmissions = (db: Db) =>
         test_subs: undefined,
       } as HomeworkWithSubmission)),
     );
+};
 
 /** Одна запись ДЗ с join'ом и сдачей (для детальной страницы). */
 export const getHomeworkById = (db: Db, id: string) =>
@@ -401,11 +430,39 @@ export const getGrades = (db: Db) =>
   db.from("grades").select("*").order("graded_at", { ascending: false }).then(unwrap);
 
 // --- Оплаты / списания ---
-export const getPayments = (db: Db) =>
-  db.from("payments").select("*").order("paid_at", { ascending: false }).then(unwrap);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const getPayments = (db: Db, studentId?: string) => {
+  let query = db.from("payments").select("*").order("paid_at", { ascending: false });
+  if (studentId) query = (query as any).eq("student_id", studentId);
+  return query.then(unwrap);
+};
 
-export const getCharges = (db: Db) =>
-  db.from("charges").select("*").order("charged_at", { ascending: false }).then(unwrap);
+export const getCharges = (db: Db, studentId?: string) => {
+  let query = db.from("charges").select("*").order("charged_at", { ascending: false });
+  if (studentId) query = (query as any).eq("student_id", studentId);
+  return query.then(unwrap);
+};
+
+/** Профиль одного ребёнка для parent-контекста: ФИО, ДР, куратор, группы+учителя. */
+export const getStudentById = async (db: Db, studentId: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("students")
+    .select(
+      "id, full_name, birth_date, avatar_url, balance, status, " +
+      "curator:teachers!curator_id(id, full_name, phone), " +
+      "student_groups(groups(id, name, subject, teacher:teachers(id, full_name, phone)))",
+    )
+    .eq("id", studentId)
+    .single();
+  if (error) throw error;
+  return data as {
+    id: string; full_name: string; birth_date: string | null; avatar_url: string | null;
+    balance: number; status: StudentStatus;
+    curator: { id: string; full_name: string; phone: string | null } | null;
+    student_groups: Array<{ groups: { id: string; name: string; subject: string; teacher: { id: string; full_name: string; phone: string | null } | null } | null }>;
+  };
+};
 
 // --- Объявления ---
 export const getAnnouncements = (db: Db) =>
@@ -489,18 +546,25 @@ export type StudentGradeItem = {
 
 type HwJoin = { title: string; content_type: string; group: { subject: string; name: string } | null };
 
-/** Все оценённые работы текущего ученика (RLS отдаёт только свои). */
-export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
+/** Все оценённые работы текущего ученика (RLS отдаёт только свои).
+ *  studentId — опционально: parent-контекст сужает до ОДНОГО выбранного
+ *  ребёнка (без него RLS для parent отдало бы объединение по всем детям). */
+export const getStudentGrades = async (db: Db, studentId?: string): Promise<StudentGradeItem[]> => {
   // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
   // на hosted. Дата работы = submitted_at (для seed практически совпадает).
   const fileSel =
     "id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
   const testSel =
     "id, score, max_score, grade, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
-  const [fileRes, testRes] = await Promise.all([
-    db.from("homework_submissions").select(fileSel).not("grade", "is", null),
-    db.from("test_submissions").select(testSel).not("score", "is", null),
-  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fileQuery: any = db.from("homework_submissions").select(fileSel).not("grade", "is", null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let testQuery: any = db.from("test_submissions").select(testSel).not("score", "is", null);
+  if (studentId) {
+    fileQuery = fileQuery.eq("student_id", studentId);
+    testQuery = testQuery.eq("student_id", studentId);
+  }
+  const [fileRes, testRes] = await Promise.all([fileQuery, testQuery]);
 
   const items: StudentGradeItem[] = [];
   for (const r of (fileRes.data ?? []) as unknown as Array<{
@@ -540,7 +604,9 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
     const cwSel =
       "id, grade, teacher_comment, submitted_at, classwork:classwork!inner(title, lesson:lessons!inner(group:groups!inner(subject, name)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cwRes = await (db as any).from("classwork_submissions").select(cwSel).not("grade", "is", null);
+    let cwQuery: any = (db as any).from("classwork_submissions").select(cwSel).not("grade", "is", null);
+    if (studentId) cwQuery = cwQuery.eq("student_id", studentId);
+    const cwRes = await cwQuery;
     for (const r of (cwRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string;
       classwork: { title: string; lesson: { group: { subject: string; name: string } | null } | null } | null;
@@ -563,7 +629,9 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
     const projSel =
       "id, grade, teacher_comment, submitted_at, graded_at, project:projects!inner(title, group:groups!inner(subject, name))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const projRes = await (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
+    let projQuery: any = (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
+    if (studentId) projQuery = projQuery.eq("student_id", studentId);
+    const projRes = await projQuery;
     for (const r of (projRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string | null; graded_at: string | null;
       project: { title: string; group: { subject: string; name: string } | null } | null;
@@ -587,7 +655,9 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
       "id, grade, teacher_comment, completed_at, graded_at, submission_data, " +
       "stage:lesson_stages!inner(title, content_type, lesson:lessons!inner(group:groups!inner(subject, name)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stageRes = await (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
+    let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
+    if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
+    const stageRes = await stageQuery;
     for (const r of (stageRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null;
       completed_at: string | null; graded_at: string | null;
@@ -619,7 +689,9 @@ export const getStudentGrades = async (db: Db): Promise<StudentGradeItem[]> => {
     const lgSel =
       "id, grade, comment, graded_at, lesson:lessons!inner(title, group:groups!inner(subject, name))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lgRes = await (db as any).from("lesson_grades").select(lgSel);
+    let lgQuery: any = (db as any).from("lesson_grades").select(lgSel);
+    if (studentId) lgQuery = lgQuery.eq("student_id", studentId);
+    const lgRes = await lgQuery;
     for (const r of (lgRes.data ?? []) as unknown as Array<{
       id: string; grade: number; comment: string | null; graded_at: string;
       lesson: { title: string | null; group: { subject: string; name: string } | null } | null;
@@ -3137,18 +3209,26 @@ const LESSON_SUBJECT_SELECT =
   "group:groups!inner(id, name, teacher:teachers(id, full_name, avatar_url))";
 
 /** Уроки ученика на конкретную дату (в Asia/Tashkent UTC+5).
- *  RLS уже ограничивает выборку группами ученика. */
+ *  RLS уже ограничивает выборку группами ученика. studentId — опционально:
+ *  parent-контекст сужает до ОДНОГО выбранного ребёнка (без него parent-RLS
+ *  отдало бы объединение по группам всех детей). */
 export async function getStudentLessonsForDate(
   db: Db,
   date: string,
+  studentId?: string,
 ): Promise<LessonWithSubject[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
+  let query = (db as any)
     .from("lessons")
     .select(LESSON_SUBJECT_SELECT)
     .gte("starts_at", `${date}T00:00:00+05:00`)
     .lte("starts_at", `${date}T23:59:59+05:00`)
     .order("starts_at");
+  if (studentId) {
+    const groupIds = await getStudentGroupIds(db, studentId);
+    query = query.in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as LessonWithSubject[];
 }
@@ -3157,18 +3237,24 @@ export async function getStudentLessonsForDate(
 export async function getStudentLessonsForWeek(
   db: Db,
   weekStart: string,
+  studentId?: string,
 ): Promise<LessonWithSubject[]> {
   // weekEnd = weekStart + 7 дней (исключительно)
   const d = new Date(`${weekStart}T00:00:00+05:00`);
   d.setDate(d.getDate() + 7);
   const weekEnd = d.toISOString().slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
+  let query = (db as any)
     .from("lessons")
     .select(LESSON_SUBJECT_SELECT)
     .gte("starts_at", `${weekStart}T00:00:00+05:00`)
     .lt("starts_at",  `${weekEnd}T00:00:00+05:00`)
     .order("starts_at");
+  if (studentId) {
+    const groupIds = await getStudentGroupIds(db, studentId);
+    query = query.in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as LessonWithSubject[];
 }

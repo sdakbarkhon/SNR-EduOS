@@ -332,6 +332,20 @@ export interface Dictionary {
     title: string;
     role: string;
     navDashboard: string;
+    selectChild: string;
+    noChildren: string;
+  };
+  parentNav: {
+    dashboard: string;
+    schedule: string;
+    grades: string;
+    homework: string;
+    attendance: string;
+    payments: string;
+    childProfile: string;
+    messages: string;
+    messagesComingSoon: string;
+    logout: string;
   };
   parentJoin: {
     title: string;
@@ -384,12 +398,64 @@ export interface Dictionary {
     searchPlaceholder: string;
     noParents: string;
   };
-  parentDashboard: {
-    greeting: string;
-    comingSoon: string;
-    childrenTitle: string;
-    childProfileLink: string;
-    noChildren: string;
+  parentUi: {
+    todayTitle: string;
+    scheduleTodayTitle: string;
+    noLessonsToday: string;
+    lessonNow: string;
+    lessonPast: string;
+    lessonUpcoming: string;
+    gradesWeekTitle: string;
+    noGradesWeek: string;
+    viewAllGrades: string;
+    homeworkPendingTitle: string;
+    allHomeworkDone: string;
+    viewAllHomework: string;
+    dueDate: string;
+
+    scheduleTitle: string;
+    thisWeek: string;
+    nextWeek: string;
+    noLessonsWeek: string;
+
+    gradesTitle: string;
+    overallAverage: string;
+    subjectAverage: string;
+    noGrades: string;
+
+    homeworkTitle: string;
+    hwStatusDone: string;
+    hwStatusPending: string;
+    hwStatusOverdue: string;
+    noHomeworkAtAll: string;
+    submittedByChild: string;
+    notSubmittedYet: string;
+    teacherGradeLabel: string;
+
+    attendanceTitle: string;
+    attendancePercentage: string;
+    statusPresent: string;
+    statusAbsent: string;
+    statusExcused: string;
+    noAttendanceRecords: string;
+
+    remainingBalance: string;
+
+    profileTitle: string;
+    birthDateLabel: string;
+    curatorLabel: string;
+    curatorPhoneLabel: string;
+    contactCurator: string;
+    curatorComingSoon: string;
+    noCurator: string;
+    classesLabel: string;
+
+    messagesStubTitle: string;
+    messagesStubDescription: string;
+
+    notFoundChildTitle: string;
+    notFoundChildDescription: string;
+    backToDashboard: string;
   };
   homework: {
     title: string;

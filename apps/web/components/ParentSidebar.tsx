@@ -1,23 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  Home,
+  Calendar,
+  Award,
+  ClipboardList,
+  CheckSquare,
+  Wallet,
+  UserCircle,
+  MessageCircle,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  type LucideIcon,
+} from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
+import { useToast } from "./Toast";
 import { signOut } from "@/app/actions/auth";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "parent_sidebar_collapsed";
 
-export function ParentSidebar() {
+interface SidebarItem {
+  key: string;
+  hrefFor: (childId: string | null) => string;
+  icon: LucideIcon;
+  label: (d: ReturnType<typeof getDictionary>) => string;
+}
+
+const ITEMS: SidebarItem[] = [
+  { key: "dashboard", hrefFor: () => "/parent/dashboard", icon: Home, label: (d) => d.parentNav.dashboard },
+  { key: "schedule", hrefFor: (id) => `/parent/child/${id ?? ""}/schedule`, icon: Calendar, label: (d) => d.parentNav.schedule },
+  { key: "grades", hrefFor: (id) => `/parent/child/${id ?? ""}/grades`, icon: Award, label: (d) => d.parentNav.grades },
+  { key: "homework", hrefFor: (id) => `/parent/child/${id ?? ""}/homework`, icon: ClipboardList, label: (d) => d.parentNav.homework },
+  { key: "attendance", hrefFor: (id) => `/parent/child/${id ?? ""}/attendance`, icon: CheckSquare, label: (d) => d.parentNav.attendance },
+  { key: "payments", hrefFor: (id) => `/parent/child/${id ?? ""}/payments`, icon: Wallet, label: (d) => d.parentNav.payments },
+  { key: "profile", hrefFor: (id) => `/parent/child/${id ?? ""}/profile`, icon: UserCircle, label: (d) => d.parentNav.childProfile },
+  { key: "messages", hrefFor: () => "/parent/messages", icon: MessageCircle, label: (d) => d.parentNav.messages },
+];
+
+export function ParentSidebar({ selectedChildId }: { selectedChildId: string | null }) {
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const dp = d.parent;
+  const showToast = useToast();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -37,14 +69,13 @@ export function ParentSidebar() {
     });
   }
 
+  function onMessagesClick(e: MouseEvent) {
+    e.preventDefault();
+    showToast(d.parentNav.messagesComingSoon);
+  }
+
   const isCollapsed = mounted && collapsed;
   const width = isCollapsed ? "w-16" : "w-[230px]";
-
-  // Only one real destination for now — the rest of the parent nav (children
-  // profiles, chat, payments, ...) lands in later Iteration 6 prompts (П5+).
-  const navItems = [
-    { key: "dashboard", href: "/parent/dashboard", icon: LayoutDashboard, label: dp.navDashboard },
-  ];
 
   return (
     <aside
@@ -55,7 +86,7 @@ export function ParentSidebar() {
       style={{ background: "linear-gradient(to bottom, #db2777, #831843)" }}
     >
       <div className={cn(
-        "mb-8 px-3",
+        "mb-6 px-3",
         isCollapsed ? "flex flex-col items-center gap-3" : "flex items-center justify-between gap-2",
       )}>
         <div className="flex min-w-0 items-center gap-3">
@@ -77,32 +108,38 @@ export function ParentSidebar() {
       </div>
 
       {!isCollapsed && (
-        <div className="mb-8 px-3">
+        <div className="mb-6 px-3">
           <div className="w-fit rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-pink-700 shadow-sm">
-            {dp.role}
+            {d.parent.role}
           </div>
         </div>
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
-        {navItems.map((item) => {
-          const active = pathname.startsWith(item.href);
+        {ITEMS.map((item) => {
+          const href = item.hrefFor(selectedChildId);
+          const active = item.key === "dashboard"
+            ? pathname === "/parent/dashboard"
+            : item.key === "messages"
+              ? pathname.startsWith("/parent/messages")
+              : pathname.startsWith(`/parent/child/`) && pathname.includes(`/${item.key}`);
           const Icon = item.icon;
           return (
             <Link
               key={item.key}
-              href={item.href}
-              title={item.label}
+              href={href}
+              onClick={item.key === "messages" ? onMessagesClick : undefined}
+              title={item.label(d)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
+                "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-medium transition-all duration-200",
                 active
                   ? "bg-white/25 text-white shadow-sm backdrop-blur-sm"
                   : "text-white/80 hover:bg-white/10 hover:text-white",
                 isCollapsed && "justify-center",
               )}
             >
-              <Icon size={20} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
-              {!isCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
+              <Icon size={19} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
+              {!isCollapsed && <span className="whitespace-nowrap">{item.label(d)}</span>}
             </Link>
           );
         })}
@@ -112,14 +149,14 @@ export function ParentSidebar() {
         <form action={signOut}>
           <button
             type="submit"
-            title="Выйти"
+            title={d.parent.role}
             className={cn(
               "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
               isCollapsed && "justify-center",
             )}
           >
             <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
-            {!isCollapsed && <span className="font-medium">Выйти</span>}
+            {!isCollapsed && <span className="font-medium">{d.parentNav.logout}</span>}
           </button>
         </form>
       </div>

@@ -1,24 +1,20 @@
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getParentContext, SELECTED_CHILD_COOKIE } from "@/lib/parent-context";
 import { ParentShell } from "./ParentShell";
 
 export default async function ParentLayout({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const ctx = await getParentContext();
+  if (!ctx) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: parent } = await (supabase as any)
-    .from("parents")
-    .select("id, full_name")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!parent) redirect("/login");
+  const cookieStore = await cookies();
+  const cookieChildId = cookieStore.get(SELECTED_CHILD_COOKIE)?.value ?? null;
+  const defaultChildId =
+    ctx.children.find((c) => c.id === cookieChildId)?.id ?? ctx.children[0]?.id ?? null;
 
   return (
-    <ParentShell parentName={(parent as { full_name: string }).full_name}>
+    <ParentShell parentName={ctx.parentName} kids={ctx.children} defaultChildId={defaultChildId}>
       {children}
     </ParentShell>
   );

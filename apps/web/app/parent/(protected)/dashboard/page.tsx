@@ -1,32 +1,68 @@
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getStudentLessonsForDate, getStudentGrades, getHomeworkWithSubmissions } from "@snr/core";
+import { getParentContext, resolveSelectedChild, SELECTED_CHILD_COOKIE } from "@/lib/parent-context";
 import { DashboardContent } from "./DashboardContent";
 
-export default async function ParentDashboardPage() {
-  const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
+function getTashkentToday(): string {
+  const tashkentMs = Date.now() + 5 * 60 * 60 * 1000;
+  return new Date(tashkentMs).toISOString().slice(0, 10);
+}
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: parent } = await sb.from("parents").select("id, full_name").eq("user_id", user!.id).single();
+export default async function ParentDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ child?: string }>;
+}) {
+  const ctx = await getParentContext();
+  if (!ctx) redirect("/login");
 
-  const { data: links } = await sb.from("parent_students").select("student_id").eq("parent_id", parent.id);
-  const studentIds = ((links ?? []) as { student_id: string }[]).map((l) => l.student_id);
+  const sp = await searchParams;
+  const cookieStore = await cookies();
+  const requestedId = sp.child ?? cookieStore.get(SELECTED_CHILD_COOKIE)?.value ?? null;
+  const selected = resolveSelectedChild(ctx.children, requestedId);
+  const today = getTashkentToday();
 
-  let kids: { id: string; full_name: string; className: string | null }[] = [];
-  if (studentIds.length > 0) {
-    const { data: students } = await sb
-      .from("students")
-      .select("id, full_name, student_groups(groups(name))")
-      .in("id", studentIds);
-
-    kids = ((students ?? []) as any[]).map((s) => {
-      const groupNames: string[] = (s.student_groups ?? [])
-        .map((sg: any) => sg.groups?.name)
-        .filter(Boolean);
-      const className = groupNames.find((n) => n.includes("класс")) ?? groupNames[0] ?? null;
-      return { id: s.id, full_name: s.full_name, className };
-    });
+  if (!selected) {
+    return (
+      <DashboardContent
+        parentName={ctx.parentName}
+        child={null}
+        today={today}
+        lessons={[]}
+        weekGrades={[]}
+        pendingHomework={[]}
+      />
+    );
   }
 
-  return <DashboardContent fullName={parent.full_name} kids={kids} />;
+  const db = await createClient();
+  const todayStart = new Date(`${today}T00:00:00+05:00`).getTime();
+  const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  const [lessons, grades, homework] = await Promise.all([
+    getStudentLessonsForDate(db, today, selected.id).catch(() => []),
+    getStudentGrades(db, selected.id).catch(() => []),
+    getHomeworkWithSubmissions(db, selected.id).catch(() => []),
+  ]);
+
+  const weekGrades = grades
+    .filter((g) => g.date && new Date(g.date).getTime() >= weekAgoMs)
+    .slice(0, 10);
+
+  const pendingHomework = homework
+    .filter((h) => !h.submission && !h.test_submission && (!h.due_date || new Date(h.due_date).getTime() >= todayStart))
+    .slice(0, 5);
+
+  return (
+    <DashboardContent
+      parentName={ctx.parentName}
+      child={selected}
+      today={today}
+      lessons={lessons}
+      weekGrades={weekGrades}
+      pendingHomework={pendingHomework}
+    />
+  );
 }
