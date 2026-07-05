@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ParentSidebar } from "@/components/ParentSidebar";
 import { ParentTopbar } from "@/components/ParentTopbar";
 import { ToastProvider } from "@/components/Toast";
@@ -48,8 +48,9 @@ function ShellBody({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const childMatch = pathname.match(CHILD_PATH_RE);
-  const selectedChildId = childMatch ? (childMatch[1] ?? defaultChildId) : defaultChildId;
+  const selectedChildId = childMatch?.[1] ?? searchParams.get("child") ?? defaultChildId;
 
   return (
     <>

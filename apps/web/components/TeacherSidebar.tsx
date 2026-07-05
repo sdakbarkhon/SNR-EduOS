@@ -74,7 +74,7 @@ export function TeacherSidebar() {
           {isCollapsed ? (
             <span className="text-[11px] font-extrabold tracking-[3px] text-white">SNR</span>
           ) : (
-            <div className="rounded-xl bg-white/90 px-2.5 py-1.5 shadow-inner">
+            <div className="rounded-xl px-2.5 py-1.5">
               <Logo priority className="h-6" />
             </div>
           )}
