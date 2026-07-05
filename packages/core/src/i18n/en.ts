@@ -460,7 +460,7 @@ export const en: Dictionary = {
     classesLabel: "Classes/groups",
 
     messagesStubTitle: "Messages are coming soon",
-    messagesStubDescription: "This is where you'll chat with your child's curator and see school announcements.",
+    messagesStubDescription: "Direct chats with your child's curator are coming in an upcoming update.",
 
     notFoundChildTitle: "Child not found",
     notFoundChildDescription: "This child is not linked to your account.",
@@ -1628,5 +1628,19 @@ export const en: Dictionary = {
       noComment: "The teacher hasn't left a comment yet",
       closeBtn: "Close",
     },
+  },
+  chat: {
+    title: "Messages",
+    composerPlaceholder: "Write a message...",
+    send: "Send",
+    today: "Today",
+    yesterday: "Yesterday",
+    noThreadsTitle: "You have no messages yet",
+    noThreadsStudent: "Your class group chat will appear once your curator sends the first message",
+    noThreadsTeacher: "Your class group chats are available on the left",
+    noThreadSelected: "Select a chat on the left",
+    participantsLabel: "Participants",
+    backToList: "Back to chat list",
+    sendError: "Failed to send message",
   },
 };

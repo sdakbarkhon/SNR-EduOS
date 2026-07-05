@@ -5,14 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, FolderOpen, Library, Briefcase,
-  Megaphone, Users, Settings, LogOut, Bell,
+  Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
-import { getDictionary } from "@snr/core";
+import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { signOut } from "@/app/actions/auth";
+import { useRealtimeChannel } from "@/lib/realtime";
+import { createClient } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "teacher_sidebar_collapsed";
@@ -25,6 +27,7 @@ const teacherNavItems = [
   { key: "materials",  href: "/teacher/materials",    icon: FolderOpen,    label: (d: ReturnType<typeof getDictionary>) => d.teacher.navMaterials },
   { key: "books",      href: "/teacher/books",        icon: Library,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navBooks },
   { key: "notifications", href: "/teacher/notifications",  icon: Bell,      label: (d: ReturnType<typeof getDictionary>) => d.nav.notifications },
+  { key: "messages",   href: "/teacher/messages",     icon: MessageCircle, label: (d: ReturnType<typeof getDictionary>) => d.nav.messages },
   { key: "announce",   href: "/teacher/announcements",icon: Megaphone,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.announcements.nav },
   { key: "projects",   href: "/teacher/projects",     icon: Briefcase,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.projects.nav },
   { key: "groups",     href: "/teacher/groups",       icon: Users,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
@@ -38,13 +41,34 @@ export function TeacherSidebar() {
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [unreadThreads, setUnreadThreads] = useState(0);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
     try {
       if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
     } catch { /* blocked */ }
+
+    const db = createClient();
+    db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
+    getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
   }, []);
+
+  useRealtimeChannel(
+    myUserId ? `teacher-sidebar-unread-${myUserId}` : null,
+    "chat_messages",
+    undefined,
+    () => {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    },
+  );
+
+  useEffect(() => {
+    if (pathname.startsWith("/teacher/messages")) {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    }
+  }, [pathname]);
 
   function toggle() {
     setCollapsed((c) => {
@@ -93,13 +117,14 @@ export function TeacherSidebar() {
         {teacherNavItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
+          const showBadge = item.key === "messages" && unreadThreads > 0;
           return (
             <Link
               key={item.key}
               href={item.href}
               title={item.label(d)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
+                "relative flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
                 active
                   ? "bg-white/25 text-white shadow-sm backdrop-blur-sm"
                   : "text-white/80 hover:bg-white/10 hover:text-white",
@@ -108,6 +133,14 @@ export function TeacherSidebar() {
             >
               <Icon size={20} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
               {!isCollapsed && <span className="whitespace-nowrap">{item.label(d)}</span>}
+              {showBadge && !isCollapsed && (
+                <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[11px] font-extrabold text-white">
+                  {unreadThreads > 99 ? "99+" : unreadThreads}
+                </span>
+              )}
+              {showBadge && isCollapsed && (
+                <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-[#F5455C]" />
+              )}
             </Link>
           );
         })}

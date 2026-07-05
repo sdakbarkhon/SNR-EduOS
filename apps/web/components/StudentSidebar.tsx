@@ -4,12 +4,13 @@ import { useEffect, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, Trophy, CircleDot, MessageCircle, type LucideIcon } from "lucide-react";
-import { getDictionary, getHomework, getMySubmissions } from "@snr/core";
+import { getDictionary, getHomework, getMySubmissions, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { useToast } from "./Toast";
+import { useRealtimeChannel } from "@/lib/realtime";
 import { Logo } from "./Logo";
 import { navItems as baseNavItems, type NavItem } from "./nav-items";
 
@@ -26,11 +27,8 @@ interface SidebarItem extends NavItem {
 const STUB_ITEMS: SidebarItem[] = [
   { key: "achievements", href: "#", icon: Trophy, label: (d) => d.nav.achievements, isStub: true },
   { key: "clubs", href: "#", icon: CircleDot, label: (d) => d.nav.clubs, isStub: true },
-  { key: "messages", href: "#", icon: MessageCircle, label: (d) => d.nav.messages, isStub: true },
+  { key: "messages", href: "/messages", icon: MessageCircle, label: (d) => d.nav.messages },
 ];
-
-// Заглушечный бейдж «Сообщения» (реального счётчика нет — Iter5 P5)
-const MESSAGES_STUB_BADGE = 3;
 
 function buildItems(): SidebarItem[] {
   const projectsIdx = baseNavItems.findIndex((i) => i.key === "projects");
@@ -75,6 +73,8 @@ export function StudentSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [homeworkCount, setHomeworkCount] = useState(0);
+  const [unreadThreads, setUnreadThreads] = useState(0);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -89,7 +89,25 @@ export function StudentSidebar() {
         setHomeworkCount(homework.filter((h) => !submittedIds.has(h.id)).length);
       })
       .catch(() => null);
+
+    db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
+    getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
   }, []);
+
+  useRealtimeChannel(
+    myUserId ? `student-sidebar-unread-${myUserId}` : null,
+    "chat_messages",
+    undefined,
+    () => {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    },
+  );
+
+  useEffect(() => {
+    if (pathname.startsWith("/messages")) {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    }
+  }, [pathname]);
 
   function toggle() {
     setCollapsed((c) => {
@@ -139,7 +157,7 @@ export function StudentSidebar() {
           const style = ITEM_STYLE[item.key] ?? DEFAULT_ITEM_STYLE;
           const badge =
             item.key === "homework" ? homeworkCount
-            : item.key === "messages" ? MESSAGES_STUB_BADGE
+            : item.key === "messages" ? unreadThreads
             : undefined;
           const showBadge = badge !== undefined && badge > 0 && !isCollapsed;
 
@@ -175,7 +193,7 @@ export function StudentSidebar() {
                   </span>
                   {showBadge && (
                     <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[11px] font-extrabold text-white">
-                      {badge}
+                      {badge > 99 ? "99+" : badge}
                     </span>
                   )}
                 </div>

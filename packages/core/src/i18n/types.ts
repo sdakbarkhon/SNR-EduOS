@@ -1652,4 +1652,18 @@ export interface Dictionary {
       closeBtn: string;         // "Закрыть"
     };
   };
+  chat: {
+    title: string;              // "Сообщения"
+    composerPlaceholder: string; // "Напишите сообщение..."
+    send: string;                // "Отправить"
+    today: string;                // "Сегодня"
+    yesterday: string;            // "Вчера"
+    noThreadsTitle: string;       // "У вас пока нет сообщений"
+    noThreadsStudent: string;     // пояснение для ученика
+    noThreadsTeacher: string;     // пояснение для учителя
+    noThreadSelected: string;     // "Выберите чат слева"
+    participantsLabel: string;    // "Участники"
+    backToList: string;           // aria-label кнопки "назад" на мобильном
+    sendError: string;            // тост при ошибке отправки
+  };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type MouseEvent } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -21,7 +21,6 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
-import { useToast } from "./Toast";
 import { signOut } from "@/app/actions/auth";
 import { Logo } from "./Logo";
 
@@ -49,7 +48,6 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const showToast = useToast();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -67,11 +65,6 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
       try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* blocked */ }
       return next;
     });
-  }
-
-  function onMessagesClick(e: MouseEvent) {
-    e.preventDefault();
-    showToast(d.parentNav.messagesComingSoon);
   }
 
   const isCollapsed = mounted && collapsed;
@@ -128,7 +121,6 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
             <Link
               key={item.key}
               href={href}
-              onClick={item.key === "messages" ? onMessagesClick : undefined}
               title={item.label(d)}
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-medium transition-all duration-200",

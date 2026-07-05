@@ -460,7 +460,7 @@ export const ru: Dictionary = {
     classesLabel: "Классы/группы",
 
     messagesStubTitle: "Сообщения скоро появятся",
-    messagesStubDescription: "Здесь будет чат с куратором вашего ребёнка и рассылки от школы.",
+    messagesStubDescription: "Личные чаты с куратором появятся в ближайшем обновлении.",
 
     notFoundChildTitle: "Ребёнок не найден",
     notFoundChildDescription: "Этот ребёнок не привязан к вашему аккаунту.",
@@ -1628,5 +1628,19 @@ export const ru: Dictionary = {
       noComment: "Учитель пока не оставил комментарий",
       closeBtn: "Закрыть",
     },
+  },
+  chat: {
+    title: "Сообщения",
+    composerPlaceholder: "Напишите сообщение...",
+    send: "Отправить",
+    today: "Сегодня",
+    yesterday: "Вчера",
+    noThreadsTitle: "У вас пока нет сообщений",
+    noThreadsStudent: "Групповой чат вашего класса появится, когда куратор напишет первое сообщение",
+    noThreadsTeacher: "Групповые чаты ваших классов доступны слева",
+    noThreadSelected: "Выберите чат слева",
+    participantsLabel: "Участники",
+    backToList: "Назад к списку чатов",
+    sendError: "Не удалось отправить сообщение",
   },
 };

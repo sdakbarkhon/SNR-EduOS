@@ -460,7 +460,7 @@ export const uz: Dictionary = {
     classesLabel: "Sinflar/guruhlar",
 
     messagesStubTitle: "Xabarlar tez orada paydo bo'ladi",
-    messagesStubDescription: "Bu yerda farzandingiz kuratori bilan chat va maktab e'lonlari bo'ladi.",
+    messagesStubDescription: "Kurator bilan shaxsiy chatlar tez orada qo'shiladi.",
 
     notFoundChildTitle: "Farzand topilmadi",
     notFoundChildDescription: "Bu farzand sizning akkauntingizga bog'lanmagan.",
@@ -1628,5 +1628,19 @@ export const uz: Dictionary = {
       noComment: "O'qituvchi hali izoh qoldirmagan",
       closeBtn: "Yopish",
     },
+  },
+  chat: {
+    title: "Xabarlar",
+    composerPlaceholder: "Xabar yozing...",
+    send: "Yuborish",
+    today: "Bugun",
+    yesterday: "Kecha",
+    noThreadsTitle: "Sizda hali xabarlar yo'q",
+    noThreadsStudent: "Sinfingizning guruh chati kuratoringiz birinchi xabarni yozganda paydo bo'ladi",
+    noThreadsTeacher: "Sinflaringizning guruh chatlari chapda mavjud",
+    noThreadSelected: "Chapdan chatni tanlang",
+    participantsLabel: "Ishtirokchilar",
+    backToList: "Chatlar ro'yxatiga qaytish",
+    sendError: "Xabarni yuborib bo'lmadi",
   },
 };

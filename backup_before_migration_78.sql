@@ -1,0 +1,26 @@
+-- Snapshot of public.messages taken via Supabase Management API BEFORE
+-- migration 78 (И6-П8) dropped the table.
+--
+-- Captured 2026-07-05, hosted project qaljcmkkajqyawccxetq.
+--
+-- Row counts (Part 0 investigation, before any migration-78 statement ran):
+--   SELECT COUNT(*) FROM public.messages;                                              -> 0
+--   SELECT COUNT(*) FROM public.messages WHERE recipient_student_id IS NOT NULL;        -> 0
+--   SELECT COUNT(*) FROM public.messages WHERE group_id IS NOT NULL
+--     AND recipient_student_id IS NULL;                                                 -> 0
+--
+-- Table had 0 rows in this environment — nothing to restore. Schema (for
+-- reference, in case this file is ever needed to reconstruct the table):
+--
+--   column_name           | data_type                | is_nullable
+--   ----------------------+--------------------------+------------
+--   id                    | uuid                     | NO
+--   sender_id             | uuid                     | YES
+--   recipient_student_id  | uuid                     | YES
+--   group_id              | uuid                     | YES
+--   body                  | text                     | NO
+--   created_at            | timestamp with time zone | NO
+--   read_at               | timestamp with time zone | YES
+--   school_id             | uuid                     | NO
+--
+-- No INSERT statements follow because there was no data to preserve.
