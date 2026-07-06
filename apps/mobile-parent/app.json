@@ -42,7 +42,7 @@
     },
     "owner": "new_assassin",
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "url": "https://u.expo.dev/e70cc3d7-9f08-4d64-8475-d14712098d0b"
