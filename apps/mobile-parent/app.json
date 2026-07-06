@@ -32,7 +32,21 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
-    ]
+      ],
+      "expo-secure-store",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e70cc3d7-9f08-4d64-8475-d14712098d0b"
+      }
+    },
+    "owner": "new_assassin",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e70cc3d7-9f08-4d64-8475-d14712098d0b"
+    }
   }
 }
