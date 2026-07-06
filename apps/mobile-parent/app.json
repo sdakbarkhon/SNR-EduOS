@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "SNR EduOS",
+    "slug": "snr-eduos-parent",
+    "scheme": "snreduosparent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.snr.eduos.parent",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.snr.eduos.parent",
+      "adaptiveIcon": {
+        "backgroundImage": "./assets/adaptive-icon-background.png",
+        "foregroundImage": "./assets/adaptive-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-localization",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+    ]
+  }
+}

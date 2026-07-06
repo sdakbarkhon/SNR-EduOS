@@ -466,6 +466,15 @@ export const uz: Dictionary = {
     notFoundChildDescription: "Bu farzand sizning akkauntingizga bog'lanmagan.",
     backToDashboard: "Bosh sahifaga",
   },
+  parentMobile: {
+    loginSubtitle: "Ota-onalar uchun",
+    networkError: "Internet aloqasini tekshiring",
+    notParentError: "Bu ilova faqat ota-onalar uchun",
+    notParentDbError: "Bu ilova faqat ota-onalar uchun. Iltimos, veb-versiyadan foydalaning.",
+    greeting: "Assalomu alaykum, {name}!",
+    myChildren: "Mening farzandlarim",
+    comingSoonSection: "Tez orada",
+  },
   homework: {
     title: "Topshiriqlarim",
     active: "Faol",

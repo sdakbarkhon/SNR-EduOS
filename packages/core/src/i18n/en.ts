@@ -466,6 +466,15 @@ export const en: Dictionary = {
     notFoundChildDescription: "This child is not linked to your account.",
     backToDashboard: "Back to dashboard",
   },
+  parentMobile: {
+    loginSubtitle: "For parents",
+    networkError: "Check your connection",
+    notParentError: "This app is for parents only",
+    notParentDbError: "This app is for parents only. Please use the web version.",
+    greeting: "Hello, {name}!",
+    myChildren: "My children",
+    comingSoonSection: "Coming soon",
+  },
   homework: {
     title: "My tasks",
     active: "Active",

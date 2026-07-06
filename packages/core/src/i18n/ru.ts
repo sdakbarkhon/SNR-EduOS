@@ -466,6 +466,15 @@ export const ru: Dictionary = {
     notFoundChildDescription: "Этот ребёнок не привязан к вашему аккаунту.",
     backToDashboard: "На главную",
   },
+  parentMobile: {
+    loginSubtitle: "Для родителей",
+    networkError: "Проверьте соединение",
+    notParentError: "Это приложение только для родителей",
+    notParentDbError: "Это приложение только для родителей. Пожалуйста, используйте веб-версию.",
+    greeting: "Здравствуйте, {name}!",
+    myChildren: "Мои дети",
+    comingSoonSection: "Скоро появится",
+  },
   homework: {
     title: "Мои задания",
     active: "Активные",

@@ -457,6 +457,16 @@ export interface Dictionary {
     notFoundChildDescription: string;
     backToDashboard: string;
   };
+  /** Строки, специфичные для мобильного приложения родителя (apps/mobile-parent). */
+  parentMobile: {
+    loginSubtitle: string;
+    networkError: string;
+    notParentError: string;
+    notParentDbError: string;
+    greeting: string;
+    myChildren: string;
+    comingSoonSection: string;
+  };
   homework: {
     title: string;
     active: string;
