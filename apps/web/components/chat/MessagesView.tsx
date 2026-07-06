@@ -24,7 +24,7 @@ function threadIcon(kind: string) {
   return kind === "group" ? Users : MessageCircle;
 }
 
-export function MessagesView({ role }: { role: "student" | "teacher" }) {
+export function MessagesView({ role }: { role: "student" | "teacher" | "parent" }) {
   return (
     <Suspense fallback={null}>
       <MessagesBody role={role} />
@@ -32,7 +32,7 @@ export function MessagesView({ role }: { role: "student" | "teacher" }) {
   );
 }
 
-function MessagesBody({ role }: { role: "student" | "teacher" }) {
+function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -175,7 +175,10 @@ function MessagesBody({ role }: { role: "student" | "teacher" }) {
 
   const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
 
-  const emptyThreadsHint = role === "student" ? d.chat.noThreadsStudent : d.chat.noThreadsTeacher;
+  const emptyThreadsHint =
+    role === "student" ? d.chat.noThreadsStudent
+    : role === "teacher" ? d.chat.noThreadsTeacher
+    : d.chat.noThreadsParent;
 
   return (
     <div className="flex h-full min-h-[520px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">

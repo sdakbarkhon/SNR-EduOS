@@ -59,13 +59,15 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
   if (readErr) throw readErr;
 
   const userIds = Array.from(new Set((participants ?? []).map((p: any) => p.user_id)));
-  const [{ data: teacherRows }, { data: studentRows }] = await Promise.all([
+  const [{ data: teacherRows }, { data: studentRows }, { data: parentRows }] = await Promise.all([
     userIds.length ? sb.from("teachers").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
     userIds.length ? sb.from("students").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
+    userIds.length ? sb.from("parents").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
   ]);
   const nameByUserId = new Map<string, string>();
   (teacherRows ?? []).forEach((t: any) => nameByUserId.set(t.user_id, t.full_name));
   (studentRows ?? []).forEach((s: any) => nameByUserId.set(s.user_id, s.full_name));
+  (parentRows ?? []).forEach((p: any) => nameByUserId.set(p.user_id, p.full_name));
 
   const participantsByThread = new Map<string, ChatParticipantInfo[]>();
   (participants ?? []).forEach((p: any) => {

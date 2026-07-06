@@ -1,0 +1,45 @@
+-- Snapshot of every row/object migration 81
+-- (81_rename_teacher_demo_and_parent_group_threads.sql) is about to change,
+-- captured via Supabase Management API BEFORE the migration ran.
+--
+-- Captured 2026-07-06, hosted project qaljcmkkajqyawccxetq.
+
+-- ======================================================================
+-- teacher_demo BEFORE rename
+-- ======================================================================
+-- auth.users: {"id":"46b5c585-4fb9-4778-8896-b20166549777","email":"teacher_demo@teachers.snr.local","raw_user_meta_data":{"username":"teacher_demo","email_verified":true}}
+-- auth.identities: {"id":"e6275a14-d77f-48cf-bf9f-2836cc4c9496","user_id":"46b5c585-4fb9-4778-8896-b20166549777","identity_data":{"sub":"46b5c585-4fb9-4778-8896-b20166549777","email":"teacher_demo@snr.local","email_verified":false,"phone_verified":false}}
+-- public.teachers: {"id":"e6fc7339-0f8e-401c-adde-4577b28a41db","user_id":"46b5c585-4fb9-4778-8896-b20166549777","username":"teacher_demo","full_name":"Карим Алишер Botirovich"}
+--
+-- Rollback: UPDATE auth.users SET email='teacher_demo@teachers.snr.local', raw_user_meta_data = raw_user_meta_data || '{"username":"teacher_demo"}' WHERE id='46b5c585-4fb9-4778-8896-b20166549777';
+--           UPDATE auth.identities SET identity_data = identity_data || '{"email":"teacher_demo@snr.local"}' WHERE user_id='46b5c585-4fb9-4778-8896-b20166549777';
+--           UPDATE public.teachers SET username='teacher_demo' WHERE user_id='46b5c585-4fb9-4778-8896-b20166549777';
+
+-- ======================================================================
+-- Old unique index BEFORE drop (Part 0 schema relaxation)
+-- ======================================================================
+-- CREATE UNIQUE INDEX chat_threads_group_unique_idx ON public.chat_threads USING btree (group_id) WHERE (kind = 'group'::text)
+--
+-- Rollback: DROP INDEX IF EXISTS chat_threads_group_title_unique_idx;
+--           CREATE UNIQUE INDEX chat_threads_group_unique_idx ON public.chat_threads (group_id) WHERE (kind = 'group');
+--           (only valid to roll back if no group ever ended up with 2 group-kind threads)
+
+-- ======================================================================
+-- All 10 existing kind='group' chat_threads BEFORE this migration (for
+-- reference — Part B/C only ADD new rows, never touch these)
+-- ======================================================================
+-- [
+--   {"id":"26ba10c9-bae6-4500-867d-502ec9313352","group_id":"0ebed461-a7cc-46c6-8f0d-cf302f67831e","title":"10-А класс"},
+--   {"id":"629d2279-b0f3-4d5b-9396-5ac14ec039e9","group_id":"8ac8428a-8336-4883-bf47-1d325cf40d49","title":"3-А класс"},
+--   {"id":"74d73d15-8be3-4bdd-a056-6aaa9da7ce84","group_id":"fb4852ca-2019-43a6-914f-7d770748df92","title":"7-А класс"},
+--   {"id":"ff648cf3-dc2f-46da-85fb-93345c05561a","group_id":"d0d0d0d0-4444-0000-0000-000000000003","title":"Демо 10-А"},
+--   {"id":"4eef4f42-138b-4993-bd9c-a6e2f7d808ef","group_id":"d0d0d0d0-4444-0000-0000-000000000001","title":"Демо 3-А"},
+--   {"id":"2a0b0a73-5ec8-4805-a2e2-0c5ced9b8cf8","group_id":"d0d0d0d0-4444-0000-0000-000000000002","title":"Демо 7-А"},
+--   {"id":"e0e606b5-dc46-467e-a94c-aeba7d9b002e","group_id":"010e78cf-fa9b-4673-b051-03a0dcd77093","title":"Демо-класс"},
+--   {"id":"4f720216-3965-4fcb-b41b-20674417ebcf","group_id":"d0d0d0d0-2222-0000-0000-000000000003","title":"Программирование 10-А (демо)"},
+--   {"id":"d09f63af-f510-4470-aae1-5e9469a441e7","group_id":"d0d0d0d0-2222-0000-0000-000000000001","title":"Программирование 3-А (демо)"},
+--   {"id":"66da79d5-3c7b-4626-96f8-605db0a4a8af","group_id":"d0d0d0d0-2222-0000-0000-000000000002","title":"Программирование 7-А (демо)"}
+-- ]
+--
+-- No parent-thread ("— Родители") rows existed before this migration
+-- (confirmed count = 0 in Part 0 investigation).

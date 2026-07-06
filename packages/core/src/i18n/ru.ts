@@ -1638,6 +1638,7 @@ export const ru: Dictionary = {
     noThreadsTitle: "У вас пока нет сообщений",
     noThreadsStudent: "Групповой чат вашего класса появится, когда куратор напишет первое сообщение",
     noThreadsTeacher: "Групповые чаты ваших классов доступны слева",
+    noThreadsParent: "Групповой чат класса появится, как только вы будете привязаны к ученику",
     noThreadSelected: "Выберите чат слева",
     participantsLabel: "Участники",
     backToList: "Назад к списку чатов",

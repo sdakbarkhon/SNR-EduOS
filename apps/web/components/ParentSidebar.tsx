@@ -17,11 +17,13 @@ import {
   PanelLeftOpen,
   type LucideIcon,
 } from "lucide-react";
-import { getDictionary } from "@snr/core";
+import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { signOut } from "@/app/actions/auth";
+import { useRealtimeChannel } from "@/lib/realtime";
+import { createClient } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "parent_sidebar_collapsed";
@@ -51,13 +53,34 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [unreadThreads, setUnreadThreads] = useState(0);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
     try {
       if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
     } catch { /* blocked */ }
+
+    const db = createClient();
+    db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
+    getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
   }, []);
+
+  useRealtimeChannel(
+    myUserId ? `parent-sidebar-unread-${myUserId}` : null,
+    "chat_messages",
+    undefined,
+    () => {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    },
+  );
+
+  useEffect(() => {
+    if (pathname.startsWith("/parent/messages")) {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    }
+  }, [pathname]);
 
   function toggle() {
     setCollapsed((c) => {
@@ -117,13 +140,14 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
               ? pathname.startsWith("/parent/messages")
               : pathname.startsWith(`/parent/child/`) && pathname.includes(`/${item.key}`);
           const Icon = item.icon;
+          const showBadge = item.key === "messages" && unreadThreads > 0;
           return (
             <Link
               key={item.key}
               href={href}
               title={item.label(d)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-medium transition-all duration-200",
+                "relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-medium transition-all duration-200",
                 active
                   ? "bg-white/25 text-white shadow-sm backdrop-blur-sm"
                   : "text-white/80 hover:bg-white/10 hover:text-white",
@@ -132,6 +156,14 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
             >
               <Icon size={19} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
               {!isCollapsed && <span className="whitespace-nowrap">{item.label(d)}</span>}
+              {showBadge && !isCollapsed && (
+                <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[11px] font-extrabold text-white">
+                  {unreadThreads > 99 ? "99+" : unreadThreads}
+                </span>
+              )}
+              {showBadge && isCollapsed && (
+                <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-[#F5455C]" />
+              )}
             </Link>
           );
         })}

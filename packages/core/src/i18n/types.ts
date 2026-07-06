@@ -1661,6 +1661,7 @@ export interface Dictionary {
     noThreadsTitle: string;       // "У вас пока нет сообщений"
     noThreadsStudent: string;     // пояснение для ученика
     noThreadsTeacher: string;     // пояснение для учителя
+    noThreadsParent: string;      // пояснение для родителя
     noThreadSelected: string;     // "Выберите чат слева"
     participantsLabel: string;    // "Участники"
     backToList: string;           // aria-label кнопки "назад" на мобильном

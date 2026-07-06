@@ -1638,6 +1638,7 @@ export const uz: Dictionary = {
     noThreadsTitle: "Sizda hali xabarlar yo'q",
     noThreadsStudent: "Sinfingizning guruh chati kuratoringiz birinchi xabarni yozganda paydo bo'ladi",
     noThreadsTeacher: "Sinflaringizning guruh chatlari chapda mavjud",
+    noThreadsParent: "Farzandingiz sinfga bog'langanidan so'ng guruh chati paydo bo'ladi",
     noThreadSelected: "Chapdan chatni tanlang",
     participantsLabel: "Ishtirokchilar",
     backToList: "Chatlar ro'yxatiga qaytish",

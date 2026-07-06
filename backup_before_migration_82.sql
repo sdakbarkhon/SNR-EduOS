@@ -1,0 +1,26 @@
+-- Pre-migration snapshot for migration 82
+-- (82_parents_read_co_participant_names.sql), captured 2026-07-06,
+-- hosted project qaljcmkkajqyawccxetq.
+--
+-- Migration 82 is purely additive for RLS (one new permissive SELECT
+-- policy on parents, existing policies untouched) and replaces exactly
+-- one function definition. The only thing worth preserving for rollback
+-- is the OLD current_school_id() body:
+--
+-- CREATE OR REPLACE FUNCTION public.current_school_id()
+--  RETURNS uuid
+--  LANGUAGE sql
+--  STABLE SECURITY DEFINER
+--  SET search_path TO 'public'
+-- AS $function$
+--   SELECT school_id FROM public.students WHERE user_id = auth.uid()
+--   UNION ALL
+--   SELECT school_id FROM public.teachers WHERE user_id = auth.uid()
+--   UNION ALL
+--   SELECT school_id FROM public.admins WHERE user_id = auth.uid()
+--   LIMIT 1
+-- $function$
+--
+-- Rollback (if ever needed): re-run the CREATE OR REPLACE above (drops the
+-- parents branch) and DROP POLICY "parent reads co-participant parent names"
+-- ON public.parents;

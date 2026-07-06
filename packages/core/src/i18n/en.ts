@@ -1638,6 +1638,7 @@ export const en: Dictionary = {
     noThreadsTitle: "You have no messages yet",
     noThreadsStudent: "Your class group chat will appear once your curator sends the first message",
     noThreadsTeacher: "Your class group chats are available on the left",
+    noThreadsParent: "Your class group chat will appear as soon as you're linked to a student",
     noThreadSelected: "Select a chat on the left",
     participantsLabel: "Participants",
     backToList: "Back to chat list",

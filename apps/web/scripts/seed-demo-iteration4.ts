@@ -37,15 +37,15 @@ async function main() {
   // ─── 0. PRE-CLEANUP (idempotent — можно перезапускать) ────────────────────
   console.log("\n[0/8] Pre-cleanup (idempotent)...");
 
-  // Find existing teacher_demo
+  // Find existing teacher_karim
   const { data: existingTeacher } = await supabase
     .from("teachers")
     .select("id, user_id")
-    .eq("username", "teacher_demo")
+    .eq("username", "teacher_karim")
     .maybeSingle();
 
   if (existingTeacher) {
-    console.log("  Found existing teacher_demo, cleaning up...");
+    console.log("  Found existing teacher_karim, cleaning up...");
 
     // Delete books and subjects linked to this teacher
     await supabase.from("books").delete().eq("uploaded_by", existingTeacher.id);
@@ -132,10 +132,10 @@ async function main() {
   console.log("\n[2/8] Creating teacher Karim Alisher...");
   const { data: teacherAuth, error: teacherAuthErr } =
     await supabase.auth.admin.createUser({
-      email: "teacher_demo@teachers.snr.local",
+      email: "teacher_karim@teachers.snr.local",
       password: PASSWORD,
       email_confirm: true,
-      user_metadata: { username: "teacher_demo" },
+      user_metadata: { username: "teacher_karim" },
     });
   if (teacherAuthErr)
     throw new Error(`Teacher auth: ${teacherAuthErr.message}`);
@@ -146,7 +146,7 @@ async function main() {
     .from("teachers")
     .insert({
       user_id: teacherUserId,
-      username: "teacher_demo",
+      username: "teacher_karim",
       full_name: "Карим Алишер Botirovich",
     })
     .select()
@@ -401,7 +401,7 @@ async function main() {
   console.log(`Homework:  ${hc}`);
   console.log(`Books:     ${bc}`);
   console.log(`\nLogin credentials:`);
-  console.log(`  Teacher:  teacher_demo  / ${PASSWORD}`);
+  console.log(`  Teacher:  teacher_karim  / ${PASSWORD}`);
   console.log(`  Students: Aziz_03       / ${PASSWORD}  (3-А)`);
   console.log(`            Nodira_07     / ${PASSWORD}  (7-А)`);
   console.log(`            Sherzod_10    / ${PASSWORD}  (10-А)`);
