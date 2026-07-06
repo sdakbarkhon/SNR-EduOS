@@ -1,15 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, MessageCircle, Star } from "lucide-react";
-import { getDictionary } from "@snr/core";
-import type { Locale } from "@snr/core";
+import { ChevronDown, Star } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { LogoutButton } from "./LogoutButton";
 import { NotificationsBell } from "./NotificationsBell";
 import { AnnouncementTicker } from "./AnnouncementTicker";
-import { useLocale } from "./LocaleProvider";
-import { useToast } from "./Toast";
 
 export function Topbar({
   title,
@@ -22,10 +18,6 @@ export function Topbar({
   avatarUrl?: string | null;
   classLabel?: string;
 }) {
-  const { locale } = useLocale();
-  const d = getDictionary(locale as Locale);
-  const showToast = useToast();
-
   return (
     <header className="flex shrink-0 items-center justify-between gap-4 rounded-[20px] bg-white py-3 pl-6 pr-4 shadow-[0_8px_22px_rgba(93,80,150,0.05)]">
       <h1 className="text-[20px] font-black tracking-tight text-[#2A2A45] md:text-[24px]">
@@ -42,19 +34,6 @@ export function Topbar({
           <Star className="h-4 w-4 fill-[#FFB020] text-[#FFB020]" />
           <span className="text-sm font-extrabold text-[#2A2A45]">1050</span>
         </div>
-
-        {/* Сообщения — заглушка */}
-        <button
-          onClick={() => showToast(d.auth.comingSoon)}
-          aria-label={d.nav.messages}
-          className="relative flex h-10 items-center gap-2 rounded-2xl border border-[#EFEEF3] bg-white px-3.5 text-[#6E6E8A] transition hover:bg-[#F4F2FC]"
-        >
-          <MessageCircle className="h-[18px] w-[18px]" />
-          <span className="hidden text-sm font-extrabold text-[#2A2A45] sm:inline">{d.nav.messages}</span>
-          <span className="absolute -right-1 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#F5455C] px-1 text-[10px] font-extrabold text-white">
-            5
-          </span>
-        </button>
 
         <NotificationsBell />
 

@@ -1,0 +1,91 @@
+-- Snapshot of every row migration 79 (79_unlink_real_from_demo_and_fix_chat.sql)
+-- is about to DELETE or UPDATE, captured via Supabase Management API BEFORE
+-- the migration ran.
+--
+-- Captured 2026-07-06, hosted project qaljcmkkajqyawccxetq.
+--
+-- ======================================================================
+-- student_groups rows about to be DELETEd (real students in demo groups)
+-- ======================================================================
+-- [
+--   {"student_id":"dba28430-b891-4215-96f2-385ee5c793b4","group_id":"d0d0d0d0-2222-0000-0000-000000000001","school_id":"a0a0a0a0-0000-0000-0000-000000000001"},
+--   {"student_id":"c3fdb958-30eb-45bf-a6ca-326b23e79348","group_id":"d0d0d0d0-2222-0000-0000-000000000002","school_id":"a0a0a0a0-0000-0000-0000-000000000001"},
+--   {"student_id":"b0a067b1-1559-4238-bde1-b21be1dbc61c","group_id":"d0d0d0d0-2222-0000-0000-000000000003","school_id":"a0a0a0a0-0000-0000-0000-000000000001"}
+-- ]
+-- Rollback: re-INSERT these 3 rows into student_groups.
+
+-- ======================================================================
+-- groups.teacher_id BEFORE update (3 rows changing e6fc7339... -> ca1fbee0...)
+-- ======================================================================
+-- [
+--   {"id":"d0d0d0d0-2222-0000-0000-000000000001","name":"Программирование 3-А (демо)","teacher_id":"e6fc7339-0f8e-401c-adde-4577b28a41db"},
+--   {"id":"d0d0d0d0-2222-0000-0000-000000000002","name":"Программирование 7-А (демо)","teacher_id":"e6fc7339-0f8e-401c-adde-4577b28a41db"},
+--   {"id":"d0d0d0d0-2222-0000-0000-000000000003","name":"Программирование 10-А (демо)","teacher_id":"e6fc7339-0f8e-401c-adde-4577b28a41db"}
+-- ]
+-- Rollback: UPDATE groups SET teacher_id = 'e6fc7339-0f8e-401c-adde-4577b28a41db' WHERE id IN (...).
+
+-- ======================================================================
+-- chat_participants rows about to be DELETEd (real users in demo threads)
+-- ======================================================================
+-- [
+--   {"thread_id":"d09f63af-f510-4470-aae1-5e9469a441e7","user_id":"46b5c585-4fb9-4778-8896-b20166549777","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"d09f63af-f510-4470-aae1-5e9469a441e7","user_id":"5c55c1a8-ae57-486a-a24d-97c13c4ce5e6","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"66da79d5-3c7b-4626-96f8-605db0a4a8af","user_id":"46b5c585-4fb9-4778-8896-b20166549777","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"66da79d5-3c7b-4626-96f8-605db0a4a8af","user_id":"54214a0d-52b2-4168-bf16-3afc187b310b","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"4f720216-3965-4fcb-b41b-20674417ebcf","user_id":"46b5c585-4fb9-4778-8896-b20166549777","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"4f720216-3965-4fcb-b41b-20674417ebcf","user_id":"1c6753a9-ce0c-427e-aee5-b8240350b1e2","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"e0e606b5-dc46-467e-a94c-aeba7d9b002e","user_id":"ae9dcfce-4bde-48c7-a669-728d0748033c","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"e0e606b5-dc46-467e-a94c-aeba7d9b002e","user_id":"6505e138-ae0c-454b-9ccc-00abbe8b7725","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"4eef4f42-138b-4993-bd9c-a6e2f7d808ef","user_id":"ae9dcfce-4bde-48c7-a669-728d0748033c","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"4eef4f42-138b-4993-bd9c-a6e2f7d808ef","user_id":"d0d0d0d0-3333-0000-0000-000000000001","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"2a0b0a73-5ec8-4805-a2e2-0c5ced9b8cf8","user_id":"ae9dcfce-4bde-48c7-a669-728d0748033c","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"2a0b0a73-5ec8-4805-a2e2-0c5ced9b8cf8","user_id":"d0d0d0d0-3333-0000-0000-000000000002","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"ff648cf3-dc2f-46da-85fb-93345c05561a","user_id":"ae9dcfce-4bde-48c7-a669-728d0748033c","role_in_thread":"curator","joined_at":"2026-07-05T17:15:59.933789+00:00"},
+--   {"thread_id":"ff648cf3-dc2f-46da-85fb-93345c05561a","user_id":"d0d0d0d0-3333-0000-0000-000000000003","role_in_thread":"student","joined_at":"2026-07-05T17:15:59.933789+00:00"}
+-- ]
+-- Note: only the teacher_demo (46b5c585...) and 3 real-student rows on the
+-- "Программирование N-А (демо)" threads (d09f63af/66da79d5/4f720216) are
+-- actually deleted by migration 79 Part 3a. The demo_teacher/demo_student
+-- rows on the "Демо ..." threads (e0e606b5/4eef4f42/2a0b0a73/ff648cf3) match
+-- the delete filter's user_id list only for demo_teacher's OWN curator rows
+-- there, which are correct/expected and were already his — no real user_id
+-- from this list matches those 4 threads, so they are unaffected in practice.
+-- Rollback: re-INSERT the deleted (thread_id, user_id, role_in_thread) pairs.
+
+-- ======================================================================
+-- chat_threads.title BEFORE (all already matched groups.name; Part 4 is a
+-- no-op today, kept only as a defensive idempotent safeguard)
+-- ======================================================================
+-- [
+--   {"id":"629d2279-b0f3-4d5b-9396-5ac14ec039e9","title":"3-А класс","group_id":"8ac8428a-8336-4883-bf47-1d325cf40d49"},
+--   {"id":"74d73d15-8be3-4bdd-a056-6aaa9da7ce84","title":"7-А класс","group_id":"fb4852ca-2019-43a6-914f-7d770748df92"},
+--   {"id":"26ba10c9-bae6-4500-867d-502ec9313352","title":"10-А класс","group_id":"0ebed461-a7cc-46c6-8f0d-cf302f67831e"},
+--   {"id":"d09f63af-f510-4470-aae1-5e9469a441e7","title":"Программирование 3-А (демо)","group_id":"d0d0d0d0-2222-0000-0000-000000000001"},
+--   {"id":"66da79d5-3c7b-4626-96f8-605db0a4a8af","title":"Программирование 7-А (демо)","group_id":"d0d0d0d0-2222-0000-0000-000000000002"},
+--   {"id":"4f720216-3965-4fcb-b41b-20674417ebcf","title":"Программирование 10-А (демо)","group_id":"d0d0d0d0-2222-0000-0000-000000000003"},
+--   {"id":"e0e606b5-dc46-467e-a94c-aeba7d9b002e","title":"Демо-класс","group_id":"010e78cf-fa9b-4673-b051-03a0dcd77093"},
+--   {"id":"4eef4f42-138b-4993-bd9c-a6e2f7d808ef","title":"Демо 3-А","group_id":"d0d0d0d0-4444-0000-0000-000000000001"},
+--   {"id":"2a0b0a73-5ec8-4805-a2e2-0c5ced9b8cf8","title":"Демо 7-А","group_id":"d0d0d0d0-4444-0000-0000-000000000002"},
+--   {"id":"ff648cf3-dc2f-46da-85fb-93345c05561a","title":"Демо 10-А","group_id":"d0d0d0d0-4444-0000-0000-000000000003"}
+-- ]
+
+-- ======================================================================
+-- notifications rows about to be DELETEd (32 orphaned test/sanity-check
+-- rows from earlier hotfixes this session, titles "[MIGRATION 71/72
+-- SANITY CHECK - DELETE ME]" and "[I6P2 SANITY CHECK - DELETE ME]";
+-- their source_id no longer exists in announcements). Full row list (32):
+-- ======================================================================
+-- [
+--   {"id":"da08e23d-cc99-44dc-ae1d-2841e44066fb","recipient_user_id":"d0d0d0d0-3333-0000-0000-000000000002","kind":"announcement","title":"[MIGRATION 71/72 SANITY CHECK - DELETE ME]","source_id":"ecc76fec-f269-45e6-a8a1-bd4c22c1b670","created_at":"2026-07-04T18:26:29.337197+00:00"},
+--   {"id":"d3e8a4f1-551e-49c8-a6c2-8c687d375fbd","recipient_user_id":"d0d0d0d0-3333-0000-0000-000000000003","kind":"announcement","title":"[MIGRATION 71/72 SANITY CHECK - DELETE ME]","source_id":"ecc76fec-f269-45e6-a8a1-bd4c22c1b670","created_at":"2026-07-04T18:26:29.337197+00:00"},
+--   {"id":"c7b6cc74-6daa-4730-bafd-ff855d8cb66d","recipient_user_id":"6505e138-ae0c-454b-9ccc-00abbe8b7725","kind":"announcement","title":"[MIGRATION 71/72 SANITY CHECK - DELETE ME]","source_id":"ecc76fec-f269-45e6-a8a1-bd4c22c1b670","created_at":"2026-07-04T18:26:29.337197+00:00"},
+--   {"id":"eaf9703f-0298-48e5-8cbf-328211598d0a","recipient_user_id":"d0d0d0d0-3333-0000-0000-000000000001","kind":"announcement","title":"[MIGRATION 71/72 SANITY CHECK - DELETE ME]","source_id":"ecc76fec-f269-45e6-a8a1-bd4c22c1b670","created_at":"2026-07-04T18:26:29.337197+00:00"},
+--   (... 12 more from the same 2 test batches — this is 100% junk data
+--   from this session's own migration testing, not real user content;
+--   the ~16 "survivors" of an earlier narrower dedup-only plan were
+--   superseded by deleting all 32 outright, see migration 79 Part 5b
+--   comment for reasoning) ...
+--   {"id":"d52b8442-6992-4e24-9793-8c141ddd6945","recipient_user_id":"d0d0d0d0-3333-0000-0000-000000000002","kind":"announcement","title":"[I6P2 SANITY CHECK - DELETE ME]","source_id":"32afc79d-fd57-4414-8902-d81840c30cfc","created_at":"2026-07-05T06:40:20.459616+00:00"}
+-- ]
+-- Rollback: not meaningful (these are test artifacts, not real content) —
+-- if ever needed, re-run with title text above and appropriate recipient.
