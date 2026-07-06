@@ -14,19 +14,25 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      const db = getSupabase();
-      const { data } = await db.auth.getSession();
-      if (data.session) {
-        const profile = await fetchParentProfile();
-        if (profile) {
-          setInitialProfile(profile);
-        } else {
-          // Сессия есть, но это не родитель (или строка parents исчезла) — выходим.
-          await db.auth.signOut();
+      try {
+        const db = getSupabase();
+        const { data } = await db.auth.getSession();
+        if (data.session) {
+          const profile = await fetchParentProfile();
+          if (profile) {
+            setInitialProfile(profile);
+          } else {
+            // Сессия есть, но это не родитель (или строка parents исчезла) — выходим.
+            await db.auth.signOut();
+          }
         }
+      } catch {
+        // Ошибка на старте (сеть/хранилище) не должна вешать сплэш навечно —
+        // просто идём на LoginScreen как при отсутствии сессии.
+      } finally {
+        setReady(true);
+        await SplashScreen.hideAsync();
       }
-      setReady(true);
-      await SplashScreen.hideAsync();
     })();
   }, []);
 
