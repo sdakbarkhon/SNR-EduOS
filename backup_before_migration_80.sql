@@ -1,0 +1,27 @@
+-- Pre-migration note for migration 80 (populate_real_classes_and_parents).
+-- Captured 2026-07-06, hosted project qaljcmkkajqyawccxetq.
+--
+-- Unlike migration 79, this migration is PURELY ADDITIVE — it only INSERTs
+-- new auth.users / auth.identities / students / student_groups /
+-- chat_participants / parents / parent_students rows. It does not DELETE or
+-- UPDATE any pre-existing row, so there is no prior state to snapshot for
+-- rollback purposes.
+--
+-- Confirmed before running (see Хотфикс П8.2 Part 0 report): none of the
+-- following 14 emails existed in auth.users prior to this migration:
+--   aziza_10@students.snr.local, farrukh_10@students.snr.local,
+--   diyora_10@students.snr.local, bekzod_07@students.snr.local,
+--   malika_07@students.snr.local, sardor_07@students.snr.local,
+--   rustam_03@students.snr.local, zarina_03@students.snr.local,
+--   demo_student_extra_10@demo.snr.local, demo_student_extra_7@demo.snr.local,
+--   demo_student_extra_3@demo.snr.local,
+--   parent_ismailov@parents.snr.local, parent_rakhimov@parents.snr.local,
+--   parent_karimov@parents.snr.local, parent_yusupov@parents.snr.local,
+--   parent_aliev@parents.snr.local, parent_nazarov@parents.snr.local
+--
+-- Rollback (if ever needed): DELETE FROM auth.users WHERE email IN (...) —
+-- ON DELETE CASCADE on students.user_id/parents.user_id/auth.identities.user_id
+-- removes all dependent rows (students, parents, student_groups via
+-- students cascade, parent_students via parents cascade, chat_participants
+-- has no FK to auth.users directly but rows become orphaned references to
+-- deleted user_ids and can be cleaned up by user_id IN (...) if needed).
