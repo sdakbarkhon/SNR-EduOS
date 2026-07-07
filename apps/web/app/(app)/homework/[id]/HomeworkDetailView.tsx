@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GlassCard, SubjectIcon, useLocale } from "@/components";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
+import { BundleSolver } from "./BundleSolver";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -397,6 +398,11 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   // Programming homework → dedicated two-column pseudo-IDE page.
   if (hw.content_type === "programming") {
     return <ProgrammingIDE hw={hw} />;
+  }
+
+  // Bundle homework → subtask accordion + own submit flow.
+  if (hw.content_type === "bundle") {
+    return <BundleSolver hw={hw} />;
   }
 
   return (

@@ -6,24 +6,28 @@ import {
   getDictionary,
   createTeacherHomework,
   createTestQuestions,
+  createHomeworkSubtasks,
   uploadHomeworkAttachment,
   setHomeworkAttachment,
   uploadHomeworkTestsFile,
   getTeacherLessonsForGroup,
 } from "@snr/core";
-import type { Locale } from "@snr/core";
+import type { Locale, HomeworkSubtaskType } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, GraduationCap, Code } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, GraduationCap, Code, Layers, GripVertical, Puzzle } from "lucide-react";
 import { TeacherAIPanel } from "./TeacherAIPanel";
+import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
+import { EduOSAiIcon } from "@/components/EduOSAiIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 
-type Format = "file" | "test" | "learning" | "programming";
+type Format = "file" | "test" | "learning" | "programming" | "bundle";
 type QuestionType = "single_choice" | "open";
 
 interface Option { text: string; isCorrect: boolean }
 interface Question { type: QuestionType; text: string; options: Option[] }
+interface Subtask { type: HomeworkSubtaskType; title: string; description: string; config: Record<string, unknown> }
 
 interface Props {
   groups: Array<{ id: string; name: string; subject: string }>;
@@ -55,10 +59,12 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiToast, setAiToast] = useState(false);
+  const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
 
   useEffect(() => {
     if (!groupId) return;
@@ -106,6 +112,18 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     setQuestions((qs) => qs.map((q, idx) => idx === qi ? { ...q, options: q.options.map((o, oidx) => ({ ...o, isCorrect: oidx === oi })) } : q));
   }
 
+  function addSubtask(type: HomeworkSubtaskType) {
+    setSubtasks((ts) => ts.length >= 10 ? ts : [...ts, { type, title: "", description: "", config: {} }]);
+  }
+
+  function removeSubtask(i: number) {
+    setSubtasks((ts) => ts.filter((_, idx) => idx !== i));
+  }
+
+  function updateSubtask(i: number, patch: Partial<Subtask>) {
+    setSubtasks((ts) => ts.map((t, idx) => idx === i ? { ...t, ...patch } : t));
+  }
+
   function handleAIApply(data: {
     title: string;
     description: string;
@@ -127,10 +145,36 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     setTimeout(() => setAiToast(false), 4000);
   }
 
+  function handleAiGenerateApply(data: GeneratedHomework) {
+    setTitle(data.title);
+    setDescription(data.description);
+    if (format === "test" && data.config?.questions) {
+      setQuestions(
+        data.config.questions.map((q) => ({
+          type: "single_choice" as QuestionType,
+          text: q.question,
+          options: q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correctIndex })),
+        })),
+      );
+    }
+    if (format === "programming" && data.config) {
+      if (data.config.starterCode) setStarterCode(data.config.starterCode);
+      if (data.config.expectedOutput) setExpectedOutput(data.config.expectedOutput);
+      if (data.config.language) setProgLanguage(data.config.language);
+    }
+    if (format === "bundle" && data.subtasks) {
+      setSubtasks(data.subtasks.map((s) => ({ type: s.type, title: s.title, description: s.description, config: s.config })));
+    }
+    setAiToast(true);
+    setTimeout(() => setAiToast(false), 4000);
+  }
+
   async function save(status: "draft" | "published") {
     if (format === "learning") return; // stub
     if (!title.trim()) { setError("Введите название"); return; }
     if (format === "programming" && !description.trim()) { setError("Введите условие задачи"); return; }
+    if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
+    if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
     if (!groupId) { setError("Выберите группу"); return; }
     if (!deadline) { setError("Укажите дедлайн"); return; }
 
@@ -150,7 +194,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
       const hw = await createTeacherHomework(supabase, {
         groupId, title: title.trim(), description: description.trim(),
         dueDate: deadline,
-        contentType: format === "test" ? "test" : format === "programming" ? "programming" : "file",
+        contentType: format === "test" ? "test" : format === "programming" ? "programming" : format === "bundle" ? "bundle" : "file",
         teacherId: resolvedTeacherId,
         lessonId: lessonId || null,
         status,
@@ -184,6 +228,11 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           tests_attachment_path: path, tests_attachment_filename: testsFile.name, tests_attachment_size_bytes: sizeByte,
         }).eq("id", hw.id);
       }
+      if (format === "bundle" && subtasks.length > 0) {
+        await createHomeworkSubtasks(supabase, hw.id, subtasks.map((s, i) => ({
+          type: s.type, title: s.title.trim(), description: s.description.trim() || null, config: s.config, orderIndex: i,
+        })));
+      }
       router.push("/teacher/homework");
     } catch (e: unknown) {
       setError((e as Error).message ?? d.common.error);
@@ -198,6 +247,13 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
     { key: "learning", label: d.homework.typeLearning, Icon: GraduationCap },
     { key: "programming", label: d.homework.typeProgramming, Icon: Code },
+    { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
+  ];
+  const SUBTASK_TYPE_TABS: Array<{ key: HomeworkSubtaskType; label: string }> = [
+    { key: "file", label: d.homework.typeFile },
+    { key: "test", label: d.homework.typeTest },
+    { key: "code", label: d.homework.typeProgrammingShort },
+    { key: "scratch", label: d.homework.typeScratch },
   ];
 
   return (
@@ -209,13 +265,23 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         <h1 className="flex-1 text-[22px] font-bold text-brand-ink">
           {d.teacher.newHomeworkTitle}
         </h1>
-        {!isStub && (
+        {!isStub && format !== "bundle" && (
           <button
             type="button"
             onClick={() => setAiPanelOpen(true)}
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
           >
             <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
+          </button>
+        )}
+        {!isStub && (
+          <button
+            type="button"
+            onClick={() => setAiGenerateOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-600 shadow-sm transition-all hover:bg-orange-50"
+          >
+            <EduOSAiIcon className="h-5 w-5" />
+            {d.ai.generateHomework.button}
           </button>
         )}
       </div>
@@ -486,6 +552,54 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           </div>
         </div>
       )}
+
+      {format === "bundle" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[16px] font-bold text-brand-ink">{d.teacher.bundleSubtasksBlock}</h2>
+            <span className="text-[12px] text-brand-ink-muted">{d.teacher.bundleMinHint}</span>
+          </div>
+
+          {subtasks.length === 0 && (
+            <p className="rounded-[14px] border-2 border-dashed border-slate-200 py-6 text-center text-[13px] text-brand-ink-muted">
+              {d.teacher.bundleEmptyHint}
+            </p>
+          )}
+
+          {subtasks.map((s, si) => (
+            <div key={si} className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-4 space-y-3"
+              style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+              <div className="flex items-start gap-3">
+                <GripVertical size={16} className="mt-2 shrink-0 text-slate-300" />
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-[12px] font-bold text-brand-blue">{si + 1}</span>
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select value={s.type} onChange={(e) => updateSubtask(si, { type: e.target.value as HomeworkSubtaskType })}
+                      className="rounded-[8px] border border-slate-200 bg-white px-2 py-1 text-[12px] text-brand-ink focus:outline-none">
+                      {SUBTASK_TYPE_TABS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                    </select>
+                    <button onClick={() => removeSubtask(si)} title={d.teacher.bundleRemoveSubtask} className="ml-auto text-slate-400 hover:text-danger">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <input value={s.title} onChange={(e) => updateSubtask(si, { title: e.target.value })}
+                    placeholder={d.teacher.bundleSubtaskTitle}
+                    className="w-full rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2 text-[14px] text-brand-ink focus:outline-none focus:border-brand-blue/50" />
+                  <textarea rows={2} value={s.description} onChange={(e) => updateSubtask(si, { description: e.target.value })}
+                    placeholder={d.teacher.bundleSubtaskDesc}
+                    className="w-full rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2 text-[13px] text-brand-ink focus:outline-none focus:border-brand-blue/50 resize-none" />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button onClick={() => addSubtask("file")}
+            className="w-full rounded-[14px] border-2 border-dashed border-slate-200 py-3 text-[13px] font-semibold text-brand-ink-muted transition-all hover:border-brand-blue/40 hover:text-brand-blue">
+            <Puzzle size={14} className="mr-1.5 inline" />
+            {d.teacher.bundleAddSubtask}
+          </button>
+        </div>
+      )}
       </>
       )}
 
@@ -511,10 +625,18 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         onApply={handleAIApply}
       />
 
+      <HomeworkAiGenerateModal
+        isOpen={aiGenerateOpen}
+        onClose={() => setAiGenerateOpen(false)}
+        type={format === "learning" ? "file" : format}
+        groupLabel={groups.find((g) => g.id === groupId)?.name ?? ""}
+        onApply={handleAiGenerateApply}
+      />
+
       {aiToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[14px] bg-slate-800 px-4 py-3 text-[13px] font-medium text-white shadow-xl">
           <Check className="h-4 w-4 text-green-400" />
-          Задание заполнено AI. Проверьте и опубликуйте.
+          {d.ai.generateHomework.appliedToast}
         </div>
       )}
     </div>

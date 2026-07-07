@@ -9,7 +9,7 @@
 export type StudentStatus = "active" | "debtor" | "frozen";
 export type LessonStatus = "scheduled" | "in_progress" | "completed";
 export type AttendanceStatus = "present" | "absent_excused" | "absent_unexcused";
-export type SubmissionStatus = "submitted" | "checking" | "graded";
+export type SubmissionStatus = "in_progress" | "submitted" | "checking" | "graded";
 export type PaymentStatus = "completed" | "pending" | "canceled";
 export type PaymentKind = "subscription" | "one_time";
 
@@ -416,9 +416,38 @@ export type HomeworkSubmission = {
 };
 
 /** Homework с join'ом группы и опциональной сдачей студента. */
-export type ContentType = 'file' | 'test' | 'programming';
+export type ContentType = 'file' | 'test' | 'programming' | 'bundle';
 export type ProgrammingLanguage = 'python' | 'cpp';
 export type HomeworkSource = 'curriculum' | 'teacher';
+
+// ─── BUNDLE HOMEWORK (migration 87) ────────────────────────────────────────
+// content_type='bundle': 1+ subtasks of mixed types, solved independently,
+// graded as one whole via the existing gradeSubmission() (grade+comment live
+// on homework_submissions, same as file/programming — no per-subtask grade).
+
+export type HomeworkSubtaskType = 'file' | 'test' | 'code' | 'scratch';
+
+export type HomeworkSubtask = {
+  id: string;
+  homework_id: string;
+  order_index: number;
+  type: HomeworkSubtaskType;
+  title: string;
+  description: string | null;
+  config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type HomeworkSubtaskSubmission = {
+  id: string;
+  submission_id: string;
+  subtask_id: string;
+  content: Record<string, unknown>;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
 export type TestQuestionOption = {
   id: string;
@@ -483,6 +512,7 @@ export type HomeworkWithSubmission = {
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;
+  subtasks?: HomeworkSubtask[];               // bundle only, populated by getHomeworkById
 };
 
 // ── Projects (migration 33) ─────────────────────────────────────────

@@ -14,6 +14,7 @@ import {
 } from "@snr/core";
 import { Code2 } from "lucide-react";
 import { TeacherProgrammingSubmissions } from "./TeacherProgrammingSubmissions";
+import { TeacherBundleSubmissions } from "./TeacherBundleSubmissions";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
@@ -342,9 +343,11 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
             <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
               hw.content_type === "test" ? "bg-violet-100 text-violet-700"
                 : hw.content_type === "programming" ? "bg-emerald-100 text-emerald-700"
+                : hw.content_type === "bundle" ? "bg-indigo-100 text-indigo-700"
                 : "bg-blue-100 text-blue-700")}>
               {hw.content_type === "test" ? d.homework.typeTest
                 : hw.content_type === "programming" ? d.homework.typeProgramming
+                : hw.content_type === "bundle" ? d.homework.typeBundle
                 : d.homework.typeFile}
             </span>
           </div>
@@ -467,6 +470,8 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           language={hw.programming_language ?? "python"}
           submissions={localSubs}
         />
+      ) : hw.content_type === "bundle" ? (
+        <TeacherBundleSubmissions hw={hw} submissions={localSubs} />
       ) : (
       /* Submissions list */
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5"

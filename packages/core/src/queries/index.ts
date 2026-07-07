@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -248,47 +248,51 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
     );
 };
 
-/** Одна запись ДЗ с join'ом и сдачей (для детальной страницы). */
-export const getHomeworkById = (db: Db, id: string) =>
-  db
+/** Одна запись ДЗ с join'ом и сдачей (для детальной страницы).
+ *  Для content_type='bundle' дополнительно подгружает subtasks (order_index asc). */
+export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithSubmission> => {
+  const r = await db
     .from("homework")
     .select("*, content_type, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .eq("id", id)
     .single()
-    .then(unwrap)
-    .then((r) => {
-      const raw = r as unknown as {
-        id: string; group_id: string; lesson_id: string | null; title: string;
-        description: string | null; due_date: string | null; attachments: unknown;
-        content_type: ContentType; source: HomeworkSource;
-        teacher_id: string | null;
-        attachment_storage_path: string | null;
-        attachment_size_bytes: number | null;
-        attachment_filename: string | null;
-        test_duration_seconds: number | null;
-        test_auto_grade: boolean;
-        programming_language: "python" | "cpp" | null;
-        starter_code: string | null;
-        expected_output: string | null;
-        tests_attachment_path: string | null;
-        tests_attachment_filename: string | null;
-        tests_attachment_size_bytes: number | null;
-        created_at: string;
-        group: { subject: string; name: string };
-        submissions: HomeworkSubmission[];
-        test_subs: TestSubmission[];
-      };
-      return {
-        ...raw,
-        attachments: (raw.attachments ?? []) as HomeworkAttachment[],
-        content_type: raw.content_type ?? 'file',
-        source: raw.source ?? 'curriculum',
-        submission: raw.submissions?.[0] ?? null,
-        test_submission: raw.test_subs?.[0] ?? null,
-        submissions: undefined,
-        test_subs: undefined,
-      } as HomeworkWithSubmission;
-    });
+    .then(unwrap);
+  const raw = r as unknown as {
+    id: string; group_id: string; lesson_id: string | null; title: string;
+    description: string | null; due_date: string | null; attachments: unknown;
+    content_type: ContentType; source: HomeworkSource;
+    teacher_id: string | null;
+    attachment_storage_path: string | null;
+    attachment_size_bytes: number | null;
+    attachment_filename: string | null;
+    test_duration_seconds: number | null;
+    test_auto_grade: boolean;
+    programming_language: "python" | "cpp" | null;
+    starter_code: string | null;
+    expected_output: string | null;
+    tests_attachment_path: string | null;
+    tests_attachment_filename: string | null;
+    tests_attachment_size_bytes: number | null;
+    created_at: string;
+    group: { subject: string; name: string };
+    submissions: HomeworkSubmission[];
+    test_subs: TestSubmission[];
+  };
+  const hw = {
+    ...raw,
+    attachments: (raw.attachments ?? []) as HomeworkAttachment[],
+    content_type: raw.content_type ?? 'file',
+    source: raw.source ?? 'curriculum',
+    submission: raw.submissions?.[0] ?? null,
+    test_submission: raw.test_subs?.[0] ?? null,
+    submissions: undefined,
+    test_subs: undefined,
+  } as HomeworkWithSubmission;
+  if (hw.content_type === 'bundle') {
+    hw.subtasks = await getHomeworkSubtasks(db, id);
+  }
+  return hw;
+};
 
 /** Загружает аватар в бакет avatars/<studentId>/avatar.<ext>, возвращает signed URL. */
 export const uploadAvatar = async (
@@ -867,7 +871,7 @@ export const gradeSubmission = async (
   if (error) throw error;
 };
 
-/** Создать ДЗ (file или test). Returns created homework record. */
+/** Создать ДЗ (file, test, programming или bundle). Returns created homework record. */
 export const createTeacherHomework = async (
   db: Db,
   input: {
@@ -875,7 +879,7 @@ export const createTeacherHomework = async (
     title: string;
     description: string;
     dueDate: string;
-    contentType: "file" | "test" | "programming";
+    contentType: "file" | "test" | "programming" | "bundle";
     teacherId: string;
     lessonId?: string | null;
     status?: "draft" | "published";
@@ -1248,6 +1252,121 @@ export const getProgrammingSubmission = async (
     .eq("student_id", studentId)
     .maybeSingle();
   return (data as HomeworkSubmission | null) ?? null;
+};
+
+// ─── BUNDLE HOMEWORK (migration 87/88) ─────────────────────────────────────
+
+/** Создать подзадачи для homework типа 'bundle' (в порядке orderIndex). */
+export const createHomeworkSubtasks = async (
+  db: Db,
+  homeworkId: string,
+  subtasks: Array<{
+    type: HomeworkSubtaskType;
+    title: string;
+    description?: string | null;
+    config?: Record<string, unknown>;
+    orderIndex: number;
+  }>,
+): Promise<HomeworkSubtask[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("homework_subtasks")
+    .insert(
+      subtasks.map((s) => ({
+        homework_id: homeworkId,
+        order_index: s.orderIndex,
+        type: s.type,
+        title: s.title,
+        description: s.description ?? null,
+        config: s.config ?? {},
+      })),
+    )
+    .select("*");
+  if (error) throw error;
+  return data as HomeworkSubtask[];
+};
+
+/** Подзадачи ДЗ-набора, по порядку. */
+export const getHomeworkSubtasks = (db: Db, homeworkId: string) =>
+  db
+    .from("homework_subtasks")
+    .select("*")
+    .eq("homework_id", homeworkId)
+    .order("order_index", { ascending: true })
+    .then(unwrap) as Promise<HomeworkSubtask[]>;
+
+/** Найти или лениво создать homework_submissions для bundle-ДЗ ученика.
+ *  status='in_progress' — ещё не финальная сдача, поэтому не попадает в
+ *  "ожидает проверки" у учителя (см. миграцию 88). */
+export const getOrCreateBundleSubmission = async (
+  db: Db,
+  { homeworkId, studentId }: { homeworkId: string; studentId: string },
+): Promise<HomeworkSubmission> => {
+  const { data: existing } = await db
+    .from("homework_submissions")
+    .select("*")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (existing) return existing as unknown as HomeworkSubmission;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("homework_submissions")
+    .insert({ homework_id: homeworkId, student_id: studentId, status: "in_progress" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as HomeworkSubmission;
+};
+
+/** Сохранить прогресс по одной подзадаче (upsert по submission_id+subtask_id).
+ *  Вызывается при каждом изменении — реальное сохранение, не черновик в памяти. */
+export const saveHomeworkSubtaskProgress = async (
+  db: Db,
+  { submissionId, subtaskId, content, completed }: {
+    submissionId: string;
+    subtaskId: string;
+    content: Record<string, unknown>;
+    completed: boolean;
+  },
+): Promise<HomeworkSubtaskSubmission> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("homework_subtask_submissions")
+    .upsert(
+      {
+        submission_id: submissionId,
+        subtask_id: subtaskId,
+        content,
+        completed,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "submission_id,subtask_id" },
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as HomeworkSubtaskSubmission;
+};
+
+/** Прогресс по всем подзадачам одной сдачи (ученик или учитель на проверке). */
+export const getHomeworkSubtaskSubmissions = (db: Db, submissionId: string) =>
+  db
+    .from("homework_subtask_submissions")
+    .select("*")
+    .eq("submission_id", submissionId)
+    .then(unwrap) as Promise<HomeworkSubtaskSubmission[]>;
+
+/** Финальная сдача bundle-ДЗ целиком ("Отправить всё") — переводит
+ *  status 'in_progress' -> 'submitted', попадает в очередь учителя. */
+export const submitHomeworkBundle = async (db: Db, submissionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("homework_submissions")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("id", submissionId);
+  if (error) throw error;
 };
 
 // ─── LESSON DETAIL ───────────────────────────────────────────────────────────

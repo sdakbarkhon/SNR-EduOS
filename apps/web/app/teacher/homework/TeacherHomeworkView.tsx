@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 type Submission = { id: string; status: string };
 type TestSub = { id: string; student_id: string };
 type HomeworkItem = {
-  id: string; title: string; due_date: string | null; content_type: "file" | "test" | "programming";
+  id: string; title: string; due_date: string | null; content_type: "file" | "test" | "programming" | "bundle";
   teacher_id: string | null;
   group: {
     id: string; name: string; subject: string;
@@ -329,9 +329,12 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
                         ? "border-amber-200/50 bg-amber-100/80 text-amber-700"
                         : hw.content_type === "programming"
                         ? "border-emerald-200/50 bg-emerald-100/80 text-emerald-700"
+                        : hw.content_type === "bundle"
+                        ? "border-purple-200/50 bg-purple-100/80 text-purple-700"
                         : "border-gray-200/50 bg-gray-100/80 text-gray-700")}>
                       {hw.content_type === "test" ? d.homework.typeTest
                         : hw.content_type === "programming" ? d.homework.typeProgramming
+                        : hw.content_type === "bundle" ? d.homework.typeBundle
                         : d.homework.typeFile}
                     </span>
                     {active && (

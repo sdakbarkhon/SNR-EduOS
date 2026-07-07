@@ -524,6 +524,8 @@ export interface Dictionary {
     // Homework types (migration 31)
     typeLearning: string;
     typeProgramming: string;
+    typeBundle: string;
+    typeScratch: string;
     // новые ключи — редизайн /homework (Iter5 P8)
     searchPlaceholder: string;
     typeAll: string;
@@ -597,6 +599,20 @@ export interface Dictionary {
       testsFile: string;        // "Файл с тестами"
       download: string;         // "Скачать"
       noCode: string;           // "Ученик ещё не отправил код"
+    };
+    bundle: {
+      subtasksTitle: string;
+      subtaskDone: string;
+      subtaskInProgress: string;
+      subtaskNotStarted: string;
+      progressLabel: string;      // "{done} из {total} подзадач выполнено"
+      submitAll: string;
+      confirmPartialTitle: string;
+      confirmPartialBody: string; // "Ты выполнил {done} из {total} подзадач. Отправить сейчас?"
+      confirmSubmitBtn: string;
+      confirmBackBtn: string;
+      submittedStatus: string;
+      openSubtask: string;
     };
   };
   projects: {
@@ -1441,6 +1457,17 @@ export interface Dictionary {
     hwDeleteAttachConfirm: string;
     hwDownloadAttach: string;
     hwCreatedMsg: string;
+    bundleSubtasksBlock: string;
+    bundleAddSubtask: string;
+    bundleSubtaskType: string;
+    bundleSubtaskTitle: string;
+    bundleSubtaskDesc: string;
+    bundleMinHint: string;
+    bundleRemoveSubtask: string;
+    bundleEmptyHint: string;
+    bundleGradeLabel: string;
+    bundleCommentLabel: string;
+    bundleStudentAnswers: string;
     reviewDownloadWork: string;
     rollCallTitle: string;
     rollCallSubtitle: string;
@@ -1560,6 +1587,21 @@ export interface Dictionary {
       collapse: string;          // "Свернуть"
       expand: string;            // "Развернуть"
       loading: string;           // "Думаю…"
+    };
+    generateHomework: {
+      button: string;
+      title: string;
+      topicLabel: string;
+      topicPlaceholder: string;
+      levelLabel: string;
+      hintsLabel: string;
+      hintsPlaceholder: string;
+      bundleTypesLabel: string;
+      bundleTypesHint: string;
+      generateBtn: string;
+      generating: string;
+      error: string;
+      appliedToast: string;
     };
     generate: {
       button: string;            // "✨ Добавить этапы через ИИ"

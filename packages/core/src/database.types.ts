@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admins: {
@@ -502,6 +527,160 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          attachments: Json | null
+          body: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          school_id: string
+          sender_id: string | null
+          thread_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          school_id?: string
+          sender_id?: string | null
+          thread_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          school_id?: string
+          sender_id?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_participants: {
+        Row: {
+          joined_at: string
+          role_in_thread: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role_in_thread: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role_in_thread?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_participants_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_read_state: {
+        Row: {
+          last_read_message_id: string | null
+          thread_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          last_read_message_id?: string | null
+          thread_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          last_read_message_id?: string | null
+          thread_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_read_state_last_read_message_id_fkey"
+            columns: ["last_read_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_read_state_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_threads: {
+        Row: {
+          created_at: string
+          group_id: string | null
+          id: string
+          kind: string
+          school_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          kind: string
+          school_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          kind?: string
+          school_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_threads_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_threads_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -1124,6 +1303,101 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      homework_subtask_submissions: {
+        Row: {
+          completed: boolean
+          content: Json
+          created_at: string
+          id: string
+          school_id: string
+          submission_id: string
+          subtask_id: string
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          content?: Json
+          created_at?: string
+          id?: string
+          school_id?: string
+          submission_id: string
+          subtask_id: string
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          content?: Json
+          created_at?: string
+          id?: string
+          school_id?: string
+          submission_id?: string
+          subtask_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "homework_subtask_submissions_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "homework_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "homework_subtask_submissions_subtask_id_fkey"
+            columns: ["subtask_id"]
+            isOneToOne: false
+            referencedRelation: "homework_subtasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      homework_subtasks: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          homework_id: string
+          id: string
+          order_index: number
+          school_id: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          homework_id: string
+          id?: string
+          order_index?: number
+          school_id?: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          homework_id?: string
+          id?: string
+          order_index?: number
+          school_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "homework_subtasks_homework_id_fkey"
+            columns: ["homework_id"]
+            isOneToOne: false
+            referencedRelation: "homework"
             referencedColumns: ["id"]
           },
         ]
@@ -1756,61 +2030,6 @@ export type Database = {
           },
         ]
       }
-      messages: {
-        Row: {
-          body: string
-          created_at: string
-          group_id: string | null
-          id: string
-          read_at: string | null
-          recipient_student_id: string | null
-          school_id: string
-          sender_id: string | null
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          group_id?: string | null
-          id?: string
-          read_at?: string | null
-          recipient_student_id?: string | null
-          school_id?: string
-          sender_id?: string | null
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          group_id?: string | null
-          id?: string
-          read_at?: string | null
-          recipient_student_id?: string | null
-          school_id?: string
-          sender_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "messages_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_recipient_student_id_fkey"
-            columns: ["recipient_student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       notification_settings: {
         Row: {
           push_attendance: boolean
@@ -1899,6 +2118,135 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parent_invites: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          parent_id: string
+          school_id: string
+          used_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          parent_id: string
+          school_id?: string
+          used_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          parent_id?: string
+          school_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parent_invites_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parent_students: {
+        Row: {
+          created_at: string
+          parent_id: string
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          parent_id: string
+          school_id?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          parent_id?: string
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parent_students_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          full_name: string
+          id: string
+          phone: string | null
+          school_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          full_name: string
+          id?: string
+          phone?: string | null
+          school_id?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          school_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parents_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -2888,9 +3236,24 @@ export type Database = {
         }
         Returns: undefined
       }
+      is_my_child: { Args: { p_student_id: string }; Returns: boolean }
+      is_my_child_group: { Args: { p_group_id: string }; Returns: boolean }
+      is_my_child_lesson: { Args: { p_lesson_id: string }; Returns: boolean }
       is_my_group: { Args: { p_group_id: string }; Returns: boolean }
       is_my_teacher_group: { Args: { p_group_id: string }; Returns: boolean }
+      is_my_thread: { Args: { p_thread_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      notify_user_and_parents: {
+        Args: {
+          p_body: string
+          p_link: string
+          p_source_id: string
+          p_student_id: string
+          p_title: string
+          p_type: string
+        }
+        Returns: undefined
+      }
       reset_demo_data: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -2900,12 +3263,12 @@ export type Database = {
         | "event"
         | "urgent"
         | "reminder"
-      content_type: "file" | "test" | "programming"
+      content_type: "file" | "test" | "programming" | "bundle"
       homework_source: "curriculum" | "teacher"
       payment_kind: "subscription" | "one_time"
       payment_status: "completed" | "pending" | "canceled"
       student_status: "active" | "debtor" | "frozen"
-      submission_status: "submitted" | "checking" | "graded"
+      submission_status: "in_progress" | "submitted" | "checking" | "graded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3031,6 +3394,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       announcement_category: [
@@ -3040,12 +3406,12 @@ export const Constants = {
         "urgent",
         "reminder",
       ],
-      content_type: ["file", "test", "programming"],
+      content_type: ["file", "test", "programming", "bundle"],
       homework_source: ["curriculum", "teacher"],
       payment_kind: ["subscription", "one_time"],
       payment_status: ["completed", "pending", "canceled"],
       student_status: ["active", "debtor", "frozen"],
-      submission_status: ["submitted", "checking", "graded"],
+      submission_status: ["in_progress", "submitted", "checking", "graded"],
     },
   },
 } as const

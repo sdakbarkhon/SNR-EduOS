@@ -22,6 +22,7 @@ export type StatusKey =
   | "active"
   | "debtor"
   | "frozen"
+  | "inProgress"
   | "submitted"
   | "checking"
   | "graded"
@@ -66,6 +67,8 @@ export function studentStatus(status: StudentStatus): StatusBadge {
 
 export function submissionStatus(status: SubmissionStatus): StatusBadge {
   switch (status) {
+    case "in_progress":
+      return { variant: "warning", key: "inProgress" };
     case "submitted":
       return { variant: "info", key: "submitted" };
     case "checking":

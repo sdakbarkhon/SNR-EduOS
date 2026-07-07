@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, Layers, type LucideIcon } from "lucide-react";
 import {
   getDictionary,
   getSubjectStyle,
@@ -18,6 +18,7 @@ const TYPE_STYLE: Record<ContentType, { bg: string; text: string; Icon: LucideIc
   file: { bg: "bg-blue-50", text: "text-blue-600", Icon: FileText },
   test: { bg: "bg-violet-50", text: "text-violet-600", Icon: ClipboardCheck },
   programming: { bg: "bg-orange-50", text: "text-orange-600", Icon: Code2 },
+  bundle: { bg: "bg-purple-50", text: "text-purple-600", Icon: Layers },
 };
 
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
@@ -37,7 +38,9 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
       ? d.homework.typeTest
       : hw.content_type === "programming"
         ? d.homework.typeProgrammingShort
-        : d.homework.typeFile;
+        : hw.content_type === "bundle"
+          ? d.homework.typeBundle
+          : d.homework.typeFile;
 
   const dueLabel = hw.due_date
     ? d.homework.dueUntil.replace(
