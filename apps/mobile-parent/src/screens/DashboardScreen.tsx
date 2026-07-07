@@ -8,7 +8,12 @@ import { getMyChildren, type ParentChild } from "../lib/queries";
 import type { ParentProfile } from "../lib/auth";
 
 // Соотношение сторон брендового логотипа (тот же PNG, что и на вебе).
+// Высота и ширина заданы явными числами (не через style.aspectRatio) —
+// на Android aspectRatio у Image ненадёжно резолвится с локальным require(),
+// изображение может отрисоваться в исходных пикселях (849×285) и обрезаться.
 const LOGO_ASPECT = 849 / 285;
+const HEADER_LOGO_HEIGHT = 44;
+const HEADER_LOGO_WIDTH = Math.round(HEADER_LOGO_HEIGHT * LOGO_ASPECT);
 
 export default function DashboardScreen({
   profile,
@@ -52,7 +57,7 @@ export default function DashboardScreen({
         >
           <Image
             source={require("../../assets/logo-full.png")}
-            style={{ height: 26, aspectRatio: LOGO_ASPECT }}
+            style={{ width: HEADER_LOGO_WIDTH, height: HEADER_LOGO_HEIGHT }}
             resizeMode="contain"
           />
         </View>

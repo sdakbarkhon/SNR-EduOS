@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Locale } from "@snr/core";
 import { useAppLocale } from "../i18n";
 import { loginAsParent, NotParentError, type ParentProfile } from "../lib/auth";
@@ -18,7 +19,12 @@ const ORANGE_FROM = "#F97316";
 const ORANGE_TO = "#FBBF24";
 
 // Соотношение сторон брендового логотипа (тот же PNG, что и на вебе).
+// Высота и ширина заданы явными числами (не через style.aspectRatio) —
+// на Android aspectRatio у Image ненадёжно резолвится с локальным require(),
+// изображение может отрисоваться в исходных пикселях (849×285) и обрезаться.
 const LOGO_ASPECT = 849 / 285;
+const LOGIN_LOGO_HEIGHT = 90;
+const LOGIN_LOGO_WIDTH = Math.round(LOGIN_LOGO_HEIGHT * LOGO_ASPECT);
 
 const LANGS: { code: Locale; label: string }[] = [
   { code: "ru", label: "RU" },
@@ -34,6 +40,7 @@ export default function LoginScreen({
   const { locale, d, setLocale } = useAppLocale();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -67,7 +74,7 @@ export default function LoginScreen({
           <View style={{ alignItems: "center", gap: 12 }}>
             <Image
               source={require("../../assets/logo-full.png")}
-              style={{ width: 240, aspectRatio: LOGO_ASPECT }}
+              style={{ width: LOGIN_LOGO_WIDTH, height: LOGIN_LOGO_HEIGHT }}
               resizeMode="contain"
             />
             <Text style={{ fontSize: 15, color: "#6B7280" }}>{d.parentMobile.loginSubtitle}</Text>
@@ -100,21 +107,35 @@ export default function LoginScreen({
               <Text style={{ fontSize: 13, color: "#4A5568", fontWeight: "500" }}>
                 {d.auth.passwordLabel}
               </Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder={d.auth.passwordPlaceholder}
-                placeholderTextColor="#94A3B8"
-                style={{
-                  backgroundColor: "#F4F6FB",
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  fontSize: 16,
-                  color: "#1A1A24",
-                }}
-              />
+              <View style={{ justifyContent: "center" }}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  placeholder={d.auth.passwordPlaceholder}
+                  placeholderTextColor="#94A3B8"
+                  style={{
+                    backgroundColor: "#F4F6FB",
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingRight: 44,
+                    paddingVertical: 12,
+                    fontSize: 16,
+                    color: "#1A1A24",
+                  }}
+                />
+                <Pressable
+                  onPress={() => setShowPassword((v) => !v)}
+                  hitSlop={10}
+                  style={{ position: "absolute", right: 12 }}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color="#8A93A8"
+                  />
+                </Pressable>
+              </View>
             </View>
 
             {error ? <Text style={{ color: "#DC2626", fontSize: 13 }}>{error}</Text> : null}
