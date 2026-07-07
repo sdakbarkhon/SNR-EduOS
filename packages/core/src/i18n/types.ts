@@ -650,7 +650,8 @@ export interface Dictionary {
     typePython: string;
     typeArduino: string;
     typeWeb: string;
-    typeScratch: string;
+    typeGeogebra: string;
+    typePhet: string;
   };
   sandbox: {
     title: string;          // "Проекты (песочница)"
@@ -659,11 +660,19 @@ export interface Dictionary {
     modeProjects: string;   // вкладка "Проекты"
     modeSandbox: string;    // вкладка "Песочница"
     tools: {
-      scratch: { name: string; description: string };
       wokwi: { name: string; description: string };
       codesandbox: { name: string; description: string };
       makecode: { name: string; description: string };
       code: { name: string; description: string };
+      geogebra: { name: string; description: string };
+      phet: { name: string; description: string };
+      desmos: { name: string; description: string };
+      blockly_games: { name: string; description: string };
+      visualgo: { name: string; description: string };
+      p5js: { name: string; description: string };
+      excalidraw: { name: string; description: string };
+      learningapps: { name: string; description: string };
+      sqlonline: { name: string; description: string };
     };
   };
   // Iter5 P10 — standalone /ai-assistant page (Claude Design redesign);
@@ -1019,10 +1028,18 @@ export interface Dictionary {
     stageBadgeTask: string;            // "Задача"
     stageContentPresentation: string;  // "Презентация"
     stageContentCode: string;          // "Программирование (код)"
-    stageContentScratch: string;       // "Scratch"
     stageContentWokwi: string;         // "Wokwi"
     stageContentCodesandbox: string;   // "CodeSandbox"
     stageContentMakecode: string;      // "MakeCode Arcade"
+    stageContentGeogebra: string;      // "GeoGebra"
+    stageContentPhet: string;          // "PhET Simulations"
+    stageContentDesmos: string;        // "Desmos"
+    stageContentBlocklyGames: string;  // "Blockly Games"
+    stageContentVisualgo: string;      // "VisuAlgo"
+    stageContentP5js: string;          // "p5.js Web Editor"
+    stageContentExcalidraw: string;    // "Excalidraw"
+    stageContentLearningapps: string;  // "Learning Apps"
+    stageContentSqlonline: string;     // "SQL Online"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"
     stageStepLabel: string;            // "Этап {n}"
@@ -1136,9 +1153,8 @@ export interface Dictionary {
       gradeSaved: string;
       submittedAt: string;
     };
-    // External services: scratch / wokwi / codesandbox / makecode
+    // External services: wokwi / codesandbox / makecode
     external: {
-      scratch: string;
       wokwi: string;
       codesandbox: string;
       makecode: string;

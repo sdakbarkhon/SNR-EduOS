@@ -71,14 +71,22 @@ function TaskStubModal({
 
   const contentName = stage.content_type
     ? {
-        presentation: d.stageContentPresentation,
-        code:         d.stageContentCode,
-        scratch:      d.stageContentScratch,
-        wokwi:        d.stageContentWokwi,
-        codesandbox:  d.stageContentCodesandbox,
-        makecode:     d.stageContentMakecode,
-        quiz_qia:     d.stageContentQuizQia,
-        quiz_kahoot:  d.stageContentQuizKahoot,
+        presentation:   d.stageContentPresentation,
+        code:           d.stageContentCode,
+        wokwi:          d.stageContentWokwi,
+        codesandbox:    d.stageContentCodesandbox,
+        makecode:       d.stageContentMakecode,
+        quiz_qia:       d.stageContentQuizQia,
+        quiz_kahoot:    d.stageContentQuizKahoot,
+        geogebra:       d.stageContentGeogebra,
+        phet:           d.stageContentPhet,
+        desmos:         d.stageContentDesmos,
+        blockly_games:  d.stageContentBlocklyGames,
+        visualgo:       d.stageContentVisualgo,
+        p5js:           d.stageContentP5js,
+        excalidraw:     d.stageContentExcalidraw,
+        learningapps:   d.stageContentLearningapps,
+        sqlonline:      d.stageContentSqlonline,
       }[stage.content_type] ?? stage.content_type
     : null;
 

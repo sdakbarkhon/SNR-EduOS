@@ -12,9 +12,13 @@ export const maxDuration = 60;
 
 const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
-  "scratch", "wokwi", "codesandbox", "makecode",
+  "wokwi", "codesandbox", "makecode",
+  "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
 ];
-const EXTERNAL = ["scratch", "wokwi", "codesandbox", "makecode"];
+const EXTERNAL = [
+  "wokwi", "codesandbox", "makecode",
+  "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
+];
 
 type AttachedMaterial = { title: string; text: string };
 
@@ -46,19 +50,22 @@ function buildPrompt(input: {
 
   // IMPORTANT: this must be driven by the TOPIC, never by the subject name alone.
   // Subjects like "Информатика"/"Робототехника"/"Программирование" also cover
-  // Scratch/Arduino/web topics — matching on the subject string used to force
+  // GeoGebra/PhET/Arduino/web topics — matching on the subject string used to force
   // EVERY lesson under those subjects into an all-Python "code" progression,
-  // which is exactly why the AI never proposed scratch/wokwi/codesandbox/makecode.
+  // which is exactly why the AI never proposed geogebra/phet/wokwi/codesandbox/makecode.
   const topicLower = input.topic.toLowerCase();
   const PYTHON_TOPIC_HINTS = [
     "python", "питон", "цикл", "функци", "алгоритм", "перемен", "массив",
     "список", "рекурси", "условн", "структур данн",
   ];
   const OTHER_TOOL_HINTS = [
-    "scratch", "скретч", "блочн", "кот", "arduino", "ардуино",
+    "блочн", "arduino", "ардуино",
     "светодиод", "датчик", "схем", "wokwi", "микроконтроллер", "html", "css",
     "javascript", "сайт", "веб", "makecode", "аркада", "приставка", "квиз", "kahoot",
     "qia", "повторени",
+    "geogebra", "геогебра", "phet", "симуляц", "desmos", "калькулятор граф",
+    "blockly", "visualgo", "сортировк", "p5.js", "p5js", "excalidraw", "доска",
+    "learningapps", "learning apps", "sqlonline", "sql",
   ];
   const mentionsPython = PYTHON_TOPIC_HINTS.some((kw) => topicLower.includes(kw));
   const mentionsOtherTool = OTHER_TOOL_HINTS.some((kw) => topicLower.includes(kw));
@@ -98,17 +105,33 @@ ${programmingSection}
 - "code" — программирование в Monaco редакторе (stage_type: "task")
 - "quiz_qia" — асинхронный тест с вопросами (stage_type: "task")
 - "quiz_kahoot" — синхронный live-квиз с таймером (stage_type: "task")
-- "scratch" — визуальное блочное программирование, классы 1–7
 - "makecode" — игровое программирование Microsoft, классы 5–9
 - "wokwi" — Arduino/электроника симуляция, классы 7–11
 - "codesandbox" — веб-разработка HTML/CSS/JS, классы 9–11
+- "geogebra" — графики, геометрия, статистика (математика), классы 5–11
+- "phet" — симуляции по физике, химии, биологии, классы 6–11
+- "desmos" — графический калькулятор и алгебра, классы 7–11
+- "blockly_games" — визуальное блочное программирование, младшие классы 1–6
+- "visualgo" — визуализация алгоритмов и структур данных, классы 8–11
+- "p5js" — creative coding, рисование и анимация через JavaScript, классы 7–11
+- "excalidraw" — виртуальная доска для схем и диаграмм, любые классы
+- "learningapps" — интерактивные упражнения и мини-игры, классы 1–9
+- "sqlonline" — SQL-запросы в браузере, классы 9–11
 
 ВАЖНО: название предмета ("Информатика", "Робототехника", "Программирование") само по себе
 НЕ означает что все этапы должны быть "code" — эти предметы охватывают ВСЕ инструменты выше
-(Scratch, Arduino/Wokwi, веб, Python). Решает ТЕМА урока, а не название предмета.
+(GeoGebra, PhET, Arduino/Wokwi, веб, Python и другие). Решает ТЕМА урока, а не название предмета.
 
 ПОДСКАЗКА ПО КЛЮЧЕВЫМ СЛОВАМ В ТЕМЕ:
-- "Scratch", "блоки", "кот", "анимация", "игра" (младшие классы) → content_type="scratch"
+- "GeoGebra", "график", "геометрия", "статистика" → content_type="geogebra"
+- "PhET", "симуляция", "опыт", "физика", "химия", "биология" → content_type="phet"
+- "Desmos", "калькулятор", "график функции", "алгебра" → content_type="desmos"
+- "Blockly", "блоки", "визуальное программирование", "игра" (младшие классы) → content_type="blockly_games"
+- "VisuAlgo", "алгоритм", "сортировка", "структуры данных" (визуализация) → content_type="visualgo"
+- "p5.js", "creative coding", "рисование кодом", "анимация" (JavaScript) → content_type="p5js"
+- "Excalidraw", "схема", "диаграмма", "доска" → content_type="excalidraw"
+- "LearningApps", "интерактивное упражнение", "мини-игра" → content_type="learningapps"
+- "SQL", "база данных", "запросы" (старшие классы) → content_type="sqlonline"
 - "Arduino", "светодиод", "датчик", "схема", "робот", "микроконтроллер" → content_type="wokwi"
 - "HTML", "CSS", "JavaScript", "веб", "сайт", "страница" → content_type="codesandbox"
 - "аркада", "приставка", "MakeCode", "игра" (младшие классы) → content_type="makecode"
@@ -167,17 +190,17 @@ ${programmingSection}
 - Вопросы проверяют ПОНИМАНИЕ концепции темы урока, а не запоминание синтаксиса.
 - Для content_type='quiz_kahoot' поле "quiz" НЕ заполняй — учитель добавит вопросы вручную позже.
 
-ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='scratch'|'wokwi'|'codesandbox'|'makecode'):
+ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='geogebra'|'phet'|'desmos'|'blockly_games'|'visualgo'|'p5js'|'excalidraw'|'learningapps'|'sqlonline'|'wokwi'|'codesandbox'|'makecode'):
 - Ссылку (URL) НЕ указывай — система сама подставит редактор по умолчанию.
 - Обязательно заполни description (что именно должен сделать ученик в редакторе) и teacher_notes
   (на что учителю обратить внимание при демонстрации/проверке), например:
-  - scratch: teacher_notes = "Начни с показа готового кота на своём экране, потом дай ученикам самим экспериментировать"
+  - geogebra: teacher_notes = "Начни с построения графика на своём экране, потом дай ученикам самим поэкспериментировать с параметрами"
   - wokwi: teacher_notes = "Проверь понимание: попроси ученика объяснить что делает каждый провод"
   - quiz_qia: teacher_notes = "Разбери каждую ошибку — вопросы про смысл понятия, а не про синтаксис"
 
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
-  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"scratch"|"wokwi"|"codesandbox"|"makecode",
+  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"wokwi"|"codesandbox"|"makecode"|"geogebra"|"phet"|"desmos"|"blockly_games"|"visualgo"|"p5js"|"excalidraw"|"learningapps"|"sqlonline",
   "stage_type": "theory"|"task",
   "title": "Короткое название",
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",

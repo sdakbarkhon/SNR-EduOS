@@ -12,7 +12,7 @@ import type {
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { SERVICE_CONFIG, toScratchIframeSrc } from "@/lib/external-services";
+import { SERVICE_CONFIG } from "@/lib/external-services";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 
 const GRADE_COLORS: Record<number, string> = {
@@ -27,17 +27,26 @@ const GRADE_COLORS: Record<number, string> = {
 // a fixed default project/editor for the service instead of leaving the
 // stage unusable.
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
-  scratch: "https://scratch.mit.edu/projects/1351866425",
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
   makecode: "https://arcade.makecode.com/99842-77365-57673-38391",
+  geogebra: "https://www.geogebra.org/classic",
+  phet: "https://phet.colorado.edu/sims/html/forces-and-motion-basics/latest/forces-and-motion-basics_en.html",
+  desmos: "https://www.desmos.com/calculator",
+  blockly_games: "https://blockly.games/",
+  visualgo: "https://visualgo.net/en",
+  p5js: "https://editor.p5js.org/",
+  excalidraw: "https://excalidraw.com/",
+  learningapps: "https://learningapps.org/",
+  sqlonline: "https://sqlime.org/",
 };
 
 /**
- * External-service (scratch/wokwi/codesandbox/makecode) embedded directly in
- * the stage card. Owns its full header (title/description/actions on one
- * row), no "Open" gate, no fullscreen modal, no "open in new tab" fallback —
- * all four services embed via iframe.
+ * External-service (wokwi/codesandbox/makecode/geogebra/phet/desmos/
+ * blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline) embedded
+ * directly in the stage card. Owns its full header (title/description/
+ * actions on one row), no "Open" gate, no fullscreen modal, no "open in new
+ * tab" fallback — all twelve services embed via iframe.
  */
 export function ExternalStageModal({
   stage, studentId, onSubmitted,
@@ -58,7 +67,7 @@ export function ExternalStageModal({
   const embeddable = meta.embedSupported;
   const embedUrl = cfg.embed_url || DEFAULT_EXTERNAL_URLS[service] || null;
   const openUrl = cfg.url || DEFAULT_EXTERNAL_URLS[service] || null;
-  const iframeSrc = service === "scratch" ? toScratchIframeSrc(embedUrl) : embedUrl;
+  const iframeSrc = embedUrl;
 
   const existingSub = (stage.progress?.submission_data ?? null) as ExternalServiceSubmission | null;
   const isSubmitted = !!stage.progress?.submission_data;

@@ -3,7 +3,10 @@
 //
 // Adding a new tool later = append one entry here (+ its i18n in sandbox.tools).
 
-export type SandboxToolId = "scratch" | "wokwi" | "codesandbox" | "makecode" | "code";
+export type SandboxToolId =
+  | "wokwi" | "codesandbox" | "makecode" | "code"
+  | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
+  | "p5js" | "excalidraw" | "learningapps" | "sqlonline";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -16,13 +19,6 @@ export type SandboxTool = {
 };
 
 export const SANDBOX_TOOLS: SandboxTool[] = [
-  {
-    id: "scratch",
-    kind: "iframe",
-    embedUrl: "https://scratch.mit.edu/projects/1351866425/embed",
-    icon: "🎨",
-    gradient: "from-orange-400 to-amber-500",
-  },
   {
     id: "wokwi",
     kind: "iframe",
@@ -43,6 +39,69 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://arcade.makecode.com/",
     icon: "🎮",
     gradient: "from-violet-500 to-purple-600",
+  },
+  {
+    id: "geogebra",
+    kind: "iframe",
+    embedUrl: "https://www.geogebra.org/classic",
+    icon: "📐",
+    gradient: "from-green-500 to-emerald-600",
+  },
+  {
+    id: "phet",
+    kind: "iframe",
+    embedUrl: "https://phet.colorado.edu/sims/html/forces-and-motion-basics/latest/forces-and-motion-basics_en.html",
+    icon: "🔬",
+    gradient: "from-blue-500 to-indigo-600",
+  },
+  {
+    id: "desmos",
+    kind: "iframe",
+    embedUrl: "https://www.desmos.com/calculator",
+    icon: "📈",
+    gradient: "from-teal-500 to-cyan-600",
+  },
+  {
+    id: "blockly_games",
+    kind: "iframe",
+    embedUrl: "https://blockly.games/",
+    icon: "🧩",
+    gradient: "from-amber-400 to-orange-500",
+  },
+  {
+    id: "visualgo",
+    kind: "iframe",
+    embedUrl: "https://visualgo.net/en",
+    icon: "🔀",
+    gradient: "from-purple-500 to-violet-600",
+  },
+  {
+    id: "p5js",
+    kind: "iframe",
+    embedUrl: "https://editor.p5js.org/",
+    icon: "🎨",
+    gradient: "from-pink-500 to-rose-600",
+  },
+  {
+    id: "excalidraw",
+    kind: "iframe",
+    embedUrl: "https://excalidraw.com/",
+    icon: "🖊️",
+    gradient: "from-slate-500 to-slate-700",
+  },
+  {
+    id: "learningapps",
+    kind: "iframe",
+    embedUrl: "https://learningapps.org/",
+    icon: "🧠",
+    gradient: "from-lime-500 to-green-600",
+  },
+  {
+    id: "sqlonline",
+    kind: "iframe",
+    embedUrl: "https://sqlime.org/",
+    icon: "🗄️",
+    gradient: "from-cyan-600 to-blue-700",
   },
   {
     id: "code",

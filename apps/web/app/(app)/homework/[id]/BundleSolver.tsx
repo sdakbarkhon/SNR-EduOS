@@ -22,12 +22,20 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, Modal, SubjectIcon, useLocale } from "@/components";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
-import { toScratchIframeSrc } from "@/lib/external-services";
 import { cn } from "@/lib/cn";
 
-// Same fallback used by lesson stages when the teacher didn't attach a
-// specific Scratch project URL (see ExternalStageModal.tsx).
+// Same fallback used previously by lesson stages when the teacher didn't
+// attach a specific Scratch project URL. The lesson-stage Scratch service
+// itself was removed (УЧ.8), but the "scratch" bundle-homework subtask type
+// (a separate, unrelated feature — see HomeworkSubtaskType) still lets a
+// student embed a Scratch project, so this normalizer stays local to this file.
 const DEFAULT_SCRATCH_EMBED = "https://scratch.mit.edu/projects/1351866425/embed";
+
+function toScratchIframeSrc(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const match = url.trim().match(/scratch\.mit\.edu\/projects\/(\d+)/);
+  return match ? `https://scratch.mit.edu/projects/${match[1]}/embed` : null;
+}
 
 type TestQuestionConfig = { question: string; options: string[]; correctIndex: number };
 type Dict = ReturnType<typeof getDictionary>;

@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2,
+  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -48,14 +49,22 @@ import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
-  presentation: <Presentation className="h-4 w-4" />,
-  code:         <Code2 className="h-4 w-4" />,
-  scratch:      <Puzzle className="h-4 w-4" />,
-  wokwi:        <CircuitBoard className="h-4 w-4" />,
-  codesandbox:  <Code2 className="h-4 w-4" />,
-  makecode:     <Gamepad2 className="h-4 w-4" />,
-  quiz_qia:     <TestTube2 className="h-4 w-4" />,
-  quiz_kahoot:  <Gamepad2 className="h-4 w-4" />,
+  presentation:   <Presentation className="h-4 w-4" />,
+  code:           <Code2 className="h-4 w-4" />,
+  wokwi:          <CircuitBoard className="h-4 w-4" />,
+  codesandbox:    <Code2 className="h-4 w-4" />,
+  makecode:       <Gamepad2 className="h-4 w-4" />,
+  quiz_qia:       <TestTube2 className="h-4 w-4" />,
+  quiz_kahoot:    <Gamepad2 className="h-4 w-4" />,
+  geogebra:       <Ruler className="h-4 w-4" />,
+  phet:           <FlaskConical className="h-4 w-4" />,
+  desmos:         <LineChart className="h-4 w-4" />,
+  blockly_games:  <Puzzle className="h-4 w-4" />,
+  visualgo:       <Shuffle className="h-4 w-4" />,
+  p5js:           <Palette className="h-4 w-4" />,
+  excalidraw:     <PenTool className="h-4 w-4" />,
+  learningapps:   <Brain className="h-4 w-4" />,
+  sqlonline:      <Database className="h-4 w-4" />,
 };
 
 function fmtDate(iso: string): string {
@@ -81,7 +90,8 @@ type ModalStep = 1 | 2 | 3;
 
 const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
-  "code", "scratch", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
+  "code", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
+  "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
 ];
 
 function StageModal({
@@ -137,7 +147,7 @@ function StageModal({
   const [expectedOutput, setExpectedOutput] = useState(existing?.expected_output ?? existingCfg.expected_output ?? "");
   const isCode = contentType === "code";
 
-  // external-service config (scratch/wokwi/codesandbox/makecode)
+  // external-service config (wokwi/codesandbox/makecode/geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline)
   const existingExtCfg = (existing?.config ?? {}) as Partial<ExternalServiceConfig>;
   const isExternal = isExternalService(contentType);
   const externalMeta = isExternal ? SERVICE_CONFIG[contentType as ExternalServiceType] : null;
@@ -952,14 +962,22 @@ export function TeacherLessonDetailView({
 
   function contentLabel(ct: LessonContentType): string {
     const map: Record<LessonContentType, string> = {
-      presentation: dl.stageContentPresentation,
-      code:         dl.stageContentCode,
-      scratch:      dl.stageContentScratch,
-      wokwi:        dl.stageContentWokwi,
-      codesandbox:  dl.stageContentCodesandbox,
-      makecode:     dl.stageContentMakecode,
-      quiz_qia:     dl.stageContentQuizQia,
-      quiz_kahoot:  dl.stageContentQuizKahoot,
+      presentation:   dl.stageContentPresentation,
+      code:           dl.stageContentCode,
+      wokwi:          dl.stageContentWokwi,
+      codesandbox:    dl.stageContentCodesandbox,
+      makecode:       dl.stageContentMakecode,
+      quiz_qia:       dl.stageContentQuizQia,
+      quiz_kahoot:    dl.stageContentQuizKahoot,
+      geogebra:       dl.stageContentGeogebra,
+      phet:           dl.stageContentPhet,
+      desmos:         dl.stageContentDesmos,
+      blockly_games:  dl.stageContentBlocklyGames,
+      visualgo:       dl.stageContentVisualgo,
+      p5js:           dl.stageContentP5js,
+      excalidraw:     dl.stageContentExcalidraw,
+      learningapps:   dl.stageContentLearningapps,
+      sqlonline:      dl.stageContentSqlonline,
     };
     return map[ct] ?? ct;
   }

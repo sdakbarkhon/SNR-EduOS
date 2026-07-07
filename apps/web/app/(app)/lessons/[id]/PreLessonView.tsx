@@ -23,7 +23,10 @@ function stageTypeIcon(ct: LessonContentType | null): LucideIcon {
     case "code": return Code2;
     case "quiz_qia": return ClipboardCheck;
     case "quiz_kahoot": return Trophy;
-    case "scratch": case "wokwi": case "codesandbox": case "makecode": return Puzzle;
+    case "wokwi": case "codesandbox": case "makecode":
+    case "geogebra": case "phet": case "desmos": case "blockly_games": case "visualgo":
+    case "p5js": case "excalidraw": case "learningapps": case "sqlonline":
+      return Puzzle;
     default: return BookOpen;
   }
 }
@@ -34,10 +37,18 @@ function stageTypeLabel(ct: LessonContentType | null, dl: ReturnType<typeof getD
     case "code": return dl.stageContentCode;
     case "quiz_qia": return dl.stageContentQuizQia;
     case "quiz_kahoot": return dl.stageContentQuizKahoot;
-    case "scratch": return dl.stageContentScratch;
     case "wokwi": return dl.stageContentWokwi;
     case "codesandbox": return dl.stageContentCodesandbox;
     case "makecode": return dl.stageContentMakecode;
+    case "geogebra": return dl.stageContentGeogebra;
+    case "phet": return dl.stageContentPhet;
+    case "desmos": return dl.stageContentDesmos;
+    case "blockly_games": return dl.stageContentBlocklyGames;
+    case "visualgo": return dl.stageContentVisualgo;
+    case "p5js": return dl.stageContentP5js;
+    case "excalidraw": return dl.stageContentExcalidraw;
+    case "learningapps": return dl.stageContentLearningapps;
+    case "sqlonline": return dl.stageContentSqlonline;
     default: return "";
   }
 }

@@ -6,6 +6,7 @@ import {
   X, Sparkles, Loader2, Check, Clock,
   BookOpen, Code2, TestTube2, Gamepad2, Puzzle, CircuitBoard, Globe,
   Paperclip, Search, Copy, ExternalLink,
+  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database,
 } from "lucide-react";
 import { addLessonStage, replaceQuizQuestions, getDictionary } from "@snr/core";
 import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide, QuizQuestionInput } from "@snr/core";
@@ -36,7 +37,10 @@ interface GenerateResult {
   external: string[];
 }
 
-const EXTERNAL = ["scratch", "wokwi", "codesandbox", "makecode"];
+const EXTERNAL = [
+  "wokwi", "codesandbox", "makecode",
+  "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -46,10 +50,18 @@ function stageIcon(ct: string) {
     case "code": return <Code2 className="h-4 w-4" />;
     case "quiz_qia": return <TestTube2 className="h-4 w-4" />;
     case "quiz_kahoot": return <Gamepad2 className="h-4 w-4" />;
-    case "scratch": return <Puzzle className="h-4 w-4" />;
     case "wokwi": return <CircuitBoard className="h-4 w-4" />;
     case "codesandbox": return <Code2 className="h-4 w-4" />;
     case "makecode": return <Gamepad2 className="h-4 w-4" />;
+    case "geogebra": return <Ruler className="h-4 w-4" />;
+    case "phet": return <FlaskConical className="h-4 w-4" />;
+    case "desmos": return <LineChart className="h-4 w-4" />;
+    case "blockly_games": return <Puzzle className="h-4 w-4" />;
+    case "visualgo": return <Shuffle className="h-4 w-4" />;
+    case "p5js": return <Palette className="h-4 w-4" />;
+    case "excalidraw": return <PenTool className="h-4 w-4" />;
+    case "learningapps": return <Brain className="h-4 w-4" />;
+    case "sqlonline": return <Database className="h-4 w-4" />;
     default: return null;
   }
 }
@@ -63,10 +75,18 @@ function ctLabel(
     case "code": return t.code;
     case "quiz_qia": return t.quizQia;
     case "quiz_kahoot": return t.quizKahoot;
-    case "scratch": return "Scratch";
     case "wokwi": return "Wokwi";
     case "codesandbox": return "CodeSandbox";
     case "makecode": return "MakeCode";
+    case "geogebra": return "GeoGebra";
+    case "phet": return "PhET Simulations";
+    case "desmos": return "Desmos";
+    case "blockly_games": return "Blockly Games";
+    case "visualgo": return "VisuAlgo";
+    case "p5js": return "p5.js Web Editor";
+    case "excalidraw": return "Excalidraw";
+    case "learningapps": return "Learning Apps";
+    case "sqlonline": return "SQL Online";
     default: return ct;
   }
 }
