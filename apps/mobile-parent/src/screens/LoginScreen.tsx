@@ -17,6 +17,9 @@ import { loginAsParent, NotParentError, type ParentProfile } from "../lib/auth";
 const ORANGE_FROM = "#F97316";
 const ORANGE_TO = "#FBBF24";
 
+// Соотношение сторон брендового логотипа (тот же PNG, что и на вебе).
+const LOGO_ASPECT = 849 / 285;
+
 const LANGS: { code: Locale; label: string }[] = [
   { code: "ru", label: "RU" },
   { code: "uz", label: "UZ" },
@@ -63,12 +66,10 @@ export default function LoginScreen({
         >
           <View style={{ alignItems: "center", gap: 12 }}>
             <Image
-              source={require("../../assets/icon.png")}
-              style={{ width: 88, height: 88, borderRadius: 22 }}
+              source={require("../../assets/logo-full.png")}
+              style={{ width: 240, aspectRatio: LOGO_ASPECT }}
+              resizeMode="contain"
             />
-            <Text style={{ fontSize: 24, fontWeight: "700", color: "#1A1A24" }}>
-              {d.common.appName}
-            </Text>
             <Text style={{ fontSize: 15, color: "#6B7280" }}>{d.parentMobile.loginSubtitle}</Text>
           </View>
 

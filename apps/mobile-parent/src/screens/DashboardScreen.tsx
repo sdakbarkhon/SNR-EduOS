@@ -7,7 +7,8 @@ import { getSupabase } from "../lib/supabase";
 import { getMyChildren, type ParentChild } from "../lib/queries";
 import type { ParentProfile } from "../lib/auth";
 
-const COMING_SOON_SECTIONS = ["schedule", "grades", "homework", "attendance", "payments", "messages"] as const;
+// Соотношение сторон брендового логотипа (тот же PNG, что и на вебе).
+const LOGO_ASPECT = 849 / 285;
 
 export default function DashboardScreen({
   profile,
@@ -49,10 +50,11 @@ export default function DashboardScreen({
             borderBottomColor: "#EEF2FB",
           }}
         >
-          <Image source={require("../../assets/icon.png")} style={{ width: 32, height: 32, borderRadius: 8 }} />
-          <Text style={{ fontSize: 17, fontWeight: "700", color: "#1A1A24", flex: 1 }}>
-            {d.common.appName}
-          </Text>
+          <Image
+            source={require("../../assets/logo-full.png")}
+            style={{ height: 26, aspectRatio: LOGO_ASPECT }}
+            resizeMode="contain"
+          />
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }}>
@@ -97,22 +99,6 @@ export default function DashboardScreen({
                 ))}
               </View>
             )}
-          </View>
-
-          <View style={{ gap: 10 }}>
-            {COMING_SOON_SECTIONS.map((key) => (
-              <View
-                key={key}
-                style={{
-                  backgroundColor: "#fff",
-                  borderRadius: 16,
-                  padding: 16,
-                  opacity: 0.6,
-                }}
-              >
-                <Text style={{ fontSize: 14, color: "#8A93A8" }}>{d.parentMobile.comingSoonSection}</Text>
-              </View>
-            ))}
           </View>
 
           <Pressable
