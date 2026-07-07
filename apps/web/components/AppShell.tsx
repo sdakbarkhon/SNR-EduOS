@@ -11,6 +11,7 @@ import { Topbar } from "./Topbar";
 import { ToastProvider } from "./Toast";
 import { navItems } from "./nav-items";
 import { LessonStartBanner } from "./LessonStartBanner";
+import { AiFloatingButton } from "./AiFloatingButton";
 
 export function AppShell({
   studentName,
@@ -56,6 +57,11 @@ export function AppShell({
           </main>
           <BottomNav />
         </div>
+
+        {/* Reachable from every student page except the fullscreen-lesson
+            branch above (workspace/pre-lesson/presentations) — that branch
+            returns early and never reaches this JSX. */}
+        <AiFloatingButton />
       </div>
     </ToastProvider>
   );

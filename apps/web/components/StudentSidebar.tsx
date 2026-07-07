@@ -30,9 +30,13 @@ const STUB_ITEMS: SidebarItem[] = [
   { key: "messages", href: "/messages", icon: MessageCircle, label: (d) => d.nav.messages },
 ];
 
+// "ai" is filtered out here only — nav-items.ts itself is left untouched
+// since BottomNav.tsx (and the AI-assistant page's own route) still consume
+// it unchanged; the AI assistant is now a floating button (see
+// AiFloatingButton.tsx), not a sidebar destination.
 function buildItems(): SidebarItem[] {
-  const projectsIdx = baseNavItems.findIndex((i) => i.key === "projects");
-  const items = [...baseNavItems] as SidebarItem[];
+  const items = (baseNavItems as SidebarItem[]).filter((i) => i.key !== "ai");
+  const projectsIdx = items.findIndex((i) => i.key === "projects");
   items.splice(projectsIdx + 1, 0, ...STUB_ITEMS);
   return items;
 }
