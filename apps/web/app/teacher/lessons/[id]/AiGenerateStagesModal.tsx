@@ -36,7 +36,7 @@ interface GenerateResult {
   external: string[];
 }
 
-const EXTERNAL = ["turbowarp", "wokwi", "codesandbox", "makecode"];
+const EXTERNAL = ["scratch", "wokwi", "codesandbox", "makecode"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ function stageIcon(ct: string) {
     case "code": return <Code2 className="h-4 w-4" />;
     case "quiz_qia": return <TestTube2 className="h-4 w-4" />;
     case "quiz_kahoot": return <Gamepad2 className="h-4 w-4" />;
-    case "turbowarp": return <Puzzle className="h-4 w-4" />;
+    case "scratch": return <Puzzle className="h-4 w-4" />;
     case "wokwi": return <CircuitBoard className="h-4 w-4" />;
     case "codesandbox": return <Code2 className="h-4 w-4" />;
     case "makecode": return <Gamepad2 className="h-4 w-4" />;
@@ -63,7 +63,7 @@ function ctLabel(
     case "code": return t.code;
     case "quiz_qia": return t.quizQia;
     case "quiz_kahoot": return t.quizKahoot;
-    case "turbowarp": return "TurboWarp";
+    case "scratch": return "Scratch";
     case "wokwi": return "Wokwi";
     case "codesandbox": return "CodeSandbox";
     case "makecode": return "MakeCode";

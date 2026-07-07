@@ -50,7 +50,7 @@ import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   presentation: <Presentation className="h-4 w-4" />,
   code:         <Code2 className="h-4 w-4" />,
-  turbowarp:    <Puzzle className="h-4 w-4" />,
+  scratch:      <Puzzle className="h-4 w-4" />,
   wokwi:        <CircuitBoard className="h-4 w-4" />,
   codesandbox:  <Code2 className="h-4 w-4" />,
   makecode:     <Gamepad2 className="h-4 w-4" />,
@@ -81,7 +81,7 @@ type ModalStep = 1 | 2 | 3;
 
 const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
-  "code", "turbowarp", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
+  "code", "scratch", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
 ];
 
 function StageModal({
@@ -137,7 +137,7 @@ function StageModal({
   const [expectedOutput, setExpectedOutput] = useState(existing?.expected_output ?? existingCfg.expected_output ?? "");
   const isCode = contentType === "code";
 
-  // external-service config (turbowarp/wokwi/codesandbox/makecode)
+  // external-service config (scratch/wokwi/codesandbox/makecode)
   const existingExtCfg = (existing?.config ?? {}) as Partial<ExternalServiceConfig>;
   const isExternal = isExternalService(contentType);
   const externalMeta = isExternal ? SERVICE_CONFIG[contentType as ExternalServiceType] : null;
@@ -954,7 +954,7 @@ export function TeacherLessonDetailView({
     const map: Record<LessonContentType, string> = {
       presentation: dl.stageContentPresentation,
       code:         dl.stageContentCode,
-      turbowarp:    dl.stageContentTurbowarp,
+      scratch:      dl.stageContentScratch,
       wokwi:        dl.stageContentWokwi,
       codesandbox:  dl.stageContentCodesandbox,
       makecode:     dl.stageContentMakecode,

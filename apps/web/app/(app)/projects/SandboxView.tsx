@@ -51,7 +51,7 @@ function SandboxFullscreen({
   );
 }
 
-// ── Iframe tool (turbowarp/wokwi/codesandbox/makecode) ───────────────────────────
+// ── Iframe tool (scratch/wokwi/codesandbox/makecode) ───────────────────────────
 function IframeSandbox({ tool, name }: { tool: SandboxTool; name: string }) {
   const { locale } = useLocale();
   const dx = getDictionary(locale as Locale).lesson.external;

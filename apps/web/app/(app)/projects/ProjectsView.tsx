@@ -9,7 +9,7 @@ import { SandboxView } from "./SandboxView";
 import type { SandboxToolId } from "@/lib/sandbox-tools";
 
 type Mode = "projects" | "sandbox";
-type ProjectType = "python" | "arduino" | "web" | "turbowarp";
+type ProjectType = "python" | "arduino" | "web" | "scratch";
 type ProjectStatus = "not_started" | "in_progress" | "completed";
 
 type DemoProject = {
@@ -29,10 +29,10 @@ const DEMO_PROJECTS: DemoProject[] = [
   { id: 1, title: "Игра змейка на Python", type: "python", icon: "🐍", description: "Классическая игра Змейка с использованием Pygame", status: "in_progress", progress: 60 },
   { id: 2, title: "Мигающий светодиод Arduino", type: "arduino", icon: "💡", description: "Управление светодиодом через Wokwi симулятор", status: "completed", progress: 100 },
   { id: 3, title: "Мой первый сайт", type: "web", icon: "🌐", description: "HTML + CSS страница про хобби", status: "in_progress", progress: 40 },
-  { id: 4, title: "Танцующий кот", type: "turbowarp", icon: "🐱", description: "Анимация в TurboWarp", status: "completed", progress: 100 },
+  { id: 4, title: "Танцующий кот", type: "scratch", icon: "🐱", description: "Анимация в Scratch", status: "completed", progress: 100 },
   { id: 5, title: "Калькулятор", type: "python", icon: "🧮", description: "Простой калькулятор на Python", status: "not_started", progress: 0 },
   { id: 6, title: "Умный дом на Arduino", type: "arduino", icon: "🏠", description: "Датчики температуры и света через Wokwi", status: "in_progress", progress: 30 },
-  { id: 7, title: "Викторина на TurboWarp", type: "turbowarp", icon: "❓", description: "Интерактивная викторина по школьным предметам", status: "not_started", progress: 0 },
+  { id: 7, title: "Викторина на Scratch", type: "scratch", icon: "❓", description: "Интерактивная викторина по школьным предметам", status: "not_started", progress: 0 },
 ];
 
 // Соответствует градиентам инструментов в SANDBOX_TOOLS — карточка ведёт
@@ -41,7 +41,7 @@ const TYPE_STYLE: Record<ProjectType, { tool: SandboxToolId; gradient: string; b
   python: { tool: "code", gradient: "from-emerald-500 to-teal-600", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700", Icon: Code2 },
   arduino: { tool: "wokwi", gradient: "from-sky-400 to-blue-500", badgeBg: "bg-sky-50", badgeText: "text-sky-700", Icon: Cpu },
   web: { tool: "codesandbox", gradient: "from-slate-600 to-slate-800", badgeBg: "bg-slate-100", badgeText: "text-slate-700", Icon: Globe },
-  turbowarp: { tool: "turbowarp", gradient: "from-orange-400 to-amber-500", badgeBg: "bg-orange-50", badgeText: "text-orange-700", Icon: Code2 },
+  scratch: { tool: "scratch", gradient: "from-orange-400 to-amber-500", badgeBg: "bg-orange-50", badgeText: "text-orange-700", Icon: Code2 },
 };
 
 export function ProjectsView() {
@@ -60,7 +60,7 @@ export function ProjectsView() {
     python: t.typePython,
     arduino: t.typeArduino,
     web: t.typeWeb,
-    turbowarp: t.typeTurbowarp,
+    scratch: t.typeScratch,
   };
 
   function statusBadge(p: DemoProject) {

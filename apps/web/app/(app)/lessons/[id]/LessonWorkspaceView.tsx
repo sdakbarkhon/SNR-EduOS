@@ -73,7 +73,7 @@ function TaskStubModal({
     ? {
         presentation: d.stageContentPresentation,
         code:         d.stageContentCode,
-        turbowarp:    d.stageContentTurbowarp,
+        scratch:      d.stageContentScratch,
         wokwi:        d.stageContentWokwi,
         codesandbox:  d.stageContentCodesandbox,
         makecode:     d.stageContentMakecode,

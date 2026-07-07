@@ -1,5 +1,5 @@
 // Whitelist + URL validation for the external-service lesson stages.
-// All four services (turbowarp, wokwi, codesandbox, makecode) support iframe embed.
+// All four services (scratch, wokwi, codesandbox, makecode) support iframe embed.
 
 import type { ExternalServiceType } from "@snr/core";
 
@@ -14,27 +14,21 @@ type ServiceMeta = {
 };
 
 export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
-  turbowarp: {
-    name: "TurboWarp",
+  scratch: {
+    name: "Scratch",
     embedSupported: true,
-    // Accepts a direct TurboWarp link (blank editor or a specific project by
-    // id) as well as a real Scratch project link — TurboWarp doesn't host
-    // projects itself, so a scratch.mit.edu/projects/<id> link is still a
-    // legitimate way to point at a specific project (see extractEmbedUrl,
-    // which upgrades it to a turbowarp.org/<id>/embed URL either way).
-    urlPattern: /^https?:\/\/(www\.)?turbowarp\.org\/(editor|\d+\/(embed|fullscreen|editor))|^https?:\/\/(www\.)?scratch\.mit\.edu\/projects\/\d+/,
+    // scratch.mit.edu/projects/<id>/embed has no X-Frame-Options/CSP
+    // frame-ancestors restriction (confirmed via curl + live iframe test,
+    // УЧ.4) — unlike /editor, which sends X-Frame-Options: SAMEORIGIN and
+    // refuses to render in a cross-origin iframe.
+    urlPattern: /^https?:\/\/(www\.)?scratch\.mit\.edu\/projects\/\d+/,
     extractEmbedUrl: (url) => {
       const trimmed = url.trim();
-      if (/^https?:\/\/(www\.)?turbowarp\.org\/editor/.test(trimmed)) {
-        return "https://turbowarp.org/editor";
-      }
-      const twMatch = trimmed.match(/turbowarp\.org\/(\d+)\/(embed|fullscreen|editor)/);
-      if (twMatch) return `https://turbowarp.org/${twMatch[1]}/embed`;
       const match = trimmed.match(/projects\/(\d+)/);
       return match ? `https://scratch.mit.edu/projects/${match[1]}/embed` : null;
     },
-    placeholder: "https://turbowarp.org/editor или ссылка на проект",
-    errorMsg: "Неверная ссылка. Ожидается ссылка на TurboWarp (turbowarp.org/editor или turbowarp.org/<ID>) или проект Scratch (scratch.mit.edu/projects/...)",
+    placeholder: "https://scratch.mit.edu/projects/1351866425",
+    errorMsg: "Неверная ссылка. Ожидается ссылка на проект Scratch (scratch.mit.edu/projects/...)",
     description: "Создание интерактивных историй и игр через блоки",
   },
 
@@ -90,22 +84,14 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
 };
 
 export function isExternalService(ct: string | null | undefined): ct is ExternalServiceType {
-  return ct === "turbowarp" || ct === "wokwi" || ct === "codesandbox" || ct === "makecode";
+  return ct === "scratch" || ct === "wokwi" || ct === "codesandbox" || ct === "makecode";
 }
 
-// TurboWarp's iframe embed only renders correctly for a URL of the form
-// "https://turbowarp.org/<projectID>/embed" or a Scratch project id upgraded
-// to the same form — a bare "/editor" (the value stored when a teacher hasn't
-// picked a project, see extractEmbedUrl above) shows TurboWarp's own
-// "Invalid TurboWarp Embed :(" page when framed, even though it's a perfectly
-// valid full-page destination. This only affects what gets put in an
-// <iframe src> — it must NOT be used for validation or for the "open in a new
-// tab" link, both of which should keep accepting/using a bare /editor URL.
-export function toTurbowarpIframeSrc(url: string | null | undefined): string | null {
+// Normalizes any scratch.mit.edu/projects/<id>[/editor] URL to the
+// iframe-safe .../embed form.
+export function toScratchIframeSrc(url: string | null | undefined): string | null {
   if (!url) return null;
   const trimmed = url.trim();
-  const twMatch = trimmed.match(/turbowarp\.org\/(\d+)\/(embed|fullscreen|editor)/);
-  if (twMatch) return `https://turbowarp.org/${twMatch[1]}/embed`;
   const scratchMatch = trimmed.match(/scratch\.mit\.edu\/projects\/(\d+)/);
   if (scratchMatch) return `https://scratch.mit.edu/projects/${scratchMatch[1]}/embed`;
   return null;

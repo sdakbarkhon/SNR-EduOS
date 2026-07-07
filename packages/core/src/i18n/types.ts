@@ -634,7 +634,7 @@ export interface Dictionary {
     typePython: string;
     typeArduino: string;
     typeWeb: string;
-    typeTurbowarp: string;
+    typeScratch: string;
   };
   sandbox: {
     title: string;          // "Проекты (песочница)"
@@ -643,7 +643,7 @@ export interface Dictionary {
     modeProjects: string;   // вкладка "Проекты"
     modeSandbox: string;    // вкладка "Песочница"
     tools: {
-      turbowarp: { name: string; description: string };
+      scratch: { name: string; description: string };
       wokwi: { name: string; description: string };
       codesandbox: { name: string; description: string };
       makecode: { name: string; description: string };
@@ -1003,7 +1003,7 @@ export interface Dictionary {
     stageBadgeTask: string;            // "Задача"
     stageContentPresentation: string;  // "Презентация"
     stageContentCode: string;          // "Программирование (код)"
-    stageContentTurbowarp: string;     // "TurboWarp"
+    stageContentScratch: string;       // "Scratch"
     stageContentWokwi: string;         // "Wokwi"
     stageContentCodesandbox: string;   // "CodeSandbox"
     stageContentMakecode: string;      // "MakeCode Arcade"
@@ -1120,9 +1120,9 @@ export interface Dictionary {
       gradeSaved: string;
       submittedAt: string;
     };
-    // External services: turbowarp / wokwi / codesandbox / makecode
+    // External services: scratch / wokwi / codesandbox / makecode
     external: {
-      turbowarp: string;
+      scratch: string;
       wokwi: string;
       codesandbox: string;
       makecode: string;
@@ -1140,8 +1140,6 @@ export interface Dictionary {
       afterWork: string;          // "После работы вернись и прикрепи результат"
       loadError: string;
       loadErrorBody: string;
-      noProjectTitle: string;
-      noProjectBody: string;
       openEditor: string;
       attachResult: string;       // "Прикрепи результат"
       attachResultOptional: string;
