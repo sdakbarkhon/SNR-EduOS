@@ -281,7 +281,8 @@ export function LessonsView({
           </div>
 
           {todayLessons.length > 0 ? (
-            <div className="scrollbar-hide mt-3 flex items-stretch gap-4 overflow-x-auto pb-2">
+            <div className="relative mt-3">
+              <div className="scrollbar-hide flex items-stretch gap-4 overflow-x-auto pb-2">
               {todayLessons.map((l) => {
                 const color = lessonColor(l);
                 const isNow = l.id === currentId;
@@ -329,6 +330,17 @@ export function LessonsView({
                   </button>
                 );
               })}
+              </div>
+              {todayLessons.length > 3 && (
+                // scrollbar-hide removes the native scrollbar, which otherwise is the
+                // only visual cue this row scrolls horizontally — with enough lessons
+                // it reads as "cut off" rather than "scroll for more". Edge fade signals
+                // there's more without needing the scrollbar back.
+                <div
+                  className="pointer-events-none absolute right-0 top-0 h-[calc(100%-0.5rem)] w-10 bg-gradient-to-l from-[#F2F1FA] to-transparent"
+                  aria-hidden="true"
+                />
+              )}
             </div>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 py-6">

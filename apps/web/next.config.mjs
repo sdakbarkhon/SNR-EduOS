@@ -5,6 +5,16 @@ const nextConfig = {
   transpilePackages: ["@snr/core", "@snr/ui-tokens"],
   // Server-only парсеры файлов — не бандлим, грузим из node_modules в Node-рантайме.
   serverExternalPackages: ["pdf-parse", "mammoth", "jszip"],
+  async headers() {
+    return [
+      {
+        // TurboWarp's project_url param (docs.turbowarp.org/url-parameters)
+        // fetches this cross-origin from turbowarp.org and requires CORS.
+        source: "/blank-project.sb3",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
+    ];
+  },
   eslint: {
     // ESLint подключим отдельно; на этапе скаффолда не блокируем сборку.
     ignoreDuringBuilds: true,

@@ -76,6 +76,18 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
     },
   );
 
+  // Reading a thread writes to chat_read_state, not chat_messages — without this,
+  // the badge only cleared when a NEW message arrived, never when the parent
+  // actually read one.
+  useRealtimeChannel(
+    myUserId ? `parent-sidebar-unread-read-state-${myUserId}` : null,
+    "chat_read_state",
+    undefined,
+    () => {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    },
+  );
+
   useEffect(() => {
     if (pathname.startsWith("/parent/messages")) {
       getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);

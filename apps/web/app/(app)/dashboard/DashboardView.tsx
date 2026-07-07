@@ -126,13 +126,26 @@ export function DashboardView({
   const classLabel = getClassLabel(groups);
   const greeting = t.greetings[dayOfYear(now ?? new Date()) % t.greetings.length];
 
-  // Today's lessons (all of them, not just the next one) — only computed
-  // client-side once `now` is set, for the same hydration-safety reason above.
-  const todayLessons = now
+  // Today's lessons — only computed client-side once `now` is set, for the
+  // same hydration-safety reason above.
+  const todayLessonsAll = now
     ? lessons
         .filter((l) => new Date(l.starts_at).toDateString() === now.toDateString())
         .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
     : [];
+  // Widget shows at most 3 — the ones still relevant (in progress or upcoming),
+  // not lessons that already finished. Same past/now/next formula as the
+  // per-item badges below, factored out so the cutoff and the badges agree.
+  const MAX_TODAY_WIDGET = 3;
+  const todayLessonsUpcoming = now
+    ? todayLessonsAll.filter((l) => {
+        const end = l.ends_at ? new Date(l.ends_at) : null;
+        const isPastLesson = !!end && now > end;
+        return !isPastLesson;
+      })
+    : [];
+  const todayLessons = todayLessonsUpcoming.slice(0, MAX_TODAY_WIDGET);
+  const hasMoreToday = todayLessonsUpcoming.length > MAX_TODAY_WIDGET;
   const subjectById = new Map(mySubjects.map((s) => [s.id, s]));
 
   // Per-subject progress: completed vs. total lessons for that subject_id.
@@ -402,12 +415,14 @@ export function DashboardView({
               )}
             </div>
 
-            <Link
-              href="/lessons"
-              className="mt-3 flex items-center justify-center gap-1.5 rounded-2xl bg-[#F1EDFF] py-3 text-sm font-extrabold text-[#7C5CFF] transition hover:bg-[#E6DDFF]"
-            >
-              {t.fullSchedule} <ArrowRight className="h-4 w-4" />
-            </Link>
+            {hasMoreToday && (
+              <Link
+                href="/lessons"
+                className="mt-3 flex items-center justify-center gap-1.5 rounded-2xl bg-[#F1EDFF] py-3 text-sm font-extrabold text-[#7C5CFF] transition hover:bg-[#E6DDFF]"
+              >
+                {t.fullSchedule} <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
           </div>
 
           {/* Мои достижения — заглушка, реальной таблицы нет */}

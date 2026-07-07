@@ -103,6 +103,18 @@ export function StudentSidebar() {
     },
   );
 
+  // Reading a thread writes to chat_read_state, not chat_messages — without this,
+  // the badge only cleared when a NEW message arrived, never when the student
+  // actually read one.
+  useRealtimeChannel(
+    myUserId ? `student-sidebar-unread-read-state-${myUserId}` : null,
+    "chat_read_state",
+    undefined,
+    () => {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    },
+  );
+
   useEffect(() => {
     if (pathname.startsWith("/messages")) {
       getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);

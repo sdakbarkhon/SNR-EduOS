@@ -64,6 +64,19 @@ export function TeacherSidebar() {
     },
   );
 
+  // Reading a thread writes to chat_read_state, not chat_messages — without this,
+  // the sidebar badge only cleared when a NEW message arrived, never when the
+  // teacher actually read one (the chat header's own count updated fine since
+  // MessagesView re-fetches itself after markThreadRead; this component didn't).
+  useRealtimeChannel(
+    myUserId ? `teacher-sidebar-unread-read-state-${myUserId}` : null,
+    "chat_read_state",
+    undefined,
+    () => {
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+    },
+  );
+
   useEffect(() => {
     if (pathname.startsWith("/teacher/messages")) {
       getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);

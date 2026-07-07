@@ -25,10 +25,14 @@ const GRADE_COLORS: Record<number, string> = {
 
 // Used when the teacher didn't attach a specific project URL — opens a
 // blank editor for the service instead of leaving the stage unusable.
-// turbowarp → /editor is TurboWarp's own blank-project editor (verified live:
-// no X-Frame-Options/CSP header, real editor bundle in the response — not an
-// error page), so a student with no teacher-supplied project just gets a
-// fresh empty canvas instead of a specific pre-made demo project.
+// turbowarp → framing a bare /editor (no project id) does NOT give a blank
+// canvas — verified live, it renders TurboWarp's own "Invalid TurboWarp
+// Embed :(" error page (confirmed by injecting the iframe directly and
+// screenshotting it; also documented at docs.turbowarp.org/embedding, which
+// only supports embedding by numeric project id). TurboWarp has no "blank
+// project" embed mode, so DEFAULT_EXTERNAL_URLS.turbowarp is only used for
+// the "open in a new tab" link (openUrl below) — the iframe src for the
+// no-project case is built separately via BLANK_PROJECT_URL/project_url.
 // makecode → the "#editor" hash opens a blank *chooser* screen (no project
 // loaded → blank iframe); the embeddable form is a real share id with no
 // query/hash (host detects the iframe context and switches to sim mode) —
@@ -39,6 +43,17 @@ const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
   makecode: "https://arcade.makecode.com/99842-77365-57673-38391",
 };
+
+// TurboWarp's documented project_url mechanism (docs.turbowarp.org/url-parameters)
+// loads project data from any CORS-reachable direct-download URL — this is
+// the only real way to get a genuinely blank, working editor inside an
+// iframe. We host a minimal empty .sb3 ourselves (public/blank-project.sb3,
+// served with Access-Control-Allow-Origin: * — see next.config.mjs) since
+// TurboWarp doesn't provide one. Computed client-side only (needs
+// window.location.origin) to avoid an SSR/client hydration mismatch.
+function blankTurbowarpEditorUrl(): string {
+  return `https://turbowarp.org/?project_url=${encodeURIComponent(`${window.location.origin}/blank-project.sb3`)}`;
+}
 
 /**
  * External-service (turbowarp/wokwi/codesandbox/makecode) embedded directly in
@@ -68,10 +83,17 @@ export function ExternalStageModal({
   // TurboWarp's "/editor" (no project id) renders TurboWarp's own "Invalid
   // Embed" page inside an iframe — only usable as a full-page destination.
   // Normalize to a real /<id>/embed URL for the iframe; null means "no
-  // project id resolvable", handled by a dedicated fallback card below
-  // instead of attempting to frame it.
-  const iframeSrc = service === "turbowarp" ? toTurbowarpIframeSrc(embedUrl) : embedUrl;
-  const noProject = service === "turbowarp" && !iframeSrc;
+  // project id resolvable" — filled in by blankProjectUrl below (a real,
+  // working blank editor) once it's computed client-side.
+  const configuredIframeSrc = service === "turbowarp" ? toTurbowarpIframeSrc(embedUrl) : embedUrl;
+  const [blankProjectUrl, setBlankProjectUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (service === "turbowarp" && !configuredIframeSrc) {
+      setBlankProjectUrl(blankTurbowarpEditorUrl());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const iframeSrc = configuredIframeSrc ?? (service === "turbowarp" ? blankProjectUrl : null);
 
   const existingSub = (stage.progress?.submission_data ?? null) as ExternalServiceSubmission | null;
   const isSubmitted = !!stage.progress?.submission_data;
@@ -90,7 +112,10 @@ export function ExternalStageModal({
   const fileRef = useRef<HTMLInputElement>(null);
 
   // iframe load tracking (30s timeout → error message, no open-elsewhere fallback).
-  const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">(embeddable && iframeSrc ? "loading" : "error");
+  // Starts "loading" even before iframeSrc resolves (turbowarp-no-project needs one
+  // client-side tick to compute blankProjectUrl) — the render below shows a plain
+  // spinner rather than the error card for that brief null-iframeSrc window.
+  const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">("loading");
   useEffect(() => {
     if (!embeddable || !iframeSrc) return;
     const t = setTimeout(() => setIframeState((s) => (s === "loading" ? "error" : s)), 30000);
@@ -223,19 +248,11 @@ export function ExternalStageModal({
                 className="h-full w-full border-none"
               />
             </>
-          ) : noProject ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-              <Globe className="h-10 w-10 text-blue-400" />
-              <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">{dx.noProjectTitle}</h4>
-              <p className="max-w-md text-sm text-slate-500">{dx.noProjectBody}</p>
-              <a
-                href={openUrl ?? "https://turbowarp.org/editor"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                <ExternalLink className="h-4 w-4" /> {dx.openEditor}
-              </a>
+          ) : iframeState !== "error" ? (
+            // iframeSrc not resolved yet (turbowarp-no-project: waiting one client
+            // tick for blankProjectUrl) — plain spinner, not the error card.
+            <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+              <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
