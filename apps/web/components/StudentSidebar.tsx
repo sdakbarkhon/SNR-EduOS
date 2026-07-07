@@ -83,7 +83,14 @@ export function StudentSidebar() {
   useEffect(() => {
     setMounted(true);
     try {
-      if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "true") setCollapsed(true);
+      else if (stored === "false") setCollapsed(false);
+      // No explicit user preference yet — default collapsed on tablet widths
+      // (md-lg, roughly 768-1023px) so the 320px-wide expanded sidebar
+      // doesn't eat most of the viewport; desktop/large screens keep the
+      // existing expanded default.
+      else if (window.innerWidth < 1024) setCollapsed(true);
     } catch { /* blocked */ }
 
     const db = createClient();

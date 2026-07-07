@@ -48,7 +48,9 @@ export function TeacherShell({
 
         <TeacherTopbar name={teacherName ?? ""} subtitle={teacherSubtitle} avatarUrl={avatarUrl} />
         <main className="flex-1 overflow-y-auto px-4 pb-20 pt-1 md:px-8 md:pb-8">
-          {children}
+          <div className="mx-auto w-full min-[1440px]:max-w-[1600px]">
+            {children}
+          </div>
         </main>
 
         {/* Mobile bottom nav */}

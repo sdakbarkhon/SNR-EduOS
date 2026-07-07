@@ -47,7 +47,12 @@ export function TeacherSidebar() {
   useEffect(() => {
     setMounted(true);
     try {
-      if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "true") setCollapsed(true);
+      else if (stored === "false") setCollapsed(false);
+      // No explicit user preference yet — default collapsed on tablet widths
+      // (md-lg, roughly 768-1023px), matching StudentSidebar's behavior.
+      else if (window.innerWidth < 1024) setCollapsed(true);
     } catch { /* blocked */ }
 
     const db = createClient();

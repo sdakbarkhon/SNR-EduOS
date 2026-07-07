@@ -53,7 +53,9 @@ export function AppShell({
         <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]">
           <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
           <main className="flex-1 overflow-y-auto pb-20 md:pb-1">
-            {children}
+            <div className="mx-auto w-full min-[1440px]:max-w-[1600px]">
+              {children}
+            </div>
           </main>
           <BottomNav />
         </div>
