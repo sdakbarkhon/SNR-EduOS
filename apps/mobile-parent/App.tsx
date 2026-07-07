@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import RootNavigator from "./src/navigation/RootNavigator";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { getSupabase } from "./src/lib/supabase";
 import { fetchParentProfile, type ParentProfile } from "./src/lib/auth";
 
@@ -22,6 +24,10 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      // Сплэш убираем СРАЗУ, до всей async-цепочки: даже если инициализация
+      // ниже упадёт или зависнет, приложение никогда не застрянет на сплэше.
+      // Пока идёт init, показываем спиннер (ready=false), затем — навигатор.
+      SplashScreen.hideAsync().catch(() => {});
       try {
         await Promise.race([
           (async () => {
@@ -40,21 +46,30 @@ export default function App() {
           timeout(STARTUP_TIMEOUT_MS),
         ]);
       } catch {
-        // Ошибка на старте (сеть/хранилище/таймаут) не должна вешать сплэш
-        // навечно — просто идём на LoginScreen как при отсутствии сессии.
+        // Ошибка на старте (сеть/хранилище/таймаут) не должна блокировать вход —
+        // просто идём на LoginScreen как при отсутствии сессии.
       } finally {
         setReady(true);
-        await SplashScreen.hideAsync();
       }
     })();
   }, []);
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <ErrorBoundary>
+        <View style={{ flex: 1, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#4f46e5" />
+        </View>
+      </ErrorBoundary>
+    );
+  }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <RootNavigator initialProfile={initialProfile} />
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <RootNavigator initialProfile={initialProfile} />
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
