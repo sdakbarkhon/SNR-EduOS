@@ -188,7 +188,7 @@ export type LessonStageWithProgress = LessonStage & {
   progress: LessonStageProgress | null;
 };
 
-export type CodeLanguage = 'python' | 'cpp';
+export type CodeLanguage = 'python' | 'javascript' | 'cpp' | 'java';
 
 /** Stored in lesson_stages.config for content_type='code' (Prompt 4). */
 export type CodeStageConfig = {
@@ -421,8 +421,11 @@ export type HomeworkSubmission = {
 };
 
 /** Homework с join'ом группы и опциональной сдачей студента. */
-export type ContentType = 'file' | 'test' | 'programming' | 'bundle';
-export type ProgrammingLanguage = 'python' | 'cpp';
+// content_type: the 4 "native" homework kinds plus the 12 SERVICE_CONFIG
+// external services (migration 95, УЧ.10) — each rendered as an iframe using
+// homework.external_url, the same SERVICE_CONFIG the lesson stages use.
+export type ContentType = 'file' | 'test' | 'programming' | 'bundle' | ExternalServiceType;
+export type ProgrammingLanguage = CodeLanguage;
 export type HomeworkSource = 'curriculum' | 'teacher';
 
 // ─── BUNDLE HOMEWORK (migration 87) ────────────────────────────────────────
@@ -430,7 +433,10 @@ export type HomeworkSource = 'curriculum' | 'teacher';
 // graded as one whole via the existing gradeSubmission() (grade+comment live
 // on homework_submissions, same as file/programming — no per-subtask grade).
 
-export type HomeworkSubtaskType = 'file' | 'test' | 'code' | 'scratch';
+// 'scratch' was removed (migration 95, УЧ.10) in favor of the 12
+// SERVICE_CONFIG external services, so a bundle subtask can embed the same
+// iframe services a top-level homework or lesson stage can.
+export type HomeworkSubtaskType = 'file' | 'test' | 'code' | ExternalServiceType;
 
 export type HomeworkSubtask = {
   id: string;
@@ -506,6 +512,7 @@ export type HomeworkWithSubmission = {
   attachment_storage_path: string | null;
   attachment_size_bytes: number | null;
   attachment_filename: string | null;
+  external_url: string | null; // migration 95 (external-service homework types)
   test_duration_seconds: number | null; // migration 31 (test type)
   test_auto_grade: boolean;             // migration 31 (test type)
   programming_language: ProgrammingLanguage | null; // migration 32

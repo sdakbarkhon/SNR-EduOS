@@ -12,17 +12,19 @@ import {
   uploadHomeworkTestsFile,
   getTeacherLessonsForGroup,
 } from "@snr/core";
-import type { Locale, HomeworkSubtaskType } from "@snr/core";
+import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, GraduationCap, Code, Layers, GripVertical, Puzzle } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle } from "lucide-react";
 import { TeacherAIPanel } from "./TeacherAIPanel";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
 import { EduOSAiIcon } from "@/components/EduOSAiIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
+import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
+import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 
-type Format = "file" | "test" | "learning" | "programming" | "bundle";
+type Format = ContentType;
 type QuestionType = "single_choice" | "open";
 
 interface Option { text: string; isCorrect: boolean }
@@ -43,9 +45,11 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [format, setFormat] = useState<Format>("file");
   const [testDuration, setTestDuration] = useState(10); // minutes
   const [autoGrade, setAutoGrade] = useState(true);
-  const [progLanguage, setProgLanguage] = useState<"python" | "cpp">("python");
+  const [progLanguage, setProgLanguage] = useState<CodeLanguage>("python");
   const [starterCode, setStarterCode] = useState("");
   const [expectedOutput, setExpectedOutput] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
+  const [externalUrlError, setExternalUrlError] = useState<string | null>(null);
   const [testsFile, setTestsFile] = useState<File | null>(null);
   const testsRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
@@ -170,11 +174,15 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   }
 
   async function save(status: "draft" | "published") {
-    if (format === "learning") return; // stub
     if (!title.trim()) { setError("Введите название"); return; }
     if (format === "programming" && !description.trim()) { setError("Введите условие задачи"); return; }
     if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
     if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
+    if (isExternalService(format)) {
+      const v = validateServiceUrl(format, externalUrl);
+      if (!v.valid) { setExternalUrlError(v.error); setError(v.error); return; }
+      setExternalUrlError(null);
+    }
     if (!groupId) { setError("Выберите группу"); return; }
     if (!deadline) { setError("Укажите дедлайн"); return; }
 
@@ -194,7 +202,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
       const hw = await createTeacherHomework(supabase, {
         groupId, title: title.trim(), description: description.trim(),
         dueDate: deadline,
-        contentType: format === "test" ? "test" : format === "programming" ? "programming" : format === "bundle" ? "bundle" : "file",
+        contentType: format,
         teacherId: resolvedTeacherId,
         lessonId: lessonId || null,
         status,
@@ -203,6 +211,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         programmingLanguage: format === "programming" ? progLanguage : null,
         starterCode: format === "programming" ? (starterCode || null) : null,
         expectedOutput: format === "programming" ? (expectedOutput || null) : null,
+        externalUrl: isExternalService(format) ? externalUrl.trim() : null,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({
@@ -241,19 +250,19 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     }
   }
 
-  const isStub = format === "learning";
+  const isExternal = isExternalService(format);
   const TYPE_TABS: Array<{ key: Format; label: string; Icon: typeof FileText }> = [
     { key: "file", label: d.homework.typeFile, Icon: FileText },
     { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
-    { key: "learning", label: d.homework.typeLearning, Icon: GraduationCap },
     { key: "programming", label: d.homework.typeProgramming, Icon: Code },
     { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
+    ...EXTERNAL_SERVICE_ORDER.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
   ];
   const SUBTASK_TYPE_TABS: Array<{ key: HomeworkSubtaskType; label: string }> = [
     { key: "file", label: d.homework.typeFile },
     { key: "test", label: d.homework.typeTest },
     { key: "code", label: d.homework.typeProgrammingShort },
-    { key: "scratch", label: d.homework.typeScratch },
+    ...EXTERNAL_SERVICE_ORDER.map((key) => ({ key, label: SERVICE_CONFIG[key].name })),
   ];
 
   return (
@@ -265,7 +274,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         <h1 className="flex-1 text-[22px] font-bold text-brand-ink">
           {d.teacher.newHomeworkTitle}
         </h1>
-        {!isStub && format !== "bundle" && (
+        {!isExternal && format !== "bundle" && (
           <button
             type="button"
             onClick={() => setAiPanelOpen(true)}
@@ -274,7 +283,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
           </button>
         )}
-        {!isStub && (
+        {!isExternal && (
           <button
             type="button"
             onClick={() => setAiGenerateOpen(true)}
@@ -309,21 +318,6 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         })}
       </div>
 
-      {isStub ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-[24px] border border-white/80 bg-white/70 px-6 py-16 text-center backdrop-blur-xl"
-          style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.07)" }}>
-          {format === "learning"
-            ? <GraduationCap size={40} className="text-slate-300" />
-            : <Code size={40} className="text-slate-300" />}
-          <p className="text-[16px] font-bold text-brand-ink">
-            {format === "learning" ? d.homework.test.learningStub : d.homework.test.programmingStub}
-          </p>
-          <p className="max-w-sm text-[13px] text-brand-ink-muted">
-            {format === "learning" ? d.homework.test.learningStubSub : d.homework.test.programmingStubSub}
-          </p>
-        </div>
-      ) : (
-      <>
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"
         style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -423,6 +417,30 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             )}
           </div>
         )}
+
+        {isExternal && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.lesson.external.projectLink} <span className="text-slate-400 font-normal">— {SERVICE_CONFIG[format].description}</span>
+            </span>
+            <input
+              value={externalUrl}
+              onChange={(e) => { setExternalUrl(e.target.value); setExternalUrlError(null); }}
+              onBlur={() => {
+                if (!externalUrl.trim()) return;
+                const v = validateServiceUrl(format, externalUrl);
+                setExternalUrlError(v.valid ? null : v.error);
+              }}
+              placeholder={SERVICE_CONFIG[format].placeholder}
+              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20"
+            />
+            {externalUrlError && (
+              <span className="flex items-center gap-1.5 text-[12px] font-medium text-danger">
+                <AlertCircle size={13} /> {externalUrlError}
+              </span>
+            )}
+          </label>
+        )}
       </div>
 
       {format === "test" && (
@@ -502,13 +520,13 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           {/* Language */}
           <div>
             <span className="mb-1.5 block text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.language}</span>
-            <div className="flex gap-2">
-              {(["python", "cpp"] as const).map((l) => (
+            <div className="flex flex-wrap gap-2">
+              {CODE_LANGUAGES.map((l) => (
                 <button key={l} type="button" onClick={() => setProgLanguage(l)}
                   className={cn("flex items-center gap-2 rounded-[10px] border px-4 py-2 text-[13px] font-semibold transition-colors",
                     progLanguage === l ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-brand-ink-muted hover:border-emerald-300")}>
                   <span className={cn("h-3.5 w-3.5 rounded-full border-2", progLanguage === l ? "border-emerald-500 bg-emerald-500" : "border-slate-300")} />
-                  {l === "python" ? "Python" : "C++"}
+                  {CODE_LANGUAGE_LABELS[l]}
                 </button>
               ))}
             </div>
@@ -600,17 +618,15 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           </button>
         </div>
       )}
-      </>
-      )}
 
       {error && <p className="text-[13px] font-medium text-danger">{error}</p>}
 
       <div className="flex gap-3">
-        <button onClick={() => save("draft")} disabled={saving || isStub}
+        <button onClick={() => save("draft")} disabled={saving}
           className="rounded-[12px] border border-slate-200 bg-white/80 px-5 py-2.5 text-[14px] font-semibold text-brand-ink transition-all hover:bg-white disabled:opacity-50">
           {saving ? d.common.loading : d.teacher.saveDraft}
         </button>
-        <button onClick={() => save("published")} disabled={saving || isStub}
+        <button onClick={() => save("published")} disabled={saving}
           className="rounded-[12px] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50"
           style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)", boxShadow: "0 4px 16px rgba(29,111,245,0.35)" }}>
           {format === "test" ? d.homework.test.createTest : (saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish)}
@@ -628,7 +644,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
       <HomeworkAiGenerateModal
         isOpen={aiGenerateOpen}
         onClose={() => setAiGenerateOpen(false)}
-        type={format === "learning" ? "file" : format}
+        type={(isExternal ? "file" : format) as "file" | "test" | "programming" | "bundle"}
         groupLabel={groups.find((g) => g.id === groupId)?.name ?? ""}
         onApply={handleAiGenerateApply}
       />

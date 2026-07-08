@@ -8,12 +8,13 @@ import {
   getHomeworkSubtaskSubmissions,
   gradeSubmission,
 } from "@snr/core";
-import type { Locale, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType } from "@snr/core";
+import type { Locale, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { X } from "lucide-react";
+import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
 
 type BundleSub = {
   id: string;
@@ -112,7 +113,7 @@ function SubtaskAnswer({
 
   if (subtask.type === "code") {
     const code = (answer.content as { code?: string }).code ?? "";
-    const language = (subtask.config as { language?: "python" | "cpp" }).language ?? "python";
+    const language = (subtask.config as { language?: CodeLanguage }).language ?? "python";
     return code ? (
       <CodeViewer value={code} language={language} minHeight={140} />
     ) : (
@@ -120,7 +121,7 @@ function SubtaskAnswer({
     );
   }
 
-  // scratch
+  // external service subtask (wokwi/codesandbox/geogebra/.../h5p)
   const ack = (answer.content as { acknowledged?: boolean }).acknowledged === true;
   return (
     <p className={cn("text-[13px] font-medium", ack ? "text-emerald-600" : "text-brand-ink-muted")}>
@@ -130,11 +131,11 @@ function SubtaskAnswer({
 }
 
 function subtaskTypeLabel(d: ReturnType<typeof getDictionary>, type: HomeworkSubtaskType) {
+  if (isExternalService(type)) return SERVICE_CONFIG[type].name;
   switch (type) {
     case "file": return d.homework.typeFile;
     case "test": return d.homework.typeTest;
     case "code": return d.homework.typeProgrammingShort;
-    case "scratch": return d.homework.typeScratch;
     default: return type;
   }
 }

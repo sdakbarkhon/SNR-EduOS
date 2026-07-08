@@ -1164,11 +1164,12 @@ export type Database = {
           attachment_size_bytes: number | null
           attachment_storage_path: string | null
           attachments: Json
-          content_type: Database["public"]["Enums"]["content_type"]
+          content_type: string
           created_at: string
           description: string | null
           due_date: string | null
           expected_output: string | null
+          external_url: string | null
           group_id: string
           id: string
           lesson_id: string | null
@@ -1189,11 +1190,12 @@ export type Database = {
           attachment_size_bytes?: number | null
           attachment_storage_path?: string | null
           attachments?: Json
-          content_type?: Database["public"]["Enums"]["content_type"]
+          content_type?: string
           created_at?: string
           description?: string | null
           due_date?: string | null
           expected_output?: string | null
+          external_url?: string | null
           group_id: string
           id?: string
           lesson_id?: string | null
@@ -1214,11 +1216,12 @@ export type Database = {
           attachment_size_bytes?: number | null
           attachment_storage_path?: string | null
           attachments?: Json
-          content_type?: Database["public"]["Enums"]["content_type"]
+          content_type?: string
           created_at?: string
           description?: string | null
           due_date?: string | null
           expected_output?: string | null
+          external_url?: string | null
           group_id?: string
           id?: string
           lesson_id?: string | null
@@ -3307,7 +3310,6 @@ export type Database = {
         | "event"
         | "urgent"
         | "reminder"
-      content_type: "file" | "test" | "programming" | "bundle"
       homework_source: "curriculum" | "teacher"
       payment_kind: "subscription" | "one_time"
       payment_status: "completed" | "pending" | "canceled"
@@ -3450,7 +3452,6 @@ export const Constants = {
         "urgent",
         "reminder",
       ],
-      content_type: ["file", "test", "programming", "bundle"],
       homework_source: ["curriculum", "teacher"],
       payment_kind: ["subscription", "one_time"],
       payment_status: ["completed", "pending", "canceled"],

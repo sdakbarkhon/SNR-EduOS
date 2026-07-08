@@ -3,20 +3,21 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
-import { getDictionary, type Locale } from "@snr/core";
+import { getDictionary, type Locale, type CodeLanguage, type ExternalServiceType } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { EduOSAiIcon } from "@/components/EduOSAiIcon";
 import { cn } from "@/lib/cn";
+import { SERVICE_CONFIG, EXTERNAL_SERVICE_ORDER, isExternalService } from "@/lib/external-services";
 
 export interface GeneratedHomework {
   title: string;
   description: string;
   config?: {
     questions?: Array<{ question: string; options: string[]; correctIndex: number }>; // type="test"
-    starterCode?: string; language?: "python" | "cpp"; expectedOutput?: string;        // type="programming"
+    starterCode?: string; language?: CodeLanguage; expectedOutput?: string;            // type="programming"
   };
   subtasks?: Array<{
-    type: "file" | "test" | "code" | "scratch";
+    type: "file" | "test" | "code" | ExternalServiceType;
     title: string;
     description: string;
     config: Record<string, unknown>;
@@ -31,15 +32,16 @@ interface Props {
   onApply: (data: GeneratedHomework) => void;
 }
 
-const BUNDLE_SUBTASK_TYPES = ["file", "test", "code", "scratch"] as const;
+const BUNDLE_SUBTASK_TYPES = ["file", "test", "code", ...EXTERNAL_SERVICE_ORDER] as const;
 type BundleSubtaskType = (typeof BUNDLE_SUBTASK_TYPES)[number];
 
 function bundleTypeLabel(bt: BundleSubtaskType, d: ReturnType<typeof getDictionary>): string {
+  if (isExternalService(bt)) return SERVICE_CONFIG[bt].name;
   switch (bt) {
     case "file": return d.homework.typeFile;
     case "test": return d.homework.typeTest;
     case "code": return d.homework.typeProgrammingShort;
-    case "scratch": return d.homework.typeScratch;
+    default: return bt;
   }
 }
 

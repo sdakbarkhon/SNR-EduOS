@@ -181,6 +181,30 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
   },
 };
 
+// Used when a teacher didn't attach a specific project URL (lesson stage,
+// homework, or bundle subtask) — falls back to a fixed default project/editor
+// for the service instead of leaving the embed unusable.
+export const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
+  wokwi: "https://wokwi.com/projects/new/arduino-uno",
+  codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
+  geogebra: "https://www.geogebra.org/classic",
+  phet: "https://phet.colorado.edu/sims/html/forces-and-motion-basics/latest/forces-and-motion-basics_en.html",
+  desmos: "https://www.desmos.com/calculator",
+  blockly_games: "https://blockly.games/",
+  visualgo: "https://visualgo.net/en",
+  p5js: "https://editor.p5js.org/",
+  excalidraw: "https://excalidraw.com/",
+  learningapps: "https://learningapps.org/",
+  sqlonline: "https://sqlime.org/",
+  h5p: "https://h5p.eduos.snruz.uz/library",
+};
+
+// Canonical display order for the 12 services (teacher-facing type pickers).
+export const EXTERNAL_SERVICE_ORDER: ExternalServiceType[] = [
+  "wokwi", "codesandbox", "geogebra", "phet", "desmos", "blockly_games",
+  "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline", "h5p",
+];
+
 export function isExternalService(ct: string | null | undefined): ct is ExternalServiceType {
   return (
     ct === "wokwi" || ct === "codesandbox" ||

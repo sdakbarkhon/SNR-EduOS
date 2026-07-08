@@ -522,10 +522,8 @@ export interface Dictionary {
     uploadingFile: string;
     resubmitBtn: string;
     // Homework types (migration 31)
-    typeLearning: string;
     typeProgramming: string;
     typeBundle: string;
-    typeScratch: string;
     // новые ключи — редизайн /homework (Iter5 P8)
     searchPlaceholder: string;
     typeAll: string;
@@ -574,10 +572,6 @@ export interface Dictionary {
       awaitingReview: string;      // "Ожидает проверки учителя"
       viewAnswers: string;         // "Просмотреть свои ответы"
       yourAnswer: string;          // "Ваш ответ"
-      learningStub: string;
-      learningStubSub: string;
-      programmingStub: string;
-      programmingStubSub: string;
     };
     programming: {
       language: string;
@@ -589,12 +583,11 @@ export interface Dictionary {
       testsHint: string;
       condition: string;        // "Условие"
       run: string;              // "Запустить"
+      running: string;          // "Запуск..." (Piston request in flight)
+      exitCode: string;         // "Код выхода"
       submit: string;           // "Отправить учителю"
       output: string;           // "Вывод"
       outputEmpty: string;
-      runSoonTitle: string;     // "Скоро будет доступно"
-      runSoonBody: string;
-      understood: string;       // "Понятно"
       sent: string;             // "Код отправлен учителю"
       testsFile: string;        // "Файл с тестами"
       download: string;         // "Скачать"
@@ -1197,6 +1190,8 @@ export interface Dictionary {
       gradeSaved: string;
       graded: string;
       teacherComment: string;
+      fullscreen: string;         // "На весь экран" (УЧ.10 Part 5)
+      exitFullscreen: string;     // "Свернуть"
     };
     // Quizzes: QIA test + Kahoot game (Prompt 6)
     quiz: {

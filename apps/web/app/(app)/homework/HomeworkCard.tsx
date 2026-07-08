@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, Layers, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, Layers, Globe, type LucideIcon } from "lucide-react";
 import {
   getDictionary,
   getSubjectStyle,
@@ -13,13 +13,17 @@ import {
 } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { SubjectIcon, useLocale } from "@/components";
+import { EXTERNAL_SERVICE_ORDER, SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
 
 const TYPE_STYLE: Record<ContentType, { bg: string; text: string; Icon: LucideIcon }> = {
   file: { bg: "bg-blue-50", text: "text-blue-600", Icon: FileText },
   test: { bg: "bg-violet-50", text: "text-violet-600", Icon: ClipboardCheck },
   programming: { bg: "bg-orange-50", text: "text-orange-600", Icon: Code2 },
   bundle: { bg: "bg-purple-50", text: "text-purple-600", Icon: Layers },
-};
+  ...Object.fromEntries(
+    EXTERNAL_SERVICE_ORDER.map((key) => [key, { bg: "bg-sky-50", text: "text-sky-600", Icon: Globe }]),
+  ),
+} as Record<ContentType, { bg: string; text: string; Icon: LucideIcon }>;
 
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
 
@@ -40,7 +44,9 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
         ? d.homework.typeProgrammingShort
         : hw.content_type === "bundle"
           ? d.homework.typeBundle
-          : d.homework.typeFile;
+          : isExternalService(hw.content_type)
+            ? SERVICE_CONFIG[hw.content_type].name
+            : d.homework.typeFile;
 
   const dueLabel = hw.due_date
     ? d.homework.dueUntil.replace(

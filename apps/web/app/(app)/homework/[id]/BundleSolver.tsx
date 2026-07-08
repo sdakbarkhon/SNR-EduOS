@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Blocks, ChevronDown, ChevronUp, ClipboardList, Code2, FileText, Loader2, Send,
+  ArrowLeft, Blocks, ChevronDown, ChevronUp, ClipboardList, Code2, FileText, Globe, Loader2, Send,
 } from "lucide-react";
 import {
   getDictionary,
@@ -17,44 +17,33 @@ import {
   type HomeworkSubtask,
   type HomeworkSubtaskSubmission,
   type HomeworkSubtaskType,
+  type CodeLanguage,
   type Locale,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, Modal, SubjectIcon, useLocale } from "@/components";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
-
-// Same fallback used previously by lesson stages when the teacher didn't
-// attach a specific Scratch project URL. The lesson-stage Scratch service
-// itself was removed (УЧ.8), but the "scratch" bundle-homework subtask type
-// (a separate, unrelated feature — see HomeworkSubtaskType) still lets a
-// student embed a Scratch project, so this normalizer stays local to this file.
-const DEFAULT_SCRATCH_EMBED = "https://scratch.mit.edu/projects/1351866425/embed";
-
-function toScratchIframeSrc(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const match = url.trim().match(/scratch\.mit\.edu\/projects\/(\d+)/);
-  return match ? `https://scratch.mit.edu/projects/${match[1]}/embed` : null;
-}
+import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 
 type TestQuestionConfig = { question: string; options: string[]; correctIndex: number };
 type Dict = ReturnType<typeof getDictionary>;
 
 function subtaskTypeLabel(type: HomeworkSubtaskType, d: Dict): string {
+  if (isExternalService(type)) return SERVICE_CONFIG[type].name;
   switch (type) {
     case "file": return d.homework.typeFile;
     case "test": return d.homework.typeTest;
     case "code": return d.homework.typeProgrammingShort;
-    case "scratch": return d.homework.typeScratch;
   }
 }
 
 function subtaskTypeIcon(type: HomeworkSubtaskType) {
+  if (isExternalService(type)) return Globe;
   switch (type) {
     case "file": return FileText;
     case "test": return ClipboardList;
     case "code": return Code2;
-    case "scratch": return Blocks;
   }
 }
 
@@ -198,7 +187,7 @@ function CodeSubtaskEditor({
   onSave: (content: Record<string, unknown>, completed: boolean, immediate?: boolean) => void;
   readOnly: boolean;
 }) {
-  const config = (subtask.config ?? {}) as { starterCode?: string; language?: "python" | "cpp" };
+  const config = (subtask.config ?? {}) as { starterCode?: string; language?: CodeLanguage };
   const lang = config.language ?? "python";
   const code = (content?.code as string) ?? config.starterCode ?? "";
 
@@ -215,7 +204,7 @@ function CodeSubtaskEditor({
   );
 }
 
-function ScratchSubtaskEditor({
+function ExternalServiceSubtaskEditor({
   subtask, content, onSave, readOnly,
 }: {
   subtask: HomeworkSubtask;
@@ -223,14 +212,23 @@ function ScratchSubtaskEditor({
   onSave: (content: Record<string, unknown>, completed: boolean, immediate?: boolean) => void;
   readOnly: boolean;
 }) {
+  const service = subtask.type as Exclude<HomeworkSubtaskType, "file" | "test" | "code">;
   const config = (subtask.config ?? {}) as { url?: string };
-  const src = config.url ? (toScratchIframeSrc(config.url) ?? DEFAULT_SCRATCH_EMBED) : DEFAULT_SCRATCH_EMBED;
+  const meta = SERVICE_CONFIG[service];
+  const src = config.url ? (meta.extractEmbedUrl(config.url) ?? DEFAULT_EXTERNAL_URLS[service]) : DEFAULT_EXTERNAL_URLS[service];
   const acknowledged = (content?.acknowledged as boolean) ?? false;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-xl border border-slate-200" style={{ aspectRatio: "16 / 9" }}>
-        <iframe src={src} className="h-full w-full" allow="autoplay" title={subtask.title} />
+        <iframe
+          src={src}
+          className="h-full w-full border-none"
+          title={subtask.title}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
+          allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
       </div>
       <label className={cn("flex items-center gap-2 text-sm text-brand-ink", readOnly ? "opacity-70" : "cursor-pointer")}>
         <input
@@ -294,8 +292,8 @@ function SubtaskRow({
           {subtask.type === "code" && (
             <CodeSubtaskEditor subtask={subtask} content={sub?.content} onSave={onSave} readOnly={readOnly} />
           )}
-          {subtask.type === "scratch" && (
-            <ScratchSubtaskEditor subtask={subtask} content={sub?.content} onSave={onSave} readOnly={readOnly} />
+          {isExternalService(subtask.type) && (
+            <ExternalServiceSubtaskEditor subtask={subtask} content={sub?.content} onSave={onSave} readOnly={readOnly} />
           )}
         </div>
       )}

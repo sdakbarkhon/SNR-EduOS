@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { callGemini } from "@/lib/ai-gemini";
+import { EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
+import type { CodeLanguage, ExternalServiceType } from "@snr/core";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -8,11 +10,11 @@ export const maxDuration = 30;
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type HomeworkType = "file" | "test" | "programming" | "bundle";
-type SubtaskType = "file" | "test" | "code" | "scratch";
+type SubtaskType = "file" | "test" | "code" | ExternalServiceType;
 
 const ALLOWED_TYPES: HomeworkType[] = ["file", "test", "programming", "bundle"];
-const ALLOWED_SUBTASK_TYPES: SubtaskType[] = ["file", "test", "code", "scratch"];
-const RUNNABLE_LANGUAGES = ["python", "cpp"];
+const ALLOWED_SUBTASK_TYPES: SubtaskType[] = ["file", "test", "code", ...EXTERNAL_SERVICE_ORDER];
+const RUNNABLE_LANGUAGES: CodeLanguage[] = ["python", "javascript", "cpp", "java"];
 
 interface RequestBody {
   type: HomeworkType;
@@ -58,7 +60,7 @@ interface GeneratedHomework {
   config?: {
     questions?: NormalizedQuestion[];
     starterCode?: string;
-    language?: "python" | "cpp";
+    language?: CodeLanguage;
     expectedOutput?: string;
   };
   subtasks?: Array<{
@@ -119,21 +121,24 @@ function buildTestPrompt(topic: string, level: string, hints: string | undefined
 }
 
 function buildProgrammingPrompt(topic: string, level: string, hints: string | undefined): string {
-  const langHint = hints && /c\+\+|си\+\+|cpp/i.test(hints) ? "cpp" : "python";
+  const langHint = hints && /c\+\+|си\+\+|cpp/i.test(hints) ? "cpp"
+    : hints && /java(?!script)/i.test(hints) ? "java"
+    : hints && /javascript|js\b/i.test(hints) ? "javascript"
+    : "python";
   return `Ты — методический ассистент для учителя в школе Узбекистана.
 
 ЗАДАЧА: Составить задание по программированию (домашнее задание типа "программирование").
 
 Тема задания: ${topic}
 Класс/уровень: ${level}${hintsLine(hints)}
-Язык программирования по умолчанию: ${langHint} (используй его, если пожелания учителя явно не требуют другого из списка "python"|"cpp").
+Язык программирования по умолчанию: ${langHint} (используй его, если пожелания учителя явно не требуют другого из списка "python"|"javascript"|"cpp"|"java").
 
 Требования:
 - title — короткое ёмкое название задания (без кавычек).
 - description — условие задачи: что должна делать программа, входные/выходные данные. Академический стиль, без markdown-разметки, без эмодзи.
 - starterCode — код-скелет для ученика с комментарием/TODO, подсказывающим что реализовать (НЕ полное решение).
 - expectedOutput — то, что выведет на экран правильное решение (пример вывода).
-- language — "python" или "cpp".
+- language — "python", "javascript", "cpp" или "java".
 
 ВЕРНИ СТРОГО JSON (без markdown, без вступления, без комментариев):
 {
@@ -148,7 +153,7 @@ function buildProgrammingPrompt(topic: string, level: string, hints: string | un
 function buildBundlePrompt(topic: string, level: string, hints: string | undefined, requestedTypes: SubtaskType[]): string {
   const typesInstruction = requestedTypes.length > 0
     ? `Создай РОВНО ${requestedTypes.length} подзадач(и) — по одной подзадаче на каждый из следующих типов, СТРОГО в этом порядке: ${requestedTypes.join(", ")}.`
-    : `Сам выбери от 2 до 4 РАЗНЫХ типов подзадач из списка "file", "test", "code", "scratch" — те, что лучше всего подходят теме.`;
+    : `Сам выбери от 2 до 4 РАЗНЫХ типов подзадач из списка "file", "test", "code" и внешних сервисов ниже — те, что лучше всего подходят теме.`;
 
   return `Ты — методический ассистент для учителя в школе Узбекистана.
 
@@ -160,8 +165,8 @@ function buildBundlePrompt(topic: string, level: string, hints: string | undefin
 Доступные типы подзадач:
 - "file" — ученик присылает файл/текстовый ответ. config всегда {} (пустой объект).
 - "test" — мини-тест с вопросами с одним правильным ответом. config = { "questions": [...] }, 3–5 вопросов (меньше, чем в полном тесте — это только часть набора), формат вопроса такой же как ниже.
-- "code" — задача по программированию. config = { "starterCode": "...", "language": "python"|"cpp", "expectedOutput": "..." }.
-- "scratch" — задание в редакторе Scratch (визуальное блочное программирование). config ВСЕГДА {} (пустой объект) — НЕ придумывай ссылку на проект. Вместо этого подробно опиши в поле "description" ЧТО именно ученик должен собрать/исследовать в Scratch.
+- "code" — задача по программированию. config = { "starterCode": "...", "language": "python"|"javascript"|"cpp"|"java", "expectedOutput": "..." }.
+- "${EXTERNAL_SERVICE_ORDER.join('", "')}" — задание во внешнем сервисе (${EXTERNAL_SERVICE_ORDER.join(", ")}). config ВСЕГДА {} (пустой объект) — НЕ придумывай ссылку на проект, она подставится автоматически. Вместо этого подробно опиши в поле "description" ЧТО именно ученик должен сделать в этом сервисе.
 
 ${typesInstruction}
 
@@ -177,7 +182,7 @@ ${typesInstruction}
   "description": "...",
   "subtasks": [
     {
-      "type": "file"|"test"|"code"|"scratch",
+      "type": "file"|"test"|"code"|"...",
       "title": "...",
       "description": "...",
       "config": { }
@@ -214,8 +219,8 @@ function normalizeQuestions(raw: GenQuestion[] | undefined, max: number): Normal
     .slice(0, max);
 }
 
-function normalizeLanguage(raw: unknown): "python" | "cpp" {
-  return RUNNABLE_LANGUAGES.includes(String(raw)) ? (raw as "python" | "cpp") : "python";
+function normalizeLanguage(raw: unknown): CodeLanguage {
+  return (RUNNABLE_LANGUAGES as string[]).includes(String(raw)) ? (raw as CodeLanguage) : "python";
 }
 
 function normalizeFileResult(parsed: GenRaw): GeneratedHomework | null {
@@ -263,7 +268,7 @@ function normalizeSubtask(s: GenSubtask): { type: SubtaskType; title: string; de
       expectedOutput: typeof s.config?.expectedOutput === "string" ? s.config.expectedOutput.trim() : "",
     };
   } else {
-    // "file" | "scratch" — always empty config
+    // "file" | external service — always empty config
     config = {};
   }
 

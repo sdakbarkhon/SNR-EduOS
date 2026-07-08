@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 
@@ -200,7 +200,7 @@ export const getStudentGroupIds = async (db: Db, studentId: string): Promise<str
 export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => {
   let query = db
     .from("homework")
-    .select("*, content_type, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
+    .select("*, content_type, external_url, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .order("due_date", { ascending: true });
 
   if (studentId) {
@@ -218,14 +218,14 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
       (rows as unknown as Array<{
         id: string; group_id: string; lesson_id: string | null; title: string;
         description: string | null; due_date: string | null; attachments: unknown;
-        content_type: ContentType; source: HomeworkSource;
+        content_type: ContentType; external_url: string | null; source: HomeworkSource;
         teacher_id: string | null;
         attachment_storage_path: string | null;
         attachment_size_bytes: number | null;
         attachment_filename: string | null;
         test_duration_seconds: number | null;
         test_auto_grade: boolean;
-        programming_language: "python" | "cpp" | null;
+        programming_language: ProgrammingLanguage | null;
         starter_code: string | null;
         expected_output: string | null;
         tests_attachment_path: string | null;
@@ -253,21 +253,21 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
 export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithSubmission> => {
   const r = await db
     .from("homework")
-    .select("*, content_type, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
+    .select("*, content_type, external_url, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .eq("id", id)
     .single()
     .then(unwrap);
   const raw = r as unknown as {
     id: string; group_id: string; lesson_id: string | null; title: string;
     description: string | null; due_date: string | null; attachments: unknown;
-    content_type: ContentType; source: HomeworkSource;
+    content_type: ContentType; external_url: string | null; source: HomeworkSource;
     teacher_id: string | null;
     attachment_storage_path: string | null;
     attachment_size_bytes: number | null;
     attachment_filename: string | null;
     test_duration_seconds: number | null;
     test_auto_grade: boolean;
-    programming_language: "python" | "cpp" | null;
+    programming_language: ProgrammingLanguage | null;
     starter_code: string | null;
     expected_output: string | null;
     tests_attachment_path: string | null;
@@ -871,7 +871,9 @@ export const gradeSubmission = async (
   if (error) throw error;
 };
 
-/** Создать ДЗ (file, test, programming или bundle). Returns created homework record. */
+const NATIVE_CONTENT_TYPES = ["file", "test", "programming", "bundle"] as const;
+
+/** Создать ДЗ (file/test/programming/bundle или один из 12 внешних сервисов). Returns created homework record. */
 export const createTeacherHomework = async (
   db: Db,
   input: {
@@ -879,21 +881,23 @@ export const createTeacherHomework = async (
     title: string;
     description: string;
     dueDate: string;
-    contentType: "file" | "test" | "programming" | "bundle";
+    contentType: ContentType;
     teacherId: string;
     lessonId?: string | null;
     status?: "draft" | "published";
     testDurationSeconds?: number | null;
     testAutoGrade?: boolean;
-    programmingLanguage?: "python" | "cpp" | null;
+    programmingLanguage?: ProgrammingLanguage | null;
     starterCode?: string | null;
     expectedOutput?: string | null;
     testsAttachmentPath?: string | null;
     testsAttachmentFilename?: string | null;
     testsAttachmentSizeBytes?: number | null;
+    externalUrl?: string | null;
   },
 ) => {
   const isProg = input.contentType === "programming";
+  const isExternal = !(NATIVE_CONTENT_TYPES as readonly string[]).includes(input.contentType);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
     .from("homework")
@@ -914,6 +918,7 @@ export const createTeacherHomework = async (
       tests_attachment_path: isProg ? (input.testsAttachmentPath ?? null) : null,
       tests_attachment_filename: isProg ? (input.testsAttachmentFilename ?? null) : null,
       tests_attachment_size_bytes: isProg ? (input.testsAttachmentSizeBytes ?? null) : null,
+      external_url: isExternal ? (input.externalUrl ?? null) : null,
     })
     .select()
     .single();

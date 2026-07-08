@@ -15,13 +15,15 @@ import {
 import { Code2 } from "lucide-react";
 import { TeacherProgrammingSubmissions } from "./TeacherProgrammingSubmissions";
 import { TeacherBundleSubmissions } from "./TeacherBundleSubmissions";
-import type { Locale } from "@snr/core";
+import type { Locale, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { ReviewModal, TestReviewModal } from "@/components/teacher/ReviewModals";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
+import { CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 
 type Question = {
   id: string;
@@ -53,7 +55,7 @@ type HW = {
   attachment_size_bytes: number | null;
   test_duration_seconds: number | null;
   test_auto_grade: boolean;
-  programming_language: "python" | "cpp" | null;
+  programming_language: CodeLanguage | null;
   expected_output: string | null;
   tests_attachment_path: string | null;
   tests_attachment_filename: string | null;
@@ -344,10 +346,12 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
               hw.content_type === "test" ? "bg-violet-100 text-violet-700"
                 : hw.content_type === "programming" ? "bg-emerald-100 text-emerald-700"
                 : hw.content_type === "bundle" ? "bg-indigo-100 text-indigo-700"
+                : isExternalService(hw.content_type) ? "bg-sky-100 text-sky-700"
                 : "bg-blue-100 text-blue-700")}>
               {hw.content_type === "test" ? d.homework.typeTest
                 : hw.content_type === "programming" ? d.homework.typeProgramming
                 : hw.content_type === "bundle" ? d.homework.typeBundle
+                : isExternalService(hw.content_type) ? SERVICE_CONFIG[hw.content_type].name
                 : d.homework.typeFile}
             </span>
           </div>
@@ -361,7 +365,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           )}
           {hw.content_type === "programming" && (
             <p className="mt-1 flex items-center gap-1 text-[11px] text-brand-ink-muted">
-              <Code2 size={12} /> {hw.programming_language === "cpp" ? "C++" : "Python"}
+              <Code2 size={12} /> {CODE_LANGUAGE_LABELS[hw.programming_language ?? "python"]}
             </p>
           )}
         </div>
