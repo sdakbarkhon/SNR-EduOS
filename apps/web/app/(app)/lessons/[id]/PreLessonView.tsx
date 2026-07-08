@@ -23,7 +23,7 @@ function stageTypeIcon(ct: LessonContentType | null): LucideIcon {
     case "code": return Code2;
     case "quiz_qia": return ClipboardCheck;
     case "quiz_kahoot": return Trophy;
-    case "wokwi": case "codesandbox": case "makecode":
+    case "wokwi": case "codesandbox":
     case "geogebra": case "phet": case "desmos": case "blockly_games": case "visualgo":
     case "p5js": case "excalidraw": case "learningapps": case "sqlonline":
       return Puzzle;
@@ -39,7 +39,6 @@ function stageTypeLabel(ct: LessonContentType | null, dl: ReturnType<typeof getD
     case "quiz_kahoot": return dl.stageContentQuizKahoot;
     case "wokwi": return dl.stageContentWokwi;
     case "codesandbox": return dl.stageContentCodesandbox;
-    case "makecode": return dl.stageContentMakecode;
     case "geogebra": return dl.stageContentGeogebra;
     case "phet": return dl.stageContentPhet;
     case "desmos": return dl.stageContentDesmos;

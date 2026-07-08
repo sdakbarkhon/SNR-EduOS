@@ -12,11 +12,11 @@ export const maxDuration = 60;
 
 const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
-  "wokwi", "codesandbox", "makecode",
+  "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
 ];
 const EXTERNAL = [
-  "wokwi", "codesandbox", "makecode",
+  "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
 ];
 
@@ -52,7 +52,7 @@ function buildPrompt(input: {
   // Subjects like "Информатика"/"Робототехника"/"Программирование" also cover
   // GeoGebra/PhET/Arduino/web topics — matching on the subject string used to force
   // EVERY lesson under those subjects into an all-Python "code" progression,
-  // which is exactly why the AI never proposed geogebra/phet/wokwi/codesandbox/makecode.
+  // which is exactly why the AI never proposed geogebra/phet/wokwi/codesandbox.
   const topicLower = input.topic.toLowerCase();
   const PYTHON_TOPIC_HINTS = [
     "python", "питон", "цикл", "функци", "алгоритм", "перемен", "массив",
@@ -61,7 +61,7 @@ function buildPrompt(input: {
   const OTHER_TOOL_HINTS = [
     "блочн", "arduino", "ардуино",
     "светодиод", "датчик", "схем", "wokwi", "микроконтроллер", "html", "css",
-    "javascript", "сайт", "веб", "makecode", "аркада", "приставка", "квиз", "kahoot",
+    "javascript", "сайт", "веб", "квиз", "kahoot",
     "qia", "повторени",
     "geogebra", "геогебра", "phet", "симуляц", "desmos", "калькулятор граф",
     "blockly", "visualgo", "сортировк", "p5.js", "p5js", "excalidraw", "доска",
@@ -105,7 +105,6 @@ ${programmingSection}
 - "code" — программирование в Monaco редакторе (stage_type: "task")
 - "quiz_qia" — асинхронный тест с вопросами (stage_type: "task")
 - "quiz_kahoot" — синхронный live-квиз с таймером (stage_type: "task")
-- "makecode" — игровое программирование Microsoft, классы 5–9
 - "wokwi" — Arduino/электроника симуляция, классы 7–11
 - "codesandbox" — веб-разработка HTML/CSS/JS, классы 9–11
 - "geogebra" — графики, геометрия, статистика (математика), классы 5–11
@@ -134,7 +133,6 @@ ${programmingSection}
 - "SQL", "база данных", "запросы" (старшие классы) → content_type="sqlonline"
 - "Arduino", "светодиод", "датчик", "схема", "робот", "микроконтроллер" → content_type="wokwi"
 - "HTML", "CSS", "JavaScript", "веб", "сайт", "страница" → content_type="codesandbox"
-- "аркада", "приставка", "MakeCode", "игра" (младшие классы) → content_type="makecode"
 - "Python", "циклы", "функции", "алгоритмы", "переменные" → content_type="code"
 - "квиз", "тест", "проверка", "повторение" → content_type="quiz_qia" или "quiz_kahoot"
 
@@ -190,7 +188,7 @@ ${programmingSection}
 - Вопросы проверяют ПОНИМАНИЕ концепции темы урока, а не запоминание синтаксиса.
 - Для content_type='quiz_kahoot' поле "quiz" НЕ заполняй — учитель добавит вопросы вручную позже.
 
-ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='geogebra'|'phet'|'desmos'|'blockly_games'|'visualgo'|'p5js'|'excalidraw'|'learningapps'|'sqlonline'|'wokwi'|'codesandbox'|'makecode'):
+ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='geogebra'|'phet'|'desmos'|'blockly_games'|'visualgo'|'p5js'|'excalidraw'|'learningapps'|'sqlonline'|'wokwi'|'codesandbox'):
 - Ссылку (URL) НЕ указывай — система сама подставит редактор по умолчанию.
 - Обязательно заполни description (что именно должен сделать ученик в редакторе) и teacher_notes
   (на что учителю обратить внимание при демонстрации/проверке), например:
@@ -200,7 +198,7 @@ ${programmingSection}
 
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
-  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"wokwi"|"codesandbox"|"makecode"|"geogebra"|"phet"|"desmos"|"blockly_games"|"visualgo"|"p5js"|"excalidraw"|"learningapps"|"sqlonline",
+  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"wokwi"|"codesandbox"|"geogebra"|"phet"|"desmos"|"blockly_games"|"visualgo"|"p5js"|"excalidraw"|"learningapps"|"sqlonline",
   "stage_type": "theory"|"task",
   "title": "Короткое название",
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",

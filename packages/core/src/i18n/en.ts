@@ -667,7 +667,6 @@ export const en: Dictionary = {
     tools: {
       wokwi: { name: "Wokwi", description: "Arduino simulation" },
       codesandbox: { name: "CodeSandbox", description: "Web development" },
-      makecode: { name: "MakeCode", description: "Make games" },
       code: { name: "Programming", description: "Python, C++" },
       geogebra: { name: "GeoGebra", description: "Graphing, geometry, statistics — interactive math" },
       phet: { name: "PhET Simulations", description: "Simulations for physics, chemistry, and biology" },
@@ -1028,7 +1027,6 @@ export const en: Dictionary = {
     stageContentCode: "Programming (code)",
     stageContentWokwi: "Wokwi",
     stageContentCodesandbox: "CodeSandbox",
-    stageContentMakecode: "MakeCode Arcade",
     stageContentGeogebra: "GeoGebra",
     stageContentPhet: "PhET Simulations",
     stageContentDesmos: "Desmos",
@@ -1146,10 +1144,8 @@ export const en: Dictionary = {
     external: {
       wokwi: "Wokwi",
       codesandbox: "CodeSandbox",
-      makecode: "MakeCode",
       wokwiDesc: "Arduino circuit simulator",
       codesandboxDesc: "Web development in browser",
-      makecodeDesc: "Games, micro:bit, Minecraft via Microsoft MakeCode",
       service: "Service",
       projectLink: "Project link",
       leaveEmptyHint: "Leave empty to open a blank editor",

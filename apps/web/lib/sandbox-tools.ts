@@ -4,7 +4,7 @@
 // Adding a new tool later = append one entry here (+ its i18n in sandbox.tools).
 
 export type SandboxToolId =
-  | "wokwi" | "codesandbox" | "makecode" | "code"
+  | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
   | "p5js" | "excalidraw" | "learningapps" | "sqlonline";
 
@@ -32,13 +32,6 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://codesandbox.io/s/new",
     icon: "🌐",
     gradient: "from-slate-600 to-slate-800",
-  },
-  {
-    id: "makecode",
-    kind: "iframe",
-    embedUrl: "https://arcade.makecode.com/",
-    icon: "🎮",
-    gradient: "from-violet-500 to-purple-600",
   },
   {
     id: "geogebra",

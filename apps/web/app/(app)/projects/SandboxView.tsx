@@ -51,7 +51,7 @@ function SandboxFullscreen({
   );
 }
 
-// ── Iframe tool (geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline/wokwi/codesandbox/makecode) ───
+// ── Iframe tool (geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline/wokwi/codesandbox) ───
 function IframeSandbox({ tool, name }: { tool: SandboxTool; name: string }) {
   const { locale } = useLocale();
   const dx = getDictionary(locale as Locale).lesson.external;

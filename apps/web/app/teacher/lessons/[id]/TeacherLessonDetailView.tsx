@@ -53,7 +53,6 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   code:           <Code2 className="h-4 w-4" />,
   wokwi:          <CircuitBoard className="h-4 w-4" />,
   codesandbox:    <Code2 className="h-4 w-4" />,
-  makecode:       <Gamepad2 className="h-4 w-4" />,
   quiz_qia:       <TestTube2 className="h-4 w-4" />,
   quiz_kahoot:    <Gamepad2 className="h-4 w-4" />,
   geogebra:       <Ruler className="h-4 w-4" />,
@@ -90,7 +89,7 @@ type ModalStep = 1 | 2 | 3;
 
 const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
-  "code", "wokwi", "codesandbox", "makecode", "quiz_qia", "quiz_kahoot",
+  "code", "wokwi", "codesandbox", "quiz_qia", "quiz_kahoot",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
 ];
 
@@ -147,7 +146,7 @@ function StageModal({
   const [expectedOutput, setExpectedOutput] = useState(existing?.expected_output ?? existingCfg.expected_output ?? "");
   const isCode = contentType === "code";
 
-  // external-service config (wokwi/codesandbox/makecode/geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline)
+  // external-service config (wokwi/codesandbox/geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline)
   const existingExtCfg = (existing?.config ?? {}) as Partial<ExternalServiceConfig>;
   const isExternal = isExternalService(contentType);
   const externalMeta = isExternal ? SERVICE_CONFIG[contentType as ExternalServiceType] : null;
@@ -966,7 +965,6 @@ export function TeacherLessonDetailView({
       code:           dl.stageContentCode,
       wokwi:          dl.stageContentWokwi,
       codesandbox:    dl.stageContentCodesandbox,
-      makecode:       dl.stageContentMakecode,
       quiz_qia:       dl.stageContentQuizQia,
       quiz_kahoot:    dl.stageContentQuizKahoot,
       geogebra:       dl.stageContentGeogebra,

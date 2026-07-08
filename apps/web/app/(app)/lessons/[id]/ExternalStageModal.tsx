@@ -29,7 +29,6 @@ const GRADE_COLORS: Record<number, string> = {
 const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   wokwi: "https://wokwi.com/projects/new/arduino-uno",
   codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
-  makecode: "https://arcade.makecode.com/99842-77365-57673-38391",
   geogebra: "https://www.geogebra.org/classic",
   phet: "https://phet.colorado.edu/sims/html/forces-and-motion-basics/latest/forces-and-motion-basics_en.html",
   desmos: "https://www.desmos.com/calculator",
@@ -42,11 +41,11 @@ const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
 };
 
 /**
- * External-service (wokwi/codesandbox/makecode/geogebra/phet/desmos/
+ * External-service (wokwi/codesandbox/geogebra/phet/desmos/
  * blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline) embedded
  * directly in the stage card. Owns its full header (title/description/
  * actions on one row), no "Open" gate, no fullscreen modal, no "open in new
- * tab" fallback — all twelve services embed via iframe.
+ * tab" fallback — all eleven services embed via iframe.
  */
 export function ExternalStageModal({
   stage, studentId, onSubmitted,

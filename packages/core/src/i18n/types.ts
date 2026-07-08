@@ -662,7 +662,6 @@ export interface Dictionary {
     tools: {
       wokwi: { name: string; description: string };
       codesandbox: { name: string; description: string };
-      makecode: { name: string; description: string };
       code: { name: string; description: string };
       geogebra: { name: string; description: string };
       phet: { name: string; description: string };
@@ -1030,7 +1029,6 @@ export interface Dictionary {
     stageContentCode: string;          // "Программирование (код)"
     stageContentWokwi: string;         // "Wokwi"
     stageContentCodesandbox: string;   // "CodeSandbox"
-    stageContentMakecode: string;      // "MakeCode Arcade"
     stageContentGeogebra: string;      // "GeoGebra"
     stageContentPhet: string;          // "PhET Simulations"
     stageContentDesmos: string;        // "Desmos"
@@ -1153,14 +1151,12 @@ export interface Dictionary {
       gradeSaved: string;
       submittedAt: string;
     };
-    // External services: wokwi / codesandbox / makecode
+    // External services: wokwi / codesandbox
     external: {
       wokwi: string;
       codesandbox: string;
-      makecode: string;
       wokwiDesc: string;
       codesandboxDesc: string;
-      makecodeDesc: string;
       service: string;            // "Сервис"
       projectLink: string;        // teacher config field
       leaveEmptyHint: string;     // "Оставьте пустым для открытия чистого редактора"

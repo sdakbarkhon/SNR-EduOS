@@ -667,7 +667,6 @@ export const uz: Dictionary = {
     tools: {
       wokwi: { name: "Wokwi", description: "Arduino simulyatsiyasi" },
       codesandbox: { name: "CodeSandbox", description: "Veb-dasturlash" },
-      makecode: { name: "MakeCode", description: "O'yinlar yaratish" },
       code: { name: "Dasturlash", description: "Python, C++" },
       geogebra: { name: "GeoGebra", description: "Grafiklar, geometriya, statistika — interaktiv matematika" },
       phet: { name: "PhET Simulations", description: "Fizika, kimyo va biologiya bo'yicha simulyatsiyalar" },
@@ -1028,7 +1027,6 @@ export const uz: Dictionary = {
     stageContentCode: "Dasturlash (kod)",
     stageContentWokwi: "Wokwi",
     stageContentCodesandbox: "CodeSandbox",
-    stageContentMakecode: "MakeCode Arcade",
     stageContentGeogebra: "GeoGebra",
     stageContentPhet: "PhET Simulations",
     stageContentDesmos: "Desmos",
@@ -1146,10 +1144,8 @@ export const uz: Dictionary = {
     external: {
       wokwi: "Wokwi",
       codesandbox: "CodeSandbox",
-      makecode: "MakeCode",
       wokwiDesc: "Arduino sxema simulyatori",
       codesandboxDesc: "Brauzerda veb dasturlash",
-      makecodeDesc: "Microsoft MakeCode orqali o'yinlar, micro:bit, Minecraft",
       service: "Servis",
       projectLink: "Loyiha havolasi",
       leaveEmptyHint: "Toza muharrirni ochish uchun bo'sh qoldiring",

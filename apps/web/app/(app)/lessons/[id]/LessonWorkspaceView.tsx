@@ -75,7 +75,6 @@ function TaskStubModal({
         code:           d.stageContentCode,
         wokwi:          d.stageContentWokwi,
         codesandbox:    d.stageContentCodesandbox,
-        makecode:       d.stageContentMakecode,
         quiz_qia:       d.stageContentQuizQia,
         quiz_kahoot:    d.stageContentQuizKahoot,
         geogebra:       d.stageContentGeogebra,

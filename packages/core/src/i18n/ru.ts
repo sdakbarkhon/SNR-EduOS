@@ -667,7 +667,6 @@ export const ru: Dictionary = {
     tools: {
       wokwi: { name: "Wokwi", description: "Arduino симуляция" },
       codesandbox: { name: "CodeSandbox", description: "Веб-разработка" },
-      makecode: { name: "MakeCode", description: "Создание игр" },
       code: { name: "Программирование", description: "Python, C++" },
       geogebra: { name: "GeoGebra", description: "Графики, геометрия, статистика — интерактивная математика" },
       phet: { name: "PhET Simulations", description: "Симуляции по физике, химии и биологии" },
@@ -1028,7 +1027,6 @@ export const ru: Dictionary = {
     stageContentCode: "Программирование (код)",
     stageContentWokwi: "Wokwi",
     stageContentCodesandbox: "CodeSandbox",
-    stageContentMakecode: "MakeCode Arcade",
     stageContentGeogebra: "GeoGebra",
     stageContentPhet: "PhET Simulations",
     stageContentDesmos: "Desmos",
@@ -1146,10 +1144,8 @@ export const ru: Dictionary = {
     external: {
       wokwi: "Wokwi",
       codesandbox: "CodeSandbox",
-      makecode: "MakeCode",
       wokwiDesc: "Симулятор электронных схем Arduino",
       codesandboxDesc: "Веб-разработка в браузере",
-      makecodeDesc: "Создание игр, micro:bit, Minecraft через Microsoft MakeCode",
       service: "Сервис",
       projectLink: "Ссылка на проект",
       leaveEmptyHint: "Оставьте пустым для открытия чистого редактора",

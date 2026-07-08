@@ -38,7 +38,7 @@ interface GenerateResult {
 }
 
 const EXTERNAL = [
-  "wokwi", "codesandbox", "makecode",
+  "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
 ];
 
@@ -52,7 +52,6 @@ function stageIcon(ct: string) {
     case "quiz_kahoot": return <Gamepad2 className="h-4 w-4" />;
     case "wokwi": return <CircuitBoard className="h-4 w-4" />;
     case "codesandbox": return <Code2 className="h-4 w-4" />;
-    case "makecode": return <Gamepad2 className="h-4 w-4" />;
     case "geogebra": return <Ruler className="h-4 w-4" />;
     case "phet": return <FlaskConical className="h-4 w-4" />;
     case "desmos": return <LineChart className="h-4 w-4" />;
@@ -77,7 +76,6 @@ function ctLabel(
     case "quiz_kahoot": return t.quizKahoot;
     case "wokwi": return "Wokwi";
     case "codesandbox": return "CodeSandbox";
-    case "makecode": return "MakeCode";
     case "geogebra": return "GeoGebra";
     case "phet": return "PhET Simulations";
     case "desmos": return "Desmos";

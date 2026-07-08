@@ -108,7 +108,7 @@ export type LessonStageRole = 'start' | 'middle' | 'summary';
 export type LessonStageType = 'theory' | 'task';
 export type LessonContentType =
   | 'presentation' | 'code'
-  | 'wokwi' | 'codesandbox' | 'makecode'
+  | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
   | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline'
   | 'quiz_qia' | 'quiz_kahoot';
@@ -206,7 +206,7 @@ export type CodeSubmission = {
 };
 
 export type ExternalServiceType =
-  | 'wokwi' | 'codesandbox' | 'makecode'
+  | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
   | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline';
 
