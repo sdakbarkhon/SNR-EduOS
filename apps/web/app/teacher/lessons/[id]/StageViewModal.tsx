@@ -7,7 +7,7 @@ import { getDictionary, getQuizQuestions, getKahootLeaderboard } from "@snr/core
 import type { Locale, LessonStage, LessonStatus, QuizQuestion, QuizLeaderboardEntry } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
+import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 
 const LIVE_SCORES_POLL_MS = 12000;
@@ -61,6 +61,9 @@ export function StageViewModal({
 
   const config = stage.config as { url?: string };
   const serviceMeta = isExternalService(stage.content_type) ? SERVICE_CONFIG[stage.content_type] : null;
+  // §9.1 — teacher's own read-only view falls back to the same default as
+  // the student-facing ExternalStageModal when no custom URL was set.
+  const serviceUrl = config?.url || (isExternalService(stage.content_type) ? DEFAULT_EXTERNAL_URLS[stage.content_type] : null);
 
   return createPortal(
     <div
@@ -134,9 +137,9 @@ export function StageViewModal({
             </div>
           )}
 
-          {serviceMeta && config?.url && (
+          {serviceMeta && serviceUrl && (
             <a
-              href={config.url}
+              href={serviceUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100"

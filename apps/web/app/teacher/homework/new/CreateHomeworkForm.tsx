@@ -212,7 +212,10 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     if (format === "programming" && !description.trim()) { setError("Введите условие задачи"); return; }
     if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
     if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
-    if (isExternalService(format)) {
+    // БОЛЬШОЕ ОБНОВЛЕНИЕ §9.1 — ссылка необязательна: пустая строка → на
+    // просмотре у ученика подставится DEFAULT_EXTERNAL_URLS, как на уроках
+    // (см. TeacherLessonDetailView.tsx's `externalReady` — тот же паттерн).
+    if (isExternalService(format) && externalUrl.trim()) {
       const v = validateServiceUrl(format, externalUrl);
       if (!v.valid) { setExternalUrlError(v.error); setError(v.error); return; }
       setExternalUrlError(null);
@@ -245,7 +248,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         programmingLanguage: format === "programming" ? progLanguage : null,
         starterCode: format === "programming" ? (starterCode || null) : null,
         expectedOutput: format === "programming" ? (expectedOutput || null) : null,
-        externalUrl: isExternalService(format) ? externalUrl.trim() : null,
+        externalUrl: isExternalService(format) ? (externalUrl.trim() || null) : null,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({
@@ -545,7 +548,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         {isExternal && (
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-brand-ink-muted">
-              {d.lesson.external.projectLink} <span className="text-slate-400 font-normal">— {SERVICE_CONFIG[format].description}</span>
+              {d.lesson.external.projectLink} <span className="text-slate-400 font-normal">(опционально) — {SERVICE_CONFIG[format].description}</span>
             </span>
             <input
               value={externalUrl}
@@ -562,6 +565,9 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
               <span className="flex items-center gap-1.5 text-[12px] font-medium text-danger">
                 <AlertCircle size={13} /> {externalUrlError}
               </span>
+            )}
+            {!externalUrlError && !externalUrl.trim() && (
+              <span className="text-[12px] text-slate-400">{d.lesson.external.leaveEmptyHint}</span>
             )}
           </label>
         )}
