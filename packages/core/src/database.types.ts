@@ -998,6 +998,30 @@ export type Database = {
           },
         ]
       }
+      demo_sessions: {
+        Row: {
+          account_user_id: string
+          claimed_at: string | null
+          id: string
+          last_activity: string | null
+          released: boolean
+        }
+        Insert: {
+          account_user_id: string
+          claimed_at?: string | null
+          id?: string
+          last_activity?: string | null
+          released?: boolean
+        }
+        Update: {
+          account_user_id?: string
+          claimed_at?: string | null
+          id?: string
+          last_activity?: string | null
+          released?: boolean
+        }
+        Relationships: []
+      }
       grades: {
         Row: {
           comment: string | null
@@ -3305,6 +3329,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_demo_account: {
+        Args: { p_grade?: string; p_kind: string }
+        Returns: {
+          email: string
+          username: string
+        }[]
+      }
       current_school_id: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
@@ -3341,6 +3372,8 @@ export type Database = {
         Returns: undefined
       }
       reset_demo_data: { Args: never; Returns: undefined }
+      reset_expired_demo_sessions: { Args: never; Returns: undefined }
+      touch_demo_session: { Args: never; Returns: undefined }
     }
     Enums: {
       announcement_category:

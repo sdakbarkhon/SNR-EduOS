@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
+import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
 import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <>
       <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
+      <DemoHeartbeat isDemo={isDemo} />
       <AppShell studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel}>{children}</AppShell>
     </>
   );

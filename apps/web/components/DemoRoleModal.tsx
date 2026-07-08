@@ -7,63 +7,26 @@ import { useRouter } from "next/navigation";
 import { defaultLocale, getDictionary } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 
-interface DemoAccount {
-  email: string;
-  password: string;
-  role: string;
-  name: string;
+// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 4.2 — accounts are no longer hardcoded (that
+// broke entirely the moment migration 97 wiped the old demo_teacher/
+// demo_student_3/7/10 accounts these buttons used to point at). Each click
+// now claims a free slot from the demo_sessions pool (migration 99's
+// claim_demo_account RPC) among the 90 demo_student_{10,7,3}_NN / 5
+// demo_teacher_NN accounts, and signs into whichever one it returns.
+interface DemoRole {
+  kind: "student" | "teacher";
+  grade: "10" | "7" | "3" | null;
+  labelKey: "roleStudent10" | "roleStudent7" | "roleStudent3" | "roleTeacher";
   avatar: string;
   color: string;
   redirectTo: string;
 }
 
-// Accounts dedicated to the "Demo Mode" button (migration 66) — separate
-// from teacher_demo/aziz_03/nodira_07/sherzod_10, which used to double as
-// both real test accounts AND the demo-button destination, causing the demo
-// banner to show up on ordinary logins to those accounts.
-//
-// Iter5 hotfix P14.3: the single demo_student was replaced here by three
-// grade-level demo students (migration 70), one per class level, all led by
-// the same demo_teacher. demo_student itself is untouched in the database —
-// it just stopped being one of these buttons; its credentials still work if
-// someone logs in with them directly on the main form.
-const DEMO_ACCOUNTS: DemoAccount[] = [
-  {
-    email: "demo_teacher@demo.snr.local",
-    password: "demo2026",
-    role: "Учитель",
-    name: "Демо Учитель",
-    avatar: "👨‍🏫",
-    color: "from-violet-500 to-purple-600",
-    redirectTo: "/teacher/dashboard",
-  },
-  {
-    email: "demo_student_3@demo.snr.local",
-    password: "demo2026",
-    role: "3-А класс",
-    name: "Демо Ученик 3-А",
-    avatar: "🐣",
-    color: "from-emerald-500 to-teal-600",
-    redirectTo: "/dashboard",
-  },
-  {
-    email: "demo_student_7@demo.snr.local",
-    password: "demo2026",
-    role: "7-А класс",
-    name: "Демо Ученик 7-А",
-    avatar: "👦",
-    color: "from-blue-500 to-cyan-600",
-    redirectTo: "/dashboard",
-  },
-  {
-    email: "demo_student_10@demo.snr.local",
-    password: "demo2026",
-    role: "10-А класс",
-    name: "Демо Ученик 10-А",
-    avatar: "🧑‍💻",
-    color: "from-orange-500 to-red-600",
-    redirectTo: "/dashboard",
-  },
+const DEMO_ROLES: DemoRole[] = [
+  { kind: "teacher", grade: null, labelKey: "roleTeacher", avatar: "👨‍🏫", color: "from-violet-500 to-purple-600", redirectTo: "/teacher/dashboard" },
+  { kind: "student", grade: "3", labelKey: "roleStudent3", avatar: "🐣", color: "from-emerald-500 to-teal-600", redirectTo: "/dashboard" },
+  { kind: "student", grade: "7", labelKey: "roleStudent7", avatar: "👦", color: "from-blue-500 to-cyan-600", redirectTo: "/dashboard" },
+  { kind: "student", grade: "10", labelKey: "roleStudent10", avatar: "🧑‍💻", color: "from-orange-500 to-red-600", redirectTo: "/dashboard" },
 ];
 
 export function DemoRoleModal({ onClose }: { onClose: () => void }) {
@@ -74,13 +37,26 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
   const supabase = createClient();
   const [isPending, startTransition] = useTransition();
 
-  async function handleLogin(account: DemoAccount) {
-    setLoading(account.email);
+  async function handleLogin(role: DemoRole) {
+    const key = role.grade ?? role.kind;
+    setLoading(key);
     setError("");
     try {
+      const { data, error: rpcError } = await supabase.rpc("claim_demo_account", {
+        p_kind: role.kind,
+        p_grade: role.grade ?? undefined,
+      });
+      if (rpcError) throw rpcError;
+      const claimed = data?.[0];
+      if (!claimed) {
+        setError(d.allBusy);
+        setLoading(null);
+        return;
+      }
+
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: account.email,
-        password: account.password,
+        email: claimed.email,
+        password: "demo2026",
       });
       if (authError) throw authError;
       sessionStorage.setItem("show-demo-welcome", "true");
@@ -88,7 +64,7 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
       // stay true straight through the navigation so the button keeps its
       // spinner until the destination page is actually on screen.
       startTransition(() => {
-        router.replace(account.redirectTo);
+        router.replace(role.redirectTo);
         router.refresh();
       });
     } catch (err) {
@@ -119,26 +95,29 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
         )}
 
         <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {DEMO_ACCOUNTS.map((account) => (
-            <button
-              key={account.email}
-              onClick={() => handleLogin(account)}
-              disabled={loading !== null || isPending}
-              className="group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-6 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
-            >
-              <div className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${account.color} text-3xl`}>
-                {account.avatar}
-              </div>
-              <p className="text-center font-bold text-slate-900">{account.name}</p>
-              <p className="mt-1 text-xs text-slate-500">{account.role}</p>
-              <div className="mt-4 w-full">
-                <span className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r ${account.color} py-2 text-sm font-medium text-white ${loading === account.email ? "opacity-50" : ""}`}>
-                  {loading === account.email && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  {loading === account.email ? d.loginProgress : d.loginBtn}
-                </span>
-              </div>
-            </button>
-          ))}
+          {DEMO_ROLES.map((role) => {
+            const key = role.grade ?? role.kind;
+            const label = d[role.labelKey];
+            return (
+              <button
+                key={key}
+                onClick={() => handleLogin(role)}
+                disabled={loading !== null || isPending}
+                className="group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-6 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
+              >
+                <div className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${role.color} text-3xl`}>
+                  {role.avatar}
+                </div>
+                <p className="text-center font-bold text-slate-900">{label}</p>
+                <div className="mt-4 w-full">
+                  <span className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r ${role.color} py-2 text-sm font-medium text-white ${loading === key ? "opacity-50" : ""}`}>
+                    {loading === key && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {loading === key ? d.loginProgress : d.loginBtn}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-400">{d.resetNote}</p>

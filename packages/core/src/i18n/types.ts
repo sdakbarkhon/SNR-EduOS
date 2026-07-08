@@ -732,10 +732,16 @@ export interface Dictionary {
     loginProgress: string; // "Вход..."
     bannerText: string;    // "Вы в демо-режиме. Все данные тестовые."
     bannerLogout: string;  // "Выйти"
-    resetNote: string;     // "Данные тестовые. Сброс раз в сутки в 3:00 ночи (Ташкент)."
+    resetNote: string;     // "Данные тестовые. Автосброс через 3 часа неактивности."
     welcomeTitle: string;  // "Вы в демо-режиме"
     welcomeText: string;   // "Все данные тестовые."
     welcomeOk: string;     // "Понятно"
+    // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 4.2 — pool claim/release model (migration 99)
+    roleStudent10: string; // "Демо-ученик 10 класс"
+    roleStudent7: string;  // "Демо-ученик 7 класс"
+    roleStudent3: string;  // "Демо-ученик 3 класс"
+    roleTeacher: string;   // "Демо-учитель"
+    allBusy: string;       // "Все демо-аккаунты заняты, попробуйте через несколько минут"
   };
   announcements: {
     title: string;

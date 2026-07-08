@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getMyTeacher, getTeacherGroups, getSubjectConfig } from "@snr/core";
 import { TeacherShell } from "@/components/TeacherShell";
 import { DemoBanner } from "@/components/DemoBanner";
+import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/auth";
@@ -41,6 +42,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
     <>
       <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
+      <DemoHeartbeat isDemo={isDemo} />
       <TeacherShell teacherName={teacherName} teacherSubtitle={teacherSubtitle} avatarUrl={avatarUrl}>
         {children}
       </TeacherShell>
