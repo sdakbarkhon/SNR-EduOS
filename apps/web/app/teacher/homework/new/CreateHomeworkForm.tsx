@@ -322,7 +322,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   ];
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="mx-auto w-full max-w-2xl space-y-5">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />

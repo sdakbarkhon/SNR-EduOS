@@ -27,7 +27,7 @@ export function TeacherGroupDetailView({ group, students }: Props) {
   const cfg = getSubjectConfig(group.subject);
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="mx-auto w-full max-w-2xl space-y-5">
       <div className="flex items-center gap-3">
         <Link href="/teacher/groups" className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />

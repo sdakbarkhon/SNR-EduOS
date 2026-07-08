@@ -333,7 +333,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
   }
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="mx-auto w-full max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
         <Link href="/teacher/homework" className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />
