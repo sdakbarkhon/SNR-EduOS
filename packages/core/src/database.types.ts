@@ -1066,6 +1066,42 @@ export type Database = {
           },
         ]
       }
+      group_teachers: {
+        Row: {
+          created_at: string
+          group_id: string
+          school_id: string
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          school_id?: string
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          school_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_teachers_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_teachers_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           course_price: number

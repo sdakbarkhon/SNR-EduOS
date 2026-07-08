@@ -33,6 +33,9 @@ supabase/.branches/
 screenshots/
 *.zip
 
+# DB backups (contain auth.users password hashes — never commit)
+backup_*.sql
+
 # misc
 .DS_Store
 *.log
