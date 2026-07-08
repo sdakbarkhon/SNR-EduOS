@@ -677,6 +677,7 @@ export const uz: Dictionary = {
       excalidraw: { name: "Excalidraw", description: "Sxema va diagrammalar uchun virtual doska" },
       learningapps: { name: "Learning Apps", description: "Darslar uchun interaktiv mashqlar va mini-o'yinlar" },
       sqlonline: { name: "SQL Online", description: "Brauzerda SQL so'rovlari (SQLite) — yuqori sinflar uchun" },
+      h5p: { name: "H5P Interactive", description: "Interaktiv topshiriqlar: memory games, viktorinalar, drag-n-drop. Har qanday fan uchun" },
     },
   },
   aiAssistant: {
@@ -1036,6 +1037,7 @@ export const uz: Dictionary = {
     stageContentExcalidraw: "Excalidraw",
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
+    stageContentH5p: "H5P Interactive",
     stageContentQuizQia: "Test (QIA)",
     stageContentQuizKahoot: "Kviz o'yini (Kahoot)",
     stageStepLabel: "Bosqich {n}",

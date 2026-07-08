@@ -1114,6 +1114,50 @@ export type Database = {
           },
         ]
       }
+      h5p_content: {
+        Row: {
+          content_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_public: boolean
+          school_id: string | null
+          storage_path: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_public?: boolean
+          school_id?: string | null
+          storage_path: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_public?: boolean
+          school_id?: string | null
+          storage_path?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "h5p_content_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       homework: {
         Row: {
           attachment_filename: string | null

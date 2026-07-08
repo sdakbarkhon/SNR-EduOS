@@ -677,6 +677,7 @@ export const en: Dictionary = {
       excalidraw: { name: "Excalidraw", description: "Virtual whiteboard for diagrams and sketches" },
       learningapps: { name: "Learning Apps", description: "Interactive exercises and mini-games for lessons" },
       sqlonline: { name: "SQL Online", description: "SQL queries in the browser (SQLite) — for older students" },
+      h5p: { name: "H5P Interactive", description: "Interactive tasks: memory games, quizzes, drag-n-drop. Works for any subject" },
     },
   },
   aiAssistant: {
@@ -1036,6 +1037,7 @@ export const en: Dictionary = {
     stageContentExcalidraw: "Excalidraw",
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
+    stageContentH5p: "H5P Interactive",
     stageContentQuizQia: "Quiz (QIA)",
     stageContentQuizKahoot: "Quiz game (Kahoot)",
     stageStepLabel: "Stage {n}",

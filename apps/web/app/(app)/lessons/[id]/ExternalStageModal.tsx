@@ -38,14 +38,15 @@ const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   excalidraw: "https://excalidraw.com/",
   learningapps: "https://learningapps.org/",
   sqlonline: "https://sqlime.org/",
+  h5p: "https://h5p.eduos.snruz.uz/library",
 };
 
 /**
  * External-service (wokwi/codesandbox/geogebra/phet/desmos/
- * blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline) embedded
+ * blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline/h5p) embedded
  * directly in the stage card. Owns its full header (title/description/
  * actions on one row), no "Open" gate, no fullscreen modal, no "open in new
- * tab" fallback — all eleven services embed via iframe.
+ * tab" fallback — all twelve services embed via iframe.
  */
 export function ExternalStageModal({
   stage, studentId, onSubmitted,

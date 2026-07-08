@@ -6,7 +6,7 @@
 export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
-  | "p5js" | "excalidraw" | "learningapps" | "sqlonline";
+  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "h5p";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -95,6 +95,13 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://sqlime.org/",
     icon: "🗄️",
     gradient: "from-cyan-600 to-blue-700",
+  },
+  {
+    id: "h5p",
+    kind: "iframe",
+    embedUrl: "https://h5p.eduos.snruz.uz/library",
+    icon: "🎴",
+    gradient: "from-fuchsia-500 to-purple-600",
   },
   {
     id: "code",

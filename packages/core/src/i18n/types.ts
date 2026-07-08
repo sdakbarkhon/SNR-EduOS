@@ -672,6 +672,7 @@ export interface Dictionary {
       excalidraw: { name: string; description: string };
       learningapps: { name: string; description: string };
       sqlonline: { name: string; description: string };
+      h5p: { name: string; description: string };
     };
   };
   // Iter5 P10 — standalone /ai-assistant page (Claude Design redesign);
@@ -1038,6 +1039,7 @@ export interface Dictionary {
     stageContentExcalidraw: string;    // "Excalidraw"
     stageContentLearningapps: string;  // "Learning Apps"
     stageContentSqlonline: string;     // "SQL Online"
+    stageContentH5p: string;           // "H5P Interactive"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"
     stageStepLabel: string;            // "Этап {n}"

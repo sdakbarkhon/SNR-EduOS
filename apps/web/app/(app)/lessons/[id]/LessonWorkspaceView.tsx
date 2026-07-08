@@ -86,6 +86,7 @@ function TaskStubModal({
         excalidraw:     d.stageContentExcalidraw,
         learningapps:   d.stageContentLearningapps,
         sqlonline:      d.stageContentSqlonline,
+        h5p:            d.stageContentH5p,
       }[stage.content_type] ?? stage.content_type
     : null;
 

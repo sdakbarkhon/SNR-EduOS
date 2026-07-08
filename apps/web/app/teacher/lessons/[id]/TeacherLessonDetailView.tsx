@@ -9,7 +9,7 @@ import {
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2,
-  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database,
+  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3,
 } from "lucide-react";
 import {
   updateLesson, getLessonStages, addLessonStage, updateLessonStage,
@@ -64,6 +64,7 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   excalidraw:     <PenTool className="h-4 w-4" />,
   learningapps:   <Brain className="h-4 w-4" />,
   sqlonline:      <Database className="h-4 w-4" />,
+  h5p:            <Grid3x3 className="h-4 w-4" />,
 };
 
 function fmtDate(iso: string): string {
@@ -91,6 +92,7 @@ const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
   "code", "wokwi", "codesandbox", "quiz_qia", "quiz_kahoot",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
+  "h5p",
 ];
 
 function StageModal({
@@ -976,6 +978,7 @@ export function TeacherLessonDetailView({
       excalidraw:     dl.stageContentExcalidraw,
       learningapps:   dl.stageContentLearningapps,
       sqlonline:      dl.stageContentSqlonline,
+      h5p:            dl.stageContentH5p,
     };
     return map[ct] ?? ct;
   }

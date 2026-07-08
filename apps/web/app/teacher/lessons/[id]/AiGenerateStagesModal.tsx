@@ -6,7 +6,7 @@ import {
   X, Sparkles, Loader2, Check, Clock,
   BookOpen, Code2, TestTube2, Gamepad2, Puzzle, CircuitBoard, Globe,
   Paperclip, Search, Copy, ExternalLink,
-  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database,
+  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3,
 } from "lucide-react";
 import { addLessonStage, replaceQuizQuestions, getDictionary } from "@snr/core";
 import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide, QuizQuestionInput } from "@snr/core";
@@ -40,6 +40,7 @@ interface GenerateResult {
 const EXTERNAL = [
   "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
+  "h5p",
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -61,6 +62,7 @@ function stageIcon(ct: string) {
     case "excalidraw": return <PenTool className="h-4 w-4" />;
     case "learningapps": return <Brain className="h-4 w-4" />;
     case "sqlonline": return <Database className="h-4 w-4" />;
+    case "h5p": return <Grid3x3 className="h-4 w-4" />;
     default: return null;
   }
 }
@@ -85,6 +87,7 @@ function ctLabel(
     case "excalidraw": return "Excalidraw";
     case "learningapps": return "Learning Apps";
     case "sqlonline": return "SQL Online";
+    case "h5p": return "H5P Interactive";
     default: return ct;
   }
 }

@@ -1,9 +1,13 @@
 // Whitelist + URL validation for the external-service lesson stages.
-// All eleven services (wokwi, codesandbox, geogebra, phet, desmos,
-// blockly_games, visualgo, p5js, excalidraw, learningapps, sqlonline)
+// All twelve services (wokwi, codesandbox, geogebra, phet, desmos,
+// blockly_games, visualgo, p5js, excalidraw, learningapps, sqlonline, h5p)
 // support iframe embed.
 
 import type { ExternalServiceType } from "@snr/core";
+
+// Self-hosted H5P app (apps/h5p), deployed as its own Vercel project on this
+// subdomain — see УЧ.9.
+export const H5P_BASE_URL = "https://h5p.eduos.snruz.uz";
 
 type ServiceMeta = {
   name: string;
@@ -163,6 +167,18 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
     errorMsg: "Неверная ссылка. Ожидается ссылка на SQL-песочницу (sqlime.org)",
     description: "SQL-запросы в браузере (SQLite) — для старших классов",
   },
+
+  h5p: {
+    name: "H5P Interactive",
+    embedSupported: true,
+    // Teacher pastes a link to content they created in the self-hosted H5P
+    // app's /editor (apps/h5p) — e.g. https://h5p.eduos.snruz.uz/player/<uuid>.
+    urlPattern: /^https?:\/\/h5p\.eduos\.snruz\.uz\/player\/[\w-]+\/?$/i,
+    extractEmbedUrl: (url) => url.trim().replace(/[?#].*$/, ""),
+    placeholder: `${H5P_BASE_URL}/player/<content-id>`,
+    errorMsg: `Неверная ссылка. Ожидается ссылка на задание из H5P (${H5P_BASE_URL}/player/...)`,
+    description: "Интерактивные задания: memory games, квизы, drag-n-drop. Универсально для любых предметов",
+  },
 };
 
 export function isExternalService(ct: string | null | undefined): ct is ExternalServiceType {
@@ -170,7 +186,7 @@ export function isExternalService(ct: string | null | undefined): ct is External
     ct === "wokwi" || ct === "codesandbox" ||
     ct === "geogebra" || ct === "phet" || ct === "desmos" || ct === "blockly_games" ||
     ct === "visualgo" || ct === "p5js" || ct === "excalidraw" || ct === "learningapps" ||
-    ct === "sqlonline"
+    ct === "sqlonline" || ct === "h5p"
   );
 }
 
