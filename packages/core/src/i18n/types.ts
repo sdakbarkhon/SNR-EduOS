@@ -537,6 +537,9 @@ export interface Dictionary {
     testReview: string;
     testWebOnly: string;
     teacherFile: string;
+    hintPanelTitle: string;     // "Подсказка" — БОЛЬШОЕ ОБНОВЛЕНИЕ §8.2 side panel
+    hintPanelCollapse: string;
+    hintPanelOpen: string;
     submittedFileLbl: string;
     uploadingFile: string;
     resubmitBtn: string;
@@ -1505,6 +1508,10 @@ export interface Dictionary {
     hwDeleteAttach: string;
     hwDeleteAttachConfirm: string;
     hwDownloadAttach: string;
+    hwHintLabel: string;      // "Подсказка ученику" — БОЛЬШОЕ ОБНОВЛЕНИЕ §8.1
+    hwHintHint: string;
+    hwHintBtn: string;
+    hwHintInvalidType: string;
     hwCreatedMsg: string;
     bundleSubtasksBlock: string;
     bundleAddSubtask: string;

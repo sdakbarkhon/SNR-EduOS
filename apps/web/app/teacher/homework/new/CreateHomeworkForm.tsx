@@ -10,6 +10,8 @@ import {
   uploadHomeworkAttachment,
   setHomeworkAttachment,
   uploadHomeworkTestsFile,
+  uploadHomeworkHint,
+  setHomeworkHint,
   getTeacherLessonsForGroup,
   linkedMaterialAttachmentPath,
   linkedBookAttachmentPath,
@@ -65,6 +67,11 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectName: string | null }>
   >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 8.1 — hint image/PDF, independent of format
+  // (unlike attachFile which only applies to content_type='file').
+  const [hintFile, setHintFile] = useState<File | null>(null);
+  const [hintError, setHintError] = useState<string | null>(null);
+  const hintRef = useRef<HTMLInputElement>(null);
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.4 — attach an existing Knowledge Base file
   // instead of uploading a fresh copy. Mutually exclusive with attachFile.
   const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
@@ -101,6 +108,26 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     if (f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); return; }
     setError(null);
     setAttachFile(f);
+  }
+
+  const HINT_MIME_TYPES = ["image/png", "image/jpeg", "application/pdf"];
+
+  function handleHintFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (f && !HINT_MIME_TYPES.includes(f.type)) { setHintError(d.teacher.hwHintInvalidType); e.target.value = ""; return; }
+    if (f && f.size > MAX_FILE_BYTES) { setHintError("Файл больше 50 МБ"); e.target.value = ""; return; }
+    setHintError(null);
+    setHintFile(f);
+  }
+
+  function handleHintFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    if (!HINT_MIME_TYPES.includes(f.type)) { setHintError(d.teacher.hwHintInvalidType); return; }
+    if (f.size > MAX_FILE_BYTES) { setHintError("Файл больше 50 МБ"); return; }
+    setHintError(null);
+    setHintFile(f);
   }
 
   function addQuestion() {
@@ -257,6 +284,12 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           type: s.type, title: s.title.trim(), description: s.description.trim() || null, config: s.config, orderIndex: i,
         })));
       }
+      if (hintFile) {
+        const { path } = await uploadHomeworkHint(supabase, {
+          teacherId: resolvedTeacherId, homeworkId: hw.id, fileName: hintFile.name, blob: hintFile,
+        });
+        await setHomeworkHint(supabase, hw.id, { path, fileName: hintFile.name, mimeType: hintFile.type });
+      }
       router.push("/teacher/homework");
     } catch (e: unknown) {
       setError((e as Error).message ?? d.common.error);
@@ -394,6 +427,49 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             </select>
           </label>
         )}
+
+        {/* Подсказка (§8.1) — независима от типа ДЗ, всегда доступна */}
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-brand-ink-muted">
+            {d.teacher.hwHintLabel} <span className="text-slate-400 font-normal">(опционально)</span>
+          </span>
+          <input
+            ref={hintRef}
+            type="file"
+            accept="image/png,image/jpeg,application/pdf"
+            onChange={handleHintFileChange}
+            className="hidden"
+            id="hw-hint"
+          />
+          {hintFile ? (
+            <div className="flex items-center gap-3 rounded-[14px] border border-brand-blue/40 bg-blue-50/60 px-4 py-3">
+              <Paperclip size={15} className="shrink-0 text-brand-blue" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-brand-blue">{hintFile.name}</p>
+                <p className="text-[11px] text-slate-500">{(hintFile.size / (1024 * 1024)).toFixed(1)} МБ</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setHintFile(null); if (hintRef.current) hintRef.current.value = ""; }}
+                className="shrink-0 text-slate-400 hover:text-red-500"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <label
+              htmlFor="hw-hint"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleHintFileDrop}
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-slate-200 p-6 text-center transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+            >
+              <Paperclip size={20} className="text-slate-400" />
+              <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.hwHintBtn}</span>
+              <span className="text-[11px] text-slate-400">{d.teacher.hwHintHint}</span>
+            </label>
+          )}
+          {hintError && <p className="mt-1.5 text-[12px] text-red-500">{hintError}</p>}
+        </div>
 
         {format === "file" && (
           <div>

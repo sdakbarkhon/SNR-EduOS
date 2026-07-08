@@ -20,6 +20,7 @@ import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { useFullscreenToggle } from "@/lib/useFullscreenToggle";
+import { HomeworkHintPanel } from "./HomeworkHintPanel";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -437,18 +438,37 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
       })
     : null;
 
+  const hintPanel = (
+    <HomeworkHintPanel
+      hintStoragePath={hw.hint_storage_path}
+      hintFilename={hw.hint_filename}
+      hintMimeType={hw.hint_mime_type}
+    />
+  );
+
   // Programming homework → dedicated two-column pseudo-IDE page.
   if (hw.content_type === "programming") {
-    return <ProgrammingIDE hw={hw} />;
+    return (
+      <>
+        {hintPanel}
+        <ProgrammingIDE hw={hw} />
+      </>
+    );
   }
 
   // Bundle homework → subtask accordion + own submit flow.
   if (hw.content_type === "bundle") {
-    return <BundleSolver hw={hw} />;
+    return (
+      <>
+        {hintPanel}
+        <BundleSolver hw={hw} />
+      </>
+    );
   }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:px-8">
+      {hintPanel}
       <button
         type="button"
         onClick={() => router.back()}

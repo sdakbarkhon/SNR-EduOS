@@ -524,6 +524,9 @@ export type HomeworkWithSubmission = {
   tests_attachment_path: string | null;
   tests_attachment_filename: string | null;
   tests_attachment_size_bytes: number | null;
+  hint_storage_path: string | null;   // БОЛЬШОЕ ОБНОВЛЕНИЕ §8 — image/PDF hint, migration 104
+  hint_filename: string | null;
+  hint_mime_type: string | null;
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;

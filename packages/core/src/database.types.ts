@@ -1231,6 +1231,9 @@ export type Database = {
           expected_output: string | null
           external_url: string | null
           group_id: string
+          hint_filename: string | null
+          hint_mime_type: string | null
+          hint_storage_path: string | null
           id: string
           lesson_id: string | null
           programming_language: string | null
@@ -1257,6 +1260,9 @@ export type Database = {
           expected_output?: string | null
           external_url?: string | null
           group_id: string
+          hint_filename?: string | null
+          hint_mime_type?: string | null
+          hint_storage_path?: string | null
           id?: string
           lesson_id?: string | null
           programming_language?: string | null
@@ -1283,6 +1289,9 @@ export type Database = {
           expected_output?: string | null
           external_url?: string | null
           group_id?: string
+          hint_filename?: string | null
+          hint_mime_type?: string | null
+          hint_storage_path?: string | null
           id?: string
           lesson_id?: string | null
           programming_language?: string | null

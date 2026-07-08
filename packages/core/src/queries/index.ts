@@ -231,6 +231,9 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         tests_attachment_path: string | null;
         tests_attachment_filename: string | null;
         tests_attachment_size_bytes: number | null;
+        hint_storage_path: string | null;
+        hint_filename: string | null;
+        hint_mime_type: string | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -273,6 +276,9 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     tests_attachment_path: string | null;
     tests_attachment_filename: string | null;
     tests_attachment_size_bytes: number | null;
+    hint_storage_path: string | null;
+    hint_filename: string | null;
+    hint_mime_type: string | null;
     created_at: string;
     group: { subject: string; name: string };
     submissions: HomeworkSubmission[];
@@ -2950,6 +2956,60 @@ export const getSubmissionFileUrl = async (
     .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
   if (error) throw error;
   return data!.signedUrl;
+};
+
+// ─── HOMEWORK HINT (БОЛЬШОЕ ОБНОВЛЕНИЕ §8 — image/PDF, shown to the student
+// as an always-visible side panel, distinct from the general teacher
+// attachment above which is a downloadable resource card). ─────────────────
+
+/** Upload teacher hint image/PDF to homework-files bucket (separate path
+ *  prefix from the general attachment, same bucket/policies). */
+export const uploadHomeworkHint = async (
+  db: Db,
+  { teacherId, homeworkId, fileName, blob }: {
+    teacherId: string; homeworkId: string; fileName: string; blob: Blob;
+  },
+): Promise<{ path: string; sizeByte: number }> => {
+  const ext = fileName.split(".").pop() ?? "bin";
+  const path = `${teacherId}/${homeworkId}/hint/${Date.now()}.${ext}`;
+  const { error } = await db.storage
+    .from("homework-files")
+    .upload(path, blob, { upsert: true, contentType: (blob as File).type || undefined });
+  if (error) throw error;
+  return { path, sizeByte: blob.size };
+};
+
+export const setHomeworkHint = async (
+  db: Db,
+  homeworkId: string,
+  hint: { path: string; fileName: string; mimeType: string } | null,
+) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db.from("homework") as any)
+    .update({
+      hint_storage_path: hint?.path ?? null,
+      hint_filename: hint?.fileName ?? null,
+      hint_mime_type: hint?.mimeType ?? null,
+    })
+    .eq("id", homeworkId);
+  if (error) throw error;
+};
+
+export const getHomeworkHintUrl = async (db: Db, storagePath: string): Promise<string> => {
+  const { data, error } = await db.storage
+    .from("homework-files")
+    .createSignedUrl(storagePath, 3600);
+  if (error) throw error;
+  return data!.signedUrl;
+};
+
+export const deleteHomeworkHint = async (db: Db, homeworkId: string, storagePath: string) => {
+  await db.storage.from("homework-files").remove([storagePath]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db.from("homework") as any)
+    .update({ hint_storage_path: null, hint_filename: null, hint_mime_type: null })
+    .eq("id", homeworkId);
+  if (error) throw error;
 };
 
 /** Submit homework with optional file — handles both first submit and resubmit.
