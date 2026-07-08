@@ -1677,6 +1677,13 @@ export const en: Dictionary = {
         "Ask anytime, I'll always help",
         "Here if you need advice",
       ],
+      quickQuestions: [
+        "Help me solve a problem",
+        "Explain the lesson topic",
+        "How do I do my homework?",
+        "Find a bug in my code",
+      ],
+      closeLabel: "Close",
     },
   },
   grades: {

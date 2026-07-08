@@ -166,11 +166,6 @@ export function AiAssistantView() {
               })}
             </div>
           </div>
-
-          <div className="rounded-[24px] p-5 shadow-md" style={{ background: "linear-gradient(140deg,#EFEBFF,#EAE1FF)" }}>
-            <h3 className="text-[16px] font-black text-slate-900">{t.tipTitle} 💡</h3>
-            <p className="mt-2 text-[13.5px] leading-relaxed text-[#7A6F98]">{t.tipBody}</p>
-          </div>
         </aside>
       </div>
 

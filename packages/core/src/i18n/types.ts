@@ -1698,6 +1698,8 @@ export interface Dictionary {
     fab: {
       welcome: string[]; // 2 phrases, one picked at random on first landing after login
       idle: string[];    // 5 phrases, cycled at random every 15s on other pages
+      quickQuestions: string[]; // shown as chips inside the empty floating chat window
+      closeLabel: string;
     };
   };
   grades: {

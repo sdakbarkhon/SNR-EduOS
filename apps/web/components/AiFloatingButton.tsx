@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
-import { AiAssistantView } from "@/app/(app)/ai-assistant/AiAssistantView";
+import { AiFloatingChat } from "./AiFloatingChat";
 
 // sessionStorage (not localStorage): the welcome bubble should reappear on a
 // genuinely new browser session, but not every time the student navigates
@@ -24,16 +24,16 @@ export function AiFloatingButton() {
   const d = getDictionary(locale as Locale);
 
   const [open, setOpen] = useState(false);
-  // Once opened, the modal stays mounted (just visually hidden) so the chat
-  // — a plain useState inside AiAssistantView — keeps its messages for the
-  // rest of the session instead of resetting every time the dialog closes.
+  // Once opened, the panel stays mounted (just visually hidden/scaled out)
+  // so AiFloatingChat's sessionStorage-backed history survives toggling the
+  // panel closed and open again, not just full page navigation.
   const [everOpened, setEverOpened] = useState(false);
   const [bubble, setBubble] = useState<string | null>(null);
   const [hovering, setHovering] = useState(false);
 
-  function handleOpen() {
+  function toggleOpen() {
     setEverOpened(true);
-    setOpen(true);
+    setOpen((prev) => !prev);
   }
 
   // Welcome bubble once per session on first landing after login, then
@@ -90,43 +90,33 @@ export function AiFloatingButton() {
 
       {/* bottom-20/right-4 on mobile clears the BottomNav (md:hidden, ~56px
           tall) below it; bottom-4/right-4 on md+ (where BottomNav is hidden)
-          is the strict corner the spec asks for. */}
+          is the strict corner the spec asks for. Compact ~52px circle (§6.1),
+          bank-widget scale rather than the previous 56px. */}
       <button
-        onClick={handleOpen}
+        onClick={toggleOpen}
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
         title={d.nav.aiAssistant}
         aria-label={d.nav.aiAssistant}
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-400 shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-4"
+        className="fixed bottom-20 right-4 z-40 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-400 shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-4"
       >
-        <Sparkles className="h-7 w-7 text-white" strokeWidth={2} />
+        <Sparkles className="h-6 w-6 text-white" strokeWidth={2} />
       </button>
 
+      {/* Плавающее окно чата (§6.2) — НЕ модалка: без затемняющего фона,
+          страница за окном остаётся видимой и рабочей. Заякорено над
+          кнопкой в правом нижнем углу, ~400×600px. */}
       {everOpened && (
         <div
           className={
             open
-              ? "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-              : "hidden"
+              ? "fixed bottom-36 right-4 z-50 w-[calc(100vw-2rem)] max-w-[400px] origin-bottom-right transition-all duration-200 md:bottom-20"
+              : "pointer-events-none fixed bottom-36 right-4 z-50 w-[calc(100vw-2rem)] max-w-[400px] origin-bottom-right scale-95 opacity-0 transition-all duration-200 md:bottom-20"
           }
-          onClick={() => setOpen(false)}
+          style={{ height: "min(600px, calc(100vh - 180px))" }}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative flex w-[75vw] max-w-[1400px] flex-col rounded-[24px] bg-white shadow-2xl"
-            style={{ height: "80vh", maxHeight: 900 }}
-          >
-            <button
-              onClick={() => setOpen(false)}
-              title="Закрыть"
-              aria-label="Закрыть"
-              className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-400 shadow-sm hover:bg-slate-100 hover:text-slate-600"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <AiAssistantView />
-            </div>
+          <div className="h-full w-full rounded-[20px] shadow-2xl ring-1 ring-black/5">
+            <AiFloatingChat onClose={() => setOpen(false)} />
           </div>
         </div>
       )}

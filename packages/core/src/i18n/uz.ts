@@ -1677,6 +1677,13 @@ export const uz: Dictionary = {
         "So'ra, doim yordam beraman",
         "Maslahat kerak bo'lsa, shu yerdaman",
       ],
+      quickQuestions: [
+        "Masalani yechishga yordam ber",
+        "Dars mavzusini tushuntir",
+        "Uy vazifasini qanday bajaraman?",
+        "Kodimdagi xatoni top",
+      ],
+      closeLabel: "Yopish",
     },
   },
   grades: {
