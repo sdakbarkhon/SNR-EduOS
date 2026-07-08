@@ -672,6 +672,8 @@ export const en: Dictionary = {
     backToMenu: "← Back to projects menu",
     modeProjects: "Projects",
     modeSandbox: "Sandbox",
+    filterLabel: "Subject",
+    filterAll: "All",
     tools: {
       wokwi: { name: "Wokwi", description: "Arduino simulation" },
       codesandbox: { name: "CodeSandbox", description: "Web development" },

@@ -521,7 +521,7 @@ export const getStudentById = async (db: Db, studentId: string) => {
     .select(
       "id, full_name, birth_date, avatar_url, balance, status, " +
       "curator:teachers!curator_id(id, full_name, phone), " +
-      "student_groups(groups(id, name, subject, teacher:teachers(id, full_name, phone)))",
+      "student_groups(groups(id, name, subject, teacher:teachers!groups_teacher_id_fkey(id, full_name, phone)))",
     )
     .eq("id", studentId)
     .single();
@@ -1505,14 +1505,16 @@ export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDet
 export const getTeacherLessonsForGroup = async (
   db: Db,
   groupId: string,
-): Promise<Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>> => {
-  const { data, error } = await db
+): Promise<Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectName: string | null }>> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
     .from("lessons")
-    .select("id, starts_at, topic, title, lesson_no")
+    .select("id, starts_at, topic, title, lesson_no, subject:subjects(name)")
     .eq("group_id", groupId)
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>;
+  return ((data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject: { name: string } | null }>)
+    .map((r) => ({ id: r.id, starts_at: r.starts_at, topic: r.topic, title: r.title, lesson_no: r.lesson_no, subjectName: r.subject?.name ?? null }));
 };
 
 // ─── LESSON MODULE (migration 24 → 35) ───────────────────────────────────────
@@ -3428,7 +3430,7 @@ export const cancelLeaveRequest = async (
 const LESSON_SUBJECT_SELECT =
   "id, group_id, title, topic, starts_at, ends_at, duration_minutes, room, status, " +
   "subject:subjects(id, name, icon, color), " +
-  "group:groups!inner(id, name, teacher:teachers(id, full_name, avatar_url))";
+  "group:groups!inner(id, name, teacher:teachers!groups_teacher_id_fkey(id, full_name, avatar_url))";
 
 /** Уроки ученика на конкретную дату (в Asia/Tashkent UTC+5).
  *  RLS уже ограничивает выборку группами ученика. studentId — опционально:

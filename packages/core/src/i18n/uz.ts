@@ -672,6 +672,8 @@ export const uz: Dictionary = {
     backToMenu: "← Loyihalar menyusiga qaytish",
     modeProjects: "Loyihalar",
     modeSandbox: "Mashq maydoni",
+    filterLabel: "Fan",
+    filterAll: "Barchasi",
     tools: {
       wokwi: { name: "Wokwi", description: "Arduino simulyatsiyasi" },
       codesandbox: { name: "CodeSandbox", description: "Veb-dasturlash" },

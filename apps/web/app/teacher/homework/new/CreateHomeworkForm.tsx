@@ -24,7 +24,7 @@ import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGen
 import { EduOSAiIcon } from "@/components/EduOSAiIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
-import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
+import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER, getServicesForSubject } from "@/lib/external-services";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
 type Format = ContentType;
@@ -62,7 +62,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [lessonId, setLessonId] = useState<string>("");
   const [lessonsForGroup, setLessonsForGroup] = useState<
-    Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>
+    Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectName: string | null }>
   >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.4 — attach an existing Knowledge Base file
@@ -266,18 +266,23 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   }
 
   const isExternal = isExternalService(format);
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — external-service options filtered by the
+  // linked lesson's subject, when one is picked; standalone homework (no
+  // lessonId) shows every service, same as before this change.
+  const linkedLessonSubject = lessonsForGroup.find((l) => l.id === lessonId)?.subjectName ?? null;
+  const allowedServiceOrder = EXTERNAL_SERVICE_ORDER.filter((key) => getServicesForSubject(linkedLessonSubject).includes(key));
   const TYPE_TABS: Array<{ key: Format; label: string; Icon: typeof FileText }> = [
     { key: "file", label: d.homework.typeFile, Icon: FileText },
     { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
     { key: "programming", label: d.homework.typeProgramming, Icon: Code },
     { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
-    ...EXTERNAL_SERVICE_ORDER.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
+    ...allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
   ];
   const SUBTASK_TYPE_TABS: Array<{ key: HomeworkSubtaskType; label: string }> = [
     { key: "file", label: d.homework.typeFile },
     { key: "test", label: d.homework.typeTest },
     { key: "code", label: d.homework.typeProgrammingShort },
-    ...EXTERNAL_SERVICE_ORDER.map((key) => ({ key, label: SERVICE_CONFIG[key].name })),
+    ...allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name })),
   ];
 
   return (

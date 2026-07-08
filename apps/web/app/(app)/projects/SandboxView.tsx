@@ -8,6 +8,7 @@ import {
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
+import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
 import { CodeEditor } from "@/components/CodeEditor";
 import { StdinInput } from "@/components/StdinInput";
 import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
@@ -224,12 +225,35 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
 
   const toolMeta = (id: SandboxToolId) => t.tools[id];
 
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — subject filter above the tool grid.
+  // "code" (Python/C++ sandbox) counts as Программирование; "all" (default)
+  // shows every tool, unchanged from before this filter existed.
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const subjectOptions = Object.keys(SUBJECT_SERVICE_MAP);
+  const visibleTools = subjectFilter === "all"
+    ? SANDBOX_TOOLS
+    : SANDBOX_TOOLS.filter((tool) =>
+        tool.id === "code" ? subjectFilter === "Программирование" : getServicesForSubject(subjectFilter).includes(tool.id),
+      );
+
   return (
     <div>
       <p className="max-w-2xl text-sm text-slate-500">{t.subtitle}</p>
 
+      <label className="mt-4 flex max-w-xs items-center gap-2 text-sm font-medium text-slate-600">
+        {t.filterLabel}
+        <select
+          value={subjectFilter}
+          onChange={(e) => setSubjectFilter(e.target.value)}
+          className="flex-1 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        >
+          <option value="all">{t.filterAll}</option>
+          {subjectOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </label>
+
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {SANDBOX_TOOLS.map((tool) => {
+        {visibleTools.map((tool) => {
           const meta = toolMeta(tool.id);
           return (
             <button

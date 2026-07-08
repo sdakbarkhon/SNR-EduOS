@@ -671,6 +671,9 @@ export interface Dictionary {
     backToMenu: string;     // "← Вернуться в меню проектов"
     modeProjects: string;   // вкладка "Проекты"
     modeSandbox: string;    // вкладка "Песочница"
+    // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — subject filter above the tool grid
+    filterLabel: string;    // "Предмет"
+    filterAll: string;      // "Все"
     tools: {
       wokwi: { name: string; description: string };
       codesandbox: { name: string; description: string };

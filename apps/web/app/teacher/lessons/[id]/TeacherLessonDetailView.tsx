@@ -26,7 +26,7 @@ import type {
   CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
   QuizQuestionInput, QuizConfigForStage,
 } from "@snr/core";
-import { SERVICE_CONFIG, validateServiceUrl, isExternalService } from "@/lib/external-services";
+import { SERVICE_CONFIG, validateServiceUrl, isExternalService, getServicesForSubject } from "@/lib/external-services";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { createClient } from "@/lib/supabase/client";
@@ -105,6 +105,7 @@ function StageModal({
   db,
   groupId,
   groupSubject,
+  subjectName,
   teacherId,
 }: {
   modalState: Extract<StageModalState, { mode: "add" | "edit" }>;
@@ -126,6 +127,7 @@ function StageModal({
   db: any;
   groupId: string;
   groupSubject: string;
+  subjectName: string | null;
   teacherId: string;
 }) {
   const { locale } = useLocale();
@@ -233,7 +235,13 @@ function StageModal({
     }
   }
 
-  const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — external-service options filtered by the
+  // lesson's subject (code/quiz types are never subject-restricted).
+  const allowedServices = new Set(getServicesForSubject(subjectName));
+  const rawContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
+  const availableContentTypes = rawContentTypes.filter(
+    (ct) => !isExternalService(ct) || allowedServices.has(ct),
+  );
 
   function handleNext() {
     if (!stageType) { setStepError("Выбери тип этапа"); return; }
@@ -1668,6 +1676,7 @@ export function TeacherLessonDetailView({
           db={db}
           groupId={lesson.group_id}
           groupSubject={lesson.group.subject}
+          subjectName={lesson.subjectName}
           teacherId={teacher.id}
         />
       )}

@@ -672,6 +672,8 @@ export const ru: Dictionary = {
     backToMenu: "← Вернуться в меню проектов",
     modeProjects: "Проекты",
     modeSandbox: "Песочница",
+    filterLabel: "Предмет",
+    filterAll: "Все",
     tools: {
       wokwi: { name: "Wokwi", description: "Arduino симуляция" },
       codesandbox: { name: "CodeSandbox", description: "Веб-разработка" },
