@@ -188,7 +188,10 @@ export type LessonStageWithProgress = LessonStage & {
   progress: LessonStageProgress | null;
 };
 
-export type CodeLanguage = 'python' | 'javascript' | 'cpp' | 'java';
+// 'html' (УЧ.11 Part 4) is never sent to Piston — it renders as a live srcdoc
+// iframe preview instead. Kept in the same union so the language selector,
+// Monaco editor, and default-snippet lookups stay a single exhaustive list.
+export type CodeLanguage = 'python' | 'javascript' | 'cpp' | 'java' | 'html';
 
 /** Stored in lesson_stages.config for content_type='code' (Prompt 4). */
 export type CodeStageConfig = {

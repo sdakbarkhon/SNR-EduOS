@@ -16,7 +16,7 @@ import { runCode } from "@/lib/piston";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { StudentLiveViewer } from "@/components/lesson-stages/StudentLiveViewer";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
-import { CODE_LANGUAGE_FILENAMES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
+import { CODE_LANGUAGE_FILENAMES, CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -73,6 +73,8 @@ export function CodeStageView({
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const isHtml = isHtmlLanguage(language);
 
   const [isLive, setIsLive] = useState(!!stage.is_live_active);
   const [liveCode, setLiveCodeValue] = useState(stage.live_code ?? "");
@@ -126,6 +128,12 @@ export function CodeStageView({
   }
 
   async function handleRun() {
+    // HTML/CSS never goes to Piston/Pyodide — it renders as a live srcdoc
+    // iframe preview, refreshed on every click (УЧ.11 Part 4).
+    if (isHtml) {
+      setHtmlPreview(code);
+      return;
+    }
     setRunning(true);
     try {
       const r = language === "python" ? await runPython(code, stdin) : await runCode(language, code, stdin);
@@ -249,14 +257,15 @@ export function CodeStageView({
           </div>
         </div>
 
-        {/* Right: output terminal */}
-        <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[300px]">
+        {/* Right: output terminal — widened for html so the srcdoc preview
+            isn't cramped inside the usual 300px terminal sidebar. */}
+        <div className={`flex w-full shrink-0 flex-col gap-2 ${isHtml ? "lg:w-[420px]" : "lg:w-[300px]"}`}>
           <div className="flex items-center justify-between gap-2 px-1">
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{dc.output}</h3>
             <div className="flex shrink-0 items-center gap-2">
-              {result && (
+              {(result || htmlPreview) && (
                 <button
-                  onClick={() => setResult(null)}
+                  onClick={() => { setResult(null); setHtmlPreview(null); }}
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
                 >
                   <Trash2 className="h-3 w-3" />
@@ -280,23 +289,41 @@ export function CodeStageView({
               )}
             </div>
           </div>
-          <div
-            className="min-h-[180px] flex-1 overflow-auto rounded-2xl border border-slate-800 p-4 font-mono text-sm leading-relaxed shadow-inner"
-            style={{ background: "#1a1b26" }}
-          >
-            {result ? (
-              <>
-                {result.stdout && <pre className="whitespace-pre-wrap text-slate-100">{result.stdout}</pre>}
-                {result.stderr && <pre className="whitespace-pre-wrap text-red-400">{result.stderr}</pre>}
-                {result.error && <pre className="whitespace-pre-wrap text-orange-400">{errMessage(result.error)}</pre>}
-                {!result.stdout && !result.stderr && !result.error && (
-                  <span className="text-slate-500">{dc.emptyOutput}</span>
-                )}
-              </>
+          {isHtml ? (
+            htmlPreview != null ? (
+              <iframe
+                srcDoc={htmlPreview}
+                sandbox="allow-scripts"
+                title={dc.output}
+                className="min-h-[300px] w-full flex-1 rounded-2xl border border-slate-800 bg-white shadow-inner"
+              />
             ) : (
-              <span className="text-slate-500">{dc.emptyOutput}</span>
-            )}
-          </div>
+              <div
+                className="flex min-h-[180px] flex-1 items-center justify-center rounded-2xl border border-slate-800 p-4 font-mono text-sm leading-relaxed shadow-inner"
+                style={{ background: "#1a1b26" }}
+              >
+                <span className="text-slate-500">{dc.emptyOutput}</span>
+              </div>
+            )
+          ) : (
+            <div
+              className="min-h-[180px] flex-1 overflow-auto rounded-2xl border border-slate-800 p-4 font-mono text-sm leading-relaxed shadow-inner"
+              style={{ background: "#1a1b26" }}
+            >
+              {result ? (
+                <>
+                  {result.stdout && <pre className="whitespace-pre-wrap text-slate-100">{result.stdout}</pre>}
+                  {result.stderr && <pre className="whitespace-pre-wrap text-red-400">{result.stderr}</pre>}
+                  {result.error && <pre className="whitespace-pre-wrap text-orange-400">{errMessage(result.error)}</pre>}
+                  {!result.stdout && !result.stderr && !result.error && (
+                    <span className="text-slate-500">{dc.emptyOutput}</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-slate-500">{dc.emptyOutput}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

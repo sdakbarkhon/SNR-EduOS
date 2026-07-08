@@ -1665,6 +1665,11 @@ export interface Dictionary {
       creating: string;          // "Этапы создаются..."
       createAll: string;         // "Создать этапы"
     };
+    // УЧ.11 Part 2 — speech bubble above the floating AI button
+    fab: {
+      welcome: string[]; // 2 phrases, one picked at random on first landing after login
+      idle: string[];    // 5 phrases, cycled at random every 15s on other pages
+    };
   };
   grades: {
     title: string;              // "Мои оценки"

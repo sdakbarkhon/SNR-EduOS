@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CodeViewer } from "@/components/CodeEditor";
 import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
 import { runCode } from "@/lib/piston";
-import { CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
+import { CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
 type Row = LessonStageProgress & {
   student: { id: string; full_name: string; avatar_url: string | null };
@@ -36,8 +36,12 @@ export function CodeStageSubmissionsModal({
   const dc = getDictionary(locale as Locale).lesson.code;
   const db = createClient();
 
+  // migration 62 promoted this to a top-level column; config.language is only
+  // a fallback for stages created before the migration (pre-existing bug fixed
+  // here — this modal was reading only cfg.language, so isHtml/CodeViewer/
+  // "Run here" all silently treated every non-legacy stage as Python).
   const cfg = (stage.config ?? {}) as Partial<CodeStageConfig>;
-  const language: CodeLanguage = cfg.language ?? "python";
+  const language: CodeLanguage = (stage.programming_language as CodeLanguage | null) ?? cfg.language ?? "python";
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,8 +134,15 @@ function SubmissionRow({
   const [runStdin, setRunStdin] = useState(sub.stdin ?? "");
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const isHtml = isHtmlLanguage(language);
 
   async function handleRunHere() {
+    // HTML/CSS never goes to Piston — show a live srcdoc preview instead.
+    if (isHtml) {
+      setHtmlPreview(sub.code ?? "");
+      return;
+    }
     setRunning(true);
     try {
       const r = language === "python" ? await runPython(sub.code ?? "", runStdin) : await runCode(language, sub.code ?? "", runStdin);
@@ -199,18 +210,21 @@ function SubmissionRow({
             </div>
           </div>
 
-          {/* Run here */}
+          {/* Run here — html shows a live srcdoc preview instead of a stdin+
+              stdout run, since Piston can't execute it (УЧ.11 Part 4). */}
           <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
             <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-0 flex-1">
-                <label className="mb-1 block text-[11px] font-semibold text-slate-500">{dc.studentStdin}</label>
-                <textarea
-                  value={runStdin}
-                  onChange={(e) => setRunStdin(e.target.value)}
-                  rows={2}
-                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[12px] outline-none focus:border-blue-500"
-                />
-              </div>
+              {!isHtml && (
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-500">{dc.studentStdin}</label>
+                  <textarea
+                    value={runStdin}
+                    onChange={(e) => setRunStdin(e.target.value)}
+                    rows={2}
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[12px] outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
               <button
                 onClick={handleRunHere}
                 disabled={running}
@@ -220,13 +234,25 @@ function SubmissionRow({
                 {runLabel}
               </button>
             </div>
-            {result && (
-              <pre className="mt-2 max-h-32 overflow-auto rounded-lg p-3 font-mono text-[12px] text-slate-100" style={{ background: "#1a1a1a" }}>
-                {result.stdout}
-                {result.stderr && `\n[stderr]\n${result.stderr}`}
-                {result.error && `\n[${result.error}]`}
-                {!result.stdout && !result.stderr && !result.error && dc.emptyOutput}
-              </pre>
+            {isHtml ? (
+              htmlPreview != null && (
+                <iframe
+                  srcDoc={htmlPreview}
+                  sandbox="allow-scripts"
+                  title={dc.output}
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white"
+                  style={{ minHeight: 300 }}
+                />
+              )
+            ) : (
+              result && (
+                <pre className="mt-2 max-h-32 overflow-auto rounded-lg p-3 font-mono text-[12px] text-slate-100" style={{ background: "#1a1a1a" }}>
+                  {result.stdout}
+                  {result.stderr && `\n[stderr]\n${result.stderr}`}
+                  {result.error && `\n[${result.error}]`}
+                  {!result.stdout && !result.stderr && !result.error && dc.emptyOutput}
+                </pre>
+              )
             )}
           </div>
 

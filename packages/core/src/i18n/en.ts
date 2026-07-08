@@ -1642,6 +1642,19 @@ export const en: Dictionary = {
       creating: "Creating stages...",
       createAll: "Create stages",
     },
+    fab: {
+      welcome: [
+        "Hi! I'm EduOS AI, ready to help with your studies",
+        "Hello! My name is EduOS AI, ask what you don't understand",
+      ],
+      idle: [
+        "Need help? Ask me",
+        "Ready to answer any question",
+        "Didn't get the topic? Let's figure it out together",
+        "Ask anytime, I'll always help",
+        "Here if you need advice",
+      ],
+    },
   },
   grades: {
     title: "My Grades",

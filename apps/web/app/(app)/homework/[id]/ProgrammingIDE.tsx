@@ -12,7 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, SubjectIcon, useLocale } from "@/components";
 import { CodeEditor } from "@/components/CodeEditor";
-import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS } from "@/lib/code-languages";
+import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS, isHtmlLanguage } from "@/lib/code-languages";
 import { runCode } from "@/lib/piston";
 import type { RunResult } from "@/lib/pyodide";
 
@@ -28,9 +28,11 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const [studentId, setStudentId] = useState<string | null>(null);
   const [code, setCode] = useState<string>(hw.submission?.code_text ?? hw.starter_code ?? CODE_LANGUAGE_DEFAULT_SNIPPETS[lang]);
   const [result, setResult] = useState<RunResult | null>(null);
+  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const isHtml = isHtmlLanguage(lang);
 
   useEffect(() => {
     sb.from("students").select("id").single().then(({ data, error }) => {
@@ -63,6 +65,12 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   }
 
   async function handleRun() {
+    // HTML/CSS never goes to Piston — it renders as a live srcdoc iframe
+    // preview, refreshed on every click (УЧ.11 Part 4).
+    if (isHtml) {
+      setHtmlPreview(code);
+      return;
+    }
     setRunning(true);
     try {
       setResult(await runCode(lang, code));
@@ -109,7 +117,7 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
             )}
           </GlassCard>
 
-          {hw.expected_output && (
+          {hw.expected_output && !isHtml && (
             <GlassCard className="p-5">
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">{t.expectedLabel}</p>
               <pre className="overflow-auto rounded-xl bg-[#1e1e1e] p-3 text-[13px] text-slate-100" style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace" }}>{hw.expected_output}</pre>
@@ -151,9 +159,23 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
 
           <CodeEditor value={code} onChange={setCode} language={lang} minHeight={400} />
 
-          {/* Output panel */}
+          {/* Output panel — html renders a live srcdoc iframe preview instead
+              of the stdout/stderr terminal (УЧ.11 Part 4). */}
           <div className="rounded-xl border border-slate-700 bg-[#181818] p-3" style={{ minHeight: 160 }}>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">{t.output}</p>
+            {isHtml ? (
+              htmlPreview != null ? (
+                <iframe
+                  srcDoc={htmlPreview}
+                  sandbox="allow-scripts"
+                  title={t.output}
+                  className="w-full rounded-lg bg-white"
+                  style={{ minHeight: 300, height: 300 }}
+                />
+              ) : (
+                <p className="text-[13px] text-slate-600">{t.outputEmpty}</p>
+              )
+            ) : (
             <pre style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace", whiteSpace: "pre-wrap", fontSize: 13 }}>
               {!result && !running && <span className="text-slate-600">{t.outputEmpty}</span>}
               {running && <span className="text-slate-500">{t.running}</span>}
@@ -162,6 +184,9 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
                   {result.stdout && <span className="text-emerald-400">{result.stdout}</span>}
                   {result.stdout && result.stderr && "\n"}
                   {result.stderr && <span className="text-red-400">{result.stderr}</span>}
+                  {result.error && result.error !== "compile" && !result.error.startsWith("exit:") && (
+                    <span className="text-red-400">{result.error}</span>
+                  )}
                   {!result.stdout && !result.stderr && !result.error && (
                     <span className="text-slate-600">{t.outputEmpty}</span>
                   )}
@@ -173,13 +198,17 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
                 </>
               )}
             </pre>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Sent toast */}
+      {/* Sent toast — same offsets as the AI button's speech bubble
+          (bottom-40/md:bottom-24), not bottom-6: the button itself now sits
+          at bottom-20/md:bottom-4 (h-14 = 56px tall), so a smaller offset
+          would visually overlap it (УЧ.11 Part 1). */}
       {sent && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[14px] bg-slate-800 px-4 py-3 text-[13px] font-medium text-white shadow-xl">
+        <div className="fixed bottom-40 right-6 z-50 flex items-center gap-2 rounded-[14px] bg-slate-800 px-4 py-3 text-[13px] font-medium text-white shadow-xl md:bottom-24">
           <Send className="h-4 w-4 text-emerald-400" /> {t.sent}
         </div>
       )}

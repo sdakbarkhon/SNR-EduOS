@@ -11,24 +11,33 @@ import { CODE_LANGUAGE_FILENAMES } from "./code-languages";
 const PISTON_URL = "https://emkc.org/api/v2/piston/execute";
 
 // Piston's own language slugs, keyed by our CodeLanguage (python/javascript/
-// java match 1:1; c++ is Piston's slug for what we call "cpp").
-const PISTON_LANGUAGE: Record<CodeLanguage, string> = {
+// java match 1:1; c++ is Piston's slug for what we call "cpp"). 'html' is
+// deliberately absent — Piston doesn't execute it, callers must intercept
+// language === "html" and render a srcdoc iframe preview instead (УЧ.11
+// Part 4) before ever calling runCode.
+const PISTON_LANGUAGE: Partial<Record<CodeLanguage, string>> = {
   python: "python",
   javascript: "javascript",
   cpp: "c++",
   java: "java",
 };
 
-/** Runs any of the 4 supported languages via Piston (УЧ.10 Part 6 — homework
- *  "Запустить" button). Unlike runCpp (fixed version "10.2.0"), this uses
- *  version "*" (latest) for every language, per spec. */
+/** Runs a Piston-supported language (Python/JavaScript/C++/Java — УЧ.10 Part
+ *  6, УЧ.11 Part 3). Unlike runCpp (fixed version "10.2.0"), this uses version
+ *  "*" (latest) for every language, per spec. Never call this with "html" —
+ *  see isHtmlLanguage()/code-languages.ts; it returns an error result rather
+ *  than silently hitting Piston with an unsupported language. */
 export async function runCode(language: CodeLanguage, code: string, stdin = ""): Promise<RunResult> {
+  const pistonLang = PISTON_LANGUAGE[language];
+  if (!pistonLang) {
+    return { stdout: "", stderr: "", error: `Piston не поддерживает язык "${language}"`, exitCode: null };
+  }
   try {
     const res = await fetch(PISTON_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        language: PISTON_LANGUAGE[language],
+        language: pistonLang,
         version: "*",
         files: [{ name: CODE_LANGUAGE_FILENAMES[language], content: code }],
         stdin,

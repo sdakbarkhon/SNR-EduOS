@@ -22,7 +22,7 @@ import { EduOSAiIcon } from "@/components/EduOSAiIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
-import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
+import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
 type Format = ContentType;
 type QuestionType = "single_choice" | "open";
@@ -537,15 +537,18 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             <span className="mb-1 text-[11px] text-slate-400">{d.homework.programming.starterHint}</span>
             <CodeEditor value={starterCode} onChange={setStarterCode} language={progLanguage} minHeight={150} />
           </div>
-          {/* Expected output */}
-          <label className="flex flex-col gap-1">
-            <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.expectedLabel}</span>
-            <span className="mb-1 text-[11px] text-slate-400">{d.homework.programming.expectedHint}</span>
-            <textarea rows={2} value={expectedOutput} onChange={(e) => setExpectedOutput(e.target.value)}
-              placeholder="Hello, World!" spellCheck={false}
-              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink resize-none focus:outline-none focus:border-brand-blue/50"
-              style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace" }} />
-          </label>
+          {/* Expected output — meaningless for html (no stdout, the student
+              gets a live preview instead), so hidden for that language. */}
+          {!isHtmlLanguage(progLanguage) && (
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.programming.expectedLabel}</span>
+              <span className="mb-1 text-[11px] text-slate-400">{d.homework.programming.expectedHint}</span>
+              <textarea rows={2} value={expectedOutput} onChange={(e) => setExpectedOutput(e.target.value)}
+                placeholder="Hello, World!" spellCheck={false}
+                className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink resize-none focus:outline-none focus:border-brand-blue/50"
+                style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace" }} />
+            </label>
+          )}
           {/* Tests file */}
           <div>
             <span className="mb-1.5 block text-[13px] font-medium text-brand-ink-muted">

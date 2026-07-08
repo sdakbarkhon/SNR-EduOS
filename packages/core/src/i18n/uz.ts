@@ -1642,6 +1642,19 @@ export const uz: Dictionary = {
       creating: "Bosqichlar yaratilmoqda...",
       createAll: "Bosqichlarni yaratish",
     },
+    fab: {
+      welcome: [
+        "Salom! Men EduOS AI, o'qishda yordam berishga tayyorman",
+        "Salom! Mening ismim EduOS AI, tushunmagan narsangni so'ra",
+      ],
+      idle: [
+        "Yordam kerakmi? Mendan so'ra",
+        "Har qanday savolga javob berishga tayyorman",
+        "Mavzuni tushunmadingmi? Birga tahlil qilamiz",
+        "So'ra, doim yordam beraman",
+        "Maslahat kerak bo'lsa, shu yerdaman",
+      ],
+    },
   },
   grades: {
     title: "Mening baholarim",

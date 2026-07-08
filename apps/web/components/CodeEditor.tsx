@@ -54,6 +54,7 @@ const MONACO_LANG: Record<Lang, string> = {
   javascript: "javascript",
   cpp: "cpp",
   java: "java",
+  html: "html",
 };
 
 function monacoLang(lang: Lang): string {
