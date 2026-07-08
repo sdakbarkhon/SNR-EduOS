@@ -11,7 +11,7 @@ import {
 import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
-  getMaterialDownloadUrl,
+  getMaterialDownloadUrl, endLesson,
 } from "@snr/core";
 import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -234,6 +234,7 @@ export function LessonWorkspaceView({
   const [countdown, setCountdown] = useState(5);
   const [completedElapsed, setCompletedElapsed] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [endingLesson, setEndingLesson] = useState(false);
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
@@ -422,6 +423,21 @@ export function LessonWorkspaceView({
   const activeMiddleStage = allMiddleStages.find((s) => s.id === activeStageId) ?? null;
   const activePos = activeMiddleStage?.position ?? -1;
   const isCompleted = lesson.status === "completed";
+
+  // Manual "Закончить урок" (§7.6) — available to student too, not just teacher.
+  // fn_auto_end_lessons keeps running independently; this just fires it early.
+  // No router.refresh() here on purpose — the existing realtime/poll below
+  // (applyLessonLiveUpdate) picks up the status flip and shows the completion
+  // modal, same as when the teacher or pg_cron ends the lesson.
+  async function handleEndLesson() {
+    if (endingLesson || !window.confirm(dl.endLessonConfirm)) return;
+    setEndingLesson(true);
+    try {
+      await endLesson(db, lesson.id);
+    } catch {
+      setEndingLesson(false);
+    }
+  }
   // middleStages: visible stages for sidebar stepper (position ≤ active, or all if completed)
   const middleStages = isCompleted
     ? allMiddleStages.filter((s) => (s as any).was_activated === true)
@@ -734,6 +750,15 @@ export function LessonWorkspaceView({
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
+            {!isCompleted && (
+              <button
+                onClick={handleEndLesson}
+                disabled={endingLesson}
+                className="flex items-center gap-2 rounded-[11px] border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+              >
+                {endingLesson ? "…" : dl.endLessonBtn}
+              </button>
+            )}
             <button
               onClick={toggleFullscreen}
               className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"

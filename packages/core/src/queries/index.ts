@@ -2680,6 +2680,21 @@ export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
     .eq("stage_role", "start");
 };
 
+/** Ручное завершение урока (кнопка "Закончить урок" — учитель или ученик, БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6).
+ *  Симметрична fn_auto_end_lessons(): помечает этап "Итог" выполненным. */
+export const endLesson = async (db: Db, lessonId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { error } = await db2.from("lessons")
+    .update({ status: "completed", ended_at: new Date().toISOString() })
+    .eq("id", lessonId);
+  if (error) throw error;
+  await db2.from("lesson_stages")
+    .update({ is_completed: true, completed_at: new Date().toISOString() })
+    .eq("lesson_id", lessonId)
+    .eq("stage_role", "summary");
+};
+
 // ─── ATTENDANCE ROLL-CALL ─────────────────────────────────────────────────────
 
 /** Список всех учеников группы с их статусом на конкретном уроке (для переклички). */

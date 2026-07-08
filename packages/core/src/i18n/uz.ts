@@ -1112,6 +1112,17 @@ export const uz: Dictionary = {
     scheduledAutoNote: "Dars jadval bo'yicha avtomatik boshlanadi.",
     inProgressAutoNote: "Dars ketmoqda.",
     inProgressMins: "{n} daqiqa davom etmoqda.",
+    startLessonBtn: "Darsni boshlash",
+    endLessonBtn: "Darsni tugatish",
+    endLessonConfirm: "Darsni hozir tugatasizmi? Bu amalni bekor qilib bo'lmaydi.",
+    liveScores: {
+      title: "Jonli natijalar",
+      student: "O'quvchi",
+      correct: "To'g'ri javoblar",
+      grade: "Ball",
+      empty: "Hali hech kim boshlamadi",
+      updating: "Avtomatik yangilanadi",
+    },
     code: {
       backToStages: "Bosqichlarga qaytish",
       problemStatement: "Masala sharti",

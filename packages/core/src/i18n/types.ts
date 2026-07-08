@@ -1126,6 +1126,17 @@ export interface Dictionary {
     scheduledAutoNote: string;         // "Урок начнётся автоматически по расписанию"
     inProgressAutoNote: string;        // "Урок идёт."
     inProgressMins: string;            // "Длится {n} мин."
+    startLessonBtn: string;            // "Начать урок" — БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6
+    endLessonBtn: string;              // "Закончить урок"
+    endLessonConfirm: string;          // confirm text before manual end
+    liveScores: {                      // §7.7 — live quiz_qia/quiz_kahoot scores table
+      title: string;
+      student: string;
+      correct: string;
+      grade: string;
+      empty: string;
+      updating: string;
+    };
     // Programming code stages (Prompt 4)
     code: {
       backToStages: string;

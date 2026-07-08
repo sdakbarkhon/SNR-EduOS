@@ -8,7 +8,7 @@ import {
   Presentation, Code2, ClipboardCheck, Trophy, Puzzle, BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
+import { getSubjectStyle, formatTime, formatDate, getDictionary, startLesson } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
@@ -81,6 +81,7 @@ export function PreLessonView({
   // duration_min), fetched separately from `lesson.stages` so we never ship
   // config/slides/quiz data to the client before the lesson actually starts.
   const [stages, setStages] = useState<LessonStagePreview[] | null>(null);
+  const [startingLesson, setStartingLesson] = useState(false);
 
   useEffect(() => {
     // createClient() must run only in the browser (accesses document.cookie)
@@ -151,6 +152,20 @@ export function PreLessonView({
       setError(d.common.error ?? "Ошибка");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // Manual "Начать урок" (§7.6) — available to student too, not just teacher.
+  // Auto-start by pg_cron keeps running independently; this just fires it early.
+  async function handleStartLesson() {
+    const db = dbRef.current;
+    if (!db || startingLesson) return;
+    setStartingLesson(true);
+    try {
+      await startLesson(db, lesson.id);
+      router.refresh();
+    } catch {
+      setStartingLesson(false);
     }
   }
 
@@ -352,6 +367,17 @@ export function PreLessonView({
             <Bell className="h-[18px] w-[18px] text-orange-300" />
             {dl.autoOpen}
           </div>
+
+          {/* Manual start (§7.6) — same effect as auto-start, just immediate */}
+          {studentId && (
+            <button
+              onClick={handleStartLesson}
+              disabled={startingLesson}
+              className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-bold text-violet-700 shadow-lg transition hover:bg-white/90 active:scale-95 disabled:opacity-60"
+            >
+              {startingLesson ? "…" : dl.startLessonBtn}
+            </button>
+          )}
 
           {/* Excuse button (replaces the old "Перейти сейчас") */}
           {studentId && excuse !== undefined && !excuse && (

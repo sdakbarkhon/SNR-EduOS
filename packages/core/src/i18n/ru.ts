@@ -1112,6 +1112,17 @@ export const ru: Dictionary = {
     scheduledAutoNote: "Урок начнётся автоматически по расписанию.",
     inProgressAutoNote: "Урок идёт.",
     inProgressMins: "Длится {n} мин.",
+    startLessonBtn: "Начать урок",
+    endLessonBtn: "Закончить урок",
+    endLessonConfirm: "Закончить урок сейчас? Действие нельзя отменить.",
+    liveScores: {
+      title: "Результаты в реальном времени",
+      student: "Ученик",
+      correct: "Правильных",
+      grade: "Балл",
+      empty: "Пока никто не приступил",
+      updating: "Обновляется автоматически",
+    },
     code: {
       backToStages: "Назад к этапам",
       problemStatement: "Условие задачи",

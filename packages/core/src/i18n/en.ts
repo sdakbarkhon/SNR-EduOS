@@ -1112,6 +1112,17 @@ export const en: Dictionary = {
     scheduledAutoNote: "Lesson will start automatically on schedule.",
     inProgressAutoNote: "Lesson is in progress.",
     inProgressMins: "Running {n} min.",
+    startLessonBtn: "Start lesson",
+    endLessonBtn: "End lesson",
+    endLessonConfirm: "End the lesson now? This can't be undone.",
+    liveScores: {
+      title: "Live results",
+      student: "Student",
+      correct: "Correct",
+      grade: "Score",
+      empty: "No one has started yet",
+      updating: "Updates automatically",
+    },
     code: {
       backToStages: "Back to stages",
       problemStatement: "Problem statement",

@@ -12,13 +12,14 @@ import {
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3,
 } from "lucide-react";
 import {
-  updateLesson, getLessonStages, addLessonStage, updateLessonStage,
+  getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
   getSubjectStyle, getLessonExcuseRequests,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
   uploadPresentationFile, isPptxFile,
+  startLesson, endLesson,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -48,6 +49,7 @@ import { PdfViewer } from "@/components/PdfViewer";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
+import { StageViewModal } from "./StageViewModal";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -693,15 +695,13 @@ export function TeacherLessonDetailView({
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
 
-  const [title, setTitle] = useState(lesson.title ?? "");
-  const [desc, setDesc] = useState(lesson.description ?? "");
-  const [infoSaving, setInfoSaving] = useState(false);
-  const [infoSaved, setInfoSaved] = useState(false);
-
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
   const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
+  const [viewStage, setViewStage] = useState<LessonStage | null>(null);
+  const [startingLesson, setStartingLesson] = useState(false);
+  const [endingLesson, setEndingLesson] = useState(false);
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
   const [reviewStage, setReviewStage] = useState<LessonStage | null>(null);
@@ -849,13 +849,29 @@ export function TeacherLessonDetailView({
     return () => clearInterval(id);
   }, [status, startedAt]);
 
-  async function handleSaveInfo() {
-    setInfoSaving(true);
+  // ── Manual start/end (§7.6 — available to both teacher and student; auto-start/
+  // auto-end by pg_cron still run independently and simply find nothing to do). ──
+
+  async function handleStartLesson() {
+    if (startingLesson) return;
+    setStartingLesson(true);
     try {
-      await updateLesson(db, lesson.id, { title: title || null, description: desc || null });
-      setInfoSaved(true);
-      setTimeout(() => setInfoSaved(false), 2000);
-    } catch { /* noop */ } finally { setInfoSaving(false); }
+      await startLesson(db, lesson.id);
+      window.location.reload();
+    } catch {
+      setStartingLesson(false);
+    }
+  }
+
+  async function handleEndLesson() {
+    if (endingLesson || !window.confirm(dl.endLessonConfirm)) return;
+    setEndingLesson(true);
+    try {
+      await endLesson(db, lesson.id);
+      window.location.reload();
+    } catch {
+      setEndingLesson(false);
+    }
   }
 
   // ── Stage CRUD ──────────────────────────────────────────────────────────────
@@ -1034,7 +1050,6 @@ export function TeacherLessonDetailView({
 
   const isLessonCompleted = status === "completed";
   const style = getSubjectStyle(lesson.group.subject);
-  const infoChanged = title !== (lesson.title ?? "") || desc !== (lesson.description ?? "");
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
     : fmtTime(lesson.starts_at);
@@ -1086,21 +1101,45 @@ export function TeacherLessonDetailView({
         {dl.backToLessons}
       </Link>
 
-      {/* Header card */}
+      {/* Header card — subject/group/title/time/room/status, all in one block (§7.2) */}
       {(() => {
         const bg =
           status === "in_progress" ? "linear-gradient(135deg, #16a34a, #15803d)"
           : status === "completed"  ? "linear-gradient(135deg, #6b7280, #4b5563)"
           : `linear-gradient(135deg, ${style.color}, color-mix(in sRGB, ${style.color} 60%, #1e1b4b))`;
         return (
-          <div className="flex flex-col gap-2 rounded-2xl p-6 text-white shadow-xl" style={{ background: bg }}>
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
-              {(lesson.subjectName ?? style.label)} · {lesson.group.name}
-            </p>
-            {lesson.lesson_no && <p className="text-xs text-white/60">Урок №{lesson.lesson_no}</p>}
-            <h1 className="text-2xl font-bold">
-              {lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
-            </h1>
+          <div className="flex flex-col gap-3 rounded-2xl p-6 text-white shadow-xl" style={{ background: bg }}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
+                  {(lesson.subjectName ?? style.label)} · {lesson.group.name}
+                </p>
+                {lesson.lesson_no && <p className="text-xs text-white/60">Урок №{lesson.lesson_no}</p>}
+                <h1 className="mt-1 text-2xl font-bold">
+                  {lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
+                </h1>
+              </div>
+              {/* Manual start/end (§7.6) — pg_cron auto-transitions still run independently */}
+              {status === "scheduled" && (
+                <button
+                  onClick={handleStartLesson}
+                  disabled={startingLesson}
+                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-md transition hover:bg-white/90 active:scale-95 disabled:opacity-60"
+                >
+                  {startingLesson ? "…" : dl.startLessonBtn}
+                </button>
+              )}
+              {status === "in_progress" && (
+                <button
+                  onClick={handleEndLesson}
+                  disabled={endingLesson}
+                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-red-600 shadow-md transition hover:bg-white/90 active:scale-95 disabled:opacity-60"
+                >
+                  {endingLesson ? "…" : dl.endLessonBtn}
+                </button>
+              )}
+            </div>
+
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span className="rounded-full bg-white/10 px-3 py-1">{timeRange}</span>
               <span className="rounded-full bg-white/10 px-3 py-1">{fmtDate(lesson.starts_at)}</span>
@@ -1110,26 +1149,38 @@ export function TeacherLessonDetailView({
                 </span>
               )}
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/15 pt-3 text-sm text-white/90">
+              {status === "scheduled" && (
+                <>
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>{dl.scheduledAutoNote}</span>
+                </>
+              )}
+              {status === "in_progress" && (
+                <>
+                  <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-white" />
+                  <span>
+                    {dl.inProgressAutoNote}{" "}
+                    {elapsedMin > 0 && dl.inProgressMins.replace("{n}", String(elapsedMin))}
+                  </span>
+                </>
+              )}
+              {status === "completed" && (
+                <>
+                  <Check className="h-4 w-4 shrink-0" />
+                  <span>
+                    Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
+                  </span>
+                  <span className="text-white/40">·</span>
+                  <Lock className="h-3.5 w-3.5 shrink-0" />
+                  <span>{dl.completedLock}</span>
+                </>
+              )}
+            </div>
           </div>
         );
       })()}
-
-      {/* Status indicator (no manual start/end — pg_cron handles transitions) */}
-      {status === "scheduled" && (
-        <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
-          <Clock className="h-4 w-4 shrink-0 text-blue-500" />
-          <p className="text-sm text-blue-800">{dl.scheduledAutoNote}</p>
-        </div>
-      )}
-      {status === "in_progress" && (
-        <div className="flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
-          <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-green-500" />
-          <p className="text-sm text-green-800">
-            {dl.inProgressAutoNote}{" "}
-            {elapsedMin > 0 && dl.inProgressMins.replace("{n}", String(elapsedMin))}
-          </p>
-        </div>
-      )}
 
       {/* Inline attendance reminder (5–15 min before end) */}
       {status === "in_progress" && (
@@ -1142,403 +1193,11 @@ export function TeacherLessonDetailView({
           }
         />
       )}
-      {status === "completed" && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4">
-            <Check className="h-5 w-5 text-gray-500" />
-            <p className="text-sm text-gray-600">
-              Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
-            </p>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-3">
-            <Lock className="h-4 w-4 shrink-0 text-yellow-600" />
-            <p className="text-sm font-medium text-yellow-800">{dl.completedLock}</p>
-          </div>
-        </div>
-      )}
 
-      {/* Roll call */}
-      {(status === "in_progress" || status === "completed") && (
-        <div ref={rollCallRef}>
-        <AttendanceRollCall
-          lessonId={lesson.id}
-          teacherId={teacher.id}
-          lessonStatus={status}
-          excused={excusedMap}
-        />
-        </div>
-      )}
-
-      {/* Raised hands */}
+      {/* Raised hands (§7.3 order: raised hand → materials → stages → roll call) */}
       {status === "in_progress" && (
         <RaisedHandsBlock lessonId={lesson.id} teacherId={teacher.id} />
       )}
-
-      {/* About lesson */}
-      <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.aboutLesson}</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.titleLabel}</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              disabled={isLessonCompleted}
-              placeholder={dl.titlePlaceholder}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">{dl.descLabel}</label>
-            <textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)}
-              disabled={isLessonCompleted}
-              placeholder={dl.descPlaceholder}
-              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400" />
-          </div>
-          {!isLessonCompleted && infoChanged && (
-            <button onClick={handleSaveInfo} disabled={infoSaving}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-60">
-              {infoSaved ? <><Check className="inline-block h-4 w-4 mr-1" /> {dl.saveBtn}</> : infoSaving ? dl.uploading : dl.saveBtn}
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* Excuse requests */}
-      {status !== "completed" && excuses.length > 0 && (
-        <section className="rounded-2xl border border-orange-100 bg-orange-50/50 p-6 shadow-sm space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-orange-600">
-            <CalendarX className="h-4 w-4" />
-            {dl.excuse.teacherTitle} ({excuses.length})
-          </h2>
-          <div className="space-y-2">
-            {excuses.map((e) => (
-              <div key={e.id} className="flex items-start gap-3 rounded-xl border border-white bg-white/80 px-4 py-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[12px] font-bold text-orange-600">
-                  {e.student.full_name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-slate-800">{e.student.full_name}</p>
-                  <p className="mt-0.5 text-[13px] text-slate-500">{e.reason}</p>
-                </div>
-                <span className="shrink-0 text-[11px] text-slate-400">{fmtTime(e.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── ACTIVE STAGE CONTROL (only during in_progress) ─────────────────── */}
-      {(status === "in_progress" || status === "scheduled") && middleStages.length > 0 && (
-        <section className="rounded-2xl border border-violet-100 bg-violet-50/50 p-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-violet-500" />
-            <h2 className="text-sm font-bold uppercase tracking-widest text-violet-700">
-              {dl.activeStage.manageStages}
-            </h2>
-          </div>
-
-          <div className="flex flex-col divide-y divide-violet-100 rounded-xl border border-violet-100 bg-white overflow-hidden">
-            {middleStages.map((stage) => {
-              const isActive = stage.id === activeStageId;
-              const activePos = middleStages.find((s) => s.id === activeStageId)?.position ?? Infinity;
-              const isPassed = stage.position < activePos && activeStageId !== null;
-              const isActivating = activatingStageId === stage.id;
-
-              const hasSlides = isActive && stage.slides && stage.slides.length > 0;
-              const hasLiveCode = isActive && stage.content_type === "code";
-
-              return (
-                <div key={stage.id}>
-                  <div
-                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                      isActive ? "bg-violet-50" : ""
-                    }`}
-                  >
-                    {/* State indicator */}
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                      isActive
-                        ? "bg-violet-600 text-white"
-                        : isPassed
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-500"
-                    }`}>
-                      {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
-                    </div>
-
-                    {/* Title + badge */}
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
-                        {stage.title}
-                      </span>
-                      {isActive && (
-                        <p className="mt-0.5 text-[11px] text-violet-500">{dl.activeStage.studentsSeeThis}</p>
-                      )}
-                    </div>
-
-                    {/* Status label or button */}
-                    {isActive ? (
-                      <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
-                        {dl.activeStage.activeNow}
-                      </span>
-                    ) : isPassed ? (
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-[11px] font-semibold text-emerald-600">{dl.activeStage.passed}</span>
-                        <button
-                          onClick={() => handleActivateStage(stage.id)}
-                          disabled={status !== "in_progress" || isActivating}
-                          className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {isActivating ? "…" : dl.activeStage.activate}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleActivateStage(stage.id)}
-                        disabled={status !== "in_progress" || isActivating}
-                        title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
-                        className="shrink-0 flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {isActivating ? "…" : `▶ ${dl.activeStage.activate}`}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Teacher presentation control — drives students' current_slide_index via Realtime */}
-                  {hasSlides && (
-                    <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
-                      <SlideViewer
-                        slides={stage.slides ?? []}
-                        canExport
-                        onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
-                        isTeacher
-                        stageId={stage.id}
-                        initialSlide={stage.current_slide_index ?? 0}
-                      />
-                    </div>
-                  )}
-
-                  {/* Live coding — drives students' fullscreen read-only view via Realtime */}
-                  {hasLiveCode && (
-                    <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
-                      <TeacherLiveCodeControl stage={stage} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {status === "scheduled" && (
-            <p className="text-[11px] text-violet-400">{dl.activeStage.lessonNotStarted}</p>
-          )}
-        </section>
-      )}
-
-      {/* ── STAGES BLOCK ──────────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
-          {!isLessonCompleted && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAiGenerateOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-violet-300 bg-gradient-to-r from-blue-50 to-violet-50 px-4 py-2 text-sm font-bold text-violet-700 shadow-sm hover:from-blue-100 hover:to-violet-100 active:scale-95 dark:border-violet-500/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-300"
-              >
-                <Sparkles className="h-4 w-4" /> {d.ai.generate.button}
-              </button>
-              <button
-                onClick={() => setStageModal({ mode: "add" })}
-                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
-              >
-                <Plus className="h-4 w-4" /> {dl.stageAddBtn}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          {/* Start stage */}
-          {startStage && (
-            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-              startStage.is_completed
-                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
-                : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
-            }`}>
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                startStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
-              }`}>
-                {startStage.is_completed ? <Check className="h-4 w-4" /> : "→"}
-              </div>
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageStartLabel}</span>
-              {startStage.is_completed && (
-                <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
-              )}
-            </div>
-          )}
-
-          {/* Middle stages */}
-          {middleStages.length === 0 ? (
-            !isLessonCompleted && (
-              <div
-                onClick={() => setStageModal({ mode: "add" })}
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-6 text-slate-400 transition-all hover:border-blue-300 hover:text-blue-500"
-              >
-                <Plus className="h-5 w-5" />
-                <span className="text-sm">{dl.stageAddBtn}</span>
-              </div>
-            )
-          ) : (
-            middleStages.map((stage, idx) => (
-              <div
-                key={stage.id}
-                className="flex items-start gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5"
-              >
-                {/* Position + type badge */}
-                <div className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold ${
-                    stage.stage_type === "task"
-                      ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-                  }`}>
-                    {idx + 1}
-                  </div>
-                </div>
-
-                {/* Info */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage.title}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                      stage.stage_type === "task"
-                        ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
-                        : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-                    }`}>
-                      {stage.stage_type === "task" ? dl.stageBadgeTask : dl.stageBadgeTheory}
-                    </span>
-                    {stage.content_type && (
-                      <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                        {CONTENT_ICONS[stage.content_type]}
-                        {contentLabel(stage.content_type)}
-                      </span>
-                    )}
-                    {/* Пропущен badge: stage was never activated during the completed lesson */}
-                    {isLessonCompleted && !(stage as any).was_activated && (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                        Пропущен
-                      </span>
-                    )}
-                    {/* Difficulty + duration badges: only for AI-generated stages (duration_min set) */}
-                    {stage.duration_min != null && (
-                      <>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          stage.difficulty === "easy"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-                            : stage.difficulty === "hard"
-                            ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-                        }`}>
-                          {stage.difficulty === "easy"
-                            ? dl.stageDifficultyEasy
-                            : stage.difficulty === "hard"
-                            ? dl.stageDifficultyHard
-                            : dl.stageDifficultyMedium}
-                        </span>
-                        <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
-                          <Clock className="h-3 w-3" />
-                          {stage.duration_min} {d.ai.generate.minutesShort}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {stage.description && (
-                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{stage.description}</p>
-                  )}
-                </div>
-
-                {/* Review submissions — code + external stages, always available (incl. after lesson ends) */}
-                {(stage.content_type === "code" || isExternalService(stage.content_type)) && (
-                  <button
-                    onClick={() => setReviewStage(stage)}
-                    className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-                  >
-                    {dl.code.reviewSubmissions}
-                  </button>
-                )}
-
-                {/* Kahoot: launch live game */}
-                {stage.content_type === "quiz_kahoot" && (
-                  <button
-                    onClick={() => setKahootStage(stage)}
-                    className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
-                  >
-                    {dl.quiz.launchGame}
-                  </button>
-                )}
-
-                {/* Actions */}
-                {!isLessonCompleted && (
-                <div className="flex shrink-0 items-center gap-1">
-                  {reorderingStageId === stage.id ? (
-                    // Спиннер на этапе, по которому идёт reorder
-                    <span className="flex h-7 w-[60px] items-center justify-center text-blue-500">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </span>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleMoveStage(stage.id, "up")}
-                        disabled={idx === 0 || reorderingStageId !== null}
-                        className={`rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10 ${reorderingStageId !== null ? "cursor-not-allowed" : ""}`}
-                        title={dl.stageMoveUp}
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleMoveStage(stage.id, "down")}
-                        disabled={idx === middleStages.length - 1 || reorderingStageId !== null}
-                        className={`rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10 ${reorderingStageId !== null ? "cursor-not-allowed" : ""}`}
-                        title={dl.stageMoveDown}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => setStageModal({ mode: "edit", stage })}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-500/10"
-                  >
-                    <FileText className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setStageToDelete(stage)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                )}
-              </div>
-            ))
-          )}
-
-          {/* Summary stage */}
-          {summaryStage && (
-            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-              summaryStage.is_completed
-                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
-                : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
-            }`}>
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                summaryStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
-              }`}>
-                {summaryStage.is_completed ? <Check className="h-4 w-4" /> : "✓"}
-              </div>
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageSummaryLabel}</span>
-              {summaryStage.is_completed && (
-                <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Materials */}
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
@@ -1612,6 +1271,352 @@ export function TeacherLessonDetailView({
         )}
       </section>
 
+      {/* ── STAGES BLOCK (§7.4 — activate control now lives at the top, no longer a separate section) ── */}
+      <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
+          {!isLessonCompleted && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAiGenerateOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-violet-300 bg-gradient-to-r from-blue-50 to-violet-50 px-4 py-2 text-sm font-bold text-violet-700 shadow-sm hover:from-blue-100 hover:to-violet-100 active:scale-95 dark:border-violet-500/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-300"
+              >
+                <Sparkles className="h-4 w-4" /> {d.ai.generate.button}
+              </button>
+              <button
+                onClick={() => setStageModal({ mode: "add" })}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
+              >
+                <Plus className="h-4 w-4" /> {dl.stageAddBtn}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Активация этапов — раньше отдельная секция, теперь верх блока "Этапы" (§7.4) */}
+        {(status === "in_progress" || status === "scheduled") && middleStages.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-violet-500" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-violet-700">
+                {dl.activeStage.manageStages}
+              </h3>
+            </div>
+
+            <div className="flex flex-col divide-y divide-violet-100 rounded-xl border border-violet-100 bg-white overflow-hidden">
+              {middleStages.map((stage) => {
+                const isActive = stage.id === activeStageId;
+                const activePos = middleStages.find((s) => s.id === activeStageId)?.position ?? Infinity;
+                const isPassed = stage.position < activePos && activeStageId !== null;
+                const isActivating = activatingStageId === stage.id;
+
+                const hasSlides = isActive && stage.slides && stage.slides.length > 0;
+                const hasLiveCode = isActive && stage.content_type === "code";
+
+                return (
+                  <div key={stage.id}>
+                    <div
+                      className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                        isActive ? "bg-violet-50" : ""
+                      }`}
+                    >
+                      {/* State indicator */}
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        isActive
+                          ? "bg-violet-600 text-white"
+                          : isPassed
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}>
+                        {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
+                      </div>
+
+                      {/* Title + badge */}
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
+                          {stage.title}
+                        </span>
+                        {isActive && (
+                          <p className="mt-0.5 text-[11px] text-violet-500">{dl.activeStage.studentsSeeThis}</p>
+                        )}
+                      </div>
+
+                      {/* Status label or button */}
+                      {isActive ? (
+                        <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
+                          {dl.activeStage.activeNow}
+                        </span>
+                      ) : isPassed ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-[11px] font-semibold text-emerald-600">{dl.activeStage.passed}</span>
+                          <button
+                            onClick={() => handleActivateStage(stage.id)}
+                            disabled={status !== "in_progress" || isActivating}
+                            className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isActivating ? "…" : dl.activeStage.activate}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleActivateStage(stage.id)}
+                          disabled={status !== "in_progress" || isActivating}
+                          title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
+                          className="shrink-0 flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isActivating ? "…" : `▶ ${dl.activeStage.activate}`}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Teacher presentation control — drives students' current_slide_index via Realtime */}
+                    {hasSlides && (
+                      <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
+                        <SlideViewer
+                          slides={stage.slides ?? []}
+                          canExport
+                          onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                          isTeacher
+                          stageId={stage.id}
+                          initialSlide={stage.current_slide_index ?? 0}
+                        />
+                      </div>
+                    )}
+
+                    {/* Live coding — drives students' fullscreen read-only view via Realtime */}
+                    {hasLiveCode && (
+                      <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
+                        <TeacherLiveCodeControl stage={stage} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {status === "scheduled" && (
+              <p className="text-[11px] text-violet-400">{dl.activeStage.lessonNotStarted}</p>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {/* Start stage */}
+          {startStage && (
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+              startStage.is_completed
+                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
+            }`}>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                startStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
+              }`}>
+                {startStage.is_completed ? <Check className="h-4 w-4" /> : "→"}
+              </div>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageStartLabel}</span>
+              {startStage.is_completed && (
+                <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
+              )}
+            </div>
+          )}
+
+          {/* Middle stages */}
+          {middleStages.length === 0 ? (
+            !isLessonCompleted && (
+              <div
+                onClick={() => setStageModal({ mode: "add" })}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-6 text-slate-400 transition-all hover:border-blue-300 hover:text-blue-500"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="text-sm">{dl.stageAddBtn}</span>
+              </div>
+            )
+          ) : (
+            middleStages.map((stage, idx) => (
+              <div
+                key={stage.id}
+                onClick={() => setViewStage(stage)}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 transition-colors hover:border-blue-200 hover:bg-blue-50/30 dark:border-white/10 dark:bg-white/5"
+              >
+                {/* Position + type badge */}
+                <div className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold ${
+                    stage.stage_type === "task"
+                      ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                  }`}>
+                    {idx + 1}
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage.title}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      stage.stage_type === "task"
+                        ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                    }`}>
+                      {stage.stage_type === "task" ? dl.stageBadgeTask : dl.stageBadgeTheory}
+                    </span>
+                    {stage.content_type && (
+                      <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        {CONTENT_ICONS[stage.content_type]}
+                        {contentLabel(stage.content_type)}
+                      </span>
+                    )}
+                    {/* Пропущен badge: stage was never activated during the completed lesson */}
+                    {isLessonCompleted && !(stage as any).was_activated && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                        Пропущен
+                      </span>
+                    )}
+                    {/* Difficulty + duration badges: only for AI-generated stages (duration_min set) */}
+                    {stage.duration_min != null && (
+                      <>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          stage.difficulty === "easy"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                            : stage.difficulty === "hard"
+                            ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                        }`}>
+                          {stage.difficulty === "easy"
+                            ? dl.stageDifficultyEasy
+                            : stage.difficulty === "hard"
+                            ? dl.stageDifficultyHard
+                            : dl.stageDifficultyMedium}
+                        </span>
+                        <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          {stage.duration_min} {d.ai.generate.minutesShort}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {stage.description && (
+                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{stage.description}</p>
+                  )}
+                </div>
+
+                {/* Review submissions — code + external stages, always available (incl. after lesson ends) */}
+                {(stage.content_type === "code" || isExternalService(stage.content_type)) && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setReviewStage(stage); }}
+                    className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  >
+                    {dl.code.reviewSubmissions}
+                  </button>
+                )}
+
+                {/* Kahoot: launch live game */}
+                {stage.content_type === "quiz_kahoot" && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setKahootStage(stage); }}
+                    className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
+                  >
+                    {dl.quiz.launchGame}
+                  </button>
+                )}
+
+                {/* Actions */}
+                {!isLessonCompleted && (
+                <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {reorderingStageId === stage.id ? (
+                    // Спиннер на этапе, по которому идёт reorder
+                    <span className="flex h-7 w-[60px] items-center justify-center text-blue-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleMoveStage(stage.id, "up")}
+                        disabled={idx === 0 || reorderingStageId !== null}
+                        className={`rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10 ${reorderingStageId !== null ? "cursor-not-allowed" : ""}`}
+                        title={dl.stageMoveUp}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveStage(stage.id, "down")}
+                        disabled={idx === middleStages.length - 1 || reorderingStageId !== null}
+                        className={`rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 dark:hover:bg-white/10 ${reorderingStageId !== null ? "cursor-not-allowed" : ""}`}
+                        title={dl.stageMoveDown}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setStageToDelete(stage)}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                )}
+              </div>
+            ))
+          )}
+
+          {/* Summary stage */}
+          {summaryStage && (
+            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+              summaryStage.is_completed
+                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
+            }`}>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                summaryStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
+              }`}>
+                {summaryStage.is_completed ? <Check className="h-4 w-4" /> : "✓"}
+              </div>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageSummaryLabel}</span>
+              {summaryStage.is_completed && (
+                <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Roll call (§7.3 order: ... → stages → roll call) */}
+      {(status === "in_progress" || status === "completed") && (
+        <div ref={rollCallRef}>
+        <AttendanceRollCall
+          lessonId={lesson.id}
+          teacherId={teacher.id}
+          lessonStatus={status}
+          excused={excusedMap}
+        />
+        </div>
+      )}
+
+      {/* Excuse requests — not part of §7.3's 4-block order, kept adjacent to roll call (attendance-related) */}
+      {status !== "completed" && excuses.length > 0 && (
+        <section className="rounded-2xl border border-orange-100 bg-orange-50/50 p-6 shadow-sm space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-orange-600">
+            <CalendarX className="h-4 w-4" />
+            {dl.excuse.teacherTitle} ({excuses.length})
+          </h2>
+          <div className="space-y-2">
+            {excuses.map((e) => (
+              <div key={e.id} className="flex items-start gap-3 rounded-xl border border-white bg-white/80 px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[12px] font-bold text-orange-600">
+                  {e.student.full_name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-slate-800">{e.student.full_name}</p>
+                  <p className="mt-0.5 text-[13px] text-slate-500">{e.reason}</p>
+                </div>
+                <span className="shrink-0 text-[11px] text-slate-400">{fmtTime(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Upload material modal */}
       {uploadModal && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 flex items-center justify-center"
@@ -1664,6 +1669,16 @@ export function TeacherLessonDetailView({
           </div>
         </div>,
         document.body,
+      )}
+
+      {/* Read-only stage view (§7.5) — click a stage row to open; "Редактировать этап" switches to the edit modal below */}
+      {viewStage && (
+        <StageViewModal
+          stage={viewStage}
+          lessonStatus={status}
+          onClose={() => setViewStage(null)}
+          onEdit={() => { setStageModal({ mode: "edit", stage: viewStage }); setViewStage(null); }}
+        />
       )}
 
       {/* Stage add/edit modal */}
