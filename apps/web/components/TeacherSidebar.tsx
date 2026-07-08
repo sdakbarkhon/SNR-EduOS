@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home, BookOpen, Award, CalendarDays, FolderOpen, Library, Briefcase,
+  Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
@@ -24,8 +24,7 @@ const teacherNavItems = [
   { key: "lessons",    href: "/teacher/lessons",      icon: CalendarDays,  label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLessons },
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
-  { key: "materials",  href: "/teacher/materials",    icon: FolderOpen,    label: (d: ReturnType<typeof getDictionary>) => d.teacher.navMaterials },
-  { key: "books",      href: "/teacher/books",        icon: Library,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navBooks },
+  { key: "knowledgeBase", href: "/teacher/knowledge-base", icon: GraduationCap, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navKnowledgeBase },
   { key: "notifications", href: "/teacher/notifications",  icon: Bell,      label: (d: ReturnType<typeof getDictionary>) => d.nav.notifications },
   { key: "messages",   href: "/teacher/messages",     icon: MessageCircle, label: (d: ReturnType<typeof getDictionary>) => d.nav.messages },
   { key: "announce",   href: "/teacher/announcements",icon: Megaphone,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.announcements.nav },

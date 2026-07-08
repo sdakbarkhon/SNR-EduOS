@@ -271,7 +271,7 @@ export function DashboardView({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               <QuickAction icon={<PlusCircle />} bg="#7B5CF7" iconBg="rgba(255,255,255,.22)" iconColor="#fff" label={t.qaNewLesson} textLight href="/lessons" />
               <QuickAction icon={<FileText />} bg="#FFF3DE" iconBg="#FFB020" iconColor="#fff" label={t.qaHomework} badge={activeHomeworkCount} href="/homework" />
-              <QuickAction icon={<Folder />} bg="#E9F1FF" iconBg="#4E86F7" iconColor="#fff" label={t.qaFiles} href="/materials" />
+              <QuickAction icon={<Folder />} bg="#E9F1FF" iconBg="#4E86F7" iconColor="#fff" label={t.qaFiles} href="/knowledge-base" />
               <QuickAction icon={<UserPlus />} bg="#FCE9F2" iconBg="#F368A8" iconColor="#fff" label={t.qaTeacher} onClick={() => showToast(d.auth.comingSoon)} />
               <QuickAction icon={<Bot />} bg="#E4F7F1" iconBg="#23C4A3" iconColor="#fff" label={t.qaAI} href="/ai-assistant" />
             </div>

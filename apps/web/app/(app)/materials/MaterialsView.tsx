@@ -72,7 +72,7 @@ const SUBJECT_LABELS: Record<string, string> = {
   physics: "Физика", biology: "Биология", history: "История",
 };
 
-export function MaterialsView({ materials }: { materials: MaterialWithGroup[] }) {
+export function MaterialsView({ materials, hideHeading }: { materials: MaterialWithGroup[]; hideHeading?: boolean }) {
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [activeType, setActiveType] = useState<DisplayType | "all">("all");
@@ -159,9 +159,10 @@ export function MaterialsView({ materials }: { materials: MaterialWithGroup[] })
           {toast}
         </div>
       )}
-      {/* Header */}
+      {/* Header — omitted when hosted under the Knowledge Base tab switcher
+          (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2), which already shows its own title. */}
       <header className="mb-6 mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Учебные материалы</h1>
+        {!hideHeading && <h1 className="text-3xl font-bold tracking-tight text-slate-800">Учебные материалы</h1>}
         <div className="relative w-full max-w-xs sm:w-80">
           <input
             type="text"

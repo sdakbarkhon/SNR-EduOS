@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
-  ChevronLeft, MapPin, Check, Plus, X, FileText, Download,
+  ChevronLeft, MapPin, Check, Plus, X, FileText, FileImage, Download,
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
@@ -18,6 +18,7 @@ import {
   getSubjectStyle, getLessonExcuseRequests,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
+  uploadPresentationFile, isPptxFile,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -102,6 +103,9 @@ function StageModal({
   onSave,
   contentLabel,
   db,
+  groupId,
+  groupSubject,
+  teacherId,
 }: {
   modalState: Extract<StageModalState, { mode: "add" | "edit" }>;
   onClose: () => void;
@@ -120,6 +124,9 @@ function StageModal({
   contentLabel: (ct: LessonContentType) => string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any;
+  groupId: string;
+  groupSubject: string;
+  teacherId: string;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).lesson;
@@ -199,6 +206,33 @@ function StageModal({
 
   const quizReady = !isQuiz || quizQuestionsValid(quizQuestions);
 
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.5/3.6 — upload a .pptx directly as an
+  // alternative to AI-generating slides. The AI-generated SlideViewer path
+  // (existingCfg.slides) is untouched; this only applies when the teacher
+  // chooses to upload a file instead.
+  const isPresentation = contentType === "presentation";
+  const existingPresentationCfg = (existing?.config ?? {}) as { presentation_file?: { storagePath: string; filename: string; sizeBytes: number; materialId: string } };
+  const [presentationFile, setPresentationFile] = useState(existingPresentationCfg.presentation_file ?? null);
+  const [presentationUploading, setPresentationUploading] = useState(false);
+  const [presentationError, setPresentationError] = useState("");
+
+  async function handlePresentationFile(file: File) {
+    setPresentationError("");
+    if (!isPptxFile(file)) {
+      setPresentationError("Для презентаций используйте формат PPTX. PDF можно загрузить в Материалы группы.");
+      return;
+    }
+    setPresentationUploading(true);
+    try {
+      const result = await uploadPresentationFile(db, { groupId, subject: groupSubject, teacherId, file });
+      setPresentationFile(result);
+    } catch (err) {
+      setPresentationError(err instanceof Error ? err.message : "Не удалось загрузить файл");
+    } finally {
+      setPresentationUploading(false);
+    }
+  }
+
   const availableContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
 
   function handleNext() {
@@ -227,6 +261,8 @@ function StageModal({
         ...q,
         options: q.options.map((o) => o.trim()).filter((_, i) => i < 4),
       }));
+    } else if (isPresentation && presentationFile) {
+      config = { presentation_file: presentationFile };
     }
     setSaving(true);
     try {
@@ -347,6 +383,45 @@ function StageModal({
               {contentType && contentType !== "presentation" && !isCode && !isExternal && !isQuiz && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                   {d.stageContentStubNote}
+                </div>
+              )}
+
+              {/* Presentation: upload a .pptx directly (БОЛЬШОЕ ОБНОВЛЕНИЕ
+                  Этап 3.5/3.6) — an alternative to AI-generating slides via
+                  the ✨ panel elsewhere in this workspace, which is untouched.
+                  Strictly .pptx; PDF is rejected with a pointer to Materials. */}
+              {isPresentation && (
+                <div className="mb-4">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    Файл презентации (.pptx)
+                  </label>
+                  {presentationFile ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-500/30 dark:bg-blue-500/10">
+                      <FileImage className="h-4 w-4 shrink-0 text-blue-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-blue-700 dark:text-blue-300">{presentationFile.filename}</p>
+                        <p className="text-[11px] text-slate-500">{(presentationFile.sizeBytes / (1024 * 1024)).toFixed(1)} МБ</p>
+                      </div>
+                      <button type="button" onClick={() => setPresentationFile(null)} className="shrink-0 text-slate-400 hover:text-red-500">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-6 text-center transition-all hover:border-blue-400 hover:bg-blue-50/40 dark:border-white/10">
+                      <input
+                        type="file"
+                        accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePresentationFile(f); }}
+                      />
+                      <FileImage className="h-5 w-5 text-slate-400" />
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        {presentationUploading ? "Загрузка…" : "Загрузить PPTX"}
+                      </span>
+                      <span className="text-[11px] text-slate-400">Строго формат .pptx</span>
+                    </label>
+                  )}
+                  {presentationError && <p className="mt-1.5 text-xs text-red-500">{presentationError}</p>}
                 </div>
               )}
 
@@ -1591,6 +1666,9 @@ export function TeacherLessonDetailView({
           onSave={stageModal.mode === "add" ? handleAddStage : handleEditStage}
           contentLabel={contentLabel}
           db={db}
+          groupId={lesson.group_id}
+          groupSubject={lesson.group.subject}
+          teacherId={teacher.id}
         />
       )}
 

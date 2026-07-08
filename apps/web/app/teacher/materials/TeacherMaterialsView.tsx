@@ -64,7 +64,7 @@ function formatDate(iso: string): string {
 
 // ── Type for teacher group (matches getTeacherGroups shape) ──────────
 
-type TeacherGroup = {
+export type TeacherGroup = {
   id: string;
   name: string;
   subject: string;
@@ -402,10 +402,12 @@ export function TeacherMaterialsView({
   materials: initialMaterials,
   groups,
   initialTeacherId,
+  hideHeading,
 }: {
   materials: MaterialWithGroup[];
   groups: TeacherGroup[];
   initialTeacherId: string;
+  hideHeading?: boolean;
 }) {
   const router = useRouter();
   const [materials, setMaterials] = useState(initialMaterials);
@@ -551,9 +553,10 @@ export function TeacherMaterialsView({
       )}
 
       <div className="text-slate-800">
-        {/* Header */}
+        {/* Header — omitted when hosted under the Knowledge Base tab
+            switcher (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2). */}
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">Мои материалы</h1>
+          {!hideHeading && <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">Мои материалы</h1>}
           <button
             onClick={() => setShowUpload(true)}
             className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"

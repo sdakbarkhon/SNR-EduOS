@@ -1,36 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
-import { getMaterials, getTeacherGroups } from "@snr/core";
-import { TeacherMaterialsView } from "./TeacherMaterialsView";
+import { redirect } from "next/navigation";
 
-async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
-  try { return await (p as Promise<T>); } catch { return fb; }
-}
-
-export default async function TeacherMaterialsPage() {
-  const supabase = await createClient();
-
-  // Resolve teacher id server-side — avoids a client-side query that would
-  // 406 because .single() sees multiple rows under the blanket SELECT policy.
-  const { data: { user } } = await supabase.auth.getUser();
-  const teacherId = user
-    ? await supabase
-        .from("teachers")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle()
-        .then((r) => (r.data as { id: string } | null)?.id ?? "")
-    : "";
-
-  const [materials, groups] = await Promise.all([
-    safe(getMaterials(supabase), []),
-    safe(getTeacherGroups(supabase), []),
-  ]);
-
-  return (
-    <TeacherMaterialsView
-      materials={materials}
-      groups={groups as never[]}
-      initialTeacherId={teacherId}
-    />
-  );
+// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1 — "Материалы" merged into "База знаний"
+// (/teacher/knowledge-base, "Материалы группы" tab). TeacherMaterialsView.tsx
+// is still used from there — kept in place, just no longer routed here
+// directly, so old bookmarks/links don't 404.
+export default function TeacherMaterialsPage() {
+  redirect("/teacher/knowledge-base");
 }

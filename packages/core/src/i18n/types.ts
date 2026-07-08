@@ -41,6 +41,22 @@ export interface Dictionary {
     clubs: string;        // stub — Iter5 P4
     messages: string;     // stub — Iter5 P5
     myLevel: string;      // sidebar level-card stub — Iter5 P5
+    knowledgeBase: string; // "База знаний" — БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1, replaces materials+books in the sidebar
+  };
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3 — merged "Материалы" + "Библиотека" page and the
+  // Windows-explorer-style file picker used to attach an existing file to a
+  // lesson/assignment instead of uploading a fresh copy.
+  knowledgeBase: {
+    title: string;            // "База знаний"
+    tabLibrary: string;       // "Библиотека"
+    tabGroupMaterials: string; // "Материалы группы"
+    pickerTitle: string;       // "Выбор файла"
+    searchPlaceholder: string; // "Поиск по названию"
+    select: string;            // "Выбрать"
+    selectCount: string;       // "Выбрать ({n})"
+    cancel: string;
+    noResults: string;
+    browse: string;            // "Выбрать из базы знаний" — button that opens the picker
   };
   auth: {
     title: string;
@@ -1342,6 +1358,7 @@ export interface Dictionary {
     navHomework: string;
     navGrades: string;
     navMaterials: string;
+    navKnowledgeBase: string; // "База знаний" — БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1, replaces navMaterials+navBooks in the sidebar
     navGroups: string;
     navProfile: string;
     kpiGroups: string;

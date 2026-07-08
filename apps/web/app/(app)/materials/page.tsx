@@ -1,13 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
-import { getMaterials } from "@snr/core";
-import { MaterialsView } from "./MaterialsView";
+import { redirect } from "next/navigation";
 
-async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
-  try { return await (p as Promise<T>); } catch { return fb; }
-}
-
-export default async function MaterialsPage() {
-  const supabase = await createClient();
-  const materials = await safe(getMaterials(supabase), []);
-  return <MaterialsView materials={materials} />;
+// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1 — "Учебные материалы" merged into "База
+// знаний" (/knowledge-base, "Материалы группы" tab). MaterialsView.tsx is
+// still used from there — kept in place, just no longer routed here
+// directly, so old bookmarks/links don't 404.
+export default function MaterialsPage() {
+  redirect("/knowledge-base");
 }

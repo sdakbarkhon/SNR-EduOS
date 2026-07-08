@@ -11,11 +11,14 @@ import {
   setHomeworkAttachment,
   uploadHomeworkTestsFile,
   getTeacherLessonsForGroup,
+  linkedMaterialAttachmentPath,
+  linkedBookAttachmentPath,
 } from "@snr/core";
 import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch } from "lucide-react";
+import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { TeacherAIPanel } from "./TeacherAIPanel";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
 import { EduOSAiIcon } from "@/components/EduOSAiIcon";
@@ -62,6 +65,10 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
     Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null }>
   >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.4 — attach an existing Knowledge Base file
+  // instead of uploading a fresh copy. Mutually exclusive with attachFile.
+  const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
+  const [showKBPicker, setShowKBPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [saving, setSaving] = useState(false);
@@ -219,7 +226,15 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           options: q.type === "single_choice" ? q.options.map((o, oi) => ({ optionText: o.text, isCorrect: o.isCorrect, orderIndex: oi })) : undefined,
         })));
       }
-      if (format === "file" && attachFile) {
+      if (format === "file" && pickedFromKB) {
+        // Linked, not copied — see linkedMaterialAttachmentPath/linkedBookAttachmentPath.
+        const linkedPath = pickedFromKB.source === "book"
+          ? linkedBookAttachmentPath(pickedFromKB.storagePath)
+          : linkedMaterialAttachmentPath(pickedFromKB.storagePath);
+        await setHomeworkAttachment(supabase, hw.id, {
+          path: linkedPath, sizeByte: pickedFromKB.sizeBytes ?? 0, fileName: pickedFromKB.title,
+        });
+      } else if (format === "file" && attachFile) {
         const { path, sizeByte } = await uploadHomeworkAttachment(supabase, {
           teacherId: resolvedTeacherId,
           homeworkId: hw.id,
@@ -388,7 +403,18 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
               className="hidden"
               id="hw-attach"
             />
-            {attachFile ? (
+            {pickedFromKB ? (
+              <div className="flex items-center gap-3 rounded-[14px] border border-brand-blue/40 bg-blue-50/60 px-4 py-3">
+                <FolderSearch size={15} className="shrink-0 text-brand-blue" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-brand-blue">{pickedFromKB.title}</p>
+                  <p className="text-[11px] text-slate-500">{d.knowledgeBase.title}</p>
+                </div>
+                <button type="button" onClick={() => setPickedFromKB(null)} className="shrink-0 text-slate-400 hover:text-red-500">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : attachFile ? (
               <div className="flex items-center gap-3 rounded-[14px] border border-brand-blue/40 bg-blue-50/60 px-4 py-3">
                 <Paperclip size={15} className="shrink-0 text-brand-blue" />
                 <div className="min-w-0 flex-1">
@@ -404,19 +430,36 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
                 </button>
               </div>
             ) : (
-              <label
-                htmlFor="hw-attach"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleFileDrop}
-                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-slate-200 p-6 text-center transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
-              >
-                <Paperclip size={20} className="text-slate-400" />
-                <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.hwAttachBtn}</span>
-                <span className="text-[11px] text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ</span>
-              </label>
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="hw-attach"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleFileDrop}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-slate-200 p-6 text-center transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+                >
+                  <Paperclip size={20} className="text-slate-400" />
+                  <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.hwAttachBtn}</span>
+                  <span className="text-[11px] text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowKBPicker(true)}
+                  className="flex items-center justify-center gap-2 rounded-[14px] border border-slate-200 py-2.5 text-[13px] font-medium text-brand-ink-muted transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+                >
+                  <FolderSearch size={15} /> {d.knowledgeBase.browse}
+                </button>
+              </div>
             )}
           </div>
         )}
+
+        <KnowledgeBaseFilePicker
+          open={showKBPicker}
+          onClose={() => setShowKBPicker(false)}
+          onSelect={(items) => { const first = items[0]; if (first) { setPickedFromKB(first); setAttachFile(null); } }}
+          groupIds={groupId ? [groupId] : []}
+          multiSelect={false}
+        />
 
         {isExternal && (
           <label className="flex flex-col gap-1.5">

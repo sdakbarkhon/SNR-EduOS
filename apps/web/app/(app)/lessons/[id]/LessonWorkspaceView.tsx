@@ -11,6 +11,7 @@ import {
 import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
+  getMaterialDownloadUrl,
 } from "@snr/core";
 import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -936,6 +937,30 @@ export function LessonWorkspaceView({
                           initialSlide={stage.current_slide_index ?? 0}
                         />
                       </div>
+                    ) : (stage.config as { presentation_file?: { storagePath: string; filename: string; sizeBytes: number } })?.presentation_file ? (
+                      // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.5/3.6 — teacher uploaded a
+                      // .pptx directly instead of generating slides. No
+                      // in-browser page-by-page renderer exists for an
+                      // arbitrary uploaded file (see resheniya.md) — shown
+                      // as an open/download card, same as any Knowledge
+                      // Base file.
+                      <button
+                        onClick={async () => {
+                          const pf = (stage.config as { presentation_file: { storagePath: string; filename: string } }).presentation_file;
+                          const url = await getMaterialDownloadUrl(db, pf.storagePath, pf.filename);
+                          window.open(url, "_blank");
+                        }}
+                        className="mb-3 flex w-full items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-left transition hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10"
+                      >
+                        <ImageIcon className="h-5 w-5 shrink-0 text-orange-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-orange-700 dark:text-orange-300">
+                            {(stage.config as { presentation_file: { filename: string } }).presentation_file.filename}
+                          </p>
+                          <p className="text-xs text-orange-600/70">{dl.stageContentPresentation}</p>
+                        </div>
+                        <Download className="h-4 w-4 shrink-0 text-orange-600" />
+                      </button>
                     ) : stage.description ? (
                       <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
                     ) : null

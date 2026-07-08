@@ -274,11 +274,13 @@ export function BooksView({
   initialFavoriteIds,
   studentId,
   coverUrls,
+  hideHeading,
 }: {
   initialBooks: Book[];
   initialFavoriteIds: string[];
   studentId: string;
   coverUrls: Record<string, string>;
+  hideHeading?: boolean;
 }) {
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
@@ -403,9 +405,10 @@ export function BooksView({
         />
       )}
 
-      {/* Header */}
+      {/* Header — omitted when hosted under the Knowledge Base tab switcher
+          (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2), which already shows its own title. */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-bold text-slate-800">Библиотека</h1>
+        {!hideHeading && <h1 className="text-3xl font-bold text-slate-800">Библиотека</h1>}
         <div className="relative w-full max-w-xs sm:w-80">
           <input
             type="text"

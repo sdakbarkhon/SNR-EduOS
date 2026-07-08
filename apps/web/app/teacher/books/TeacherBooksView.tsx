@@ -535,10 +535,12 @@ export function TeacherBooksView({
   initialBooks,
   initialTeacherId,
   coverUrls,
+  hideHeading,
 }: {
   initialBooks: Book[];
   initialTeacherId: string;
   coverUrls: Record<string, string>;
+  hideHeading?: boolean;
 }) {
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
@@ -690,9 +692,10 @@ export function TeacherBooksView({
       )}
 
       <div className="text-slate-800">
-        {/* Header */}
+        {/* Header — omitted when hosted under the Knowledge Base tab
+            switcher (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2). */}
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">Библиотека</h1>
+          {!hideHeading && <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">Библиотека</h1>}
           <button
             onClick={() => setShowUpload(true)}
             className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"

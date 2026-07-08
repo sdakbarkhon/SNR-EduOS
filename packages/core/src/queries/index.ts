@@ -389,6 +389,71 @@ export const insertMaterial = async (
   if (error) throw error;
 };
 
+// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.5/3.6 — teacher uploads a .pptx file directly for
+// a "Презентация" stage (alternative to AI-generating one — that existing
+// SlideViewer path is untouched). Strictly .pptx; PDF must go to Материалы
+// group Materials instead. Auto-added to course_materials for the lesson's
+// group, deduped by (group_id, title) so re-saving the same stage/file never
+// creates a second row.
+export const PPTX_MIME_TYPES = [
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+];
+
+export function isPptxFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".pptx") || PPTX_MIME_TYPES.includes(file.type);
+}
+
+export async function uploadPresentationFile(
+  db: Db,
+  input: { groupId: string; subject: string; teacherId: string; file: File },
+): Promise<{ storagePath: string; filename: string; sizeBytes: number; materialId: string }> {
+  if (!isPptxFile(input.file)) {
+    throw new Error("Для презентаций используйте формат PPTX. PDF можно загрузить в Материалы группы.");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (db as any)
+    .from("course_materials")
+    .select("id, storage_path, file_size_bytes")
+    .eq("group_id", input.groupId)
+    .eq("title", input.file.name)
+    .eq("type", "presentation")
+    .maybeSingle();
+  if (existing?.storage_path) {
+    return {
+      storagePath: existing.storage_path as string,
+      filename: input.file.name,
+      sizeBytes: (existing.file_size_bytes as number | null) ?? input.file.size,
+      materialId: existing.id as string,
+    };
+  }
+
+  const materialId = crypto.randomUUID();
+  const path = `${input.teacherId}/${materialId}.pptx`;
+  const { error: uploadErr } = await db.storage
+    .from("materials")
+    .upload(path, input.file, { contentType: PPTX_MIME_TYPES[0] });
+  if (uploadErr) throw uploadErr;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insertErr } = await (db as any).from("course_materials").insert({
+    id: materialId,
+    group_id: input.groupId,
+    title: input.file.name,
+    type: "presentation",
+    file_type: PPTX_MIME_TYPES[0],
+    storage_path: path,
+    file_size_bytes: input.file.size,
+    uploaded_by: input.teacherId,
+    subject: input.subject,
+    description: null,
+    lesson_id: null,
+  });
+  if (insertErr) throw insertErr;
+
+  return { storagePath: path, filename: input.file.name, sizeBytes: input.file.size, materialId };
+}
+
 /** Удаляет материал из БД и Storage. */
 export const deleteMaterial = async (
   db: Db,
@@ -2799,25 +2864,57 @@ export const setHomeworkAttachment = async (
 };
 
 /** Signed URL for teacher attachment (accessible to both student and teacher). */
+// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.4 — attaching an existing Knowledge Base file
+// (course_materials/books) to homework must NOT copy it: the homework row's
+// existing plain-text attachment_storage_path column is reused, prefixed to
+// record which bucket the file actually lives in. Bare paths (no recognized
+// prefix) keep resolving against "homework-files" exactly as before — fully
+// backward-compatible with every pre-existing homework row.
+const KB_MATERIAL_PREFIX = "kb:materials:";
+const KB_BOOK_PREFIX = "kb:books:";
+
+export function linkedMaterialAttachmentPath(storagePath: string): string {
+  return `${KB_MATERIAL_PREFIX}${storagePath}`;
+}
+export function linkedBookAttachmentPath(storagePath: string): string {
+  return `${KB_BOOK_PREFIX}${storagePath}`;
+}
+
+function resolveAttachmentBucket(storagePath: string): { bucket: string; path: string; isLinked: boolean } {
+  if (storagePath.startsWith(KB_MATERIAL_PREFIX)) {
+    return { bucket: "materials", path: storagePath.slice(KB_MATERIAL_PREFIX.length), isLinked: true };
+  }
+  if (storagePath.startsWith(KB_BOOK_PREFIX)) {
+    return { bucket: "books", path: storagePath.slice(KB_BOOK_PREFIX.length), isLinked: true };
+  }
+  return { bucket: "homework-files", path: storagePath, isLinked: false };
+}
+
 export const getHomeworkAttachmentUrl = async (
   db: Db,
   storagePath: string,
   downloadAs?: string,
 ): Promise<string> => {
+  const { bucket, path } = resolveAttachmentBucket(storagePath);
   const { data, error } = await db.storage
-    .from("homework-files")
-    .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
+    .from(bucket)
+    .createSignedUrl(path, 3600, downloadAs ? { download: downloadAs } : undefined);
   if (error) throw error;
   return data!.signedUrl;
 };
 
-/** Delete teacher attachment from Storage + clear homework columns. */
+/** Delete teacher attachment from Storage + clear homework columns.
+ *  A Knowledge Base-linked file (Этап 3.4) is shared with its Materials/
+ *  Library entry — only the link is removed, the underlying file survives. */
 export const deleteHomeworkAttachment = async (
   db: Db,
   homeworkId: string,
   storagePath: string,
 ) => {
-  await db.storage.from("homework-files").remove([storagePath]);
+  const { bucket, path, isLinked } = resolveAttachmentBucket(storagePath);
+  if (!isLinked) {
+    await db.storage.from(bucket).remove([path]);
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db.from("homework") as any)
     .update({ attachment_storage_path: null, attachment_size_bytes: null, attachment_filename: null })
