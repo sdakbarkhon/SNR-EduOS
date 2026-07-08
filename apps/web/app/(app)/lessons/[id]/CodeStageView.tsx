@@ -12,10 +12,11 @@ import { createClient } from "@/lib/supabase/client";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
-import { runCpp } from "@/lib/piston";
+import { runCode } from "@/lib/piston";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { StudentLiveViewer } from "@/components/lesson-stages/StudentLiveViewer";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
+import { CODE_LANGUAGE_FILENAMES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -25,10 +26,7 @@ const GRADE_COLORS: Record<number, string> = {
   1: "bg-red-100 text-red-700 border-red-200",
 };
 
-const FILE_NAMES: Record<CodeLanguage, string> = {
-  python: "main.py",
-  cpp: "main.cpp",
-};
+const FILE_NAMES = CODE_LANGUAGE_FILENAMES;
 
 /**
  * Monaco editor embedded directly in the stage card. Task info sits above an
@@ -130,7 +128,7 @@ export function CodeStageView({
   async function handleRun() {
     setRunning(true);
     try {
-      const r = language === "python" ? await runPython(code, stdin) : await runCpp(code, stdin);
+      const r = language === "python" ? await runPython(code, stdin) : await runCode(language, code, stdin);
       setResult(r);
     } catch (e) {
       setResult({ stdout: "", stderr: "", error: String(e) });
@@ -176,7 +174,7 @@ export function CodeStageView({
               {stage.title}
             </h2>
             <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-              {language === "python" ? dc.python : dc.cpp}
+              {CODE_LANGUAGE_LABELS[language]}
             </span>
           </div>
           {stage.description && (

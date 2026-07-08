@@ -50,7 +50,7 @@ export async function getPyodide(): Promise<any> {
   return pyodidePromise;
 }
 
-export type RunResult = { stdout: string; stderr: string; error: string | null };
+export type RunResult = { stdout: string; stderr: string; error: string | null; exitCode?: number | null };
 
 export async function runPython(code: string, stdin = ""): Promise<RunResult> {
   let pyodide;

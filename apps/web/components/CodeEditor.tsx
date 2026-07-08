@@ -10,7 +10,9 @@
 import dynamic from "next/dynamic";
 import type { EditorProps } from "@monaco-editor/react";
 
-type Lang = "python" | "cpp";
+import type { CodeLanguage } from "@snr/core";
+
+type Lang = CodeLanguage;
 
 function Skeleton({ minHeight }: { minHeight: number }) {
   return (
@@ -47,8 +49,15 @@ const BASE_OPTIONS: EditorProps["options"] = {
   matchBrackets: "always",
 };
 
+const MONACO_LANG: Record<Lang, string> = {
+  python: "python",
+  javascript: "javascript",
+  cpp: "cpp",
+  java: "java",
+};
+
 function monacoLang(lang: Lang): string {
-  return lang === "cpp" ? "cpp" : "python";
+  return MONACO_LANG[lang];
 }
 
 export function CodeEditor({

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  X, Globe, AlertTriangle, ExternalLink, Upload, Check, Loader2, Save, Send,
+  X, Globe, AlertTriangle, ExternalLink, Upload, Check, Loader2, Save, Send, Maximize2, Minimize2,
 } from "lucide-react";
 import { getDictionary, uploadStageAttachment, getStageAttachmentUrl, submitStageTask } from "@snr/core";
 import type {
@@ -12,8 +12,9 @@ import type {
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { SERVICE_CONFIG } from "@/lib/external-services";
+import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS } from "@/lib/external-services";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
+import { useFullscreenToggle } from "@/lib/useFullscreenToggle";
 
 const GRADE_COLORS: Record<number, string> = {
   5: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -21,24 +22,6 @@ const GRADE_COLORS: Record<number, string> = {
   3: "bg-yellow-100 text-yellow-700 border-yellow-200",
   2: "bg-orange-100 text-orange-700 border-orange-200",
   1: "bg-red-100 text-red-700 border-red-200",
-};
-
-// Used when the teacher didn't attach a specific project URL — falls back to
-// a fixed default project/editor for the service instead of leaving the
-// stage unusable.
-const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
-  wokwi: "https://wokwi.com/projects/new/arduino-uno",
-  codesandbox: "https://codesandbox.io/p/sandbox/vanilla",
-  geogebra: "https://www.geogebra.org/classic",
-  phet: "https://phet.colorado.edu/sims/html/forces-and-motion-basics/latest/forces-and-motion-basics_en.html",
-  desmos: "https://www.desmos.com/calculator",
-  blockly_games: "https://blockly.games/",
-  visualgo: "https://visualgo.net/en",
-  p5js: "https://editor.p5js.org/",
-  excalidraw: "https://excalidraw.com/",
-  learningapps: "https://learningapps.org/",
-  sqlonline: "https://sqlime.org/",
-  h5p: "https://h5p.eduos.snruz.uz/library",
 };
 
 /**
@@ -84,6 +67,8 @@ export function ExternalStageModal({
   const [submitError, setSubmitError] = useState("");
   const [attachOpen, setAttachOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const { ref: fullscreenRef, isFullscreen, toggle: toggleFullscreen } = useFullscreenToggle<HTMLDivElement>();
 
   // iframe load tracking (30s timeout → error message, no open-elsewhere fallback).
   const [iframeState, setIframeState] = useState<"loading" | "ok" | "error">("loading");
@@ -200,7 +185,10 @@ export function ExternalStageModal({
 
       {/* Body: embedded iframe fills remaining space (or non-embeddable fallback card) */}
       {embeddable ? (
-        <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-900">
+        <div
+          ref={fullscreenRef}
+          className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-900"
+        >
           {iframeState !== "error" && iframeSrc ? (
             <>
               {iframeState === "loading" && (
@@ -208,6 +196,14 @@ export function ExternalStageModal({
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               )}
+              <button
+                onClick={toggleFullscreen}
+                title={isFullscreen ? dx.exitFullscreen : dx.fullscreen}
+                className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-md backdrop-blur transition hover:bg-white dark:bg-slate-800/95 dark:text-slate-200"
+              >
+                {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                {isFullscreen ? dx.exitFullscreen : dx.fullscreen}
+              </button>
               <iframe
                 src={iframeSrc}
                 title={serviceName}

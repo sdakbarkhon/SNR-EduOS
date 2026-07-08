@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Play, Send, Download, FileText, Construction, X, Loader2, Code2,
+  ArrowLeft, Play, Send, Download, FileText, Loader2, Code2,
 } from "lucide-react";
 import {
   getDictionary, getSubjectStyle, submitProgrammingHomework, getHomeworkTestsUrl,
@@ -12,11 +12,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, SubjectIcon, useLocale } from "@/components";
 import { CodeEditor } from "@/components/CodeEditor";
-
-const DEFAULT: Record<"python" | "cpp", string> = {
-  python: "def solve():\n    # Твой код здесь\n    pass\n\nsolve()",
-  cpp: "#include <iostream>\nusing namespace std;\n\nint main() {\n    // Твой код здесь\n    return 0;\n}",
-};
+import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS } from "@/lib/code-languages";
+import { runCode } from "@/lib/piston";
+import type { RunResult } from "@/lib/pyodide";
 
 export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const router = useRouter();
@@ -28,9 +26,9 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const lang = hw.programming_language ?? "python";
 
   const [studentId, setStudentId] = useState<string | null>(null);
-  const [code, setCode] = useState<string>(hw.submission?.code_text ?? hw.starter_code ?? DEFAULT[lang]);
-  const [output, setOutput] = useState("");
-  const [runModal, setRunModal] = useState(false);
+  const [code, setCode] = useState<string>(hw.submission?.code_text ?? hw.starter_code ?? CODE_LANGUAGE_DEFAULT_SNIPPETS[lang]);
+  const [result, setResult] = useState<RunResult | null>(null);
+  const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -64,7 +62,16 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
     if (url) window.open(url, "_blank");
   }
 
-  const langLabel = lang === "python" ? "Python" : "C++";
+  async function handleRun() {
+    setRunning(true);
+    try {
+      setResult(await runCode(lang, code));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const langLabel = CODE_LANGUAGE_LABELS[lang];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
@@ -130,9 +137,9 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
               <Code2 size={16} className="text-emerald-600" /> {langLabel}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setRunModal(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700">
-                <Play size={13} className="fill-white" /> {t.run}
+              <button onClick={handleRun} disabled={running}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60">
+                {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} className="fill-white" />} {running ? t.running : t.run}
               </button>
               <button onClick={handleSubmit} disabled={submitting || !studentId}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm transition disabled:opacity-60"
@@ -147,30 +154,28 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
           {/* Output panel */}
           <div className="rounded-xl border border-slate-700 bg-[#181818] p-3" style={{ minHeight: 160 }}>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">{t.output}</p>
-            <pre className="text-[13px] text-slate-300" style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace", whiteSpace: "pre-wrap" }}>
-              {output || <span className="text-slate-600">{t.outputEmpty}</span>}
+            <pre style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace", whiteSpace: "pre-wrap", fontSize: 13 }}>
+              {!result && !running && <span className="text-slate-600">{t.outputEmpty}</span>}
+              {running && <span className="text-slate-500">{t.running}</span>}
+              {result && (
+                <>
+                  {result.stdout && <span className="text-emerald-400">{result.stdout}</span>}
+                  {result.stdout && result.stderr && "\n"}
+                  {result.stderr && <span className="text-red-400">{result.stderr}</span>}
+                  {!result.stdout && !result.stderr && !result.error && (
+                    <span className="text-slate-600">{t.outputEmpty}</span>
+                  )}
+                  {result.exitCode != null && (
+                    <div className="mt-2 border-t border-slate-700 pt-2 text-slate-500">
+                      {t.exitCode}: {result.exitCode}
+                    </div>
+                  )}
+                </>
+              )}
             </pre>
           </div>
         </div>
       </div>
-
-      {/* Run "coming soon" modal */}
-      {runModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
-          onClick={() => setRunModal(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl" style={{ background: "#ffffff" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-              <Construction size={26} />
-            </div>
-            <h3 className="mb-2 text-lg font-bold text-slate-900">{t.runSoonTitle}</h3>
-            <p className="mb-5 text-sm text-slate-500">{t.runSoonBody}</p>
-            <button onClick={() => setRunModal(false)} className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-white hover:bg-slate-900">
-              {t.understood}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Sent toast */}
       {sent && (

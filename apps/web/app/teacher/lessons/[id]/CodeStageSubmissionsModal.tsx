@@ -11,7 +11,8 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CodeViewer } from "@/components/CodeEditor";
 import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
-import { runCpp } from "@/lib/piston";
+import { runCode } from "@/lib/piston";
+import { CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 
 type Row = LessonStageProgress & {
   student: { id: string; full_name: string; avatar_url: string | null };
@@ -69,7 +70,7 @@ export function CodeStageSubmissionsModal({
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
             <h3 className="text-base font-bold text-slate-900">{dc.reviewSubmissions}</h3>
-            <p className="text-xs text-slate-400">{stage.title} · {language === "python" ? dc.python : dc.cpp}</p>
+            <p className="text-xs text-slate-400">{stage.title} · {CODE_LANGUAGE_LABELS[language]}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X className="h-5 w-5" />
@@ -133,7 +134,7 @@ function SubmissionRow({
   async function handleRunHere() {
     setRunning(true);
     try {
-      const r = language === "python" ? await runPython(sub.code ?? "", runStdin) : await runCpp(sub.code ?? "", runStdin);
+      const r = language === "python" ? await runPython(sub.code ?? "", runStdin) : await runCode(language, sub.code ?? "", runStdin);
       setResult(r);
     } catch (e) {
       setResult({ stdout: "", stderr: "", error: String(e) });

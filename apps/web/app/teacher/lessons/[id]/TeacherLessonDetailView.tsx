@@ -26,6 +26,7 @@ import type {
   QuizQuestionInput, QuizConfigForStage,
 } from "@snr/core";
 import { SERVICE_CONFIG, validateServiceUrl, isExternalService } from "@/lib/external-services";
+import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -441,7 +442,7 @@ function StageModal({
                 <div className="mb-4">
                   <label className="mb-2 block text-xs font-semibold text-slate-600 dark:text-slate-400">{dc.language}</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {(["python", "cpp"] as CodeLanguage[]).map((lang) => (
+                    {CODE_LANGUAGES.map((lang) => (
                       <button
                         key={lang}
                         type="button"
@@ -454,7 +455,7 @@ function StageModal({
                       >
                         <Code2 className="h-5 w-5 text-emerald-600" />
                         <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                          {lang === "python" ? dc.python : dc.cpp}
+                          {CODE_LANGUAGE_LABELS[lang]}
                         </span>
                       </button>
                     ))}

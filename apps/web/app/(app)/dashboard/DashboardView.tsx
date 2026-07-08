@@ -22,7 +22,6 @@ import { useToast } from "@/components/Toast";
 import { getClassLabel } from "@/lib/student-class-label";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import type { Database } from "@snr/core";
-import { FloatingActionButton } from "./FloatingActionButton";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
 type SubjectRow = { id: string; name: string; group_id: string; icon: string; color: string };
@@ -455,8 +454,6 @@ export function DashboardView({
           </div>
         </aside>
       </div>
-
-      <FloatingActionButton />
     </div>
   );
 }

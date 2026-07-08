@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { ChevronDown, Download, Pencil } from "lucide-react";
-import { gradeSubmission, getDictionary, type Locale } from "@snr/core";
+import { gradeSubmission, getDictionary, type Locale, type CodeLanguage } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
+import { CODE_LANGUAGE_FILENAMES } from "@/lib/code-languages";
 
 type Sub = {
   id: string; student_id: string;
@@ -21,7 +22,7 @@ function initials(name: string) {
 export function TeacherProgrammingSubmissions({
   language, submissions: initial,
 }: {
-  language: "python" | "cpp";
+  language: CodeLanguage;
   submissions: Sub[];
 }) {
   const { locale } = useLocale();
@@ -54,7 +55,7 @@ export function TeacherProgrammingSubmissions({
   }
 
   function download(s: Sub) {
-    const ext = language === "python" ? "py" : "cpp";
+    const ext = CODE_LANGUAGE_FILENAMES[language].split(".").pop();
     const blob = new Blob([s.code_text ?? ""], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -96,7 +97,7 @@ export function TeacherProgrammingSubmissions({
 
                     {s.code_text && (
                       <button onClick={() => download(s)} className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600 hover:underline">
-                        <Download size={13} /> {t.download} .{language === "python" ? "py" : "cpp"}
+                        <Download size={13} /> {t.download} .{CODE_LANGUAGE_FILENAMES[language].split(".").pop()}
                       </button>
                     )}
 

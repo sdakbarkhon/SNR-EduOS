@@ -46,7 +46,8 @@ export function AiFloatingButton() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative max-h-[80vh] w-full max-w-[600px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl"
+            className="relative flex w-[75vw] max-w-[1400px] flex-col rounded-[24px] bg-white shadow-2xl"
+            style={{ height: "80vh", maxHeight: 900 }}
           >
             <button
               onClick={() => setOpen(false)}
@@ -56,7 +57,9 @@ export function AiFloatingButton() {
             >
               <X className="h-5 w-5" />
             </button>
-            <AiAssistantView />
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <AiAssistantView />
+            </div>
           </div>
         </div>
       )}

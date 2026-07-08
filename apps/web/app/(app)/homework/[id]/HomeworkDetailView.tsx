@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, FileText, Paperclip, Send, X } from "lucide-react";
+import { ArrowLeft, Download, FileText, Maximize2, Minimize2, Paperclip, Send, X } from "lucide-react";
 import {
   getDictionary,
   getSubjectStyle,
@@ -18,6 +18,8 @@ import { GlassCard, SubjectIcon, useLocale } from "@/components";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
+import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
+import { useFullscreenToggle } from "@/lib/useFullscreenToggle";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -378,6 +380,46 @@ function SubmitForm({
   );
 }
 
+/** External-service homework (wokwi/codesandbox/geogebra/.../h5p): teacher's
+ *  project link embedded as an iframe, with a fullscreen toggle (УЧ.10 Part 5).
+ *  Submission itself still goes through the generic SubmitForm/SubmissionBlock
+ *  below (text/file "mark done"), same as the plain "file" homework type. */
+function ExternalServiceCard({ hw }: { hw: HomeworkWithSubmission }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const dx = d.lesson.external;
+  const service = hw.content_type as Exclude<HomeworkWithSubmission["content_type"], "file" | "test" | "programming" | "bundle">;
+  const meta = SERVICE_CONFIG[service];
+  const embedUrl = hw.external_url ? (meta.extractEmbedUrl(hw.external_url) ?? DEFAULT_EXTERNAL_URLS[service]) : DEFAULT_EXTERNAL_URLS[service];
+  const { ref, isFullscreen, toggle } = useFullscreenToggle<HTMLDivElement>();
+
+  return (
+    <GlassCard className="mb-4 p-0 overflow-hidden">
+      <div
+        ref={ref}
+        className="relative"
+        style={{ aspectRatio: isFullscreen ? undefined : "16 / 9", height: isFullscreen ? "100%" : undefined }}
+      >
+        <button
+          onClick={toggle}
+          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
+        >
+          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {isFullscreen ? dx.exitFullscreen : dx.fullscreen}
+        </button>
+        <iframe
+          src={embedUrl}
+          title={meta.name}
+          className="h-full w-full border-none"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
+          allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      </div>
+    </GlassCard>
+  );
+}
+
 export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   const router = useRouter();
   const { locale } = useLocale();
@@ -460,6 +502,8 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
           </div>
         </GlassCard>
       )}
+
+      {isExternalService(hw.content_type) && <ExternalServiceCard hw={hw} />}
 
       {/* Submission or Test */}
       {hw.content_type === "test" ? (
