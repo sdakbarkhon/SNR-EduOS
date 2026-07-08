@@ -22,6 +22,9 @@ export const SUBJECT_DEFAULTS: Record<string, { icon: string; color: string }> =
   "Изобразительное искусство": { icon: "Palette",      color: "#8B5CF6" },
   "Технология":                { icon: "Hammer",       color: "#71717A" },
   "Окружающий мир":            { icon: "TreePine",     color: "#16A34A" },
+  "Природоведение":            { icon: "TreePine",     color: "#16A34A" },
+  "ИЗО":                       { icon: "Palette",      color: "#8B5CF6" },
+  "Обществознание":            { icon: "Users",        color: "#6366F1" },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

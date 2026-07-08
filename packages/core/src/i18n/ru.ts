@@ -130,6 +130,8 @@ export const ru: Dictionary = {
     goalsTitle: "Ты на пути к новым вершинам!",
     goalsSubtitle: "Ещё немного, и ты получишь новую награду 🏆",
     viewGoals: "Смотреть цели",
+    classSubjectsTitle: "Предметы класса",
+    subjectComingSoon: "Скоро появится",
   },
   schedule: {
     title: "Расписание",

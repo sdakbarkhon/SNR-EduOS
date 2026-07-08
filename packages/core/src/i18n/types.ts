@@ -111,6 +111,9 @@ export interface Dictionary {
     goalsTitle: string;        // "Ты на пути к новым вершинам!"
     goalsSubtitle: string;     // "Ещё немного, и ты получишь новую награду 🏆"
     viewGoals: string;         // "Смотреть цели" (stub)
+    // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 2.4 — full per-class subject catalog section
+    classSubjectsTitle: string; // "Предметы класса"
+    subjectComingSoon: string;  // "Скоро появится" (toast on stub subject click)
   };
   schedule: {
     title: string;

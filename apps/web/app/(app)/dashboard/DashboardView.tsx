@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Bot, BookOpen, Flame,
+  Bot, BookOpen, Flame, Lock,
   Sparkles, ArrowRight, FileText, Folder, UserPlus, Calendar, PlusCircle,
 } from "lucide-react";
 import {
@@ -24,7 +24,7 @@ import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import type { Database } from "@snr/core";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
-type SubjectRow = { id: string; name: string; group_id: string; icon: string; color: string };
+type SubjectRow = { id: string; name: string; group_id: string; icon: string; color: string; is_active: boolean };
 
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
 // Заглушка серии успехов — реальной таблицы стриков нет (Iter5 P9)
@@ -76,7 +76,7 @@ export function DashboardView({
     stableLoadSubjects.current = async () => {
       if (!groups.length) return;
       const groupIds = groups.map((g) => g.id);
-      const { data } = await (db as any).from("subjects").select("id, name, group_id, icon, color").in("group_id", groupIds);
+      const { data } = await (db as any).from("subjects").select("id, name, group_id, icon, color, is_active").in("group_id", groupIds);
       if (data) setMySubjects(data as SubjectRow[]);
     };
     stableLoadSubjects.current();
@@ -148,7 +148,10 @@ export function DashboardView({
   const subjectById = new Map(mySubjects.map((s) => [s.id, s]));
 
   // Per-subject progress: completed vs. total lessons for that subject_id.
-  const subjectsWithProgress = mySubjects.map((sub) => {
+  // Stub subjects (is_active=false, БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 2.3) never have
+  // lessons, so a 0% ring for them would be meaningless clutter here — the
+  // full catalog (active+stub) has its own section below instead.
+  const subjectsWithProgress = mySubjects.filter((sub) => sub.is_active).map((sub) => {
     const subjectLessons = lessons.filter((l) => l.subject_id === sub.id);
     const total = subjectLessons.length;
     const done = subjectLessons.filter((l) => l.status === "completed").length;
@@ -329,6 +332,47 @@ export function DashboardView({
               )}
             </div>
           </div>
+
+          {/* Предметы класса — полный каталог (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 2.4).
+              Рабочие предметы кликабельны (ведут в /lessons); заглушки
+              (is_active=false) показаны затемнёнными с иконкой замка — клик
+              просто показывает тост "Скоро появится", без перехода. */}
+          {mySubjects.length > 0 && (
+            <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
+              <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.classSubjectsTitle}</h3>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {[...mySubjects].sort((a, b) => Number(b.is_active) - Number(a.is_active)).map((sub) => {
+                  const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
+                  const card = (
+                    <div
+                      className={`flex h-full flex-col items-center gap-2 rounded-[16px] p-3 text-center transition ${sub.is_active ? "hover:-translate-y-0.5" : "opacity-60"}`}
+                      style={{ backgroundColor: sub.is_active ? `${sub.color}1F` : "#F1F1F5" }}
+                    >
+                      <div
+                        className="relative flex h-10 w-10 items-center justify-center rounded-[12px]"
+                        style={{ background: sub.is_active ? sub.color : "#B7B7CE" }}
+                      >
+                        <SubIcon className="h-5 w-5 text-white" />
+                        {!sub.is_active && (
+                          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow">
+                            <Lock className="h-2.5 w-2.5 text-[#9A9AB5]" />
+                          </span>
+                        )}
+                      </div>
+                      <p className="line-clamp-2 text-[12px] font-bold leading-tight text-[#2A2A45]">{sub.name}</p>
+                    </div>
+                  );
+                  return sub.is_active ? (
+                    <Link key={sub.id} href="/lessons">{card}</Link>
+                  ) : (
+                    <button key={sub.id} type="button" onClick={() => showToast(t.subjectComingSoon)} className="text-left">
+                      {card}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Баннер целей — заглушка (Iter5 P9) */}
           <div

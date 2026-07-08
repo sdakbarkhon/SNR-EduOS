@@ -16,13 +16,17 @@ export default async function TeacherLessonsPage() {
 
   const groups = (groupsRaw as unknown as Array<{ id: string; name: string; subject: string }>);
 
-  // Fetch subjects for this teacher
+  // Subjects of every group this teacher can access (curator OR co-teacher via
+  // group_teachers — see is_my_teacher_group()), NOT just subjects.teacher_id
+  // ownership. A strict teacher_id filter would leave co-teachers with an
+  // empty subject list and unable to create lessons at all (БОЛЬШОЕ
+  // ОБНОВЛЕНИЕ Этап 4.7 — demo teachers must have full functional parity).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: teacherSubjects } = teacherRow
+  const { data: teacherSubjects } = groups.length > 0
     ? await (db as any)
         .from("subjects")
         .select("*, group:groups(id, name), teacher:teachers(id, full_name)")
-        .eq("teacher_id", teacherRow.id)
+        .in("group_id", groups.map(g => g.id))
         .order("name")
     : { data: [] };
 

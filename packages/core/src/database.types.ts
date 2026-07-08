@@ -2964,6 +2964,7 @@ export type Database = {
           group_id: string
           icon: string
           id: string
+          is_active: boolean
           name: string
           school_id: string
           teacher_id: string | null
@@ -2975,6 +2976,7 @@ export type Database = {
           group_id: string
           icon?: string
           id?: string
+          is_active?: boolean
           name: string
           school_id?: string
           teacher_id?: string | null
@@ -2986,6 +2988,7 @@ export type Database = {
           group_id?: string
           icon?: string
           id?: string
+          is_active?: boolean
           name?: string
           school_id?: string
           teacher_id?: string | null

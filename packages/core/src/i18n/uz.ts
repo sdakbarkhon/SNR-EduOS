@@ -130,6 +130,8 @@ export const uz: Dictionary = {
     goalsTitle: "Sen yangi cho'qqilar sari yo'ldasan!",
     goalsSubtitle: "Yana bir oz — va sen yangi mukofot olasan 🏆",
     viewGoals: "Maqsadlarni ko'rish",
+    classSubjectsTitle: "Sinf fanlari",
+    subjectComingSoon: "Tez orada",
   },
   schedule: {
     title: "Dars jadvali",

@@ -73,16 +73,21 @@ export async function signInWithUsername(
   });
   if (!parentResult.error) return { ...parentResult, role: "parent" as const };
 
-  // demo_teacher/demo_student (migration 66) share one domain, so role can't
-  // be derived from the domain the way it is above — go by exact username.
+  // All demo accounts (demo_teacher/demo_student from migration 66,
+  // demo_student_3/7/10 from migration 70, and demo_student_{grade}_NN /
+  // demo_teacher_NN from БОЛЬШОЕ ОБНОВЛЕНИЕ migration 97) share one email
+  // domain — role can't be derived from the domain the way it is above, so
+  // it's derived from the username prefix instead (was an exact-match
+  // allowlist of only the two original names, which silently rejected every
+  // newer demo_* username with "Неверный логин или пароль").
   const lower = input.toLowerCase();
-  if (lower === "demo_teacher" || lower === "demo_student") {
+  if (lower.startsWith("demo_teacher") || lower.startsWith("demo_student")) {
     const demoResult = await db.auth.signInWithPassword({
       email: usernameToEmail(input, DEMO_EMAIL_DOMAIN),
       password,
     });
     if (!demoResult.error) {
-      return { ...demoResult, role: lower === "demo_teacher" ? "teacher" as const : "student" as const };
+      return { ...demoResult, role: lower.startsWith("demo_teacher") ? "teacher" as const : "student" as const };
     }
   }
 
