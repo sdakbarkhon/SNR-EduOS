@@ -96,7 +96,7 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
     : t.run;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
+    <div className="mx-auto max-w-[1800px] px-4 py-6 md:px-8">
       <button onClick={() => router.back()} className="mb-5 flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-800">
         <ArrowLeft size={16} /> {d.common.back}
       </button>
