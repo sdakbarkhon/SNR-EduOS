@@ -11,8 +11,8 @@ import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
-import { runCode } from "@/lib/piston";
+import { pyodideReady } from "@/lib/pyodide";
+import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { StudentLiveViewer } from "@/components/lesson-stages/StudentLiveViewer";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
@@ -113,8 +113,10 @@ export function CodeStageView({
 
   function errMessage(err: string): string {
     if (err === "compile") return dc.compileError;
+    if (err === "timeout") return dc.timeout;
     if (err.startsWith("exit:")) return `${dc.error} (exit ${err.slice(5)})`;
     if (err.startsWith("net:")) return `${dc.error}: ${err.slice(4)}`;
+    if (isUnsupportedCppFeatureError(err)) return dc.cppUnsupported;
     return err; // raw Python traceback message
   }
 
@@ -128,15 +130,16 @@ export function CodeStageView({
   }
 
   async function handleRun() {
-    // HTML/CSS never goes to Piston/Pyodide — it renders as a live srcdoc
-    // iframe preview, refreshed on every click (УЧ.11 Part 4).
+    // HTML/CSS never goes through code-runner — it renders as a live srcdoc
+    // iframe preview, refreshed on every click (УЧ.11 Part 4; runner
+    // migration — see resheniya.md).
     if (isHtml) {
       setHtmlPreview(code);
       return;
     }
     setRunning(true);
     try {
-      const r = language === "python" ? await runPython(code, stdin) : await runCode(language, code, stdin);
+      const r = await runCode({ language, code, stdin });
       setResult(r);
     } catch (e) {
       setResult({ stdout: "", stderr: "", error: String(e) });

@@ -605,7 +605,7 @@ export interface Dictionary {
       testsHint: string;
       condition: string;        // "Условие"
       run: string;              // "Запустить"
-      running: string;          // "Запуск..." (Piston request in flight)
+      running: string;          // "Запуск..." (code-runner in flight, client-side)
       exitCode: string;         // "Код выхода"
       submit: string;           // "Отправить учителю"
       output: string;           // "Вывод"
@@ -1161,7 +1161,8 @@ export interface Dictionary {
       run: string;
       running: string;
       runFirst: string;       // first Pyodide load (5–15s)
-      runningCpp: string;     // sending to Piston
+      runningCpp: string;     // JSCPP compiling/interpreting (browser, no server round-trip)
+      cppUnsupported: string; // JSCPP hit a language/library feature it never implemented
       output: string;
       emptyOutput: string;
       clear: string;

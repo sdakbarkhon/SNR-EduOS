@@ -13,14 +13,15 @@ import { createClient } from "@/lib/supabase/client";
 import { GlassCard, SubjectIcon, useLocale } from "@/components";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS, isHtmlLanguage } from "@/lib/code-languages";
-import { runCode } from "@/lib/piston";
-import type { RunResult } from "@/lib/pyodide";
+import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
+import { pyodideReady } from "@/lib/pyodide";
 
 export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const router = useRouter();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.homework.programming;
+  const dc = d.lesson.code;
   const sb = createClient();
   const style = getSubjectStyle(hw.group.subject);
   const lang = hw.programming_language ?? "python";
@@ -57,6 +58,15 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
     }
   }
 
+  function errMessage(err: string): string {
+    if (err === "compile") return dc.compileError;
+    if (err === "timeout") return dc.timeout;
+    if (err.startsWith("exit:")) return `${dc.error} (exit ${err.slice(5)})`;
+    if (err.startsWith("net:")) return `${dc.error}: ${err.slice(4)}`;
+    if (isUnsupportedCppFeatureError(err)) return dc.cppUnsupported;
+    return err;
+  }
+
   async function downloadTests() {
     if (!hw.tests_attachment_path) return;
     const name = hw.tests_attachment_filename ?? "tests";
@@ -65,21 +75,25 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   }
 
   async function handleRun() {
-    // HTML/CSS never goes to Piston — it renders as a live srcdoc iframe
-    // preview, refreshed on every click (УЧ.11 Part 4).
+    // HTML/CSS never goes through code-runner — it renders as a live srcdoc
+    // iframe preview, refreshed on every click (УЧ.11 Part 4; runner
+    // migration — see resheniya.md).
     if (isHtml) {
       setHtmlPreview(code);
       return;
     }
     setRunning(true);
     try {
-      setResult(await runCode(lang, code));
+      setResult(await runCode({ language: lang, code }));
     } finally {
       setRunning(false);
     }
   }
 
   const langLabel = CODE_LANGUAGE_LABELS[lang];
+  const runLabel = running
+    ? (lang === "python" && !pyodideReady() ? dc.runFirst : lang === "cpp" ? dc.runningCpp : t.running)
+    : t.run;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
@@ -147,7 +161,7 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
             <div className="flex gap-2">
               <button onClick={handleRun} disabled={running}
                 className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60">
-                {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} className="fill-white" />} {running ? t.running : t.run}
+                {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} className="fill-white" />} {runLabel}
               </button>
               <button onClick={handleSubmit} disabled={submitting || !studentId}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm transition disabled:opacity-60"
@@ -178,14 +192,14 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
             ) : (
             <pre style={{ fontFamily: "'JetBrains Mono','Fira Code',Monaco,monospace", whiteSpace: "pre-wrap", fontSize: 13 }}>
               {!result && !running && <span className="text-slate-600">{t.outputEmpty}</span>}
-              {running && <span className="text-slate-500">{t.running}</span>}
+              {running && <span className="text-slate-500">{runLabel}</span>}
               {result && (
                 <>
                   {result.stdout && <span className="text-emerald-400">{result.stdout}</span>}
                   {result.stdout && result.stderr && "\n"}
                   {result.stderr && <span className="text-red-400">{result.stderr}</span>}
-                  {result.error && result.error !== "compile" && !result.error.startsWith("exit:") && (
-                    <span className="text-red-400">{result.error}</span>
+                  {result.error && (
+                    <span className="text-red-400">{errMessage(result.error)}</span>
                   )}
                   {!result.stdout && !result.stderr && !result.error && (
                     <span className="text-slate-600">{t.outputEmpty}</span>

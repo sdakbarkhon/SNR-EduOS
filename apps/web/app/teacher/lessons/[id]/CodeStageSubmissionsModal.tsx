@@ -10,8 +10,8 @@ import type {
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CodeViewer } from "@/components/CodeEditor";
-import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
-import { runCode } from "@/lib/piston";
+import { pyodideReady } from "@/lib/pyodide";
+import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
 import { CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
 
 type Row = LessonStageProgress & {
@@ -137,15 +137,25 @@ function SubmissionRow({
   const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
   const isHtml = isHtmlLanguage(language);
 
+  function errMessage(err: string): string {
+    if (err === "compile") return dc.compileError;
+    if (err === "timeout") return dc.timeout;
+    if (err.startsWith("exit:")) return `${dc.error} (exit ${err.slice(5)})`;
+    if (err.startsWith("net:")) return `${dc.error}: ${err.slice(4)}`;
+    if (isUnsupportedCppFeatureError(err)) return dc.cppUnsupported;
+    return err;
+  }
+
   async function handleRunHere() {
-    // HTML/CSS never goes to Piston — show a live srcdoc preview instead.
+    // HTML/CSS never goes through code-runner — show a live srcdoc preview
+    // instead (this branch is intentionally untouched, see resheniya.md).
     if (isHtml) {
       setHtmlPreview(sub.code ?? "");
       return;
     }
     setRunning(true);
     try {
-      const r = language === "python" ? await runPython(sub.code ?? "", runStdin) : await runCode(language, sub.code ?? "", runStdin);
+      const r = await runCode({ language, code: sub.code ?? "", stdin: runStdin });
       setResult(r);
     } catch (e) {
       setResult({ stdout: "", stderr: "", error: String(e) });
@@ -211,7 +221,8 @@ function SubmissionRow({
           </div>
 
           {/* Run here — html shows a live srcdoc preview instead of a stdin+
-              stdout run, since Piston can't execute it (УЧ.11 Part 4). */}
+              stdout run; code-runner's html case is never actually called
+              (УЧ.11 Part 4; runner migration — see resheniya.md). */}
           <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
             <div className="flex flex-wrap items-end gap-3">
               {!isHtml && (
@@ -249,7 +260,7 @@ function SubmissionRow({
                 <pre className="mt-2 max-h-32 overflow-auto rounded-lg p-3 font-mono text-[12px] text-slate-100" style={{ background: "#1a1a1a" }}>
                   {result.stdout}
                   {result.stderr && `\n[stderr]\n${result.stderr}`}
-                  {result.error && `\n[${result.error}]`}
+                  {result.error && `\n[${errMessage(result.error)}]`}
                   {!result.stdout && !result.stderr && !result.error && dc.emptyOutput}
                 </pre>
               )

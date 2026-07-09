@@ -30,7 +30,7 @@ export const CODE_LANGUAGE_DEFAULT_SNIPPETS: Record<CodeLanguage, string> = {
   html: "<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    /* Твои стили здесь */\n  </style>\n</head>\n<body>\n  <h1>Привет, мир!</h1>\n</body>\n</html>",
 };
 
-/** 'html' never reaches Piston — it renders as a live iframe preview instead. */
+/** 'html' never reaches code-runner.ts — it renders as a live iframe preview instead. */
 export function isHtmlLanguage(language: CodeLanguage): boolean {
   return language === "html";
 }

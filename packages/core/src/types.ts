@@ -188,9 +188,14 @@ export type LessonStageWithProgress = LessonStage & {
   progress: LessonStageProgress | null;
 };
 
-// 'html' (УЧ.11 Part 4) is never sent to Piston — it renders as a live srcdoc
-// iframe preview instead. Kept in the same union so the language selector,
-// Monaco editor, and default-snippet lookups stay a single exhaustive list.
+// Execution: python → Pyodide, javascript → sandboxed iframe, cpp → JSCPP
+// (all client-side, see apps/web/lib/code-runner.ts — Piston/emkc.org went
+// whitelist-only 2026-02-15 and is no longer used anywhere). 'java' has no
+// browser runtime commissioned; code-runner.ts returns a clear "not
+// supported" result for it. 'html' (УЧ.11 Part 4) never reaches code-runner
+// at all — it renders as a live srcdoc iframe preview instead. Kept in the
+// same union so the language selector, Monaco editor, and default-snippet
+// lookups stay a single exhaustive list.
 export type CodeLanguage = 'python' | 'javascript' | 'cpp' | 'java' | 'html';
 
 /** Stored in lesson_stages.config for content_type='code' (Prompt 4). */

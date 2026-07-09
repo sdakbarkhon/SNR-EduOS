@@ -11,8 +11,8 @@ import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandb
 import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
 import { CodeEditor } from "@/components/CodeEditor";
 import { StdinInput } from "@/components/StdinInput";
-import { runPython, pyodideReady, type RunResult } from "@/lib/pyodide";
-import { runCpp } from "@/lib/piston";
+import { pyodideReady } from "@/lib/pyodide";
+import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
 
 // ── Fullscreen shell (no submit — pure sandbox) ────────────────────────────────
 function SandboxFullscreen({
@@ -118,15 +118,17 @@ function CodeSandbox() {
 
   function errMessage(err: string): string {
     if (err === "compile") return dc.compileError;
+    if (err === "timeout") return dc.timeout;
     if (err.startsWith("exit:")) return `${dc.error} (exit ${err.slice(5)})`;
     if (err.startsWith("net:")) return `${dc.error}: ${err.slice(4)}`;
+    if (isUnsupportedCppFeatureError(err)) return dc.cppUnsupported;
     return err;
   }
 
   async function handleRun() {
     setRunning(true);
     try {
-      const r = language === "python" ? await runPython(code, stdin) : await runCpp(code, stdin);
+      const r = await runCode({ language, code, stdin });
       setResult(r);
     } catch (e) {
       setResult({ stdout: "", stderr: "", error: String(e) });
