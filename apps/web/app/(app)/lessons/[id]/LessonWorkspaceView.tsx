@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Clock, Check, FileText, FileCode2, File, ChevronsLeft, ChevronsRight,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
-  Maximize2, Minimize2, Bot,
+  Maximize2, Minimize2, Bot, RefreshCw,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -750,6 +750,15 @@ export function LessonWorkspaceView({
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
+            {!isCompleted && (
+              <button
+                onClick={() => window.location.reload()}
+                className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {dl.reloadPage}
+              </button>
+            )}
             {!isCompleted && (
               <button
                 onClick={handleEndLesson}

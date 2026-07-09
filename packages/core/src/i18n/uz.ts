@@ -1118,6 +1118,7 @@ export const uz: Dictionary = {
     startLessonBtn: "Darsni boshlash",
     endLessonBtn: "Darsni tugatish",
     endLessonConfirm: "Darsni hozir tugatasizmi? Bu amalni bekor qilib bo'lmaydi.",
+    reloadPage: "Sahifani yangilash",
     liveScores: {
       title: "Jonli natijalar",
       student: "O'quvchi",

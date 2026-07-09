@@ -1118,6 +1118,7 @@ export const ru: Dictionary = {
     startLessonBtn: "Начать урок",
     endLessonBtn: "Закончить урок",
     endLessonConfirm: "Закончить урок сейчас? Действие нельзя отменить.",
+    reloadPage: "Обновить страницу",
     liveScores: {
       title: "Результаты в реальном времени",
       student: "Ученик",

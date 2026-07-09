@@ -1118,6 +1118,7 @@ export const en: Dictionary = {
     startLessonBtn: "Start lesson",
     endLessonBtn: "End lesson",
     endLessonConfirm: "End the lesson now? This can't be undone.",
+    reloadPage: "Reload page",
     liveScores: {
       title: "Live results",
       student: "Student",

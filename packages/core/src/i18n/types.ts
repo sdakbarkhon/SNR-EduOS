@@ -1132,6 +1132,7 @@ export interface Dictionary {
     startLessonBtn: string;            // "Начать урок" — БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6
     endLessonBtn: string;              // "Закончить урок"
     endLessonConfirm: string;          // confirm text before manual end
+    reloadPage: string;                // "Обновить страницу" — reload button next to endLessonBtn
     liveScores: {                      // §7.7 — live quiz_qia/quiz_kahoot scores table
       title: string;
       student: string;
