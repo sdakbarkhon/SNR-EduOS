@@ -20,14 +20,10 @@ const teacherNavItems = [
 ];
 
 export function TeacherShell({
-  teacherName,
-  teacherSubtitle,
-  avatarUrl,
+  headerInfo,
   children,
 }: {
-  teacherName?: string;
-  teacherSubtitle?: string;
-  avatarUrl?: string | null;
+  headerInfo: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -46,7 +42,7 @@ export function TeacherShell({
         </div>
         <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-[60px]" style={{ background: "var(--shell-overlay)" }} />
 
-        <TeacherTopbar name={teacherName ?? ""} subtitle={teacherSubtitle} avatarUrl={avatarUrl} />
+        <TeacherTopbar headerInfo={headerInfo} />
         <main className="flex-1 overflow-y-auto px-4 pb-20 pt-1 md:px-8 md:pb-8">
           <div className="mx-auto w-full min-[1440px]:max-w-[1600px]">
             {children}

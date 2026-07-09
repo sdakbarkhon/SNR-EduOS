@@ -188,6 +188,7 @@ export function StudentSidebar() {
             <Link
               key={item.key}
               href={item.href}
+              prefetch={false}
               onClick={item.isStub ? onStubClick : undefined}
               title={item.label(d)}
               className={cn(

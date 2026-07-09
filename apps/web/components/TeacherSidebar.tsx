@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
@@ -12,7 +12,6 @@ import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
-import { signOut } from "@/app/actions/auth";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
@@ -35,6 +34,11 @@ const teacherNavItems = [
 
 export function TeacherSidebar() {
   const pathname = usePathname();
+  // pathname only updates once a navigation actually commits — with
+  // prefetch off, that can take a beat. Tracking the just-clicked href lets
+  // the active highlight react instantly instead of waiting on the route.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const router = useRouter();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
 
@@ -58,6 +62,10 @@ export function TeacherSidebar() {
     db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
     getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
   }, []);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   useRealtimeChannel(
     myUserId ? `teacher-sidebar-unread-${myUserId}` : null,
@@ -93,6 +101,13 @@ export function TeacherSidebar() {
       try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* blocked */ }
       return next;
     });
+  }
+
+  // Navigate away immediately — don't make the user wait on the
+  // Supabase (Frankfurt) round trip before the screen changes.
+  function handleLogout() {
+    router.replace("/login");
+    createClient().auth.signOut().catch(() => {});
   }
 
   const isCollapsed = mounted && collapsed;
@@ -132,13 +147,15 @@ export function TeacherSidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
         {teacherNavItems.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = pendingHref ? pendingHref === item.href : pathname.startsWith(item.href);
           const Icon = item.icon;
           const showBadge = item.key === "messages" && unreadThreads > 0;
           return (
             <Link
               key={item.key}
               href={item.href}
+              prefetch={false}
+              onClick={() => setPendingHref(item.href)}
               title={item.label(d)}
               className={cn(
                 "relative flex items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium transition-all duration-200",
@@ -165,19 +182,18 @@ export function TeacherSidebar() {
 
       {/* Logout */}
       <div className="shrink-0 border-t border-white/20 pt-4 px-2">
-        <form action={signOut}>
-          <button
-            type="submit"
-            title="Выйти"
-            className={cn(
-              "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
-              isCollapsed && "justify-center",
-            )}
-          >
-            <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
-            {!isCollapsed && <span className="font-medium">Выйти</span>}
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Выйти"
+          className={cn(
+            "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
+            isCollapsed && "justify-center",
+          )}
+        >
+          <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
+          {!isCollapsed && <span className="font-medium">Выйти</span>}
+        </button>
       </div>
     </aside>
   );

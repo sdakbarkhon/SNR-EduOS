@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getMyTeacher, getTeacherGroups, getSubjectConfig } from "@snr/core";
 import { TeacherShell } from "@/components/TeacherShell";
+import { TeacherHeaderInfo, TeacherHeaderSkeleton } from "@/components/TeacherHeaderInfo";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
@@ -18,32 +19,18 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
 
   const isDemo = user.user_metadata?.is_demo === true;
 
-  let teacherName = "";
-  let avatarUrl: string | null = null;
-  let teacherSubtitle = "";
-  try {
-    const teacher = await getMyTeacher(supabase);
-    teacherName = teacher.full_name ?? "";
-    avatarUrl = teacher.avatar_url ?? null;
-  } catch (e) {
-    console.error("[TeacherLayout] getMyTeacher failed:", e);
-  }
-  try {
-    const groups = (await getTeacherGroups(supabase)) as Array<{ subject: string }>;
-    const subjects = Array.from(new Set(groups.map((g) => getSubjectConfig(g.subject).label)));
-    teacherSubtitle = subjects.length <= 2
-      ? subjects.join(" · ")
-      : `${subjects.slice(0, 2).join(" · ")} · ещё ${subjects.length - 2}`;
-  } catch (e) {
-    console.error("[TeacherLayout] getTeacherGroups failed:", e);
-  }
-
   return (
     <>
       <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
       <DemoHeartbeat isDemo={isDemo} />
-      <TeacherShell teacherName={teacherName} teacherSubtitle={teacherSubtitle} avatarUrl={avatarUrl}>
+      <TeacherShell
+        headerInfo={
+          <Suspense fallback={<TeacherHeaderSkeleton />}>
+            <TeacherHeaderInfo />
+          </Suspense>
+        }
+      >
         {children}
       </TeacherShell>
     </>
