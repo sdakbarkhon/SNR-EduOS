@@ -94,9 +94,14 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const runLabel = running
     ? (lang === "python" && !pyodideReady() ? dc.runFirst : lang === "cpp" ? dc.runningCpp : t.running)
     : t.run;
+  // HomeworkHintPanel is fixed right-4 w-[300px] (lg+ only) — reserve the
+  // same width in our own padding so the editor column doesn't render
+  // under it. No max-w here: AppShell's own min-[1440px]:max-w-[1600px]
+  // is the real ceiling, same as the in-progress lesson workspace.
+  const hintPad = hw.hint_storage_path ? "lg:pr-[340px]" : "";
 
   return (
-    <div className="mx-auto max-w-[1800px] px-4 py-6 md:px-8">
+    <div className={`px-4 py-6 md:px-8 ${hintPad}`}>
       <button onClick={() => router.back()} className="mb-5 flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-800">
         <ArrowLeft size={16} /> {d.common.back}
       </button>

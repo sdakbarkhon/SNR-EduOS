@@ -414,9 +414,13 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
   const dueLabel = hw.due_date
     ? new Date(hw.due_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent" })
     : null;
+  // HomeworkHintPanel is fixed right-4 w-[300px] (lg+ only) — reserve the
+  // same width so nothing renders under it. No max-w here: AppShell's own
+  // min-[1440px]:max-w-[1600px] is the real ceiling.
+  const hintPad = hw.hint_storage_path ? "lg:pr-[340px]" : "";
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 md:px-8">
+    <div className={`px-4 py-6 md:px-8 ${hintPad}`}>
       <button
         type="button"
         onClick={() => router.back()}
