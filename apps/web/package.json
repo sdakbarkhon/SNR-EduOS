@@ -17,6 +17,7 @@
     "@snr/ui-tokens": "workspace:*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
+    "JSCPP": "^2.0.9",
     "canvas-confetti": "^1.9.4",
     "jszip": "^3.10.1",
     "lucide-react": "^0.460.0",

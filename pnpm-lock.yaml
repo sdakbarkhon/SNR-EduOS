@@ -217,6 +217,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.108.1
+      JSCPP:
+        specifier: ^2.0.9
+        version: 2.0.9
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -2204,6 +2207,9 @@ packages:
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
 
+  JSCPP@2.0.9:
+    resolution: {integrity: sha512-ix62BbyR33JfuLS5JN3lrP5WrDFHJMe498TbyEN0vjRgK1pvOREs03YA0rMoj0U2h9EYLSoo9emZMW2rSlFVfQ==}
+
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
     engines: {node: '>=6.5'}
@@ -3643,6 +3649,9 @@ packages:
   lodash.throttle@4.1.1:
     resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
 
+  lodash@4.18.1:
+    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+
   log-symbols@2.2.0:
     resolution: {integrity: sha512-VeIAFslyIerEJLXHziedo2basKbMKtTw3vfn5IzG0XTjhAVEJyNHnL2p7vc+wBDSdQuUpNw3M2u6xb9QsAY5Eg==}
     engines: {node: '>=4'}
@@ -4249,6 +4258,14 @@ packages:
     resolution: {integrity: sha512-IHZsA4T7YElCKNNXtiLgqScw4zPd3pG9do8UrznC757gMd7UPeHSL2qwNNMJo4r79fl8oj1Xx+1nh2YkzdMpLQ==}
     engines: {node: '>=18'}
 
+  pegjs-util@1.4.21:
+    resolution: {integrity: sha512-0z15BXCjxwgeD+pO5QImUgOFsJ86jFt6oDqatveLggeARSS5wmrt9SxCONkUvOeSsob2faVBC9H4wpl4zudg9A==}
+
+  pegjs@0.10.0:
+    resolution: {integrity: sha512-qI5+oFNEGi3L5HAxDwN2LA4Gg7irF70Zs25edhjld9QemOgp0CbvMtbFcMvFtEo1OityPrcCzkQFB8JP/hxgow==}
+    engines: {node: '>=0.10'}
+    hasBin: true
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -4366,6 +4383,10 @@ packages:
   pretty-format@29.7.0:
     resolution: {integrity: sha512-Pdlw/oPxN+aXdmM9R00JVC9WVFoCLTKJvDVLgmJ+qAffBMxsV85l/Lu7sNx4zSzPyoL2euImuEwHhOXdEgNFZQ==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
+
+  printf@0.6.1:
+    resolution: {integrity: sha512-is0ctgGdPJ5951KulgfzvHGwJtZ5ck8l042vRkV6jrkpBzTmb/lueTqguWHy2JfVA+RY6gFVlaZgUS0j7S/dsw==}
+    engines: {node: '>= 0.9.0'}
 
   prismjs@1.30.0:
     resolution: {integrity: sha512-DEvV2ZF2r2/63V+tK8hQvrR2ZGn10srHbXviTlcv7Kpzw8jWiNTqbVgjO3IY8RxrrOUF8VPMQQFysYYYv0YZxw==}
@@ -7995,6 +8016,12 @@ snapshots:
 
   '@xmldom/xmldom@0.9.10': {}
 
+  JSCPP@2.0.9:
+    dependencies:
+      lodash: 4.18.1
+      pegjs-util: 1.4.21
+      printf: 0.6.1
+
   abort-controller@3.0.0:
     dependencies:
       event-target-shim: 5.0.1
@@ -9656,6 +9683,8 @@ snapshots:
 
   lodash.throttle@4.1.1: {}
 
+  lodash@4.18.1: {}
+
   log-symbols@2.2.0:
     dependencies:
       chalk: 2.4.2
@@ -10677,6 +10706,12 @@ snapshots:
       canvas: 3.2.3
       path2d: 0.2.2
 
+  pegjs-util@1.4.21:
+    dependencies:
+      pegjs: 0.10.0
+
+  pegjs@0.10.0: {}
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
@@ -10792,6 +10827,8 @@ snapshots:
       '@jest/schemas': 29.6.3
       ansi-styles: 5.2.0
       react-is: 18.3.1
+
+  printf@0.6.1: {}
 
   prismjs@1.30.0: {}
 
