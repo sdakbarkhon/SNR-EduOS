@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { MaterialWithGroup } from "@snr/core";
 import { getMaterialUrl } from "@/app/actions/materials";
+import { FileViewerModal } from "@/components/FileViewerModal";
 
 // ── File type helpers ─────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
   const [activeType, setActiveType] = useState<DisplayType | "all">("all");
   const [filterSubject, setFilterSubject] = useState("all");
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Debounce search 300ms
@@ -118,35 +120,26 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
   }
 
   async function handleOpen(mat: MaterialWithGroup) {
-    console.log("[materials] click:", { id: mat.id, storage_path: mat.storage_path, link_url: mat.link_url });
     if (!mat.storage_path && !mat.link_url) {
       showToast("У этого материала нет файла");
       return;
     }
     setOpeningId(mat.id);
     try {
-      console.log("[materials] calling getMaterialUrl for", mat.id);
       const url = await getMaterialUrl(mat.id);
-      console.log("[materials] signed url result:", url);
       if (!url) {
         showToast("Не удалось открыть файл");
         return;
       }
-      // Trigger a download via a programmatic <a download> click — avoids
-      // popup blocker and forces save instead of inline PDF render. The
-      // signed URL already carries Content-Disposition: attachment with
-      // the filename (see getMaterialDownloadUrl).
-      const filename = mat.storage_path?.split("/").pop() || mat.title || "material";
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (mat.link_url && !mat.storage_path) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      const fileName = mat.storage_path?.split("/").pop() || mat.title || "material";
+      setViewer({ url, title: mat.title, fileName });
     } catch (err) {
       console.error("[materials] getMaterialUrl threw:", err);
-      showToast("Ошибка при скачивании файла");
+      showToast("Не удалось открыть файл");
     } finally {
       setOpeningId(null);
     }
@@ -158,6 +151,15 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-2xl">
           {toast}
         </div>
+      )}
+
+      {viewer && (
+        <FileViewerModal
+          url={viewer.url}
+          title={viewer.title}
+          fileName={viewer.fileName}
+          onClose={() => setViewer(null)}
+        />
       )}
       {/* Header — omitted when hosted under the Knowledge Base tab switcher
           (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2), which already shows its own title. */}

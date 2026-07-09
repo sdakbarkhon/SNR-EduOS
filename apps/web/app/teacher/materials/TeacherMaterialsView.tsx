@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   FolderOpen, Plus, FileText, Video, FileImage, File, BookOpen,
-  Link as LinkIcon, MoreHorizontal, Download, Trash2, X, Upload, Check, Search,
+  Link as LinkIcon, MoreHorizontal, Trash2, X, Upload, Check, Search,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertMaterial } from "@snr/core";
 import type { MaterialWithGroup } from "@snr/core";
 import { getMaterialUrl, deleteMaterial as deleteMaterialAction } from "@/app/actions/materials";
 import { useRouter } from "next/navigation";
+import { FileViewerModal } from "@/components/FileViewerModal";
 
 // ── File type helpers (same as student view) ──────────────────────────
 
@@ -420,6 +421,8 @@ export function TeacherMaterialsView({
   const [query, setQuery] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
 
   // teacherId comes from the RSC — no client-side fetch needed.
   const teacherId = initialTeacherId;
@@ -482,29 +485,26 @@ export function TeacherMaterialsView({
     router.refresh();
   }
 
-  async function handleDownload(mat: MaterialWithGroup) {
+  async function handleOpen(mat: MaterialWithGroup) {
     setMenuOpenId(null);
     if (!mat.storage_path && !mat.link_url) {
       setToast("У этого материала нет файла");
       return;
     }
+    setOpeningId(mat.id);
     try {
       const url = await getMaterialUrl(mat.id);
-      if (!url) { setToast("Не удалось скачать файл"); return; }
+      if (!url) { setToast("Не удалось открыть файл"); return; }
       if (mat.link_url && !mat.storage_path) {
         window.open(url, "_blank", "noopener,noreferrer");
-      } else {
-        const filename = mat.storage_path?.split("/").pop() || mat.title || "material";
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        return;
       }
+      const fileName = mat.storage_path?.split("/").pop() || mat.title || "material";
+      setViewer({ url, title: mat.title, fileName });
     } catch {
-      setToast("Не удалось скачать файл");
+      setToast("Не удалось открыть файл");
+    } finally {
+      setOpeningId(null);
     }
   }
 
@@ -535,6 +535,14 @@ export function TeacherMaterialsView({
   return (
     <>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+      {viewer && (
+        <FileViewerModal
+          url={viewer.url}
+          title={viewer.title}
+          fileName={viewer.fileName}
+          onClose={() => setViewer(null)}
+        />
+      )}
       {successInfo && (
         <SuccessModal
           title={successInfo.title}
@@ -623,33 +631,26 @@ export function TeacherMaterialsView({
               const dtype = resolveType(mat);
               const Icon = TYPE_ICON[dtype];
               const isDeleting = deleting === mat.id;
+              const isOpening = openingId === mat.id;
               return (
                 <div
                   key={mat.id}
-                  className="group relative flex h-[190px] flex-col rounded-[20px] border border-white/40 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:shadow-lg"
+                  onClick={() => handleOpen(mat)}
+                  className="group relative flex h-[190px] cursor-pointer flex-col rounded-[20px] border border-white/40 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:shadow-lg"
                 >
                   {/* ••• menu — z-30 so it sits above other z-10 card elements.
                       data-menu-id lets the outside-click handler identify its own node. */}
                   <div className="absolute right-3 top-3 z-30" data-menu-id={mat.id}>
                     <button
-                      onClick={() => setMenuOpenId(menuOpenId === mat.id ? null : mat.id)}
+                      onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === mat.id ? null : mat.id); }}
                       className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                     {menuOpenId === mat.id && (
                       <div className="absolute right-0 top-8 min-w-[140px] overflow-hidden rounded-xl border border-white/60 bg-white shadow-xl">
-                        {(mat.storage_path || mat.link_url) && (
-                          <button
-                            onClick={() => handleDownload(mat)}
-                            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                          >
-                            <Download className="h-4 w-4" />
-                            Скачать
-                          </button>
-                        )}
                         <button
-                          onClick={() => handleDelete(mat)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(mat); }}
                           disabled={isDeleting}
                           className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
                         >
@@ -662,7 +663,11 @@ export function TeacherMaterialsView({
 
                   <div className="z-10 flex flex-1 flex-col items-center justify-center">
                     <div className={`mb-2 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-105 ${TYPE_COLORS[dtype]}`}>
-                      <Icon className="h-8 w-8" />
+                      {isOpening ? (
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Icon className="h-8 w-8" />
+                      )}
                     </div>
                     <p className="line-clamp-2 px-2 text-center text-sm font-bold leading-tight text-slate-800">
                       {mat.title}

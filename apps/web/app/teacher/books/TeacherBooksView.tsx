@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  BookOpen, Plus, MoreHorizontal, Download, Trash2, X, Upload, Check, Library, Search,
+  BookOpen, Plus, MoreHorizontal, Trash2, X, Upload, Check, Library, Search,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertBook, getSubjectStyle } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
+import { FileViewerModal } from "@/components/FileViewerModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -41,13 +42,13 @@ function getBookGradient(subject: string): string {
   return `linear-gradient(135deg, ${from}, ${to})`;
 }
 
-function getDownloadText(bookType: string): string {
+function getOpenText(bookType: string): string {
   switch (bookType) {
-    case "Учебник":    return "Скачать учебник";
-    case "Конспект":   return "Скачать конспект";
-    case "Сборник":    return "Скачать сборник";
-    case "Справочник": return "Скачать справочник";
-    default:           return "Скачать";
+    case "Учебник":    return "Читать учебник";
+    case "Конспект":   return "Читать конспект";
+    case "Сборник":    return "Читать сборник";
+    case "Справочник": return "Читать справочник";
+    default:           return "Читать";
   }
 }
 
@@ -76,14 +77,14 @@ function TeacherBookDetailModal({
   book,
   coverUrl,
   onClose,
-  onDownload,
-  downloading,
+  onOpen,
+  opening,
 }: {
   book: Book;
   coverUrl?: string | null;
   onClose: () => void;
-  onDownload: () => void;
-  downloading: boolean;
+  onOpen: () => void;
+  opening: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   const style = getSubjectStyle(book.subject);
@@ -161,16 +162,16 @@ function TeacherBookDetailModal({
 
             <div className="mt-auto pt-4">
               <button
-                onClick={onDownload}
-                disabled={downloading}
+                onClick={onOpen}
+                disabled={opening}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
               >
-                {downloading ? (
+                {opening ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
-                  <Download className="h-4 w-4" />
+                  <BookOpen className="h-4 w-4" />
                 )}
-                {downloading ? "Скачиваем…" : getDownloadText(book.book_type)}
+                {opening ? "Открываем…" : getOpenText(book.book_type)}
               </button>
             </div>
           </div>
@@ -550,7 +551,8 @@ export function TeacherBooksView({
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [viewerBook, setViewerBook] = useState<{ url: string; title: string; fileName: string } | null>(null);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [filterSubject, setFilterSubject] = useState("all");
@@ -584,43 +586,20 @@ export function TeacherBooksView({
     router.refresh();
   }
 
-  async function handleModalDownload(bookId: string) {
-    setDownloadingId(bookId);
+  async function handleOpen(bookId: string) {
+    setOpeningId(bookId);
     try {
       const book = books.find((b) => b.id === bookId);
       if (!book) return;
       const url = await getBookFileUrl(bookId);
       if (!url) { setToast("Не удалось получить ссылку"); return; }
-      const filename = book.file_storage_path.split("/").pop() || "book.pdf";
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const fileName = book.file_storage_path.split("/").pop() || "book.pdf";
+      setSelectedBookId(null);
+      setViewerBook({ url, title: book.title, fileName });
     } catch {
-      setToast("Не удалось скачать файл");
+      setToast("Не удалось открыть файл");
     } finally {
-      setDownloadingId(null);
-    }
-  }
-
-  async function handleDownload(book: Book) {
-    setMenuOpenId(null);
-    try {
-      const url = await getBookFileUrl(book.id);
-      if (!url) { setToast("Не удалось получить ссылку"); return; }
-      const filename = book.file_storage_path.split("/").pop() || "book.pdf";
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch {
-      setToast("Не удалось скачать файл");
+      setOpeningId(null);
     }
   }
 
@@ -668,8 +647,17 @@ export function TeacherBooksView({
           book={selectedBook}
           coverUrl={coverUrls[selectedBook.id]}
           onClose={() => setSelectedBookId(null)}
-          onDownload={() => handleModalDownload(selectedBook.id)}
-          downloading={downloadingId === selectedBook.id}
+          onOpen={() => handleOpen(selectedBook.id)}
+          opening={openingId === selectedBook.id}
+        />
+      )}
+
+      {viewerBook && (
+        <FileViewerModal
+          url={viewerBook.url}
+          title={viewerBook.title}
+          fileName={viewerBook.fileName}
+          onClose={() => setViewerBook(null)}
         />
       )}
 
@@ -795,13 +783,6 @@ export function TeacherBooksView({
                         </button>
                         {menuOpenId === book.id && (
                           <div className="absolute right-0 top-9 min-w-[140px] overflow-hidden rounded-xl border border-white/60 bg-white shadow-xl">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDownload(book); }}
-                              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                            >
-                              <Download className="h-4 w-4" />
-                              Скачать
-                            </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleDelete(book); }}
                               disabled={isDeleting}

@@ -18,8 +18,8 @@ export async function getBookFileUrl(bookId: string): Promise<string | null> {
   if (error || !data) return null;
 
   try {
-    const filename = (data.file_storage_path as string).split("/").pop() || "book.pdf";
-    return await getBookSignedUrl(supabase, data.file_storage_path as string, filename);
+    // No downloadAs — opens inline in the viewer instead of forcing a download.
+    return await getBookSignedUrl(supabase, data.file_storage_path as string);
   } catch (e) {
     console.error("[getBookFileUrl] failed:", e);
     return null;

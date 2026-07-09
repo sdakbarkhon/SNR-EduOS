@@ -360,8 +360,9 @@ export const getMaterials = (db: Db) =>
     .then(unwrap)
     .then((rows) => rows as unknown as import("../types").MaterialWithGroup[]);
 
-/** Signed URL на 1 час. Если передан downloadAs — URL принудительно скачивает
- *  файл (Supabase ставит Content-Disposition: attachment с этим именем). */
+/** Signed URL на 1 час. Без downloadAs открывается инлайн (просмотр в
+ *  браузере); передайте downloadAs только если действительно нужно
+ *  принудительное скачивание (Content-Disposition: attachment). */
 export const getMaterialDownloadUrl = (
   db: Db,
   storagePath: string,
@@ -2837,7 +2838,7 @@ export const insertBook = async (
   return data as unknown as Book;
 };
 
-/** Signed URL для скачивания книги (1 час). */
+/** Signed URL для книги (1 час). Без downloadAs открывается инлайн. */
 export const getBookSignedUrl = async (
   db: Db,
   storagePath: string,

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Star, BookOpen, Library, X, Download, Search } from "lucide-react";
+import { Star, BookOpen, Library, X, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getSubjectStyle, addBookFavorite, removeBookFavorite } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
+import { FileViewerModal } from "@/components/FileViewerModal";
 
 // ── Config ──────────────────────────────────────────────────────────────
 
@@ -40,13 +41,13 @@ function getBookGradient(subject: string): string {
   return `linear-gradient(135deg, ${from}, ${to})`;
 }
 
-function getDownloadText(bookType: string): string {
+function getOpenText(bookType: string): string {
   switch (bookType) {
-    case "Учебник":    return "Скачать учебник";
-    case "Конспект":   return "Скачать конспект";
-    case "Сборник":    return "Скачать сборник";
-    case "Справочник": return "Скачать справочник";
-    default:           return "Скачать";
+    case "Учебник":    return "Читать учебник";
+    case "Конспект":   return "Читать конспект";
+    case "Сборник":    return "Читать сборник";
+    case "Справочник": return "Читать справочник";
+    default:           return "Читать";
   }
 }
 
@@ -59,8 +60,8 @@ function BookDetailModal({
   isStudent,
   onClose,
   onToggleFavorite,
-  onDownload,
-  downloading,
+  onOpen,
+  opening,
 }: {
   book: Book;
   coverUrl?: string | null;
@@ -68,8 +69,8 @@ function BookDetailModal({
   isStudent: boolean;
   onClose: () => void;
   onToggleFavorite: () => void;
-  onDownload: () => void;
-  downloading: boolean;
+  onOpen: () => void;
+  opening: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   const [optimisticFav, setOptimisticFav] = useState(isFavorite);
@@ -177,18 +178,18 @@ function BookDetailModal({
                 </button>
               )}
 
-              {/* Download button */}
+              {/* Open in viewer */}
               <button
-                onClick={onDownload}
-                disabled={downloading}
+                onClick={onOpen}
+                disabled={opening}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
               >
-                {downloading ? (
+                {opening ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
-                  <Download className="h-4 w-4" />
+                  <BookOpen className="h-4 w-4" />
                 )}
-                {downloading ? "Скачиваем…" : getDownloadText(book.book_type)}
+                {opening ? "Открываем…" : getOpenText(book.book_type)}
               </button>
             </div>
           </div>
@@ -287,7 +288,8 @@ export function BooksView({
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set(initialFavoriteIds));
   const [activeTab, setActiveTab] = useState<"library" | "favorites">("library");
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [viewerBook, setViewerBook] = useState<{ url: string; title: string; fileName: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -341,25 +343,21 @@ export function BooksView({
     [studentId, favoriteIds, router],
   );
 
-  const handleDownload = useCallback(
+  const handleOpen = useCallback(
     async (bookId: string) => {
-      setDownloadingId(bookId);
+      setOpeningId(bookId);
       try {
         const url = await getBookFileUrl(bookId);
         if (!url) { setToast("Не удалось получить ссылку на файл"); return; }
         const book = books.find((b) => b.id === bookId);
-        const filename = book?.file_storage_path.split("/").pop() || "book.pdf";
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        if (!book) return;
+        const fileName = book.file_storage_path.split("/").pop() || "book.pdf";
+        setSelectedBookId(null);
+        setViewerBook({ url, title: book.title, fileName });
       } catch {
-        setToast("Не удалось скачать файл");
+        setToast("Не удалось открыть файл");
       } finally {
-        setDownloadingId(null);
+        setOpeningId(null);
       }
     },
     [books],
@@ -400,8 +398,18 @@ export function BooksView({
           isStudent={!!studentId}
           onClose={() => setSelectedBookId(null)}
           onToggleFavorite={() => toggleFavorite(selectedBook.id)}
-          onDownload={() => handleDownload(selectedBook.id)}
-          downloading={downloadingId === selectedBook.id}
+          onOpen={() => handleOpen(selectedBook.id)}
+          opening={openingId === selectedBook.id}
+        />
+      )}
+
+      {/* In-app viewer */}
+      {viewerBook && (
+        <FileViewerModal
+          url={viewerBook.url}
+          title={viewerBook.title}
+          fileName={viewerBook.fileName}
+          onClose={() => setViewerBook(null)}
         />
       )}
 
