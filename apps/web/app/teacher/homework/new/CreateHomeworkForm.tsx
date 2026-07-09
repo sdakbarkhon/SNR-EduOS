@@ -19,9 +19,8 @@ import {
 import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Sparkles, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch } from "lucide-react";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
-import { TeacherAIPanel } from "./TeacherAIPanel";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
 import { EduOSAiIcon } from "@/components/EduOSAiIcon";
 import { CodeEditor } from "@/components/CodeEditor";
@@ -80,7 +79,6 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiToast, setAiToast] = useState(false);
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
 
@@ -160,27 +158,6 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
 
   function updateSubtask(i: number, patch: Partial<Subtask>) {
     setSubtasks((ts) => ts.map((t, idx) => idx === i ? { ...t, ...patch } : t));
-  }
-
-  function handleAIApply(data: {
-    title: string;
-    description: string;
-    questions?: Array<{ question: string; options: string[]; correctIndex: number }>;
-  }) {
-    setTitle(data.title);
-    setDescription(data.description);
-    if (data.questions && format === "test") {
-      setQuestions(
-        data.questions.map((q) => ({
-          type: "single_choice" as QuestionType,
-          text: q.question,
-          options: q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correctIndex })),
-        })),
-      );
-    }
-    setAiPanelOpen(false);
-    setAiToast(true);
-    setTimeout(() => setAiToast(false), 4000);
   }
 
   function handleAiGenerateApply(data: GeneratedHomework) {
@@ -330,15 +307,6 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         <h1 className="flex-1 text-[22px] font-bold text-brand-ink">
           {d.teacher.newHomeworkTitle}
         </h1>
-        {!isExternal && format !== "bundle" && (
-          <button
-            type="button"
-            onClick={() => setAiPanelOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:brightness-110"
-          >
-            <Sparkles className="h-4 w-4" /> Сгенерировать с ИИ
-          </button>
-        )}
         {!isExternal && (
           <button
             type="button"
@@ -765,14 +733,6 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
           {format === "test" ? d.homework.test.createTest : (saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish)}
         </button>
       </div>
-
-      <TeacherAIPanel
-        isOpen={aiPanelOpen}
-        onClose={() => setAiPanelOpen(false)}
-        format={format === "test" ? "test" : "file"}
-        subject={groups.find((g) => g.id === groupId)?.subject ?? ""}
-        onApply={handleAIApply}
-      />
 
       <HomeworkAiGenerateModal
         isOpen={aiGenerateOpen}
