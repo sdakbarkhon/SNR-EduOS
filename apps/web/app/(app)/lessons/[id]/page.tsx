@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStudentLessonView, getLessonMaterialUrl } from "@snr/core";
+import { getStudentLessonView, getLessonMaterialUrl, getHomeworkByLessonId } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { LessonView } from "./LessonView";
@@ -34,5 +34,18 @@ export default async function LessonPage({
     }),
   );
 
-  return <LessonView lesson={lesson} materialUrls={materialUrls} studentId={student?.id ?? null} />;
+  // Only relevant once the lesson has ended — the completed-review screen
+  // links straight to any homework created from this lesson.
+  const linkedHomework = lesson.status === "completed"
+    ? await getHomeworkByLessonId(db, id).catch(() => [])
+    : [];
+
+  return (
+    <LessonView
+      lesson={lesson}
+      materialUrls={materialUrls}
+      studentId={student?.id ?? null}
+      linkedHomework={linkedHomework}
+    />
+  );
 }

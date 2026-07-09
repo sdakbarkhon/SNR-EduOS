@@ -1,9 +1,14 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, MapPin, Check, Download, BookOpen, FileText, Clock } from "lucide-react";
-import type { StudentLessonView, LessonStageWithProgress } from "@snr/core";
+import { ChevronLeft, MapPin, Check, Eye, BookOpen, FileText, Clock, ClipboardList } from "lucide-react";
+import type { StudentLessonView, LessonStageWithProgress, ContentType } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
 import { PreLessonView } from "./PreLessonView";
 import { LessonWorkspaceView } from "./LessonWorkspaceView";
+import { StudentStageReviewModal } from "./StudentStageReviewModal";
+import { FileViewerModal } from "@/components/FileViewerModal";
 
 function initials(name: string): string {
   return name.split(" ").map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 2);
@@ -31,9 +36,16 @@ interface Props {
   lesson: StudentLessonView;
   materialUrls: Record<string, string>;
   studentId: string | null;
+  linkedHomework: Array<{ id: string; title: string; content_type: ContentType; due_date: string | null }>;
 }
 
-export function LessonView({ lesson, materialUrls, studentId }: Props) {
+export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: Props) {
+  // Hooks must run unconditionally on every render — declared before the
+  // scheduled/in_progress early returns below, even though they're only
+  // used by the completed branch.
+  const [reviewStage, setReviewStage] = useState<LessonStageWithProgress | null>(null);
+  const [viewerMaterial, setViewerMaterial] = useState<{ url: string; title: string; fileName: string | null } | null>(null);
+
   // Before the lesson starts → full pre-lesson page (countdown + excuse).
   if (lesson.status === "scheduled") {
     return <PreLessonView lesson={lesson} studentId={studentId} />;
@@ -103,7 +115,7 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
         <div className="relative z-10 flex flex-1 flex-col justify-between">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-white/70">
-              {style.label} · {lesson.group.name}
+              {lesson.subjectName ?? style.label} · {lesson.group.name}
             </p>
             {lesson.lesson_no && (
               <p className="mb-1 text-xs text-white/60">Урок №{lesson.lesson_no}</p>
@@ -161,7 +173,12 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
             {stages.map((stage: LessonStageWithProgress) => {
               const isDone = stage.is_completed || stage.progress?.is_completed;
               return (
-                <div key={stage.id} className="relative z-10 flex flex-col items-center gap-2">
+                <button
+                  key={stage.id}
+                  type="button"
+                  onClick={() => setReviewStage(stage)}
+                  className="relative z-10 flex flex-col items-center gap-2"
+                >
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-4 transition-transform duration-300 hover:scale-105 ${
                       isDone
@@ -182,7 +199,7 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
                   >
                     {stage.title}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -209,9 +226,12 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
             {lesson.materials.map((m) => {
               const url = materialUrls[m.id];
               return (
-                <div
+                <button
                   key={m.id}
-                  className="group flex items-center gap-3 rounded-2xl border border-white bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  type="button"
+                  disabled={!url}
+                  onClick={() => url && setViewerMaterial({ url, title: m.title, fileName: m.file_original_name })}
+                  className="group flex items-center gap-3 rounded-2xl border border-white bg-white/70 p-4 text-left shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                     <FileText className="h-4 w-4" />
@@ -223,22 +243,54 @@ export function LessonView({ lesson, materialUrls, studentId }: Props) {
                     )}
                   </div>
                   {url && (
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                      title="Скачать"
+                    <span
+                      className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600"
+                      title="Открыть"
                     >
-                      <Download className="h-4 w-4" />
-                    </a>
+                      <Eye className="h-4 w-4" />
+                    </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Homework created from this lesson, if any */}
+      {linkedHomework.length > 0 && (
+        <div className="anim-fade-up anim-delay-2">
+          <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-gray-500">
+            Задание по этому уроку
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {linkedHomework.map((hw) => (
+              <Link
+                key={hw.id}
+                href={`/homework/${hw.id}`}
+                className="group flex items-center gap-3 rounded-2xl border border-white bg-white/70 p-4 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                  <ClipboardList className="h-4 w-4" />
+                </div>
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold">{hw.title}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {reviewStage && studentId && (
+        <StudentStageReviewModal stage={reviewStage} studentId={studentId} onClose={() => setReviewStage(null)} />
+      )}
+      {viewerMaterial && (
+        <FileViewerModal
+          url={viewerMaterial.url}
+          title={viewerMaterial.title}
+          fileName={viewerMaterial.fileName}
+          onClose={() => setViewerMaterial(null)}
+        />
+      )}
     </div>
   );
 }
