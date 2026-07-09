@@ -445,12 +445,10 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
       hintMimeType={hw.hint_mime_type}
     />
   );
-  // HomeworkHintPanel is fixed right-4 w-[300px] (lg+ only) — reserve just
-  // enough width (300 + 16 offset + small buffer) so nothing renders under
-  // it. No page-level px here: dashboard's own content sits flush against
-  // AppShell's mx-auto max-w-[1600px] boundary with zero extra padding, so
-  // matching that convention avoids stacking a second margin on top of it.
-  const hintPad = hw.hint_storage_path ? "lg:pr-[320px]" : "";
+  // HomeworkHintPanel is fixed/z-40 — it already floats above normal-flow
+  // content, so no padding reservation is needed: content fills the full
+  // width and the panel overlays its right edge (its own narrow-tab/expand
+  // interaction is unaffected either way).
 
   // Programming homework → dedicated two-column pseudo-IDE page.
   if (hw.content_type === "programming") {
@@ -473,7 +471,7 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   }
 
   return (
-    <div className={`py-6 ${hintPad}`}>
+    <div className="py-6">
       {hintPanel}
       <button
         type="button"

@@ -94,16 +94,12 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const runLabel = running
     ? (lang === "python" && !pyodideReady() ? dc.runFirst : lang === "cpp" ? dc.runningCpp : t.running)
     : t.run;
-  // HomeworkHintPanel is fixed right-4 w-[300px] (lg+ only) — reserve just
-  // enough width (300 + 16 offset + small buffer) so the editor column
-  // doesn't render under it. No page-level px here: dashboard's own content
-  // sits flush against AppShell's mx-auto max-w-[1600px] boundary with zero
-  // extra padding, so matching that convention avoids stacking a second
-  // margin on top of it.
-  const hintPad = hw.hint_storage_path ? "lg:pr-[320px]" : "";
+  // HomeworkHintPanel is fixed/z-40 — it already floats above normal-flow
+  // content, so no padding reservation is needed: the editor column fills
+  // the full width and the panel overlays its right edge.
 
   return (
-    <div className={`py-6 ${hintPad}`}>
+    <div className="py-6">
       <button onClick={() => router.back()} className="mb-5 flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-800">
         <ArrowLeft size={16} /> {d.common.back}
       </button>

@@ -414,15 +414,12 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
   const dueLabel = hw.due_date
     ? new Date(hw.due_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent" })
     : null;
-  // HomeworkHintPanel is fixed right-4 w-[300px] (lg+ only) — reserve just
-  // enough width (300 + 16 offset + small buffer) so nothing renders under
-  // it. No page-level px here: dashboard's own content sits flush against
-  // AppShell's mx-auto max-w-[1600px] boundary with zero extra padding, so
-  // matching that convention avoids stacking a second margin on top of it.
-  const hintPad = hw.hint_storage_path ? "lg:pr-[320px]" : "";
+  // HomeworkHintPanel is fixed/z-40 — it already floats above normal-flow
+  // content, so no padding reservation is needed: content fills the full
+  // width and the panel overlays its right edge.
 
   return (
-    <div className={`py-6 ${hintPad}`}>
+    <div className="py-6">
       <button
         type="button"
         onClick={() => router.back()}
