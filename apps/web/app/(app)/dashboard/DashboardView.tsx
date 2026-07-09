@@ -414,9 +414,10 @@ export function DashboardView({
                 const isPast = !isNow && !isNext && now !== null && !!end && now > end;
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
-                  <div
+                  <Link
                     key={lesson.id}
-                    className="flex items-center gap-2.5 rounded-2xl p-2.5 transition"
+                    href={`/lessons/${lesson.id}`}
+                    className="flex items-center gap-2.5 rounded-2xl p-2.5 transition hover:bg-[#F7F5FF]"
                     style={{ background: isNow ? "#F4F0FF" : undefined, opacity: isPast ? 0.6 : 1 }}
                   >
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tileColor }} />
@@ -449,7 +450,7 @@ export function DashboardView({
                         {t.finished}
                       </span>
                     ) : null}
-                  </div>
+                  </Link>
                 );
               })}
 
