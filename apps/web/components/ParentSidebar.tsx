@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -27,6 +27,12 @@ import { createClient } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "parent_sidebar_collapsed";
+
+// Runs before the browser paints (unlike useEffect, which runs after) so the
+// persisted collapsed state applies on the very first frame — otherwise the
+// sidebar briefly renders expanded with the "collapse" icon, then visibly
+// animates to collapsed with the "expand" icon on every load.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface SidebarItem {
   key: string;
@@ -56,12 +62,14 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
   const [unreadThreads, setUnreadThreads] = useState(0);
   const [myUserId, setMyUserId] = useState<string | null>(null);
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     setMounted(true);
     try {
       if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);
     } catch { /* blocked */ }
+  }, []);
 
+  useEffect(() => {
     const db = createClient();
     db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
     getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);

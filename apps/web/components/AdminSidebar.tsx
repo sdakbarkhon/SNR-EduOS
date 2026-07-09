@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +16,12 @@ import { Logo } from "./Logo";
 
 const STORAGE_KEY = "admin_sidebar_collapsed";
 
+// Runs before the browser paints (unlike useEffect, which runs after) so the
+// persisted collapsed state applies on the very first frame — otherwise the
+// sidebar briefly renders expanded with the "collapse" icon, then visibly
+// animates to collapsed with the "expand" icon on every load.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export function AdminSidebar() {
   const pathname = usePathname();
   const { locale } = useLocale();
@@ -25,7 +31,7 @@ export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     setMounted(true);
     try {
       if (localStorage.getItem(STORAGE_KEY) === "true") setCollapsed(true);

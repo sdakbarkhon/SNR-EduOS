@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -17,6 +17,12 @@ import { createClient } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "teacher_sidebar_collapsed";
+
+// Runs before the browser paints (unlike useEffect, which runs after) so the
+// persisted/tablet-default collapsed state applies on the very first frame —
+// otherwise the sidebar briefly renders expanded with the "collapse" icon,
+// then visibly animates to collapsed with the "expand" icon on every load.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const teacherNavItems = [
   { key: "home",       href: "/teacher/dashboard",    icon: Home,          label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
@@ -47,7 +53,7 @@ export function TeacherSidebar() {
   const [unreadThreads, setUnreadThreads] = useState(0);
   const [myUserId, setMyUserId] = useState<string | null>(null);
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     setMounted(true);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -57,7 +63,9 @@ export function TeacherSidebar() {
       // (md-lg, roughly 768-1023px), matching StudentSidebar's behavior.
       else if (window.innerWidth < 1024) setCollapsed(true);
     } catch { /* blocked */ }
+  }, []);
 
+  useEffect(() => {
     const db = createClient();
     db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
     getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);

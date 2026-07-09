@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, Trophy, CircleDot, MessageCircle, type LucideIcon } from "lucide-react";
@@ -68,6 +68,12 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }
 
+// Runs before the browser paints (unlike useEffect, which runs after) so the
+// persisted/tablet-default collapsed state applies on the very first frame —
+// otherwise the sidebar briefly renders expanded with the "collapse" icon,
+// then visibly animates to collapsed with the "expand" icon on every load.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export function StudentSidebar() {
   const pathname = usePathname();
   const { locale } = useLocale();
@@ -80,7 +86,7 @@ export function StudentSidebar() {
   const [unreadThreads, setUnreadThreads] = useState(0);
   const [myUserId, setMyUserId] = useState<string | null>(null);
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     setMounted(true);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -92,7 +98,9 @@ export function StudentSidebar() {
       // existing expanded default.
       else if (window.innerWidth < 1024) setCollapsed(true);
     } catch { /* blocked */ }
+  }, []);
 
+  useEffect(() => {
     const db = createClient();
     Promise.all([getHomework(db), getMySubmissions(db)])
       .then(([homework, submissions]) => {
