@@ -490,7 +490,7 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
               className="mb-1 text-xs font-semibold uppercase tracking-wider"
               style={{ color: style.color }}
             >
-              {style.label} · {hw.group.name}
+              {hw.subjectName ?? style.label} · {hw.group.name}
             </div>
             <h1 className="mb-2 text-xl font-bold text-slate-800">{hw.title}</h1>
             {dueLabel && (

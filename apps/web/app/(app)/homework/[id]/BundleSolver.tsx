@@ -437,7 +437,7 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: style.color }}>
-                {style.label} · {hw.group.name}
+                {hw.subjectName ?? style.label} · {hw.group.name}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-semibold text-brand-blue">
                 <Blocks size={11} /> {d.homework.typeBundle}

@@ -532,6 +532,8 @@ export type HomeworkWithSubmission = {
   hint_storage_path: string | null;   // БОЛЬШОЕ ОБНОВЛЕНИЕ §8 — image/PDF hint, migration 104
   hint_filename: string | null;
   hint_mime_type: string | null;
+  subject_id: string | null;          // migration 107 — real subject, group.subject is a placeholder
+  subjectName: string | null;         // resolved via subject_id → subjects.name, migration 107
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;

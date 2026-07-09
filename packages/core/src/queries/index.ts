@@ -200,7 +200,7 @@ export const getStudentGroupIds = async (db: Db, studentId: string): Promise<str
 export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => {
   let query = db
     .from("homework")
-    .select("*, content_type, external_url, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
+    .select("*, content_type, external_url, source, group:groups!inner(subject, name), subject:subjects(name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .order("due_date", { ascending: true });
 
   if (studentId) {
@@ -234,6 +234,8 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         hint_storage_path: string | null;
         hint_filename: string | null;
         hint_mime_type: string | null;
+        subject_id: string | null;
+        subject: { name: string } | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -243,10 +245,12 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         attachments: (r.attachments ?? []) as HomeworkAttachment[],
         content_type: r.content_type ?? 'file',
         source: r.source ?? 'curriculum',
+        subjectName: r.subject?.name ?? null,
         submission: r.submissions?.[0] ?? null,
         test_submission: r.test_subs?.[0] ?? null,
         submissions: undefined,
         test_subs: undefined,
+        subject: undefined,
       } as HomeworkWithSubmission)),
     );
 };
@@ -256,7 +260,7 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
 export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithSubmission> => {
   const r = await db
     .from("homework")
-    .select("*, content_type, external_url, source, group:groups!inner(subject, name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
+    .select("*, content_type, external_url, source, group:groups!inner(subject, name), subject:subjects(name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .eq("id", id)
     .single()
     .then(unwrap);
@@ -279,6 +283,8 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     hint_storage_path: string | null;
     hint_filename: string | null;
     hint_mime_type: string | null;
+    subject_id: string | null;
+    subject: { name: string } | null;
     created_at: string;
     group: { subject: string; name: string };
     submissions: HomeworkSubmission[];
@@ -289,16 +295,33 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     attachments: (raw.attachments ?? []) as HomeworkAttachment[],
     content_type: raw.content_type ?? 'file',
     source: raw.source ?? 'curriculum',
+    subjectName: raw.subject?.name ?? null,
     submission: raw.submissions?.[0] ?? null,
     test_submission: raw.test_subs?.[0] ?? null,
     submissions: undefined,
     test_subs: undefined,
+    subject: undefined,
   } as HomeworkWithSubmission;
   if (hw.content_type === 'bundle') {
     hw.subtasks = await getHomeworkSubtasks(db, id);
   }
   return hw;
 };
+
+/** Homework rows linked to a specific lesson (homework.lesson_id) — used on
+ *  the completed-lesson review page so a student can jump straight to the
+ *  assignment that came out of that lesson, if one was created. Returns []
+ *  when nothing is linked (most current homework predates this linkage). */
+export const getHomeworkByLessonId = async (
+  db: Db,
+  lessonId: string,
+): Promise<Array<{ id: string; title: string; content_type: ContentType; due_date: string | null }>> =>
+  db
+    .from("homework")
+    .select("id, title, content_type, due_date")
+    .eq("lesson_id", lessonId)
+    .then(unwrap)
+    .then((rows) => rows as unknown as Array<{ id: string; title: string; content_type: ContentType; due_date: string | null }>);
 
 /** Загружает аватар в бакет avatars/<studentId>/avatar.<ext>, возвращает signed URL. */
 export const uploadAvatar = async (
