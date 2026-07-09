@@ -23,15 +23,19 @@ export async function POST(req: NextRequest) {
   const { lessonId } = (await req.json()) as { lessonId?: string };
   if (!lessonId) return NextResponse.json({ error: "lessonId required" }, { status: 400 });
 
-  // Verify this teacher owns the lesson (lessons → group.teacher_id).
+  // Confirm this teacher can access the lesson. No extra teacher_id equality
+  // check — RLS on "lessons" already gates this SELECT on
+  // is_my_teacher_group(group_id) (owner, subject-assigned, or co-teacher
+  // via group_teachers), so a non-null result already proves legitimate
+  // access. A straight groups.teacher_id comparison 403'd every co-teacher/
+  // demo account that isn't the group's single primary owner.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("group:groups!inner(teacher_id)")
+    .select("id")
     .eq("id", lessonId)
     .single();
-  const ownerTeacherId = (lesson?.group as { teacher_id: string } | null)?.teacher_id;
-  if (!lesson || ownerTeacherId !== teacher.id) {
+  if (!lesson) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

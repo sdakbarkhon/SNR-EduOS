@@ -409,7 +409,12 @@ export async function POST(req: NextRequest) {
     .eq("id", body.lesson_id)
     .single();
   const group = lesson?.group as { teacher_id: string; name: string | null; subject: string | null } | null;
-  if (!lesson || !group || group.teacher_id !== teacher.id) {
+  // No extra teacher_id equality check here — RLS on "lessons" already gates
+  // this SELECT on is_my_teacher_group(group_id) (owner, subject-assigned,
+  // or co-teacher via group_teachers), so a non-null result already proves
+  // legitimate access. A straight groups.teacher_id comparison 403'd every
+  // co-teacher/demo account that isn't the group's single primary owner.
+  if (!lesson || !group) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
