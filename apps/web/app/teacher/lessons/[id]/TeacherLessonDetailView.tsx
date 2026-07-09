@@ -562,8 +562,11 @@ function StageModal({
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                   />
                 </div>
-                {/* Theory content source: AI slides vs manual text */}
-                {stageType === "theory" && !isCode && !isExternal && !isQuiz && (
+                {/* Theory content source: AI slides vs manual text — hidden
+                    once a .pptx is attached (Этап 12), since content then
+                    comes from the uploaded file, not from AI slides or the
+                    plain-text description; reappears if the file is removed. */}
+                {stageType === "theory" && !isCode && !isExternal && !isQuiz && !presentationFile && (
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">
                       {d.contentSource.label}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Pencil, ExternalLink } from "lucide-react";
-import { getDictionary, getQuizQuestions, getKahootLeaderboard } from "@snr/core";
+import { getDictionary, getQuizQuestions, getKahootLeaderboard, getMaterialDownloadUrl } from "@snr/core";
 import type { Locale, LessonStage, LessonStatus, QuizQuestion, QuizLeaderboardEntry } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +37,27 @@ export function StageViewModal({
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loadingQuiz, setLoadingQuiz] = useState(isQuizType);
   const [scores, setScores] = useState<QuizLeaderboardEntry[]>([]);
+
+  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 12 — teacher's own read-only preview previously
+  // had no branch at all for a manually-uploaded .pptx (stage.slides is
+  // only populated for AI-generated presentations), so the teacher never
+  // saw their own uploaded file here. Same Office Online embed as the
+  // student-facing LessonWorkspaceView.
+  const presentationFile = (stage.config as { presentation_file?: { storagePath: string; filename: string } } | null)?.presentation_file ?? null;
+  const [presentationUrl, setPresentationUrl] = useState<string | null>(null);
+  const [presentationFailed, setPresentationFailed] = useState(false);
+
+  useEffect(() => {
+    if (!presentationFile) return;
+    let cancelled = false;
+    setPresentationUrl(null);
+    setPresentationFailed(false);
+    getMaterialDownloadUrl(db, presentationFile.storagePath, presentationFile.filename)
+      .then((u) => { if (!cancelled) setPresentationUrl(u); })
+      .catch(() => { if (!cancelled) setPresentationFailed(true); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentationFile?.storagePath, presentationFile?.filename]);
 
   useEffect(() => {
     if (!isQuizType) return;
@@ -112,6 +133,26 @@ export function StageViewModal({
             <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
               <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} />
             </div>
+          )}
+
+          {presentationFile && (
+            presentationFailed ? (
+              <div className="flex h-[50vh] min-h-[360px] items-center justify-center rounded-xl border border-orange-100 bg-orange-50 text-sm text-orange-700">
+                {d.common.error}
+              </div>
+            ) : !presentationUrl ? (
+              <div className="flex h-[50vh] min-h-[360px] items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-sm text-slate-400">
+                {d.common.loading}
+              </div>
+            ) : (
+              <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
+                <iframe
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(presentationUrl)}`}
+                  title={presentationFile.filename}
+                  className="h-full w-full border-0 bg-white"
+                />
+              </div>
+            )
           )}
 
           {stage.content_type === "code" && (

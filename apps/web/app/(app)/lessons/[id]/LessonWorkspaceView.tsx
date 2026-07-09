@@ -59,6 +59,58 @@ function materialIcon(name: string): { Icon: typeof FileText; cls: string } {
   return { Icon: File, cls: "bg-slate-50 text-slate-500" };
 }
 
+// БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 12 — a manually-uploaded .pptx (Этап 3.5/3.6) now
+// renders page-by-page like an AI-generated presentation, via Office
+// Online's own embed viewer (it ships its own slide chrome — forward/back
+// arrows, slide counter) instead of a bare open/download card. Same
+// approach FileViewerModal already uses for Knowledge Base docx/pptx, just
+// inline instead of in a modal. No teacher-driven live sync here (Office's
+// cross-origin embed exposes no API to read/set the current slide) — each
+// viewer navigates independently, unlike SlideViewer's Realtime-synced AI
+// slides.
+function UploadedPresentationEmbed({ storagePath, filename }: { storagePath: string; filename: string }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUrl(null);
+    setFailed(false);
+    getMaterialDownloadUrl(createClient(), storagePath, filename)
+      .then((u) => { if (!cancelled) setUrl(u); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [storagePath, filename]);
+
+  if (failed) {
+    return (
+      <div className="mb-3 flex h-[70vh] min-h-[460px] items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-sm text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
+        {d.common.error}
+      </div>
+    );
+  }
+
+  if (!url) {
+    return (
+      <div className="mb-3 flex h-[70vh] min-h-[460px] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-800/50">
+        {d.common.loading}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 h-[70vh] min-h-[460px] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+      <iframe
+        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`}
+        title={filename}
+        className="h-full w-full border-0 bg-white"
+      />
+    </div>
+  );
+}
+
 // ── Task stub modal ────────────────────────────────────────────────────────────
 function TaskStubModal({
   stage,
@@ -972,29 +1024,10 @@ export function LessonWorkspaceView({
                         />
                       </div>
                     ) : (stage.config as { presentation_file?: { storagePath: string; filename: string; sizeBytes: number } })?.presentation_file ? (
-                      // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.5/3.6 — teacher uploaded a
-                      // .pptx directly instead of generating slides. No
-                      // in-browser page-by-page renderer exists for an
-                      // arbitrary uploaded file (see resheniya.md) — shown
-                      // as an open/download card, same as any Knowledge
-                      // Base file.
-                      <button
-                        onClick={async () => {
-                          const pf = (stage.config as { presentation_file: { storagePath: string; filename: string } }).presentation_file;
-                          const url = await getMaterialDownloadUrl(db, pf.storagePath, pf.filename);
-                          window.open(url, "_blank");
-                        }}
-                        className="mb-3 flex w-full items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-left transition hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10"
-                      >
-                        <ImageIcon className="h-5 w-5 shrink-0 text-orange-600" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-orange-700 dark:text-orange-300">
-                            {(stage.config as { presentation_file: { filename: string } }).presentation_file.filename}
-                          </p>
-                          <p className="text-xs text-orange-600/70">{dl.stageContentPresentation}</p>
-                        </div>
-                        <Download className="h-4 w-4 shrink-0 text-orange-600" />
-                      </button>
+                      <UploadedPresentationEmbed
+                        storagePath={(stage.config as { presentation_file: { storagePath: string; filename: string } }).presentation_file.storagePath}
+                        filename={(stage.config as { presentation_file: { storagePath: string; filename: string } }).presentation_file.filename}
+                      />
                     ) : stage.description ? (
                       <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
                     ) : null
