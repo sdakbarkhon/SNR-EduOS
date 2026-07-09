@@ -1240,6 +1240,7 @@ export type Database = {
           school_id: string
           source: Database["public"]["Enums"]["homework_source"]
           starter_code: string | null
+          subject_id: string | null
           teacher_id: string | null
           test_auto_grade: boolean
           test_duration_seconds: number | null
@@ -1269,6 +1270,7 @@ export type Database = {
           school_id?: string
           source?: Database["public"]["Enums"]["homework_source"]
           starter_code?: string | null
+          subject_id?: string | null
           teacher_id?: string | null
           test_auto_grade?: boolean
           test_duration_seconds?: number | null
@@ -1298,6 +1300,7 @@ export type Database = {
           school_id?: string
           source?: Database["public"]["Enums"]["homework_source"]
           starter_code?: string | null
+          subject_id?: string | null
           teacher_id?: string | null
           test_auto_grade?: boolean
           test_duration_seconds?: number | null
@@ -1319,6 +1322,13 @@ export type Database = {
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "homework_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
           {

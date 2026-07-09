@@ -930,6 +930,7 @@ export interface Dictionary {
     download: string;
     linkLesson: string;     // "К какому уроку (опционально)"
     noLesson: string;       // "Не привязывать к уроку"
+    selectSubjectFirst: string; // "Сначала выберите предмет"
     // Teacher lesson editor (migration 24)
     titleLabel: string;
     titlePlaceholder: string;

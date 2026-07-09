@@ -16,7 +16,7 @@ import {
   linkedMaterialAttachmentPath,
   linkedBookAttachmentPath,
 } from "@snr/core";
-import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage } from "@snr/core";
+import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage, SubjectWithGroup } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch } from "lucide-react";
@@ -37,10 +37,11 @@ interface Subtask { type: HomeworkSubtaskType; title: string; description: strin
 
 interface Props {
   groups: Array<{ id: string; name: string; subject: string }>;
+  subjects: SubjectWithGroup[];
   teacherId: string;
 }
 
-export function CreateHomeworkForm({ groups, teacherId }: Props) {
+export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const router = useRouter();
@@ -60,10 +61,11 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
+  const [subjectId, setSubjectId] = useState<string>("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [lessonId, setLessonId] = useState<string>("");
   const [lessonsForGroup, setLessonsForGroup] = useState<
-    Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectName: string | null }>
+    Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectId: string | null; subjectName: string | null }>
   >([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 8.1 — hint image/PDF, independent of format
@@ -85,10 +87,17 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   useEffect(() => {
     if (!groupId) return;
     setLessonId("");
+    setSubjectId("");
     getTeacherLessonsForGroup(supabase, groupId)
       .then(setLessonsForGroup)
       .catch(() => setLessonsForGroup([]));
   }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A previously-picked lesson may belong to a different subject than the
+  // newly picked one — drop it rather than silently keep a mismatched link.
+  useEffect(() => {
+    setLessonId("");
+  }, [subjectId]);
 
   const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -198,6 +207,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
       setExternalUrlError(null);
     }
     if (!groupId) { setError("Выберите группу"); return; }
+    if (!subjectId) { setError(d.lesson.createSelectSubject); return; }
     if (!deadline) { setError("Укажите дедлайн"); return; }
 
     // teacherId may be "" if getMyTeacher failed at page load — fetch from auth as fallback
@@ -219,6 +229,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
         contentType: format,
         teacherId: resolvedTeacherId,
         lessonId: lessonId || null,
+        subjectId: subjectId || null,
         status,
         testDurationSeconds: format === "test" ? testDuration * 60 : null,
         testAutoGrade: format === "test" ? autoGrade : true,
@@ -279,11 +290,16 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
   }
 
   const isExternal = isExternalService(format);
+  const subjectsForGroup = subjects.filter((s) => s.group_id === groupId);
+  const lessonsForSubject = lessonsForGroup.filter((l) => !subjectId || l.subjectId === subjectId);
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — external-service options filtered by the
-  // linked lesson's subject, when one is picked; standalone homework (no
-  // lessonId) shows every service, same as before this change.
-  const linkedLessonSubject = lessonsForGroup.find((l) => l.id === lessonId)?.subjectName ?? null;
-  const allowedServiceOrder = EXTERNAL_SERVICE_ORDER.filter((key) => getServicesForSubject(linkedLessonSubject).includes(key));
+  // selected subject; falls back to the linked lesson's subject for the rare
+  // case a lesson is picked without an explicit subject (shouldn't happen
+  // now that subject is required, kept for standalone/legacy safety).
+  const selectedSubjectName = subjects.find((s) => s.id === subjectId)?.name
+    ?? lessonsForGroup.find((l) => l.id === lessonId)?.subjectName
+    ?? null;
+  const allowedServiceOrder = EXTERNAL_SERVICE_ORDER.filter((key) => getServicesForSubject(selectedSubjectName).includes(key));
   const TYPE_TABS: Array<{ key: Format; label: string; Icon: typeof FileText }> = [
     { key: "file", label: d.homework.typeFile, Icon: FileText },
     { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
@@ -344,7 +360,7 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
 
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"
         style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formName}</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)}
@@ -356,6 +372,20 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
               className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formSubject}</span>
+            {subjectsForGroup.length === 0 ? (
+              <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-700">
+                {d.lesson.createNoSubjects}
+              </p>
+            ) : (
+              <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}
+                className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
+                <option value="">{d.lesson.createSelectSubject}</option>
+                {subjectsForGroup.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
           </label>
         </div>
         <label className="flex flex-col gap-1.5">
@@ -369,35 +399,42 @@ export function CreateHomeworkForm({ groups, teacherId }: Props) {
             className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none" />
         </label>
 
-        {/* Lesson selector */}
-        {lessonsForGroup.length > 0 && (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-brand-ink-muted">
-              {d.lesson.linkLesson}
-            </span>
-            <select
-              value={lessonId}
-              onChange={(e) => setLessonId(e.target.value)}
-              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none"
-            >
-              <option value="">{d.lesson.noLesson}</option>
-              {lessonsForGroup.map((l) => {
-                const dateStr = new Date(l.starts_at).toLocaleDateString("ru-RU", {
-                  day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Tashkent",
-                });
-                const topic = l.title ?? l.topic;
-                const label = topic
-                  ? `${dateStr} · ${topic}`
-                  : l.lesson_no
-                  ? `${dateStr} · Урок №${l.lesson_no}`
-                  : dateStr;
-                return (
-                  <option key={l.id} value={l.id}>{label}</option>
-                );
-              })}
-            </select>
-          </label>
-        )}
+        {/* Lesson selector — filtered to the selected subject's lessons;
+            disabled until a subject is chosen (a subject-less list would be
+            the unfiltered "каша" this was built to fix). */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-brand-ink-muted">
+            {d.lesson.linkLesson}
+          </span>
+          <select
+            value={lessonId}
+            onChange={(e) => setLessonId(e.target.value)}
+            disabled={!subjectId}
+            className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {!subjectId ? (
+              <option value="">{d.lesson.selectSubjectFirst}</option>
+            ) : (
+              <>
+                <option value="">{d.lesson.noLesson}</option>
+                {lessonsForSubject.map((l) => {
+                  const dateStr = new Date(l.starts_at).toLocaleDateString("ru-RU", {
+                    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Tashkent",
+                  });
+                  const topic = l.title ?? l.topic;
+                  const label = topic
+                    ? `${dateStr} · ${topic}`
+                    : l.lesson_no
+                    ? `${dateStr} · Урок №${l.lesson_no}`
+                    : dateStr;
+                  return (
+                    <option key={l.id} value={l.id}>{label}</option>
+                  );
+                })}
+              </>
+            )}
+          </select>
+        </label>
 
         {/* Подсказка (§8.1) — независима от типа ДЗ, всегда доступна */}
         <div>

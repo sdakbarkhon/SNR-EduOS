@@ -979,6 +979,7 @@ export const createTeacherHomework = async (
     contentType: ContentType;
     teacherId: string;
     lessonId?: string | null;
+    subjectId?: string | null;
     status?: "draft" | "published";
     testDurationSeconds?: number | null;
     testAutoGrade?: boolean;
@@ -1005,6 +1006,7 @@ export const createTeacherHomework = async (
       source: "teacher",
       teacher_id: input.teacherId,
       lesson_id: input.lessonId ?? null,
+      subject_id: input.subjectId ?? null,
       test_duration_seconds: input.contentType === "test" ? (input.testDurationSeconds ?? null) : null,
       test_auto_grade: input.contentType === "test" ? (input.testAutoGrade ?? true) : true,
       programming_language: isProg ? (input.programmingLanguage ?? null) : null,
@@ -1535,16 +1537,16 @@ export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDet
 export const getTeacherLessonsForGroup = async (
   db: Db,
   groupId: string,
-): Promise<Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectName: string | null }>> => {
+): Promise<Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subjectId: string | null; subjectName: string | null }>> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
     .from("lessons")
-    .select("id, starts_at, topic, title, lesson_no, subject:subjects(name)")
+    .select("id, starts_at, topic, title, lesson_no, subject_id, subject:subjects(name)")
     .eq("group_id", groupId)
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return ((data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject: { name: string } | null }>)
-    .map((r) => ({ id: r.id, starts_at: r.starts_at, topic: r.topic, title: r.title, lesson_no: r.lesson_no, subjectName: r.subject?.name ?? null }));
+  return ((data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject_id: string | null; subject: { name: string } | null }>)
+    .map((r) => ({ id: r.id, starts_at: r.starts_at, topic: r.topic, title: r.title, lesson_no: r.lesson_no, subjectId: r.subject_id, subjectName: r.subject?.name ?? null }));
 };
 
 // ─── LESSON MODULE (migration 24 → 35) ───────────────────────────────────────

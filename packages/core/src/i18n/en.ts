@@ -930,6 +930,7 @@ export const en: Dictionary = {
     download: "Download",
     linkLesson: "Link to lesson (optional)",
     noLesson: "No lesson link",
+    selectSubjectFirst: "Select a subject first",
     titleLabel: "Lesson title",
     titlePlaceholder: "E.g. Loops in Python",
     descLabel: "Description / goal",

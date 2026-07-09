@@ -930,6 +930,7 @@ export const uz: Dictionary = {
     download: "Yuklab olish",
     linkLesson: "Qaysi darsga (ixtiyoriy)",
     noLesson: "Darsga bog'lamaslik",
+    selectSubjectFirst: "Avval fanni tanlang",
     titleLabel: "Dars nomi",
     titlePlaceholder: "Masalan: Pythonda sikllar",
     descLabel: "Tavsif / maqsad",

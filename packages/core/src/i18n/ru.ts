@@ -930,6 +930,7 @@ export const ru: Dictionary = {
     download: "Скачать",
     linkLesson: "К какому уроку (опционально)",
     noLesson: "Не привязывать к уроку",
+    selectSubjectFirst: "Сначала выберите предмет",
     titleLabel: "Название урока",
     titlePlaceholder: "Например: Циклы в Python",
     descLabel: "Описание / цель",
