@@ -1083,6 +1083,41 @@ export const createTestQuestions = async (
   }
 };
 
+// PROMT 3 (rework) — с миграции 109 все 5 предметных учителей состоят в
+// group_teachers всех 3 групп (нужно для RLS-доступа к самим группам), но
+// каждый должен видеть в расписании ТОЛЬКО СВОЙ предмет — teacher_karim
+// (subject_slug=NULL, куратор) продолжает видеть всё. RLS остаётся
+// group-based (не меняем — иначе сломается доступ karim), фильтр по
+// предмету — здесь, в query-слое.
+type TeacherSubjectFilter = { teacherId: string; subjectIds: string[] | null };
+
+/** null subjectIds = куратор (subject_slug=NULL) — фильтр не нужен. */
+async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: userRes } = await db.auth.getUser();
+  const userId = userRes?.user?.id;
+  if (!userId) return null;
+  const { data: teacher } = await db2
+    .from("teachers")
+    .select("id, subject_slug")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!teacher) return null;
+  if (!teacher.subject_slug) return { teacherId: teacher.id, subjectIds: null };
+  const { data: subjects } = await db2.from("subjects").select("id").eq("teacher_id", teacher.id);
+  return { teacherId: teacher.id, subjectIds: ((subjects ?? []) as Array<{ id: string }>).map((s) => s.id) };
+}
+
+function filterBySubject<T extends { subject_id?: string | null }>(
+  rows: T[],
+  filter: TeacherSubjectFilter | null,
+): T[] {
+  if (!filter || filter.subjectIds === null) return rows;
+  const ids = new Set(filter.subjectIds);
+  return rows.filter((r) => r.subject_id != null && ids.has(r.subject_id));
+}
+
 /** Уроки учителя на сегодня (локальная дата). */
 export const getTeacherTodayLessons = async (db: Db) => {
   const todayStart = new Date();
@@ -1096,7 +1131,8 @@ export const getTeacherTodayLessons = async (db: Db) => {
     .lte("starts_at", todayEnd.toISOString())
     .order("starts_at");
   if (error) throw error;
-  return data ?? [];
+  const filter = await getTeacherSubjectFilter(db);
+  return filterBySubject((data ?? []) as Array<{ subject_id?: string | null }>, filter);
 };
 
 /** Последние сдачи ДЗ в группах учителя (для activity feed). */
@@ -1567,8 +1603,12 @@ export const getTeacherLessonsForGroup = async (
     .eq("group_id", groupId)
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return ((data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject_id: string | null; subject: { name: string } | null }>)
-    .map((r) => ({ id: r.id, starts_at: r.starts_at, topic: r.topic, title: r.title, lesson_no: r.lesson_no, subjectId: r.subject_id, subjectName: r.subject?.name ?? null }));
+  const filter = await getTeacherSubjectFilter(db);
+  const rows = filterBySubject(
+    (data ?? []) as Array<{ id: string; starts_at: string; topic: string | null; title: string | null; lesson_no: number | null; subject_id: string | null; subject: { name: string } | null }>,
+    filter,
+  );
+  return rows.map((r) => ({ id: r.id, starts_at: r.starts_at, topic: r.topic, title: r.title, lesson_no: r.lesson_no, subjectId: r.subject_id, subjectName: r.subject?.name ?? null }));
 };
 
 // ─── LESSON MODULE (migration 24 → 35) ───────────────────────────────────────
@@ -2692,6 +2732,7 @@ type TeacherLessonListItem = {
   id: string; group_id: string; lesson_no: number | null; topic: string | null;
   title: string | null; starts_at: string; ends_at: string | null; room: string | null;
   status: string; started_at: string | null; ended_at: string | null; is_demo: boolean;
+  subject_id: string | null;
   group: { id: string; name: string; subject: string };
 };
 
@@ -2699,10 +2740,11 @@ type TeacherLessonListItem = {
 export const getTeacherAllLessons = async (db: Db): Promise<TeacherLessonListItem[]> => {
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, is_demo, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, is_demo, subject_id, group:groups!inner(id, name, subject)")
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as TeacherLessonListItem[];
+  const filter = await getTeacherSubjectFilter(db);
+  return filterBySubject((data ?? []) as unknown as TeacherLessonListItem[], filter);
 };
 
 /** Уроки в группах учителя за конкретный месяц (year/month — 1-based). */
@@ -2715,12 +2757,13 @@ export const getTeacherLessonsByMonth = async (
   const end = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, is_demo, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, is_demo, subject_id, group:groups!inner(id, name, subject)")
     .gte("starts_at", start)
     .lte("starts_at", end)
     .order("starts_at");
   if (error) throw error;
-  return (data ?? []) as unknown as TeacherLessonListItem[];
+  const filter = await getTeacherSubjectFilter(db);
+  return filterBySubject((data ?? []) as unknown as TeacherLessonListItem[], filter);
 };
 
 /** Переводит урок в статус 'in_progress', отмечает этап Старт выполненным. */
