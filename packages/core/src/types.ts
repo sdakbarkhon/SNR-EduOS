@@ -538,6 +538,8 @@ export type HomeworkWithSubmission = {
   hint_mime_type: string | null;
   subject_id: string | null;          // migration 107 — real subject, group.subject is a placeholder
   subjectName: string | null;         // resolved via subject_id → subjects.name, migration 107
+  subjectIcon: string | null;         // resolved via subject_id → subjects.icon
+  subjectColor: string | null;        // resolved via subject_id → subjects.color
   group: { subject: string; name: string };
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;

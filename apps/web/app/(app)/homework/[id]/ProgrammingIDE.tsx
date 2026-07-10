@@ -10,7 +10,8 @@ import {
   type HomeworkWithSubmission, type Locale,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
-import { GlassCard, SubjectIcon, useLocale } from "@/components";
+import { GlassCard, useLocale } from "@/components";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS, isHtmlLanguage } from "@/lib/code-languages";
 import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
@@ -23,7 +24,12 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const t = d.homework.programming;
   const dc = d.lesson.code;
   const sb = createClient();
-  const style = getSubjectStyle(hw.group.subject);
+  // subject_id (migration 107) is the real subject; group.subject is a legacy
+  // placeholder ("programming" for every group) — fall back to it only when
+  // subject_id is null (pre-migration rows).
+  const fallbackStyle = getSubjectStyle(hw.group.subject);
+  const subjectLabel = hw.subjectName ?? fallbackStyle.label;
+  const subjectColor = hw.subjectColor ?? fallbackStyle.color;
   const lang = hw.programming_language ?? "python";
 
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -109,11 +115,11 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
         <div className="space-y-4">
           <GlassCard className="p-5">
             <div className="flex items-start gap-4">
-              <SubjectIcon subject={hw.group.subject} size={48} />
+              <LessonSubjectIcon icon={hw.subjectIcon ?? undefined} color={subjectColor} size={48} />
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: style.color }}>
-                    {hw.subjectName ?? style.label} · {hw.group.name}
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: subjectColor }}>
+                    {subjectLabel} · {hw.group.name}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                     <Code2 size={11} /> {d.homework.typeProgramming}

@@ -14,7 +14,8 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
-import { GlassCard, SubjectIcon, useLocale } from "@/components";
+import { GlassCard, useLocale } from "@/components";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
@@ -426,8 +427,12 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const [resubmitMode, setResubmitMode] = useState(false);
-  const subj = hw.group.subject;
-  const style = getSubjectStyle(subj);
+  // subject_id (migration 107) is the real subject; group.subject is a legacy
+  // placeholder ("programming" for every group) — fall back to it only when
+  // subject_id is null (pre-migration rows).
+  const fallbackStyle = getSubjectStyle(hw.group.subject);
+  const subjectLabel = hw.subjectName ?? fallbackStyle.label;
+  const subjectColor = hw.subjectColor ?? fallbackStyle.color;
 
   const dueLabel = hw.due_date
     ? new Date(hw.due_date).toLocaleDateString("ru-RU", {
@@ -485,13 +490,13 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
       {/* Header */}
       <GlassCard className="mb-4 p-5">
         <div className="flex items-start gap-4">
-          <SubjectIcon subject={subj} size={48} />
+          <LessonSubjectIcon icon={hw.subjectIcon ?? undefined} color={subjectColor} size={48} />
           <div className="min-w-0 flex-1">
             <div
               className="mb-1 text-xs font-semibold uppercase tracking-wider"
-              style={{ color: style.color }}
+              style={{ color: subjectColor }}
             >
-              {hw.subjectName ?? style.label} · {hw.group.name}
+              {subjectLabel} · {hw.group.name}
             </div>
             <h1 className="mb-2 text-xl font-bold text-slate-800">{hw.title}</h1>
             {dueLabel && (

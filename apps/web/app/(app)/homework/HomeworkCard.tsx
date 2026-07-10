@@ -12,7 +12,8 @@ import {
   type Locale,
 } from "@snr/core";
 import { cn } from "@/lib/cn";
-import { SubjectIcon, useLocale } from "@/components";
+import { useLocale } from "@/components";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { EXTERNAL_SERVICE_ORDER, SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
 
 const TYPE_STYLE: Record<ContentType, { bg: string; text: string; Icon: LucideIcon }> = {
@@ -30,8 +31,12 @@ const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-U
 export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const subj = hw.group.subject;
-  const style = getSubjectStyle(subj);
+  // subject_id (migration 107) is the real source of truth; group.subject is a
+  // legacy placeholder ("programming" for every group) — fall back to it only
+  // for the handful of pre-migration rows that still have no subject_id.
+  const fallbackStyle = getSubjectStyle(hw.group.subject);
+  const subjectLabel = hw.subjectName ?? fallbackStyle.label;
+  const subjectColor = hw.subjectColor ?? fallbackStyle.color;
 
   const cat = homeworkCategory(hw, hw.submission);
   const urgency = deadlineUrgency(hw.due_date);
@@ -82,12 +87,12 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
     <Link
       href={`/homework/${hw.id}`}
       className="group flex flex-col gap-2.5 min-h-[158px] rounded-[20px] border border-slate-100 p-4 shadow-[0_2px_10px_rgba(24,20,50,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(24,20,50,0.10)] hover:border-slate-200"
-      style={{ background: `linear-gradient(180deg, ${style.color}1A 0%, #ffffff 44%)` }}
+      style={{ background: `linear-gradient(180deg, ${subjectColor}1A 0%, #ffffff 44%)` }}
     >
       <div className="flex items-center gap-2.5">
-        <SubjectIcon subject={subj} size={32} />
-        <span className="text-[13.5px] font-bold truncate" style={{ color: style.color }}>
-          {style.label}
+        <LessonSubjectIcon icon={hw.subjectIcon ?? undefined} color={subjectColor} size={32} />
+        <span className="text-[13.5px] font-bold truncate" style={{ color: subjectColor }}>
+          {subjectLabel}
         </span>
       </div>
 

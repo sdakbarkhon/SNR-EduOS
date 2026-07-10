@@ -200,7 +200,7 @@ export const getStudentGroupIds = async (db: Db, studentId: string): Promise<str
 export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => {
   let query = db
     .from("homework")
-    .select("*, content_type, external_url, source, group:groups!inner(subject, name), subject:subjects(name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
+    .select("*, content_type, external_url, source, group:groups!inner(subject, name), subject:subjects(name, icon, color), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .order("due_date", { ascending: true });
 
   if (studentId) {
@@ -235,7 +235,7 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         hint_filename: string | null;
         hint_mime_type: string | null;
         subject_id: string | null;
-        subject: { name: string } | null;
+        subject: { name: string; icon: string; color: string } | null;
         created_at: string;
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
@@ -246,6 +246,8 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         content_type: r.content_type ?? 'file',
         source: r.source ?? 'curriculum',
         subjectName: r.subject?.name ?? null,
+        subjectIcon: r.subject?.icon ?? null,
+        subjectColor: r.subject?.color ?? null,
         submission: r.submissions?.[0] ?? null,
         test_submission: r.test_subs?.[0] ?? null,
         submissions: undefined,
@@ -260,7 +262,7 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
 export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithSubmission> => {
   const r = await db
     .from("homework")
-    .select("*, content_type, external_url, source, group:groups!inner(subject, name), subject:subjects(name), submissions:homework_submissions(*), test_subs:test_submissions(*)")
+    .select("*, content_type, external_url, source, group:groups!inner(subject, name), subject:subjects(name, icon, color), submissions:homework_submissions(*), test_subs:test_submissions(*)")
     .eq("id", id)
     .single()
     .then(unwrap);
@@ -284,7 +286,7 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     hint_filename: string | null;
     hint_mime_type: string | null;
     subject_id: string | null;
-    subject: { name: string } | null;
+    subject: { name: string; icon: string; color: string } | null;
     created_at: string;
     group: { subject: string; name: string };
     submissions: HomeworkSubmission[];
@@ -296,6 +298,8 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     content_type: raw.content_type ?? 'file',
     source: raw.source ?? 'curriculum',
     subjectName: raw.subject?.name ?? null,
+    subjectIcon: raw.subject?.icon ?? null,
+    subjectColor: raw.subject?.color ?? null,
     submission: raw.submissions?.[0] ?? null,
     test_submission: raw.test_subs?.[0] ?? null,
     submissions: undefined,

@@ -21,7 +21,8 @@ import {
   type Locale,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
-import { GlassCard, Modal, SubjectIcon, useLocale } from "@/components";
+import { GlassCard, Modal, useLocale } from "@/components";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
@@ -307,7 +308,12 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const bd = d.homework.bundle;
-  const style = getSubjectStyle(hw.group.subject);
+  // subject_id (migration 107) is the real subject; group.subject is a legacy
+  // placeholder ("programming" for every group) — fall back to it only when
+  // subject_id is null (pre-migration rows).
+  const fallbackStyle = getSubjectStyle(hw.group.subject);
+  const subjectLabel = hw.subjectName ?? fallbackStyle.label;
+  const subjectColor = hw.subjectColor ?? fallbackStyle.color;
   const subtasks = hw.subtasks ?? [];
 
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -432,11 +438,11 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
       {/* Header */}
       <GlassCard className="mb-4 p-5">
         <div className="flex items-start gap-4">
-          <SubjectIcon subject={hw.group.subject} size={48} />
+          <LessonSubjectIcon icon={hw.subjectIcon ?? undefined} color={subjectColor} size={48} />
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: style.color }}>
-                {hw.subjectName ?? style.label} · {hw.group.name}
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: subjectColor }}>
+                {subjectLabel} · {hw.group.name}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-semibold text-brand-blue">
                 <Blocks size={11} /> {d.homework.typeBundle}

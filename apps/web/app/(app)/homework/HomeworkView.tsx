@@ -22,7 +22,8 @@ import {
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { SubjectIcon, useLocale, useToast } from "@/components";
+import { useLocale, useToast } from "@/components";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { HomeworkStatsDonut } from "./HomeworkStatsDonut";
 import { HomeworkHero } from "./HomeworkHero";
 import { HomeworkCalendarCard } from "./HomeworkCalendarCard";
@@ -49,6 +50,20 @@ function cmpDue(a: HomeworkWithSubmission, b: HomeworkWithSubmission): number {
   return a.due_date.localeCompare(b.due_date);
 }
 
+// subject_id (migration 107) is the real subject; group.subject is a legacy
+// placeholder ("programming" for every group) kept only as a fallback key
+// for the handful of pre-migration rows that still have no subject_id.
+function subjectKeyOf(hw: HomeworkWithSubmission): string {
+  return hw.subject_id ?? hw.group.subject;
+}
+function subjectStyleOf(hw: HomeworkWithSubmission): { label: string; color: string; icon?: string } {
+  if (hw.subject_id && hw.subjectName) {
+    return { label: hw.subjectName, color: hw.subjectColor ?? "#64748b", icon: hw.subjectIcon ?? undefined };
+  }
+  const fallback = getSubjectStyle(hw.group.subject);
+  return { label: fallback.label, color: fallback.color, icon: undefined };
+}
+
 export function HomeworkView({
   initialRows,
   initialSubject = "all",
@@ -71,15 +86,23 @@ export function HomeworkView({
 
   const counts = useMemo(() => homeworkCounts(rows), [rows]);
 
+  const subjectStyles = useMemo(() => {
+    const map = new Map<string, { label: string; color: string; icon?: string }>();
+    rows.forEach((r) => map.set(subjectKeyOf(r), subjectStyleOf(r)));
+    return map;
+  }, [rows]);
+
   const subjectKeys = useMemo(() => {
     const seen = new Set<string>();
-    rows.forEach((r) => seen.add(r.group.subject));
-    return Array.from(seen).sort((a, b) => getSubjectStyle(a).label.localeCompare(getSubjectStyle(b).label, "ru"));
-  }, [rows]);
+    rows.forEach((r) => seen.add(subjectKeyOf(r)));
+    return Array.from(seen).sort((a, b) =>
+      (subjectStyles.get(a)?.label ?? "").localeCompare(subjectStyles.get(b)?.label ?? "", "ru"),
+    );
+  }, [rows, subjectStyles]);
 
   const filtered = useMemo(() => {
     let items = rows;
-    if (subjectFilter !== "all") items = items.filter((r) => r.group.subject === subjectFilter);
+    if (subjectFilter !== "all") items = items.filter((r) => subjectKeyOf(r) === subjectFilter);
     if (typeFilter !== "all") items = items.filter((r) => r.content_type === typeFilter);
     if (deadlineFilter !== "all") items = items.filter((r) => matchesDeadlineFilter(r, deadlineFilter));
     if (query.trim()) {
@@ -95,7 +118,7 @@ export function HomeworkView({
     const arr = [...filtered];
     if (sortBy === "title") arr.sort((a, b) => a.title.localeCompare(b.title, "ru"));
     else if (sortBy === "subject") {
-      arr.sort((a, b) => getSubjectStyle(a.group.subject).label.localeCompare(getSubjectStyle(b.group.subject).label, "ru"));
+      arr.sort((a, b) => subjectStyleOf(a).label.localeCompare(subjectStyleOf(b).label, "ru"));
     } else if (sortBy === "deadlineDesc") arr.sort((a, b) => cmpDue(b, a));
     else arr.sort(cmpDue);
     return arr;
@@ -197,7 +220,7 @@ export function HomeworkView({
                 {d.schedule.allSubjects}
               </button>
               {subjectKeys.map((key) => {
-                const style = getSubjectStyle(key);
+                const style = subjectStyles.get(key);
                 const active = subjectFilter === key;
                 return (
                   <button
@@ -212,8 +235,8 @@ export function HomeworkView({
                     )}
                     style={active ? { background: "linear-gradient(135deg,#8E72F8,#6C4EE6)" } : undefined}
                   >
-                    <SubjectIcon subject={key} size={18} />
-                    {style.label}
+                    <LessonSubjectIcon icon={style?.icon} color={active ? "#ffffff" : (style?.color ?? "#64748b")} size={18} />
+                    {style?.label}
                   </button>
                 );
               })}
