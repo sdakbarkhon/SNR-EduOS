@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@snr/core";
 import { getSupabaseEnv } from "../env";
 import { getCurrentUserRole, roleToHome } from "../auth";
+import { DEMO_SESSION_COOKIE, sessionIdFromAccessToken } from "../single-session";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -50,6 +51,45 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
+    // ── Single-session (PROMT 3, миграция 110): одна активная сессия на
+    // аккаунт. session_id из JWT сверяется со строкой user_sessions;
+    // 'replaced' = вошли с другого устройства, 'missing' = строки нет
+    // (сессия снесена кроном / логин в обход server action / деплой
+    // single-session). В обоих случаях локальный signOut + /login.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const currentSessionId = session?.access_token
+      ? sessionIdFromAccessToken(session.access_token)
+      : null;
+
+    let sessionStatus = "missing";
+    if (currentSessionId) {
+      const { data: checkResult, error: checkError } = await supabase.rpc(
+        "check_user_session",
+        { p_session_id: currentSessionId },
+      );
+      // Fail-open при сбое RPC: недоступность БД не должна разлогинивать
+      // всех пользователей разом.
+      sessionStatus = checkError ? "ok" : (checkResult ?? "missing");
+    }
+
+    if (sessionStatus !== "ok") {
+      await supabase.auth.signOut({ scope: "local" });
+      const target = request.nextUrl.clone();
+      target.pathname = "/login";
+      target.search = sessionStatus === "replaced" ? "?reason=session_replaced" : "";
+      const redirectResponse = NextResponse.redirect(target);
+      // signOut записал удаление auth-cookie в `response` через setAll —
+      // переносим на redirect-ответ, иначе браузер останется «залогинен» и
+      // middleware зациклит /login → home → /login.
+      response.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie);
+      });
+      redirectResponse.cookies.delete(DEMO_SESSION_COOKIE);
+      return redirectResponse;
+    }
+
     const role = await getCurrentUserRole(supabase, user.id);
     const isSuperAdmin = role === "super_admin";
     const isAdmin = role === "admin";

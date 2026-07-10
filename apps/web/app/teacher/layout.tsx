@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { TeacherShell } from "@/components/TeacherShell";
 import { TeacherHeaderInfo, TeacherHeaderSkeleton } from "@/components/TeacherHeaderInfo";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
+import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 
 export default async function TeacherLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -22,7 +24,9 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
     .from("teachers").select("id").eq("user_id", user.id).maybeSingle();
   if (!teacher) redirect("/login");
 
-  const isDemo = user.user_metadata?.is_demo === true;
+  // Демо-режим — свойство СЕССИИ, не аккаунта: под teacher_math может сидеть
+  // и реальный учитель, и демо-гость. Кука ставится server action'ом demoLogin.
+  const isDemo = (await cookies()).has(DEMO_SESSION_COOKIE);
 
   return (
     <>

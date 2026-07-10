@@ -5,11 +5,13 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Code2, Bot, Calculator, Languages, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { defaultLocale, getDictionary } from "@snr/core";
-import { createClient } from "@/lib/supabase/client";
+import { demoLogin } from "@/app/actions/auth";
 
-// PROMT 3 — demo teachers split by subject. claim_demo_account signature
-// extended (p_kind, p_grade, p_subject_slug) — теперь клик по конкретной
-// предметной карточке отдаёт свободного demo_teacher_{slug}_XX.
+// PROMT 3 (rework) — клик по предметной карточке = прямой логин под РЕАЛЬНЫМ
+// предметным учителем (teacher_prog/robot/math/english/russian) с флагом
+// демо-сессии (user_sessions.is_demo + кука snr-demo-session). Пул из 25
+// demo_teacher_* удалён миграцией 110. Ученики остаются пулом
+// demo_student_{grade}_NN через claim_demo_account (теперь server-only).
 type StudentGrade = "10" | "7" | "3";
 type TeacherSlug = "programming" | "robotics" | "math" | "english" | "russian";
 
@@ -53,33 +55,27 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
   const router = useRouter();
-  const supabase = createClient();
   const [isPending, startTransition] = useTransition();
 
-  async function claim(kind: "student" | "teacher", grade: string | null, subjectSlug: string | null, key: string, redirectTo: string) {
+  async function claim(kind: "student" | "teacher", grade: StudentGrade | null, subjectSlug: TeacherSlug | null, key: string, redirectTo: string) {
     setLoading(key);
     setError("");
     try {
-      // claim_demo_account signature: (p_kind, p_grade, p_subject_slug)
-      // p_subject_slug only meaningful for teacher; server ignores it for students.
-      const { data, error: rpcError } = await supabase.rpc("claim_demo_account", {
-        p_kind: kind,
-        p_grade: grade ?? undefined,
-        p_subject_slug: subjectSlug ?? undefined,
-      });
-      if (rpcError) throw rpcError;
-      const claimed = data?.[0];
-      if (!claimed) {
-        setError(d.allBusy);
+      // Server action: сам логинит (учитель — прямой вход под teacher_{slug},
+      // ученик — claim из пула), вытесняет предыдущую сессию аккаунта
+      // (single-session) и ставит демо-куку.
+      const result =
+        kind === "teacher" && subjectSlug
+          ? await demoLogin({ kind: "teacher", slug: subjectSlug })
+          : grade
+            ? await demoLogin({ kind: "student", grade })
+            : null;
+      if (!result) throw new Error("invalid demo target");
+      if (!result.ok) {
+        setError(result.error === "all_busy" ? d.allBusy : d.loginFailed);
         setLoading(null);
         return;
       }
-
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: claimed.email,
-        password: "demo2026",
-      });
-      if (authError) throw authError;
       sessionStorage.setItem("show-demo-welcome", "true");
       // `loading`/`isPending` intentionally stay true straight through navigation
       // so the button keeps its spinner until the destination page renders.

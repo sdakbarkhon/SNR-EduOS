@@ -1,26 +1,25 @@
 "use client";
 
 import { AlertCircle, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { defaultLocale, getDictionary } from "@snr/core";
-import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/app/actions/auth";
 
 /**
- * `isDemo` is computed server-side (from the already-fetched user's
- * `user_metadata.is_demo`, set by migration 65's demo accounts) and passed
- * down as a prop — avoids a second client-side auth round trip and the
- * flash-of-no-banner that a `useEffect` + `getUser()` here would cause.
+ * `isDemo` is computed server-side (PROMT 3: from the `snr-demo-session`
+ * cookie set by the demoLogin server action — session-scoped, not
+ * account-scoped) and passed down as a prop — avoids a second client-side
+ * auth round trip and the flash-of-no-banner that a `useEffect` +
+ * `getUser()` here would cause.
  */
 export function DemoBanner({ isDemo }: { isDemo: boolean }) {
   const d = getDictionary(defaultLocale).demoMode;
-  const router = useRouter();
 
   if (!isDemo) return null;
 
   async function handleLogout() {
-    await createClient().auth.signOut();
-    router.push("/login");
-    router.refresh();
+    // Server action: штампует user_sessions.last_activity, снимает
+    // auth-cookie (scope local) и демо-куку, редиректит на /login.
+    await signOut();
   }
 
   return (

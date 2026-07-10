@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/app/actions/auth";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "teacher_sidebar_collapsed";
@@ -112,10 +113,12 @@ export function TeacherSidebar() {
   }
 
   // Navigate away immediately — don't make the user wait on the
-  // Supabase (Frankfurt) round trip before the screen changes.
+  // Supabase (Frankfurt) round trip before the screen changes. Сам выход —
+  // через server action (single-session: штампует last_activity, снимает
+  // auth- и демо-куки).
   function handleLogout() {
     router.replace("/login");
-    createClient().auth.signOut().catch(() => {});
+    signOut().catch(() => {});
   }
 
   const isCollapsed = mounted && collapsed;

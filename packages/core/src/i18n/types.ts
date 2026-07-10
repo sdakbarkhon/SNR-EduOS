@@ -68,6 +68,7 @@ export interface Dictionary {
     submit: string;
     forgot: string;
     invalid: string;
+    sessionReplaced: string; // single-session: «Вход выполнен с другого устройства»
     tagline: string;
     // Iter5 P1 — Stitch login redesign
     signingIn: string;    // "Вход..."
@@ -756,6 +757,7 @@ export interface Dictionary {
     sectionStudents: string;
     sectionTeachers: string;
     allBusy: string;       // "Все демо-аккаунты заняты, попробуйте через несколько минут"
+    loginFailed: string;   // демо-логин не удался по иной причине (не занятость пула)
   };
   announcements: {
     title: string;

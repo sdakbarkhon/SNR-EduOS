@@ -4,9 +4,9 @@ import { useEffect, useRef, useState, useTransition, type FormEvent } from "reac
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
-import { getDictionary, signInWithUsername } from "@snr/core";
+import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
-import { createClient } from "@/lib/supabase/client";
+import { loginWithUsername } from "@/app/actions/auth";
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 
 function GoogleIcon() {
@@ -51,6 +51,15 @@ export function LoginForm({ locale }: { locale: Locale }) {
 
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
 
+  // Single-session: middleware выкинул эту сессию, потому что тем же
+  // аккаунтом вошли с другого устройства. Постоянный error-pill, не
+  // 2.5-секундный notice — сообщение должно дожить до взгляда пользователя.
+  useEffect(() => {
+    if (searchParams.get("reason") === "session_replaced") {
+      setError(t.sessionReplaced);
+    }
+  }, [searchParams, t.sessionReplaced]);
+
   // Warm the two most likely post-login route bundles so the RSC payload
   // isn't fetched cold the instant login succeeds (Iter5 hotfix P14.1).
   useEffect(() => {
@@ -68,33 +77,28 @@ export function LoginForm({ locale }: { locale: Locale }) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error: authError, data } = await signInWithUsername(supabase, username, password);
-    if (authError) {
+    // Single-session: логин через server action — там ставятся auth-cookie,
+    // регистрируется user_sessions-строка (вытесняя предыдущую сессию этого
+    // аккаунта) и вычисляется destination по ролям (super_admin > admin >
+    // parent > teacher > student).
+    let result: Awaited<ReturnType<typeof loginWithUsername>>;
+    try {
+      result = await loginWithUsername(username, password);
+    } catch {
       setLoading(false);
       setError(t.invalid);
       return;
     }
-    // Determine destination from DB (super_admin > admin > parent > teacher > student) so
-    // that a user who appears in admins table always lands on /admin regardless of email domain.
-    const userId = data?.user?.id;
-    let dest = "/dashboard";
-    if (userId) {
-      const [superAdminRes, adminRes, parentRes, teacherRes] = await Promise.all([
-        supabase.from("super_admins" as any).select("id").eq("user_id", userId).maybeSingle(),
-        supabase.from("admins" as any).select("id").eq("user_id", userId).maybeSingle(),
-        supabase.from("parents" as any).select("id").eq("user_id", userId).maybeSingle(),
-        supabase.from("teachers" as any).select("id").eq("user_id", userId).maybeSingle(),
-      ]);
-      if (superAdminRes.data) dest = "/superadmin/dashboard";
-      else if (adminRes.data) dest = "/admin";
-      else if (parentRes.data) dest = "/parent/dashboard";
-      else if (teacherRes.data) dest = "/teacher/dashboard";
+    if (!result.ok) {
+      setLoading(false);
+      setError(t.invalid);
+      return;
     }
+    const dest = result.dest;
     // A direct username/password login into a demo account (e.g. typing
-    // "demo_teacher" instead of using the Demo Mode button) should still
-    // get the welcome modal + banner — same flag the DemoRoleModal sets.
-    if (data?.user?.user_metadata?.is_demo === true) {
+    // "demo_student_10_01" instead of using the Demo Mode button) should
+    // still get the welcome modal + banner — same flag the DemoRoleModal sets.
+    if (result.isDemo) {
       sessionStorage.setItem("show-demo-welcome", "true");
     }
     // `loading` stays true straight through the navigation below (it's only
