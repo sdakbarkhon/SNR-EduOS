@@ -310,6 +310,7 @@ export type Database = {
       }
       attendance: {
         Row: {
+          is_demo: boolean
           id: string
           is_finalized: boolean
           lesson_id: string
@@ -321,6 +322,7 @@ export type Database = {
           student_id: string
         }
         Insert: {
+          is_demo?: boolean
           id?: string
           is_finalized?: boolean
           lesson_id: string
@@ -332,6 +334,7 @@ export type Database = {
           student_id: string
         }
         Update: {
+          is_demo?: boolean
           id?: string
           is_finalized?: boolean
           lesson_id?: string
@@ -799,6 +802,7 @@ export type Database = {
       }
       classwork_submissions: {
         Row: {
+          is_demo: boolean
           classwork_id: string
           file_original_name: string | null
           file_size_bytes: number | null
@@ -817,6 +821,7 @@ export type Database = {
           text_answer: string | null
         }
         Insert: {
+          is_demo?: boolean
           classwork_id: string
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -835,6 +840,7 @@ export type Database = {
           text_answer?: string | null
         }
         Update: {
+          is_demo?: boolean
           classwork_id?: string
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -885,6 +891,7 @@ export type Database = {
       }
       course_materials: {
         Row: {
+          is_demo: boolean
           created_at: string
           description: string | null
           file_size_bytes: number | null
@@ -902,6 +909,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          is_demo?: boolean
           created_at?: string
           description?: string | null
           file_size_bytes?: number | null
@@ -919,6 +927,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          is_demo?: boolean
           created_at?: string
           description?: string | null
           file_size_bytes?: number | null
@@ -1220,6 +1229,7 @@ export type Database = {
       }
       homework: {
         Row: {
+          is_demo: boolean
           attachment_filename: string | null
           attachment_size_bytes: number | null
           attachment_storage_path: string | null
@@ -1250,6 +1260,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          is_demo?: boolean
           attachment_filename?: string | null
           attachment_size_bytes?: number | null
           attachment_storage_path?: string | null
@@ -1280,6 +1291,7 @@ export type Database = {
           title: string
         }
         Update: {
+          is_demo?: boolean
           attachment_filename?: string | null
           attachment_size_bytes?: number | null
           attachment_storage_path?: string | null
@@ -1349,6 +1361,7 @@ export type Database = {
       }
       homework_submissions: {
         Row: {
+          is_demo: boolean
           answer_text: string | null
           code_text: string | null
           file_original_name: string | null
@@ -1367,6 +1380,7 @@ export type Database = {
           teacher_comment: string | null
         }
         Insert: {
+          is_demo?: boolean
           answer_text?: string | null
           code_text?: string | null
           file_original_name?: string | null
@@ -1385,6 +1399,7 @@ export type Database = {
           teacher_comment?: string | null
         }
         Update: {
+          is_demo?: boolean
           answer_text?: string | null
           code_text?: string | null
           file_original_name?: string | null
@@ -1692,6 +1707,7 @@ export type Database = {
       }
       lesson_grades: {
         Row: {
+          is_demo: boolean
           comment: string | null
           grade: number
           graded_at: string
@@ -1703,6 +1719,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          is_demo?: boolean
           comment?: string | null
           grade: number
           graded_at?: string
@@ -1714,6 +1731,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          is_demo?: boolean
           comment?: string | null
           grade?: number
           graded_at?: string
@@ -1757,6 +1775,7 @@ export type Database = {
       }
       lesson_materials: {
         Row: {
+          is_demo: boolean
           created_at: string
           file_original_name: string | null
           file_size_bytes: number | null
@@ -1769,6 +1788,7 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          is_demo?: boolean
           created_at?: string
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -1781,6 +1801,7 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          is_demo?: boolean
           created_at?: string
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -1948,6 +1969,7 @@ export type Database = {
       }
       lesson_stages: {
         Row: {
+          is_demo: boolean
           completed_at: string | null
           config: Json
           content_type: string | null
@@ -1974,6 +1996,7 @@ export type Database = {
           was_activated: boolean
         }
         Insert: {
+          is_demo?: boolean
           completed_at?: string | null
           config?: Json
           content_type?: string | null
@@ -2000,6 +2023,7 @@ export type Database = {
           was_activated?: boolean
         }
         Update: {
+          is_demo?: boolean
           completed_at?: string | null
           config?: Json
           content_type?: string | null
@@ -2044,6 +2068,7 @@ export type Database = {
       }
       lessons: {
         Row: {
+          is_demo: boolean
           active_stage_id: string | null
           created_at: string
           demo_current_page: number | null
@@ -2069,6 +2094,7 @@ export type Database = {
           topic: string | null
         }
         Insert: {
+          is_demo?: boolean
           active_stage_id?: string | null
           created_at?: string
           demo_current_page?: number | null
@@ -2094,6 +2120,7 @@ export type Database = {
           topic?: string | null
         }
         Update: {
+          is_demo?: boolean
           active_stage_id?: string | null
           created_at?: string
           demo_current_page?: number | null
@@ -3274,6 +3301,7 @@ export type Database = {
       }
       test_submissions: {
         Row: {
+          is_demo: boolean
           grade: number | null
           graded_at: string | null
           graded_by: string | null
@@ -3287,6 +3315,7 @@ export type Database = {
           submitted_at: string
         }
         Insert: {
+          is_demo?: boolean
           grade?: number | null
           graded_at?: string | null
           graded_by?: string | null
@@ -3300,6 +3329,7 @@ export type Database = {
           submitted_at?: string
         }
         Update: {
+          is_demo?: boolean
           grade?: number | null
           graded_at?: string | null
           graded_by?: string | null
@@ -3343,6 +3373,39 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string
+          demo_started_at: string | null
+          device_info: string | null
+          id: string
+          is_demo: boolean
+          last_activity: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          demo_started_at?: string | null
+          device_info?: string | null
+          id?: string
+          is_demo?: boolean
+          last_activity?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          demo_started_at?: string | null
+          device_info?: string | null
+          id?: string
+          is_demo?: boolean
+          last_activity?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -3355,6 +3418,7 @@ export type Database = {
           username: string
         }[]
       }
+      check_user_session: { Args: { p_session_id: string }; Returns: string }
       current_school_id: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
@@ -3372,6 +3436,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      is_demo_session: { Args: never; Returns: boolean }
       is_my_child: { Args: { p_student_id: string }; Returns: boolean }
       is_my_child_group: { Args: { p_group_id: string }; Returns: boolean }
       is_my_child_lesson: { Args: { p_lesson_id: string }; Returns: boolean }
@@ -3391,8 +3456,13 @@ export type Database = {
         Returns: undefined
       }
       reset_demo_data: { Args: never; Returns: undefined }
+      reset_demo_data_for_user: {
+        Args: { p_user_id: string; p_since?: string }
+        Returns: undefined
+      }
       reset_expired_demo_sessions: { Args: never; Returns: undefined }
       touch_demo_session: { Args: never; Returns: undefined }
+      touch_user_session: { Args: never; Returns: undefined }
     }
     Enums: {
       announcement_category:
