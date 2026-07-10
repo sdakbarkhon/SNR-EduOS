@@ -70,9 +70,17 @@ export async function generateSlideImage(imagePrompt: string): Promise<string | 
   // Academic illustration style for consistency across slides.
   const styledPrompt = `Academic educational illustration, clean flat style, soft colors, no text labels. ${imagePrompt.trim()}`;
 
-  const fromImagen = await tryImagen(styledPrompt);
-  if (fromImagen) return fromImagen;
-
-  console.log("[ai-imagen] Imagen unavailable, falling back to Pollinations");
+  // Imagen via generativelanguage.googleapis.com's :predict path 404s for
+  // every request — confirmed live (imagen-3.0-generate-002 "is not found
+  // for API version v1beta, or is not supported for predict"), independent
+  // of the API key. Attempting it first burned a full failed round trip per
+  // slide (up to MAX_SLIDE_IMAGES of them), pushing generate-stages past its
+  // 60s function timeout. Skip straight to the fallback that actually works
+  // until this is repointed at a real Imagen-capable endpoint.
+  if (process.env.AI_IMAGEN_ENABLED === "true") {
+    const fromImagen = await tryImagen(styledPrompt);
+    if (fromImagen) return fromImagen;
+    console.log("[ai-imagen] Imagen unavailable, falling back to Pollinations");
+  }
   return tryPollinations(styledPrompt);
 }
