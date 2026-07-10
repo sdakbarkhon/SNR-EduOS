@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callGemini } from "@/lib/ai-gemini";
+import { callClaude } from "@/lib/ai-claude";
 import { generateSlideImage } from "@/lib/ai-imagen";
 
 // Hard cap on Imagen calls per generation (keeps us within maxDuration).
@@ -433,9 +433,10 @@ export async function POST(req: NextRequest) {
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
     const useSearch = wantSearch && attempt === 0;
-    const { text, error } = await callGemini(prompt, [], {
+    // No forced-JSON param — buildPrompt() already instructs "return only
+    // JSON"; stripFences() below handles any stray markdown code fences.
+    const { text, error } = await callClaude(prompt, [], {
       temperature: 0.85,
-      responseMimeType: "application/json",
       useSearch,
     });
 

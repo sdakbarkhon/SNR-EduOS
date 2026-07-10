@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callGemini } from "@/lib/ai-gemini";
+import { callClaude } from "@/lib/ai-claude";
 import { EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
 import type { CodeLanguage, ExternalServiceType } from "@snr/core";
 
@@ -326,9 +326,10 @@ export async function POST(req: NextRequest) {
   let lastError = "";
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
-    const { text, error } = await callGemini(prompt, [], {
+    // No forced-JSON param — buildXPrompt() already instructs "return only
+    // JSON"; stripFences() below handles any stray markdown code fences.
+    const { text, error } = await callClaude(prompt, [], {
       temperature: 0.8,
-      responseMimeType: "application/json",
       useSearch: false,
     });
 

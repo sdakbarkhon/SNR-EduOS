@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, Send, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
-import { callGemini } from "@/app/actions/ai";
+import { callAiChat } from "@/app/actions/ai";
 
 const STUDENT_SYSTEM = `Ты — дружелюбный помощник для школьников.
 Помогай с любыми вопросами кратко и понятно.
@@ -66,7 +66,7 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
     setLoading(true);
 
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
-    const result = await callGemini(STUDENT_SYSTEM, trimmed, history);
+    const result = await callAiChat(STUDENT_SYSTEM, trimmed, history);
     const aiText = "error" in result ? t.errorFallback : result.text;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
     setLoading(false);

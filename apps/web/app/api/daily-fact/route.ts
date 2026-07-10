@@ -1,48 +1,29 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-flash-lite-latest"];
+import { callClaude } from "@/lib/ai-claude";
 
 function getTashkentDate(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
 }
 
-async function fetchGeminiFact(apiKey: string): Promise<string | null> {
+async function fetchAiFact(): Promise<string | null> {
   const MAX_LEN = 80;
   const prompt =
     `Один короткий интересный факт для школьников. СТРОГО: 1 предложение, максимум 80 символов на русском языке. Без вступления, без кавычек, без тире в начале. Только сам факт.\n` +
     `Примеры: "Сердце синего кита весит около 600 кг." / "Антарктида — самая большая пустыня мира."`;
-  const body = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-  });
   let lastText: string | null = null;
-  for (const model of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
-          body,
-        });
-        if (!res.ok) break;
-        const data = (await res.json()) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-        };
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        if (!raw) continue;
-        // Clean leading/trailing markdown, quotes, dashes
-        const text = raw
-          .replace(/^["""«»'\-—\*\s]+/, "")
-          .replace(/["""«»'\*\s]+$/, "")
-          .trim();
-        if (text.length <= MAX_LEN) return text;
-        lastText = text;
-        console.warn(`[daily-fact] ${model} attempt ${attempt + 1}: ${text.length} chars, retrying`);
-      } catch {
-        break;
-      }
-    }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { text: raw, error } = await callClaude(prompt, [], { maxTokens: 128 });
+    if (error || !raw.trim()) break;
+    // Clean leading/trailing markdown, quotes, dashes
+    const text = raw
+      .trim()
+      .replace(/^["""«»'\-—\*\s]+/, "")
+      .replace(/["""«»'\*\s]+$/, "")
+      .trim();
+    if (text.length <= MAX_LEN) return text;
+    lastText = text;
+    console.warn(`[daily-fact] attempt ${attempt + 1}: ${text.length} chars, retrying`);
   }
   return lastText ? lastText.slice(0, 77) + "..." : null;
 }
@@ -66,12 +47,7 @@ export async function GET() {
   }
 
   // Generate new fact
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 500 });
-  }
-
-  const text = await fetchGeminiFact(apiKey);
+  const text = await fetchAiFact();
   if (!text) {
     return NextResponse.json({ error: "AI временно недоступен" }, { status: 502 });
   }

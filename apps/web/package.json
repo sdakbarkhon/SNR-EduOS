@@ -11,7 +11,7 @@
     "seed:demo-iter4": "tsx scripts/seed-demo-iteration4.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@monaco-editor/react": "^4.7.0",
     "@snr/core": "workspace:*",
     "@snr/ui-tokens": "workspace:*",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callGemini } from "@/lib/ai-gemini";
+import { callClaude } from "@/lib/ai-claude";
 
 const DAILY_LIMIT = 10;
 
@@ -152,10 +152,10 @@ ${stageCtx}
     { role: "user" as const, content: body.user_message },
   ];
 
-  const { text, error } = await callGemini(systemPrompt, chatMessages);
+  const { text, error } = await callClaude(systemPrompt, chatMessages);
 
   if (error) {
-    console.error("[ai-chat] callGemini returned error:", error);
+    console.error("[ai-chat] callClaude returned error:", error);
     // Do NOT insert to DB on error — counter must not increment for failed requests
     return NextResponse.json({ error }, { status: 500 });
   }
