@@ -8,6 +8,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { CODE_LANGUAGE_FILENAMES } from "@/lib/code-languages";
+import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
 type Sub = {
   id: string; student_id: string;
@@ -38,12 +39,14 @@ export function TeacherProgrammingSubmissions({
     for (const s of initial) m[s.id] = { grade: s.grade?.toString() ?? "", comment: s.teacher_comment ?? "", saving: false };
     return m;
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function save(s: Sub) {
     const g = grades[s.id];
     const n = parseInt(g?.grade ?? "");
     if (isNaN(n) || n < 1 || n > 5) return;
     setGrades((p) => ({ ...p, [s.id]: { grade: p[s.id]?.grade ?? "", comment: p[s.id]?.comment ?? "", saving: true } }));
+    setErrors((p) => ({ ...p, [s.id]: "" }));
     try {
       const comment = g?.comment ?? "";
       await gradeSubmission(db, { submissionId: s.id, grade: n, comment });
@@ -51,6 +54,7 @@ export function TeacherProgrammingSubmissions({
       setEditingId(null);
     } catch (e: unknown) {
       console.error("[grade] failed:", e);
+      setErrors((p) => ({ ...p, [s.id]: isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : d.common.error }));
     } finally {
       setGrades((p) => ({ ...p, [s.id]: { grade: p[s.id]?.grade ?? "", comment: p[s.id]?.comment ?? "", saving: false } }));
     }
@@ -116,6 +120,9 @@ export function TeacherProgrammingSubmissions({
                       </div>
                     ) : (
                       <div className="space-y-2">
+                        {errors[s.id] && (
+                          <p className="text-[12px] font-medium text-amber-600">{errors[s.id]}</p>
+                        )}
                         <div className="flex gap-2">
                           <input type="number" min={1} max={5} placeholder="1–5"
                             value={g?.grade ?? ""}

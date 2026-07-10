@@ -413,9 +413,11 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                   const isGraded = s.grade != null;
                   const isEditing = editingId === s.id;
                   const g = grades[s.id];
-                  // Перегрузка УЖЕ проставленной реальной оценки демо-сессией запрещена;
-                  // выставление первой оценки (isGraded=false) — создание, всегда можно.
-                  const regradeBlocked = isDemoSession && isGraded && !s.is_demo;
+                  // gradeClasswork — ЧИСТЫЙ UPDATE существующей classwork_submissions
+                  // (строка создаётся upsert'ом ученика при сдаче, до всякой оценки).
+                  // Поэтому блокировать нужно и первую оценку тоже, не только правку —
+                  // единственное условие "создания" здесь — это сама сдача ученика.
+                  const regradeBlocked = isDemoSession && hasSubmission && !s.is_demo;
                   return (
                     <div key={s.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
                       {/* Student row */}
@@ -477,24 +479,29 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                       {/* Grade form — ungraded or currently editing */}
                       {hasSubmission && (!isGraded || isEditing) && (
                         <div className="mt-2 space-y-2">
+                          {regradeBlocked && (
+                            <p className="text-xs font-medium text-amber-600">{d.demoMode.cannotEditRealData}</p>
+                          )}
                           <div className="flex gap-2">
                             <input
                               type="number"
                               min={1}
                               max={5}
                               value={g?.grade ?? ""}
+                              disabled={regradeBlocked}
                               onChange={(e) =>
                                 setGrades((prev) => ({
                                   ...prev,
                                   [s.id]: { grade: e.target.value, comment: prev[s.id]?.comment ?? "", saving: false },
                                 }))
                               }
-                              className="w-16 px-2 py-1.5 rounded-lg bg-[var(--surface-1)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:border-[var(--accent)]"
+                              className="w-16 px-2 py-1.5 rounded-lg bg-[var(--surface-1)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
                               placeholder="1–5"
                             />
                             <input
                               type="text"
                               value={g?.comment ?? ""}
+                              disabled={regradeBlocked}
                               onChange={(e) =>
                                 setGrades((prev) => ({
                                   ...prev,
@@ -502,11 +509,12 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                                 }))
                               }
                               placeholder={`${d.teacher.classworkCommentLabel} (опционально)`}
-                              className="flex-1 px-2 py-1.5 rounded-lg bg-[var(--surface-1)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:border-[var(--accent)]"
+                              className="flex-1 px-2 py-1.5 rounded-lg bg-[var(--surface-1)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
                             />
                             <button
-                              onClick={() => handleGrade(s.id)}
-                              disabled={g?.saving}
+                              onClick={() => { if (regradeBlocked) return; handleGrade(s.id); }}
+                              disabled={g?.saving || regradeBlocked}
+                              title={regradeBlocked ? d.demoMode.cannotEditRealData : undefined}
                               className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
                             >
                               {g?.saving ? "…" : d.teacher.classworkGradeBtn}
