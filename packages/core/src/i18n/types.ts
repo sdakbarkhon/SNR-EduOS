@@ -746,7 +746,15 @@ export interface Dictionary {
     roleStudent10: string; // "Демо-ученик 10 класс"
     roleStudent7: string;  // "Демо-ученик 7 класс"
     roleStudent3: string;  // "Демо-ученик 3 класс"
-    roleTeacher: string;   // "Демо-учитель"
+    roleTeacher: string;   // "Демо-учитель" — kept for backward compat
+    // PROMT 3 — per-subject demo teachers
+    roleTeacherProgramming: string;
+    roleTeacherRobotics: string;
+    roleTeacherMath: string;
+    roleTeacherEnglish: string;
+    roleTeacherRussian: string;
+    sectionStudents: string;
+    sectionTeachers: string;
     allBusy: string;       // "Все демо-аккаунты заняты, попробуйте через несколько минут"
   };
   announcements: {
