@@ -1584,8 +1584,8 @@ export const getTeacherLessonView = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
   const subjectQuery = lesson.subject_id
-    ? db2.from("subjects").select("name").eq("id", lesson.subject_id).maybeSingle()
-    : db2.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle();
+    ? db2.from("subjects").select("name, icon, color").eq("id", lesson.subject_id).maybeSingle()
+    : db2.from("subjects").select("name, icon, color").eq("group_id", lesson.group_id).limit(1).maybeSingle();
   const [teacherRes, materialsRes, stagesRes, subjectRes] = await Promise.all([
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
@@ -1606,6 +1606,8 @@ export const getTeacherLessonView = async (
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
     subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
+    subjectIcon: ((subjectRes as { data: { icon: string | null } | null }).data?.icon) ?? null,
+    subjectColor: ((subjectRes as { data: { color: string | null } | null }).data?.color) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
@@ -1641,8 +1643,8 @@ export const getStudentLessonView = async (
   // Subject name: prefer the lesson's actual subject_id FK; fall back to the
   // group's (legacy lessons without subject_id may have NULL).
   const subjectQuery = lesson.subject_id
-    ? db3.from("subjects").select("name").eq("id", lesson.subject_id).maybeSingle()
-    : db3.from("subjects").select("name").eq("group_id", lesson.group_id).limit(1).maybeSingle();
+    ? db3.from("subjects").select("name, icon, color").eq("id", lesson.subject_id).maybeSingle()
+    : db3.from("subjects").select("name, icon, color").eq("group_id", lesson.group_id).limit(1).maybeSingle();
   const [teacherRes, materialsRes, stagesRaw, subjectRes] = await Promise.all([
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
@@ -1671,6 +1673,8 @@ export const getStudentLessonView = async (
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
     subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
+    subjectIcon: ((subjectRes as { data: { icon: string | null } | null }).data?.icon) ?? null,
+    subjectColor: ((subjectRes as { data: { color: string | null } | null }).data?.color) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
     materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],

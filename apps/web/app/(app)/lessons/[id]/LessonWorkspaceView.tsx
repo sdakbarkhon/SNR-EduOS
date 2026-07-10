@@ -16,6 +16,7 @@ import {
 import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
 import { RaiseHandButton } from "./RaiseHandButton";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { AiChatPanel } from "./AiChatPanel";
@@ -785,22 +786,13 @@ export function LessonWorkspaceView({
           of the full-height sidebar above. */}
       <div className="flex min-w-0 flex-1 flex-col space-y-5 overflow-y-auto px-4 py-5 md:px-6">
       {/* Header bar */}
-      <header className="rounded-2xl border border-[#ECEDF4] bg-white px-5 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-2xl"
-              style={{ background: "linear-gradient(135deg,#EEEAFD,#E6DEFC)" }}
-            >
-              {style.emoji}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[11px] font-extrabold uppercase tracking-wide text-[#6A4FE6]">{lesson.subjectName ?? style.label}</p>
-              <h1 className="truncate text-lg font-black leading-tight text-[#242A45]">{heroTitle}</h1>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <LessonHeaderBar
+        subjectIcon={lesson.subjectIcon}
+        subjectColor={lesson.subjectColor}
+        subjectName={lesson.subjectName ?? style.label}
+        title={heroTitle}
+        actions={
+          <>
             {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} />}
             {!isCompleted && (
               <button
@@ -841,45 +833,40 @@ export function LessonWorkspaceView({
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Pills row: elapsed timer, live status, group, lesson number, quiz/kahoot context */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-            <Clock className="h-4 w-4 text-[#9CA0B4]" />
-            <span className="font-mono tabular-nums">{elapsed}</span>
-          </div>
-          {!isCompleted && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-green-100 bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-              {w.live}
-            </div>
-          )}
-          <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-            <Users className="h-4 w-4 text-[#9CA0B4]" />
-            {lesson.group.name}
-          </div>
-          {lesson.lesson_no != null && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-              <Hash className="h-4 w-4 text-[#9CA0B4]" />
-              {w.lessonNumberLabel.replace("{n}", String(lesson.lesson_no))}
-            </div>
-          )}
-          {currentIsQuiz && currentCfg?.time_limit_minutes != null && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-[#ECEDF4] bg-white px-3 py-2 text-sm font-bold text-[#5B6178]">
-              <Clock className="h-4 w-4 text-[#9CA0B4]" />
-              {currentCfg.time_limit_minutes} {d.ai.generate.minutesShort}
-            </div>
-          )}
-          {currentIsKahoot && (
-            <div className="flex items-center gap-2 rounded-[12px] border border-[#C9EEDA] bg-[#E7F7EE] px-3 py-2 text-sm font-extrabold text-[#1E9E63]">
-              <span className="h-2 w-2 rounded-full bg-[#22B573] animate-pulse" />
-              {dl.quiz.kahootLiveNow}
-            </div>
-          )}
-        </div>
-      </header>
+          </>
+        }
+        pills={
+          <>
+            <LessonHeaderPill icon={<Clock className="h-4 w-4 text-[#9CA0B4]" />}>
+              <span className="font-mono tabular-nums">{elapsed}</span>
+            </LessonHeaderPill>
+            {!isCompleted && (
+              <LessonHeaderPill tone="live" icon={<span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />}>
+                {w.live}
+              </LessonHeaderPill>
+            )}
+            <LessonHeaderPill icon={<Users className="h-4 w-4 text-[#9CA0B4]" />}>
+              {lesson.group.name}
+            </LessonHeaderPill>
+            {lesson.lesson_no != null && (
+              <LessonHeaderPill icon={<Hash className="h-4 w-4 text-[#9CA0B4]" />}>
+                {w.lessonNumberLabel.replace("{n}", String(lesson.lesson_no))}
+              </LessonHeaderPill>
+            )}
+            {currentIsQuiz && currentCfg?.time_limit_minutes != null && (
+              <LessonHeaderPill icon={<Clock className="h-4 w-4 text-[#9CA0B4]" />}>
+                {currentCfg.time_limit_minutes} {d.ai.generate.minutesShort}
+              </LessonHeaderPill>
+            )}
+            {currentIsKahoot && (
+              <span className="flex items-center gap-2 rounded-[12px] border border-[#C9EEDA] bg-[#E7F7EE] px-3 py-2 text-sm font-extrabold text-[#1E9E63]">
+                <span className="h-2 w-2 rounded-full bg-[#22B573] animate-pulse" />
+                {dl.quiz.kahootLiveNow}
+              </span>
+            )}
+          </>
+        }
+      />
 
       {/* Teacher is showing a material to the whole class (Realtime broadcast).
           Fullscreen — no sidebar/topbar/scroll, and no close control on the

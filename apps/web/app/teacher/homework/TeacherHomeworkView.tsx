@@ -9,6 +9,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { SubjectIcon } from "@/components/SubjectIcon";
 
 type Submission = { id: string; status: string };
 type TestSub = { id: string; student_id: string };
@@ -310,10 +311,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
                   )}>
                   <div className="mb-4 flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] text-[22px]"
-                        style={{ background: cfg.color + "20" }}>
-                        {cfg.emoji}
-                      </div>
+                      <SubjectIcon subject={hw.group.subject} size={48} />
                       <div className="min-w-0">
                         <h3 className="text-lg font-bold leading-tight text-gray-900">{hw.title}</h3>
                         <p className="text-sm font-medium text-gray-500">{cfg.label}</p>

@@ -32,6 +32,7 @@ import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { AttendanceRollCall } from "./AttendanceRollCall";
@@ -1105,85 +1106,72 @@ export function TeacherLessonDetailView({
       </Link>
 
       {/* Header card — subject/group/title/time/room/status, all in one block (§7.2) */}
-      {(() => {
-        const bg =
-          status === "in_progress" ? "linear-gradient(135deg, #16a34a, #15803d)"
-          : status === "completed"  ? "linear-gradient(135deg, #6b7280, #4b5563)"
-          : `linear-gradient(135deg, ${style.color}, color-mix(in sRGB, ${style.color} 60%, #1e1b4b))`;
-        return (
-          <div className="flex flex-col gap-3 rounded-2xl p-6 text-white shadow-xl" style={{ background: bg }}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
-                  {(lesson.subjectName ?? style.label)} · {lesson.group.name}
-                </p>
-                {lesson.lesson_no && <p className="text-xs text-white/60">Урок №{lesson.lesson_no}</p>}
-                <h1 className="mt-1 text-2xl font-bold">
-                  {lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
-                </h1>
-              </div>
-              {/* Manual start/end (§7.6) — pg_cron auto-transitions still run independently */}
-              {status === "scheduled" && (
-                <button
-                  onClick={handleStartLesson}
-                  disabled={startingLesson}
-                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-md transition hover:bg-white/90 active:scale-95 disabled:opacity-60"
-                >
-                  {startingLesson ? "…" : dl.startLessonBtn}
-                </button>
-              )}
-              {status === "in_progress" && (
-                <button
-                  onClick={handleEndLesson}
-                  disabled={endingLesson}
-                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-bold text-red-600 shadow-md transition hover:bg-white/90 active:scale-95 disabled:opacity-60"
-                >
-                  {endingLesson ? "…" : dl.endLessonBtn}
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="rounded-full bg-white/10 px-3 py-1">{timeRange}</span>
-              <span className="rounded-full bg-white/10 px-3 py-1">{fmtDate(lesson.starts_at)}</span>
-              {lesson.room && (
-                <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
-                  <MapPin className="h-3.5 w-3.5" /> Каб. {lesson.room}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/15 pt-3 text-sm text-white/90">
-              {status === "scheduled" && (
-                <>
-                  <Clock className="h-4 w-4 shrink-0" />
-                  <span>{dl.scheduledAutoNote}</span>
-                </>
-              )}
-              {status === "in_progress" && (
-                <>
-                  <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-white" />
-                  <span>
-                    {dl.inProgressAutoNote}{" "}
-                    {elapsedMin > 0 && dl.inProgressMins.replace("{n}", String(elapsedMin))}
-                  </span>
-                </>
-              )}
-              {status === "completed" && (
-                <>
-                  <Check className="h-4 w-4 shrink-0" />
-                  <span>
-                    Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
-                  </span>
-                  <span className="text-white/40">·</span>
-                  <Lock className="h-3.5 w-3.5 shrink-0" />
-                  <span>{dl.completedLock}</span>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      <LessonHeaderBar
+        subjectIcon={lesson.subjectIcon}
+        subjectColor={lesson.subjectColor}
+        subjectName={lesson.subjectName ?? style.label}
+        title={lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
+        actions={
+          <>
+            {/* Manual start/end (§7.6) — pg_cron auto-transitions still run independently */}
+            {status === "scheduled" && (
+              <button
+                onClick={handleStartLesson}
+                disabled={startingLesson}
+                className="flex items-center gap-2 rounded-[11px] bg-green-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-green-700 disabled:opacity-60"
+              >
+                {startingLesson ? "…" : dl.startLessonBtn}
+              </button>
+            )}
+            {status === "in_progress" && (
+              <button
+                onClick={handleEndLesson}
+                disabled={endingLesson}
+                className="flex items-center gap-2 rounded-[11px] border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+              >
+                {endingLesson ? "…" : dl.endLessonBtn}
+              </button>
+            )}
+          </>
+        }
+        pills={
+          <>
+            {status === "scheduled" && (
+              <LessonHeaderPill icon={<Clock className="h-4 w-4 text-[#9CA0B4]" />}>
+                {dl.scheduledAutoNote}
+              </LessonHeaderPill>
+            )}
+            {status === "in_progress" && (
+              <LessonHeaderPill tone="live" icon={<span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />}>
+                {dl.inProgressAutoNote}
+                {elapsedMin > 0 && ` · ${dl.inProgressMins.replace("{n}", String(elapsedMin))}`}
+              </LessonHeaderPill>
+            )}
+            {status === "completed" && (
+              <LessonHeaderPill tone="done" icon={<Check className="h-4 w-4" />}>
+                Урок завершён{startedAt && endedAt && ` · ${fmtTime(startedAt)} – ${fmtTime(endedAt)}`}
+              </LessonHeaderPill>
+            )}
+            {status === "completed" && (
+              <LessonHeaderPill tone="done" icon={<Lock className="h-3.5 w-3.5" />}>
+                {dl.completedLock}
+              </LessonHeaderPill>
+            )}
+            <LessonHeaderPill icon={<Clock className="h-4 w-4 text-[#9CA0B4]" />}>
+              {timeRange} · {fmtDate(lesson.starts_at)}
+            </LessonHeaderPill>
+            <LessonHeaderPill>{lesson.group.name}</LessonHeaderPill>
+            {lesson.lesson_no != null && (
+              <LessonHeaderPill>{`Урок №${lesson.lesson_no}`}</LessonHeaderPill>
+            )}
+            {lesson.room && (
+              <LessonHeaderPill icon={<MapPin className="h-3.5 w-3.5 text-[#9CA0B4]" />}>
+                Каб. {lesson.room}
+              </LessonHeaderPill>
+            )}
+          </>
+        }
+      />
 
       {/* Inline attendance reminder (5–15 min before end) */}
       {status === "in_progress" && (

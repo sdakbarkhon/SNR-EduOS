@@ -332,6 +332,8 @@ export type TeacherLessonView = {
   active_stage_id: string | null;
   demo_material_id: string | null;
   subjectName: string | null;
+  subjectIcon: string | null;
+  subjectColor: string | null;
   group: { id: string; name: string; subject: string };
   teacher: { id: string; full_name: string } | null;
   materials: LessonMaterial[];
@@ -350,6 +352,8 @@ export type StudentLessonView = {
   started_at: string | null;
   ended_at: string | null;
   subjectName: string | null;
+  subjectIcon: string | null;
+  subjectColor: string | null;
   status: LessonStatus;
   room: string | null;
   active_stage_id: string | null;

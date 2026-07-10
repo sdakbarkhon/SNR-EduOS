@@ -16,6 +16,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { LUCIDE_ICONS } from "@/lib/subject-icons";
+
+function SubjectHeroIcon({ icon, className }: { icon: string | null; className?: string }) {
+  const Icon = (icon && LUCIDE_ICONS[icon]) || BookOpen;
+  return <Icon className={className} strokeWidth={2.2} />;
+}
 
 function stageTypeIcon(ct: LessonContentType | null): LucideIcon {
   switch (ct) {
@@ -248,10 +254,17 @@ export function PreLessonView({
             {dl.nowStarting}
           </span>
 
-          {/* Subject name */}
-          <h1 className="mb-4 text-5xl font-black leading-tight tracking-tight md:text-6xl lg:text-7xl">
-            {heroTitle}
-          </h1>
+          {/* Subject icon + name — white-on-translucent to match this screen's
+              dark hero (LessonSubjectIcon's light-background tint would be
+              invisible here, so the badge is built inline instead). */}
+          <div className="mb-4 flex items-center gap-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-md">
+              <SubjectHeroIcon icon={lesson.subjectIcon} className="h-7 w-7 text-white" />
+            </span>
+            <h1 className="text-5xl font-black leading-tight tracking-tight md:text-6xl lg:text-7xl">
+              {heroTitle}
+            </h1>
+          </div>
 
           {/* Group · Teacher */}
           <p className="mb-8 text-xl font-medium text-white/70 md:text-2xl">

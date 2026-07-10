@@ -9,13 +9,14 @@ import {
   MoreHorizontal, Pencil, Trash2, X, AlertTriangle, CalendarDays,
 } from "lucide-react";
 import {
-  getSubjectStyle, createLesson, updateLesson, deleteLesson,
+  createLesson, updateLesson, deleteLesson,
   getTeacherLessonsByMonth, getDictionary,
 } from "@snr/core";
 import type { SubjectWithGroup, Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
+import { SubjectIcon } from "@/components/SubjectIcon";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -188,7 +189,6 @@ function LessonCard({
   lesson: LessonItem; now: Date;
   onEdit: (l: LessonItem) => void; onDelete: (l: LessonItem) => void;
 }) {
-  const style = getSubjectStyle(lesson.group.subject);
   const displayTitle = lesson.title ?? lesson.topic ?? fmtDate(lesson.starts_at);
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
@@ -199,12 +199,7 @@ function LessonCard({
   return (
     <div className={`flex items-center gap-3 rounded-2xl border border-white/60 p-3 pl-4 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-l-4 ${EFF_CARD_BG[eff]} ${EFF_BORDER[eff]}`}>
       <Link href={`/teacher/lessons/${lesson.id}`} className="flex flex-1 items-center gap-3 min-w-0">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
-          style={{ background: style.color }}
-        >
-          {style.emoji}
-        </div>
+        <SubjectIcon subject={lesson.group.subject} size={36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="truncate text-xs font-bold text-[#1D1D1F]">{displayTitle}</p>

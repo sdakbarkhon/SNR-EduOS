@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, MapPin, Check, Eye, BookOpen, FileText, Clock, ClipboardList } from "lucide-react";
 import type { StudentLessonView, LessonStageWithProgress, ContentType } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
+import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
 import { PreLessonView } from "./PreLessonView";
 import { LessonWorkspaceView } from "./LessonWorkspaceView";
 import { StudentStageReviewModal } from "./StudentStageReviewModal";
@@ -18,12 +19,6 @@ function fmtTime(iso: string): string {
 }
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ru", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
-}
-function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r}, ${g}, ${b}`;
 }
 function fmtBytes(b: number | null): string {
   if (!b) return "";
@@ -56,7 +51,6 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
   }
 
   const style = getSubjectStyle(lesson.group.subject);
-  const rgb = hexToRgb(style.color);
 
   const stages = [...lesson.stages].sort((a, b) => a.position - b.position);
   const doneCount = stages.filter((s) => s.is_completed || s.progress?.is_completed).length;
@@ -104,63 +98,43 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
       )}
 
       {/* Hero */}
-      <div
-        className="anim-fade-up relative flex min-h-[210px] flex-col gap-6 overflow-hidden rounded-[24px] p-8 text-white shadow-2xl"
-        style={{
-          background: `linear-gradient(135deg, rgb(${rgb}) 0%, color-mix(in sRGB, rgb(${rgb}) 60%, #1e1b4b) 100%)`,
-        }}
-      >
-        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-20 blur-3xl" style={{ background: "white" }} />
-
-        <div className="relative z-10 flex flex-1 flex-col justify-between">
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-white/70">
-              {lesson.subjectName ?? style.label} · {lesson.group.name}
-            </p>
-            {lesson.lesson_no && (
-              <p className="mb-1 text-xs text-white/60">Урок №{lesson.lesson_no}</p>
-            )}
-            <h2 className="mb-2 text-2xl font-bold tracking-tight md:text-3xl">{heroTitle}</h2>
-            {lesson.description && (
-              <p className="mb-4 text-sm leading-relaxed text-white/80">{lesson.description}</p>
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm font-medium">
-                {timeRange}
+      <LessonHeaderBar
+        subjectIcon={lesson.subjectIcon}
+        subjectColor={lesson.subjectColor}
+        subjectName={lesson.subjectName ?? style.label}
+        title={heroTitle}
+        actions={
+          lesson.teacher && (
+            <div className="flex items-center gap-2 rounded-[13px] border border-[#E6E7EF] bg-white py-1 pl-1 pr-3">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                style={{ background: "linear-gradient(135deg,#7C63F0,#6A4FE6)" }}
+              >
+                {initials(lesson.teacher.full_name)}
               </div>
-              {lesson.teacher && (
-                <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold">
-                    {initials(lesson.teacher.full_name)}
-                  </div>
-                  <span className="text-sm font-medium">{lesson.teacher.full_name}</span>
-                </div>
-              )}
-              {lesson.room && (
-                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm font-medium">
-                  <MapPin className="h-4 w-4 text-white/70" />
-                  Каб. {lesson.room}
-                </div>
-              )}
+              <span className="text-xs font-bold text-[#242A45]">{lesson.teacher.full_name}</span>
             </div>
-          </div>
-
-          {stages.length > 0 && (
-            <div className="mt-6 w-full max-w-sm md:mt-8">
-              <div className="mb-2 flex justify-between text-xs font-medium text-white/80">
-                <span>Прогресс урока</span>
-                <span>{doneCount}/{stages.length} этапов</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-white transition-all duration-700"
-                  style={{ width: stages.length > 0 ? `${(doneCount / stages.length) * 100}%` : "0%" }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+          )
+        }
+        pills={
+          <>
+            <LessonHeaderPill tone="done" icon={<Check className="h-4 w-4" />}>
+              Урок завершён
+            </LessonHeaderPill>
+            <LessonHeaderPill>{timeRange}</LessonHeaderPill>
+            <LessonHeaderPill>{lesson.group.name}</LessonHeaderPill>
+            {lesson.lesson_no != null && <LessonHeaderPill>{`Урок №${lesson.lesson_no}`}</LessonHeaderPill>}
+            {lesson.room && (
+              <LessonHeaderPill icon={<MapPin className="h-3.5 w-3.5 text-[#9CA0B4]" />}>
+                Каб. {lesson.room}
+              </LessonHeaderPill>
+            )}
+            {stages.length > 0 && (
+              <LessonHeaderPill>{`Прогресс: ${doneCount}/${stages.length} этапов`}</LessonHeaderPill>
+            )}
+          </>
+        }
+      />
 
       {/* Stages (only if teacher enabled any) */}
       {stages.length > 0 && (
