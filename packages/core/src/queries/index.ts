@@ -669,6 +669,8 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     testQuery = testQuery.eq("student_id", studentId);
   }
   const [fileRes, testRes] = await Promise.all([fileQuery, testQuery]);
+  if (fileRes.error) console.error("[getStudentGrades] homework_submissions error:", fileRes.error.message);
+  if (testRes.error) console.error("[getStudentGrades] test_submissions error:", testRes.error.message);
 
   const items: StudentGradeItem[] = [];
   for (const r of (fileRes.data ?? []) as unknown as Array<{
@@ -711,6 +713,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     let cwQuery: any = (db as any).from("classwork_submissions").select(cwSel).not("grade", "is", null);
     if (studentId) cwQuery = cwQuery.eq("student_id", studentId);
     const cwRes = await cwQuery;
+    if (cwRes.error) console.error("[getStudentGrades] classwork_submissions error:", cwRes.error.message);
     for (const r of (cwRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string;
       classwork: { title: string; lesson: { group: { subject: string; name: string } | null } | null } | null;
@@ -726,7 +729,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.teacher_comment,
       });
     }
-  } catch { /* classwork table may not exist on older hosted instances */ }
+  } catch (e) { console.error("[getStudentGrades] classwork_submissions threw:", (e as Error)?.message); }
 
   // Project submissions with grades (migration 33)
   try {
@@ -736,6 +739,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     let projQuery: any = (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
     if (studentId) projQuery = projQuery.eq("student_id", studentId);
     const projRes = await projQuery;
+    if (projRes.error) console.error("[getStudentGrades] project_submissions error:", projRes.error.message);
     for (const r of (projRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string | null; graded_at: string | null;
       project: { title: string; group: { subject: string; name: string } | null } | null;
@@ -751,7 +755,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.teacher_comment,
       });
     }
-  } catch { /* projects table may not exist on older hosted instances */ }
+  } catch (e) { console.error("[getStudentGrades] project_submissions threw:", (e as Error)?.message); }
 
   // Lesson stage task grades (quiz_qia, quiz_kahoot, code, external — migration 39)
   try {
@@ -762,6 +766,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
     if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
     const stageRes = await stageQuery;
+    if (stageRes.error) console.error("[getStudentGrades] lesson_stage_progress error:", stageRes.error.message);
     for (const r of (stageRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null;
       completed_at: string | null; graded_at: string | null;
@@ -786,7 +791,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.teacher_comment,
       });
     }
-  } catch { /* lesson_stage_progress join may not be available on older instances */ }
+  } catch (e) { console.error("[getStudentGrades] lesson_stage_progress threw:", (e as Error)?.message); }
 
   // Lesson grades (migration 40)
   try {
@@ -796,6 +801,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     let lgQuery: any = (db as any).from("lesson_grades").select(lgSel);
     if (studentId) lgQuery = lgQuery.eq("student_id", studentId);
     const lgRes = await lgQuery;
+    if (lgRes.error) console.error("[getStudentGrades] lesson_grades error:", lgRes.error.message);
     for (const r of (lgRes.data ?? []) as unknown as Array<{
       id: string; grade: number; comment: string | null; graded_at: string;
       lesson: { title: string | null; group: { subject: string; name: string } | null } | null;
@@ -811,7 +817,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.comment,
       });
     }
-  } catch { /* lesson_grades may not exist on older hosted instances */ }
+  } catch (e) { console.error("[getStudentGrades] lesson_grades threw:", (e as Error)?.message); }
 
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;
