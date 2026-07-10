@@ -17,6 +17,7 @@
     "@snr/ui-tokens": "workspace:*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
+    "@vercel/speed-insights": "^2.0.0",
     "JSCPP": "^2.0.9",
     "canvas-confetti": "^1.9.4",
     "jszip": "^3.10.1",

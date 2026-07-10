@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {children}
           </LocaleProvider>
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

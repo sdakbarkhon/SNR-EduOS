@@ -9,6 +9,16 @@ const nextConfig = {
     // ESLint подключим отдельно; на этапе скаффолда не блокируем сборку.
     ignoreDuringBuilds: true,
   },
+  async headers() {
+    // App Router's icon.svg convention defaults to max-age=0 (assumes it may
+    // change at runtime) — this one is static, so cache it like any other asset.
+    return [
+      {
+        source: "/icon.svg",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, must-revalidate" }],
+      },
+    ];
+  },
   webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
       // pptxgenjs (client PPTX export) references node: builtins behind a browser
