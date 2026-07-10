@@ -758,6 +758,7 @@ export interface Dictionary {
     sectionTeachers: string;
     allBusy: string;       // "Все демо-аккаунты заняты, попробуйте через несколько минут"
     loginFailed: string;   // демо-логин не удался по иной причине (не занятость пула)
+    cannotEditRealData: string; // tooltip/ошибка: в демо нельзя менять реальные записи
   };
   announcements: {
     title: string;

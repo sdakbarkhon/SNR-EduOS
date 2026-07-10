@@ -9,6 +9,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
+import { useIsDemoSession } from "@/lib/useIsDemoSession";
 
 const LIVE_SCORES_POLL_MS = 12000;
 
@@ -32,6 +33,8 @@ export function StageViewModal({
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
   const db = createClient();
+  const isDemoSession = useIsDemoSession();
+  const editBlocked = isDemoSession && !stage.is_demo;
 
   const isQuizType = stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot";
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -108,8 +111,10 @@ export function StageViewModal({
           <div className="flex shrink-0 items-center gap-2">
             {lessonStatus !== "completed" && (
               <button
-                onClick={onEdit}
-                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95"
+                onClick={() => { if (editBlocked) return; onEdit(); }}
+                disabled={editBlocked}
+                title={editBlocked ? d.demoMode.cannotEditRealData : undefined}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-blue-600"
               >
                 <Pencil className="h-4 w-4" /> {dl.stageEditModalTitle}
               </button>

@@ -49,6 +49,8 @@ export function TeacherProgrammingSubmissions({
       await gradeSubmission(db, { submissionId: s.id, grade: n, comment });
       setSubs((p) => p.map((x) => (x.id === s.id ? { ...x, grade: n, teacher_comment: comment || null } : x)));
       setEditingId(null);
+    } catch (e: unknown) {
+      console.error("[grade] failed:", e);
     } finally {
       setGrades((p) => ({ ...p, [s.id]: { grade: p[s.id]?.grade ?? "", comment: p[s.id]?.comment ?? "", saving: false } }));
     }

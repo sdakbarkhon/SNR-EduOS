@@ -15,6 +15,7 @@ import { CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { X } from "lucide-react";
 import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
+import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
 type BundleSub = {
   id: string;
@@ -178,7 +179,7 @@ function BundleGradeModal({
       await gradeSubmission(supabase, { submissionId: submission.id, grade: gradeNum, comment: comment.trim() });
       onGraded(gradeNum, comment.trim());
     } catch (e: unknown) {
-      setError((e as Error).message ?? d.common.error);
+      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
     } finally {
       setSaving(false);
     }

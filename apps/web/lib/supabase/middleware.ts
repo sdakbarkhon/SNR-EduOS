@@ -65,7 +65,8 @@ export async function updateSession(request: NextRequest) {
 
     let sessionStatus = "missing";
     if (currentSessionId) {
-      const { data: checkResult, error: checkError } = await supabase.rpc(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: checkResult, error: checkError } = await (supabase as any).rpc(
         "check_user_session",
         { p_session_id: currentSessionId },
       );

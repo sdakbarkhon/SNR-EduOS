@@ -754,6 +754,7 @@ export const ru: Dictionary = {
     sectionTeachers: "Учителя",
     allBusy: "Все демо-аккаунты заняты, попробуйте через несколько минут",
     loginFailed: "Не удалось войти в демо-режим, попробуйте ещё раз",
+    cannotEditRealData: "В демо-режиме нельзя редактировать реальные данные",
     welcomeTitle: "Вы в демо-режиме",
     welcomeText: "Все данные тестовые.",
     welcomeOk: "Понятно",

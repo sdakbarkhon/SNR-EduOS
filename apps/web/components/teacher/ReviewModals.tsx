@@ -8,6 +8,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { Download, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
 export type ReviewQuestion = {
   id: string;
@@ -76,7 +77,7 @@ export function ReviewModal({ submission, onClose, onGraded }: {
       await gradeSubmission(supabase, { submissionId: submission.id, grade: gradeNum, comment: comment.trim() });
       onGraded(gradeNum, comment.trim());
     } catch (e: unknown) {
-      setError((e as Error).message ?? d.common.error);
+      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
     } finally {
       setSaving(false);
     }
@@ -209,7 +210,7 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
       if (err) throw err;
       onGraded(newScore, newMax);
     } catch (e: unknown) {
-      setError((e as Error).message ?? d.common.error);
+      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
     } finally {
       setSaving(false);
     }

@@ -146,6 +146,8 @@ export type LessonStage = {
   // migration 64 — live coding: учитель транслирует код в реальном времени
   live_code?: string | null;
   is_live_active?: boolean | null;
+  // migration 110 — демо-сессия не может редактировать реальные (is_demo=false) этапы
+  is_demo: boolean;
 };
 
 export type LessonSlideLayout = "title" | "split" | "quote" | "code" | "default";
@@ -313,6 +315,8 @@ export type LessonMaterial = {
   uploaded_by: string | null;
   created_at: string;
   visibility: 'all' | 'teacher_only';
+  // migration 110 — демо-сессия не может удалить реальный (is_demo=false) материал
+  is_demo: boolean;
 };
 
 
@@ -398,6 +402,9 @@ export type AttendanceRollCallRow = {
   status: AttendanceStatus | null; // null = ещё не отмечен
   marked_at: string | null;
   is_finalized: boolean;
+  // migration 110 — null = записи ещё нет (демо-отметка разрешена — создание);
+  // false = реальная запись, демо-сессии её перезаписывать нельзя.
+  is_demo: boolean | null;
 };
 
 export type HomeworkAttachment = {
@@ -803,6 +810,8 @@ export type ClassworkSubmission = {
   teacher_comment: string | null;
   graded_at: string | null;
   graded_by: string | null;
+  // migration 110 — демо-сессия не может перегрузить уже проставленную реальную оценку
+  is_demo: boolean;
 };
 
 export type Classwork = {
@@ -878,4 +887,6 @@ export type LessonGrade = {
   graded_by: string;
   graded_at: string;
   updated_at: string;
+  // migration 110 — демо-сессия не может перезаписать реальную (is_demo=false) оценку
+  is_demo: boolean;
 };

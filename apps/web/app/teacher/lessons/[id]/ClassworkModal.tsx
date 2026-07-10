@@ -11,6 +11,7 @@ import {
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { useIsDemoSession } from "@/lib/useIsDemoSession";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -33,6 +34,7 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const db = createClient();
+  const isDemoSession = useIsDemoSession();
 
   const [tab, setTab] = useState<"task" | "submissions">("task");
   const [classwork, setClasswork] = useState<Classwork | null>(null);
@@ -411,6 +413,9 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                   const isGraded = s.grade != null;
                   const isEditing = editingId === s.id;
                   const g = grades[s.id];
+                  // Перегрузка УЖЕ проставленной реальной оценки демо-сессией запрещена;
+                  // выставление первой оценки (isGraded=false) — создание, всегда можно.
+                  const regradeBlocked = isDemoSession && isGraded && !s.is_demo;
                   return (
                     <div key={s.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
                       {/* Student row */}
@@ -458,8 +463,10 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                             )}
                           </div>
                           <button
-                            onClick={() => setEditingId(s.id)}
-                            className="flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
+                            onClick={() => { if (regradeBlocked) return; setEditingId(s.id); }}
+                            disabled={regradeBlocked}
+                            title={regradeBlocked ? d.demoMode.cannotEditRealData : undefined}
+                            className="flex items-center gap-1 text-xs text-[var(--accent)] hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline"
                           >
                             <Pencil className="w-3 h-3" />
                             Редактировать

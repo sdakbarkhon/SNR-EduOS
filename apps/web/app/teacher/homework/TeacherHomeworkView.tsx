@@ -7,6 +7,7 @@ import { getDictionary, getSubjectConfig, deleteHomework } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
+import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
@@ -180,7 +181,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
       await deleteHomework(supabase, hw.id);
       setLocalHW((list) => list.filter((h) => h.id !== hw.id));
     } catch (e: unknown) {
-      alert((e as Error).message);
+      alert(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message);
     } finally {
       setBusyId(null);
     }

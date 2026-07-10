@@ -169,6 +169,8 @@ function AttachmentCard({
     try {
       await deleteHomeworkAttachment(sb, hw.id, hw.attachment_storage_path);
       onDeleted();
+    } catch (e: unknown) {
+      console.error("[homework-attachment] delete failed:", e);
     } finally {
       setDelLoading(false);
     }

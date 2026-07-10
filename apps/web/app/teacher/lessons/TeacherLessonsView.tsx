@@ -10,13 +10,14 @@ import {
 } from "lucide-react";
 import {
   createLesson, updateLesson, deleteLesson,
-  getTeacherLessonsByMonth, getDictionary,
+  getTeacherLessonsByMonth, getDictionary, defaultLocale,
 } from "@snr/core";
 import type { SubjectWithGroup, Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
 import { SubjectIcon } from "@/components/SubjectIcon";
+import { useDemoEditBlocked, isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -25,6 +26,7 @@ type LessonItem = {
   topic: string | null; title: string | null;
   starts_at: string; ends_at: string | null; room: string | null;
   status: string; started_at: string | null; ended_at: string | null;
+  is_demo: boolean;
   group: { id: string; name: string; subject: string };
 };
 type FormState = {
@@ -144,7 +146,12 @@ function lessonToForm(l: LessonItem): FormState {
 }
 
 // ── CardMenu ──────────────────────────────────────────────────────────────────
-function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function CardMenu({
+  onEdit, onDelete, editBlocked,
+}: {
+  onEdit: () => void; onDelete: () => void; editBlocked: boolean;
+}) {
+  const demoTooltip = getDictionary(defaultLocale).demoMode.cannotEditRealData;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -165,14 +172,18 @@ function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => vo
       {open && (
         <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
           <button
-            onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(false); onEdit(); }}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={e => { e.preventDefault(); e.stopPropagation(); if (editBlocked) return; setOpen(false); onEdit(); }}
+            disabled={editBlocked}
+            title={editBlocked ? demoTooltip : undefined}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <Pencil className="h-3.5 w-3.5" /> Редактировать
           </button>
           <button
-            onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(false); onDelete(); }}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+            onClick={e => { e.preventDefault(); e.stopPropagation(); if (editBlocked) return; setOpen(false); onDelete(); }}
+            disabled={editBlocked}
+            title={editBlocked ? demoTooltip : undefined}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <Trash2 className="h-3.5 w-3.5" /> Удалить
           </button>
@@ -195,6 +206,7 @@ function LessonCard({
     : fmtTime(lesson.starts_at);
   const eff = getEffectiveStatus(lesson, now);
   const badge = EFF_BADGE[eff];
+  const editBlocked = useDemoEditBlocked(lesson.is_demo);
 
   return (
     <div className={`flex items-center gap-3 rounded-2xl border border-white/60 p-3 pl-4 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-l-4 ${EFF_CARD_BG[eff]} ${EFF_BORDER[eff]}`}>
@@ -215,7 +227,7 @@ function LessonCard({
           </div>
         </div>
       </Link>
-      <CardMenu onEdit={() => onEdit(lesson)} onDelete={() => onDelete(lesson)} />
+      <CardMenu onEdit={() => onEdit(lesson)} onDelete={() => onDelete(lesson)} editBlocked={editBlocked} />
     </div>
   );
 }
@@ -315,7 +327,14 @@ function LessonFormModal({
     if (!form.startTime) { setError("Укажите время начала"); return; }
     setSaving(true); setError("");
     try { await onSave(form); }
-    catch (err: unknown) { setError(err instanceof Error ? err.message : "Ошибка сохранения"); setSaving(false); }
+    catch (err: unknown) {
+      setError(
+        isDemoEditBlockedError(err)
+          ? getDictionary(defaultLocale).demoMode.cannotEditRealData
+          : err instanceof Error ? err.message : "Ошибка сохранения",
+      );
+      setSaving(false);
+    }
   }
 
   const inputCls = "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";

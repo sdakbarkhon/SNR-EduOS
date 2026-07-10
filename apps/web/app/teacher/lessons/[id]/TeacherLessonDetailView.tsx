@@ -39,6 +39,7 @@ import { AttendanceRollCall } from "./AttendanceRollCall";
 import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { useIsDemoSession, isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
@@ -698,6 +699,7 @@ export function TeacherLessonDetailView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
+  const isDemoSession = useIsDemoSession();
 
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
@@ -1205,7 +1207,9 @@ export function TeacherLessonDetailView({
           <p className="text-sm text-gray-400">{dl.materialsEmpty}</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {materials.map((mat) => (
+            {materials.map((mat) => {
+              const matEditBlocked = isDemoSession && !mat.is_demo;
+              return (
               <div key={mat.id} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -1228,8 +1232,11 @@ export function TeacherLessonDetailView({
                       <Download className="h-4 w-4" />
                     </button>
                     {!isLessonCompleted && (
-                      <button onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title={dl.deleteConfirm}>
+                      <button
+                        onClick={() => { if (matEditBlocked) return; setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
+                        disabled={matEditBlocked}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                        title={matEditBlocked ? d.demoMode.cannotEditRealData : dl.deleteConfirm}>
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -1257,7 +1264,8 @@ export function TeacherLessonDetailView({
                   )
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -1540,8 +1548,10 @@ export function TeacherLessonDetailView({
                     </>
                   )}
                   <button
-                    onClick={() => setStageToDelete(stage)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                    onClick={() => { if (isDemoSession && !stage.is_demo) return; setStageToDelete(stage); }}
+                    disabled={isDemoSession && !stage.is_demo}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                    title={isDemoSession && !stage.is_demo ? d.demoMode.cannotEditRealData : undefined}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

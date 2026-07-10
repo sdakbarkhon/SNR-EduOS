@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
 import { GradeModal } from "./GradeModal";
+import { useIsDemoSession } from "@/lib/useIsDemoSession";
 
 type Props = {
   lessonId: string;
@@ -32,6 +33,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   const d = getDictionary(locale as Locale);
   const dt = d.teacher;
   const db = createClient();
+  const isDemoSession = useIsDemoSession();
 
   const [rows, setRows] = useState<AttendanceRollCallRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +78,10 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
-  async function setStatus(studentId: string, oldStatus: AttendanceStatus | null, next: AttendanceStatus) {
-    if (readOnly || next === oldStatus) return;
+  async function setStatus(
+    studentId: string, oldStatus: AttendanceStatus | null, next: AttendanceStatus, rowEditBlocked: boolean,
+  ) {
+    if (readOnly || next === oldStatus || rowEditBlocked) return;
     setRows((prev) =>
       prev.map((r) =>
         r.student_id === studentId ? { ...r, status: next, marked_at: new Date().toISOString() } : r,
@@ -164,6 +168,9 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
           {rows.map((row) => {
             const st = row.status;
             const excuseReason = excused?.[row.student_id];
+            // is_demo === false: реальная запись — демо-сессии её менять нельзя.
+            // null (записи нет) или true (уже демо) — можно.
+            const rowEditBlocked = isDemoSession && row.is_demo === false;
             return (
               <div
                 key={row.student_id}
@@ -214,43 +221,43 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                 })()}
                 <div className="flex shrink-0 gap-1">
                   <button
-                    onClick={() => setStatus(row.student_id, st, "present")}
-                    disabled={readOnly}
-                    title={dt.rollCallPresent}
+                    onClick={() => setStatus(row.student_id, st, "present", rowEditBlocked)}
+                    disabled={readOnly || rowEditBlocked}
+                    title={rowEditBlocked ? d.demoMode.cannotEditRealData : dt.rollCallPresent}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                       st === "present"
                         ? "bg-emerald-500 text-white shadow-sm"
                         : "bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-500",
-                      readOnly && "cursor-default opacity-60",
+                      (readOnly || rowEditBlocked) && "cursor-not-allowed opacity-60",
                     )}
                   >
                     <Check className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => setStatus(row.student_id, st, "absent_excused")}
-                    disabled={readOnly}
-                    title={dt.rollCallExcused}
+                    onClick={() => setStatus(row.student_id, st, "absent_excused", rowEditBlocked)}
+                    disabled={readOnly || rowEditBlocked}
+                    title={rowEditBlocked ? d.demoMode.cannotEditRealData : dt.rollCallExcused}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                       st === "absent_excused"
                         ? "bg-yellow-400 text-white shadow-sm"
                         : "bg-gray-100 text-gray-400 hover:bg-yellow-50 hover:text-yellow-500",
-                      readOnly && "cursor-default opacity-60",
+                      (readOnly || rowEditBlocked) && "cursor-not-allowed opacity-60",
                     )}
                   >
                     <BookMarked className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => setStatus(row.student_id, st, "absent_unexcused")}
-                    disabled={readOnly}
-                    title={dt.rollCallUnexcused}
+                    onClick={() => setStatus(row.student_id, st, "absent_unexcused", rowEditBlocked)}
+                    disabled={readOnly || rowEditBlocked}
+                    title={rowEditBlocked ? d.demoMode.cannotEditRealData : dt.rollCallUnexcused}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                       st === "absent_unexcused"
                         ? "bg-red-500 text-white shadow-sm"
                         : "bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500",
-                      readOnly && "cursor-default opacity-60",
+                      (readOnly || rowEditBlocked) && "cursor-not-allowed opacity-60",
                     )}
                   >
                     <UserX className="h-3.5 w-3.5" />

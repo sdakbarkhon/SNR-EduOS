@@ -754,6 +754,7 @@ export const uz: Dictionary = {
     sectionTeachers: "O'qituvchilar",
     allBusy: "Barcha demo hisoblar band, bir necha daqiqadan so'ng qayta urinib ko'ring",
     loginFailed: "Demo rejimga kirish amalga oshmadi, qayta urinib ko'ring",
+    cannotEditRealData: "Demo rejimda haqiqiy ma'lumotlarni tahrirlab bo'lmaydi",
     welcomeTitle: "Demo rejim",
     welcomeText: "Barcha ma'lumotlar sinov uchun.",
     welcomeOk: "Tushundim",

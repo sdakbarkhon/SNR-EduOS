@@ -2691,7 +2691,7 @@ export const getLessonGradesForGroup = async (db: Db, groupId: string): Promise<
 type TeacherLessonListItem = {
   id: string; group_id: string; lesson_no: number | null; topic: string | null;
   title: string | null; starts_at: string; ends_at: string | null; room: string | null;
-  status: string; started_at: string | null; ended_at: string | null;
+  status: string; started_at: string | null; ended_at: string | null; is_demo: boolean;
   group: { id: string; name: string; subject: string };
 };
 
@@ -2699,7 +2699,7 @@ type TeacherLessonListItem = {
 export const getTeacherAllLessons = async (db: Db): Promise<TeacherLessonListItem[]> => {
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, is_demo, group:groups!inner(id, name, subject)")
     .order("starts_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as TeacherLessonListItem[];
@@ -2715,7 +2715,7 @@ export const getTeacherLessonsByMonth = async (
   const end = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, is_demo, group:groups!inner(id, name, subject)")
     .gte("starts_at", start)
     .lte("starts_at", end)
     .order("starts_at");
@@ -2773,11 +2773,11 @@ export const getTeacherLessonAttendance = async (
 
   const { data: records } = await db2
     .from("attendance")
-    .select("student_id, status, marked_at, is_finalized")
+    .select("student_id, status, marked_at, is_finalized, is_demo")
     .eq("lesson_id", lessonId);
 
-  const attMap = new Map<string, { status: string; marked_at: string; is_finalized: boolean }>(
-    ((records ?? []) as Array<{ student_id: string; status: string; marked_at: string; is_finalized: boolean }>)
+  const attMap = new Map<string, { status: string; marked_at: string; is_finalized: boolean; is_demo: boolean }>(
+    ((records ?? []) as Array<{ student_id: string; status: string; marked_at: string; is_finalized: boolean; is_demo: boolean }>)
       .map((r) => [r.student_id, r]),
   );
 
@@ -2790,6 +2790,7 @@ export const getTeacherLessonAttendance = async (
         status: (att?.status ?? null) as AttendanceStatus | null,
         marked_at: att?.marked_at ?? null,
         is_finalized: att?.is_finalized ?? false,
+        is_demo: att ? att.is_demo : null,
       };
     })
     .sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
@@ -3339,6 +3340,7 @@ export const getClassworkSubmissions = async (
       text_answer: null, file_storage_path: null, file_original_name: null, file_size_bytes: null,
       test_answers: null, test_score: null, test_max: null,
       submitted_at: "", grade: null, teacher_comment: null, graded_at: null, graded_by: null,
+      is_demo: false,
     }),
     student: s,
   }));

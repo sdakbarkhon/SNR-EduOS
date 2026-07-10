@@ -754,6 +754,7 @@ export const en: Dictionary = {
     sectionTeachers: "Teachers",
     allBusy: "All demo accounts are busy, please try again in a few minutes",
     loginFailed: "Demo sign-in failed, please try again",
+    cannotEditRealData: "Real data cannot be edited in demo mode",
     welcomeTitle: "Demo mode",
     welcomeText: "All data is test data.",
     welcomeOk: "Got it",
