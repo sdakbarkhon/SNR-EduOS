@@ -759,9 +759,14 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
 
   // Lesson stage task grades (quiz_qia, quiz_kahoot, code, external — migration 39)
   try {
+    // lesson:lessons!lesson_id — explicit FK hint. lesson_stages<->lessons has
+    // TWO relationships (lesson_stages.lesson_id -> lessons.id, AND the
+    // reverse lessons.active_stage_id -> lesson_stages.id from migration 54),
+    // so PostgREST can't auto-resolve the embed and errors with "more than
+    // one relationship was found" — confirmed live in production logs.
     const stageSel =
       "id, grade, teacher_comment, completed_at, graded_at, submission_data, " +
-      "stage:lesson_stages!inner(title, content_type, lesson:lessons!inner(group:groups!inner(subject, name)))";
+      "stage:lesson_stages!inner(title, content_type, lesson:lessons!lesson_id(group:groups!inner(subject, name)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
     if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
