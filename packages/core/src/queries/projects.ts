@@ -102,26 +102,39 @@ export const getStudentProjects = async (db: Db, studentId: string): Promise<Stu
     .select("*, teacher:teachers(full_name), stages:project_stages(count), submissions:project_submissions(id, is_submitted, grade, student_id)")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  const out: StudentProjectListItem[] = [];
-  for (const p of (data ?? []) as any[]) {
+  const projects = (data ?? []) as any[];
+  const subByProjectId = new Map<string, any>();
+  for (const p of projects) {
     const sub = (p.submissions ?? []).find((s: any) => s.student_id === studentId) ?? null;
-    let completedCount = 0;
-    if (sub) {
-      const { data: prog } = await (db as any).from("project_stage_progress")
-        .select("is_completed").eq("submission_id", sub.id);
-      completedCount = (prog ?? []).filter((x: any) => x.is_completed).length;
+    if (sub) subByProjectId.set(p.id, sub);
+  }
+
+  // One query for every submission's stage progress instead of one query
+  // per submission (was N+1 — every project load fired a separate
+  // project_stage_progress round trip per completed/started submission).
+  const submissionIds = Array.from(subByProjectId.values(), (s) => s.id);
+  const completedCountBySubmissionId = new Map<string, number>();
+  if (submissionIds.length > 0) {
+    const { data: prog } = await (db as any).from("project_stage_progress")
+      .select("submission_id, is_completed").in("submission_id", submissionIds);
+    for (const row of (prog ?? []) as any[]) {
+      if (!row.is_completed) continue;
+      completedCountBySubmissionId.set(row.submission_id, (completedCountBySubmissionId.get(row.submission_id) ?? 0) + 1);
     }
-    out.push({
+  }
+
+  return projects.map((p) => {
+    const sub = subByProjectId.get(p.id) ?? null;
+    return {
       ...p,
       teacherName: p.teacher?.full_name ?? null,
       stageCount: p.stages?.[0]?.count ?? 0,
-      completedCount,
+      completedCount: sub ? (completedCountBySubmissionId.get(sub.id) ?? 0) : 0,
       submission: sub
         ? { id: sub.id, project_id: p.id, student_id: studentId, is_submitted: sub.is_submitted, submitted_at: null, grade: sub.grade ?? null, teacher_comment: null, graded_at: null, graded_by: null }
         : null,
-    });
-  }
-  return out;
+    };
+  });
 };
 
 export const getProjectDetailForStudent = async (

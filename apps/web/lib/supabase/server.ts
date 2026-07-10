@@ -14,7 +14,7 @@ export const createClient = cache(async (): Promise<Db> => {
   const cookieStore = await cookies();
   const { url, anonKey } = getSupabaseEnv();
 
-  return createServerClient<Database, "public">(url, anonKey, {
+  const client = createServerClient<Database, "public">(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -32,4 +32,24 @@ export const createClient = cache(async (): Promise<Db> => {
       },
     },
   }) as unknown as Db;
+
+  // auth.getUser() does a real network round-trip (JWT revalidation against
+  // Supabase Auth) on every call, and multiple call sites within one request
+  // (a layout, a page, and query helpers like getMyStudent) each called it
+  // independently — up to 3 round trips for what is the same request's same
+  // user. Since createClient() is itself cache()'d (one client per request),
+  // memoizing getUser() on that client here covers every call site — layout,
+  // page, or deep inside a @snr/core query function — with zero changes to
+  // any of them.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawGetUser = client.auth.getUser.bind(client.auth) as (...args: any[]) => any;
+  let cachedUserPromise: ReturnType<typeof rawGetUser> | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (client.auth as any).getUser = (jwt?: string) => {
+    if (jwt !== undefined) return rawGetUser(jwt);
+    if (!cachedUserPromise) cachedUserPromise = rawGetUser();
+    return cachedUserPromise;
+  };
+
+  return client;
 });

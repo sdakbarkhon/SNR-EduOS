@@ -1034,30 +1034,37 @@ export const createTestQuestions = async (
     options?: Array<{ optionText: string; isCorrect: boolean; orderIndex: number }>;
   }>,
 ) => {
-  for (const q of questions) {
-    const { data: qRow, error: qErr } = await db
-      .from("test_questions")
-      .insert({
-        homework_id: homeworkId,
-        question_text: q.questionText,
-        question_type: q.questionType,
-        order_index: q.orderIndex,
-      })
-      .select("id")
-      .single();
-    if (qErr) throw qErr;
-    const qId = (qRow as unknown as { id: string }).id;
-    if (q.questionType === "single_choice" && q.options?.length) {
-      const { error: oErr } = await db.from("test_question_options").insert(
-        q.options.map((o) => ({
-          question_id: qId,
+  if (questions.length === 0) return;
+  // Bulk insert instead of one INSERT per question (+ one per question's
+  // options) — was N+1, now 2 round trips regardless of question count.
+  // A single INSERT...VALUES statement returns rows in input order, so the
+  // returned ids line up with `questions` by index.
+  const { data: qRows, error: qErr } = await db
+    .from("test_questions")
+    .insert(questions.map((q) => ({
+      homework_id: homeworkId,
+      question_text: q.questionText,
+      question_type: q.questionType,
+      order_index: q.orderIndex,
+    })))
+    .select("id");
+  if (qErr) throw qErr;
+  const ids = (qRows as unknown as Array<{ id: string }>).map((r) => r.id);
+  if (ids.length !== questions.length) throw new Error("test_questions insert returned unexpected row count");
+
+  const allOptions = questions.flatMap((q, i) =>
+    q.questionType === "single_choice" && q.options?.length
+      ? q.options.map((o) => ({
+          question_id: ids[i] as string,
           option_text: o.optionText,
           is_correct: o.isCorrect,
           order_index: o.orderIndex,
-        })),
-      );
-      if (oErr) throw oErr;
-    }
+        }))
+      : [],
+  );
+  if (allOptions.length > 0) {
+    const { error: oErr } = await db.from("test_question_options").insert(allOptions);
+    if (oErr) throw oErr;
   }
 };
 

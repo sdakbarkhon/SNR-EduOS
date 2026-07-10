@@ -1,5 +1,6 @@
 {
   "buildCommand": "pnpm turbo run build --filter=web",
   "outputDirectory": ".next",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "regions": ["fra1"]
 }
