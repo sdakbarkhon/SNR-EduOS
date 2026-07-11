@@ -198,24 +198,34 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                 {savedId === row.student_id && (
                   <span className="text-[11px] font-semibold text-emerald-500">{dt.rollCallSaved}</span>
                 )}
-                {/* Grade button — always active */}
+                {/* Grade button — новая оценка всегда доступна; перевыставление существующей
+                    реальной оценки из демо-сессии заблокировано (см. rowEditBlocked выше). */}
                 {(() => {
                   const lg = gradesMap[row.student_id];
-                  return lg ? (
+                  if (!lg) {
+                    return (
+                      <button
+                        onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                      >
+                        <Star className="h-3 w-3" />
+                        Оценить
+                      </button>
+                    );
+                  }
+                  const gradeEditBlocked = isDemoSession && lg.is_demo === false;
+                  return (
                     <button
-                      onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
-                      className="flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-200 transition-colors"
+                      onClick={() => !gradeEditBlocked && setGradeTarget({ id: row.student_id, name: row.full_name })}
+                      disabled={gradeEditBlocked}
+                      title={gradeEditBlocked ? d.demoMode.cannotEditRealData : undefined}
+                      className={cn(
+                        "flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700 transition-colors",
+                        gradeEditBlocked ? "cursor-not-allowed opacity-60" : "hover:bg-amber-200",
+                      )}
                     >
                       <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
                       {lg.grade} ✓
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition-colors"
-                    >
-                      <Star className="h-3 w-3" />
-                      Оценить
                     </button>
                   );
                 })()}
