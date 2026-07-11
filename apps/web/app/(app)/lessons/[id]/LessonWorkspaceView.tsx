@@ -166,7 +166,7 @@ function TaskStubModal({
             onClick={onClose}
             className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 

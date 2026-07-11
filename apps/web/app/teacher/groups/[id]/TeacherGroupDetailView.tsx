@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getDictionary, getSubjectConfig, pluralizeStudents } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { ChevronLeft } from "lucide-react";
 
 interface Props {
@@ -25,6 +26,7 @@ export function TeacherGroupDetailView({ group, students }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const cfg = getSubjectConfig(group.subject);
+  const { Icon: GroupSubjectIcon } = resolveSubjectIcon(group.subject);
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
@@ -33,9 +35,9 @@ export function TeacherGroupDetailView({ group, students }: Props) {
           <ChevronLeft size={20} />
         </Link>
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-[14px] text-[24px]"
-            style={{ background: cfg.color + "20" }}>
-            {cfg.emoji}
+          <div className="flex h-12 w-12 items-center justify-center rounded-[14px]"
+            style={{ background: cfg.color + "20", color: cfg.color }}>
+            <GroupSubjectIcon className="h-6 w-6" />
           </div>
           <div>
             <h1 className="text-[20px] font-bold text-brand-ink">{group.name}</h1>

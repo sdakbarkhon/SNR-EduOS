@@ -26,6 +26,12 @@ const ICONS: Record<string, LucideIcon> = {
   "code-2": Code2,
 };
 
+/** Resolves a subject to its lucide icon + color, no wrapper/background — for embedding inside an already-styled container (colored tile, gradient cover). */
+export function resolveSubjectIcon(subject: string | null): { Icon: LucideIcon; color: string } {
+  const s = getSubjectStyle(subject);
+  return { Icon: ICONS[s.icon] ?? BookOpen, color: s.color };
+}
+
 export function SubjectIcon({
   subject,
   size = 40,

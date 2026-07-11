@@ -13,7 +13,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
@@ -125,8 +125,8 @@ function SubtaskAnswer({
   // external service subtask (wokwi/codesandbox/geogebra/.../h5p)
   const ack = (answer.content as { acknowledged?: boolean }).acknowledged === true;
   return (
-    <p className={cn("text-[13px] font-medium", ack ? "text-emerald-600" : "text-brand-ink-muted")}>
-      {ack ? "✓ Отметил как выполнено" : "— Не отмечено"}
+    <p className={cn("flex items-center gap-1 text-[13px] font-medium", ack ? "text-emerald-600" : "text-brand-ink-muted")}>
+      {ack ? <><Check className="h-3.5 w-3.5" /> Отметил как выполнено</> : "— Не отмечено"}
     </p>
   );
 }

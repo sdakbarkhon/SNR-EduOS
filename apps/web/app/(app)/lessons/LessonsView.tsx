@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Backpack,
   BookOpen,
   Calendar,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Clock,
+  Smile,
   Star,
 } from "lucide-react";
 import { getDictionary, getStudentLessonsForWeek } from "@snr/core";
@@ -128,7 +131,7 @@ function ClayIcon({
   );
 }
 
-// ── emoji-иллюстрация (нет пригодных растровых ассетов) ──────────────────────
+// ── иллюстрация "нет уроков" (нет пригодных растровых ассетов) ───────────────
 
 function BackpackArt({ size = "lg" }: { size?: "lg" | "sm" }) {
   const lg = size === "lg";
@@ -139,11 +142,11 @@ function BackpackArt({ size = "lg" }: { size?: "lg" | "sm" }) {
         lg ? "h-24 w-24" : "h-14 w-14",
       )}
     >
-      <span className={cn("drop-shadow-md", lg ? "text-5xl" : "text-3xl")}>🎒</span>
+      <Backpack className={cn("text-violet-500 drop-shadow-md", lg ? "h-11 w-11" : "h-7 w-7")} />
       {lg && (
         <>
-          <span className="absolute -left-1 top-1 -rotate-12 text-2xl drop-shadow-sm">📚</span>
-          <span className="absolute -right-1 bottom-1 rotate-12 text-2xl drop-shadow-sm">⏰</span>
+          <BookOpen className="absolute -left-1 top-1 h-5 w-5 -rotate-12 text-amber-500 drop-shadow-sm" />
+          <Clock className="absolute -right-1 bottom-1 h-5 w-5 rotate-12 text-sky-500 drop-shadow-sm" />
         </>
       )}
     </div>
@@ -333,7 +336,7 @@ export function LessonsView({
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 py-6">
               <BackpackArt />
-              <p className="text-lg font-bold text-slate-700">{d.dashboard.noLessonsToday} 😊</p>
+              <p className="flex items-center gap-1.5 text-lg font-bold text-slate-700">{d.dashboard.noLessonsToday} <Smile className="h-5 w-5 text-violet-400" /></p>
               <button
                 onClick={() => switchMode("week")}
                 className="rounded-full px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:opacity-90"
@@ -561,8 +564,8 @@ function WeekGrid({
                   className="z-[1] flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 py-4"
                   style={{ gridColumn: di + 2, gridRow: `1 / ${rowCount + 1}` }}
                 >
-                  <span className="text-3xl opacity-70">🎒</span>
-                  <span className="px-1 text-center text-xs font-bold text-slate-400">{s.weekend} 😊</span>
+                  <Backpack className="h-8 w-8 text-violet-400 opacity-70" />
+                  <span className="flex items-center gap-1 px-1 text-center text-xs font-bold text-slate-400">{s.weekend} <Smile className="h-3.5 w-3.5" /></span>
                 </div>
               ) : null,
             )}

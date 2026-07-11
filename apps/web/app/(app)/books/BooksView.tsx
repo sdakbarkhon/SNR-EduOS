@@ -9,6 +9,7 @@ import type { Book } from "@snr/core";
 import { getBookFileUrl } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { resolveSubjectIcon } from "@/components/SubjectIcon";
 
 // ── Config ──────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ function BookDetailModal({
   const [visible, setVisible] = useState(false);
   const [optimisticFav, setOptimisticFav] = useState(isFavorite);
   const style = getSubjectStyle(book.subject);
+  const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
 
   useEffect(() => { setOptimisticFav(isFavorite); }, [isFavorite]);
   useEffect(() => {
@@ -125,7 +127,7 @@ function BookDetailModal({
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-6xl">{style.emoji}</span>
+                  <BookSubjectIcon className="h-16 w-16" style={{ color: style.color }} />
                 </div>
               )}
             </div>
@@ -144,7 +146,7 @@ function BookDetailModal({
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
                 style={{ background: style.color + "22", color: style.color }}
               >
-                {style.emoji} {SUBJECT_LABELS[book.subject] ?? book.subject}
+                <BookSubjectIcon className="h-3.5 w-3.5" /> {SUBJECT_LABELS[book.subject] ?? book.subject}
               </span>
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                 {book.book_type}
@@ -217,7 +219,7 @@ function BookCard({
   onSelect: (bookId: string) => void;
   onToggleFavorite: (bookId: string) => void;
 }) {
-  const style = getSubjectStyle(book.subject);
+  const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
 
   return (
     <div className="group cursor-pointer" onClick={() => onSelect(book.id)}>
@@ -253,10 +255,10 @@ function BookCard({
           </button>
         )}
 
-        {/* Emoji auto-cover */}
+        {/* Icon auto-cover */}
         {!coverUrl && (
-          <span className="absolute inset-0 z-[2] flex items-center justify-center text-5xl transition-transform duration-300 group-hover:scale-110">
-            {style.emoji}
+          <span className="absolute inset-0 z-[2] flex items-center justify-center text-white/90 transition-transform duration-300 group-hover:scale-110">
+            <BookSubjectIcon className="h-12 w-12" />
           </span>
         )}
       </div>

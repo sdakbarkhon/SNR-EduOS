@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Calculator, Code2, Cpu, FlaskConical, Globe, type LucideIcon } from "lucide-react";
+import { ArrowRight, Calculator, Code2, Cpu, FlaskConical, Globe, FlaskRound, type LucideIcon } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { cn } from "@/lib/cn";
@@ -16,7 +16,6 @@ type DemoProject = {
   id: number;
   title: string;
   type: ProjectType;
-  icon: string;
   description: string;
   status: ProjectStatus;
   progress: number;
@@ -24,15 +23,16 @@ type DemoProject = {
 
 // Заглушки — реальной таблицы "портфолио проектов" нет, только оцениваемые
 // проекты (см. getStudentProjects/[id]) и песочница. Карточки ведут в
-// песочницу с предвыбранным инструментом (Iter5 P10, вариант А).
+// песочницу с предвыбранным инструментом (Iter5 P10, вариант А). Иконка
+// берётся из TYPE_STYLE[type].Icon — отдельного поля на проект не нужно.
 const DEMO_PROJECTS: DemoProject[] = [
-  { id: 1, title: "Игра змейка на Python", type: "python", icon: "🐍", description: "Классическая игра Змейка с использованием Pygame", status: "in_progress", progress: 60 },
-  { id: 2, title: "Мигающий светодиод Arduino", type: "arduino", icon: "💡", description: "Управление светодиодом через Wokwi симулятор", status: "completed", progress: 100 },
-  { id: 3, title: "Мой первый сайт", type: "web", icon: "🌐", description: "HTML + CSS страница про хобби", status: "in_progress", progress: 40 },
-  { id: 4, title: "График параболы", type: "geogebra", icon: "📐", description: "Построение графиков функций в GeoGebra", status: "completed", progress: 100 },
-  { id: 5, title: "Калькулятор", type: "python", icon: "🧮", description: "Простой калькулятор на Python", status: "not_started", progress: 0 },
-  { id: 6, title: "Умный дом на Arduino", type: "arduino", icon: "🏠", description: "Датчики температуры и света через Wokwi", status: "in_progress", progress: 30 },
-  { id: 7, title: "Опыт с маятником", type: "phet", icon: "🔬", description: "Симуляция физического маятника в PhET", status: "not_started", progress: 0 },
+  { id: 1, title: "Игра змейка на Python", type: "python", description: "Классическая игра Змейка с использованием Pygame", status: "in_progress", progress: 60 },
+  { id: 2, title: "Мигающий светодиод Arduino", type: "arduino", description: "Управление светодиодом через Wokwi симулятор", status: "completed", progress: 100 },
+  { id: 3, title: "Мой первый сайт", type: "web", description: "HTML + CSS страница про хобби", status: "in_progress", progress: 40 },
+  { id: 4, title: "График параболы", type: "geogebra", description: "Построение графиков функций в GeoGebra", status: "completed", progress: 100 },
+  { id: 5, title: "Калькулятор", type: "python", description: "Простой калькулятор на Python", status: "not_started", progress: 0 },
+  { id: 6, title: "Умный дом на Arduino", type: "arduino", description: "Датчики температуры и света через Wokwi", status: "in_progress", progress: 30 },
+  { id: 7, title: "Опыт с маятником", type: "phet", description: "Симуляция физического маятника в PhET", status: "not_started", progress: 0 },
 ];
 
 // Соответствует градиентам инструментов в SANDBOX_TOOLS — карточка ведёт
@@ -105,7 +105,7 @@ export function ProjectsView() {
             onClick={() => openSandbox(undefined)}
             className="group mt-6 flex w-full items-center gap-5 rounded-[24px] bg-gradient-to-br from-violet-600 to-indigo-600 p-6 text-left shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:shadow-xl"
           >
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl">🧪</div>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white"><FlaskRound className="h-7 w-7" /></div>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-extrabold text-white">{t.openSandboxBtn}</h2>
               <p className="mt-0.5 text-sm text-violet-100">{d.sandbox.subtitle}</p>
@@ -126,8 +126,8 @@ export function ProjectsView() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3">
-                      <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-xl shadow-sm", style.gradient)}>
-                        {p.icon}
+                      <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm", style.gradient)}>
+                        <style.Icon className="h-5 w-5" />
                       </div>
                       <h3 className="font-bold text-slate-900">{p.title}</h3>
                     </div>

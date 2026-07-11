@@ -9,7 +9,7 @@ import {
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
-  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3,
+  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3, Hand,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
@@ -608,8 +608,8 @@ function StageModal({
                         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>
                           {hasSlides
-                            ? `${existing?.slides?.length} ${d.slides.of} — слайды готовы. Перегенерировать можно кнопкой «✨».`
-                            : "Слайды генерируются кнопкой «✨ Сгенерировать этапы» из плана урока."}
+                            ? <>{existing?.slides?.length} {d.slides.of} — слайды готовы. Перегенерировать можно кнопкой <Sparkles className="inline h-3 w-3" /> выше.</>
+                            : <>Слайды генерируются кнопкой <Sparkles className="inline h-3 w-3" /> «Сгенерировать этапы» из плана урока.</>}
                         </span>
                       </div>
                     )}
@@ -1603,7 +1603,7 @@ export function TeacherLessonDetailView({
               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                 summaryStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
               }`}>
-                {summaryStage.is_completed ? <Check className="h-4 w-4" /> : "✓"}
+                <Check className="h-4 w-4" />
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageSummaryLabel}</span>
               {summaryStage.is_completed && (
@@ -1870,7 +1870,7 @@ export function TeacherLessonDetailView({
       {mounted && raisedHandModal && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-            <div className="mb-4 text-center text-6xl">✋</div>
+            <Hand className="mx-auto mb-4 h-16 w-16 text-violet-500" />
             <h3 className="mb-6 text-center text-xl font-bold text-slate-900">
               {dl.raisedHand.studentRaisedHand.replace("{name}", raisedHandModal.studentName)}
             </h3>

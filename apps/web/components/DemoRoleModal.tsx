@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Code2, Bot, Calculator, Languages, BookOpen } from "lucide-react";
+import { X, Loader2, Code2, Bot, Calculator, Languages, BookOpen, Baby, Backpack, Laptop } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { defaultLocale, getDictionary } from "@snr/core";
 import { demoLogin } from "@/app/actions/auth";
@@ -19,7 +19,7 @@ interface StudentRole {
   kind: "student";
   grade: StudentGrade;
   labelKey: "roleStudent10" | "roleStudent7" | "roleStudent3";
-  avatar: string;
+  Icon: typeof Code2;
   color: string;
 }
 
@@ -37,9 +37,9 @@ interface TeacherRole {
 }
 
 const STUDENT_ROLES: StudentRole[] = [
-  { kind: "student", grade: "3", labelKey: "roleStudent3", avatar: "🐣", color: "from-emerald-500 to-teal-600" },
-  { kind: "student", grade: "7", labelKey: "roleStudent7", avatar: "👦", color: "from-blue-500 to-cyan-600" },
-  { kind: "student", grade: "10", labelKey: "roleStudent10", avatar: "🧑‍💻", color: "from-orange-500 to-red-600" },
+  { kind: "student", grade: "3", labelKey: "roleStudent3", Icon: Baby, color: "from-emerald-500 to-teal-600" },
+  { kind: "student", grade: "7", labelKey: "roleStudent7", Icon: Backpack, color: "from-blue-500 to-cyan-600" },
+  { kind: "student", grade: "10", labelKey: "roleStudent10", Icon: Laptop, color: "from-orange-500 to-red-600" },
 ];
 
 const TEACHER_ROLES: TeacherRole[] = [
@@ -125,8 +125,8 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
                   disabled={busy}
                   className="group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-6 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
                 >
-                  <div className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${role.color} text-3xl`}>
-                    {role.avatar}
+                  <div className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${role.color} text-white`}>
+                    <role.Icon className="h-8 w-8" />
                   </div>
                   <p className="text-center font-bold text-slate-900">{label}</p>
                   <div className="mt-4 w-full">

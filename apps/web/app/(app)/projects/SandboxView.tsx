@@ -264,8 +264,8 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
               disabled={!mounted}
               className="group flex flex-col items-start gap-3 rounded-[20px] border border-white bg-white/70 p-5 text-left shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg disabled:opacity-60"
             >
-              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${tool.gradient} text-2xl shadow-sm`}>
-                {tool.icon}
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${tool.gradient} text-white shadow-sm`}>
+                <tool.Icon className="h-6 w-6" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900">{meta.name}</h3>

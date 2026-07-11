@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getDictionary, getSubjectConfig, pluralizeStudents } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { Users, MoreVertical } from "lucide-react";
 
 interface Props {
@@ -58,6 +59,7 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {cards.map(({ group, studentCount, avgGrade, attendancePct }, idx) => {
             const cfg = getSubjectConfig(group.subject);
+            const { Icon: GroupSubjectIcon } = resolveSubjectIcon(group.subject);
             const badge = classBadge(group.name);
             const schedule = group.schedule_days?.trim();
 
@@ -73,8 +75,8 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
                   <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-xl font-bold text-white shadow-lg shadow-blue-500/20"
                     style={{ background: GRADIENTS[idx % GRADIENTS.length] }}>
                     {badge}
-                    <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[12px] shadow-sm">
-                      {cfg.emoji}
+                    <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm" style={{ color: cfg.color }}>
+                      <GroupSubjectIcon className="h-3.5 w-3.5" />
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">

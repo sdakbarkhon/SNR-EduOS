@@ -11,7 +11,7 @@ import {
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { User, Shield, Bell, LayoutTemplate, Camera, Check, Eye, EyeOff } from "lucide-react";
+import { User, Shield, Bell, LayoutTemplate, Camera, Check, Eye, EyeOff, Moon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/Avatar";
 
@@ -420,8 +420,8 @@ export function TeacherSettingsView({ teacher, groups }: Props) {
               <div>
                 <label className="mb-2 block text-sm font-bold text-gray-500">{d.settings.darkThemeComingSoon}</label>
                 <div className="flex gap-2">
-                  <button disabled className="cursor-not-allowed rounded-[10px] border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-400">
-                    🌙 Dark
+                  <button disabled className="flex cursor-not-allowed items-center gap-1.5 rounded-[10px] border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-400">
+                    <Moon className="h-4 w-4" /> Dark
                   </button>
                 </div>
               </div>

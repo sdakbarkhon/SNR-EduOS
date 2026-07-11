@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, ChevronUp, ChevronDown, Check } from "lucide-react";
+import { Plus, Trash2, ChevronUp, ChevronDown, Check, Triangle, Diamond, Circle, Square } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale, QuizQuestionInput } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 
-const OPTION_DOTS = ["🔴", "🔵", "🟡", "🟢"];
+const OPTION_ICONS = [
+  { Icon: Triangle, color: "#E21B3C" }, { Icon: Diamond, color: "#1368CE" },
+  { Icon: Circle, color: "#E0A211" }, { Icon: Square, color: "#26890C" },
+];
 
 export function emptyQuizQuestion(): QuizQuestionInput {
   return { question_text: "", options: ["", "", "", ""], correct_option_index: 0, time_per_question_seconds: 20 };
@@ -115,7 +118,7 @@ export function QuizBuilder({
                       >
                         <Check className="h-4 w-4" strokeWidth={3} />
                       </button>
-                      <span className="shrink-0 text-lg">{OPTION_DOTS[oi]}</span>
+                      {(() => { const OptIcon = OPTION_ICONS[oi]?.Icon; return OptIcon ? <OptIcon className="h-5 w-5 shrink-0" style={{ color: OPTION_ICONS[oi]?.color }} /> : null; })()}
                       <input
                         type="text"
                         value={opt}

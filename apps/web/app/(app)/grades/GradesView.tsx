@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Star, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
+import { Star, BookOpen, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { getDictionary, getSubjectConfig } from "@snr/core";
 import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
+import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { cn } from "@/lib/cn";
@@ -145,10 +146,10 @@ export function GradesView({ grades }: Props) {
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
-          {t.title} <span className="text-2xl">⭐</span>
+          {t.title} <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
         </h1>
         <div className="flex flex-col items-center justify-center gap-3 rounded-[24px] border border-white bg-white/80 py-24 text-center shadow-md backdrop-blur-xl">
-          <span className="text-5xl">📚</span>
+          <BookOpen className="h-12 w-12 text-slate-300" />
           <p className="text-lg font-extrabold text-slate-800">{t.emptyTitle}</p>
           <p className="max-w-xs text-sm text-slate-500">{t.emptySubtitle}</p>
         </div>
@@ -212,7 +213,7 @@ export function GradesView({ grades }: Props) {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
-        {t.title} <span className="text-2xl">⭐</span>
+        {t.title} <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
       </h1>
 
       {/* Stat cards */}
@@ -278,9 +279,10 @@ export function GradesView({ grades }: Props) {
             <button onClick={() => setSubjectFilter("all")} className={pillClass(subjectFilter === "all")}>{t.allSubjects}</button>
             {subjects.map((s) => {
               const cfg = getSubjectConfig(s);
+              const { Icon: SubjIcon } = resolveSubjectIcon(s);
               return (
                 <button key={s} onClick={() => setSubjectFilter(s)} className={pillClass(subjectFilter === s)}>
-                  <span className="text-[14px]">{cfg.emoji}</span>
+                  <SubjIcon className="h-3.5 w-3.5" />
                   {cfg.label}
                 </button>
               );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Check, Clock, Loader2, PartyPopper, Lightbulb } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Clock, Loader2, PartyPopper, Lightbulb } from "lucide-react";
 import {
   getDictionary, getQuizQuestions, getStudentQuizAttempt, startQuizAttempt,
   submitQuizAnswer, finalizeQuizAttempt, getQuizAttemptResults,
@@ -326,8 +326,8 @@ function ResultView({
           const ok = sel === q.correct_option_index;
           return (
             <li key={q.id} className={`rounded-[14px] border px-4 py-2.5 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-              <span className={`font-extrabold ${ok ? "text-emerald-700" : "text-red-700"}`}>
-                {ok ? "✓" : "✗"} {dq.question.replace("{n}", String(i + 1))}:
+              <span className={`inline-flex items-center gap-1 font-extrabold ${ok ? "text-emerald-700" : "text-red-700"}`}>
+                {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />} {dq.question.replace("{n}", String(i + 1))}:
               </span>{" "}
               {ok ? (
                 <span className="text-emerald-700">{dq.correctLabel}</span>

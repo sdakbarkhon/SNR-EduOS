@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Circle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -78,7 +78,7 @@ export function LessonStartBanner() {
       }}
     >
       <div className="flex items-center gap-3 text-white">
-        <span className="text-lg leading-none">🟢</span>
+        <Circle className="h-3.5 w-3.5 fill-emerald-400 text-emerald-400" />
         <span className="text-sm font-bold">
           {dl.bannerStarted}{banner.title ? ` ${banner.title}` : ""}
         </span>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Paperclip } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale, HomeworkWithSubmission } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -91,14 +91,14 @@ export function HomeworkListView({ child, homework }: { child: ParentChild; home
                       {h.attachments?.length > 0 && (
                         <ul className="space-y-1 text-xs text-gray-500">
                           {h.attachments.map((a, i) => (
-                            <li key={i}>📎 {a.name}</li>
+                            <li key={i} className="flex items-center gap-1"><Paperclip className="h-3 w-3 shrink-0" /> {a.name}</li>
                           ))}
                         </ul>
                       )}
                       {status === "done" ? (
                         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
                           <span className="font-medium text-gray-700">{t.submittedByChild}</span>
-                          {submission?.file_original_name && <span>📎 {submission.file_original_name}</span>}
+                          {submission?.file_original_name && <span className="inline-flex items-center gap-1"><Paperclip className="h-3 w-3" /> {submission.file_original_name}</span>}
                           {grade != null && (
                             <span className="rounded-full bg-pink-50 px-2 py-0.5 font-bold text-pink-700">
                               {t.teacherGradeLabel}: {grade}

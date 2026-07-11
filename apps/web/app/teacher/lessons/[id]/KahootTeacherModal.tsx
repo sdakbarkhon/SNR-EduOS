@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Play, ChevronRight, Trophy, Clock, Users, Loader2 } from "lucide-react";
+import { X, Play, ChevronRight, Trophy, Clock, Users, User, Loader2, Triangle, Diamond, Circle, Square, Medal } from "lucide-react";
 import {
   getDictionary, getQuizQuestions, createKahootSession, getKahootSession,
   startKahootGame, showNextKahootQuestion, revealKahootAnswer, finishKahootGame,
@@ -13,10 +13,10 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 
 const OPT = [
-  { dot: "🔴", cls: "bg-red-500" }, { dot: "🔵", cls: "bg-blue-500" },
-  { dot: "🟡", cls: "bg-yellow-400" }, { dot: "🟢", cls: "bg-green-500" },
+  { Icon: Triangle, cls: "bg-red-500" }, { Icon: Diamond, cls: "bg-blue-500" },
+  { Icon: Circle, cls: "bg-yellow-400" }, { Icon: Square, cls: "bg-green-500" },
 ];
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDAL_COLORS = ["text-yellow-500", "text-slate-400", "text-amber-700"];
 
 export function KahootTeacherModal({
   stage, onClose,
@@ -163,7 +163,7 @@ export function KahootTeacherModal({
               <h2 className="text-2xl font-extrabold text-slate-800">{dq.waitingStudents}</h2>
               <div className="flex max-w-xl flex-wrap justify-center gap-2">
                 {participants.map((p) => (
-                  <span key={p.student_id} className="rounded-full bg-violet-100 px-3 py-1.5 text-sm font-semibold text-violet-700">👤 {p.full_name}</span>
+                  <span key={p.student_id} className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1.5 text-sm font-semibold text-violet-700"><User className="h-3.5 w-3.5" /> {p.full_name}</span>
                 ))}
                 {participants.length === 0 && <span className="text-sm text-slate-400">{dq.waitingStudents}</span>}
               </div>
@@ -182,11 +182,14 @@ export function KahootTeacherModal({
               </div>
               <h2 className="mb-6 text-center text-2xl font-extrabold text-slate-800">{currentQ.question_text}</h2>
               <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {currentQ.options.map((o, oi) => o ? (
-                  <div key={oi} className={`flex items-center gap-3 rounded-2xl px-5 py-4 text-base font-bold text-white ${OPT[oi]?.cls}`}>
-                    <span className="text-xl">{OPT[oi]?.dot}</span> {o}
-                  </div>
-                ) : null)}
+                {currentQ.options.map((o, oi) => {
+                  const OptIcon = OPT[oi]?.Icon;
+                  return o ? (
+                    <div key={oi} className={`flex items-center gap-3 rounded-2xl px-5 py-4 text-base font-bold text-white ${OPT[oi]?.cls}`}>
+                      {OptIcon && <OptIcon className="h-5 w-5 shrink-0" />} {o}
+                    </div>
+                  ) : null;
+                })}
               </div>
               <div className="mt-auto">
                 <p className="mb-1 text-sm font-semibold text-slate-600">{dq.answeredCount}: {answered} / {totalPlayers}</p>
@@ -204,15 +207,16 @@ export function KahootTeacherModal({
             <div className="flex flex-1 flex-col p-6">
               <div className="mb-5 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-5 text-center">
                 <p className="text-sm font-bold uppercase tracking-widest text-emerald-600">{dq.correctAnswer}</p>
-                <p className="mt-1 text-2xl font-extrabold text-emerald-700">
-                  {OPT[currentQ.correct_option_index]?.dot} {currentQ.options[currentQ.correct_option_index]}
+                <p className="flex items-center justify-center gap-2 mt-1 text-2xl font-extrabold text-emerald-700">
+                  {(() => { const CorrectIcon = OPT[currentQ.correct_option_index]?.Icon; return CorrectIcon ? <CorrectIcon className="h-6 w-6" /> : null; })()}
+                  {currentQ.options[currentQ.correct_option_index]}
                 </p>
               </div>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{dq.topThree}</h3>
               <ul className="space-y-2">
                 {board.slice(0, 3).map((e, i) => (
                   <li key={e.student_id} className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5">
-                    <span className="text-xl">{MEDALS[i]}</span>
+                    <Medal className={`h-5 w-5 ${MEDAL_COLORS[i]}`} />
                     <span className="flex-1 text-sm font-semibold text-slate-800">{e.full_name}</span>
                     <span className="font-mono text-sm font-bold text-slate-600">{e.total_score}</span>
                   </li>
@@ -233,7 +237,9 @@ export function KahootTeacherModal({
                 {board[0] && (
                   <>
                     <p className="mt-3 text-sm font-semibold uppercase tracking-widest text-slate-400">{dq.winner}</p>
-                    <p className="text-3xl font-extrabold text-slate-900">🥇 {board[0].full_name}</p>
+                    <p className="flex items-center justify-center gap-2 text-3xl font-extrabold text-slate-900">
+                      <Medal className={`h-7 w-7 ${MEDAL_COLORS[0]}`} /> {board[0].full_name}
+                    </p>
                     <p className="text-lg font-bold text-amber-600">{board[0].total_score} {dq.points}</p>
                   </>
                 )}
@@ -244,7 +250,9 @@ export function KahootTeacherModal({
                   const grade = gradeFromPercent(total > 0 ? (e.correct_count / total) * 100 : 0);
                   return (
                     <li key={e.student_id} className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5">
-                      <span className="w-6 text-center text-sm font-bold text-slate-400">{i < 3 ? MEDALS[i] : i + 1}</span>
+                      <span className="flex w-6 items-center justify-center text-sm font-bold text-slate-400">
+                        {i < 3 ? <Medal className={`h-4 w-4 ${MEDAL_COLORS[i]}`} /> : i + 1}
+                      </span>
                       <span className="flex-1 text-sm font-semibold text-slate-800">{e.full_name}</span>
                       <span className="font-mono text-sm font-bold text-slate-600">{e.total_score}</span>
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">{dq.grade}: {grade}</span>

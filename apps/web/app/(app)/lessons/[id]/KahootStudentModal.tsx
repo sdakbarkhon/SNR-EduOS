@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, Loader2, Trophy, Hourglass, Gamepad2, Triangle, Diamond, Circle, Square, Flame } from "lucide-react";
+import { Check, Loader2, Trophy, Hourglass, Gamepad2, Triangle, Diamond, Circle, Square, Flame, Medal } from "lucide-react";
 import {
   getDictionary, getQuizQuestions, getKahootSession, startQuizAttempt,
   submitKahootAnswer, getKahootLeaderboard, gradeFromPercent,
@@ -20,7 +20,7 @@ const OPT = [
   { Icon: Circle, bg: "#E0A211", shadow: "rgba(224,162,17,.45)" },
   { Icon: Square, bg: "#26890C", shadow: "rgba(38,137,12,.45)" },
 ];
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDAL_COLORS = ["text-yellow-500", "text-slate-400", "text-amber-700"];
 
 function initials(name: string): string {
   return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
@@ -294,7 +294,7 @@ export function KahootStudentModal({
           const isMe = e.student_id === studentId;
           return (
             <li key={e.student_id} className={`flex items-center gap-3 rounded-[14px] px-4 py-2.5 ${isMe ? "bg-[#F2EFFE]" : "bg-slate-50"}`}>
-              <span className="w-6 text-center">{i < 3 ? MEDALS[i] : i + 1}</span>
+              <span className="flex w-6 items-center justify-center">{i < 3 ? <Medal className={`h-4 w-4 ${MEDAL_COLORS[i]}`} /> : i + 1}</span>
               <span className="flex-1 text-sm font-bold text-[#242A45]">{isMe ? dq.you : e.full_name}</span>
               <span className="font-mono text-sm font-extrabold text-[#5B6178]">{e.total_score}</span>
             </li>

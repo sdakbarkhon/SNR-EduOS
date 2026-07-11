@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Bot, BookOpen, Flame, Lock,
   Sparkles, ArrowRight, FileText, Folder, UserPlus, Calendar, PlusCircle,
+  Check, Award, Trophy, Target, type LucideIcon,
 } from "lucide-react";
 import {
   formatTime,
@@ -256,7 +257,7 @@ export function DashboardView({
                         boxShadow: wd.done ? "0 4px 10px rgba(78,134,247,.3)" : undefined,
                       }}
                     >
-                      {wd.done ? "✓" : "·"}
+                      {wd.done ? <Check className="h-3.5 w-3.5" /> : "·"}
                     </div>
                     <span className="text-[11px] font-bold capitalize text-[#9A9AB5]">{wd.label}</span>
                   </div>
@@ -391,7 +392,7 @@ export function DashboardView({
             >
               {t.viewGoals} <ArrowRight className="h-4 w-4" />
             </button>
-            <div className="animate-float-slow pointer-events-none absolute -bottom-2 right-[22px] text-[74px] leading-none drop-shadow-[0_8px_12px_rgba(180,110,40,0.3)]">🏆</div>
+            <Trophy className="animate-float-slow pointer-events-none absolute -bottom-2 right-[22px] h-[72px] w-[72px] text-[#E5772E] drop-shadow-[0_8px_12px_rgba(180,110,40,0.3)]" />
           </div>
         </main>
 
@@ -479,9 +480,9 @@ export function DashboardView({
             </div>
 
             <div className="mt-[18px] flex justify-between gap-2">
-              <AchievementBadge emoji="🎖️" label="Исследователь" gradient="linear-gradient(150deg,#FFD24A,#FF9F2E)" shadow="rgba(255,159,46,.34)" isNew />
-              <AchievementBadge emoji="🏆" label="Трудолюбивый" gradient="linear-gradient(150deg,#9C6BFF,#7A4DF6)" shadow="rgba(124,77,246,.34)" isNew />
-              <AchievementBadge emoji="🎯" label="Целеустремлённый" gradient="linear-gradient(150deg,#38D6BE,#20B6C6)" shadow="rgba(45,190,198,.34)" />
+              <AchievementBadge icon={Award} label="Исследователь" gradient="linear-gradient(150deg,#FFD24A,#FF9F2E)" shadow="rgba(255,159,46,.34)" isNew />
+              <AchievementBadge icon={Trophy} label="Трудолюбивый" gradient="linear-gradient(150deg,#9C6BFF,#7A4DF6)" shadow="rgba(124,77,246,.34)" isNew />
+              <AchievementBadge icon={Target} label="Целеустремлённый" gradient="linear-gradient(150deg,#38D6BE,#20B6C6)" shadow="rgba(45,190,198,.34)" />
             </div>
 
             <div className="mt-5 flex items-center gap-3.5">
@@ -540,9 +541,9 @@ function QuickAction({
 }
 
 function AchievementBadge({
-  emoji, label, gradient, shadow, isNew,
+  icon: Icon, label, gradient, shadow, isNew,
 }: {
-  emoji: string;
+  icon: LucideIcon;
   label: string;
   gradient: string;
   shadow: string;
@@ -550,8 +551,8 @@ function AchievementBadge({
 }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-2 transition hover:-translate-y-1">
-      <div className="relative flex h-[72px] w-[72px] items-center justify-center rounded-[22px] text-3xl" style={{ background: gradient, boxShadow: `0 10px 20px ${shadow}` }}>
-        {emoji}
+      <div className="relative flex h-[72px] w-[72px] items-center justify-center rounded-[22px] text-white" style={{ background: gradient, boxShadow: `0 10px 20px ${shadow}` }}>
+        <Icon className="h-8 w-8" />
         {isNew && (
           <span className="absolute -right-1.5 -top-1.5 rounded-lg bg-[#F5455C] px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-white">
             NEW

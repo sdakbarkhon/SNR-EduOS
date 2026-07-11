@@ -10,6 +10,7 @@ import type { Book } from "@snr/core";
 import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { resolveSubjectIcon } from "@/components/SubjectIcon";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ function TeacherBookDetailModal({
 }) {
   const [visible, setVisible] = useState(false);
   const style = getSubjectStyle(book.subject);
+  const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
@@ -129,7 +131,7 @@ function TeacherBookDetailModal({
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-6xl">{style.emoji}</span>
+                  <BookSubjectIcon className="h-16 w-16" style={{ color: style.color }} />
                 </div>
               )}
             </div>
@@ -147,7 +149,7 @@ function TeacherBookDetailModal({
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
                 style={{ background: style.color + "22", color: style.color }}
               >
-                {style.emoji} {SUBJECT_LABELS[book.subject] ?? book.subject}
+                <BookSubjectIcon className="h-3.5 w-3.5" /> {SUBJECT_LABELS[book.subject] ?? book.subject}
               </span>
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                 {book.book_type}
@@ -742,7 +744,7 @@ export function TeacherBooksView({
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {displayed.map((book) => {
-              const style = getSubjectStyle(book.subject);
+              const { Icon: BookSubjectIcon } = resolveSubjectIcon(book.subject);
               const isOwn = book.uploaded_by === initialTeacherId;
               const isDeleting = deleting === book.id;
               const coverUrl = coverUrls[book.id];
@@ -796,10 +798,10 @@ export function TeacherBooksView({
                       </div>
                     )}
 
-                    {/* Emoji auto-cover */}
+                    {/* Icon auto-cover */}
                     {!coverUrl && (
-                      <span className="absolute inset-0 z-[2] flex items-center justify-center text-5xl transition-transform duration-300 group-hover:scale-110">
-                        {style.emoji}
+                      <span className="absolute inset-0 z-[2] flex items-center justify-center text-white/90 transition-transform duration-300 group-hover:scale-110">
+                        <BookSubjectIcon className="h-12 w-12" />
                       </span>
                     )}
                   </div>

@@ -181,7 +181,7 @@ export function HomeworkView({
               <h1 className="text-[34px] font-extrabold text-slate-900 tracking-tight leading-none">
                 {d.nav.homework}
               </h1>
-              <span className="text-3xl leading-none">📋</span>
+              <ClipboardList className="h-7 w-7 text-slate-400" />
             </div>
           </header>
 

@@ -56,7 +56,7 @@ export function AiAssistantView() {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <div>
         <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
-          {t.title} <span className="text-2xl">🤖</span>
+          {t.title} <Bot className="h-7 w-7 text-violet-500" />
         </h1>
         <p className="mt-1.5 text-sm text-slate-500">{t.subtitle}</p>
       </div>

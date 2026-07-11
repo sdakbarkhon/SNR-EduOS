@@ -155,8 +155,8 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
 
       {/* Grade saved toast */}
       {gradeSavedToast && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700">
-          ✓ {d.lesson.gradeSaved}
+        <div className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700">
+          <Check className="h-4 w-4" /> {d.lesson.gradeSaved}
         </div>
       )}
 
@@ -225,7 +225,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                       )}
                     >
                       <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                      {lg.grade} ✓
+                      {lg.grade} <Check className="h-3 w-3" />
                     </button>
                   );
                 })()}
