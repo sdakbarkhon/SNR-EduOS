@@ -2028,6 +2028,49 @@ export const getLessonStages = async (db: Db, lessonId: string): Promise<LessonS
   return (data ?? []) as LessonStage[];
 };
 
+/** Этап 3 BOLSHOE_OBNOVLENIE: PPTX-загрузка автодобавляет файл в "Материалы
+ *  группы" (uploadPresentationFile → course_materials) — но AI-генерация
+ *  (slides jsonb, не config.presentation_file) этот шаг никогда не делала.
+ *  Дедуп по (group_id, title, type='presentation'), как у uploadPresentationFile. */
+async function addAiPresentationToGroupMaterials(
+  db: Db,
+  lessonId: string,
+  stageTitle: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: lesson } = await db2
+    .from("lessons")
+    .select("group_id, subject:subjects(name)")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!lesson?.group_id) return;
+
+  const { data: existing } = await db2
+    .from("course_materials")
+    .select("id")
+    .eq("group_id", lesson.group_id)
+    .eq("title", stageTitle)
+    .eq("type", "presentation")
+    .maybeSingle();
+  if (existing) return;
+
+  const { data: userRes } = await db.auth.getUser();
+  const userId = userRes?.user?.id;
+  if (!userId) return;
+  const { data: teacher } = await db2.from("teachers").select("id").eq("user_id", userId).maybeSingle();
+
+  await db2.from("course_materials").insert({
+    group_id: lesson.group_id,
+    title: stageTitle,
+    type: "presentation",
+    subject: lesson.subject?.name ?? null,
+    uploaded_by: teacher?.id ?? null,
+  });
+  // Best-effort: если insert упал (RLS/нет teacher-строки для этой сессии —
+  // напр. миграционный контекст), addLessonStage не должен падать из-за этого.
+}
+
 /** Добавляет middle-этап в урок. position = max(middle positions)+1 (между 1 и 9998). */
 export const addLessonStage = async (
   db: Db,
@@ -2082,6 +2125,17 @@ export const addLessonStage = async (
     .select("*")
     .single();
   if (error) throw error;
+
+  // AI-презентация (slides jsonb) — не ручная загрузка (config.presentation_file,
+  // уже добавляется через uploadPresentationFile отдельно) — см. addAiPresentationToGroupMaterials.
+  if (input.contentType === "presentation" && input.slides && input.slides.length > 0) {
+    try {
+      await addAiPresentationToGroupMaterials(db, lessonId, input.title);
+    } catch {
+      // Best-effort — не должно ломать сохранение этапа.
+    }
+  }
+
   return data as LessonStage;
 };
 
