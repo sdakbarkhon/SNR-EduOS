@@ -41,6 +41,7 @@ export function KnowledgeBaseFilePicker({
   onSelect,
   groupIds,
   multiSelect = true,
+  acceptedTypes,
 }: {
   open: boolean;
   onClose: () => void;
@@ -48,6 +49,11 @@ export function KnowledgeBaseFilePicker({
   /** Group(s) whose "Материалы группы" should be shown — student/teacher's accessible groups. */
   groupIds: string[];
   multiSelect?: boolean;
+  /** When set, both tabs only show items whose fileType matches (e.g.
+   *  ["application/pdf"] for lesson-materials, which now accepts PDF only).
+   *  Omit to show everything — the homework-attachment picker relies on
+   *  this default to keep accepting all file types. */
+  acceptedTypes?: string[];
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -109,7 +115,7 @@ export function KnowledgeBaseFilePicker({
 
   if (!open) return null;
 
-  const items: { key: string; title: string; picked: PickedKnowledgeBaseFile; hasLink: boolean }[] =
+  const allItems: { key: string; title: string; picked: PickedKnowledgeBaseFile; hasLink: boolean }[] =
     tab === "library"
       ? filteredBooks.map((b) => ({
           key: `book:${b.id}`,
@@ -124,8 +130,18 @@ export function KnowledgeBaseFilePicker({
           picked: { source: "material", id: m.id, title: m.title, storagePath: m.storage_path ?? m.link_url ?? "", fileType: m.file_type, sizeBytes: m.file_size_bytes },
         }));
 
+  // acceptedTypes is opt-in per call site (undefined = show everything, e.g.
+  // the homework-attachment picker) — only lesson-materials passes it, to
+  // restrict to PDF-only per the customer's requirement for that form.
+  const items = acceptedTypes
+    ? allItems.filter((it) => it.picked.fileType && acceptedTypes.includes(it.picked.fileType))
+    : allItems;
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    // z-index above 9999 — the app's other full-screen modals (e.g. "Прикрепить
+    // материал" in TeacherLessonDetailView) use style={{ zIndex: 9999 }}, and this
+    // picker can be opened from inside one of them; z-[60] used to render behind it.
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4" style={{ zIndex: 10000 }} onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="flex h-[80vh] max-h-[700px] w-full max-w-2xl flex-col rounded-3xl bg-white shadow-2xl"

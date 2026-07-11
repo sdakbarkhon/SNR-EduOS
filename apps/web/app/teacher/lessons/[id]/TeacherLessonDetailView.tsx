@@ -744,6 +744,7 @@ export function TeacherLessonDetailView({
   const [uploadModal, setUploadModal] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFileError, setUploadFileError] = useState("");
   const [uploadVisibility, setUploadVisibility] = useState<'all' | 'teacher_only'>('all');
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -752,6 +753,23 @@ export function TeacherLessonDetailView({
   // exclusive with uploadFile (see handleUpload).
   const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
   const [showKBPicker, setShowKBPicker] = useState(false);
+
+  // Заказчик: материалы урока принимают ТОЛЬКО PDF. Проверяем и MIME
+  // (application/pdf — надёжно только когда браузер его правильно
+  // определил), и расширение (fallback для файлов с неверным/пустым MIME).
+  function handleMaterialFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (!f) { setUploadFile(null); setUploadFileError(""); return; }
+    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setUploadFileError("Разрешены только PDF файлы");
+      setUploadFile(null);
+      e.target.value = "";
+      return;
+    }
+    setUploadFileError("");
+    setUploadFile(f);
+  }
 
   const db = createClient();
   const rollCallRef = useRef<HTMLDivElement>(null);
@@ -1639,7 +1657,7 @@ export function TeacherLessonDetailView({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">{dl.addMaterialTitle}</h3>
-              <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setPickedFromKB(null); setUploadVisibility('all'); }}
+              <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadFileError(""); setPickedFromKB(null); setUploadVisibility('all'); }}
                 className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
@@ -1660,19 +1678,24 @@ export function TeacherLessonDetailView({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <input ref={fileRef} type="file" className="hidden" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+                <div className="space-y-3">
+                  <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleMaterialFileChange} />
                   <button onClick={() => fileRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
                     <Upload className="h-5 w-5" />
-                    {uploadFile ? uploadFile.name : "Выбрать файл (макс. 50 МБ)"}
+                    {uploadFile ? uploadFile.name : "Выбрать PDF файл (макс. 50 МБ)"}
                   </button>
+                  {uploadFileError && <p className="text-center text-[12px] text-red-500">{uploadFileError}</p>}
+                  <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    <div className="h-px flex-1 bg-gray-200" /> или <div className="h-px flex-1 bg-gray-200" />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowKBPicker(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-slate-200 py-2.5 text-[13px] font-medium text-brand-ink-muted transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500"
                   >
-                    <FolderSearch size={15} /> {d.knowledgeBase.browse}
+                    <FolderSearch className="h-5 w-5" />
+                    {d.knowledgeBase.browse}
                   </button>
                 </div>
               )}
@@ -1692,7 +1715,7 @@ export function TeacherLessonDetailView({
                 </button>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setPickedFromKB(null); setUploadVisibility('all'); }}
+                <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadFileError(""); setPickedFromKB(null); setUploadVisibility('all'); }}
                   className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.common.cancel}</button>
                 <button onClick={handleUpload} disabled={uploading || (!uploadFile && !pickedFromKB) || !uploadTitle.trim()}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
@@ -1718,6 +1741,7 @@ export function TeacherLessonDetailView({
         }}
         groupIds={[lesson.group_id]}
         multiSelect={false}
+        acceptedTypes={["application/pdf"]}
       />
 
       {/* Read-only stage view (§7.5) — click a stage row to open; "Редактировать этап" switches to the edit modal below */}
