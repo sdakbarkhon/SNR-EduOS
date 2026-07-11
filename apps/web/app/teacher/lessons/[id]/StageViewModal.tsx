@@ -184,14 +184,25 @@ export function StageViewModal({
           )}
 
           {serviceMeta && serviceUrl && (
-            <a
-              href={serviceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100"
-            >
-              <ExternalLink className="h-4 w-4" /> {serviceMeta.name}
-            </a>
+            <div className="space-y-2">
+              <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
+                <iframe
+                  src={serviceUrl}
+                  title={serviceMeta.name}
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="h-full w-full border-0 bg-white"
+                />
+              </div>
+              <a
+                href={serviceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" /> {serviceMeta.name}
+              </a>
+            </div>
           )}
 
           {isQuizType && (
