@@ -1710,7 +1710,7 @@ export const getStudentLessonView = async (
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
+    db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility, is_demo, from_knowledge_base, kb_bucket").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
     db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
   ]);
@@ -1989,29 +1989,72 @@ export const uploadLessonMaterial = async (
   return data as LessonMaterial;
 };
 
-/** Удаляет материал из Storage и БД. */
+/** Удаляет материал из Storage и БД. Файл из Storage НЕ удаляется, если это
+ *  линк на Базу знаний (from_knowledge_base) — тот же файл used ещё
+ *  course_materials/books записью, удаление сломало бы её. */
 export const deleteLessonMaterial = async (
   db: Db,
   materialId: string,
   storagePath: string,
+  fromKnowledgeBase = false,
 ): Promise<void> => {
-  await db.storage.from("lesson-materials").remove([storagePath]);
+  if (!fromKnowledgeBase) {
+    await db.storage.from("lesson-materials").remove([storagePath]);
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db as any).from("lesson_materials").delete().eq("id", materialId);
   if (error) throw error;
 };
 
-/** Signed URL (1 час) для скачивания материала урока. */
+/** Signed URL (1 час) для скачивания материала урока. bucket по умолчанию
+ *  "lesson-materials"; для линков из Базы знаний передавать kb_bucket
+ *  ("materials"/"books" — см. миграцию 115). */
 export const getLessonMaterialUrl = async (
   db: Db,
   storagePath: string,
   downloadAs?: string,
+  bucket: string = "lesson-materials",
 ): Promise<string> => {
   const { data, error } = await db.storage
-    .from("lesson-materials")
+    .from(bucket)
     .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined);
   if (error) throw error;
   return data!.signedUrl;
+};
+
+/** Линкует существующий файл из Базы знаний (course_materials/books) как
+ *  материал урока — БЕЗ повторной загрузки (тот же storage_path, тот же
+ *  файл). Этап 3.4-для-уроков: тот же принцип, что уже есть у homework. */
+export const linkLessonMaterialFromKnowledgeBase = async (
+  db: Db,
+  input: {
+    lessonId: string;
+    teacherId: string;
+    title: string;
+    storagePath: string;
+    kbBucket: "materials" | "books";
+    fileSizeBytes: number | null;
+    visibility?: "all" | "teacher_only";
+  },
+): Promise<LessonMaterial> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_materials")
+    .insert({
+      lesson_id: input.lessonId,
+      title: input.title,
+      file_storage_path: input.storagePath,
+      file_size_bytes: input.fileSizeBytes,
+      file_original_name: input.title,
+      uploaded_by: input.teacherId,
+      visibility: input.visibility ?? "all",
+      from_knowledge_base: true,
+      kb_bucket: input.kbBucket,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as LessonMaterial;
 };
 
 // ─── LESSON STAGES v2 (migration 35) ─────────────────────────────────────────

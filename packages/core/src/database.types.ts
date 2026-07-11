@@ -1780,6 +1780,8 @@ export type Database = {
           file_original_name: string | null
           file_size_bytes: number | null
           file_storage_path: string
+          from_knowledge_base: boolean
+          kb_bucket: string | null
           id: string
           lesson_id: string
           school_id: string
@@ -1793,6 +1795,8 @@ export type Database = {
           file_original_name?: string | null
           file_size_bytes?: number | null
           file_storage_path: string
+          from_knowledge_base?: boolean
+          kb_bucket?: string | null
           id?: string
           lesson_id: string
           school_id?: string
@@ -1806,6 +1810,8 @@ export type Database = {
           file_original_name?: string | null
           file_size_bytes?: number | null
           file_storage_path?: string
+          from_knowledge_base?: boolean
+          kb_bucket?: string | null
           id?: string
           lesson_id?: string
           school_id?: string

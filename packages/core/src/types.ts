@@ -317,6 +317,10 @@ export type LessonMaterial = {
   visibility: 'all' | 'teacher_only';
   // migration 110 — демо-сессия не может удалить реальный (is_demo=false) материал
   is_demo: boolean;
+  // migration 115 — файл линкован из Базы знаний (course_materials/books),
+  // не загружен заново; kb_bucket — какой Storage-бакет резолвить/НЕ трогать при удалении.
+  from_knowledge_base: boolean;
+  kb_bucket: 'materials' | 'books' | null;
 };
 
 

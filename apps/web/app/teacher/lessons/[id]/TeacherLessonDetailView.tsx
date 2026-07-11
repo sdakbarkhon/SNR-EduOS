@@ -8,13 +8,14 @@ import {
   Trash2, Upload, Clock, CalendarX,
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
-  Minimize2, Maximize2,
+  Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
+  linkLessonMaterialFromKnowledgeBase,
   getSubjectStyle, getLessonExcuseRequests,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
@@ -52,6 +53,7 @@ import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
+import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -732,7 +734,7 @@ export function TeacherLessonDetailView({
     const mat = materials.find((m) => m.id === demoMaterialId);
     if (!mat) { setDemoMaterialUrl(null); return; }
     let cancelled = false;
-    getLessonMaterialUrl(db, mat.file_storage_path)
+    getLessonMaterialUrl(db, mat.file_storage_path, undefined, mat.kb_bucket ?? "lesson-materials")
       .then((url) => { if (!cancelled) setDemoMaterialUrl(url); })
       .catch(() => { if (!cancelled) setDemoMaterialUrl(null); });
     return () => { cancelled = true; };
@@ -745,6 +747,11 @@ export function TeacherLessonDetailView({
   const [uploadVisibility, setUploadVisibility] = useState<'all' | 'teacher_only'>('all');
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Промт "презентации/skeleton": Задача Б из старого Промта 4 — link an
+  // existing Knowledge Base file instead of uploading a fresh copy. Mutually
+  // exclusive with uploadFile (see handleUpload).
+  const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
+  const [showKBPicker, setShowKBPicker] = useState(false);
 
   const db = createClient();
   const rollCallRef = useRef<HTMLDivElement>(null);
@@ -1012,17 +1019,24 @@ export function TeacherLessonDetailView({
   // ── Material CRUD ───────────────────────────────────────────────────────────
 
   async function handleUpload() {
-    if (!uploadFile || !uploadTitle.trim()) return;
+    if (uploading || (!uploadFile && !pickedFromKB) || !uploadTitle.trim()) return;
     setUploading(true);
     try {
-      const mat = await uploadLessonMaterial(db, {
-        lessonId: lesson.id, teacherId: teacher.id, file: uploadFile,
-        title: uploadTitle.trim(), visibility: uploadVisibility,
-      });
+      const mat = pickedFromKB
+        ? await linkLessonMaterialFromKnowledgeBase(db, {
+            lessonId: lesson.id, teacherId: teacher.id, title: uploadTitle.trim(),
+            storagePath: pickedFromKB.storagePath, kbBucket: pickedFromKB.source === "book" ? "books" : "materials",
+            fileSizeBytes: pickedFromKB.sizeBytes, visibility: uploadVisibility,
+          })
+        : await uploadLessonMaterial(db, {
+            lessonId: lesson.id, teacherId: teacher.id, file: uploadFile!,
+            title: uploadTitle.trim(), visibility: uploadVisibility,
+          });
       setMaterials((prev) => [...prev, mat]);
       setUploadModal(false);
       setUploadTitle("");
       setUploadFile(null);
+      setPickedFromKB(null);
       setUploadVisibility('all');
     } catch { /* noop */ } finally { setUploading(false); }
   }
@@ -1042,13 +1056,13 @@ export function TeacherLessonDetailView({
 
   async function handleDeleteMaterial() {
     if (!matToDelete) return;
-    await deleteLessonMaterial(db, matToDelete.id, matToDelete.file_storage_path).catch(() => null);
+    await deleteLessonMaterial(db, matToDelete.id, matToDelete.file_storage_path, matToDelete.from_knowledge_base).catch(() => null);
     setMaterials((prev) => prev.filter((m) => m.id !== matToDelete.id));
     setMatToDelete(null);
   }
 
   async function handleDownloadMaterial(mat: LessonMaterial) {
-    const url = await getLessonMaterialUrl(db, mat.file_storage_path, mat.file_original_name ?? mat.title).catch(() => null);
+    const url = await getLessonMaterialUrl(db, mat.file_storage_path, mat.file_original_name ?? mat.title, mat.kb_bucket ?? "lesson-materials").catch(() => null);
     if (url) window.open(url, "_blank");
   }
 
@@ -1370,7 +1384,7 @@ export function TeacherLessonDetailView({
 
                     {/* Teacher presentation control — drives students' current_slide_index via Realtime */}
                     {hasSlides && (
-                      <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
+                      <div className="border-t border-violet-100 bg-white p-3">
                         <SlideViewer
                           slides={stage.slides ?? []}
                           canExport
@@ -1625,7 +1639,7 @@ export function TeacherLessonDetailView({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">{dl.addMaterialTitle}</h3>
-              <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadVisibility('all'); }}
+              <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setPickedFromKB(null); setUploadVisibility('all'); }}
                 className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
@@ -1635,14 +1649,33 @@ export function TeacherLessonDetailView({
                   placeholder={dl.materialTitlePlaceholder}
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
               </div>
-              <div>
-                <input ref={fileRef} type="file" className="hidden" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
-                <button onClick={() => fileRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
-                  <Upload className="h-5 w-5" />
-                  {uploadFile ? uploadFile.name : "Выбрать файл (макс. 50 МБ)"}
-                </button>
-              </div>
+              {pickedFromKB ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-2 text-sm text-blue-800">
+                    <FolderSearch className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{pickedFromKB.title}</span>
+                  </div>
+                  <button onClick={() => setPickedFromKB(null)} className="shrink-0 text-blue-400 hover:text-blue-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <input ref={fileRef} type="file" className="hidden" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+                  <button onClick={() => fileRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
+                    <Upload className="h-5 w-5" />
+                    {uploadFile ? uploadFile.name : "Выбрать файл (макс. 50 МБ)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowKBPicker(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-slate-200 py-2.5 text-[13px] font-medium text-brand-ink-muted transition-all hover:border-brand-blue/40 hover:bg-blue-50/20"
+                  >
+                    <FolderSearch size={15} /> {d.knowledgeBase.browse}
+                  </button>
+                </div>
+              )}
               {/* Visibility toggle */}
               <div className="flex gap-2">
                 <button
@@ -1659,9 +1692,9 @@ export function TeacherLessonDetailView({
                 </button>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadVisibility('all'); }}
+                <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setPickedFromKB(null); setUploadVisibility('all'); }}
                   className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.common.cancel}</button>
-                <button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadTitle.trim()}
+                <button onClick={handleUpload} disabled={uploading || (!uploadFile && !pickedFromKB) || !uploadTitle.trim()}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                   {uploading ? dl.uploading : dl.saveBtn}
                 </button>
@@ -1671,6 +1704,21 @@ export function TeacherLessonDetailView({
         </div>,
         document.body,
       )}
+
+      <KnowledgeBaseFilePicker
+        open={showKBPicker}
+        onClose={() => setShowKBPicker(false)}
+        onSelect={(items) => {
+          const first = items[0];
+          if (first) {
+            setPickedFromKB(first);
+            setUploadFile(null);
+            if (!uploadTitle.trim()) setUploadTitle(first.title);
+          }
+        }}
+        groupIds={[lesson.group_id]}
+        multiSelect={false}
+      />
 
       {/* Read-only stage view (§7.5) — click a stage row to open; "Редактировать этап" switches to the edit modal below */}
       {viewStage && (

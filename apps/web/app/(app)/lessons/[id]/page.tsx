@@ -29,7 +29,7 @@ export default async function LessonPage({
   await Promise.all(
     lesson.materials.map(async (m) => {
       try {
-        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path);
+        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path, undefined, m.kb_bucket ?? "lesson-materials");
       } catch { /* skip if URL generation fails */ }
     }),
   );
