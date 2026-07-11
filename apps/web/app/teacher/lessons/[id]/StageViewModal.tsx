@@ -97,8 +97,8 @@ export function StageViewModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex w-[75vw] max-w-[1400px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-        style={{ height: "80vh", maxHeight: 900 }}
+        className="relative flex w-[90vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        style={{ maxHeight: "90vh" }}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
@@ -135,8 +135,8 @@ export function StageViewModal({
           )}
 
           {stage.slides && stage.slides.length > 0 && (
-            <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
-              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} />
+            <div className="overflow-hidden rounded-xl border border-slate-100">
+              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} />
             </div>
           )}
 

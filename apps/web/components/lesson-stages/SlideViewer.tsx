@@ -71,9 +71,10 @@ export function SlideViewer({
   if (!slide) return null;
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl shadow-xl">
-      {/* Slide body — layout-specific rendering (title/split/quote/code/default) */}
-      <div className="flex-1 overflow-auto">
+    <div className="flex w-full flex-col overflow-hidden rounded-2xl shadow-xl">
+      {/* Slide body — fixed 16:9 frame, SlideBody scales its content to fit
+          (never scroll — the whole slide should be visible at once). */}
+      <div className="aspect-video w-full overflow-hidden">
         <SlideBody slide={slide} current={current} total={slides.length} />
       </div>
 

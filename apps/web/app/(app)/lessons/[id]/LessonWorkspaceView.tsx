@@ -1000,7 +1000,7 @@ export function LessonWorkspaceView({
                       current_slide_index via Realtime inside SlideViewer. */}
                   {!isCodeOrExternal && (
                     stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
-                      <div className="mb-3 h-[70vh] min-h-[460px]">
+                      <div className="mb-3">
                         <SlideViewer
                           slides={stage.slides}
                           canExport
