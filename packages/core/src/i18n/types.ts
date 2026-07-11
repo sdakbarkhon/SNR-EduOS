@@ -705,6 +705,26 @@ export interface Dictionary {
       sqlonline: { name: string; description: string };
       h5p: { name: string; description: string };
     };
+    // migration 118 — Промт 5Б: автосохранение + именованные проекты
+    // (только CodeSandbox — python/cpp, единственный режим с реальным
+    // персистируемым состоянием сейчас).
+    projects: {
+      myProjects: string;       // "Мои проекты"
+      newProjectOption: string; // "Новый проект" — пункт списка = нет активного именованного проекта
+      saveAsBtn: string;        // "Сохранить как..."
+      renameBtn: string;        // "Переименовать"
+      deleteBtn: string;        // "Удалить"
+      savedLabel: string;       // "Сохранено"
+      autosaveLabel: string;    // "Автосохранение"
+      nameTakenToast: string;   // "Проект с таким названием уже есть"
+      savedSecondsAgo: string;  // "{n} сек назад"
+      savedMinutesAgo: string;  // "{n} мин назад"
+      namePlaceholder: string;  // "Название проекта"
+      deleteConfirm: string;    // "Удалить проект «{name}»?"
+      cancelBtn: string;        // "Отмена"
+      saveBtn: string;          // "Сохранить"
+      limitReached: string;     // "Достигнут лимит проектов (20)"
+    };
   };
   // Iter5 P10 — standalone /ai-assistant page (Claude Design redesign);
   // separate from `ai.chat` above, which is the in-lesson "Робокот" panel.

@@ -1,18 +1,31 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronLeft, Play, Loader2, Trash2, AlertTriangle, ExternalLink,
+  Check, Save, Pencil, X,
 } from "lucide-react";
-import { getDictionary, type Locale } from "@snr/core";
+import {
+  getDictionary, type Locale, getMyStudent,
+  getSandboxAutosave, upsertSandboxAutosave, listSandboxProjects,
+  createSandboxProject, updateSandboxProjectCode, renameSandboxProject, deleteSandboxProject,
+  SandboxProjectLimitError, SandboxProjectNameTakenError,
+  type SandboxProject,
+} from "@snr/core";
 import { useLocale } from "@/components";
+import { useToast } from "@/components/Toast";
+import { createClient } from "@/lib/supabase/client";
 import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
 import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
 import { CodeEditor } from "@/components/CodeEditor";
 import { StdinInput } from "@/components/StdinInput";
 import { pyodideReady } from "@/lib/pyodide";
 import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
+
+// Промт 5Б — debounce автосохранения (3-5с диапазон из спеки, выбрана
+// середина).
+const AUTOSAVE_DEBOUNCE_MS = 4000;
 
 // ── Fullscreen shell (no submit — pure sandbox) ────────────────────────────────
 function SandboxFullscreen({
@@ -101,12 +114,115 @@ function IframeSandbox({ tool, name }: { tool: SandboxTool; name: string }) {
   );
 }
 
+// ── Sandbox projects (Промт 5Б) — autosave + named projects, CodeSandbox only ──
+
+function savedAgoLabel(
+  since: Date | null,
+  now: number,
+  dp: ReturnType<typeof getDictionary>["sandbox"]["projects"],
+): string | null {
+  if (!since) return null;
+  const secs = Math.max(0, Math.floor((now - since.getTime()) / 1000));
+  if (secs < 60) return dp.savedSecondsAgo.replace("{n}", String(secs));
+  return dp.savedMinutesAgo.replace("{n}", String(Math.floor(secs / 60)));
+}
+
+/** Простая модалка "введи имя" — используется и для "Сохранить как...", и для "Переименовать". */
+function NamePromptModal({
+  title, initialValue, dp, onCancel, onConfirm,
+}: {
+  title: string;
+  initialValue: string;
+  dp: ReturnType<typeof getDictionary>["sandbox"]["projects"];
+  onCancel: () => void;
+  onConfirm: (name: string) => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+          <button onClick={onCancel} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <input
+          type="text"
+          autoFocus
+          value={value}
+          maxLength={100}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && value.trim()) onConfirm(value); }}
+          placeholder={dp.namePlaceholder}
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-100"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
+            {dp.cancelBtn}
+          </button>
+          <button
+            onClick={() => value.trim() && onConfirm(value)}
+            disabled={!value.trim()}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {dp.saveBtn}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ConfirmDeleteModal({
+  projectName, dp, onCancel, onConfirm,
+}: {
+  projectName: string;
+  dp: ReturnType<typeof getDictionary>["sandbox"]["projects"];
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+          {dp.deleteConfirm.replace("{name}", projectName)}
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
+            {dp.cancelBtn}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
+          >
+            {dp.deleteBtn}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Code tool (Monaco + Python/C++ runner) ─────────────────────────────────────
 type Lang = "python" | "cpp";
 
 function CodeSandbox() {
   const { locale } = useLocale();
   const dc = getDictionary(locale as Locale).lesson.code;
+  const dp = getDictionary(locale as Locale).sandbox.projects;
+  const toast = useToast();
+  const db = createClient();
 
   const [language, setLanguage] = useState<Lang>("python");
   const [code, setCode] = useState("");
@@ -114,7 +230,126 @@ function CodeSandbox() {
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
 
+  // ── Промт 5Б: сохранённые проекты ──────────────────────────────────────
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<SandboxProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [autosaveCode, setAutosaveCode] = useState(""); // для возврата из именованного проекта на "Новый проект"
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const skipNextAutosave = useRef(false);
+
   const stdin = stdinValues.join("\n");
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
+
+  // Обновляем "N сек назад" раз в секунду, пока индикатор виден.
+  useEffect(() => {
+    if (!lastSavedAt) return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [lastSavedAt]);
+
+  // Резолвим ученика один раз.
+  useEffect(() => {
+    let cancelled = false;
+    getMyStudent(db).then((s) => { if (!cancelled) setStudentId(s.id); }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // При смене языка (или после резолва ученика) — своя связка ученик+сервис:
+  // список именованных проектов + автосейв (загружается, только если ещё
+  // не выбран именованный проект — здесь всегда так, т.к. смена языка сама
+  // сбрасывает activeProjectId ниже).
+  useEffect(() => {
+    if (!studentId) return;
+    let cancelled = false;
+    setActiveProjectId(null);
+    (async () => {
+      const [list, autosave] = await Promise.all([
+        listSandboxProjects(db, studentId, language),
+        getSandboxAutosave(db, studentId, language),
+      ]);
+      if (cancelled) return;
+      setProjects(list);
+      const initialCode = autosave?.code ?? "";
+      setAutosaveCode(initialCode);
+      skipNextAutosave.current = true;
+      setCode(initialCode);
+      setLastSavedAt(autosave ? new Date(autosave.updated_at) : null);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, language]);
+
+  // Debounced автосохранение: именованный проект → UPDATE этого id;
+  // иначе → UPSERT автосейв-слота (student_id, service_id).
+  useEffect(() => {
+    if (!studentId) return;
+    if (skipNextAutosave.current) { skipNextAutosave.current = false; return; }
+    const t = setTimeout(async () => {
+      try {
+        if (activeProjectId) {
+          await updateSandboxProjectCode(db, activeProjectId, code);
+        } else {
+          await upsertSandboxAutosave(db, { studentId, serviceId: language, code });
+          setAutosaveCode(code);
+        }
+        setLastSavedAt(new Date());
+      } catch {
+        // Автосохранение не должно прерывать работу ученика тостом на каждый чих.
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, studentId, language, activeProjectId]);
+
+  function selectProject(project: SandboxProject | null) {
+    skipNextAutosave.current = true;
+    setActiveProjectId(project?.id ?? null);
+    setCode(project ? (project.code ?? "") : autosaveCode);
+  }
+
+  async function handleSaveAs(name: string) {
+    if (!studentId) return;
+    try {
+      const created = await createSandboxProject(db, { studentId, serviceId: language, name, code });
+      setProjects((prev) => [created, ...prev]);
+      setActiveProjectId(created.id);
+      setSaveAsOpen(false);
+    } catch (e) {
+      if (e instanceof SandboxProjectNameTakenError) toast(dp.nameTakenToast);
+      else if (e instanceof SandboxProjectLimitError) toast(dp.limitReached);
+      else toast(dc.error);
+    }
+  }
+
+  async function handleRename(newName: string) {
+    if (!studentId || !activeProjectId) return;
+    try {
+      await renameSandboxProject(db, { projectId: activeProjectId, studentId, serviceId: language, newName });
+      setProjects((prev) => prev.map((p) => (p.id === activeProjectId ? { ...p, name: newName.trim() } : p)));
+      setRenameOpen(false);
+    } catch (e) {
+      if (e instanceof SandboxProjectNameTakenError) toast(dp.nameTakenToast);
+      else toast(dc.error);
+    }
+  }
+
+  async function handleDelete() {
+    if (!activeProjectId) return;
+    try {
+      await deleteSandboxProject(db, activeProjectId);
+      setProjects((prev) => prev.filter((p) => p.id !== activeProjectId));
+      selectProject(null);
+      setDeleteConfirmOpen(false);
+    } catch {
+      toast(dc.error);
+    }
+  }
 
   function errMessage(err: string): string {
     if (err === "compile") return dc.compileError;
@@ -140,6 +375,7 @@ function CodeSandbox() {
   const runLabel = running
     ? (language === "python" && !pyodideReady() ? dc.runFirst : language === "cpp" ? dc.runningCpp : dc.running)
     : dc.run;
+  const savedAgo = savedAgoLabel(lastSavedAt, nowTick, dp);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -161,6 +397,52 @@ function CodeSandbox() {
             </button>
           ))}
         </div>
+
+        {/* Промт 5Б: панель проектов */}
+        <section className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/5">
+          <label className="flex min-w-[180px] flex-1 items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            {dp.myProjects}
+            <select
+              value={activeProjectId ?? "__new__"}
+              onChange={(e) => selectProject(e.target.value === "__new__" ? null : projects.find((p) => p.id === e.target.value) ?? null)}
+              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-100"
+            >
+              <option value="__new__">{dp.newProjectOption}</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <div className="flex shrink-0 gap-1.5">
+            <button
+              onClick={() => setSaveAsOpen(true)}
+              disabled={!studentId}
+              title={dp.saveAsBtn}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50 dark:border-white/10 dark:text-slate-300"
+            >
+              <Save className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{dp.saveAsBtn}</span>
+            </button>
+            <button
+              onClick={() => setRenameOpen(true)}
+              disabled={!activeProjectId}
+              title={dp.renameBtn}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 dark:border-white/10 dark:text-slate-300"
+            >
+              <Pencil className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{dp.renameBtn}</span>
+            </button>
+            <button
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={!activeProjectId}
+              title={dp.deleteBtn}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:border-red-300 hover:bg-red-50 disabled:opacity-40 dark:border-white/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{dp.deleteBtn}</span>
+            </button>
+          </div>
+          {savedAgo && (
+            <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <Check className="h-3 w-3" /> {dp.savedLabel} · {savedAgo}
+            </span>
+          )}
+        </section>
 
         {/* Editor */}
         <CodeEditor value={code} onChange={setCode} language={language} minHeight={360} />
@@ -210,6 +492,33 @@ function CodeSandbox() {
           </div>
         </section>
       </div>
+
+      {saveAsOpen && (
+        <NamePromptModal
+          title={dp.saveAsBtn}
+          initialValue=""
+          dp={dp}
+          onCancel={() => setSaveAsOpen(false)}
+          onConfirm={handleSaveAs}
+        />
+      )}
+      {renameOpen && activeProject && (
+        <NamePromptModal
+          title={dp.renameBtn}
+          initialValue={activeProject.name}
+          dp={dp}
+          onCancel={() => setRenameOpen(false)}
+          onConfirm={handleRename}
+        />
+      )}
+      {deleteConfirmOpen && activeProject && (
+        <ConfirmDeleteModal
+          projectName={activeProject.name}
+          dp={dp}
+          onCancel={() => setDeleteConfirmOpen(false)}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 }
