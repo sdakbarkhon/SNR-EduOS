@@ -1710,7 +1710,15 @@ export const getStudentLessonView = async (
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    db3.from("lesson_materials").select("id, lesson_id, title, file_storage_path, file_size_bytes, file_original_name, uploaded_by, created_at, visibility, is_demo, from_knowledge_base, kb_bucket").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
+    // Промт "презентации/skeleton" — Задача Б: select("*") instead of an
+    // explicit column list specifically so this stays deploy-order-agnostic
+    // relative to migration 115 (from_knowledge_base/kb_bucket). An explicit
+    // list naming those columns would 400 this query — and break every
+    // student lesson page — for however long the code is live before the
+    // migration is applied; "*" just returns whatever columns actually
+    // exist. Matches the teacher-side materials query (line ~1654), which
+    // already used "*" for the same reason (unrelated to this migration).
+    db3.from("lesson_materials").select("*").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
     db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
   ]);
