@@ -889,6 +889,106 @@ export type Database = {
           },
         ]
       }
+      curriculum_plans: {
+        Row: {
+          id: string
+          group_id: string
+          subject_id: string
+          teacher_id: string
+          school_id: string
+          title: string
+          source_file_url: string | null
+          source_file_type: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          group_id: string
+          subject_id: string
+          teacher_id: string
+          school_id?: string
+          title: string
+          source_file_url?: string | null
+          source_file_type?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          group_id?: string
+          subject_id?: string
+          teacher_id?: string
+          school_id?: string
+          title?: string
+          source_file_url?: string | null
+          source_file_type?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_plans_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      curriculum_plan_topics: {
+        Row: {
+          id: string
+          plan_id: string
+          order_index: number
+          title: string
+          description: string | null
+          estimated_lessons: number
+        }
+        Insert: {
+          id?: string
+          plan_id: string
+          order_index: number
+          title: string
+          description?: string | null
+          estimated_lessons?: number
+        }
+        Update: {
+          id?: string
+          plan_id?: string
+          order_index?: number
+          title?: string
+          description?: string | null
+          estimated_lessons?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_plan_topics_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_materials: {
         Row: {
           is_demo: boolean
@@ -2098,6 +2198,7 @@ export type Database = {
           subject_id: string | null
           title: string | null
           topic: string | null
+          curriculum_topic_id: string | null
         }
         Insert: {
           is_demo?: boolean
@@ -2124,6 +2225,7 @@ export type Database = {
           subject_id?: string | null
           title?: string | null
           topic?: string | null
+          curriculum_topic_id?: string | null
         }
         Update: {
           is_demo?: boolean
@@ -2150,8 +2252,16 @@ export type Database = {
           subject_id?: string | null
           title?: string | null
           topic?: string | null
+          curriculum_topic_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lessons_curriculum_topic_id_fkey"
+            columns: ["curriculum_topic_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_plan_topics"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lessons_active_stage_id_fkey"
             columns: ["active_stage_id"]

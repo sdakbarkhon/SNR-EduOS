@@ -323,6 +323,43 @@ export type LessonMaterial = {
   kb_bucket: 'materials' | 'books' | null;
 };
 
+// migration 116 — Промт 4: учебные планы. teacher_id/group_id/subject_id
+// как в БД; UNIQUE(group_id, subject_id) на стороне БД, не в типе.
+export type CurriculumPlan = {
+  id: string;
+  group_id: string;
+  subject_id: string;
+  teacher_id: string;
+  school_id: string;
+  title: string;
+  source_file_url: string | null;
+  source_file_type: 'pdf' | 'docx' | null;
+  created_at: string;
+};
+
+export type CurriculumPlanTopic = {
+  id: string;
+  plan_id: string;
+  order_index: number;
+  title: string;
+  description: string | null;
+  estimated_lessons: number;
+};
+
+/** curriculum_plans + вложенные topics (order_index asc) + производные поля
+ *  для UI (group/subject имена, счётчик уроков на группу+предмет). */
+export type CurriculumPlanWithTopics = CurriculumPlan & {
+  topics: CurriculumPlanTopic[];
+  group_name?: string;
+  subject_name?: string;
+};
+
+/** Тема плана + сколько существующих (будущих) уроков уже используют её —
+ *  для селектора темы в форме создания урока ("использована в N уроках"). */
+export type CurriculumTopicWithUsage = CurriculumPlanTopic & {
+  used_in_lessons: number;
+};
+
 
 export type TeacherLessonView = {
   id: string;
