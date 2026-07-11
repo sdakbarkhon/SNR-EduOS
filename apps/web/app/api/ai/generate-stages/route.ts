@@ -24,6 +24,22 @@ const EXTERNAL = [
 
 type AttachedMaterial = { title: string; text: string };
 
+// subjects.name (RU) → books.subject slug — тот же словарь, что SUBJECTS
+// в apps/web/app/teacher/books/TeacherBooksView.tsx. "Русский язык" не
+// маппится намеренно — у books нет соответствующего slug (см. Часть 6,
+// SUBJECT_NAME_TO_BOOK_SLUG usage): для него просто нет книжного фильтра.
+const SUBJECT_NAME_TO_BOOK_SLUG: Record<string, string> = {
+  "Математика": "math",
+  "Физика": "physics",
+  "Программирование": "programming",
+  "Робототехника": "robotics",
+  "Английский язык": "english",
+  "Информатика": "informatics",
+  "Химия": "chemistry",
+  "Биология": "biology",
+  "История": "history",
+};
+
 type CurriculumTopicContext = {
   title: string;
   description: string | null;
@@ -425,7 +441,7 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("group_id, curriculum_topic_id, group:groups!inner(teacher_id, name, subject)")
+    .select("group_id, curriculum_topic_id, subject_id, group:groups!inner(teacher_id, name, subject)")
     .eq("id", body.lesson_id)
     .single();
   const group = lesson?.group as { teacher_id: string; name: string | null; subject: string | null } | null;
@@ -448,7 +464,7 @@ export async function POST(req: NextRequest) {
 
   // Промт 4, Часть 6: если у урока есть curriculum_topic_id (только новые уроки,
   // созданные через селектор темы из плана) — подтягиваем тему плана + метаданные
-  // БЗ (course_materials/books по предмету группы) как доп. контекст для AI.
+  // БЗ (course_materials/books по предмету) как доп. контекст для AI.
   // Существующие уроки (curriculum_topic_id всегда NULL) этот блок не затрагивает.
   let curriculumTopic: CurriculumTopicContext | null = null;
   let kbMaterials: string[] = [];
@@ -468,19 +484,35 @@ export async function POST(req: NextRequest) {
       };
 
       const groupId = (lesson as { group_id: string }).group_id;
+      const subjectId = (lesson as { subject_id: string | null }).subject_id;
+      // "books.subject" — независимый slug, выбираемый учителем при загрузке
+      // (SUBJECTS в TeacherBooksView.tsx), НЕ совпадает с groups.subject —
+      // тот захардкожен в 'programming' для всех 3 групп ещё миграцией 97
+      // (full reset), фильтр по нему молча терял бы Математику/Английский/
+      // Русский. Резолвим настоящий предмет через subjects.name и мапим
+      // на тот же slug-словарь, что использует форма загрузки книг.
+      let booksSlug: string | null = null;
+      if (subjectId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: subjectRow } = await (db as any)
+          .from("subjects").select("name").eq("id", subjectId).maybeSingle();
+        booksSlug = SUBJECT_NAME_TO_BOOK_SLUG[subjectRow?.name as string] ?? null;
+      }
+
+      // course_materials.subject тоже всегда равен groups.subject
+      // ('programming' константа) — фильтр по нему исключил бы все
+      // материалы для не-программирования, поэтому здесь достаточно
+      // group_id (материалы группы общие для всех её предметов).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const [{ data: cm }, { data: bk }] = await Promise.all([
         (db as any)
           .from("course_materials")
           .select("title, description")
           .eq("group_id", groupId)
-          .eq("subject", group.subject)
           .limit(15),
-        (db as any)
-          .from("books")
-          .select("title, description")
-          .eq("subject", group.subject)
-          .limit(15),
+        booksSlug
+          ? (db as any).from("books").select("title, description").eq("subject", booksSlug).limit(15)
+          : Promise.resolve({ data: [] }),
       ]);
       const cmRows = (cm ?? []) as Array<{ title: string; description: string | null }>;
       const bkRows = (bk ?? []) as Array<{ title: string; description: string | null }>;
