@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTeacherAllLessons, getTeacherGroups } from "@snr/core";
+import { getTeacherLessonsByMonth, getTeacherGroups } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { TeacherLessonsView } from "./TeacherLessonsView";
 import { redirect } from "next/navigation";
@@ -9,8 +9,17 @@ export default async function TeacherLessonsPage() {
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
 
+  // Промт "презентации/skeleton" — TeacherLessonsView only ever uses the
+  // initial `lessons` prop to seed the CURRENT month's view (see its
+  // useState initializer); every other month is fetched on demand via
+  // loadMonth()/getTeacherLessonsByMonth. Fetching every lesson the teacher
+  // can see (396+ rows and growing) just to filter down to ~30 client-side
+  // was the single slowest query on this page (413ms measured at 396 rows,
+  // scales with total lesson count, unbounded) — fetch only the current
+  // month up front instead, matching what's actually shown on first paint.
+  const now = new Date();
   const [lessons, groupsRaw, teacherRow] = await Promise.all([
-    getTeacherAllLessons(db).catch(() => []),
+    getTeacherLessonsByMonth(db, now.getFullYear(), now.getMonth() + 1).catch(() => []),
     Promise.resolve(getTeacherGroups(db)).catch(() => []),
     getMyTeacher(db).catch(() => null),
   ]);
