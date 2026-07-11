@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cookies, headers } from "next/headers";
 import {
   signInWithUsername,
@@ -187,19 +188,29 @@ export async function demoLogin(
 
 export async function signOut() {
   const supabase = await createClient();
+  // Промт «скорость», Задача 6: getUser() (сеть до Supabase Auth) + admin
+  // .update() (сеть до Postgres) раньше выполнялись последовательно ДО
+  // signOut()+redirect() — клик «Выйти» ждал оба round trip'а. getSession()
+  // читает user.id из cookie локально; сама запись в user_sessions —
+  // best-effort бухгалтерия для крона, не требует сетевой auth-проверки.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
 
-  if (user) {
+  if (userId) {
     // Строку user_sessions НЕ удаляем — только штампуем last_activity.
     // Так «вышел >3ч назад» и «неактивен 3ч» для крона — одно условие
-    // (reset_expired_demo_sessions v2, миграция 110).
-    const admin = createAdminClient();
-    await admin
-      .from("user_sessions")
-      .update({ last_activity: new Date().toISOString() })
-      .eq("user_id", user.id);
+    // (reset_expired_demo_sessions v2, миграция 110). after() откладывает
+    // запись до момента когда redirect-ответ уже отправлен браузеру —
+    // редирект больше не ждёт её.
+    after(async () => {
+      const admin = createAdminClient();
+      await admin
+        .from("user_sessions")
+        .update({ last_activity: new Date().toISOString() })
+        .eq("user_id", userId);
+    });
   }
 
   // scope:'local' — глобальный signOut отозвал бы refresh-токен сессии,
