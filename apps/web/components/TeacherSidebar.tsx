@@ -165,7 +165,8 @@ export function TeacherSidebar() {
             <Link
               key={item.key}
               href={item.href}
-              prefetch={false}
+              // Промт «скорость», Задача 5: тот же fix, что StudentSidebar —
+              // все пункты здесь реальные маршруты, префетч по умолчанию.
               onClick={() => setPendingHref(item.href)}
               title={item.label(d)}
               className={cn(

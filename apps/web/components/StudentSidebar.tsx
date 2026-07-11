@@ -196,7 +196,12 @@ export function StudentSidebar() {
             <Link
               key={item.key}
               href={item.href}
-              prefetch={false}
+              // Промт «скорость», Задача 5: prefetch=false отключал Next.js
+              // авто-префетч по видимости на самом высокотрафиковом сайдбаре —
+              // каждый переход был полным SSR round trip'ом без прогрева.
+              // "#"-заглушки (isStub) по-прежнему без префетча — это не
+              // реальный маршрут.
+              prefetch={item.isStub ? false : undefined}
               onClick={item.isStub ? onStubClick : undefined}
               title={item.label(d)}
               className={cn(
