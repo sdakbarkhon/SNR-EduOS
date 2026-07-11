@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMyTeacher, getProjectWithStages, getProjectSubmissions, getGroupStudents } from "@snr/core";
+import { getProjectWithStages, getProjectSubmissions, getGroupStudents } from "@snr/core";
+import { getMyTeacher } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { TeacherProjectDetailView } from "./TeacherProjectDetailView";
 

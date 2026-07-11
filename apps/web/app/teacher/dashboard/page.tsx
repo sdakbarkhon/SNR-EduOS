@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import {
-  getMyTeacher, getTeacherGroups, getTeacherHomework,
+  getTeacherGroups, getTeacherHomework,
   getTeacherTodayLessons, getTeacherRecentSubmissions, getTeacherGrades,
 } from "@snr/core";
+import { getMyTeacher } from "@/lib/cached-queries";
 import { TeacherDashboardView } from "./TeacherDashboardView";
 
 async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {

@@ -1,5 +1,6 @@
-import { getMyTeacher, getSubjectConfig } from "@snr/core";
+import { getSubjectConfig } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
+import { getMyTeacher } from "@/lib/cached-queries";
 import { Avatar } from "./Avatar";
 
 /**

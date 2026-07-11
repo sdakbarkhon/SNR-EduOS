@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTeacherLessonView, getMyTeacher } from "@snr/core";
+import { getTeacherLessonView } from "@snr/core";
+import { getMyTeacher } from "@/lib/cached-queries";
 import { notFound, redirect } from "next/navigation";
 import { TeacherLessonDetailView } from "./TeacherLessonDetailView";
 

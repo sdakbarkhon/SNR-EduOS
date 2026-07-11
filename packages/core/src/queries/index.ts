@@ -1091,7 +1091,11 @@ export const createTestQuestions = async (
 // предмету — здесь, в query-слое.
 type TeacherSubjectFilter = { teacherId: string; subjectIds: string[] | null };
 
-/** null subjectIds = куратор (subject_slug=NULL) — фильтр не нужен. */
+/** null subjectIds = куратор (subject_slug=NULL) — фильтр не нужен.
+ *
+ * Промт «скорость», Задача 3: раньше — 2 последовательных round trip'а
+ * (teachers, затем subjects по teacher_id). subjects.teacher_id → teachers.id
+ * — настоящий FK, поэтому embedded-select забирает оба одним запросом. */
 async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
@@ -1100,13 +1104,15 @@ async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | n
   if (!userId) return null;
   const { data: teacher } = await db2
     .from("teachers")
-    .select("id, subject_slug")
+    .select("id, subject_slug, my_subjects:subjects!teacher_id(id)")
     .eq("user_id", userId)
     .maybeSingle();
   if (!teacher) return null;
   if (!teacher.subject_slug) return { teacherId: teacher.id, subjectIds: null };
-  const { data: subjects } = await db2.from("subjects").select("id").eq("teacher_id", teacher.id);
-  return { teacherId: teacher.id, subjectIds: ((subjects ?? []) as Array<{ id: string }>).map((s) => s.id) };
+  return {
+    teacherId: teacher.id,
+    subjectIds: ((teacher.my_subjects ?? []) as Array<{ id: string }>).map((s) => s.id),
+  };
 }
 
 function filterBySubject<T extends { subject_id?: string | null }>(

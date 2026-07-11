@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMyTeacher, getTeacherProjects, getTeacherGroups } from "@snr/core";
+import { getTeacherProjects, getTeacherGroups } from "@snr/core";
+import { getMyTeacher } from "@/lib/cached-queries";
 import { TeacherProjectsView } from "./TeacherProjectsView";
 
 export default async function TeacherProjectsPage() {
