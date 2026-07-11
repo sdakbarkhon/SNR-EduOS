@@ -989,6 +989,60 @@ export type Database = {
           },
         ]
       }
+      sandbox_projects: {
+        Row: {
+          id: string
+          student_id: string
+          school_id: string
+          name: string
+          service_id: string
+          code: string | null
+          external_url: string | null
+          is_autosave: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          school_id?: string
+          name?: string
+          service_id: string
+          code?: string | null
+          external_url?: string | null
+          is_autosave?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          school_id?: string
+          name?: string
+          service_id?: string
+          code?: string | null
+          external_url?: string | null
+          is_autosave?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sandbox_projects_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sandbox_projects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_materials: {
         Row: {
           is_demo: boolean
