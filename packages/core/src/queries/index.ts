@@ -1896,7 +1896,12 @@ export const updateLesson = async (
   if (error) throw error;
 };
 
-/** Создаёт новый урок в группе учителя. ends_at вычисляется триггером. */
+/** Создаёт новый урок в группе учителя. ends_at вычисляется триггером.
+ *  curriculumTopicId (Промт 4) — опциональная привязка к теме учебного
+ *  плана; caller уже знает title темы (из списка в форме), передаёт его
+ *  через тот же существующий `title`, лишнего похода в БД не нужно.
+ *  ТОЛЬКО для новых уроков — updateLesson НЕ принимает этот параметр,
+ *  чтобы существующие уроки нельзя было случайно перепривязать. */
 export const createLesson = async (
   db: Db,
   input: {
@@ -1907,6 +1912,7 @@ export const createLesson = async (
     title: string | null;
     description: string | null;
     subjectId?: string | null;
+    curriculumTopicId?: string | null;
   },
 ): Promise<{ id: string }> => {
   const dur = input.durationMinutes ?? 45;
@@ -1926,6 +1932,7 @@ export const createLesson = async (
       topic: null,
       status: "scheduled",
       subject_id: input.subjectId ?? null,
+      curriculum_topic_id: input.curriculumTopicId ?? null,
     })
     .select("id")
     .single();

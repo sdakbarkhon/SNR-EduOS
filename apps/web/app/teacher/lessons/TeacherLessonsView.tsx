@@ -11,8 +11,9 @@ import {
 import {
   createLesson, updateLesson, deleteLesson,
   getTeacherLessonsByMonth, getDictionary, defaultLocale,
+  getCurriculumPlanForGroupSubject, getCurriculumTopicsWithUsage,
 } from "@snr/core";
-import type { SubjectWithGroup, Locale } from "@snr/core";
+import type { SubjectWithGroup, Locale, CurriculumTopicWithUsage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
@@ -32,6 +33,8 @@ type LessonItem = {
 type FormState = {
   groupId: string; subjectId: string; date: string; startTime: string;
   durationMinutes: string; room: string; title: string; desc: string;
+  // Промт 4, Часть 5 — тема из учебного плана; null/"" = "своя тема" (title — свободный ввод как раньше).
+  curriculumTopicId: string;
 };
 type EffectiveStatus = "scheduled" | "in_progress" | "completed" | "missed";
 type DayStatus = "in_progress" | "overdue" | "completed" | "scheduled" | null;
@@ -133,7 +136,7 @@ function buildIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 function emptyForm(groupId = ""): FormState {
-  return { groupId, subjectId: "", date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "" };
+  return { groupId, subjectId: "", date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "", curriculumTopicId: "" };
 }
 function lessonToForm(l: LessonItem): FormState {
   return {
@@ -142,6 +145,7 @@ function lessonToForm(l: LessonItem): FormState {
     startTime: toLocalTimeStr(l.starts_at),
     durationMinutes: "45",
     room: l.room ?? "", title: l.title ?? "", desc: "",
+    curriculumTopicId: "", // Часть 5 — редактирование НЕ предлагает селектор темы
   };
 }
 
@@ -309,6 +313,7 @@ function LessonFormModal({
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).lesson;
+  const dc = getDictionary(locale as Locale).curriculum;
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -319,6 +324,30 @@ function LessonFormModal({
   const groupSubjects = teacherSubjects.filter(s => s.group_id === form.groupId);
   // Groups that have at least one subject assigned to this teacher
   const groupsWithSubjects = groups.filter(g => teacherSubjects.some(s => s.group_id === g.id));
+
+  // Промт 4, Часть 5 — тема из плана. ТОЛЬКО при создании урока (Часть 5:
+  // "форму редактирования — селектор не добавлять"), только когда у пары
+  // (группа, предмет) есть план.
+  const [planTopics, setPlanTopics] = useState<CurriculumTopicWithUsage[] | null>(null);
+  const [useCustomTopic, setUseCustomTopic] = useState(true);
+  useEffect(() => {
+    if (mode !== "create" || !form.groupId || !form.subjectId) { setPlanTopics(null); return; }
+    let cancelled = false;
+    const db = createClient();
+    getCurriculumPlanForGroupSubject(db, form.groupId, form.subjectId)
+      .then((plan) => {
+        if (cancelled) return;
+        if (!plan) { setPlanTopics(null); setUseCustomTopic(true); return; }
+        return getCurriculumTopicsWithUsage(db, plan.id).then((topics) => {
+          if (cancelled) return;
+          setPlanTopics(topics);
+          setUseCustomTopic(topics.length === 0);
+        });
+      })
+      .catch(() => { if (!cancelled) setPlanTopics(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, form.groupId, form.subjectId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -396,6 +425,34 @@ function LessonFormModal({
               )}
             </div>
           )}
+          {mode === "create" && planTopics && planTopics.length > 0 && (
+            <div>
+              <label className={labelCls}>{dc.topicFromPlan}</label>
+              <select
+                value={useCustomTopic ? "__custom__" : form.curriculumTopicId}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setUseCustomTopic(true);
+                    set("curriculumTopicId", "");
+                  } else {
+                    setUseCustomTopic(false);
+                    set("curriculumTopicId", e.target.value);
+                    const topic = planTopics.find((t) => t.id === e.target.value);
+                    if (topic) set("title", topic.title);
+                  }
+                }}
+                className={inputCls}
+              >
+                <option value="" disabled>— выберите тему —</option>
+                {planTopics.map((t, i) => (
+                  <option key={t.id} value={t.id}>
+                    {i + 1}. {t.title} ({t.used_in_lessons > 0 ? `использована в ${t.used_in_lessons} уроках` : "не использована"})
+                  </option>
+                ))}
+                <option value="__custom__">{dc.enterCustomTopic}</option>
+              </select>
+            </div>
+          )}
           <div>
             <label className={labelCls}>Дата *</label>
             <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
@@ -414,10 +471,12 @@ function LessonFormModal({
             <label className={labelCls}>Кабинет</label>
             <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
           </div>
-          <div>
-            <label className={labelCls}>Название урока (опционально)</label>
-            <input type="text" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Например: Циклы в Python" className={inputCls} />
-          </div>
+          {(mode !== "create" || !planTopics || planTopics.length === 0 || useCustomTopic) && (
+            <div>
+              <label className={labelCls}>Название урока (опционально)</label>
+              <input type="text" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Например: Циклы в Python" className={inputCls} />
+            </div>
+          )}
           <div>
             <label className={labelCls}>Описание / цель (опционально)</label>
             <textarea rows={2} value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="Что ученики должны узнать" className={`${inputCls} resize-none`} />
@@ -572,6 +631,7 @@ export function TeacherLessonsView({
         groupId: form.groupId, startsAt, durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
         subjectId: form.subjectId || null,
+        curriculumTopicId: form.curriculumTopicId || null,
       });
       setFormModal(null);
       router.push(`/teacher/lessons/${created.id}`);

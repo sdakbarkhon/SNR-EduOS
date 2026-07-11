@@ -24,6 +24,12 @@ const EXTERNAL = [
 
 type AttachedMaterial = { title: string; text: string };
 
+type CurriculumTopicContext = {
+  title: string;
+  description: string | null;
+  estimatedLessons: number;
+};
+
 function buildPrompt(input: {
   topic: string;
   grade: number;
@@ -31,6 +37,8 @@ function buildPrompt(input: {
   durationMin: number;
   overallDifficulty: string;
   materials: AttachedMaterial[];
+  curriculumTopic?: CurriculumTopicContext | null;
+  kbMaterials?: string[];
 }): string {
   const hasFiles = input.materials.length > 0;
   const materialsContext = hasFiles
@@ -38,6 +46,17 @@ function buildPrompt(input: {
         .map((m) => `=== Материал "${m.title}" ===\n${m.text}`)
         .join("\n\n")
     : "Материалы не прикреплены.";
+
+  // Промт 4: тема из учебного плана — первичный контекст, когда lessons.curriculum_topic_id
+  // указан на СОЗДАНИИ урока (существующие уроки этого поля не имеют — секция просто не рендерится).
+  const curriculumSection = input.curriculumTopic ? `
+
+ТЕМА ИЗ УЧЕБНОГО ПЛАНА (первичный контекст — используй как основу урока):
+- Название темы: ${input.curriculumTopic.title}
+${input.curriculumTopic.description ? `- Описание темы: ${input.curriculumTopic.description}\n` : ""}- Ожидаемое количество уроков на эту тему: ${input.curriculumTopic.estimatedLessons}
+${input.kbMaterials && input.kbMaterials.length > 0
+    ? `\nДоступные материалы: ${input.kbMaterials.join("; ")}`
+    : ""}` : "";
 
   // Optimal stage count based on lesson duration
   const stageCount = input.durationMin <= 30 ? "2–3" :
@@ -101,6 +120,7 @@ function buildPrompt(input: {
 
 МАТЕРИАЛЫ ОТ УЧИТЕЛЯ:
 ${materialsContext}
+${curriculumSection}
 ${programmingSection}
 
 ТИПЫ КОНТЕНТА (выбирай по ТЕМЕ урока и классу — НЕ только по названию предмета):
@@ -405,7 +425,7 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("group:groups!inner(teacher_id, name, subject)")
+    .select("group_id, curriculum_topic_id, group:groups!inner(teacher_id, name, subject)")
     .eq("id", body.lesson_id)
     .single();
   const group = lesson?.group as { teacher_id: string; name: string | null; subject: string | null } | null;
@@ -426,7 +446,54 @@ export async function POST(req: NextRequest) {
   const materials = Array.isArray(body.attached_materials) ? body.attached_materials.slice(0, 10) : [];
   const wantSearch = body.use_web_search ?? materials.length === 0;
 
-  const prompt = buildPrompt({ topic: body.topic.trim(), grade, subject, durationMin, overallDifficulty, materials });
+  // Промт 4, Часть 6: если у урока есть curriculum_topic_id (только новые уроки,
+  // созданные через селектор темы из плана) — подтягиваем тему плана + метаданные
+  // БЗ (course_materials/books по предмету группы) как доп. контекст для AI.
+  // Существующие уроки (curriculum_topic_id всегда NULL) этот блок не затрагивает.
+  let curriculumTopic: CurriculumTopicContext | null = null;
+  let kbMaterials: string[] = [];
+  const curriculumTopicId = (lesson as { curriculum_topic_id?: string | null }).curriculum_topic_id;
+  if (curriculumTopicId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: topicRow } = await (db as any)
+      .from("curriculum_plan_topics")
+      .select("title, description, estimated_lessons")
+      .eq("id", curriculumTopicId)
+      .maybeSingle();
+    if (topicRow) {
+      curriculumTopic = {
+        title: topicRow.title,
+        description: topicRow.description ?? null,
+        estimatedLessons: topicRow.estimated_lessons ?? 1,
+      };
+
+      const groupId = (lesson as { group_id: string }).group_id;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [{ data: cm }, { data: bk }] = await Promise.all([
+        (db as any)
+          .from("course_materials")
+          .select("title, description")
+          .eq("group_id", groupId)
+          .eq("subject", group.subject)
+          .limit(15),
+        (db as any)
+          .from("books")
+          .select("title, description")
+          .eq("subject", group.subject)
+          .limit(15),
+      ]);
+      const cmRows = (cm ?? []) as Array<{ title: string; description: string | null }>;
+      const bkRows = (bk ?? []) as Array<{ title: string; description: string | null }>;
+      kbMaterials = [...cmRows, ...bkRows]
+        .map((m) => (m.description ? `${m.title} — ${m.description}` : m.title))
+        .slice(0, 25);
+    }
+  }
+
+  const prompt = buildPrompt({
+    topic: body.topic.trim(), grade, subject, durationMin, overallDifficulty, materials,
+    curriculumTopic, kbMaterials,
+  });
 
   let result: GenResult | null = null;
   let lastError = "";
