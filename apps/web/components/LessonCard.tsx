@@ -1,10 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { MapPin, User, ChevronRight, BookOpen } from "lucide-react";
-import * as Icons from "lucide-react";
+import {
+  MapPin, User, ChevronRight, BookOpen,
+  Calculator, Globe, Languages, BookText, Scroll, Map, Leaf, Atom,
+  FlaskConical, Monitor, Code, Bot, Dumbbell, Music, Palette, Hammer,
+  TreePine, Users,
+} from "lucide-react";
 import type { LessonWithSubject } from "@snr/core";
 import { cn } from "@/lib/cn";
+
+// Промт «скорость», Задача 7: `import * as Icons from "lucide-react"` тянул
+// весь пакет (1000+ иконок, самый тяжёлый собственный код любого роута —
+// 30.3 kB на /teacher/lessons) ради иконки по имени-строке из subjects.icon.
+// Эти имена всегда приходят из SUBJECT_DEFAULTS (packages/core/queries/
+// subjects.ts) — конечный список, явная карта вместо wildcard-импорта.
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; color?: string }>> = {
+  Calculator, BookOpen, Globe, Languages, BookText, Scroll, Map, Leaf, Atom,
+  FlaskConical, Monitor, Code, Bot, Dumbbell, Music, Palette, Hammer,
+  TreePine, Users,
+};
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,8 +38,7 @@ function calcEndTime(startsAt: string, durationMin: number | null): string | nul
 function LucideIcon({ name, size = 16, className, color }: {
   name: string; size?: number; className?: string; color?: string;
 }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const Comp = (Icons as any)[name] as React.ComponentType<{ size?: number; className?: string; color?: string }> | undefined;
+  const Comp = ICON_MAP[name];
   return Comp
     ? <Comp size={size} className={className} color={color} />
     : <BookOpen size={size} className={className} color={color} />;
