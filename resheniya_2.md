@@ -402,3 +402,46 @@ RPC-уровень (`get_current_user_role()` напрямую под sherzod_10
 - Форма редактирования урока (`mode==="edit"` в `LessonFormModal`) — селектор темы условно не рендерится, `curriculumTopicId` не отправляется.
 - `apps/web/package.json`/`pnpm-lock.yaml` (временная `@google/generative-ai`) и `apps/web/generate-weekend.mjs` — по-прежнему НЕ закоммичены, как оставлено с прошлого промта; не трогал.
 
+---
+
+## Промт 5А — Косметика: emoji→lucide, AI под demo, "Закончить урок" — 2026-07-11
+
+### Часть 1 — emoji → lucide
+
+27 файлов (`apps/web/app`, `apps/web/components`, `apps/web/lib`) + `packages/core/src/config/subjects.ts`. Найдено через unicode-диапазоны emoji/dingbats/misc-symbols (не по списку слов — иначе пропустил бы нестандартные, например ✕/✋/🌙).
+
+Ключевые находки при разборе (не просто "заменить один-в-один"):
+- **`config/subjects.ts`**: у каждого предмета УЖЕ был параллельный `icon: "kebab-case"` слот (использует `components/SubjectIcon.tsx` → реальный lucide-компонент) — поле `emoji` было чистым дублем. Добавил `resolveSubjectIcon()` (голая иконка+цвет, без обёртки-бейджа) в `SubjectIcon.tsx` для мест, где сам контейнер уже даёт фон (обложка книги, бейдж группы) — иначе получался бы бейдж-в-бейдже. Поле `emoji` удалено из интерфейса и всех 10 записей + `defaultSubjectStyle` — 9 живых мест использования (`TeacherBooksView.tsx`×3, `BooksView.tsx`×3, `GradesView.tsx`, `TeacherGroupsView.tsx`, `TeacherGroupDetailView.tsx`) переведены на `resolveSubjectIcon`.
+- **`DemoRoleModal.tsx`**: `TEACHER_ROLES` уже был на lucide-иконках (`Code2`/`Bot`/`Calculator`/...), только `STUDENT_ROLES` ещё держал emoji-аватары (🐣👦🧑‍💻) — привёл к тому же паттерну (`Baby`/`Backpack`/`Laptop`).
+- **`lib/sandbox-tools.ts`**: поле `icon: string` (emoji на 13 инструментов) заменено на `Icon: LucideIcon`, взяты те же иконки, что уже использует `generate-stages/route.ts`'s `stageIcon()` для тех же content_type (CircuitBoard/Ruler/FlaskConical/LineChart/Puzzle/Shuffle/Palette/PenTool/Brain/Database/Grid3x3), кроме `code` (Terminal — чтобы не дублировать Code2 с соседним `codesandbox` в одном списке).
+- **`KahootTeacherModal.tsx`/`QuizBuilder.tsx`**: цветные emoji-точки для вариантов ответа (🔴🔵🟡🟢) заменены на Triangle/Diamond/Circle/Square с теми же hex — скопировано из УЖЕ переведённого `KahootStudentModal.tsx` (тот использует именно эти 4 фигуры+цвета, повторяя настоящий Kahoot). MEDALS (🥇🥈🥉) на всех трёх — `Medal` + `text-yellow-500`/`text-slate-400`/`text-amber-700`.
+- **`ProjectsView.tsx`**: у каждой демо-карточки УЖЕ рендерился lucide-бейдж (`style.Icon`) рядом с раздутым emoji-полем `icon` — поле удалено из типа/массива, крупная иконка карточки теперь тот же `style.Icon`.
+
+**Намеренно НЕ тронуто** (с обоснованием):
+- Декоративные маскоты/геймификация-заглушки: `DashboardView.tsx` (👋 wave, ✦ twinkle×6, 🌸🐝 float, 🧑‍🚀 astronaut, 🎁 gift — все с bespoke `animate-float-*`/`animate-twinkle` CSS под конкретный emoji), `StudentSidebar.tsx` (✦×2, 🧑‍🚀 — тот же "заглушка уровня без БД" паттерн), `LessonsView.tsx` (👋 wave). Lucide — плоский line-icon набор, не замена для этих цветных decorative-сцен; кроме 🏆/⭐/🎯/📚/⏰ — они БЫЛИ в explicit-таблице пользователя, поэтому заменены даже в декоративном контексте (напр. плавающий 🏆 в `DashboardView.tsx`, `AchievementBadge` emoji-prop → `icon: LucideIcon`).
+- **`api/ai/chat/route.ts:129`**: emoji внутри system-prompt строки, отправляемой в Claude API (`"Твоё имя — Робокот 🤖"`) — это не JSX, lucide-компонент физически нельзя вставить в текстовую строку промпта; тот же emoji в `welcomeMessage` (i18n ru/en/uz) — оставлен по той же причине, это приветствие ассистента внутри чат-бабла, а не UI chrome.
+- **6 строковых значений словаря** (`goalsSubtitle`🏆, `allDoneToday`👏, `allDoneTitle`🎉, `liveOn`🔴, `welcomeMessage`🤖, `emptySubtitle`📚 — во всех 3 локалях): тип поля `string`, не `ReactNode` — заменить на компонент означало бы менять сигнатуру словаря под конкретные поля и переписывать вызовы во всех 3 языках; риск/объём непропорционален косметической задаче.
+- **`ParentsView.tsx:142,202`**: `flash(msg: string)` — toast принимает только строку, "✓" внутри неё программно неотделим без переделки toast под ReactNode.
+- Комментарии разработчика с "✨" (`TeacherLessonDetailView.tsx:153,405`) — не рендерятся пользователю.
+
+### Часть 2 — AI под demo-учителями: НЕ было сломано
+
+Проверено сквозным трейсом (см. отчёт агента): `is_demo_session()` нигде не проверяется ни одним из 3 AI-роутов (`ai/chat`, `ai/generate-stages`, `curriculum-plans/parse`) и ни одной relevant RLS-политикой — все они резолвятся через `auth.uid()`, который у демо-сессии совпадает с реальным аккаунтом (демо = флаг на сессии реального teacher_{slug}, не отдельная личность, per PROMT 3 rework). Отдельно проверено: генерация AI-этапов на СУЩЕСТВУЮЩЕМ реальном уроке под демо-сессией — INSERT в `lesson_stages` проходит (RLS не завязана на is_demo), новый стейдж штампуется `is_demo=true` даже у реального урока — это уже предусмотрено `reset_demo_data_for_user()` (миграция 110, "демо-строки в РЕАЛЬНЫХ уроках"). Фикса не потребовалось.
+
+### Часть 3 — "Закончить урок": было сломано у ученика
+
+Кнопка существовала и была верно завязана на статус с ОБЕИХ сторон (учитель: `TeacherLessonDetailView.tsx`, ученик: `LessonWorkspaceView.tsx`), но UPDATE от ученика **молча** не срабатывал: единственная UPDATE-политика на `lessons`/`lesson_stages` — учительская (`is_my_teacher_group`), у ученика `current_teacher_id()` всегда NULL → 0 строк совпадает, PostgREST не считает это ошибкой, `endLesson()` не проверяет rowcount. Урок оставался `in_progress` до срабатывания `pg_cron`-автозавершения по `ends_at`. Исправлено миграцией 117 — двумя узкими permissive UPDATE-политиками (`student ends own in-progress lesson`, `student completes own group lesson summary stage`), PERMISSIVE = ИЛИтся с учительской, ничего не отбирает. `fn_stamp_is_demo` (миграция 110) по-прежнему независимо блокирует демо-сессию, завершающую чужой реальный урок — не изменено.
+
+### Миграции 116 и 117 — обе ещё НЕ применены к hosted
+
+Обе написаны и закоммичены на `main`, но применение к hosted Supabase заблокировано классификатором (тот же паттерн, что миграция 114) — нужно применить ОБЕ через Supabase Dashboard SQL Editor (по порядку номеров).
+
+### Коммиты
+
+| # | SHA | Заголовок | Vercel |
+|---|---|---|---|
+| 1 | `11d5c81` | refactor(ui): replace emojis with lucide icons | ✅ READY |
+| 2 | `a52041f` | fix(lesson): allow student to end own lesson (missing RLS policy) | ✅ READY |
+
+Заголовок коммита 2 отличается от предложенного пользователем `fix(lesson): end-lesson button visibility` — реальный баг был не в видимости кнопки (она везде показывалась верно), а в молчаливом отказе RLS; заголовок скорректирован под фактическую причину.
+
