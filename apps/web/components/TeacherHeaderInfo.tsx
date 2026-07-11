@@ -1,38 +1,28 @@
-import { getMyTeacher, getTeacherGroups, getSubjectConfig } from "@snr/core";
+import { getMyTeacher, getSubjectConfig } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "./Avatar";
 
 /**
- * Fetches teacher name/avatar/subjects and renders the topbar identity block.
+ * Fetches teacher name/avatar/subject and renders the topbar identity block.
  * Split out from teacher/layout.tsx + rendered inside a <Suspense> boundary so
  * the sidebar/topbar shell (and {children}, the actual page) don't wait on
- * these two Supabase round trips before painting.
+ * this Supabase round trip before painting.
  */
 export async function TeacherHeaderInfo() {
   const supabase = await createClient();
 
-  const [teacherResult, groupsResult] = await Promise.allSettled([
-    getMyTeacher(supabase),
-    getTeacherGroups(supabase),
-  ]);
-
   let teacherName = "";
   let avatarUrl: string | null = null;
-  if (teacherResult.status === "fulfilled") {
-    teacherName = teacherResult.value.full_name ?? "";
-    avatarUrl = teacherResult.value.avatar_url ?? null;
-  } else {
-    console.error("[TeacherHeaderInfo] getMyTeacher failed:", teacherResult.reason);
-  }
-
   let teacherSubtitle = "";
-  if (groupsResult.status === "fulfilled") {
-    const subjects = Array.from(new Set(groupsResult.value.map((g) => getSubjectConfig(g.subject).label)));
-    teacherSubtitle = subjects.length <= 2
-      ? subjects.join(" · ")
-      : `${subjects.slice(0, 2).join(" · ")} · ещё ${subjects.length - 2}`;
-  } else {
-    console.error("[TeacherHeaderInfo] getTeacherGroups failed:", groupsResult.reason);
+  try {
+    const teacher = await getMyTeacher(supabase);
+    teacherName = teacher.full_name ?? "";
+    avatarUrl = teacher.avatar_url ?? null;
+    // subject_slug=NULL — куратор (teacher_karim), доступ ко всем предметам,
+    // а не "Программирование" из legacy groups.subject (одинаковое во всех группах).
+    teacherSubtitle = teacher.subject_slug ? getSubjectConfig(teacher.subject_slug).label : "Куратор";
+  } catch (err) {
+    console.error("[TeacherHeaderInfo] getMyTeacher failed:", err);
   }
 
   return (

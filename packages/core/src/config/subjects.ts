@@ -14,6 +14,7 @@ export const subjects: Record<string, SubjectStyle> = {
   math:        { label: "Математика",       color: "#F5A623", icon: "calculator",    emoji: "📐" },
   physics:     { label: "Физика",           color: "#39B6F5", icon: "atom",          emoji: "⚛️" },
   english:     { label: "Английский язык",  color: "#F0556B", icon: "languages",     emoji: "🇬🇧" },
+  russian:     { label: "Русский язык",     color: "#DC2626", icon: "book-open",     emoji: "📖" },
   history:     { label: "История",          color: "#B5793A", icon: "scroll",        emoji: "📜" },
   biology:     { label: "Биология",         color: "#2DBE7E", icon: "leaf",          emoji: "🌿" },
   chemistry:   { label: "Химия",            color: "#9B5DE5", icon: "flask-conical", emoji: "🧪" },

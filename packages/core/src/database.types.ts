@@ -3119,6 +3119,7 @@ export type Database = {
           notification_preferences: Json | null
           phone: string | null
           school_id: string
+          subject_slug: string | null
           user_id: string | null
           username: string | null
         }
@@ -3131,6 +3132,7 @@ export type Database = {
           notification_preferences?: Json | null
           phone?: string | null
           school_id?: string
+          subject_slug?: string | null
           user_id?: string | null
           username?: string | null
         }
@@ -3143,6 +3145,7 @@ export type Database = {
           notification_preferences?: Json | null
           phone?: string | null
           school_id?: string
+          subject_slug?: string | null
           user_id?: string | null
           username?: string | null
         }
