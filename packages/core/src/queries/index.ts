@@ -12,6 +12,7 @@ export * from "./projects";
 export * from "./announcements";
 export * from "./subjects";
 export * from "./chat";
+export * from "./curriculum";
 
 // --- Профиль / группы ---
 // Explicit user_id filter + limit(1) prevents PGRST116 if RLS returns >1 row

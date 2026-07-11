@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, ClipboardList,
 } from "lucide-react";
 import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -28,6 +28,7 @@ const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : use
 const teacherNavItems = [
   { key: "home",       href: "/teacher/dashboard",    icon: Home,          label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
   { key: "lessons",    href: "/teacher/lessons",      icon: CalendarDays,  label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLessons },
+  { key: "curriculum", href: "/teacher/curriculum",   icon: ClipboardList, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navCurriculumPlans },
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
   { key: "knowledgeBase", href: "/teacher/knowledge-base", icon: GraduationCap, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navKnowledgeBase },

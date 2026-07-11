@@ -58,6 +58,18 @@ export interface Dictionary {
     noResults: string;
     browse: string;            // "Выбрать из базы знаний" — button that opens the picker
   };
+  // Промт 4 — учебные планы (curriculum_plans, migration 116).
+  curriculum: {
+    title: string;              // "Учебные планы"
+    uploadPlan: string;         // "Загрузить учебный план"
+    parseWithAi: string;        // "Распарсить AI"
+    topicFromPlan: string;      // "Тема из плана"
+    enterCustomTopic: string;   // "Ввести свою тему"
+    planExistsWarning: string;  // "План уже существует. Заменить?"
+    errorPdfDocxOnly: string;   // "Разрешены только PDF и DOCX файлы"
+    errorFileTooLarge: string;  // "Файл больше 20 МБ"
+    errorParseFailed: string;   // "Не удалось распарсить план"
+  };
   auth: {
     title: string;
     usernameLabel: string;
@@ -1496,6 +1508,7 @@ export interface Dictionary {
     materialsAllGroups: string;
     materialsAllSubjects: string;
     navLessons: string;
+    navCurriculumPlans: string;
     navBooks: string;
     booksTitle: string;
     booksUploadBtn: string;
