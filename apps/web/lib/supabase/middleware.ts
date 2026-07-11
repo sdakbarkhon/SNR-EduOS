@@ -26,9 +26,17 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  // Промт «скорость», Задача 4: getUser() делает отдельный сетевой запрос к
+  // Supabase Auth только чтобы провалидировать JWT — getSession() читает его
+  // из cookie локально (без сети) и даёт то же самое: user + access_token.
+  // Формальную проверку подлинности подписи здесь по-прежнему выполняет
+  // check_user_session RPC ниже — PostgREST резолвит auth.uid() только для
+  // реально подписанного токена, так что поддельный/протухший JWT провалит
+  // именно эту проверку (а не молча пройдёт мимо неё).
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname.startsWith("/login");
@@ -56,24 +64,33 @@ export async function updateSession(request: NextRequest) {
     // 'replaced' = вошли с другого устройства, 'missing' = строки нет
     // (сессия снесена кроном / логин в обход server action / деплой
     // single-session). В обоих случаях локальный signOut + /login.
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
     const currentSessionId = session?.access_token
       ? sessionIdFromAccessToken(session.access_token)
       : null;
 
-    let sessionStatus = "missing";
-    if (currentSessionId) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: checkResult, error: checkError } = await (supabase as any).rpc(
-        "check_user_session",
-        { p_session_id: currentSessionId },
-      );
-      // Fail-open при сбое RPC: недоступность БД не должна разлогинивать
-      // всех пользователей разом.
-      sessionStatus = checkError ? "ok" : (checkResult ?? "missing");
-    }
+    // Промт «скорость», Задача 4: раньше check_user_session и роль
+    // читались последовательно (роль запрашивалась только после того как
+    // сессия подтверждена валидной) — второй round trip к Frankfurt поверх
+    // первого. Роль не нужна, если сессия невалидна, но в общем случае
+    // (валидная сессия — подавляющее большинство запросов) параллельный
+    // запуск экономит один полный round trip; на редком invalid-session
+    // пути роль просто выбрасывается ниже.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sessionCheckPromise: Promise<{ data: any; error: any }> = currentSessionId
+      ? (supabase as any).rpc("check_user_session", { p_session_id: currentSessionId })
+      : Promise.resolve({ data: null, error: null });
+    const rolePromise = getCurrentUserRole(supabase, user.id);
+
+    const [{ data: checkResult, error: checkError }, role] = await Promise.all([
+      sessionCheckPromise,
+      rolePromise,
+    ]);
+
+    // Fail-open при сбое RPC: недоступность БД не должна разлогинивать
+    // всех пользователей разом.
+    const sessionStatus = currentSessionId
+      ? (checkError ? "ok" : (checkResult ?? "missing"))
+      : "missing";
 
     if (sessionStatus !== "ok") {
       await supabase.auth.signOut({ scope: "local" });
@@ -91,7 +108,6 @@ export async function updateSession(request: NextRequest) {
       return redirectResponse;
     }
 
-    const role = await getCurrentUserRole(supabase, user.id);
     const isSuperAdmin = role === "super_admin";
     const isAdmin = role === "admin";
     const isParent = role === "parent";

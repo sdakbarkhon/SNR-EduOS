@@ -3422,6 +3422,7 @@ export type Database = {
         }[]
       }
       check_user_session: { Args: { p_session_id: string }; Returns: string }
+      get_current_user_role: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
