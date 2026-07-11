@@ -3641,9 +3641,15 @@ export async function getStudentLessonsForWeek(
   weekStart: string,
   studentId?: string,
 ): Promise<LessonWithSubject[]> {
-  // weekEnd = weekStart + 7 дней (исключительно)
-  const d = new Date(`${weekStart}T00:00:00+05:00`);
-  d.setDate(d.getDate() + 7);
+  // weekEnd = weekStart + 7 дней (исключительно). Парсим/пишем строго в UTC —
+  // раньше парсинг шёл с +05:00, а d.getDate()/toISOString() читают/пишут в
+  // UTC, так что 00:00+05:00 (=19:00 предыдущего UTC-дня) после +7 дней и
+  // toISOString() всегда терял ровно 1 календарный день. Это ловило ровно
+  // последний день недели — воскресенье — под .lt(starts_at, weekEnd):
+  // граница падала на 00:00 воскресенья вместо 00:00 следующего понедельника,
+  // и все воскресные уроки отсекались (суббота при этом не задевалась).
+  const d = new Date(`${weekStart}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 7);
   const weekEnd = d.toISOString().slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (db as any)
