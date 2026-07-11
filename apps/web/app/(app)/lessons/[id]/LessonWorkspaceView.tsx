@@ -1008,6 +1008,7 @@ export function LessonWorkspaceView({
                           isTeacher={false}
                           stageId={stage.id}
                           initialSlide={stage.current_slide_index ?? 0}
+                          lessonStatus={lesson.status}
                         />
                       </div>
                     ) : (stage.config as { presentation_file?: { storagePath: string; filename: string; sizeBytes: number } })?.presentation_file ? (

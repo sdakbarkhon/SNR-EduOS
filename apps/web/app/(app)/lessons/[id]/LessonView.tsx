@@ -255,7 +255,7 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
       )}
 
       {reviewStage && studentId && (
-        <StudentStageReviewModal stage={reviewStage} studentId={studentId} onClose={() => setReviewStage(null)} />
+        <StudentStageReviewModal stage={reviewStage} studentId={studentId} onClose={() => setReviewStage(null)} lessonStatus={lesson.status} />
       )}
       {viewerMaterial && (
         <FileViewerModal

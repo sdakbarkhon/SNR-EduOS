@@ -16,20 +16,24 @@ export function SlideViewer({
   isTeacher = false,
   stageId,
   initialSlide = 0,
+  lessonStatus,
 }: {
   slides: LessonSlide[];
   onExportPptx: () => void;
   canExport: boolean;
-  /** Teacher: navigation controls active + writes current_slide_index. Student: read-only, follows via Realtime. */
+  /** Teacher: navigation controls active + writes current_slide_index. Student: read-only, follows via Realtime — UNLESS lessonStatus="completed" (post-lesson review, see canNavigate below). */
   isTeacher?: boolean;
   /** Required when isTeacher — the stage whose current_slide_index is updated on nav. */
   stageId?: string;
   /** Starting slide (teacher's current_slide_index at mount, e.g. rejoining a lesson). */
   initialSlide?: number;
+  /** Once the lesson is completed, students browse freely for review — same as teacher nav, but never writes current_slide_index (that's live-lesson-only state). */
+  lessonStatus?: string;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.slides;
   const [current, setCurrent] = useState(Math.min(initialSlide, Math.max(0, slides.length - 1)));
+  const canNavigate = isTeacher || lessonStatus === "completed";
 
   const goTo = useCallback((idx: number) => {
     const clamped = Math.max(0, Math.min(slides.length - 1, idx));
@@ -39,9 +43,11 @@ export function SlideViewer({
     }
   }, [slides.length, isTeacher, stageId]);
 
-  // Student: follow the teacher's current_slide_index via Realtime.
+  // Live student (not teacher, lesson not completed): follow the teacher's
+  // current_slide_index via Realtime. Once completed, canNavigate students
+  // browse independently — no point staying subscribed.
   useRealtimeChannel(
-    !isTeacher && stageId ? `stage-slide-${stageId}` : null,
+    !canNavigate && stageId ? `stage-slide-${stageId}` : null,
     "lesson_stages",
     stageId ? `id=eq.${stageId}` : undefined,
     (payload) => {
@@ -50,16 +56,16 @@ export function SlideViewer({
     },
   );
 
-  // Keyboard navigation — teacher only; students can't jump ahead/back.
+  // Keyboard navigation — teacher or post-completion student review.
   useEffect(() => {
-    if (!isTeacher) return;
+    if (!canNavigate) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") goTo(current - 1);
       if (e.key === "ArrowRight") goTo(current + 1);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isTeacher, current, goTo]);
+  }, [canNavigate, current, goTo]);
 
   const slide = slides[current];
   if (!slide) return null;
@@ -73,7 +79,7 @@ export function SlideViewer({
 
       {/* Navigation */}
       <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-white/10 dark:bg-slate-800">
-        {isTeacher ? (
+        {canNavigate ? (
           <button
             onClick={() => goTo(current - 1)}
             disabled={current === 0}
@@ -89,7 +95,7 @@ export function SlideViewer({
         <div className="flex items-center gap-3">
           <div className="flex gap-2">
             {slides.map((_, idx) =>
-              isTeacher ? (
+              canNavigate ? (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
@@ -124,7 +130,7 @@ export function SlideViewer({
               <Download className="h-4 w-4" />
             </button>
           )}
-          {isTeacher && (
+          {canNavigate && (
             <button
               onClick={() => goTo(current + 1)}
               disabled={current === slides.length - 1}

@@ -23,10 +23,15 @@ export function StudentStageReviewModal({
   stage,
   studentId,
   onClose,
+  lessonStatus,
 }: {
   stage: LessonStageWithProgress;
   studentId: string;
   onClose: () => void;
+  /** Always "completed" in practice (this modal only renders post-lesson) —
+   *  passed explicitly rather than assumed, so SlideViewer can allow free
+   *  slide navigation for review instead of the live-lesson teacher-only lock. */
+  lessonStatus?: string;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -99,7 +104,7 @@ export function StudentStageReviewModal({
 
           {stage.slides && stage.slides.length > 0 && (
             <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
-              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} />
+              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} />
             </div>
           )}
 
