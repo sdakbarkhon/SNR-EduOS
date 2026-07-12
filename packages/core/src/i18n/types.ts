@@ -1826,5 +1826,13 @@ export interface Dictionary {
     participantsLabel: string;    // "Участники"
     backToList: string;           // aria-label кнопки "назад" на мобильном
     sendError: string;            // тост при ошибке отправки
+    noMessagesInThread: string;   // "Нет сообщений" — открытый тред, 0 сообщений
+    // Промт 7.2: секции личных чатов ученик↔учитель.
+    sectionCurator: string;       // "Куратор" — метка над строкой куратора (ученик)
+    curatorSubtitle: string;      // "Куратор вашего класса" — подпись под именем куратора
+    sectionGroupChat: string;     // "Групповой чат" — секция у ученика
+    sectionTeachers: string;      // "Учителя" — секция личных чатов у ученика
+    sectionGroupChats: string;    // "Групповые чаты" — секция у учителя
+    sectionDirectChats: string;   // "Личные чаты" — секция у учителя (сгруппировано по классу)
   };
 }

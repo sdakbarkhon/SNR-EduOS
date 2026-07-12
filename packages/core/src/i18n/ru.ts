@@ -1805,5 +1805,12 @@ export const ru: Dictionary = {
     participantsLabel: "Участники",
     backToList: "Назад к списку чатов",
     sendError: "Не удалось отправить сообщение",
+    noMessagesInThread: "Нет сообщений",
+    sectionCurator: "Куратор",
+    curatorSubtitle: "Куратор вашего класса",
+    sectionGroupChat: "Групповой чат",
+    sectionTeachers: "Учителя",
+    sectionGroupChats: "Групповые чаты",
+    sectionDirectChats: "Личные чаты",
   },
 };

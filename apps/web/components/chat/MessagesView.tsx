@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Send, MessageCircle, ChevronLeft, Users } from "lucide-react";
+import { Send, MessageCircle, ChevronLeft, ChevronDown, Users, Star } from "lucide-react";
 import {
   getDictionary,
   getMyThreadSummaries,
@@ -16,12 +16,19 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { useLocale } from "../LocaleProvider";
+import { Avatar } from "../Avatar";
 import { dayKey, dayLabel } from "./dateGroups";
 
 const POLL_INTERVAL_MS = 5000;
 
 function threadIcon(kind: string) {
   return kind === "group" ? Users : MessageCircle;
+}
+
+// Промт 7.2: for a kind="direct" thread, the display name is the OTHER
+// participant (the two rows are always exactly {me, the other party}).
+function otherParticipantName(t: ChatThreadSummary, myUserId: string | null): string {
+  return t.participants.find((p) => p.user_id !== myUserId)?.full_name ?? "";
 }
 
 export function MessagesView({ role }: { role: "student" | "teacher" | "parent" }) {
@@ -49,6 +56,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
   const [loadedThreads, setLoadedThreads] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -186,6 +194,88 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
     : role === "teacher" ? d.chat.noThreadsTeacher
     : d.chat.noThreadsParent;
 
+  function toggleGroup(groupId: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  // Промт 7.2: студент видит куратора отдельной строкой сверху + групповой
+  // чат класса + личные чаты с предметными учителями. Учитель видит все
+  // групповые чаты своих классов + личные чаты, сгруппированные по классу.
+  // Родитель — прежнее плоское поведение (без секций, не в скоупе Промта 7.2).
+  const curatorThread = role === "student" ? threads.find((t) => t.kind === "direct" && t.isCuratorThread) ?? null : null;
+  const studentGroupChats = role === "student" ? threads.filter((t) => t.kind === "group") : [];
+  const studentTeacherChats = role === "student" ? threads.filter((t) => t.kind === "direct" && !t.isCuratorThread) : [];
+
+  const teacherGroupChats = role === "teacher" ? threads.filter((t) => t.kind === "group") : [];
+  const teacherDirectByClass = useMemo(() => {
+    if (role !== "teacher") return [] as { groupId: string; groupName: string; items: ChatThreadSummary[] }[];
+    const byGroup = new Map<string, { groupId: string; groupName: string; items: ChatThreadSummary[] }>();
+    for (const t of threads) {
+      if (t.kind !== "direct") continue;
+      const gid = t.directGroupId ?? "unknown";
+      const gname = t.directGroupName ?? d.chat.title;
+      const entry = byGroup.get(gid) ?? { groupId: gid, groupName: gname, items: [] };
+      entry.items.push(t);
+      byGroup.set(gid, entry);
+    }
+    return Array.from(byGroup.values()).sort((a, b) => a.groupName.localeCompare(b.groupName));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, threads]);
+
+  const isSectioned = role === "student" || role === "teacher";
+
+  function renderThreadRow(
+    t: ChatThreadSummary,
+    opts: { key: string; avatarSize?: number; subtitle?: string; highlight?: boolean },
+  ) {
+    const active = t.id === activeThreadId;
+    const isDirect = t.kind === "direct";
+    const displayName = isDirect ? (otherParticipantName(t, myUserId) || d.chat.title) : (t.title ?? d.chat.title);
+    const Icon = threadIcon(t.kind);
+    return (
+      <button
+        key={opts.key}
+        onClick={() => openThread(t.id)}
+        className={`flex w-full items-start gap-3 border-b border-gray-50 px-4 py-3 text-left transition ${
+          active ? "bg-indigo-50" : opts.highlight ? "bg-amber-50/70 hover:bg-amber-50" : "hover:bg-gray-50"
+        }`}
+      >
+        {isDirect ? (
+          <Avatar name={displayName || "?"} size={opts.avatarSize ?? 36} />
+        ) : (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+            <Icon className="h-5 w-5" />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1 truncate text-sm font-semibold text-gray-800">
+              {opts.highlight && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
+              <span className="truncate">{displayName}</span>
+            </span>
+            {t.lastMessage && (
+              <span className="shrink-0 text-[11px] text-gray-400">{dayLabel(t.lastMessage.created_at, d, locale, true)}</span>
+            )}
+          </div>
+          {opts.subtitle && <p className="truncate text-[11px] text-gray-400">{opts.subtitle}</p>}
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <span className="truncate text-xs text-gray-500">{t.lastMessage?.body ?? ""}</span>
+            {t.unreadCount > 0 && (
+              <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[11px] font-extrabold text-white">
+                {t.unreadCount > 99 ? "99+" : t.unreadCount}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-[520px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
       {/* Промт 6.2: на md-lg (планшет, 768-1024) 320px фиксированной ширины
@@ -207,39 +297,68 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
               <p className="text-xs text-gray-400">{emptyThreadsHint}</p>
             </div>
           )}
-          {threads.map((t) => {
-            const Icon = threadIcon(t.kind);
-            const active = t.id === activeThreadId;
-            return (
-              <button
-                key={t.id}
-                onClick={() => openThread(t.id)}
-                className={`flex w-full items-start gap-3 border-b border-gray-50 px-4 py-3 text-left transition ${
-                  active ? "bg-indigo-50" : "hover:bg-gray-50"
-                }`}
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-semibold text-gray-800">{t.title ?? d.chat.title}</span>
-                    {t.lastMessage && (
-                      <span className="shrink-0 text-[11px] text-gray-400">{dayLabel(t.lastMessage.created_at, d, locale, true)}</span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 flex items-center justify-between gap-2">
-                    <span className="truncate text-xs text-gray-500">{t.lastMessage?.body ?? ""}</span>
-                    {t.unreadCount > 0 && (
-                      <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#F5455C] px-1.5 text-[11px] font-extrabold text-white">
-                        {t.unreadCount > 99 ? "99+" : t.unreadCount}
-                      </span>
-                    )}
-                  </div>
+
+          {!isSectioned &&
+            threads.map((t) => renderThreadRow(t, { key: t.id }))}
+
+          {role === "student" && (
+            <>
+              {curatorThread && (
+                <div className="border-b border-gray-100">
+                  <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-amber-600">{d.chat.sectionCurator}</p>
+                  {renderThreadRow(curatorThread, {
+                    key: curatorThread.id,
+                    avatarSize: 44,
+                    subtitle: d.chat.curatorSubtitle,
+                    highlight: true,
+                  })}
                 </div>
-              </button>
-            );
-          })}
+              )}
+              {studentGroupChats.length > 0 && (
+                <div className="border-b border-gray-100">
+                  <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-gray-400">{d.chat.sectionGroupChat}</p>
+                  {studentGroupChats.map((t) => renderThreadRow(t, { key: t.id }))}
+                </div>
+              )}
+              {studentTeacherChats.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-gray-400">{d.chat.sectionTeachers}</p>
+                  {studentTeacherChats.map((t) => renderThreadRow(t, { key: t.id, subtitle: t.directSubjectName ?? undefined }))}
+                </div>
+              )}
+            </>
+          )}
+
+          {role === "teacher" && (
+            <>
+              {teacherGroupChats.length > 0 && (
+                <div className="border-b border-gray-100">
+                  <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-gray-400">{d.chat.sectionGroupChats}</p>
+                  {teacherGroupChats.map((t) => renderThreadRow(t, { key: t.id }))}
+                </div>
+              )}
+              {teacherDirectByClass.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-gray-400">{d.chat.sectionDirectChats}</p>
+                  {teacherDirectByClass.map((g) => {
+                    const collapsed = collapsedGroups.has(g.groupId);
+                    return (
+                      <div key={g.groupId}>
+                        <button
+                          onClick={() => toggleGroup(g.groupId)}
+                          className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                        >
+                          <span className="truncate">{g.groupName}</span>
+                          <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+                        </button>
+                        {!collapsed && g.items.map((t) => renderThreadRow(t, { key: t.id }))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -257,14 +376,29 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
                   одну строку с "лишним" пустым местом справа); переносится
                   на 2 строки при необходимости. */}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-gray-800">{activeThread.title ?? d.chat.title}</p>
-                <p className="line-clamp-2 text-xs text-gray-400">
-                  {d.chat.participantsLabel}: {activeThread.participants.map((p) => p.full_name).filter(Boolean).join(", ")}
+                <p className="truncate text-sm font-bold text-gray-800">
+                  {activeThread.kind === "direct"
+                    ? (otherParticipantName(activeThread, myUserId) || d.chat.title)
+                    : (activeThread.title ?? d.chat.title)}
                 </p>
+                {activeThread.kind === "direct" ? (
+                  activeThread.isCuratorThread ? (
+                    <p className="text-xs font-semibold text-amber-600">{d.chat.curatorSubtitle}</p>
+                  ) : activeThread.directSubjectName ? (
+                    <p className="text-xs text-gray-400">{activeThread.directSubjectName}</p>
+                  ) : null
+                ) : (
+                  <p className="line-clamp-2 text-xs text-gray-400">
+                    {d.chat.participantsLabel}: {activeThread.participants.map((p) => p.full_name).filter(Boolean).join(", ")}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="flex-1 space-y-1 overflow-y-auto px-4 py-4">
+              {messages.length === 0 && (
+                <div className="flex h-full items-center justify-center text-sm text-gray-400">{d.chat.noMessagesInThread}</div>
+              )}
               {messages.map((m, i) => {
                 const mine = m.sender_id === myUserId;
                 const prev = messages[i - 1];

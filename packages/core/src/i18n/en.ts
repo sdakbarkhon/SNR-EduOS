@@ -1805,5 +1805,12 @@ export const en: Dictionary = {
     participantsLabel: "Participants",
     backToList: "Back to chat list",
     sendError: "Failed to send message",
+    noMessagesInThread: "No messages",
+    sectionCurator: "Homeroom teacher",
+    curatorSubtitle: "Your homeroom teacher",
+    sectionGroupChat: "Group chat",
+    sectionTeachers: "Teachers",
+    sectionGroupChats: "Group chats",
+    sectionDirectChats: "Direct chats",
   },
 };

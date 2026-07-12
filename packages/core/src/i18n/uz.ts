@@ -1805,5 +1805,12 @@ export const uz: Dictionary = {
     participantsLabel: "Ishtirokchilar",
     backToList: "Chatlar ro'yxatiga qaytish",
     sendError: "Xabarni yuborib bo'lmadi",
+    noMessagesInThread: "Xabar yo'q",
+    sectionCurator: "Sinf rahbari",
+    curatorSubtitle: "Sinfingiz rahbari",
+    sectionGroupChat: "Guruh chati",
+    sectionTeachers: "O'qituvchilar",
+    sectionGroupChats: "Guruh chatlari",
+    sectionDirectChats: "Shaxsiy chatlar",
   },
 };
