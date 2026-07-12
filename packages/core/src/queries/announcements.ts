@@ -96,24 +96,32 @@ export const getTeacherAnnouncements = async (db: Db, teacherId: string): Promis
     } catch { /* ignore */ }
   }
 
-  const out: TeacherAnnouncement[] = [];
-  for (const a of list) {
-    let readCount = 0;
+  // Промт 7.2 Часть 2: was one awaited announcement_reads count query PER
+  // ROW (N+1, ~20s+ hang once 1+ announcements exist) — replaced with a
+  // single batched .in() query + a Map, matching the existing
+  // per-parent-count idiom already used above for gSize and elsewhere in
+  // the codebase (packages/core/src/queries/projects.ts's
+  // getStudentProjects).
+  const readCountByAnnouncementId = new Map<string, number>();
+  const annIds = list.map((a) => a.id);
+  if (annIds.length) {
     try {
-      const { count } = await (db as any).from("announcement_reads")
-        .select("id", { count: "exact", head: true }).eq("announcement_id", a.id);
-      readCount = count ?? 0;
+      const { data: reads } = await (db as any).from("announcement_reads")
+        .select("announcement_id").in("announcement_id", annIds);
+      for (const r of (reads ?? []) as any[]) {
+        readCountByAnnouncementId.set(r.announcement_id, (readCountByAnnouncementId.get(r.announcement_id) ?? 0) + 1);
+      }
     } catch { /* ignore */ }
-    out.push({
-      ...a,
-      groupName: a.group_id ? (gName.get(a.group_id) ?? null) : null,
-      targetStudentName: a.target_student_id ? (sName.get(a.target_student_id) ?? null) : null,
-      readCount,
-      totalRecipients: a.scope === "group" ? (gSize.get(a.group_id) ?? 0)
-        : a.scope === "student" ? 1 : totalAll,
-    } as TeacherAnnouncement);
   }
-  return out;
+
+  return list.map((a) => ({
+    ...a,
+    groupName: a.group_id ? (gName.get(a.group_id) ?? null) : null,
+    targetStudentName: a.target_student_id ? (sName.get(a.target_student_id) ?? null) : null,
+    readCount: readCountByAnnouncementId.get(a.id) ?? 0,
+    totalRecipients: a.scope === "group" ? (gSize.get(a.group_id) ?? 0)
+      : a.scope === "student" ? 1 : totalAll,
+  })) as TeacherAnnouncement[];
 };
 
 // ── Student: announcements ──
