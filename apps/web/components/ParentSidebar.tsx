@@ -72,7 +72,7 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
   useEffect(() => {
     const db = createClient();
     db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
-    getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
+    getUnreadThreadCount(db).then(setUnreadThreads).catch((e) => console.error("[ParentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
   }, []);
 
   useRealtimeChannel(
@@ -80,7 +80,7 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
     "chat_messages",
     undefined,
     () => {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[ParentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     },
   );
 
@@ -92,13 +92,13 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
     "chat_read_state",
     undefined,
     () => {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[ParentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     },
   );
 
   useEffect(() => {
     if (pathname.startsWith("/parent/messages")) {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[ParentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     }
   }, [pathname]);
 

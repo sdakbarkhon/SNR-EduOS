@@ -107,10 +107,10 @@ export function StudentSidebar() {
         const submittedIds = new Set(submissions.map((s) => s.homework_id));
         setHomeworkCount(homework.filter((h) => !submittedIds.has(h.id)).length);
       })
-      .catch(() => null);
+      .catch((e) => console.error("[StudentSidebar] homework badge count failed:", e?.message ?? e));
 
     db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
-    getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
+    getUnreadThreadCount(db).then(setUnreadThreads).catch((e) => console.error("[StudentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
   }, []);
 
   useRealtimeChannel(
@@ -118,7 +118,7 @@ export function StudentSidebar() {
     "chat_messages",
     undefined,
     () => {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[StudentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     },
   );
 
@@ -130,13 +130,13 @@ export function StudentSidebar() {
     "chat_read_state",
     undefined,
     () => {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[StudentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     },
   );
 
   useEffect(() => {
     if (pathname.startsWith("/messages")) {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[StudentSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     }
   }, [pathname]);
 

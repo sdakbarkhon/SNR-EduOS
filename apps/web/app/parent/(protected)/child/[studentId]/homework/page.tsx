@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getHomeworkWithSubmissions } from "@snr/core";
 import { getParentContext, resolveSelectedChild } from "@/lib/parent-context";
+import { safeQuery } from "@/lib/safe-query";
 import { HomeworkListView } from "./HomeworkListView";
 
 export default async function ChildHomeworkPage({
@@ -14,7 +15,7 @@ export default async function ChildHomeworkPage({
   if (!child) return null;
 
   const db = await createClient();
-  const homework = await getHomeworkWithSubmissions(db, studentId).catch(() => []);
+  const { data: homework } = await safeQuery(getHomeworkWithSubmissions(db, studentId), [], "ChildHomeworkPage.homework");
 
   return <HomeworkListView child={child} homework={homework} />;
 }

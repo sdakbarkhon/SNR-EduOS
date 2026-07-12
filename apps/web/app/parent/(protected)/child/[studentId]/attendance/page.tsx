@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStudentAttendance } from "@snr/core";
 import { getParentContext, resolveSelectedChild } from "@/lib/parent-context";
+import { safeQuery } from "@/lib/safe-query";
 import { AttendanceView } from "./AttendanceView";
 
 export default async function ChildAttendancePage({
@@ -14,10 +15,11 @@ export default async function ChildAttendancePage({
   if (!child) return null;
 
   const db = await createClient();
-  const { records } = await getStudentAttendance(db, {}, studentId).catch(() => ({
-    records: [] as Awaited<ReturnType<typeof getStudentAttendance>>["records"],
-    stats: { total: 0, present: 0, excused: 0, unexcused: 0, percentage: 0 },
-  }));
+  const { data } = await safeQuery(
+    getStudentAttendance(db, {}, studentId),
+    { records: [] as Awaited<ReturnType<typeof getStudentAttendance>>["records"], stats: { total: 0, present: 0, excused: 0, unexcused: 0, percentage: 0 } },
+    "ChildAttendancePage.attendance",
+  );
 
-  return <AttendanceView child={child} records={records} />;
+  return <AttendanceView child={child} records={data.records} />;
 }

@@ -76,7 +76,8 @@ export function TeacherGradesView({ groups, stats }: Props) {
     try {
       const data = await getTeacherGradeMatrix(supabase as never, gid);
       setMatrix(data);
-    } catch {
+    } catch (e) {
+      console.error("[TeacherGradesView] getTeacherGradeMatrix failed:", (e as Error)?.message ?? e);
       setMatrix(null);
     } finally {
       setLoading(false);
@@ -88,7 +89,9 @@ export function TeacherGradesView({ groups, stats }: Props) {
 
   useEffect(() => {
     if (!groupId) return;
-    getLessonGradesForGroup(supabase as never, groupId).then(setLessonGrades).catch(() => null);
+    getLessonGradesForGroup(supabase as never, groupId).then(setLessonGrades).catch((e) => {
+      console.error("[TeacherGradesView] getLessonGradesForGroup failed:", e?.message ?? e);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 

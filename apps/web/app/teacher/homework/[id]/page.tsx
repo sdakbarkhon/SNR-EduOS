@@ -4,21 +4,20 @@ import {
   getTeacherHomeworkDetail, getHomeworkSubmissions,
   getTestSubmissionsForHomework, getTestQuestions,
 } from "@snr/core";
+import { safeQuery } from "@/lib/safe-query";
 import { TeacherHomeworkDetailView } from "./TeacherHomeworkDetailView";
-
-async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
-  try { return await (p as Promise<T>); } catch { return fb; }
-}
 
 export default async function TeacherHomeworkDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [hw, submissions, testSubs, questions] = await Promise.all([
-    safe(getTeacherHomeworkDetail(supabase, id), null),
-    safe(getHomeworkSubmissions(supabase, id), []),
-    safe(getTestSubmissionsForHomework(supabase, id), []),
-    safe(getTestQuestions(supabase, id), []),
+  // Промт 6: getTeacherHomeworkDetail больше не глушится — сбой раньше вёл
+  // к notFound(), неотличимо от "ДЗ правда нет".
+  const [hw, submissionsRes, testSubsRes, questionsRes] = await Promise.all([
+    getTeacherHomeworkDetail(supabase, id),
+    safeQuery(getHomeworkSubmissions(supabase, id), [], "TeacherHomeworkDetailPage.submissions"),
+    safeQuery(getTestSubmissionsForHomework(supabase, id), [], "TeacherHomeworkDetailPage.testSubs"),
+    safeQuery(getTestQuestions(supabase, id), [], "TeacherHomeworkDetailPage.questions"),
   ]);
 
   if (!hw) notFound();
@@ -26,9 +25,9 @@ export default async function TeacherHomeworkDetailPage({ params }: { params: Pr
   return (
     <TeacherHomeworkDetailView
       hw={hw as never}
-      submissions={submissions as never[]}
-      testSubs={testSubs as never[]}
-      questions={questions as never[]}
+      submissions={submissionsRes.data as never[]}
+      testSubs={testSubsRes.data as never[]}
+      questions={questionsRes.data as never[]}
     />
   );
 }

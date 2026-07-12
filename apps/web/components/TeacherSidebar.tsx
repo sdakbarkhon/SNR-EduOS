@@ -70,7 +70,7 @@ export function TeacherSidebar() {
   useEffect(() => {
     const db = createClient();
     db.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
-    getUnreadThreadCount(db).then(setUnreadThreads).catch(() => null);
+    getUnreadThreadCount(db).then(setUnreadThreads).catch((e) => console.error("[TeacherSidebar] getUnreadThreadCount failed:", e?.message ?? e));
   }, []);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export function TeacherSidebar() {
     "chat_messages",
     undefined,
     () => {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[TeacherSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     },
   );
 
@@ -95,13 +95,13 @@ export function TeacherSidebar() {
     "chat_read_state",
     undefined,
     () => {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[TeacherSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     },
   );
 
   useEffect(() => {
     if (pathname.startsWith("/teacher/messages")) {
-      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch(() => null);
+      getUnreadThreadCount(createClient()).then(setUnreadThreads).catch((e) => console.error("[TeacherSidebar] getUnreadThreadCount failed:", e?.message ?? e));
     }
   }, [pathname]);
 

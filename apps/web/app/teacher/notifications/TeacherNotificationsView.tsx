@@ -79,7 +79,7 @@ export function TeacherNotificationsView({ initialNotifications }: { initialNoti
     const db = dbRef.current;
     if (!db) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const list = await getMyNotifications(db as any, page * PAGE_SIZE).catch(() => []);
+    const list = await getMyNotifications(db as any, page * PAGE_SIZE).catch((e) => { console.error("[TeacherNotificationsView] reload failed:", e?.message ?? e); return []; });
     setItems(list);
     setHasMore(list.length >= page * PAGE_SIZE);
   }
@@ -120,7 +120,7 @@ export function TeacherNotificationsView({ initialNotifications }: { initialNoti
       if (!db) return;
       const nextPage = page + 1;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const list = await getMyNotifications(db as any, nextPage * PAGE_SIZE).catch(() => []);
+      const list = await getMyNotifications(db as any, nextPage * PAGE_SIZE).catch((e) => { console.error("[TeacherNotificationsView] loadMore failed:", e?.message ?? e); return []; });
       setItems(list);
       setPage(nextPage);
       setHasMore(list.length >= nextPage * PAGE_SIZE);

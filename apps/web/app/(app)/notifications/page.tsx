@@ -1,22 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMyNotifications } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
+import { safeQuery } from "@/lib/safe-query";
 import { NotificationsView } from "./NotificationsView";
 
 export const metadata = { title: "Уведомления" };
 
 export default async function NotificationsPage() {
   const db = await createClient();
-  const [notifications, student] = await Promise.all([
-    getMyNotifications(db, 30).catch(() => []),
+  const [notificationsRes, studentRes] = await Promise.all([
+    safeQuery(getMyNotifications(db, 30), [], "NotificationsPage.notifications"),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Promise.resolve(getMyStudent(db as any)).catch(() => null),
+    safeQuery(Promise.resolve(getMyStudent(db as any)), null, "NotificationsPage.student"),
   ]);
   return (
     <NotificationsView
-      initialNotifications={notifications}
+      initialNotifications={notificationsRes.data}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      studentId={(student as any)?.id ?? null}
+      studentId={(studentRes.data as any)?.id ?? null}
     />
   );
 }

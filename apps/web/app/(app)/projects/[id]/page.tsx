@@ -7,9 +7,10 @@ import { ProjectDetailView } from "./ProjectDetailView";
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await createClient();
-  const student = await Promise.resolve(getMyStudent(db)).catch(() => null);
-  if (!student) notFound();
-  const detail = await getProjectDetailForStudent(db, id, (student as { id: string }).id).catch(() => null);
+  // Промт 6: ни getMyStudent, ни getProjectDetailForStudent больше не
+  // глушатся — сбой раньше вёл к notFound(), неотличимо от "правда нет".
+  const student = await getMyStudent(db);
+  const detail = await getProjectDetailForStudent(db, id, student.id);
   if (!detail) notFound();
   return (
     <ProjectDetailView

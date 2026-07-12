@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getPayments, getCharges, getStudentById } from "@snr/core";
 import { getParentContext, resolveSelectedChild } from "@/lib/parent-context";
+import { safeQuery } from "@/lib/safe-query";
 import { PaymentsView } from "./PaymentsView";
 
 export default async function ChildPaymentsPage({
@@ -14,17 +15,18 @@ export default async function ChildPaymentsPage({
   if (!child) return null;
 
   const db = await createClient();
-  const [payments, charges, student] = await Promise.all([
-    Promise.resolve(getPayments(db, studentId)).catch(() => []),
-    Promise.resolve(getCharges(db, studentId)).catch(() => []),
-    getStudentById(db, studentId).catch(() => null),
+  const [paymentsRes, chargesRes, studentRes] = await Promise.all([
+    safeQuery(Promise.resolve(getPayments(db, studentId)), [], "ChildPaymentsPage.payments"),
+    safeQuery(Promise.resolve(getCharges(db, studentId)), [], "ChildPaymentsPage.charges"),
+    safeQuery(getStudentById(db, studentId), null, "ChildPaymentsPage.student"),
   ]);
+  const student = studentRes.data;
 
   return (
     <PaymentsView
       child={child}
-      payments={payments}
-      charges={charges}
+      payments={paymentsRes.data}
+      charges={chargesRes.data}
       balance={student?.balance ?? null}
       status={student?.status ?? null}
     />

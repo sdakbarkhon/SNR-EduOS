@@ -49,8 +49,8 @@ export const NotificationsBell = memo(function NotificationsBell() {
 
   async function reload() {
     const [list, count] = await Promise.all([
-      getMyNotifications(db, 20).catch(() => []),
-      getUnreadCount(db).catch(() => 0),
+      getMyNotifications(db, 20).catch((e) => { console.error("[NotificationsBell] getMyNotifications failed:", e?.message ?? e); return []; }),
+      getUnreadCount(db).catch((e) => { console.error("[NotificationsBell] getUnreadCount failed:", e?.message ?? e); return 0; }),
     ]);
     setItems(list);
     setUnread(count);

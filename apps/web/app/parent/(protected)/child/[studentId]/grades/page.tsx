@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStudentGrades } from "@snr/core";
 import { getParentContext, resolveSelectedChild } from "@/lib/parent-context";
+import { safeQuery } from "@/lib/safe-query";
 import { GradesView } from "./GradesView";
 
 export default async function ChildGradesPage({
@@ -14,7 +15,7 @@ export default async function ChildGradesPage({
   if (!child) return null;
 
   const db = await createClient();
-  const grades = await getStudentGrades(db, studentId).catch(() => []);
+  const { data: grades } = await safeQuery(getStudentGrades(db, studentId), [], "ChildGradesPage.grades");
 
   return <GradesView child={child} grades={grades} />;
 }

@@ -53,13 +53,19 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function refreshThreads() {
-    const rows = await getMyThreadSummaries(db).catch(() => []);
+    const rows = await getMyThreadSummaries(db).catch((e) => {
+      console.error("[MessagesView] getMyThreadSummaries failed:", e?.message ?? e);
+      return [];
+    });
     setThreads(rows);
     setLoadedThreads(true);
   }
 
   async function refreshActiveMessages(threadId: string) {
-    const rows = await getThreadMessages(db, threadId).catch(() => []);
+    const rows = await getThreadMessages(db, threadId).catch((e) => {
+      console.error("[MessagesView] getThreadMessages failed:", e?.message ?? e);
+      return [];
+    });
     setMessages(rows);
   }
 
