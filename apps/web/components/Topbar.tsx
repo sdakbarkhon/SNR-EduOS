@@ -20,9 +20,14 @@ export function Topbar({
 }) {
   return (
     <header className="flex shrink-0 items-center justify-between gap-4 rounded-[20px] bg-white py-3 pl-6 pr-4 shadow-[0_8px_22px_rgba(93,80,150,0.05)]">
-      <h1 className="text-[20px] font-black tracking-tight text-[#2A2A45] md:text-[24px]">
-        {title}
-      </h1>
+      {/* Промт 6.2.1: длинные заголовки ("Посещаемость", "База знаний")
+          толкали правую часть шапки за край на планшете — обёртка теперь
+          min-w-0 flex-1 (может сжиматься), h1 truncate + title-tooltip. */}
+      <div className="min-w-0 flex-1">
+        <h1 title={title} className="truncate text-[20px] font-black tracking-tight text-[#2A2A45] md:text-[24px]">
+          {title}
+        </h1>
+      </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-center">
         <AnnouncementTicker />

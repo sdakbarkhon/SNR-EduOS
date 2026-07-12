@@ -206,8 +206,11 @@ export const NotificationsBell = memo(function NotificationsBell() {
           </defs>
         </svg>
         <Bell size={18} stroke="url(#notif-bell-gradient)" style={shake ? { animation: "bellshake 0.7s ease" } : undefined} />
+        {/* Промт 6.2.1: слово "Уведомления" рядом с колокольчиком на
+            планшете съедало место в шапке — скрыто до lg (>=1024),
+            остаются только иконка + badge непрочитанных. */}
         <span
-          className="bg-clip-text text-sm font-medium text-transparent"
+          className="hidden bg-clip-text text-sm font-medium text-transparent lg:inline"
           style={{ backgroundImage: "linear-gradient(135deg,#7C63F0,#6A4FE6)" }}
         >
           {d.nav.notifications}

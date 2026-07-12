@@ -96,10 +96,13 @@ function BookDetailModal({
 
   if (typeof document === "undefined") return null;
   return createPortal(
+    // Промт 6.2.1: items-start + overflow-y-auto — обложка теперь на всю
+    // ширину модалки (ниже) и заметно выше, чем при w-[60%]; overlay сам
+    // скроллится, если карточка выше вьюпорта, вместо обрезки.
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{ zIndex: 9999 }}
-      className={`fixed inset-0 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/70 p-4 py-10 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       <div
         className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
@@ -112,23 +115,24 @@ function BookDetailModal({
           <X className="h-5 w-5" />
         </button>
 
-        {/* Промт 6.2: на <1024 (моб.+планшет) обложка+инфо шли side-by-side
-            (w-[38%] узкой колонкой) — обложка казалась маленькой в центре
-            широкой модалки. Теперь стек: обложка сверху (60% ширины,
-            центрирована), инфо снизу на всю ширину; на lg+ (десктоп) — как
-            было, side-by-side. */}
+        {/* Промт 6.2.1: Промт 6.2 сузил обложку до w-[60%] — всё ещё узкой
+            полоской. Теперь на <1024 (стек) обложка на всю ширину модалки
+            минус padding (родитель flex-col без explicit width уже
+            растягивает ребёнка на 100% по умолчанию); на lg+ (десктоп) —
+            side-by-side 38%, как оставил 6.2. max-h-[50vh] — чтобы очень
+            широкая на планшете обложка не стала непропорционально высокой. */}
         <div className="flex flex-col gap-6 p-6 lg:flex-row lg:gap-8 lg:p-8">
           {/* Left: cover (portrait 3:4) */}
-          <div className="mx-auto w-[60%] min-w-[180px] shrink-0 lg:mx-0 lg:w-[38%]">
+          <div className="shrink-0 lg:w-[38%]">
             <div
-              className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-md"
+              className="relative aspect-[3/4] max-h-[50vh] w-full overflow-hidden rounded-xl shadow-md"
               style={{ background: getBookGradient(book.subject) }}
             >
               {coverUrl ? (
                 <img
                   src={coverUrl}
                   alt={book.title}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  className="absolute inset-0 h-full w-full object-contain"
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
