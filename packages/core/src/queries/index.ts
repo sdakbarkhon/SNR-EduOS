@@ -2110,10 +2110,14 @@ export const getLessonStages = async (db: Db, lessonId: string): Promise<LessonS
 /** Этап 3 BOLSHOE_OBNOVLENIE: PPTX-загрузка автодобавляет файл в "Материалы
  *  группы" (uploadPresentationFile → course_materials) — но AI-генерация
  *  (slides jsonb, не config.presentation_file) этот шаг никогда не делала.
- *  Дедуп по (group_id, title, type='presentation'), как у uploadPresentationFile. */
+ *  Дедуп по (group_id, title, type='presentation'), как у uploadPresentationFile.
+ *  stage_id (миграция 119) — точная ссылка на исходный этап: этой карточки
+ *  собственного файла никогда не будет (контент — lesson_stages.slides), без
+ *  FK открыть её было нечем ("У этого материала нет файла" на любую попытку). */
 async function addAiPresentationToGroupMaterials(
   db: Db,
   lessonId: string,
+  stageId: string,
   stageTitle: string,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2141,6 +2145,8 @@ async function addAiPresentationToGroupMaterials(
 
   await db2.from("course_materials").insert({
     group_id: lesson.group_id,
+    lesson_id: lessonId,
+    stage_id: stageId,
     title: stageTitle,
     type: "presentation",
     subject: lesson.subject?.name ?? null,
@@ -2209,7 +2215,7 @@ export const addLessonStage = async (
   // уже добавляется через uploadPresentationFile отдельно) — см. addAiPresentationToGroupMaterials.
   if (input.contentType === "presentation" && input.slides && input.slides.length > 0) {
     try {
-      await addAiPresentationToGroupMaterials(db, lessonId, input.title);
+      await addAiPresentationToGroupMaterials(db, lessonId, (data as LessonStage).id, input.title);
     } catch {
       // Best-effort — не должно ломать сохранение этапа.
     }

@@ -7,10 +7,11 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertMaterial } from "@snr/core";
-import type { MaterialWithGroup } from "@snr/core";
-import { getMaterialUrl, deleteMaterial as deleteMaterialAction } from "@/app/actions/materials";
+import type { MaterialWithGroup, LessonSlide } from "@snr/core";
+import { getMaterialUrl, getMaterialSlides, deleteMaterial as deleteMaterialAction } from "@/app/actions/materials";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { SlidesViewerModal } from "@/components/SlidesViewerModal";
 
 // ── File type helpers (same as student view) ──────────────────────────
 
@@ -423,6 +424,7 @@ export function TeacherMaterialsView({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
+  const [slideViewer, setSlideViewer] = useState<{ slides: LessonSlide[]; title: string } | null>(null);
 
   // teacherId comes from the RSC — no client-side fetch needed.
   const teacherId = initialTeacherId;
@@ -487,6 +489,28 @@ export function TeacherMaterialsView({
 
   async function handleOpen(mat: MaterialWithGroup) {
     setMenuOpenId(null);
+
+    // AI-сгенерированные презентации не имеют ни storage_path, ни link_url —
+    // их контент живёт в lesson_stages.slides (course_materials.stage_id,
+    // миграция 119), а не в Storage. Открываем тем же SlideViewer, что и урок,
+    // вместо попытки построить несуществующий файловый URL.
+    if (resolveType(mat) === "presentation" && !mat.storage_path && !mat.link_url) {
+      setOpeningId(mat.id);
+      try {
+        const slides = await getMaterialSlides(mat.id);
+        if (slides && slides.length > 0) {
+          setSlideViewer({ slides, title: mat.title });
+        } else {
+          setToast("Не удалось загрузить презентацию");
+        }
+      } catch {
+        setToast("Не удалось загрузить презентацию");
+      } finally {
+        setOpeningId(null);
+      }
+      return;
+    }
+
     if (!mat.storage_path && !mat.link_url) {
       setToast("У этого материала нет файла");
       return;
@@ -541,6 +565,13 @@ export function TeacherMaterialsView({
           title={viewer.title}
           fileName={viewer.fileName}
           onClose={() => setViewer(null)}
+        />
+      )}
+      {slideViewer && (
+        <SlidesViewerModal
+          slides={slideViewer.slides}
+          title={slideViewer.title}
+          onClose={() => setSlideViewer(null)}
         />
       )}
       {successInfo && (

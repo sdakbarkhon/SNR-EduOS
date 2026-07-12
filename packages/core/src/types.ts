@@ -737,6 +737,7 @@ export type CourseMaterial = {
   id: string;
   group_id: string;
   lesson_id: string | null;
+  stage_id: string | null;        // FK → lesson_stages, migration 119 (AI-presentation content lives there, not in Storage)
   title: string;
   type: string | null;            // legacy: 'pdf' | 'video' | 'presentation' | ...
   file_url: string | null;

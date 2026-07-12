@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getMaterialDownloadUrl } from "@snr/core";
+import type { LessonSlide } from "@snr/core";
 
 export async function deleteMaterial(
   materialId: string,
@@ -92,4 +93,36 @@ export async function getMaterialUrl(materialId: string): Promise<string | null>
     console.error("[getMaterialUrl] createSignedUrl failed for", data.storage_path, e);
     return null;
   }
+}
+
+/** AI-generated presentation materials have no storage_path/link_url — their
+ *  content is lesson_stages.slides (jsonb), reached via course_materials.stage_id
+ *  (migration 119). Returns null if the material has no linked stage, the stage
+ *  has no slides, or RLS denies access (student/teacher outside the owning group). */
+export async function getMaterialSlides(materialId: string): Promise<LessonSlide[] | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: material, error } = await supabase
+    .from("course_materials")
+    .select("stage_id")
+    .eq("id", materialId)
+    .maybeSingle();
+  if (error) {
+    console.error("[getMaterialSlides] material fetch failed:", error);
+    return null;
+  }
+  if (!material?.stage_id) return null;
+
+  const { data: stage, error: stageErr } = await supabase
+    .from("lesson_stages")
+    .select("slides")
+    .eq("id", material.stage_id)
+    .maybeSingle();
+  if (stageErr) {
+    console.error("[getMaterialSlides] stage fetch failed:", stageErr);
+    return null;
+  }
+  return (stage?.slides as LessonSlide[] | null) ?? null;
 }

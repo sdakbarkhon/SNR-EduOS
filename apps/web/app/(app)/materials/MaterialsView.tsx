@@ -5,9 +5,10 @@ import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen,
 } from "lucide-react";
-import type { MaterialWithGroup } from "@snr/core";
-import { getMaterialUrl } from "@/app/actions/materials";
+import type { MaterialWithGroup, LessonSlide } from "@snr/core";
+import { getMaterialUrl, getMaterialSlides } from "@/app/actions/materials";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { SlidesViewerModal } from "@/components/SlidesViewerModal";
 
 // ── File type helpers ─────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
   const [filterSubject, setFilterSubject] = useState("all");
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
+  const [slideViewer, setSlideViewer] = useState<{ slides: LessonSlide[]; title: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Debounce search 300ms
@@ -120,6 +122,28 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
   }
 
   async function handleOpen(mat: MaterialWithGroup) {
+    // AI-сгенерированные презентации не имеют ни storage_path, ни link_url —
+    // их контент живёт в lesson_stages.slides (course_materials.stage_id,
+    // миграция 119), а не в Storage. Открываем тем же SlideViewer, что и урок,
+    // вместо попытки построить несуществующий файловый URL.
+    if (resolveType(mat) === "presentation" && !mat.storage_path && !mat.link_url) {
+      setOpeningId(mat.id);
+      try {
+        const slides = await getMaterialSlides(mat.id);
+        if (slides && slides.length > 0) {
+          setSlideViewer({ slides, title: mat.title });
+        } else {
+          showToast("Не удалось загрузить презентацию");
+        }
+      } catch (err) {
+        console.error("[materials] getMaterialSlides threw:", err);
+        showToast("Не удалось загрузить презентацию");
+      } finally {
+        setOpeningId(null);
+      }
+      return;
+    }
+
     if (!mat.storage_path && !mat.link_url) {
       showToast("У этого материала нет файла");
       return;
@@ -159,6 +183,13 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
           title={viewer.title}
           fileName={viewer.fileName}
           onClose={() => setViewer(null)}
+        />
+      )}
+      {slideViewer && (
+        <SlidesViewerModal
+          slides={slideViewer.slides}
+          title={slideViewer.title}
+          onClose={() => setSlideViewer(null)}
         />
       )}
       {/* Header — omitted when hosted under the Knowledge Base tab switcher

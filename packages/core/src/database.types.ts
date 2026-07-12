@@ -1056,6 +1056,7 @@ export type Database = {
           lesson_id: string | null
           link_url: string | null
           school_id: string
+          stage_id: string | null
           storage_path: string | null
           subject: string | null
           title: string
@@ -1074,6 +1075,7 @@ export type Database = {
           lesson_id?: string | null
           link_url?: string | null
           school_id?: string
+          stage_id?: string | null
           storage_path?: string | null
           subject?: string | null
           title: string
@@ -1092,6 +1094,7 @@ export type Database = {
           lesson_id?: string | null
           link_url?: string | null
           school_id?: string
+          stage_id?: string | null
           storage_path?: string | null
           subject?: string | null
           title?: string
@@ -1118,6 +1121,13 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_materials_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_stages"
             referencedColumns: ["id"]
           },
           {
