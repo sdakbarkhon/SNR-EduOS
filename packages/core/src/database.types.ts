@@ -660,6 +660,8 @@ export type Database = {
           id: string
           kind: string
           school_id: string
+          student_id: string | null
+          teacher_id: string | null
           title: string | null
           updated_at: string
         }
@@ -669,6 +671,8 @@ export type Database = {
           id?: string
           kind: string
           school_id?: string
+          student_id?: string | null
+          teacher_id?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -678,6 +682,8 @@ export type Database = {
           id?: string
           kind?: string
           school_id?: string
+          student_id?: string | null
+          teacher_id?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -694,6 +700,20 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_threads_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_threads_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
         ]

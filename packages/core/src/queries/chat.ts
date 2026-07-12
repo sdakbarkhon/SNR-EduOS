@@ -31,6 +31,14 @@ export type ChatThreadSummary = {
   participants: ChatParticipantInfo[];
   lastMessage: { body: string; created_at: string; sender_id: string | null } | null;
   unreadCount: number;
+  // Промт 7.2 (migration 122) — set only for kind === "direct" (student↔teacher
+  // personal chat); undefined for "group"/"admin_ai" threads.
+  directStudentId?: string | null;
+  directTeacherId?: string | null;
+  directGroupId?: string | null;
+  directGroupName?: string | null;
+  directSubjectName?: string | null;
+  isCuratorThread?: boolean;
 };
 
 /** Все треды, где текущий пользователь — участник (RLS сама это гарантирует), с превью последнего сообщения и числом непрочитанных. */
@@ -41,7 +49,7 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
 
   const { data: threads, error: threadsErr } = await sb
     .from("chat_threads")
-    .select("id, kind, title, group_id, updated_at")
+    .select("id, kind, title, group_id, updated_at, student_id, teacher_id")
     .order("updated_at", { ascending: false });
   if (threadsErr) throw threadsErr;
 
@@ -86,6 +94,35 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
   const readByThread = new Map<string, string | null>();
   (readStates ?? []).forEach((r: any) => readByThread.set(r.thread_id, r.last_read_message_id));
 
+  // ── Промт 7.2: direct-thread (student↔teacher) enrichment — one batch
+  // of queries keyed by the distinct student_ids among kind='direct'
+  // threads, not one query per thread (same batched-Map idiom as above). ──
+  const directStudentIds = Array.from(new Set(
+    (threads ?? []).filter((t: any) => t.kind === "direct" && t.student_id).map((t: any) => t.student_id),
+  ));
+  const groupIdByStudentId = new Map<string, string>();
+  const groupById = new Map<string, { name: string; teacher_id: string | null }>();
+  const subjectNameByGroupTeacher = new Map<string, string>();
+  if (directStudentIds.length) {
+    const { data: sgRows } = await sb.from("student_groups").select("student_id, group_id").in("student_id", directStudentIds);
+    for (const sg of (sgRows ?? []) as any[]) {
+      if (!groupIdByStudentId.has(sg.student_id)) groupIdByStudentId.set(sg.student_id, sg.group_id);
+    }
+    const groupIds = Array.from(new Set(Array.from(groupIdByStudentId.values())));
+    if (groupIds.length) {
+      const [{ data: groupRows }, { data: subjectRows }] = await Promise.all([
+        sb.from("groups").select("id, name, teacher_id").in("id", groupIds),
+        sb.from("subjects").select("group_id, teacher_id, name").in("group_id", groupIds),
+      ]);
+      for (const g of (groupRows ?? []) as any[]) groupById.set(g.id, { name: g.name, teacher_id: g.teacher_id });
+      for (const s of (subjectRows ?? []) as any[]) {
+        if (!s.teacher_id) continue;
+        const key = `${s.group_id}:${s.teacher_id}`;
+        if (!subjectNameByGroupTeacher.has(key)) subjectNameByGroupTeacher.set(key, s.name);
+      }
+    }
+  }
+
   return (threads ?? []).map((t: any) => {
     const msgs = messagesByThread.get(t.id) ?? [];
     const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
@@ -99,7 +136,7 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
       unreadCount = msgs.filter((m: any) => m.sender_id !== myId).length;
     }
 
-    return {
+    const summary: ChatThreadSummary = {
       id: t.id,
       kind: t.kind,
       title: t.title,
@@ -108,7 +145,20 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
       participants: participantsByThread.get(t.id) ?? [],
       lastMessage: last ? { body: last.body, created_at: last.created_at, sender_id: last.sender_id } : null,
       unreadCount,
-    } as ChatThreadSummary;
+    };
+
+    if (t.kind === "direct") {
+      const groupId = t.student_id ? groupIdByStudentId.get(t.student_id) ?? null : null;
+      const group = groupId ? groupById.get(groupId) ?? null : null;
+      summary.directStudentId = t.student_id ?? null;
+      summary.directTeacherId = t.teacher_id ?? null;
+      summary.directGroupId = groupId;
+      summary.directGroupName = group?.name ?? null;
+      summary.directSubjectName = groupId && t.teacher_id ? subjectNameByGroupTeacher.get(`${groupId}:${t.teacher_id}`) ?? null : null;
+      summary.isCuratorThread = !!(group && t.teacher_id && group.teacher_id === t.teacher_id);
+    }
+
+    return summary;
   });
 }
 
