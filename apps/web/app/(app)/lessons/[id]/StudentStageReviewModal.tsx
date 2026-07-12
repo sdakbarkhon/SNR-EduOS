@@ -63,9 +63,14 @@ export function StudentStageReviewModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.id, studentId]);
 
-  const config = stage.config as { url?: string };
+  // Промт: раньше читал только config.url и всегда рендерил как ссылку
+  // "открыть в новой вкладке" — во время живого урока тот же этап
+  // встраивается iframe'ом (ExternalStageModal.tsx). embed_url — то же
+  // поле, что живой компонент читает первым; при его отсутствии тот же
+  // fallback на DEFAULT_EXTERNAL_URLS, что и там.
+  const config = (stage.config ?? {}) as { url?: string; embed_url?: string };
   const serviceMeta = isExternalService(stage.content_type) ? SERVICE_CONFIG[stage.content_type] : null;
-  const serviceUrl = config?.url || (isExternalService(stage.content_type) ? DEFAULT_EXTERNAL_URLS[stage.content_type] : null);
+  const embedUrl = config?.embed_url || (isExternalService(stage.content_type) ? DEFAULT_EXTERNAL_URLS[stage.content_type] : null);
 
   const codeSubmission = stage.progress?.submission_data as CodeSubmission | null;
 
@@ -146,15 +151,28 @@ export function StudentStageReviewModal({
             </div>
           )}
 
-          {serviceMeta && serviceUrl && (
-            <a
-              href={serviceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100"
-            >
-              <ExternalLink className="h-4 w-4" /> {serviceMeta.name}
-            </a>
+          {serviceMeta && embedUrl && (
+            serviceMeta.embedSupported ? (
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50" style={{ height: "60vh", minHeight: 420 }}>
+                <iframe
+                  src={embedUrl}
+                  title={serviceMeta.name}
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
+                  allow="accelerometer; autoplay; camera; encrypted-media; fullscreen; gyroscope; microphone; clipboard-read; clipboard-write"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="h-full w-full border-none"
+                />
+              </div>
+            ) : (
+              <a
+                href={embedUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100"
+              >
+                <ExternalLink className="h-4 w-4" /> {serviceMeta.name}
+              </a>
+            )
           )}
 
           {isQuizType && (

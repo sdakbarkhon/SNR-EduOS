@@ -49,7 +49,14 @@ export function PdfViewerInner({ url, title }: { url: string; title?: string }) 
   }, [numPages]);
 
   return (
-    <div ref={containerRef} className="flex h-full flex-col items-center bg-slate-100" aria-label={title}>
+    // w-full — без него контейнер (flex-ребёнок в items-center justify-center
+    // родителе) сжимался по своему контенту: на первом замере (до отрисовки
+    // страницы, когда виден только текст "Загрузка…") clientWidth ловил
+    // узкую ширину этого текста, pageWidth становился таким же узким, canvas
+    // рендерился узкой полоской — и контейнер оставался узким навсегда
+    // (без реального resize окна перезамер не срабатывал). w-full рвёт этот
+    // самоподдерживающийся цикл — ширина всегда берётся от родителя.
+    <div ref={containerRef} className="flex h-full w-full flex-col items-center bg-slate-100" aria-label={title}>
       <div className="flex flex-1 items-start justify-center overflow-auto py-4">
         <Document
           file={url}

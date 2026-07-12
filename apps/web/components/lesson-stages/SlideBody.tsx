@@ -119,13 +119,21 @@ function SlideContent({ slide, current, total }: { slide: LessonSlide; current: 
   );
 }
 
-const MIN_SCALE = 0.7;
+// Раньше был 0.7 (70%) — контент, который не влезал даже при таком
+// масштабе (например, крупный заголовок title-слайда с длинным текстом
+// ниже), обрезался по краям overflow-hidden рамки (transform-origin:
+// center режет одинаково сверху и снизу). Обрезанный текст читать
+// невозможно — мелкий, но целиком видимый текст всегда лучше. Понижен
+// до 0.2 — практически гарантирует полное умещение при сохранении
+// защиты от вырожденного near-zero масштаба на патологически длинном
+// контенте.
+const MIN_SCALE = 0.2;
 
 /** Fixed 16:9 frame + auto-scale-to-fit: slide content renders at its
  *  natural size inside `inner`, then gets scaled down (never up) so it
  *  always fits within the frame without requiring scroll — clamped to
- *  MIN_SCALE (70%) per spec; content that still doesn't fit at 70% clips
- *  via the frame's overflow-hidden rather than overflowing the modal. */
+ *  MIN_SCALE (20%, see comment above) as a floor against pathological
+ *  content, not as a "prefer cropping over shrinking" trade-off. */
 export function SlideBody({ slide, current, total }: { slide: LessonSlide; current: number; total: number }) {
   const layout = slide.layout ?? "default";
   const outerRef = useRef<HTMLDivElement>(null);
