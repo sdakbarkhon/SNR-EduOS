@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStudentLessonsForWeek } from "@snr/core";
 import { getParentContext, resolveSelectedChild } from "@/lib/parent-context";
+import { safeQuery } from "@/lib/safe-query";
 import { ScheduleView } from "./ScheduleView";
 
 function getTashkentWeekMonday(offsetWeeks = 0): string {
@@ -26,9 +27,9 @@ export default async function ChildSchedulePage({
   const thisWeekStart = getTashkentWeekMonday(0);
   const nextWeekStart = getTashkentWeekMonday(1);
 
-  const [thisWeekLessons, nextWeekLessons] = await Promise.all([
-    getStudentLessonsForWeek(db, thisWeekStart, studentId).catch(() => []),
-    getStudentLessonsForWeek(db, nextWeekStart, studentId).catch(() => []),
+  const [thisWeekRes, nextWeekRes] = await Promise.all([
+    safeQuery(getStudentLessonsForWeek(db, thisWeekStart, studentId), [], "ChildSchedulePage.thisWeek"),
+    safeQuery(getStudentLessonsForWeek(db, nextWeekStart, studentId), [], "ChildSchedulePage.nextWeek"),
   ]);
 
   return (
@@ -36,8 +37,9 @@ export default async function ChildSchedulePage({
       child={child}
       thisWeekStart={thisWeekStart}
       nextWeekStart={nextWeekStart}
-      thisWeekLessons={thisWeekLessons}
-      nextWeekLessons={nextWeekLessons}
+      thisWeekLessons={thisWeekRes.data}
+      nextWeekLessons={nextWeekRes.data}
+      loadError={thisWeekRes.failed || nextWeekRes.failed}
     />
   );
 }

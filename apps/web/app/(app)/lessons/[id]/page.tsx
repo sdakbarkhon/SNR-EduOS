@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStudentLessonView, getLessonMaterialUrl, getHomeworkByLessonId } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
+import { safeQuery } from "@/lib/safe-query";
 import { LessonView } from "./LessonView";
 
 export default async function LessonPage({
@@ -12,10 +13,19 @@ export default async function LessonPage({
   const { id } = await params;
   const db = await createClient();
 
-  const [lesson, student] = await Promise.all([
-    getStudentLessonView(db, id).catch(() => null),
-    Promise.resolve(getMyStudent(db)).catch(() => null),
+  // Промт 6: getStudentLessonView(id) раньше глушилось .catch(() => null) —
+  // РЕАЛЬНЫЙ сбой запроса (throw) и "урока правда нет" оба вели на
+  // notFound(), т.е. настоящую ошибку показывали как 404 "не найдено" —
+  // хуже, чем просто пустое состояние (ученик решил бы, что ссылка
+  // битая). Не глушим здесь: если getStudentLessonView бросает — пусть
+  // бросает дальше (Next покажет страницу ошибки), notFound() остаётся
+  // только для случая "функция вернула null" (урок действительно не найден
+  // / RLS не пускает).
+  const [lesson, studentRes] = await Promise.all([
+    getStudentLessonView(db, id),
+    safeQuery(Promise.resolve(getMyStudent(db)), null, "LessonPage.student"),
   ]);
+  const student = studentRes.data;
   if (!lesson) notFound();
 
   // Pre-generate signed URLs for all lesson materials. No `downloadAs` here —
@@ -37,7 +47,7 @@ export default async function LessonPage({
   // Only relevant once the lesson has ended — the completed-review screen
   // links straight to any homework created from this lesson.
   const linkedHomework = lesson.status === "completed"
-    ? await getHomeworkByLessonId(db, id).catch(() => [])
+    ? (await safeQuery(getHomeworkByLessonId(db, id), [], "LessonPage.linkedHomework")).data
     : [];
 
   return (

@@ -6,6 +6,7 @@ import type { Locale, LessonWithSubject, StudentGradeItem, HomeworkWithSubmissio
 import { useLocale } from "@/components/LocaleProvider";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { LessonSubjectIcon, FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
+import { ErrorState } from "@/components/ErrorState";
 import type { ParentChild } from "@/lib/parent-child";
 
 type Props = {
@@ -15,6 +16,9 @@ type Props = {
   lessons: LessonWithSubject[];
   weekGrades: StudentGradeItem[];
   pendingHomework: HomeworkWithSubmission[];
+  lessonsError?: boolean;
+  gradesError?: boolean;
+  homeworkError?: boolean;
 };
 
 function formatTime(iso: string) {
@@ -34,7 +38,10 @@ function lessonStatusLabel(l: LessonWithSubject, t: ReturnType<typeof getDiction
   return t.lessonUpcoming;
 }
 
-export function DashboardContent({ child, today: _today, lessons, weekGrades, pendingHomework }: Props) {
+export function DashboardContent({
+  child, today: _today, lessons, weekGrades, pendingHomework,
+  lessonsError = false, gradesError = false, homeworkError = false,
+}: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.parentUi;
@@ -59,7 +66,9 @@ export function DashboardContent({ child, today: _today, lessons, weekGrades, pe
       {/* Расписание на сегодня */}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
         <h2 className="mb-4 text-base font-semibold text-gray-700">{t.scheduleTodayTitle}</h2>
-        {lessons.length === 0 ? (
+        {lessonsError ? (
+          <ErrorState>{d.common.error}</ErrorState>
+        ) : lessons.length === 0 ? (
           <p className="py-4 text-center text-sm text-gray-400">{t.noLessonsToday}</p>
         ) : (
           <ul className="divide-y divide-gray-100">
@@ -99,7 +108,9 @@ export function DashboardContent({ child, today: _today, lessons, weekGrades, pe
             {t.viewAllGrades}
           </Link>
         </div>
-        {weekGrades.length === 0 ? (
+        {gradesError ? (
+          <ErrorState>{d.common.error}</ErrorState>
+        ) : weekGrades.length === 0 ? (
           <p className="py-4 text-center text-sm text-gray-400">{t.noGradesWeek}</p>
         ) : (
           <ul className="divide-y divide-gray-100">
@@ -126,7 +137,9 @@ export function DashboardContent({ child, today: _today, lessons, weekGrades, pe
             {t.viewAllHomework}
           </Link>
         </div>
-        {pendingHomework.length === 0 ? (
+        {homeworkError ? (
+          <ErrorState>{d.common.error}</ErrorState>
+        ) : pendingHomework.length === 0 ? (
           <p className="py-4 text-center text-sm text-gray-400">{t.allHomeworkDone}</p>
         ) : (
           <ul className="divide-y divide-gray-100">

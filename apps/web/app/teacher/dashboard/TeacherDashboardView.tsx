@@ -10,6 +10,7 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { Avatar } from "@/components/Avatar";
 import { SubjectIcon } from "@/components/SubjectIcon";
+import { ErrorState } from "@/components/ErrorState";
 import { cn } from "@/lib/cn";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ interface Props {
   todayLessons: TodayLesson[];
   recentSubmissions: Submission[];
   grades: Array<{ group_id: string | null; score: number }>;
+  todayLessonsError?: boolean;
 }
 
 // ── Timeline constants ────────────────────────────────────────────────────────
@@ -242,6 +244,7 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
 
 export function TeacherDashboardView({
   teacher, groups, homework, todayLessons, recentSubmissions, grades,
+  todayLessonsError = false,
 }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -312,7 +315,9 @@ export function TeacherDashboardView({
             </span>
           </div>
 
-          {todayLessons.length === 0 ? (
+          {todayLessonsError ? (
+            <div className="py-8"><ErrorState>{d.common.error}</ErrorState></div>
+          ) : todayLessons.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-400">
               <Calendar className="h-10 w-10 opacity-30" />
               <p className="text-sm">Свободный день</p>

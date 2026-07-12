@@ -5,6 +5,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale, LessonWithSubject } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { LessonSubjectIcon, FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
+import { ErrorState } from "@/components/ErrorState";
 import type { ParentChild } from "@/lib/parent-child";
 
 const LOCALE_TAG: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
@@ -34,12 +35,14 @@ export function ScheduleView({
   nextWeekStart: _nextWeekStart,
   thisWeekLessons,
   nextWeekLessons,
+  loadError = false,
 }: {
   child: ParentChild;
   thisWeekStart: string;
   nextWeekStart: string;
   thisWeekLessons: LessonWithSubject[];
   nextWeekLessons: LessonWithSubject[];
+  loadError?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -80,7 +83,9 @@ export function ScheduleView({
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-        {days.length === 0 ? (
+        {loadError ? (
+          <ErrorState>{d.common.error}</ErrorState>
+        ) : days.length === 0 ? (
           <p className="py-8 text-center text-sm text-gray-400">{t.noLessonsWeek}</p>
         ) : (
           <div className="space-y-6">

@@ -4,6 +4,7 @@ import {
   getStudentLessonsForWeek,
 } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
+import { safeQuery } from "@/lib/safe-query";
 import { LessonsView } from "./LessonsView";
 
 // ── Tashkent date helpers (UTC+5) ─────────────────────────────────────────────
@@ -29,10 +30,10 @@ export default async function LessonsPage() {
   const today = getTashkentToday();
   const weekStart = getTashkentWeekMonday();
 
-  const [student, todayLessons, weekLessons] = await Promise.all([
+  const [student, todayRes, weekRes] = await Promise.all([
     getMyStudent(db),
-    getStudentLessonsForDate(db, today).catch(() => []),
-    getStudentLessonsForWeek(db, weekStart).catch(() => []),
+    safeQuery(getStudentLessonsForDate(db, today), [], "LessonsPage.today"),
+    safeQuery(getStudentLessonsForWeek(db, weekStart), [], "LessonsPage.week"),
   ]);
 
   return (
@@ -40,8 +41,9 @@ export default async function LessonsPage() {
       studentName={student.full_name}
       today={today}
       initialWeekStart={weekStart}
-      todayLessons={todayLessons}
-      initialWeekLessons={weekLessons}
+      todayLessons={todayRes.data}
+      initialWeekLessons={weekRes.data}
+      loadError={todayRes.failed || weekRes.failed}
     />
   );
 }

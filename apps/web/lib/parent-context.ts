@@ -20,23 +20,35 @@ export const getParentContext = cache(async (): Promise<{
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
-  const { data: parent } = await sb.from("parents").select("id, full_name").eq("user_id", user.id).single();
+  // Промт 6: логируем реальную ошибку на каждом из трёх запросов — раньше
+  // РЕАЛЬНЫЙ сбой (RLS/сеть) был неотличим от "не родитель"/"нет детей" и
+  // тихо уводил на /login. Не меняем сам fallback (null/[]) — эта функция
+  // гейтит layout.tsx-редирект на /login для ВСЕХ /parent/* страниц, а
+  // error.tsx-границы в приложении нет нигде вообще; превращать сбой в
+  // необработанный throw здесь означало бы заменить редирект на голую
+  // дефолтную страницу ошибки Next.js — не факт что лучше, и явно за
+  // рамками "починить silent-fail" (это была бы новая архитектура
+  // error-boundary). Логирование делает сбой хотя бы диагностируемым.
+  const { data: parent, error: parentErr } = await sb.from("parents").select("id, full_name").eq("user_id", user.id).single();
+  if (parentErr) console.error("[getParentContext] parents query failed:", parentErr.message);
   if (!parent) return null;
 
-  const { data: links } = await sb
+  const { data: links, error: linksErr } = await sb
     .from("parent_students")
     .select("student_id, created_at")
     .eq("parent_id", parent.id)
     .order("created_at", { ascending: true });
+  if (linksErr) console.error("[getParentContext] parent_students query failed:", linksErr.message);
 
   const studentIds = ((links ?? []) as { student_id: string; created_at: string }[]).map((l) => l.student_id);
 
   let children: ParentChild[] = [];
   if (studentIds.length > 0) {
-    const { data: students } = await sb
+    const { data: students, error: studentsErr } = await sb
       .from("students")
       .select("id, full_name, student_groups(groups(name))")
       .in("id", studentIds);
+    if (studentsErr) console.error("[getParentContext] students query failed:", studentsErr.message);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const byId = new Map<string, ParentChild>(

@@ -18,6 +18,8 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
 import { SubjectIcon } from "@/components/SubjectIcon";
+import { useToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
 import { useDemoEditBlocked, isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -536,12 +538,16 @@ export function TeacherLessonsView({
   lessons: initialLessons,
   groups,
   teacherSubjects,
+  loadError = false,
 }: {
   lessons: LessonItem[];
   groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
+  loadError?: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
+  const dc = getDictionary(defaultLocale).common;
   const dbRef = useRef(createClient());
   const db = dbRef.current;
 
@@ -577,7 +583,10 @@ export function TeacherLessonsView({
     try {
       const data = await getTeacherLessonsByMonth(db, year, month);
       setMonthLessons(data as unknown as LessonItem[]);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("[TeacherLessonsView] loadMonth failed:", (e as Error)?.message ?? e);
+      toast(dc.error);
+    }
     finally { setLoading(false); }
   }
 
@@ -654,6 +663,7 @@ export function TeacherLessonsView({
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      {loadError && <ErrorState>{dc.error}</ErrorState>}
       {/* Two-column layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
 

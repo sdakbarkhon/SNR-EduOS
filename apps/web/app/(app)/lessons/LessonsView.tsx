@@ -20,6 +20,8 @@ import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
+import { useToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 
 type ViewMode = "today" | "week";
@@ -161,17 +163,20 @@ export function LessonsView({
   initialWeekStart,
   todayLessons,
   initialWeekLessons,
+  loadError = false,
 }: {
   studentName: string;
   today: string;
   initialWeekStart: string;
   todayLessons: LessonWithSubject[];
   initialWeekLessons: LessonWithSubject[];
+  loadError?: boolean;
 }) {
   const router = useRouter();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const s = d.schedule;
+  const toast = useToast();
 
   const [mode, setMode] = useState<ViewMode>("today");
   // null до маунта — сервер (UTC) и клиент считают "сейчас" одинаково (гидрация)
@@ -205,8 +210,9 @@ export function LessonsView({
       try {
         const lessons = await getStudentLessonsForWeek(createClient(), next);
         setWeekCache((c) => ({ ...c, [next]: lessons }));
-      } catch {
-        setWeekCache((c) => ({ ...c, [next]: [] }));
+      } catch (e) {
+        console.error("[LessonsView] goWeek failed:", (e as Error)?.message ?? e);
+        toast(d.common.error);
       }
       setWeekLoading(false);
     }
@@ -283,7 +289,9 @@ export function LessonsView({
             <p className="text-sm text-slate-500">{cap(fmtWeekday(today, locale))}</p>
           </div>
 
-          {todayLessons.length > 0 ? (
+          {loadError ? (
+            <div className="mt-3"><ErrorState>{d.common.error}</ErrorState></div>
+          ) : todayLessons.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-stretch gap-4 pb-2">
               {todayLessons.map((l) => {
                 const color = lessonColor(l);
@@ -370,6 +378,9 @@ export function LessonsView({
       )}
 
       {/* ── Режим НЕДЕЛЯ ──────────────────────────────────────────────────── */}
+      {mode === "week" && loadError && weekStart === initialWeekStart && (
+        <div className="mb-3"><ErrorState>{d.common.error}</ErrorState></div>
+      )}
       {mode === "week" && (
         <WeekGrid
           weekStart={weekStart}

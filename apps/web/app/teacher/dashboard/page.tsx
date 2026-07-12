@@ -4,32 +4,30 @@ import {
   getTeacherTodayLessons, getTeacherRecentSubmissions, getTeacherGrades,
 } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
+import { safeQuery } from "@/lib/safe-query";
 import { TeacherDashboardView } from "./TeacherDashboardView";
-
-async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
-  try { return await (p as Promise<T>); } catch { return fb; }
-}
 
 export default async function TeacherDashboardPage() {
   const supabase = await createClient();
 
-  const [teacher, groups, homework, todayLessons, recentSubmissions, grades] = await Promise.all([
-    safe(getMyTeacher(supabase), null),
-    safe(getTeacherGroups(supabase), []),
-    safe(getTeacherHomework(supabase), []),
-    safe(getTeacherTodayLessons(supabase), []),
-    safe(getTeacherRecentSubmissions(supabase, 8), []),
-    safe(getTeacherGrades(supabase), []),
+  const [teacherRes, groupsRes, homeworkRes, todayLessonsRes, recentSubmissionsRes, gradesRes] = await Promise.all([
+    safeQuery(getMyTeacher(supabase), null, "TeacherDashboardPage.teacher"),
+    safeQuery(getTeacherGroups(supabase), [], "TeacherDashboardPage.groups"),
+    safeQuery(getTeacherHomework(supabase), [], "TeacherDashboardPage.homework"),
+    safeQuery(getTeacherTodayLessons(supabase), [], "TeacherDashboardPage.todayLessons"),
+    safeQuery(getTeacherRecentSubmissions(supabase, 8), [], "TeacherDashboardPage.recentSubmissions"),
+    safeQuery(getTeacherGrades(supabase), [], "TeacherDashboardPage.grades"),
   ]);
 
   return (
     <TeacherDashboardView
-      teacher={teacher}
-      groups={groups as never[]}
-      homework={homework as never[]}
-      todayLessons={todayLessons as never[]}
-      recentSubmissions={recentSubmissions as never[]}
-      grades={grades as never[]}
+      teacher={teacherRes.data}
+      groups={groupsRes.data as never[]}
+      homework={homeworkRes.data as never[]}
+      todayLessons={todayLessonsRes.data as never[]}
+      recentSubmissions={recentSubmissionsRes.data as never[]}
+      grades={gradesRes.data as never[]}
+      todayLessonsError={todayLessonsRes.failed}
     />
   );
 }

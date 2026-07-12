@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getStudentLessonsForDate, getStudentGrades, getHomeworkWithSubmissions } from "@snr/core";
 import { getParentContext, resolveSelectedChild, SELECTED_CHILD_COOKIE } from "@/lib/parent-context";
+import { safeQuery } from "@/lib/safe-query";
 import { DashboardContent } from "./DashboardContent";
 
 function getTashkentToday(): string {
@@ -41,17 +42,17 @@ export default async function ParentDashboardPage({
   const todayStart = new Date(`${today}T00:00:00+05:00`).getTime();
   const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-  const [lessons, grades, homework] = await Promise.all([
-    getStudentLessonsForDate(db, today, selected.id).catch(() => []),
-    getStudentGrades(db, selected.id).catch(() => []),
-    getHomeworkWithSubmissions(db, selected.id).catch(() => []),
+  const [lessonsRes, gradesRes, homeworkRes] = await Promise.all([
+    safeQuery(getStudentLessonsForDate(db, today, selected.id), [], "ParentDashboardPage.lessons"),
+    safeQuery(getStudentGrades(db, selected.id), [], "ParentDashboardPage.grades"),
+    safeQuery(getHomeworkWithSubmissions(db, selected.id), [], "ParentDashboardPage.homework"),
   ]);
 
-  const weekGrades = grades
+  const weekGrades = gradesRes.data
     .filter((g) => g.date && new Date(g.date).getTime() >= weekAgoMs)
     .slice(0, 10);
 
-  const pendingHomework = homework
+  const pendingHomework = homeworkRes.data
     .filter((h) => !h.submission && !h.test_submission && (!h.due_date || new Date(h.due_date).getTime() >= todayStart))
     .slice(0, 5);
 
@@ -60,9 +61,12 @@ export default async function ParentDashboardPage({
       parentName={ctx.parentName}
       child={selected}
       today={today}
-      lessons={lessons}
+      lessons={lessonsRes.data}
       weekGrades={weekGrades}
       pendingHomework={pendingHomework}
+      lessonsError={lessonsRes.failed}
+      gradesError={gradesRes.failed}
+      homeworkError={homeworkRes.failed}
     />
   );
 }
