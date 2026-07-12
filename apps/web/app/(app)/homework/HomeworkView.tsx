@@ -203,14 +203,17 @@ export function HomeworkView({
             </button>
           </div>
 
-          {/* Subject chips */}
+          {/* Subject chips — grid с auto-fill/minmax вместо flex-wrap:
+              Промт 6.2, чипы распределяются равномерно по строкам (без
+              "кривых" неровных рядов) и никогда не сжимаются уже 150px,
+              так текст ("Робототехника" и т.п.) не обрезается. */}
           {subjectKeys.length > 0 && (
-            <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
               <button
                 type="button"
                 onClick={() => setSubjectFilter("all")}
                 className={cn(
-                  "inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all",
+                  "inline-flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all",
                   subjectFilter === "all"
                     ? "text-white shadow-[0_8px_18px_rgba(108,78,230,0.30)]"
                     : "bg-white text-slate-700 border border-slate-100 hover:border-slate-200",
@@ -228,7 +231,7 @@ export function HomeworkView({
                     type="button"
                     onClick={() => setSubjectFilter(active ? "all" : key)}
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all",
+                      "inline-flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all",
                       active
                         ? "text-white shadow-[0_8px_18px_rgba(108,78,230,0.30)]"
                         : "bg-white text-slate-700 border border-slate-100 hover:border-slate-200",
@@ -264,8 +267,13 @@ export function HomeworkView({
           </div>
 
           {/* Cards grid / empty states */}
+          {/* Промт 6.2: было sm:grid-cols-2 (640px, привязано к ширине
+              вьюпорта) — при открытом сайдбаре (210-266px) на планшете 768
+              реальная ширина колонки под карточки намного меньше 640px,
+              карточки зажимались. lg:grid-cols-2 (1024) — безопасный порог,
+              на >=1024 колонки те же, что были. */}
           {sorted.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mt-0.5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 mt-0.5">
               {sorted.map((hw) => (
                 <HomeworkCard key={hw.id} hw={hw} />
               ))}

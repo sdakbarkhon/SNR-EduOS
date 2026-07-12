@@ -57,7 +57,10 @@ export function LessonHeaderBar({
             <p className="truncate text-[11px] font-extrabold uppercase tracking-wide" style={{ color: accent }}>
               {subjectName}
             </p>
-            <h1 className="truncate text-xl font-black leading-tight text-[#242A45] md:text-2xl">{title}</h1>
+            {/* Промт 6.2: было truncate — на планшете длинная тема урока
+                обрезалась ("Arduino: ...(bli..."). Переносится на 2-3
+                строки вместо ellipsis. */}
+            <h1 className="line-clamp-3 text-xl font-black leading-tight text-[#242A45] md:text-2xl">{title}</h1>
           </div>
         </div>
 

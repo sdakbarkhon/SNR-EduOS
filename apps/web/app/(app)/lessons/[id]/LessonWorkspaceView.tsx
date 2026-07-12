@@ -573,7 +573,10 @@ export function LessonWorkspaceView({
       {/* Left: full-height lesson sidebar (Iter5 P13.A — spans the whole
           left column top-to-bottom; the top panel lives only in the right
           column, per Часть 7). */}
-      <aside className={`relative flex h-full shrink-0 flex-col gap-3.5 overflow-y-auto p-3 transition-all duration-300 ease-out ${sidebarCollapsed ? "w-16" : "w-[266px]"}`}>
+      {/* Промт 6.2: на планшете (md-lg, 768-1024) 266px сайдбара + прогресс-
+          бар этапов в шапке могли поджимать центр к краю экрана — сужен до
+          220px, на lg+ (>=1024) ширина как была. */}
+      <aside className={`relative flex h-full shrink-0 flex-col gap-3.5 overflow-y-auto p-3 transition-all duration-300 ease-out ${sidebarCollapsed ? "w-16" : "w-[220px] lg:w-[266px]"}`}>
 
           {/* Logo + collapse toggle — always visible */}
           <div className="flex items-center justify-between rounded-2xl border border-[#ECEDF4] bg-white px-4 py-3 shadow-sm">

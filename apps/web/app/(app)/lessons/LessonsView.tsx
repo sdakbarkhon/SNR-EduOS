@@ -399,6 +399,73 @@ export function LessonsView({
   );
 }
 
+// ── Список по дням (Промт 6.2: md-диапазон 768-1024 и мобильный <768) ───────
+// "Дни горизонтально, время слева" не помещается на планшете — названия
+// уроков обрезались до одной буквы. Здесь дни идут вертикально сверху вниз,
+// уроки каждого дня — горизонтальным рядом чипов (по времени).
+
+function WeekDayList({
+  days, byDay, todayIdx, locale, s, onOpen,
+}: {
+  days: string[];
+  byDay: Map<string, LessonWithSubject[]>;
+  todayIdx: number;
+  locale: string;
+  s: ReturnType<typeof getDictionary>["schedule"];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {days.map((day, i) => {
+        const dayLessons = (byDay.get(day) ?? []).slice().sort((a, b) => lessonStartMs(a) - lessonStartMs(b));
+        const isToday = i === todayIdx;
+        return (
+          <div
+            key={day}
+            className={cn(
+              "flex items-start gap-3 rounded-2xl border p-2.5",
+              isToday ? "border-violet-200 bg-violet-50/60" : "border-slate-100 bg-white",
+            )}
+          >
+            <div className="flex w-14 shrink-0 flex-col items-center gap-0.5 pt-0.5">
+              <span className={cn("text-[11px] font-bold", isToday ? "text-violet-600" : "text-slate-400")}>
+                {cap(fmtWeekday(day, locale, "short").replace(".", ""))}
+              </span>
+              <span
+                className={cn("flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold", isToday ? "text-white" : "text-slate-600")}
+                style={isToday ? { backgroundColor: ACCENT } : undefined}
+              >
+                {Number(day.slice(8, 10))}
+              </span>
+            </div>
+            {dayLessons.length > 0 ? (
+              <div className="flex flex-1 flex-wrap gap-2">
+                {dayLessons.map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => onOpen(l.id)}
+                    className="flex min-w-[84px] max-w-[170px] items-center gap-2 rounded-xl border border-slate-100 bg-white p-2 text-left shadow-sm transition hover:shadow-md"
+                  >
+                    <ClayIcon icon={l.subject?.icon} color={lessonColor(l)} size="sm" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold leading-tight text-slate-800">{lessonName(l)}</div>
+                      <div className="text-[10px] text-slate-400">{hm(l.starts_at)}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center gap-1.5 py-1.5 text-xs font-bold text-slate-400">
+                <Backpack className="h-4 w-4 text-violet-400 opacity-70" /> {s.weekend} <Smile className="h-3.5 w-3.5" />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Сетка недели ──────────────────────────────────────────────────────────────
 
 function WeekGrid({
@@ -415,7 +482,7 @@ function WeekGrid({
   onNext: () => void;
   onOpen: (id: string) => void;
 }) {
-  const { days, times, cells, emptyDays } = useMemo(() => {
+  const { days, times, cells, emptyDays, byDay } = useMemo(() => {
     const days = weekDates(weekStart);
     const byDay = new Map<string, LessonWithSubject[]>();
     for (const l of lessons) {
@@ -437,7 +504,7 @@ function WeekGrid({
       }
     }
     const emptyDays = days.map((day) => !(byDay.get(day)?.length));
-    return { days, times, cells, emptyDays };
+    return { days, times, cells, emptyDays, byDay };
   }, [lessons, weekStart]);
 
   const todayIdx = days.indexOf(today);
@@ -476,14 +543,20 @@ function WeekGrid({
         </div>
       </div>
 
-      {/* Сетка */}
-      <div className="relative mt-3 flex min-h-0 flex-1 flex-col rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+      {/* Сетка/список — на <1024 (моб.+планшет) список по дням, на >=1024
+          (десктоп) прежняя горизонтальная сетка без изменений. */}
+      <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
         {loading && (
           <div className="absolute inset-0 z-20 flex items-center justify-center rounded-3xl bg-white/70">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
           </div>
         )}
 
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl border border-slate-100 bg-white p-3 shadow-sm lg:hidden">
+          <WeekDayList days={days} byDay={byDay} todayIdx={todayIdx} locale={locale} s={s} onOpen={onOpen} />
+        </div>
+
+      <div className="hidden min-h-0 flex-1 flex-col rounded-3xl border border-slate-100 bg-white p-4 shadow-sm lg:flex">
         {/* Шапка дней */}
         <div className="grid shrink-0 gap-x-2" style={gridTemplate}>
           <div />
@@ -582,6 +655,7 @@ function WeekGrid({
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Нижний баннер (режим "Неделя") */}
