@@ -115,9 +115,16 @@ export function LoginForm({ locale }: { locale: Locale }) {
   }
 
   return (
-    <div className="relative z-30 w-full max-w-md">
+    <div className="relative z-30 flex w-full max-w-md flex-col items-center">
+      {/* Промт 6.2.3: логотип вынесен ИЗ карточки — стоит отдельно, крупно,
+          по центру, над карточкой. mb-10 (40px) — отступ до карточки;
+          h-[76px] → ширина ≈226px (диапазон 200-240px по аспекту логотипа
+          849:285). Иконка-шапочка выпускника осталась внутри карточки, как
+          была изначально (см. ниже). */}
+      <Logo priority className="mb-10 h-[76px]" />
+
       <div
-        className="relative overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 backdrop-blur-xl"
+        className="relative w-full overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 backdrop-blur-xl"
         style={{ boxShadow: "0 20px 60px -15px rgba(0,0,0,0.15)" }}
       >
         <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/30 blur-3xl" />
@@ -126,11 +133,6 @@ export function LoginForm({ locale }: { locale: Locale }) {
             контент на планшете 768 — теперь высота card естественная,
             скроллится вся страница (page.tsx: min-h-screen). */}
         <div className="p-6">
-          {/* Промт 6.2.1: логотип SNR EduOS отсутствовал в форме входа —
-              тот же компонент/файл, что в сайдбарах ученика/учителя.
-              Иконка-заглушка (GraduationCap) оставлена как была, ниже. */}
-          <Logo priority className="mb-3 h-8" />
-
           <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
             <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
           </div>

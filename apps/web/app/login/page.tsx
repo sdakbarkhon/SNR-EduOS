@@ -29,7 +29,11 @@ export default function LoginPage() {
           <BrandingColumn locale={locale} />
         </div>
 
-        <div className="flex items-center justify-center p-6 pb-28 lg:p-12">
+        {/* Промт 6.2.3: pt-10 (40px) вместо p-6's 24px — минимальный "воздух"
+            над вынесенным логотипом даже в худшем случае (короткий
+            viewport, где items-center-центрирование почти не даёт запаса
+            сверху сверх самого padding). */}
+        <div className="flex items-center justify-center px-6 pt-10 pb-28 lg:p-12">
           <Suspense fallback={null}>
             <LoginForm locale={locale} />
           </Suspense>
