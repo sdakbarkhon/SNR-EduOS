@@ -4,13 +4,14 @@
     "slug": "snr-eduos-parent",
     "scheme": "snreduosparent",
     "version": "1.0.0",
+    "platforms": ["ios", "android"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.snr.eduos.parent",
       "supportsTablet": true,
-      "runtimeVersion": "54.0.0"
+      "runtimeVersion": "exposdk:54.0.0"
     },
     "android": {
       "package": "com.snr.eduos.parent",
