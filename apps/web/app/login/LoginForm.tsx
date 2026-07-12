@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { loginWithUsername } from "@/app/actions/auth";
 import { DemoRoleModal } from "@/components/DemoRoleModal";
+import { Logo } from "@/components/Logo";
 
 function GoogleIcon() {
   return (
@@ -125,6 +126,11 @@ export function LoginForm({ locale }: { locale: Locale }) {
             контент на планшете 768 — теперь высота card естественная,
             скроллится вся страница (page.tsx: min-h-screen). */}
         <div className="p-6">
+          {/* Промт 6.2.1: логотип SNR EduOS отсутствовал в форме входа —
+              тот же компонент/файл, что в сайдбарах ученика/учителя.
+              Иконка-заглушка (GraduationCap) оставлена как была, ниже. */}
+          <Logo priority className="mb-3 h-8" />
+
           <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
             <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
           </div>
