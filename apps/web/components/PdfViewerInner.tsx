@@ -62,7 +62,9 @@ export function PdfViewerInner({ url, title }: { url: string; title?: string }) 
       </div>
 
       {numPages > 1 && (
-        <div className="flex w-full items-center justify-center gap-4 border-t border-slate-200 bg-white p-4">
+        // shrink-0: страница с кнопками навигации не должна сжиматься на
+        // короткой высоте модалки (планшет) — всегда видна внизу.
+        <div className="flex w-full shrink-0 items-center justify-center gap-4 border-t border-slate-200 bg-white p-4">
           <button
             onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
             disabled={pageNumber <= 1}

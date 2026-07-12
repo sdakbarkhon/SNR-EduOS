@@ -188,8 +188,11 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
 
   return (
     <div className="flex h-full min-h-[520px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+      {/* Промт 6.2: на md-lg (планшет, 768-1024) 320px фиксированной ширины
+          списка чатов зажимало область сообщений — сужена до 230px, на lg+
+          (десктоп) ширина как была. */}
       <div
-        className={`w-full shrink-0 flex-col border-r border-gray-100 md:flex md:w-[320px] ${activeThreadId ? "hidden md:flex" : "flex"}`}
+        className={`w-full shrink-0 flex-col border-r border-gray-100 md:flex md:w-[230px] lg:w-[320px] ${activeThreadId ? "hidden md:flex" : "flex"}`}
       >
         <div className="shrink-0 border-b border-gray-100 px-4 py-4">
           <h1 className="text-lg font-bold text-gray-800">{d.chat.title}</h1>
@@ -249,9 +252,13 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
               <button onClick={backToList} className="text-gray-400 hover:text-gray-600 md:hidden" aria-label={d.chat.backToList}>
                 <ChevronLeft className="h-5 w-5" />
               </button>
+              {/* Промт 6.2: убран truncate/max-width — имя группы и список
+                  участников занимают всю доступную ширину (не обрезаются в
+                  одну строку с "лишним" пустым местом справа); переносится
+                  на 2 строки при необходимости. */}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-gray-800">{activeThread.title ?? d.chat.title}</p>
-                <p className="truncate text-xs text-gray-400">
+                <p className="line-clamp-2 text-xs text-gray-400">
                   {d.chat.participantsLabel}: {activeThread.participants.map((p) => p.full_name).filter(Boolean).join(", ")}
                 </p>
               </div>

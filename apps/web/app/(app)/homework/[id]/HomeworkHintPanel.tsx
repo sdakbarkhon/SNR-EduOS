@@ -139,9 +139,13 @@ export function HomeworkHintPanel({
               {t.hintPanelTitle}
             </p>
             {isImage ? (
+              // Промт 6.2: без max-height обложка-подсказка на планшете
+              // растягивалась во весь экран (голое w-full без height cap);
+              // теперь до 40vh, object-contain — клик всё так же открывает
+              // полноэкранный lightbox (уже был реализован).
               <button onClick={() => setLightbox(true)} className="block w-full overflow-hidden rounded-xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={hintFilename ?? t.hintPanelTitle} className="w-full rounded-xl" />
+                <img src={url} alt={hintFilename ?? t.hintPanelTitle} className="mx-auto h-auto max-h-[40vh] w-full rounded-xl object-contain" />
               </button>
             ) : (
               <button

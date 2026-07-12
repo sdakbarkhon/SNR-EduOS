@@ -112,9 +112,14 @@ function BookDetailModal({
           <X className="h-5 w-5" />
         </button>
 
-        <div className="flex gap-8 p-8">
+        {/* Промт 6.2: на <1024 (моб.+планшет) обложка+инфо шли side-by-side
+            (w-[38%] узкой колонкой) — обложка казалась маленькой в центре
+            широкой модалки. Теперь стек: обложка сверху (60% ширины,
+            центрирована), инфо снизу на всю ширину; на lg+ (десктоп) — как
+            было, side-by-side. */}
+        <div className="flex flex-col gap-6 p-6 lg:flex-row lg:gap-8 lg:p-8">
           {/* Left: cover (portrait 3:4) */}
-          <div className="w-[38%] shrink-0">
+          <div className="mx-auto w-[60%] min-w-[180px] shrink-0 lg:mx-0 lg:w-[38%]">
             <div
               className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-md"
               style={{ background: getBookGradient(book.subject) }}

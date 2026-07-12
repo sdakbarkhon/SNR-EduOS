@@ -70,15 +70,20 @@ export function StudentStageReviewModal({
   const codeSubmission = stage.progress?.submission_data as CodeSubmission | null;
 
   return createPortal(
+    // Промт 6.2: items-start + overflow-y-auto + pt-10 (40px+) вместо
+    // items-center — на планшете 768 заголовок слайда иногда обрезался
+    // сверху экрана; теперь модалка гарантированно начинается с отступом
+    // от верха и, если контент выше доступной высоты, скроллится сама
+    // (а не только тело внутри неё), заголовок остаётся первым и видимым.
     <div
-      className="fixed inset-0 flex items-center justify-center p-4"
+      className="fixed inset-0 flex items-start justify-center overflow-y-auto p-4 pt-10"
       style={{ zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative flex w-[90vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-        style={{ maxHeight: "90vh" }}
+        style={{ maxHeight: "calc(100vh - 80px)" }}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
