@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
       <DemoHeartbeat isDemo={isDemo} />
-      <AppShell studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel}>{children}</AppShell>
+      <AppShell studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} isDemo={isDemo}>{children}</AppShell>
     </>
   );
 }

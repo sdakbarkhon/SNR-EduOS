@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
+import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { BottomNav } from "./BottomNav";
 import { StudentSidebar } from "./StudentSidebar";
@@ -17,11 +18,13 @@ export function AppShell({
   studentName,
   avatarUrl,
   classLabel,
+  isDemo,
   children,
 }: {
   studentName?: string;
   avatarUrl?: string | null;
   classLabel?: string;
+  isDemo?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -43,11 +46,16 @@ export function AppShell({
     );
   }
 
+  // Промт 6.2.5: DemoBanner рендерит свой h-10 (40px) спейсер ПЕРЕД AppShell
+  // как сосед (в layout.tsx), а не внутри него — h-screen здесь раньше не
+  // учитывал этот сдвиг, из-за чего вся раскладка (в т.ч. сайдбар) съезжала
+  // на 40px вниз и настолько же вылезала за нижний край вьюпорта. Теперь
+  // высота явно уменьшается на те же 40px, когда баннер показан.
   return (
     <ToastProvider>
-      <div className="flex h-screen overflow-hidden bg-[#F2F1FA]">
+      <div className={cn("flex overflow-hidden bg-[#F2F1FA]", isDemo ? "h-[calc(100vh-2.5rem)]" : "h-screen")}>
         <LessonStartBanner />
-        <StudentSidebar />
+        <StudentSidebar isDemo={isDemo} />
 
         {/* Правая колонка */}
         <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]">

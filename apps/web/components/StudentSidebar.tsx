@@ -74,7 +74,7 @@ function hexToRgba(hex: string, alpha: number): string {
 // then visibly animates to collapsed with the "expand" icon on every load.
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-export function StudentSidebar() {
+export function StudentSidebar({ isDemo }: { isDemo?: boolean } = {}) {
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -176,7 +176,13 @@ export function StudentSidebar() {
         <div
           onClick={closeOverlay}
           aria-hidden="true"
-          className="fixed inset-0 z-[9998] hidden bg-black/40 backdrop-blur-[1px] transition-opacity md:block lg:hidden"
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-30 hidden bg-black/40 backdrop-blur-[1px] transition-opacity md:block lg:hidden",
+            // Промт 6.2.5: backdrop начинается под DemoBanner (h-10=40px),
+            // а не с самого верха — иначе он визуально перекрывал бы
+            // видимую жёлтую полосу баннера при клике.
+            isDemo ? "top-10" : "top-0",
+          )}
         />
       )}
       <aside
@@ -188,21 +194,28 @@ export function StudentSidebar() {
           // (иконки) ширина w-16 не менялась нигде — не трогаем.
           // Промт 6.2.1: на md-диапазоне РАЗВЁРНУТЫЙ сайдбар — overlay
           // (position:fixed) вместо push контента.
-          // Промт 6.2.2: z-[9999] — сайдбар выше глобальных баннеров.
-          // На lg+ (>=1024) — обычный поток (static), как было. Ничего из
-          // этого (overlay/z-index-иерархия) в Промте 6.2.6 не трогаем.
-          //
           // Промт 6.2.6 Часть 1: на обычном десктопе (lg, 1024-1599px)
           // w-80 (320px) оставлял большое пустое место справа от коротких
           // подписей меню ("Главная", "Уроки" и т.п.) — сужено до w-64
           // (256px, диапазон 240-260 из спеки); "Посещаемость" (самое
           // длинное слово) по-прежнему помещается без обрезки при этой
           // ширине. На истинно больших мониторах (>=1600px) ширина
-          // осознанно ВОЗВРАЩЕНА на w-80 (320px, не тронуто) — см. отчёт
-          // за обоснование, почему не выбран uniform 256px везде.
+          // осознанно ВОЗВРАЩЕНА на w-80 (320px, не тронуто).
+          //
+          // Промт 6.2.5 (иерархия z-index): раньше сайдбар был z-[9999] —
+          // выше DemoBanner (z-[100]) и LessonStartBanner (z-[9998]),
+          // из-за чего РАСКРЫТЫЙ overlay-сайдбар перекрывал жёлтый баннер
+          // демо-режима и кнопку "Выйти" в нём. Теперь: banners (100,
+          // 9998) > sidebar (z-40) > backdrop (z-30) > контент. Плюс
+          // сайдбар в demo-режиме визуально НАЧИНАЕТСЯ под баннером
+          // (top-10=40px вместо inset-y-0/top-0), а не наезжает на него.
           isCollapsed
             ? "w-16 px-2"
-            : "w-[210px] px-3 md:fixed md:inset-y-0 md:left-0 md:z-[9999] md:shadow-2xl lg:static lg:w-64 lg:px-4 lg:shadow-[0_8px_24px_rgba(93,80,150,0.05)] min-[1600px]:w-80",
+            : cn(
+                "w-[210px] px-3 md:fixed md:bottom-0 md:left-0 md:z-40 md:shadow-2xl",
+                isDemo ? "md:top-10" : "md:top-0",
+                "lg:static lg:w-64 lg:px-4 lg:shadow-[0_8px_24px_rgba(93,80,150,0.05)] min-[1600px]:w-80",
+              ),
         )}
       >
       {/* Логотип + сворачивание */}
