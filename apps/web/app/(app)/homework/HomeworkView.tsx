@@ -213,7 +213,7 @@ export function HomeworkView({
                 type="button"
                 onClick={() => setSubjectFilter("all")}
                 className={cn(
-                  "inline-flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all",
+                  "inline-flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-center text-sm font-bold transition-all",
                   subjectFilter === "all"
                     ? "text-white shadow-[0_8px_18px_rgba(108,78,230,0.30)]"
                     : "bg-white text-slate-700 border border-slate-100 hover:border-slate-200",
@@ -231,7 +231,7 @@ export function HomeworkView({
                     type="button"
                     onClick={() => setSubjectFilter(active ? "all" : key)}
                     className={cn(
-                      "inline-flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all",
+                      "inline-flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-center text-sm font-bold transition-all",
                       active
                         ? "text-white shadow-[0_8px_18px_rgba(108,78,230,0.30)]"
                         : "bg-white text-slate-700 border border-slate-100 hover:border-slate-200",
