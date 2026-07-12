@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurriculumPlansForTeacher, getTeacherGroups } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { redirect } from "next/navigation";
+import { safeQuery } from "@/lib/safe-query";
 import { CurriculumPlansView } from "./CurriculumPlansView";
 
 export default async function TeacherCurriculumPage() {
@@ -9,13 +10,15 @@ export default async function TeacherCurriculumPage() {
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
 
-  const teacher = await getMyTeacher(db).catch(() => null);
+  const teacher = (await safeQuery(getMyTeacher(db), null, "TeacherCurriculumPage.teacher")).data;
   if (!teacher) redirect("/login");
 
-  const [plans, groupsRaw] = await Promise.all([
-    getCurriculumPlansForTeacher(db, teacher.id).catch(() => []),
-    Promise.resolve(getTeacherGroups(db)).catch(() => []),
+  const [plansRes, groupsRes] = await Promise.all([
+    safeQuery(getCurriculumPlansForTeacher(db, teacher.id), [], "TeacherCurriculumPage.plans"),
+    safeQuery(Promise.resolve(getTeacherGroups(db)), [], "TeacherCurriculumPage.groups"),
   ]);
+  const plans = plansRes.data;
+  const groupsRaw = groupsRes.data;
 
   // Только группы, где этот учитель — куратор (groups.teacher_id), не
   // co-teacher/subject-teacher — та же граница, что RLS can_manage_curriculum_plan.
@@ -24,9 +27,10 @@ export default async function TeacherCurriculumPage() {
 
   const groupIds = groups.map((g) => g.id);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: subjectsRaw } = groupIds.length > 0
+  const { data: subjectsRaw, error: subjectsErr } = groupIds.length > 0
     ? await (db as any).from("subjects").select("id, name, group_id").in("group_id", groupIds).order("name")
-    : { data: [] };
+    : { data: [], error: null };
+  if (subjectsErr) console.error("[TeacherCurriculumPage.subjects] failed:", subjectsErr.message);
 
   return (
     <CurriculumPlansView

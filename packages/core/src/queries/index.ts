@@ -144,6 +144,7 @@ export const getGroupAttendance = async (
     .select("id, topic, starts_at")
     .eq("group_id", groupId)
     .order("starts_at", { ascending: true });
+  if (lessonsRes.error) console.error("[getGroupAttendance] lessons query failed:", lessonsRes.error.message);
 
   let lessons = (lessonsRes.data ?? []) as Array<{ id: string; topic: string | null; starts_at: string }>;
   if (month) lessons = lessons.filter((l) => l.starts_at.slice(0, 7) === month);
@@ -152,6 +153,7 @@ export const getGroupAttendance = async (
     .from("students")
     .select("id, full_name")
     .in("id", db2.from("student_groups").select("student_id").eq("group_id", groupId));
+  if (studentsRes.error) console.error("[getGroupAttendance] students query failed:", studentsRes.error.message);
 
   const students = (studentsRes.data ?? []) as Array<{ id: string; full_name: string }>;
 
@@ -164,6 +166,7 @@ export const getGroupAttendance = async (
     .from("attendance")
     .select("student_id, lesson_id, status")
     .in("lesson_id", lessonIds);
+  if (attRes.error) console.error("[getGroupAttendance] attendance query failed:", attRes.error.message);
 
   const matrix: Record<string, Record<string, AttendanceStatus | null>> = {};
   for (const s of students) {
@@ -853,6 +856,7 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
     .select("id, title, content_type, due_date")
     .eq("group_id", groupId)
     .order("due_date", { ascending: false });
+  if (hwRes.error) console.error("[getTeacherGradeMatrix] homework query failed:", hwRes.error.message);
   const homework = (hwRes.data ?? []) as GradeMatrixData["homework"];
   const hwIds = homework.map((h) => h.id);
   if (hwIds.length === 0) return { students, homework, fileSubs: [], testSubs: [] };
@@ -865,6 +869,8 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
       .select("id, homework_id, student_id, score, max_score, submitted_at")
       .in("homework_id", hwIds),
   ]);
+  if (fileRes.error) console.error("[getTeacherGradeMatrix] homework_submissions query failed:", fileRes.error.message);
+  if (testRes.error) console.error("[getTeacherGradeMatrix] test_submissions query failed:", testRes.error.message);
   return {
     students,
     homework,
@@ -882,6 +888,8 @@ export const getTeacherGradeStats = async (db: Db): Promise<{ totalGraded: numbe
     db.from("homework_submissions").select("grade").not("grade", "is", null),
     db.from("test_submissions").select("score, max_score").not("score", "is", null),
   ]);
+  if (fileRes.error) console.error("[getTeacherGradeStats] homework_submissions query failed:", fileRes.error.message);
+  if (testRes.error) console.error("[getTeacherGradeStats] test_submissions query failed:", testRes.error.message);
   const files = (fileRes.data ?? []) as Array<{ grade: number }>;
   const tests = (testRes.data ?? []) as Array<{ score: number; max_score: number | null }>;
 
@@ -1659,6 +1667,10 @@ export const getTeacherLessonView = async (
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;
+  const materialsTyped = materialsRes as { data: unknown[] | null; error: { message: string } | null };
+  const stagesTyped = stagesRes as { data: unknown[] | null; error: { message: string } | null };
+  if (materialsTyped.error) console.error("[getTeacherLessonView] lesson_materials query failed:", materialsTyped.error.message);
+  if (stagesTyped.error) console.error("[getTeacherLessonView] lesson_stages query failed:", stagesTyped.error.message);
   return {
     id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
     topic: lesson.topic, title: lesson.title, description: lesson.description,
@@ -1673,8 +1685,8 @@ export const getTeacherLessonView = async (
     subjectColor: ((subjectRes as { data: { color: string | null } | null }).data?.color) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
-    materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
-    stages: ((stagesRes as { data: unknown[] | null }).data ?? []) as LessonStage[],
+    materials: (materialsTyped.data ?? []) as LessonMaterial[],
+    stages: (stagesTyped.data ?? []) as LessonStage[],
   };
 };
 
@@ -1726,9 +1738,16 @@ export const getStudentLessonView = async (
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;
+  const materialsTyped = materialsRes as { data: unknown[] | null; error: { message: string } | null };
+  const stagesTyped = stagesRaw as { data: unknown[] | null; error: { message: string } | null };
+  if (materialsTyped.error) console.error("[getStudentLessonView] lesson_materials query failed:", materialsTyped.error.message);
+  // lesson_stages — самое важное здесь: сбой рендерится как "0 этапов",
+  // неотличимо от урока, где этапы правда ещё не созданы (тот же паттерн,
+  // что "Выходной"/пустые оценки).
+  if (stagesTyped.error) console.error("[getStudentLessonView] lesson_stages query failed:", stagesTyped.error.message);
 
   // Flatten progress array → single object | null per stage
-  const stagesWithProgress = ((stagesRaw as { data: unknown[] | null }).data ?? []).map((s) => {
+  const stagesWithProgress = (stagesTyped.data ?? []).map((s) => {
     const stage = s as Record<string, unknown>;
     const progressArr = (stage.progress as unknown[]) ?? [];
     return { ...stage, progress: progressArr.length > 0 ? progressArr[0] : null };
@@ -1748,7 +1767,7 @@ export const getStudentLessonView = async (
     subjectColor: ((subjectRes as { data: { color: string | null } | null }).data?.color) ?? null,
     group: groupData,
     teacher: (teacherRes.data as { id: string; full_name: string } | null),
-    materials: ((materialsRes as { data: unknown[] | null }).data ?? []) as LessonMaterial[],
+    materials: (materialsTyped.data ?? []) as LessonMaterial[],
     stages: stagesWithProgress as LessonStageWithProgress[],
   };
 };

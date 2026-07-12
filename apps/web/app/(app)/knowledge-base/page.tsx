@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMaterials, getAllBooks, getMyFavoriteBookIds, getBookSignedUrl } from "@snr/core";
+import { safeQuery } from "@/lib/safe-query";
 import { KnowledgeBaseView } from "./KnowledgeBaseView";
-
-async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
-  try { return await (p as Promise<T>); } catch { return fb; }
-}
 
 export default async function KnowledgeBasePage() {
   const supabase = await createClient();
@@ -19,11 +16,14 @@ export default async function KnowledgeBasePage() {
         .then((r) => (r.data as { id: string } | null)?.id ?? "")
     : "";
 
-  const [materials, books, favoriteIds] = await Promise.all([
-    safe(getMaterials(supabase), []),
-    safe(getAllBooks(supabase), []),
-    safe(getMyFavoriteBookIds(supabase), []),
+  const [materialsRes, booksRes, favoriteIdsRes] = await Promise.all([
+    safeQuery(getMaterials(supabase), [], "KnowledgeBasePage.materials"),
+    safeQuery(getAllBooks(supabase), [], "KnowledgeBasePage.books"),
+    safeQuery(getMyFavoriteBookIds(supabase), [], "KnowledgeBasePage.favoriteIds"),
   ]);
+  const materials = materialsRes.data;
+  const books = booksRes.data;
+  const favoriteIds = favoriteIdsRes.data;
 
   const coverUrls: Record<string, string> = {};
   await Promise.all(

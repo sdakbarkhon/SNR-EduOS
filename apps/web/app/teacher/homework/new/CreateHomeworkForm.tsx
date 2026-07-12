@@ -90,7 +90,10 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     setSubjectId("");
     getTeacherLessonsForGroup(supabase, groupId)
       .then(setLessonsForGroup)
-      .catch(() => setLessonsForGroup([]));
+      .catch((e) => {
+        console.error("[CreateHomeworkForm] getTeacherLessonsForGroup failed:", e?.message ?? e);
+        setLessonsForGroup([]);
+      });
   }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A previously-picked lesson may belong to a different subject than the

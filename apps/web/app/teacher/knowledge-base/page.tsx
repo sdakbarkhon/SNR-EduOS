@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMaterials, getTeacherGroups, getAllBooks, getBookSignedUrl } from "@snr/core";
+import { safeQuery } from "@/lib/safe-query";
 import { TeacherKnowledgeBaseView } from "./TeacherKnowledgeBaseView";
-
-async function safe<T>(p: PromiseLike<T>, fb: T): Promise<T> {
-  try { return await (p as Promise<T>); } catch { return fb; }
-}
 
 export default async function TeacherKnowledgeBasePage() {
   const supabase = await createClient();
@@ -19,11 +16,14 @@ export default async function TeacherKnowledgeBasePage() {
         .then((r) => (r.data as { id: string } | null)?.id ?? "")
     : "";
 
-  const [materials, groups, books] = await Promise.all([
-    safe(getMaterials(supabase), []),
-    safe(getTeacherGroups(supabase), []),
-    safe(getAllBooks(supabase), []),
+  const [materialsRes, groupsRes, booksRes] = await Promise.all([
+    safeQuery(getMaterials(supabase), [], "TeacherKnowledgeBasePage.materials"),
+    safeQuery(getTeacherGroups(supabase), [], "TeacherKnowledgeBasePage.groups"),
+    safeQuery(getAllBooks(supabase), [], "TeacherKnowledgeBasePage.books"),
   ]);
+  const materials = materialsRes.data;
+  const groups = groupsRes.data;
+  const books = booksRes.data;
 
   const coverUrls: Record<string, string> = {};
   await Promise.all(
