@@ -158,25 +158,23 @@ export function StudentSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 md:flex",
+        "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 pb-8 md:flex",
         "shadow-[0_8px_24px_rgba(93,80,150,0.05)] transition-[width] duration-200 ease-in-out",
-        // Промт 6.2: на планшете (md-lg, 768-1024) развёрнутый сайдбар w-80
-        // (320px) давил на контент — сужен до 210px, на lg+ (>=1024) ширина
-        // как была.
-        isCollapsed ? "w-16 px-2" : "w-[210px] px-3 lg:w-80 lg:px-4",
+        // Промт 6.2: развёрнутая ширина на планшете (md-lg, 768-1024) сужена
+        // с 320px до 210px — оставлено (верный фикс). Свёрнутая (иконки)
+        // ширина w-16 не менялась ни в 6.2, ни сейчас — уже совпадает с
+        // состоянием до 6.2.
+        // Промт 6.2.1: на md-диапазоне РАЗВЁРНУТЫЙ сайдбар теперь overlay
+        // (position:fixed, z-50) вместо push контента — карточки страницы
+        // раньше залезали поверх сайдбара, т.к. тот оставался обычным flex-
+        // элементом. На lg+ (>=1024) — снова обычный поток, как было.
+        isCollapsed
+          ? "w-16 px-2"
+          : "w-[210px] px-3 md:fixed md:inset-y-0 md:left-0 md:z-50 md:shadow-2xl lg:static lg:w-80 lg:px-4 lg:shadow-[0_8px_24px_rgba(93,80,150,0.05)]",
       )}
     >
       {/* Логотип + сворачивание */}
-      <div
-        className={cn(
-          "flex items-center",
-          isCollapsed ? "flex-col gap-2" : "justify-between",
-          // Часть блока order-* ниже: на md-lg "Мой уровень" переносится
-          // между шапкой и nav, чтобы не давить на нижний край и не вызывать
-          // вертикальный скролл сайдбара (см. карточку уровня внизу файла).
-          !isCollapsed && "md:order-1 lg:order-none",
-        )}
-      >
+      <div className={cn("flex items-center", isCollapsed ? "flex-col gap-2" : "justify-between")}>
         {isCollapsed ? (
           <span className="text-[11px] font-extrabold tracking-[3px] text-[#FF9A3D]">SNR</span>
         ) : (
@@ -193,12 +191,7 @@ export function StudentSidebar() {
       </div>
 
       {/* Пункты меню */}
-      <nav
-        className={cn(
-          "flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden",
-          !isCollapsed && "md:order-3 lg:order-none",
-        )}
-      >
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = !item.isStub && pathname.startsWith(item.href);
           const Icon = item.icon as LucideIcon;
@@ -260,14 +253,14 @@ export function StudentSidebar() {
         })}
       </nav>
 
-      {/* Карточка уровня — заглушка без БД. На md-lg (планшет) переносится
-          между шапкой и nav через order (см. выше) + mt-0, чтобы не давить
-          на нижний край развёрнутого сайдбара; на lg+ (десктоп) — как было. */}
+      {/* Карточка уровня — заглушка без БД. Промт 6.2.1: возвращена вниз
+          сайдбара (order-реорганизация из 6.2 откачена) — аside теперь
+          с pb-8 (32px) снизу, этого достаточно, чтобы карточка не давила
+          на край и не создавала скролл, без переноса блока наверх. */}
       <div
         className={cn(
           "relative mt-auto shrink-0 overflow-hidden rounded-2xl",
           "shadow-[0_12px_26px_rgba(120,90,240,0.14)]",
-          !isCollapsed && "md:order-2 md:mt-0 lg:order-none lg:mt-auto",
           isCollapsed ? "px-1.5 py-2.5 text-center" : "px-3 py-2.5",
         )}
         style={{ background: "linear-gradient(160deg,#EFEBFF 0%,#E5DBFF 100%)" }}
