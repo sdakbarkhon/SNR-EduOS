@@ -148,6 +148,13 @@ export function StudentSidebar() {
     });
   }
 
+  // Клик по backdrop (Промт 6.2.2, overlay-режим на планшете) — всегда
+  // закрывает, не тоггл.
+  function closeOverlay() {
+    setCollapsed(true);
+    try { localStorage.setItem(STORAGE_KEY, "true"); } catch { /* blocked */ }
+  }
+
   function onStubClick(e: MouseEvent) {
     e.preventDefault();
     showToast(d.auth.comingSoon);
@@ -156,23 +163,42 @@ export function StudentSidebar() {
   const isCollapsed = mounted && collapsed;
 
   return (
-    <aside
-      className={cn(
-        "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 pb-8 md:flex",
-        "shadow-[0_8px_24px_rgba(93,80,150,0.05)] transition-[width] duration-200 ease-in-out",
-        // Промт 6.2: развёрнутая ширина на планшете (md-lg, 768-1024) сужена
-        // с 320px до 210px — оставлено (верный фикс). Свёрнутая (иконки)
-        // ширина w-16 не менялась ни в 6.2, ни сейчас — уже совпадает с
-        // состоянием до 6.2.
-        // Промт 6.2.1: на md-диапазоне РАЗВЁРНУТЫЙ сайдбар теперь overlay
-        // (position:fixed, z-50) вместо push контента — карточки страницы
-        // раньше залезали поверх сайдбара, т.к. тот оставался обычным flex-
-        // элементом. На lg+ (>=1024) — снова обычный поток, как было.
-        isCollapsed
-          ? "w-16 px-2"
-          : "w-[210px] px-3 md:fixed md:inset-y-0 md:left-0 md:z-50 md:shadow-2xl lg:static lg:w-80 lg:px-4 lg:shadow-[0_8px_24px_rgba(93,80,150,0.05)]",
+    <>
+      {/* Промт 6.2.2 Часть 3 (вариант Б, mobile-drawer): полупрозрачный
+          backdrop за раскрытым overlay-сайдбаром на md-диапазоне (768-1024)
+          — клик по нему сворачивает сайдбар. На lg+ сайдбар не overlay
+          (static), backdrop не нужен и не рендерится (lg:hidden). Без
+          backdrop контент под overlay-сайдбаром был кликабелен и визуально
+          путался с самим сайдбаром — variant А (push-контент) не выбран,
+          т.к. сжатие контента при каждом раскрытии сайдбара на планшете
+          сильнее раздражает, чем оверлей с явным способом закрыть его. */}
+      {!isCollapsed && (
+        <div
+          onClick={closeOverlay}
+          aria-hidden="true"
+          className="fixed inset-0 z-[9998] hidden bg-black/40 backdrop-blur-[1px] transition-opacity md:block lg:hidden"
+        />
       )}
-    >
+      <aside
+        className={cn(
+          "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 pb-8 md:flex",
+          "shadow-[0_8px_24px_rgba(93,80,150,0.05)] transition-[width] duration-200 ease-in-out",
+          // Промт 6.2: развёрнутая ширина на планшете (md-lg, 768-1024) сужена
+          // с 320px до 210px — оставлено (верный фикс). Свёрнутая (иконки)
+          // ширина w-16 не менялась ни в 6.2, ни сейчас — уже совпадает с
+          // состоянием до 6.2.
+          // Промт 6.2.1: на md-диапазоне РАЗВЁРНУТЫЙ сайдбар — overlay
+          // (position:fixed) вместо push контента.
+          // Промт 6.2.2: z-50 поднят до z-[9999] — глобальные баннеры
+          // (DemoBanner z-[100], LessonStartBanner z-[9998]) рисовались
+          // поверх и закрывали логотип/кнопку сворачивания в шапке
+          // сайдбара; теперь сайдбар всегда выше любого баннера. На lg+
+          // (>=1024) — снова обычный поток (static), как было.
+          isCollapsed
+            ? "w-16 px-2"
+            : "w-[210px] px-3 md:fixed md:inset-y-0 md:left-0 md:z-[9999] md:shadow-2xl lg:static lg:w-80 lg:px-4 lg:shadow-[0_8px_24px_rgba(93,80,150,0.05)]",
+        )}
+      >
       {/* Логотип + сворачивание */}
       <div className={cn("flex items-center", isCollapsed ? "flex-col gap-2" : "justify-between")}>
         {isCollapsed ? (
@@ -283,6 +309,7 @@ export function StudentSidebar() {
           🧑‍🚀
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
