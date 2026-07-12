@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, FolderOpen, Check, ChevronRight, Clock,
@@ -33,7 +33,12 @@ export const NotificationsBell = memo(function NotificationsBell() {
   const d = getDictionary(locale as Locale);
   const t = d.notifications;
   const router = useRouter();
+  const pathname = usePathname();
   const db = createClient();
+  // Промт 7.1: bell — единый компонент для student/teacher layouts; хардкод
+  // /notifications вёл учителя на ученический роут. usePathname решает роль
+  // без пробрасывания prop через Topbar/TeacherTopbar.
+  const notificationsHref = pathname?.startsWith("/teacher") ? "/teacher/notifications" : "/notifications";
 
   const [uid, setUid] = useState<string | null>(null);
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -175,7 +180,7 @@ export const NotificationsBell = memo(function NotificationsBell() {
       {/* See all link */}
       <div className="border-t border-slate-100 dark:border-slate-700">
         <Link
-          href="/notifications"
+          href={notificationsHref}
           onClick={() => setOpen(false)}
           className="flex w-full items-center justify-center gap-1 py-2.5 text-[12px] font-semibold text-blue-600 hover:bg-slate-50 dark:text-blue-400 dark:hover:bg-slate-700/40"
         >
