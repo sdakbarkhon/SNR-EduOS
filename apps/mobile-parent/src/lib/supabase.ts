@@ -1,4 +1,3 @@
-import "react-native-url-polyfill/auto";
 import { createBaseClient, type Db } from "@snr/core";
 import { secureStorageAdapter } from "./secureStorageAdapter";
 
