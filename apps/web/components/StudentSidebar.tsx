@@ -160,11 +160,23 @@ export function StudentSidebar() {
       className={cn(
         "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 md:flex",
         "shadow-[0_8px_24px_rgba(93,80,150,0.05)] transition-[width] duration-200 ease-in-out",
-        isCollapsed ? "w-16 px-2" : "w-80 px-4",
+        // Промт 6.2: на планшете (md-lg, 768-1024) развёрнутый сайдбар w-80
+        // (320px) давил на контент — сужен до 210px, на lg+ (>=1024) ширина
+        // как была.
+        isCollapsed ? "w-16 px-2" : "w-[210px] px-3 lg:w-80 lg:px-4",
       )}
     >
       {/* Логотип + сворачивание */}
-      <div className={cn("flex items-center", isCollapsed ? "flex-col gap-2" : "justify-between")}>
+      <div
+        className={cn(
+          "flex items-center",
+          isCollapsed ? "flex-col gap-2" : "justify-between",
+          // Часть блока order-* ниже: на md-lg "Мой уровень" переносится
+          // между шапкой и nav, чтобы не давить на нижний край и не вызывать
+          // вертикальный скролл сайдбара (см. карточку уровня внизу файла).
+          !isCollapsed && "md:order-1 lg:order-none",
+        )}
+      >
         {isCollapsed ? (
           <span className="text-[11px] font-extrabold tracking-[3px] text-[#FF9A3D]">SNR</span>
         ) : (
@@ -181,7 +193,12 @@ export function StudentSidebar() {
       </div>
 
       {/* Пункты меню */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
+      <nav
+        className={cn(
+          "flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden",
+          !isCollapsed && "md:order-3 lg:order-none",
+        )}
+      >
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = !item.isStub && pathname.startsWith(item.href);
           const Icon = item.icon as LucideIcon;
@@ -243,11 +260,14 @@ export function StudentSidebar() {
         })}
       </nav>
 
-      {/* Карточка уровня — заглушка без БД */}
+      {/* Карточка уровня — заглушка без БД. На md-lg (планшет) переносится
+          между шапкой и nav через order (см. выше) + mt-0, чтобы не давить
+          на нижний край развёрнутого сайдбара; на lg+ (десктоп) — как было. */}
       <div
         className={cn(
           "relative mt-auto shrink-0 overflow-hidden rounded-2xl",
           "shadow-[0_12px_26px_rgba(120,90,240,0.14)]",
+          !isCollapsed && "md:order-2 md:mt-0 lg:order-none lg:mt-auto",
           isCollapsed ? "px-1.5 py-2.5 text-center" : "px-3 py-2.5",
         )}
         style={{ background: "linear-gradient(160deg,#EFEBFF 0%,#E5DBFF 100%)" }}

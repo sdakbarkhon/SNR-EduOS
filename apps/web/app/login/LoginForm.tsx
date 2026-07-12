@@ -117,13 +117,14 @@ export function LoginForm({ locale }: { locale: Locale }) {
     <div className="relative z-30 w-full max-w-md">
       <div
         className="relative overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 backdrop-blur-xl"
-        style={{ boxShadow: "0 20px 60px -15px rgba(0,0,0,0.15)", maxHeight: "calc(100vh - 8rem)" }}
+        style={{ boxShadow: "0 20px 60px -15px rgba(0,0,0,0.15)" }}
       >
         <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/30 blur-3xl" />
 
-        {/* Only scrolls internally, and only if the card genuinely doesn't
-            fit (very short viewports) — the page itself never scrolls. */}
-        <div className="overflow-y-auto p-6" style={{ maxHeight: "calc(100vh - 8rem)" }}>
+        {/* Промт 6.2: раньше carta была capped на calc(100vh-8rem) и обрезала
+            контент на планшете 768 — теперь высота card естественная,
+            скроллится вся страница (page.tsx: min-h-screen). */}
+        <div className="p-6">
           <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
             <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
           </div>

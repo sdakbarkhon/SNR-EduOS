@@ -18,15 +18,18 @@ export default function LoginPage() {
   const { locale } = useLocale();
 
   return (
-    <div className={`${montserrat.className} relative h-screen w-full overflow-hidden`}>
+    <div className={`${montserrat.className} relative min-h-screen w-full overflow-x-hidden`}>
       <BackgroundArt />
 
-      <div className="relative z-10 grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-2">
+      {/* min-h-screen (не h-screen) + без overflow-hidden — на планшете 768
+          карточка логина иногда выше 100vh; overflow-hidden на предке ещё и
+          обрезал fixed-позиционированный BottomBar (переключатель языка). */}
+      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
         <div className="hidden flex-col justify-center overflow-hidden px-16 py-12 lg:flex">
           <BrandingColumn locale={locale} />
         </div>
 
-        <div className="flex items-center justify-center overflow-hidden p-6 lg:p-12">
+        <div className="flex items-center justify-center p-6 pb-28 lg:p-12">
           <Suspense fallback={null}>
             <LoginForm locale={locale} />
           </Suspense>

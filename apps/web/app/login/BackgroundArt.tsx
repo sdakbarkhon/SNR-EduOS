@@ -5,7 +5,9 @@ import Image from "next/image";
 // design tool generated it under.
 export function BackgroundArt() {
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    // fixed (не absolute) — при min-h-screen (Промт 6.2) страница может быть
+    // выше 100vh, absolute тогда растягивал бы/обрезал фон по высоте контента.
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       <Image
         src="/login/hero-bg.jpg"
         alt=""
