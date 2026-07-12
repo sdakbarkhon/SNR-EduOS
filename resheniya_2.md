@@ -547,3 +547,57 @@ npx eas-cli update --branch preview --message "fix: iOS runtimeVersion format fo
 
 `npx tsc --noEmit` чисто в `packages/core` и `apps/web`; `npx next build` в `apps/web` — успешно, все 62 роута скомпилированы. Финальный `git status --short` чист (кроме преднамеренно нетронутых `apps/web/package.json`/`pnpm-lock.yaml`/`apps/web/generate-weekend.mjs` — не относящихся к этому промту, оставлены как есть по стоящему правилу сессии).
 
+---
+
+## Промт 7.1 — маршрут уведомлений учителя + admin-authorship объявлений — 2026-07-12
+
+### Часть 1. Роут "Все уведомления"
+
+Единственный виновник — общий компонент `apps/web/components/NotificationsBell.tsx` (рендерится и student `Topbar.tsx`, и `TeacherTopbar.tsx`), хардкодивший `<Link href="/notifications">` независимо от роли. Фикс: `usePathname()` → `pathname?.startsWith("/teacher") ? "/teacher/notifications" : "/notifications"`. Побочно найдено и закрыто: `apps/web/app/teacher/notifications/loading.tsx` отсутствовал (у student-версии был) — добавлен для паритета. Обратный случай (студент утекает на teacher-роут) грепом не нашёлся — единственная точка была эта.
+
+### Часть 2 — переоценка задачи "построить announcements"
+
+Трёхагентное расследование (Workflow) установило, что запрошенная в исходном Промте 7.1 фича (schema, RLS, teacher/student/admin UI, i18n) **уже существует end-to-end** в кодовой базе (миграция 34 и последующие) и подтверждена живьём как `teacher_karim`. Писать вторую параллельную миграцию/схему поверх работающей — гарантированный конфликт. Решение (согласовано с пользователем через AskUserQuestion): не строить заново, а (а) прогнать исходный 7-шаговый чек-лист по факту против уже рабочей системы, фиксируя расхождения без починки "в этом заходе", и (б) найти и закрыть единственный подтверждённый баг — admin-объявления падают на FK.
+
+### Часть 1 (чек-лист) — результаты живой проверки под teacher_karim/sherzod_10/parent_ismailov
+
+| # | Шаг | Результат |
+|---|---|---|
+| 1-3 | Учитель создаёт объявление (group-scope), видит его в списке | ✅ PASS |
+| 4 | Ученик группы видит объявление учителя | ✅ PASS |
+| 5-7 | student-scope создание, видимость у ученика, видимость у родителя | ⛔ НЕ ПРОЙДЕНО — заблокировано багом ниже, зафиксировано, НЕ чинилось в этом заходе |
+
+**Найденный, но не чинённый в этом заходе баг**: `/teacher/announcements` воспроизводимо зависает (20+ сек, никогда не резолвится) как только в системе есть ≥1 объявление — с нулём объявлений страница рендерится нормально ("Объявлений пока нет"). Подтверждено воспроизводимо в нескольких свежих вкладках через прямое чтение `document.body.innerText` (не артефакт таймаута скриншота — известная не связанная особенность окружения). Коррелирует с периодическими Vercel 503 на RSC prefetch этого и двух других роутов в то же окно тестирования. Вероятная причина: `getTeacherAnnouncements()` в `packages/core/src/queries/announcements.ts` делает последовательный `for`-цикл с одним `await`-запросом на `announcement_reads` count НА КАЖДУЮ строку объявления (N+1) — под конкурентной нагрузкой этой же сессии могло упереться в пул соединений. Билд задеплоенной версии подтверждённо чистый (только несвязанное предупреждение про переменные окружения в turbo.json) — это runtime, не build issue. **Не исправлено по explicit-инструкции пользователя** — отдельная задача на будущий промт.
+
+### Часть 2 — admin-authorship: диагноз и выбор
+
+**Точная причина**: `apps/web/app/admin/announcements/page.tsx` передавал `user?.id` (= `auth.uid()`) как `creatorId` в `AdminAnnouncementsView` → `createAnnouncement(db, {teacherId: creatorId, ...})` → INSERT `created_by = auth.uid()`. Но `announcements.created_by REFERENCES teachers(id)`, а `auth.uid()` и `teachers.id` — независимые UUID-пространства, INSERT падал на FK раньше, чем на RLS. `fn_announce_notify()`'s `is_admin_author`-проверка (`EXISTS(...admins.id = NEW.created_by)`) была мёртвым кодом по той же причине.
+
+**Выбран вариант Б** (из согласованных А/Б/В/Г) — отдельная nullable-колонка `admin_id uuid REFERENCES admins(id)` + CHECK "ровно один автор установлен", вместо (А) `created_by → auth.users(id)` (потребовало бы трогать уже рабочую teacher-ветку RLS/query-слоя — прямо запрещено пользователем) или (В) полиморфный text-based `created_by_kind`/`created_by_id` (лишняя абстракция для ровно двух типов автора). Обоснование зафиксировано непосредственно в миграции 121 (комментарий в шапке файла).
+
+**Миграция 121** (`supabase/migrations/121_announcements_admin_authorship.sql`): `admin_id` колонка + `announcements_author_check` CHECK, `current_admin_id()` (паттерн `current_teacher_id()`), 5 RLS-политик пересозданы с добавленной admin-веткой (teacher-логика везде побайтово сохранена), `fn_announce_notify()` — `is_admin_author` теперь реально достижим (`NEW.admin_id IS NOT NULL`), для admin-автора `scope='all_my_groups'` фанится на всю школу (не "группы автора" — у админа своих нет). При первом прогоне на hosted нашёлся и исправлен реальный синтаксис-баг ДО применения: `OR is_super_admin()` в политике "student reads announcements" стоял вне `USING(...)` — Postgres корректно отверг (`42601: syntax error at or near "OR"`); поправлено переносом внутрь скобок, повторный прогон прошёл чисто.
+
+Код: `packages/core/src/queries/announcements.ts` (`createAnnouncement` принимает опциональные `teacherId?`/`adminId?`, ровно один пишется), `packages/core/src/types.ts` + `database.types.ts` (поле `admin_id`, функция `current_admin_id`), `apps/web/app/admin/announcements/page.tsx` (резолвит реальный `admins.id` через `user_id = auth.uid()`) и `AdminAnnouncementsView.tsx` (проп `creatorId` → `adminId` по всей цепочке).
+
+### Коммиты
+
+| # | SHA | Заголовок | Vercel |
+|---|---|---|---|
+| 1 | `81da7b4` | fix(teacher-notifications): route "all notifications" to /teacher/notifications | ✅ READY (после промежуточного фикса `pnpm-lock.yaml`/package.json desync, см. ниже) |
+| 2 | `2e869aa` | fix(announcements): allow admin authorship (schema + RLS) | ✅ READY |
+
+Между коммитами 1 и 2 в цепочке был `ecabdbd` `fix(deps): sync pnpm-lock.yaml with committed apps/web/package.json` — самостоятельно найденная и закрытая регрессия (стрей `@google/generative-ai` запись в закоммиченном lockfile из более ранней сессии ломала `pnpm install --frozen-lockfile` на Vercel для ВСЕХ последующих деплоев); без него коммит 1 не смог бы задеплоиться.
+
+### Live-верификация admin-fix (admin/admin123, prod)
+
+Создано объявление ("Тест: объявление от админа (миграция 121)", scope=group, 10-А класс) через реальную UI-форму на `snr-edu-os-web.vercel.app/admin/announcements`. Прямая read-only проверка БД подтвердила:
+- Новая строка: `created_by: null, admin_id: "84cdf252-…"` — ровно один автор, CHECK удовлетворён.
+- Ранее существовавшая teacher-строка не тронута: `created_by` установлен, `admin_id: null`.
+- `fn_announce_notify()` отработал: 32 строки в `notifications` — ученики и родители группы (`kind=announcement`, `link=/announcements`) + куратор группы (`kind=announcement_new`, `link=/teacher/announcements`).
+
+Admin-объявления работают на prod end-to-end.
+
+### Verification
+
+`npx tsc --noEmit` чисто в `packages/core` и `apps/web` (дважды — до и после правок `database.types.ts`); `npx next build` в `apps/web` успешно. `git status --short` после коммита 2 чист, кроме преднамеренно нетронутых `apps/web/package.json`/`pnpm-lock.yaml`/`apps/web/generate-weekend.mjs` (незавершённая работа по weekend-генерации из более ранней сессии, вне рамок этого промта).
+
