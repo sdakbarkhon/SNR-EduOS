@@ -682,6 +682,7 @@ export type AnnouncementCategory = "general" | "academic" | "event" | "urgent" |
 export type Announcement = {
   id: string;
   created_by: string | null;
+  admin_id: string | null;    // migration 121 — exactly one of created_by/admin_id is set
   title: string;
   body: string;
   scope: AnnouncementScope;

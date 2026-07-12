@@ -8,6 +8,15 @@ export default async function AdminAnnouncementsPage() {
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
 
+  // Промт 7.1 Часть 2: creatorId раньше был user?.id (auth.uid()) напрямую —
+  // announcements.created_by/admin_id хотят admins.id, не auth.users.id
+  // (та же разница, что teachers.id vs auth.uid() для getMyTeacher).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: admin } = user
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? await (db as any).from("admins").select("id").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [announcementsRaw, groupsRaw] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,7 +40,7 @@ export default async function AdminAnnouncementsPage() {
 
   return (
     <AdminAnnouncementsView
-      creatorId={user?.id ?? ""}
+      adminId={admin?.id ?? ""}
       announcements={announcements}
       groups={groups}
     />

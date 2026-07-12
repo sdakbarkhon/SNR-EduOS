@@ -26,11 +26,11 @@ const CATEGORY_CFG: Record<AnnouncementCategory, { cls: string; Icon: typeof Meg
 };
 
 function CreateModal({
-  creatorId,
+  adminId,
   groups,
   onClose,
 }: {
-  creatorId: string;
+  adminId: string;
   groups: Array<{ id: string; name: string }>;
   onClose: () => void;
 }) {
@@ -56,7 +56,7 @@ function CreateModal({
     setSaving(true); setError("");
     try {
       await createAnnouncement(db, {
-        teacherId: creatorId,
+        adminId,
         scope,
         title: title.trim(),
         body: body.trim(),
@@ -157,11 +157,11 @@ function CreateModal({
 }
 
 export function AdminAnnouncementsView({
-  creatorId,
+  adminId,
   announcements: initial,
   groups,
 }: {
-  creatorId: string;
+  adminId: string;
   announcements: TeacherAnnouncement[];
   groups: Array<{ id: string; name: string }>;
 }) {
@@ -253,7 +253,7 @@ export function AdminAnnouncementsView({
       )}
 
       {formOpen && (
-        <CreateModal creatorId={creatorId} groups={groups} onClose={() => { setFormOpen(false); router.refresh(); }} />
+        <CreateModal adminId={adminId} groups={groups} onClose={() => { setFormOpen(false); router.refresh(); }} />
       )}
       <ConfirmModal
         open={!!deleteId}

@@ -223,6 +223,7 @@ export type Database = {
       }
       announcements: {
         Row: {
+          admin_id: string | null
           body: string
           category: Database["public"]["Enums"]["announcement_category"]
           created_at: string
@@ -239,6 +240,7 @@ export type Database = {
           valid_until: string | null
         }
         Insert: {
+          admin_id?: string | null
           body: string
           category?: Database["public"]["Enums"]["announcement_category"]
           created_at?: string
@@ -255,6 +257,7 @@ export type Database = {
           valid_until?: string | null
         }
         Update: {
+          admin_id?: string | null
           body?: string
           category?: Database["public"]["Enums"]["announcement_category"]
           created_at?: string
@@ -271,6 +274,13 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "announcements_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "announcements_created_by_fkey"
             columns: ["created_by"]
@@ -3605,6 +3615,7 @@ export type Database = {
       get_current_user_role: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
+      current_admin_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
       fn_ai_messages_today: { Args: { p_student_id: string }; Returns: number }
       fn_auto_end_lessons: { Args: never; Returns: undefined }

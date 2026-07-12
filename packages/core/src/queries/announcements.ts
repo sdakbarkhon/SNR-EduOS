@@ -7,11 +7,16 @@ import type {
   TeacherAnnouncement, StudentAnnouncement, AppNotification,
 } from "../types";
 
-// ── Teacher: announcements ──
+// ── Teacher / Admin: announcements ──
+// Промт 7.1 Часть 2: exactly one of teacherId/adminId must be set (matches
+// the announcements_author_check CHECK constraint, migration 121) — teacher
+// call sites pass only teacherId (unchanged), the admin call site passes
+// only adminId.
 export const createAnnouncement = async (
   db: Db,
   input: {
-    teacherId: string;
+    teacherId?: string | null;
+    adminId?: string | null;
     scope: AnnouncementScope;
     groupId?: string | null;
     targetStudentId?: string | null;
@@ -24,7 +29,8 @@ export const createAnnouncement = async (
   },
 ): Promise<string> => {
   const { data, error } = await (db as any).from("announcements").insert({
-    created_by: input.teacherId,
+    created_by: input.teacherId ?? null,
+    admin_id: input.adminId ?? null,
     scope: input.scope,
     group_id: input.scope === "group" ? input.groupId : null,
     target_student_id: input.scope === "student" ? input.targetStudentId : null,
