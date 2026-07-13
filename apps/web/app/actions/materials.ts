@@ -15,7 +15,7 @@ export async function deleteMaterial(
   // Fetch storage_path before deleting the DB row (RLS enforces teacher owns the group).
   const { data: material, error: fetchErr } = await supabase
     .from("course_materials")
-    .select("storage_path, uploaded_by")
+    .select("storage_path, uploaded_by, bucket")
     .eq("id", materialId)
     .maybeSingle();
 
@@ -28,10 +28,13 @@ export async function deleteMaterial(
     return { error: "not_found" };
   }
 
-  // Delete file from Storage first; non-blocking if file is missing.
-  if (material.storage_path) {
+  // Delete file from Storage first; non-blocking if file is missing. Skip for
+  // bucket="lesson-materials" (migration 124, auto-published on lesson
+  // completion) — that file is owned by the source lesson_materials row;
+  // deleting it here would break the material inside the lesson itself.
+  if (material.storage_path && material.bucket !== "lesson-materials") {
     const { error: storageErr } = await supabase.storage
-      .from("materials")
+      .from(material.bucket ?? "materials")
       .remove([material.storage_path]);
     if (storageErr) {
       console.error("[deleteMaterial] storage remove failed:", storageErr);
@@ -68,7 +71,7 @@ export async function getMaterialUrl(materialId: string): Promise<string | null>
   // RLS verifies access; maybeSingle returns null instead of erroring on 0 rows.
   const { data, error } = await supabase
     .from("course_materials")
-    .select("id, storage_path, link_url")
+    .select("id, storage_path, link_url, bucket")
     .eq("id", materialId)
     .maybeSingle();
 
@@ -88,7 +91,13 @@ export async function getMaterialUrl(materialId: string): Promise<string | null>
 
   try {
     // No downloadAs — opens inline in the viewer instead of forcing a download.
-    return await getMaterialDownloadUrl(supabase, data.storage_path as string);
+    // bucket (migration 124) defaults to "materials" for pre-existing rows.
+    return await getMaterialDownloadUrl(
+      supabase,
+      data.storage_path as string,
+      undefined,
+      (data.bucket as string) ?? "materials",
+    );
   } catch (e) {
     console.error("[getMaterialUrl] createSignedUrl failed for", data.storage_path, e);
     return null;

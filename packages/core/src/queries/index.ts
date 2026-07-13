@@ -394,14 +394,18 @@ export const getMaterials = (db: Db) =>
 
 /** Signed URL на 1 час. Без downloadAs открывается инлайн (просмотр в
  *  браузере); передайте downloadAs только если действительно нужно
- *  принудительное скачивание (Content-Disposition: attachment). */
+ *  принудительное скачивание (Content-Disposition: attachment).
+ *  bucket по умолчанию "materials" — миграция 124 добавила
+ *  course_materials.bucket для строк, автопубликованных из lesson_materials
+ *  (физически лежат в бакете "lesson-materials"), передавайте её сюда. */
 export const getMaterialDownloadUrl = (
   db: Db,
   storagePath: string,
   downloadAs?: string,
+  bucket: string = "materials",
 ) =>
   db.storage
-    .from("materials")
+    .from(bucket)
     .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined)
     .then(({ data, error }) => {
       if (error) throw error;

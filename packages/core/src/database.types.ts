@@ -1075,6 +1075,7 @@ export type Database = {
       }
       course_materials: {
         Row: {
+          bucket: string
           is_demo: boolean
           created_at: string
           description: string | null
@@ -1094,6 +1095,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          bucket?: string
           is_demo?: boolean
           created_at?: string
           description?: string | null
@@ -1113,6 +1115,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          bucket?: string
           is_demo?: boolean
           created_at?: string
           description?: string | null

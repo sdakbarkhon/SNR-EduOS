@@ -746,10 +746,14 @@ export type CourseMaterial = {
   description: string | null;
   subject: string | null;
   file_type: string | null;       // MIME type from Storage uploads
-  storage_path: string | null;    // path inside the 'materials' bucket
+  storage_path: string | null;    // path inside `bucket`
   file_size_bytes: number | null;
   uploaded_by: string | null;
   created_at: string;
+  // migration 124 — Storage-бакет для storage_path. 'materials' (default) —
+  // весь существующий контент; 'lesson-materials' — строки, автопубликованные
+  // из lesson_materials при завершении урока (файл принадлежит lesson_materials).
+  bucket: string;
 };
 
 export type MaterialWithGroup = CourseMaterial & {
