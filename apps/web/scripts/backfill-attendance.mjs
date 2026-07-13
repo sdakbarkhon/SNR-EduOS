@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Промт 7.3 Часть 2 (расширено Промтом 7.4) — посещаемость за уроки с
-// реальным содержанием в заданном диапазоне дат (см. комментарий в
-// backfill-grades.mjs про смену сигнала status='completed' → "есть
-// контент" для будущих дат).
+// Промт 7.3 Часть 2 (расширено Промтом 7.4, гейт исправлен хотфиксом после
+// 7.4) — посещаемость за уроки, которые РЕАЛЬНО прошли (status='completed'
+// AND ends_at<now), в заданном диапазоне дат. См. комментарий в
+// backfill-grades.mjs про баг гейта "есть контент" и его исправление.
 //
 // Промт 7.5: схема НЕ содержит статус 'late' (удалён миграцией 43,
 // подтверждено прямым SELECT на pg_constraint — живой CHECK допускает
@@ -29,6 +29,7 @@ async function main() {
   const fromDate = process.argv[2] ?? "2026-07-07";
   const toDate = process.argv[3] ?? "2026-07-25";
 
+  const nowIso = new Date().toISOString();
   const { data: allLessons, error: lessonsErr } = await db
     .from("lessons")
     .select("id, group_id, subject_id, starts_at")
@@ -37,10 +38,21 @@ async function main() {
     .order("starts_at", { ascending: true });
   if (lessonsErr) throw lessonsErr;
 
-  const { data: stageRows } = await db.from("lesson_stages").select("lesson_id").eq("stage_role", "middle");
-  const hasContent = new Set((stageRows ?? []).map((r) => r.lesson_id));
-  const lessons = allLessons.filter((l) => hasContent.has(l.id));
-  console.log(`Уроков в диапазоне ${fromDate}..${toDate} с контентом: ${lessons.length} (из ${allLessons.length} всего)`);
+  const { count: totalInRange } = await db
+    .from("lessons")
+    .select("id", { count: "exact", head: true })
+    .gte("starts_at", `${fromDate}T00:00:00+05:00`)
+    .lt("starts_at", `${toDate}T00:00:00+05:00`);
+  const { data: completedRows } = await db
+    .from("lessons")
+    .select("id")
+    .eq("status", "completed")
+    .lt("ends_at", nowIso)
+    .gte("starts_at", `${fromDate}T00:00:00+05:00`)
+    .lt("starts_at", `${toDate}T00:00:00+05:00`);
+  const isCompleted = new Set((completedRows ?? []).map((r) => r.id));
+  const lessons = allLessons.filter((l) => isCompleted.has(l.id));
+  console.log(`Уроков в диапазоне ${fromDate}..${toDate}, реально прошедших (completed AND ends_at<now): ${lessons.length} (из ${totalInRange ?? allLessons.length} всего)`);
 
   const subjectIds = [...new Set(lessons.map((l) => l.subject_id).filter(Boolean))];
   const { data: subjects } = await db.from("subjects").select("id, teacher_id").in("id", subjectIds);

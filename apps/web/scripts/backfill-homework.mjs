@@ -1,9 +1,17 @@
 #!/usr/bin/env node
-// Промт 7.3 Часть 3 — сдача и проверка домашних заданий.
+// Промт 7.3 Часть 3 (гейт исправлен хотфиксом после Промта 7.4) — сдача и
+// проверка домашних заданий.
 //
 // homework.lesson_id is NULL for all current rows (confirmed live) — ДЗ
 // не привязаны к уроку напрямую, только через group_id/due_date/created_at.
-// Все 22 текущих ДЗ созданы в окне 7-16 июля, поэтому берём их все.
+// Все текущие ДЗ созданы в прошлом, но due_date может быть далеко в
+// будущем (до конца августа) — этот скрипт никогда не был датно-гейтирован
+// (обрабатывает всё ДЗ безусловно), из-за чего randomTimeBetween(created_at,
+// due_date)/randomTimeBetween(due_date, due_date+3) мог выдать submitted_at/
+// graded_at ПОСЛЕ реального "сейчас" — баг, найденный после Промта 7.4.
+// Исправление: окно сдачи капается на now(); если окно ещё не наступило
+// (due_date/created_at в будущем) — сдачи для этого ДЗ на этот прогон не
+// генерируются (не "пропустил", а "ещё рано").
 //
 // Двухшаговое обновление при проверке ДЗ: триггер set_grading_meta()
 // (BEFORE UPDATE) сам ставит graded_at:=now() и graded_by:=current_teacher_id()
@@ -57,7 +65,9 @@ async function main() {
   }
 
   // ── Часть А: вставка submissions (сдал / не сдал по профилю) ──
+  const nowMs = Date.now();
   const submissionRows = [];
+  let skippedNotDueYet = 0;
   for (const hw of homeworks) {
     const dueDate = hw.due_date ?? addDaysIso(hw.created_at, 7);
     const studentIds = studentsByGroup.get(hw.group_id) ?? [];
@@ -67,9 +77,14 @@ async function main() {
       const outcome = weightedPick({ onTime: profile.onTime, late: profile.late, missed: profile.missed });
       if (outcome === "missed") continue;
 
-      const submittedAt = outcome === "onTime"
-        ? randomTimeBetween(hw.created_at, dueDate)
-        : randomTimeBetween(dueDate, addDaysIso(dueDate, 3));
+      const windowStart = outcome === "onTime" ? hw.created_at : dueDate;
+      const windowEnd = outcome === "onTime" ? dueDate : addDaysIso(dueDate, 3);
+      if (new Date(windowStart).getTime() > nowMs) {
+        skippedNotDueYet++; // окно сдачи ещё не наступило — рано генерировать
+        continue;
+      }
+      const cappedEnd = new Date(windowEnd).getTime() < nowMs ? windowEnd : new Date(nowMs).toISOString();
+      const submittedAt = randomTimeBetween(windowStart, cappedEnd);
 
       submissionRows.push({
         homework_id: hw.id,
@@ -85,7 +100,7 @@ async function main() {
       });
     }
   }
-  console.log(`Кандидатов на сдачу (submission): ${submissionRows.length}`);
+  console.log(`Кандидатов на сдачу (submission): ${submissionRows.length} (пропущено, окно ещё не наступило: ${skippedNotDueYet})`);
 
   const CHUNK = 500;
   let submittedCount = 0;
@@ -118,7 +133,9 @@ async function main() {
 
     const { data: subRow } = await db.from("homework_submissions").select("submitted_at").eq("id", row.id).single();
     if (!subRow) return;
-    const gradedAt = addMinutes(subRow.submitted_at, randomInt(60, 48 * 60));
+    const proposedGradedAt = addMinutes(subRow.submitted_at, randomInt(60, 48 * 60));
+    // Проверка не может случиться в будущем — капаем на "сейчас".
+    const gradedAt = new Date(proposedGradedAt).getTime() > Date.now() ? new Date().toISOString() : proposedGradedAt;
 
     // Шаг 1: триггер стамплит graded_at:=now(), graded_by:=NULL (ожидаемо).
     const { error: e1 } = await db.from("homework_submissions")

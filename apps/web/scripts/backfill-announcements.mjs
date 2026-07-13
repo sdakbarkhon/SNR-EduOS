@@ -13,6 +13,10 @@
 // - node backfill-announcements.mjs <fromDate> <toDate>: Промт 7.4 —
 //   раз в 2-3 дня новое объявление (чередуя школьное/классное) в
 //   пределах диапазона, ~6 за 12 дней.
+//
+// Гейт исправлен хотфиксом после Промта 7.4: дни строго после "сегодня"
+// (+05:00) не порождают объявление — раньше диапазон дат мог целиком
+// уходить в будущее, и created_at получал ещё не наступившую дату.
 import { makeServiceRoleClient, SCHOOL_ID, randomTimeBetween, pick, randomInt } from "./_backfill-shared.mjs";
 
 const db = makeServiceRoleClient();
@@ -41,8 +45,11 @@ function twoWeeksAgoIso() {
 function nowIso() {
   return new Date().toISOString();
 }
+function todayStr() { return new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10); }
 function randomTimeWithinDay(dateStr) {
-  return randomTimeBetween(`${dateStr}T00:00:00+05:00`, `${dateStr}T23:59:59+05:00`);
+  const today = todayStr();
+  const end = dateStr >= today ? nowIso() : `${dateStr}T23:59:59+05:00`;
+  return randomTimeBetween(`${dateStr}T00:00:00+05:00`, end);
 }
 function addDaysStr(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -78,12 +85,15 @@ async function runDailyCadence(fromDate, toDate) {
   const { count: beforeCount } = await db.from("announcements").select("id", { count: "exact", head: true });
   console.log(`announcements до подсыпки: ${beforeCount ?? "?"}`);
 
+  const today = todayStr();
   const rows = [];
   let day = fromDate;
   let sinceLastPost = 0;
   let nextThreshold = randomInt(2, 3);
   let alternateSchool = true;
+  let skippedFutureDays = 0;
   while (day < toDate) {
+    if (day > today) { skippedFutureDays++; day = addDaysStr(day, 1); continue; } // день ещё не наступил
     sinceLastPost++;
     if (sinceLastPost >= nextThreshold) {
       if (alternateSchool) {
@@ -105,7 +115,7 @@ async function runDailyCadence(fromDate, toDate) {
     day = addDaysStr(day, 1);
   }
 
-  console.log(`Кандидатов на вставку (раз в 2-3 дня, ${fromDate}..${toDate}): ${rows.length}`);
+  console.log(`Кандидатов на вставку (раз в 2-3 дня, ${fromDate}..${toDate}): ${rows.length} (пропущено будущих дней: ${skippedFutureDays})`);
   if (rows.length) {
     const { data: inserted, error } = await db.from("announcements").insert(rows).select("id");
     if (error) throw error;

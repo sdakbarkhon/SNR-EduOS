@@ -10,14 +10,24 @@
 //   НОВЫЕ сообщения (не гейтится на "уже что-то есть", это ожидаемо —
 //   после Промта 7.3 у всех тредов уже есть история) в случайную
 //   подвыборку тредов, с датой в пределах конкретного дня.
+//
+// Гейт исправлен хотфиксом после Промта 7.4: дни строго после "сегодня"
+// (по расписанию школы, +05:00) пропускаются целиком, а для "сегодня"
+// время сообщения капается на текущий момент — раньше диапазон дат мог
+// уходить в будущее целиком, и created_at получал дату, которая ещё не
+// наступила.
 import { makeServiceRoleClient, SCHOOL_ID, randomTimeBetween, pick, randomInt } from "./_backfill-shared.mjs";
 
 const db = makeServiceRoleClient();
 
 function twoWeeksAgoIso() { return new Date(Date.now() - 14 * 86400000).toISOString(); }
 function nowIso() { return new Date().toISOString(); }
+// Дата "сегодня" по расписанию школы (+05:00), а не по UTC-дате сервера.
+function todayStr() { return new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10); }
 function randomTimeWithinDay(dateStr) {
-  return randomTimeBetween(`${dateStr}T00:00:00+05:00`, `${dateStr}T23:59:59+05:00`);
+  const today = todayStr();
+  const end = dateStr >= today ? nowIso() : `${dateStr}T23:59:59+05:00`;
+  return randomTimeBetween(`${dateStr}T00:00:00+05:00`, end);
 }
 function addDaysStr(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -141,9 +151,12 @@ async function runDailyTrickle(fromDate, toDate) {
   const groupThreads = threads.filter((t) => t.kind === "group" && !(t.title ?? "").includes("Родители"));
   console.log(`direct-тредов: ${directThreads.length}, group-тредов (не родительских): ${groupThreads.length}`);
 
+  const today = todayStr();
   let totalInserted = 0;
+  let skippedFutureDays = 0;
   let day = fromDate;
   while (day < toDate) {
+    if (day > today) { skippedFutureDays++; day = addDaysStr(day, 1); continue; } // день ещё не наступил
     const rows = [];
 
     const dayDirect = sampleN(directThreads, randomInt(3, 5));
@@ -190,7 +203,7 @@ async function runDailyTrickle(fromDate, toDate) {
     day = addDaysStr(day, 1);
   }
 
-  console.log(`ИТОГО chat_messages вставлено (ежедневная подсыпка ${fromDate}..${toDate}): ${totalInserted}`);
+  console.log(`ИТОГО chat_messages вставлено (ежедневная подсыпка ${fromDate}..${toDate}): ${totalInserted} (пропущено будущих дней: ${skippedFutureDays})`);
 }
 
 async function fillEmptyThreads() {
