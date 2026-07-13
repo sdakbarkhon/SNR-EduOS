@@ -782,3 +782,78 @@ Admin-объявления работают на prod end-to-end.
 
 `npx tsc --noEmit` чисто, `npx next build` успешно (скрипты — обычный JS вне TS-компиляции приложения, не влияют). Живая браузерная проверка — по инструкции пользователя, чек-лист приведён в финальном отчёте, но не выполнялась Claude Code в рамках этого промта (аналогично Промту 7.3 — не запрошена явно).
 
+---
+
+## Хотфикс — будущие данные из бэкфилла Промта 7.4 (2026-07-13, перед Промтом 7.6)
+
+Пользователь поставил Промт 7.6 на паузу сразу после написания миграции 124 (до применения), обнаружив, что Промт 7.4's content-гейт ("есть middle-этапы") пропустил проверку "урок реально прошёл" — на 13 июля в БД стояли оценки/посещаемость на уроки со `status='in_progress'`, ДЗ сдано и проверено на даты вплоть до 30 июля, сообщения и объявления датированы будущими днями диапазона 13-24 июля.
+
+### Аудит (только SELECT)
+
+| Таблица | Критерий "будущее" | Найдено |
+|---|---|---|
+| lesson_grades | урок `status<>'completed' OR ends_at>now()` | 1767 (= весь объём Промта 7.4) |
+| attendance | то же | 1767 (= весь объём) |
+| homework_submissions | `submitted_at>now() OR graded_at>now()` | 386 (включает и часть до-7.4 строк — скрипт никогда не был дато-гейтирован) |
+| chat_messages | `created_at>now()` | 183 |
+| announcements | `created_at>now()` | 4 |
+| notifications | `created_at>now()` напрямую — 0; но через `source_id` на будущие grade/submission/announcement — 2413 |
+
+DB `now()` на момент аудита: `2026-07-13 05:53:22 UTC`.
+
+### Удаление (по одной таблице, каждая — отдельное подтверждение AskUserQuestion)
+
+Порядок: notifications (2413) → homework_submissions (386) → lesson_grades (1767) → attendance (1767) → chat_messages (183) → announcements (4). Итого удалено: **6520 строк**. Повторный аудит после — 0 по всем 7 проверкам (включая notifications через `source_id`).
+
+### Правки скриптов (`fix(scripts): gate backfill by lesson completion + current-time`, SHA `4913562`)
+
+- `backfill-grades.mjs` / `backfill-attendance.mjs`: гейт вернули на `status='completed' AND ends_at<now()` вместо "есть контент" — тот самый гейт, который Промт 7.4 сознательно заменил, оказался источником бага. `lessons.status` по-прежнему нигде не трогается вручную — `fn_auto_end_lessons` сам переводит уроки в `completed` естественным ходом времени, скрипт просто ждёт этого момента вместо того, чтобы забегать вперёд.
+- `backfill-homework.mjs`: впервые получил ограничение по времени — окно сдачи/проверки капается на `now()`; если due_date/created_at ещё не наступили, сдача для этого ДЗ на данный прогон просто не генерируется (не помечается "пропустил", остаётся в очереди на будущий прогон).
+- `backfill-chat-messages.mjs` / `backfill-announcements.mjs`: `runDailyTrickle`/`runDailyCadence` останавливаются на дне "сегодня" (+05:00), для самого "сегодня" время сообщения/объявления капается на `now()`.
+- `run-daily-backfill.mjs`: логика не менялась — гейт целиком внутри под-скриптов, поэтому `toDate` теперь можно смело передавать далеко вперёд (хоть до конца расписания) без риска будущих данных.
+
+### Возврат к Промту 7.6
+
+Код-правки миграции 124 (типы, `getMaterialDownloadUrl`, `materials.ts`), сделанные ДО паузы, остались нетронутыми и незакоммиченными — вошли в коммит Промта 7.6 после возобновления, как и договаривались.
+
+---
+
+## Промт 7.6 — автопубликация материалов урока в БЗ при завершении урока (2026-07-13)
+
+### Аудит (Часть 1) — реальная схема разошлась с планом в промте
+
+- `lesson_materials`: id, lesson_id, title, `file_storage_path` (не `storage_path`), file_size_bytes, file_original_name, uploaded_by, created_at, `visibility` (`'all'|'teacher_only'`), school_id, is_demo, from_knowledge_base, kb_bucket. **Нет колонки file_type** — MIME выводится по расширению в самой функции.
+- `course_materials`: id, group_id, **lesson_id** (уже есть! FK → lessons ON DELETE SET NULL, миграция 119), title, type, file_url, link_url, created_at, description, **subject** (свободный text, не subject_id FK), file_type, storage_path, file_size_bytes, uploaded_by, school_id, is_demo, stage_id. Отдельная колонка `source_lesson_id` из плана промта — **не нужна**, переиспользовали `lesson_id`.
+- **КРИТИЧНАЯ находка, не было в плане промта**: `lesson_materials` физически хранит файлы в Storage-бакете `"lesson-materials"`, но ВЕСЬ существующий код `course_materials` (в частности `getMaterialDownloadUrl`) жёстко резолвит бакет `"materials"`. Прямая вставка `storage_path` без учёта бакета сломала бы скачивание автопубликованных материалов (404 — файл ищется не в том бакете). Решение: добавили `course_materials.bucket` (`text NOT NULL DEFAULT 'materials'`, все существующие 112 строк не затронуты), `getMaterialDownloadUrl` получил опциональный 4-й параметр `bucket`, `materials.ts`'s `getMaterialUrl` и `deleteMaterial` его читают/пробрасывают. Заодно поймали связанный риск: `deleteMaterial` раньше безусловно удалял файл из Storage при удалении строки — для `bucket='lesson-materials'` строк это стёрло бы файл, которым всё ещё владеет исходная `lesson_materials`-запись внутри урока; добавили пропуск удаления файла для этого случая.
+- `lesson_materials.visibility='teacher_only'` — не публикуем в общую БЗ (следует из модели видимости, отдельно не оговаривалось в промте).
+- `fn_auto_end_lessons` (миграция 85): `SECURITY DEFINER`, тело — обычный `UPDATE ... SET status='completed'` без `session_replication_role`/`pg_trigger_depth`-обхода → **триггеры срабатывают штатно**, наш `AFTER UPDATE OF status` реагирует одинаково что от cron-автозавершения, что от ручного клика "Закончить урок".
+- RLS INSERT на `course_materials` требует `is_my_teacher_group(group_id) AND uploaded_by=current_teacher_id()` — не мешает, наша функция `SECURITY DEFINER` и обходит RLS целиком (запускается от владельца функции, а не от вызывающей сессии).
+- Побочная находка (не в скоупе 7.6, задокументирована и не тронута): фильтр по предмету в `MaterialsView.tsx`/`TeacherMaterialsView.tsx` использует `m.group.subject` — устаревшее единое поле группы (`groups.subject='programming'` у всех 3 групп, см. баг `d76b687` из более ранней сессии), а не собственный `course_materials.subject` каждой строки. Видимость материалов это не блокирует (базовая выборка скоупится только по `group_id`), ломает только сужение по предмету в выпадающем списке.
+
+### Миграция 124
+
+`fn_lesson_materials_to_kb(p_lesson_id)` (SECURITY DEFINER) + `fn_lesson_status_to_kb()` + `AFTER UPDATE OF status ON lessons` триггер `trg_lesson_completed_to_kb`. Фильтр публикации: `from_knowledge_base=false AND visibility='all' AND file_storage_path IS NOT NULL`. Дедуп — `NOT EXISTS` по `(group_id, storage_path)`. `subject` заполняется из `subjects.name` урока. Ретроспективно НЕ применяется — только будущие переходы в `completed`.
+
+### Тестовый прогон (Часть 3, на синтетическом тестовом уроке 10-А/Программирование с датой 2099 года)
+
+5 SELECT'ов:
+1. `course_materials` до завершения — 0 строк.
+2. `course_materials` после первого `UPDATE status='completed'` — 3 новые строки, `bucket='lesson-materials'`, `subject='Программирование'`, `file_type` верно по расширению (pdf/docx/png), `lesson_id`=тестовый урок.
+3. Дедуп-проверка (COUNT) — сначала буквальный повторный `UPDATE status='completed'` (не меняет `OLD.status`, триггер даже не вызывает функцию — защита на уровне `IF NEW.status='completed' AND OLD.status IS DISTINCT FROM 'completed'`), затем — более строгий тест: переключили статус на `in_progress` и обратно на `completed`, чтобы триггер РЕАЛЬНО вызвал функцию второй раз. Результат: `count(*)=3, count(DISTINCT storage_path)=3` — сработал `NOT EXISTS`-дедуп внутри самой функции, не только внешний guard триггера.
+4-5. `DELETE FROM lesson_materials` → `DELETE FROM lessons` (тестовый урок) — `course_materials` сохранил все 3 строки, `lesson_id` корректно упал в `NULL` (`ON DELETE SET NULL`), сам тестовый урок и его `lesson_materials` полностью исчезли (cascade). После подтверждения пользователя 3 тестовые строки `course_materials` удалены отдельным DELETE (тест оставлял их в реальной группе 10-А со ссылками на никогда не загруженные Storage-пути — не нужно оставлять в проде).
+
+### Часть 4 — /knowledge-base без изменений UI
+
+Подтверждено грепом: и `apps/web/app/(app)/knowledge-base/page.tsx`, и `apps/web/app/teacher/knowledge-base/page.tsx` уже вызывают `getMaterials(supabase)` — тот же запрос к `course_materials`, что и `/materials`, RLS-скоуп только по `group_id`. Автопубликованные материалы появятся без единой правки UI.
+
+### SQL COUNT: гейт на существующие завершённые уроки (Часть 5, ретроспективный запрет)
+
+Всего `status='completed'` уроков: **54**. Из них с `lesson_materials` (`from_knowledge_base=false AND visibility='all'`): **0** — ни один реальный учитель ещё не загружал файлы в блок "Материалы урока" (весь текущий контент — AI-сгенерированные презентации/квизы через отдельный путь `addAiPresentationToGroupMaterials`, не `lesson_materials`). Ретроспективный гейт триггера практического значения пока не имеет — просто нечего было бы backfill'ить, даже если бы миграция это делала.
+
+### Коммиты
+
+| # | Заголовок | SHA |
+|---|---|---|
+| 1 | `feat(db): auto-publish lesson materials to KB on lesson completion (migration 124)` | `da04b16` |
+| 2 | `docs: log Промт 7.6 (+ hotfix) decisions in resheniya_2.md` | — (эта запись) |
+
