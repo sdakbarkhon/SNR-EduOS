@@ -171,7 +171,7 @@ export function AttendanceView({
   const kpiCards = [
     { label: d.attendance.kpiTotal, value: allStats.total, color: "#6366f1" },
     { label: d.attendance.kpiPresent, value: allStats.present, color: "#22c55e", pct: allStats.percentage },
-    { label: d.attendance.kpiLate, value: allStats.excused, color: "#f59e0b" },
+    { label: d.attendance.kpiExcused, value: allStats.excused, color: "#f59e0b" },
     { label: d.attendance.kpiAbsent, value: allStats.unexcused, color: "#ef4444" },
   ];
 
@@ -285,7 +285,7 @@ export function AttendanceView({
             <div className="mb-4 flex flex-wrap gap-3">
               {[
                 { cls: "bg-emerald-200/60 border-emerald-300/60", label: d.attendance.calendarLegendPresent },
-                { cls: "bg-amber-200/60 border-amber-300/60", label: d.attendance.calendarLegendLate },
+                { cls: "bg-amber-200/60 border-amber-300/60", label: d.attendance.calendarLegendExcused },
                 { cls: "bg-rose-200/60 border-rose-300/60", label: d.attendance.calendarLegendAbsent },
               ].map((l) => (
                 <span key={l.label} className="flex items-center gap-1.5 text-[11px] text-gray-500">

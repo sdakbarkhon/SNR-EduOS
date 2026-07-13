@@ -699,3 +699,30 @@ Admin-объявления работают на prod end-to-end.
 
 Один коммит `chore(seed): backfill realistic school data (grades, attendance, homework, announcements, notifications, chat messages)` — 6 скриптов + shared-хелпер + миграция 123. SHA и Vercel READY — в финальном отчёте.
 
+---
+
+## Промт 7.5 — удаление статуса late из attendance — 2026-07-12
+
+### Посылка пользователя не совпала с реальным состоянием схемы
+
+Прямая проверка (`pg_constraint`, `information_schema.columns`, `pg_type`) показала: `attendance_status` как ENUM **не существует вообще** — тип был полностью удалён миграцией 27 (заменён на `status text` + CHECK) задолго до текущей серии промтов. `'late'` был временно возвращён в CHECK миграцией 42 и окончательно убран миграцией 43 — **на момент этого промта живой CHECK уже допускает только `'present'/'absent_excused'/'absent_unexcused'`**. `SELECT COUNT(*) FROM attendance WHERE status = 'late'` = 0 (ожидаемо — вставить `'late'` в живую БД уже физически невозможно, CHECK бы отверг). Grep всех функций/триггеров/RLS-политик на упоминание 'late' рядом с attendance — 0 совпадений.
+
+**Вывод: миграция 124 не нужна** — на уровне схемы делать нечего, писать миграцию без единого реального DDL-эффекта было бы созданием работы ради работы. Задокументировано здесь вместо создания пустого файла.
+
+### Где 'late' реально оставался — только в именах i18n-ключей, не в тексте
+
+`packages/core/src/types.ts`'s `AttendanceStatus` и `presenters/status.ts`'s `attendanceStatus()` уже были 3-значными — тоже почищено раньше текущей серии промтов. Единственные найденные следы — ТРИ i18n-ключа с "Late" в ИМЕНИ (не в отображаемом тексте — значения уже были "Уваж. причина"/"Excused"/"Sababli yo'q", т.е. переиспользованы под "уважительная причина" без переименования):
+- `attendance.kpiLate` — единственное использование: `apps/web/app/(app)/attendance/AttendanceView.tsx:174`, KPI-плитка "excused". Рядом уже существовал правильно названный, но НИГДЕ не используемый `kpiExcused` — репойнтил код на него, `kpiLate` удалён как ставший полностью мёртвым.
+- `attendance.calendarLegendLate` — единственное использование: та же страница, инлайн-легенда календаря (строка 288). Нового отдельного `calendarLegendExcused` ключа не было — добавлен (текст = старый текст `calendarLegendLate`, только имя ключа честное).
+- `attendance.teacherLegendLate` — **нигде не используется вообще** (весь `teacherLegend*`-блок из 4 ключей — мёртвый код, вероятно остаток нереализованной "матрицы посещаемости" учителя, которую заменил `AttendanceRollCall.tsx`). Удалён только сам `teacherLegendLate` — три соседних (`teacherLegendPresent/Absent/None`) оставлены нетронутыми: они не про 'late' и трогать их — уже другая задача (общая чистка мёртвого кода), не входящая в этот промт.
+
+### Важное ограничение: apps/mobile использует свой `legendLate` — НЕ трогать
+
+Отдельная от `calendarLegendLate` группа ключей `legend*` (`legendPresent/Absent/Late/Excused/Unexcused`) используется `apps/web/app/(app)/attendance/AttendanceCalendar.tsx` (отдельный, уже корректно 3-значный компонент — `legendPresent/legendExcused/legendUnexcused`, без late) **и** `apps/mobile/app/(tabs)/attendance.tsx` (`legendPresent/legendAbsent/legendLate`). Явное требование прикреплённого промта — "не трогать apps/mobile" — и удаление/переименование `legendLate` в общем пакете `packages/core/src/i18n/*` сломало бы TS-компиляцию мобильного приложения (excess/missing-property ошибка на `Dictionary`). **`legendLate` оставлен как есть** (ключ и его уже-не-"late"-текст) — это единственный сознательно НЕ убранный след слова "late" в кодовой базе, задокументированный здесь как обоснованное исключение, а не недосмотр.
+
+`AttendanceRollCall.tsx` (учительский roll-call) и `apps/web/app/parent/(protected)/child/[studentId]/attendance/AttendanceView.tsx` (родительский вид) проверены грепом — уже полностью чисты, изменений не потребовалось.
+
+### Коммит
+
+`refactor(attendance): remove late status entirely` — SHA и Vercel READY в финальном отчёте.
+

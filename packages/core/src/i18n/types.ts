@@ -214,14 +214,13 @@ export interface Dictionary {
     bySubjectTitle: string;
     empty: string;
     // new keys for redesigned UI
-    kpiLate: string;
     kpiAbsent: string;
     kpiPercentage: string;
     filterSubject: string;
     filterAllSubjects: string;
     filterMonth: string;
     calendarLegendPresent: string;
-    calendarLegendLate: string;
+    calendarLegendExcused: string;
     calendarLegendAbsent: string;
     calendarLegendNone: string;
     // teacher attendance
@@ -231,7 +230,6 @@ export interface Dictionary {
     teacherAvgPct: string;
     teacherMatrixEmpty: string;
     teacherLegendPresent: string;
-    teacherLegendLate: string;
     teacherLegendAbsent: string;
     teacherLegendNone: string;
   };
