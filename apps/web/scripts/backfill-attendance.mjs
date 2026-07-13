@@ -1,17 +1,20 @@
 #!/usr/bin/env node
-// Промт 7.3 Часть 2 — посещаемость за прошедшие уроки.
+// Промт 7.3 Часть 2 (расширено Промтом 7.4) — посещаемость за уроки с
+// реальным содержанием в заданном диапазоне дат (см. комментарий в
+// backfill-grades.mjs про смену сигнала status='completed' → "есть
+// контент" для будущих дат).
 //
-// Схема НЕ содержит статус 'late' (удалён миграцией 43, подтверждено
-// прямым SELECT на pg_constraint — живой CHECK допускает только
-// 'present'/'absent_excused'/'absent_unexcused', минут-опоздания колонки
-// тоже нет). "Опоздание" из ТЗ сворачиваем в 'present' (пользователь сам
-// пометил его как present=true) — 85%+8%=93% present, 5% absent_excused,
-// 2% absent_unexcused.
+// Промт 7.5: схема НЕ содержит статус 'late' (удалён миграцией 43,
+// подтверждено прямым SELECT на pg_constraint — живой CHECK допускает
+// только 'present'/'absent_excused'/'absent_unexcused'). Веса по Промту
+// 7.4: 90% present, 7% absent_excused, 3% absent_unexcused.
+//
+// node backfill-attendance.mjs [fromDate] [toDate]   (toDate — исключая)
 import { makeServiceRoleClient, SCHOOL_ID, REAL_STUDENT_USERNAMES } from "./_backfill-shared.mjs";
 
 const db = makeServiceRoleClient();
 
-const STATUS_WEIGHTS = { present: 0.93, absent_excused: 0.05, absent_unexcused: 0.02 };
+const STATUS_WEIGHTS = { present: 0.90, absent_excused: 0.07, absent_unexcused: 0.03 };
 function pickStatus() {
   const r = Math.random();
   let acc = 0;
@@ -23,13 +26,21 @@ function pickStatus() {
 }
 
 async function main() {
-  const { data: lessons, error: lessonsErr } = await db
+  const fromDate = process.argv[2] ?? "2026-07-07";
+  const toDate = process.argv[3] ?? "2026-07-25";
+
+  const { data: allLessons, error: lessonsErr } = await db
     .from("lessons")
     .select("id, group_id, subject_id, starts_at")
-    .eq("status", "completed")
+    .gte("starts_at", `${fromDate}T00:00:00+05:00`)
+    .lt("starts_at", `${toDate}T00:00:00+05:00`)
     .order("starts_at", { ascending: true });
   if (lessonsErr) throw lessonsErr;
-  console.log(`Прошедших уроков: ${lessons.length}`);
+
+  const { data: stageRows } = await db.from("lesson_stages").select("lesson_id").eq("stage_role", "middle");
+  const hasContent = new Set((stageRows ?? []).map((r) => r.lesson_id));
+  const lessons = allLessons.filter((l) => hasContent.has(l.id));
+  console.log(`Уроков в диапазоне ${fromDate}..${toDate} с контентом: ${lessons.length} (из ${allLessons.length} всего)`);
 
   const subjectIds = [...new Set(lessons.map((l) => l.subject_id).filter(Boolean))];
   const { data: subjects } = await db.from("subjects").select("id, teacher_id").in("id", subjectIds);
