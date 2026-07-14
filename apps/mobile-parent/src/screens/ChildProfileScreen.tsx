@@ -1,6 +1,7 @@
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { getStudentById } from "@snr/core";
 import { useAppLocale } from "../i18n";
@@ -18,7 +19,7 @@ function initials(name: string): string {
 
 export default function ChildProfileScreen() {
   const { d } = useAppLocale();
-  const nav = useNavigation();
+  const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "ChildProfile">>();
   const { childId } = route.params;
 
@@ -67,10 +68,24 @@ export default function ChildProfileScreen() {
               </View>
 
               {curator?.phone && (
-                <View style={{ backgroundColor: colors.card, borderRadius: radii.xl, paddingHorizontal: 14, ...shadow.soft }}>
+                <View style={{ backgroundColor: colors.card, borderRadius: radii.xl, paddingHorizontal: 14, marginBottom: 14, ...shadow.soft }}>
                   <Row label={d.parentUi.curatorPhoneLabel} value={curator.phone} last />
                 </View>
               )}
+
+              <Pressable
+                onPress={() => nav.navigate("AttendanceDetail", { childId })}
+                style={({ pressed }) => [{
+                  backgroundColor: colors.card, borderRadius: radii.xl, paddingHorizontal: 14, paddingVertical: 13,
+                  flexDirection: "row", alignItems: "center", gap: 11, opacity: pressed ? 0.85 : 1, ...shadow.soft,
+                }]}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.successBg, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 13.5, fontWeight: "700", color: colors.textPrimary }}>{d.parentUi.attendanceTitle}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+              </Pressable>
             </>
           )}
         </ScrollView>

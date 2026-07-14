@@ -548,6 +548,92 @@ export interface Dictionary {
     notParentExitBtn: string;
     filterAll: string;
     filterUnread: string;
+    // Промт МОБ-3 — детальные экраны (Успехи/Предмет/ДЗ/Посещаемость/Навыки).
+    switchChildBtn: string;
+    progAverageLabel: string;
+    progRatingExcellent: string;
+    progRatingGood: string;
+    progRatingAverage: string;
+    progRatingLow: string;
+    progWeekLabel: string;
+    progWeekUp: string;
+    progWeekDown: string;
+    progWeekFlat: string;
+    progAttendanceLabel: string;
+    progAttendedOfTotal: string; // "Присутствий: {a}/{b}"
+    progSkillsSectionTitle: string;
+    progSeeMore: string;
+    progSubjectsSectionTitle: string;
+    progReviewsSectionTitle: string;
+    progReviewsSeeAll: string;
+    progReviewsEmpty: string;
+    progAiSummaryTitle: string;
+    progAiSummaryMock: string; // TODO(ai-progress-summary)
+    progSubjectsEmpty: string;
+
+    subjTeacherLabel: string;
+    subjCurrentPerfLabel: string;
+    subjTopicsTitle: string;
+    subjTopicsEmpty: string;
+    subjLastWorkTitle: string;
+    subjLastWorkEmpty: string;
+    subjUpcomingTestTitle: string;
+    subjUpcomingTestEmpty: string;
+    subjUpcomingInDays: string; // "Через {n} дн."
+    subjTeacherCommentTitle: string;
+    subjTeacherCommentEmpty: string;
+    subjAiRecTitle: string;
+    subjAiRecMock: string; // TODO(ai-subject-recommendations)
+    subjGradesEmpty: string;
+
+    hwDetailTitle: string;
+    hwDetailDeadlineLabel: string;
+    hwDetailNoDeadline: string;
+    hwDetailInstructionsTitle: string;
+    hwDetailAttachmentsTitle: string;
+    hwDetailNoAttachments: string;
+    hwDetailOpenFileBtn: string;
+    hwDetailStatusTitle: string;
+    hwDetailStepAssigned: string;
+    hwDetailStepInProgress: string;
+    hwDetailStepSubmitted: string;
+    hwDetailStepReview: string;
+    hwDetailStepGraded: string;
+    hwDetailTeacherCommentEmpty: string;
+    hwDetailSubmitUpdatedBtn: string;
+    hwDetailSubmitMockNotice: string; // TODO(homework-file-upload)
+    hwDetailNotFound: string;
+
+    attDetailTitle: string;
+    attExcusedLabel: string;
+    attUnexcusedLabel: string;
+    attThisMonth: string;
+    attCalendarLegendPresent: string;
+    attCalendarLegendExcused: string;
+    attCalendarLegendUnexcused: string;
+    attCalendarLegendNone: string;
+    attRecentDaysTitle: string;
+    attRecentDaysEmpty: string;
+
+    skillsTitle: string;
+    skillsOverallIndexLabel: string;
+    skillsOverallRatingGreat: string;
+    skillsAiInsightTitle: string;
+    skillsAiInsightMock: string; // TODO(ai-skills-insight)
+    skillsActivitiesTitle: string;
+    skillLogic: string;
+    skillMath: string;
+    skillCommunication: string;
+    skillCreativity: string;
+    skillTeamwork: string;
+    skillSpeaking: string;
+    skillsActivity1Title: string;
+    skillsActivity1Desc: string;
+    skillsActivity2Title: string;
+    skillsActivity2Desc: string;
+
+    reviewsAllTitle: string;
+    reviewsAllEmpty: string;
   };
   homework: {
     title: string;

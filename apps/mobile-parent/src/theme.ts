@@ -35,6 +35,9 @@ export const gradients = {
   coral: [colors.accentCoral, "#FF9F6E"] as const,
   soft: ["#EFEAFF", "#E0F0FF"] as const,
   softGreen: ["#E9F9F1", "#E0F7FC"] as const,
+  // Промт МОБ-3 — hero-карточки детальных экранов из прототипа.
+  warmCard: [colors.accentCoral, "#FF8E63", "#FFB03A"] as const, // #10 средний балл
+  tealCard: ["#00B8D9", "#00CBB8", "#3ED598"] as const, // #11/#16 успеваемость/индекс развития
 };
 
 export const radii = {

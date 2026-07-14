@@ -243,7 +243,7 @@ export default function HomeScreen({ profile }: { profile: ParentProfile }) {
                   { label: d.parentMobile.quickActionSchedule, icon: "calendar-outline" as const, bg: "#EFEAFF", color: colors.primary, onPress: () => nav.navigate("Schedule") },
                   { label: d.parentMobile.quickActionHomework, icon: "document-text-outline" as const, bg: "#FFE9C0", color: colors.warning, onPress: () => nav.navigate("Homework") },
                   { label: d.parentMobile.quickActionGrades, icon: "trophy-outline" as const, bg: colors.successBg, color: colors.success, onPress: () => nav.getParent()?.navigate("Progress" as never) },
-                  { label: d.parentUi.attendanceTitle, icon: "checkmark-circle-outline" as const, bg: colors.dangerBg, color: colors.danger, onPress: () => child && nav.navigate("ChildProfile", { childId: child.id }) },
+                  { label: d.parentUi.attendanceTitle, icon: "checkmark-circle-outline" as const, bg: colors.dangerBg, color: colors.danger, onPress: () => child && nav.navigate("AttendanceDetail", { childId: child.id }) },
                   { label: d.parentMobile.quickActionPayments, icon: "card-outline" as const, bg: "#FFE9EE", color: colors.accentCoral, onPress: () => nav.getParent()?.navigate("Payments" as never) },
                   { label: d.parentMobile.quickActionMessages, icon: "chatbubbles-outline" as const, bg: "#F1EBFF", color: colors.primaryLight, onPress: () => nav.getParent()?.navigate("Messages" as never) },
                 ].map((qa) => (

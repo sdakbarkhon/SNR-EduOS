@@ -318,6 +318,264 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
   return hw;
 };
 
+// ── Промт МОБ-3 — детальные родительские экраны (Успехи/Предмет/ДЗ/
+// Посещаемость). Переиспользуют getStudentGroupIds/getHomeworkWithSubmissions/
+// getStudentAttendance выше, поэтому живут здесь, а не в parent.ts (там
+// циклическая зависимость с index.ts недопустима, см. комментарий в
+// parent.ts). Навыки (#16) — целиком mock в самом экране, для них таблицы
+// нет (см. TODO(child-skills-schema) в ProgressScreen/SkillsScreen). ──
+
+export type ChildAttendanceDay = { date: string; status: AttendanceStatus; markedAt: string | null };
+
+export type ChildAttendanceDetail = {
+  month: string;
+  stats: { total: number; present: number; excused: number; unexcused: number; percentage: number };
+  days: ChildAttendanceDay[];
+};
+
+/** Посещаемость ребёнка за месяц в форме, удобной для календарной сетки.
+ *  Без опозданий — статус 'late' убран в Промте 7.5, только present/
+ *  absent_excused/absent_unexcused. Строится поверх getStudentAttendance. */
+export const getChildAttendanceDetail = async (db: Db, studentId: string, month: string): Promise<ChildAttendanceDetail> => {
+  const { records, stats } = await getStudentAttendance(db, { month }, studentId);
+  const days: ChildAttendanceDay[] = records
+    .map((r) => ({ date: r.lesson_date.slice(0, 10), status: r.status, markedAt: r.marked_at }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return { month, stats, days };
+};
+
+export type ChildWeekActivity = { thisWeek: number; lastWeek: number; deltaPct: number | null };
+
+/** Число выставленных оценок за последние 7 дней vs предыдущие 7 — реальная
+ *  метрика "изменения активности" для карточки #10 (design: "Прогресс за
+ *  неделю", ↑12%), без придуманных чисел. deltaPct=null, если на прошлой
+ *  неделе не было ни одной оценки (не с чем сравнивать). */
+export const getChildWeekActivity = async (db: Db, studentId: string): Promise<ChildWeekActivity> => {
+  const now = Date.now();
+  const since14d = new Date(now - 14 * 86400000).toISOString();
+  const { data, error } = await db
+    .from("lesson_grades")
+    .select("graded_at")
+    .eq("student_id", studentId)
+    .gte("graded_at", since14d);
+  if (error) throw error;
+
+  const since7dIso = new Date(now - 7 * 86400000).toISOString();
+  const rows = (data ?? []) as Array<{ graded_at: string | null }>;
+  const thisWeek = rows.filter((r) => r.graded_at && r.graded_at >= since7dIso).length;
+  const lastWeek = rows.filter((r) => r.graded_at && r.graded_at < since7dIso).length;
+  const deltaPct = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : null;
+  return { thisWeek, lastWeek, deltaPct };
+};
+
+export type ChildSubjectTopic = { topic: string; average: number; count: number };
+
+export type ChildSubjectDetail = {
+  subjectId: string;
+  subjectName: string;
+  icon: string | null;
+  color: string | null;
+  teacherId: string | null;
+  teacherName: string | null;
+  teacherAvatarUrl: string | null;
+  average: number | null;
+  gradeCount: number;
+  topics: ChildSubjectTopic[];
+  lastGradedHomework: { id: string; title: string; grade: number | null; gradedAt: string | null } | null;
+  upcomingQuizLesson: { lessonId: string; title: string; startsAt: string } | null;
+  lastTeacherComment: { comment: string; gradedAt: string } | null;
+};
+
+/** Детали одного предмета для ребёнка: средний балл, "освоение тем" (по
+ *  lessons.topic реально пройденных уроков, НЕ по curriculum-плану),
+ *  последняя оценённая работа, ближайший урок с квиз-этапом (content_type=
+ *  'quiz_qia' — ближайший аналог "теста" в текущей схеме; lessons/lesson_stages
+ *  не имеют отдельного поля type, см. аудит), последний комментарий учителя. */
+export const getChildSubjectDetail = async (db: Db, studentId: string, subjectId: string): Promise<ChildSubjectDetail | null> => {
+  const { data: subject, error: subjErr } = await db
+    .from("subjects")
+    .select("id, name, icon, color, teacher_id")
+    .eq("id", subjectId)
+    .maybeSingle();
+  if (subjErr) throw subjErr;
+  if (!subject) return null;
+
+  let teacherName: string | null = null;
+  let teacherAvatarUrl: string | null = null;
+  if (subject.teacher_id) {
+    const { data: t, error: tErr } = await db.from("teachers").select("full_name, avatar_url").eq("id", subject.teacher_id).maybeSingle();
+    if (tErr) throw tErr;
+    teacherName = t?.full_name ?? null;
+    teacherAvatarUrl = t?.avatar_url ?? null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: gradeRows, error: gradesErr } = await (db as any)
+    .from("lesson_grades")
+    .select("grade, comment, graded_at, lesson:lessons!inner(topic, subject_id)")
+    .eq("student_id", studentId)
+    .eq("lesson.subject_id", subjectId)
+    .order("graded_at", { ascending: false });
+  if (gradesErr) throw gradesErr;
+
+  const rows = (gradeRows ?? []) as unknown as Array<{
+    grade: number; comment: string | null; graded_at: string | null;
+    lesson: { topic: string | null; subject_id: string } | null;
+  }>;
+
+  let sum = 0;
+  const topicMap = new Map<string, { sum: number; count: number }>();
+  for (const r of rows) {
+    sum += r.grade;
+    const topic = r.lesson?.topic;
+    if (topic) {
+      const cur = topicMap.get(topic) ?? { sum: 0, count: 0 };
+      cur.sum += r.grade;
+      cur.count += 1;
+      topicMap.set(topic, cur);
+    }
+  }
+  const average = rows.length > 0 ? sum / rows.length : null;
+  const topics = Array.from(topicMap.entries())
+    .map(([topic, v]) => ({ topic, average: v.sum / v.count, count: v.count }))
+    .sort((a, b) => b.average - a.average);
+  const lastCommentRow = rows.find((r) => r.comment && r.comment.trim().length > 0);
+
+  const hwList = await getHomeworkWithSubmissions(db, studentId);
+  const subjectHw = hwList
+    .filter((h) => h.subject_id === subjectId && (h.submission?.grade != null || h.test_submission?.grade != null))
+    .sort((a, b) => (b.submission?.submitted_at ?? "").localeCompare(a.submission?.submitted_at ?? ""));
+  const lastGradedHomework = subjectHw[0]
+    ? {
+        id: subjectHw[0].id,
+        title: subjectHw[0].title,
+        grade: subjectHw[0].submission?.grade ?? subjectHw[0].test_submission?.grade ?? null,
+        gradedAt: subjectHw[0].submission?.submitted_at ?? null,
+      }
+    : null;
+
+  const groupIds = await getStudentGroupIds(db, studentId);
+  let upcomingQuizLesson: ChildSubjectDetail["upcomingQuizLesson"] = null;
+  if (groupIds.length > 0) {
+    const nowIso = new Date().toISOString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: futureLessons, error: flErr } = await (db as any)
+      .from("lessons")
+      .select("id, title, topic, starts_at, lesson_stages(content_type)")
+      .eq("subject_id", subjectId)
+      .in("group_id", groupIds)
+      .gt("starts_at", nowIso)
+      .order("starts_at", { ascending: true })
+      .limit(10);
+    if (flErr) throw flErr;
+    const withQuiz = ((futureLessons ?? []) as unknown as Array<{
+      id: string; title: string | null; topic: string | null; starts_at: string;
+      lesson_stages: { content_type: string | null }[];
+    }>).find((l) => l.lesson_stages.some((s) => s.content_type === "quiz_qia"));
+    if (withQuiz) upcomingQuizLesson = { lessonId: withQuiz.id, title: withQuiz.title ?? withQuiz.topic ?? "", startsAt: withQuiz.starts_at };
+  }
+
+  return {
+    subjectId: subject.id,
+    subjectName: subject.name,
+    icon: subject.icon,
+    color: subject.color,
+    teacherId: subject.teacher_id,
+    teacherName,
+    teacherAvatarUrl,
+    average,
+    gradeCount: rows.length,
+    topics,
+    lastGradedHomework,
+    upcomingQuizLesson,
+    lastTeacherComment: lastCommentRow ? { comment: lastCommentRow.comment!, gradedAt: lastCommentRow.graded_at ?? "" } : null,
+  };
+};
+
+export type ChildHomeworkDetail = HomeworkWithSubmission & {
+  teacherName: string | null;
+  teacherAvatarUrl: string | null;
+};
+
+/** Одна домашка ребёнка с оценкой/сдачей, безопасно ограниченной ОДНИМ
+ *  ребёнком (переиспользует getHomeworkWithSubmissions вместо дублирования
+ *  её сложного select — тот же studentId-скоуп, что и на списке ДЗ). */
+export const getChildHomeworkDetail = async (db: Db, studentId: string, homeworkId: string): Promise<ChildHomeworkDetail | null> => {
+  const list = await getHomeworkWithSubmissions(db, studentId);
+  const hw = list.find((h) => h.id === homeworkId) ?? null;
+  if (!hw) return null;
+  let teacherName: string | null = null;
+  let teacherAvatarUrl: string | null = null;
+  if (hw.teacher_id) {
+    const { data: t, error: tErr } = await db.from("teachers").select("full_name, avatar_url").eq("id", hw.teacher_id).maybeSingle();
+    if (tErr) throw tErr;
+    teacherName = t?.full_name ?? null;
+    teacherAvatarUrl = t?.avatar_url ?? null;
+  }
+  return { ...hw, teacherName, teacherAvatarUrl };
+};
+
+export type ChildTeacherReview = {
+  id: string;
+  comment: string;
+  gradedAt: string;
+  grade: number;
+  subjectName: string | null;
+  subjectColor: string | null;
+  teacherName: string | null;
+};
+
+/** Последние текстовые отзывы учителей (lesson_grades.comment) по ребёнку.
+ *  opts.sinceDays сужает окно (используется на Успехах — "последние 2
+ *  недели"); без него — полный список для экрана "Все отзывы". */
+export const getChildTeacherReviews = async (
+  db: Db,
+  studentId: string,
+  opts?: { sinceDays?: number; limit?: number },
+): Promise<ChildTeacherReview[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (db as any)
+    .from("lesson_grades")
+    .select("id, grade, comment, graded_at, graded_by, lesson:lessons!inner(subject:subjects(name, color))")
+    .eq("student_id", studentId)
+    .not("comment", "is", null)
+    .neq("comment", "")
+    .order("graded_at", { ascending: false });
+
+  if (opts?.sinceDays) {
+    const since = new Date(Date.now() - opts.sinceDays * 86400000).toISOString();
+    query = query.gte("graded_at", since);
+  }
+  if (opts?.limit) {
+    query = query.limit(opts.limit);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as Array<{
+    id: string; grade: number; comment: string; graded_at: string; graded_by: string | null;
+    lesson: { subject: { name: string; color: string | null } | null } | null;
+  }>;
+
+  const teacherIds = Array.from(new Set(rows.map((r) => r.graded_by).filter((id): id is string => Boolean(id))));
+  const nameByTeacherId = new Map<string, string>();
+  if (teacherIds.length > 0) {
+    const { data: teacherRows, error: tErr } = await db.from("teachers").select("id, full_name").in("id", teacherIds);
+    if (tErr) throw tErr;
+    for (const t of (teacherRows ?? []) as Array<{ id: string; full_name: string }>) nameByTeacherId.set(t.id, t.full_name);
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    comment: r.comment,
+    gradedAt: r.graded_at,
+    grade: r.grade,
+    subjectName: r.lesson?.subject?.name ?? null,
+    subjectColor: r.lesson?.subject?.color ?? null,
+    teacherName: r.graded_by ? nameByTeacherId.get(r.graded_by) ?? null : null,
+  }));
+};
+
 /** Homework rows linked to a specific lesson (homework.lesson_id) — used on
  *  the completed-lesson review page so a student can jump straight to the
  *  assignment that came out of that lesson, if one was created. Returns []

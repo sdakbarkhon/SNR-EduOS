@@ -4,6 +4,11 @@ import ScheduleScreen from "../screens/ScheduleScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import ChildProfileScreen from "../screens/ChildProfileScreen";
 import HomeworkScreen from "../screens/HomeworkScreen";
+import HomeworkDetailScreen from "../screens/HomeworkDetailScreen";
+import SubjectDetailScreen from "../screens/SubjectDetailScreen";
+import SkillsScreen from "../screens/SkillsScreen";
+import AttendanceDetailScreen from "../screens/AttendanceDetailScreen";
+import TeacherReviewsScreen from "../screens/TeacherReviewsScreen";
 import { ParentDataProvider } from "../context/ParentDataContext";
 import type { ParentProfile } from "../lib/auth";
 
@@ -13,6 +18,14 @@ export type MainStackParamList = {
   Notifications: undefined;
   ChildProfile: { childId: string };
   Homework: undefined;
+  // Промт МОБ-3 — детальные экраны, все требуют явного childId (родитель
+  // мог переключить ребёнка между открытием и просмотром — не полагаемся
+  // на contextual selectedChildId внутри самих детальных экранов).
+  HomeworkDetail: { id: string; childId: string };
+  SubjectDetail: { subjectId: string; childId: string };
+  Skills: { childId: string };
+  AttendanceDetail: { childId: string };
+  TeacherReviews: { childId: string };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -37,6 +50,11 @@ export default function MainNavigator({
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="ChildProfile" component={ChildProfileScreen} />
         <Stack.Screen name="Homework" component={HomeworkScreen} />
+        <Stack.Screen name="HomeworkDetail" component={HomeworkDetailScreen} />
+        <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+        <Stack.Screen name="Skills" component={SkillsScreen} />
+        <Stack.Screen name="AttendanceDetail" component={AttendanceDetailScreen} />
+        <Stack.Screen name="TeacherReviews" component={TeacherReviewsScreen} />
       </Stack.Navigator>
     </ParentDataProvider>
   );

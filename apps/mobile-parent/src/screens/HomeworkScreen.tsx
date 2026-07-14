@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { getHomeworkWithSubmissions, type HomeworkWithSubmission } from "@snr/core";
 import { useAppLocale } from "../i18n";
@@ -10,6 +11,7 @@ import { useSelectedChild } from "../context/ParentDataContext";
 import { getSupabase } from "../lib/supabase";
 import { ScreenSkeleton, ErrorState, EmptyState } from "../components/ScreenState";
 import { colors, radii, shadow, spacing } from "../theme";
+import type { MainStackParamList } from "../navigation/MainNavigator";
 
 type Filter = "all" | "active" | "done";
 
@@ -24,7 +26,7 @@ function isOverdue(hw: HomeworkWithSubmission): boolean {
 
 export default function HomeworkScreen() {
   const { d } = useAppLocale();
-  const nav = useNavigation();
+  const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const child = useSelectedChild();
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -125,12 +127,14 @@ export default function HomeworkScreen() {
                     const statusColor = done_ ? colors.success : overdue ? colors.danger : colors.warning;
                     const statusBg = done_ ? colors.successBg : overdue ? colors.dangerBg : colors.warningBg;
                     return (
-                      <View
+                      <Pressable
                         key={h.id}
-                        style={{
+                        onPress={() => child && nav.navigate("HomeworkDetail", { id: h.id, childId: child.id })}
+                        style={({ pressed }) => [{
                           backgroundColor: colors.card, borderRadius: radii.lg, padding: 13,
                           flexDirection: "row", gap: 11, alignItems: "center", marginBottom: 9, ...shadow.soft,
-                        }}
+                          opacity: pressed ? 0.85 : 1,
+                        }]}
                       >
                         <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: (h.subjectColor ?? colors.primary) + "22", alignItems: "center", justifyContent: "center" }}>
                           <Ionicons name="document-text-outline" size={18} color={h.subjectColor ?? colors.primary} />
@@ -147,7 +151,7 @@ export default function HomeworkScreen() {
                         <Text style={{ fontSize: 10.5, fontWeight: "700", color: statusColor, backgroundColor: statusBg, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8 }}>
                           {statusLabel}
                         </Text>
-                      </View>
+                      </Pressable>
                     );
                   })}
                 </>
@@ -157,9 +161,10 @@ export default function HomeworkScreen() {
                 <>
                   <Text style={{ fontSize: 15, fontWeight: "800", color: colors.textPrimary, marginTop: 6, marginBottom: 10 }}>{d.parentMobile.hwRecentlyChecked}</Text>
                   {recentlyChecked.map((h) => (
-                    <View
+                    <Pressable
                       key={h.id}
-                      style={{ backgroundColor: colors.card, borderRadius: radii.lg, padding: 13, flexDirection: "row", gap: 11, alignItems: "center", marginBottom: 9, ...shadow.soft }}
+                      onPress={() => child && nav.navigate("HomeworkDetail", { id: h.id, childId: child.id })}
+                      style={({ pressed }) => [{ backgroundColor: colors.card, borderRadius: radii.lg, padding: 13, flexDirection: "row", gap: 11, alignItems: "center", marginBottom: 9, opacity: pressed ? 0.85 : 1, ...shadow.soft }]}
                     >
                       <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: (h.subjectColor ?? colors.primary) + "22", alignItems: "center", justifyContent: "center" }}>
                         <Ionicons name="document-text-outline" size={18} color={h.subjectColor ?? colors.primary} />
@@ -171,7 +176,7 @@ export default function HomeworkScreen() {
                       <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: "#EFEAFF", alignItems: "center", justifyContent: "center" }}>
                         <Text style={{ fontSize: 17, fontWeight: "800", color: colors.primary }}>{h.submission?.grade ?? h.test_submission?.grade ?? "—"}</Text>
                       </View>
-                    </View>
+                    </Pressable>
                   ))}
                 </>
               )}
