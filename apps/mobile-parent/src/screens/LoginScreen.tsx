@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -74,6 +76,10 @@ export default function LoginScreen({
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24, gap: 28 }}
           keyboardShouldPersistTaps="handled"
@@ -97,6 +103,10 @@ export default function LoginScreen({
                 onChangeText={setUsername}
                 autoCapitalize="none"
                 autoCorrect={false}
+                spellCheck={false}
+                autoComplete="username"
+                textContentType="username"
+                importantForAutofill="no"
                 placeholder={d.auth.usernamePlaceholder}
                 placeholderTextColor="#94A3B8"
                 style={{
@@ -119,6 +129,13 @@ export default function LoginScreen({
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  autoComplete="password"
+                  textContentType={Platform.OS === "ios" ? "password" : "none"}
+                  importantForAutofill="no"
+                  keyboardType={showPassword ? "visible-password" : "default"}
                   placeholder={d.auth.passwordPlaceholder}
                   placeholderTextColor="#94A3B8"
                   style={{
@@ -190,6 +207,15 @@ export default function LoginScreen({
             ))}
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
+        {/* Временный маркер версии билда — визуально подтвердить, что OTA-
+            апдейт долетел до устройства. Убрать после подтверждения. */}
+        <Text
+          style={{ position: "absolute", bottom: 8, right: 12, fontSize: 10, color: "#B0B7C3" }}
+          pointerEvents="none"
+        >
+          v1.6
+        </Text>
       </SafeAreaView>
     </View>
   );
