@@ -491,6 +491,7 @@ export interface Dictionary {
   parentMobile: {
     loginSubtitle: string;
     networkError: string;
+    configError: string;
     notParentError: string;
     notParentDbError: string;
     greeting: string;

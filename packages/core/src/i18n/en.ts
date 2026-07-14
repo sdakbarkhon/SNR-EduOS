@@ -495,6 +495,7 @@ export const en: Dictionary = {
   parentMobile: {
     loginSubtitle: "For parents",
     networkError: "Check your connection",
+    configError: "App configuration error. Please update the app or contact support.",
     notParentError: "This app is for parents only",
     notParentDbError: "This app is for parents only. Please use the web version.",
     greeting: "Hello, {name}!",

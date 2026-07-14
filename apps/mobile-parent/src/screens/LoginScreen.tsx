@@ -52,11 +52,18 @@ export default function LoginScreen({
       const profile = await loginAsParent(username, password);
       onLoggedIn(profile);
     } catch (e) {
+      // loginAsParent already console.error's the real underlying cause
+      // before rethrowing a short label — this switch only picks the UI
+      // copy, it never swallows the original error silently.
       if (e instanceof NotParentError) {
         setError(e.reason === "no_profile" ? d.parentMobile.notParentDbError : d.parentMobile.notParentError);
       } else if (e && typeof e === "object" && "status" in e) {
         setError(d.auth.invalid);
+      } else if (e instanceof Error && e.message === "config_error") {
+        console.error("[LoginScreen] login failed due to app configuration, not connectivity:", e.message);
+        setError(d.parentMobile.configError);
       } else {
+        console.error("[LoginScreen] login failed with an unrecognized error:", e);
         setError(d.parentMobile.networkError);
       }
     } finally {

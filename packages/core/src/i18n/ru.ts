@@ -495,6 +495,7 @@ export const ru: Dictionary = {
   parentMobile: {
     loginSubtitle: "Для родителей",
     networkError: "Проверьте соединение",
+    configError: "Ошибка конфигурации приложения. Обновите приложение или сообщите в поддержку.",
     notParentError: "Это приложение только для родителей",
     notParentDbError: "Это приложение только для родителей. Пожалуйста, используйте веб-версию.",
     greeting: "Здравствуйте, {name}!",

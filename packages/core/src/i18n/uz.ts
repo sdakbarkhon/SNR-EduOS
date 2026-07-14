@@ -495,6 +495,7 @@ export const uz: Dictionary = {
   parentMobile: {
     loginSubtitle: "Ota-onalar uchun",
     networkError: "Internet aloqasini tekshiring",
+    configError: "Ilova sozlamalarida xatolik. Ilovani yangilang yoki qo'llab-quvvatlash xizmatiga murojaat qiling.",
     notParentError: "Bu ilova faqat ota-onalar uchun",
     notParentDbError: "Bu ilova faqat ota-onalar uchun. Iltimos, veb-versiyadan foydalaning.",
     greeting: "Assalomu alaykum, {name}!",
