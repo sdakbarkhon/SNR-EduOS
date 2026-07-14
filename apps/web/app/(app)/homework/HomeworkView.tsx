@@ -79,6 +79,7 @@ export function HomeworkView({
   const [rows, setRows] = useState<HomeworkWithSubmission[]>(initialRows);
   const [now] = useState(() => new Date());
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>(initialSubject);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>("all");
@@ -100,19 +101,27 @@ export function HomeworkView({
     );
   }, [rows, subjectStyles]);
 
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(id);
+  }, [query]);
+
   const filtered = useMemo(() => {
     let items = rows;
     if (subjectFilter !== "all") items = items.filter((r) => subjectKeyOf(r) === subjectFilter);
     if (typeFilter !== "all") items = items.filter((r) => r.content_type === typeFilter);
     if (deadlineFilter !== "all") items = items.filter((r) => matchesDeadlineFilter(r, deadlineFilter));
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.trim().toLowerCase();
       items = items.filter(
-        (r) => r.title.toLowerCase().includes(q) || (r.description ?? "").toLowerCase().includes(q),
+        (r) =>
+          r.title.toLowerCase().includes(q) ||
+          (r.description ?? "").toLowerCase().includes(q) ||
+          subjectStyleOf(r).label.toLowerCase().includes(q),
       );
     }
     return items;
-  }, [rows, subjectFilter, typeFilter, deadlineFilter, query]);
+  }, [rows, subjectFilter, typeFilter, deadlineFilter, debouncedQuery]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -133,6 +142,7 @@ export function HomeworkView({
     setTypeFilter("all");
     setDeadlineFilter("all");
     setQuery("");
+    setDebouncedQuery("");
   }
 
   useEffect(() => {
