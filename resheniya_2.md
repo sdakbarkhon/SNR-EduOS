@@ -896,3 +896,76 @@ DB `now()` на момент аудита: `2026-07-13 05:53:22 UTC`.
 
 Один docs-коммит с этой записью — код/схема не менялись, отдельного `fix(db)`-коммита из плана промта нет.
 
+---
+
+## Промт 8.2 — переработка структуры родителей + 3 новых ученика (2026-07-14, миграция 125)
+
+### Часть 1 — аудит существующих parent-аккаунтов
+
+`public.parents`/`parent_students`/`parent_invites` (реальные имена таблиц — НЕ `parent_children`, как предполагали формулировки промта) на момент старта были **пусты** (0 строк каждая), в `auth.users` не нашлось ни одной parent-подобной записи (`parent_ismailov`/`parent_rakhimov`/`parent_karimov`/`parent_yusupov`/`parent_aliev`/`parent_nazarov` — 0 совпадений). Удалять было нечего. Отдельная находка: миграция `80_populate_real_classes_and_parents.sql` уже когда-то создавала ровно эти usernames (включая `rustam_03`/`farrukh_10`/`malika_07`), но с ДРУГИМ распределением по семьям — её данные стёрты более поздним полным сбросом БД, а сама миграция числится применённой (номер 80 занят, переиспользовать нельзя). Новая миграция получила номер **125**, с проверенным auth-шаблоном из миграции 80, но новой (по этому промту) структурой семей.
+
+### Часть 2 — переименование 3 существующих реальных учеников
+
+`sherzod_10`→Ismailov Sherzod, `nodira_07`→Rakhimova Nodira, `aziz_03`→Karimov Aziz — только `full_name`, `user_id`/`username`/пароли/учебные данные не тронуты (простой `UPDATE ... SET full_name`, кэш-полей upper/lower_name или отдельных поисковых индексов у `students` не существует — сверено со схемой).
+
+### Часть 3-4 — 3 новых ученика + 3 новых родителя
+
+Общий шаблон вставки — auth.users/auth.identities поле-в-поле (как в 80), `curator_id=teacher_karim` у всех 3 новых учеников (как у существующих реальных). Email из промта (`bakhtiyor.ismailov@example.uz` и т.п.) **нигде не хранятся** — у `public.parents` вообще нет колонки email, а `signInWithUsername` резолвит логин через синтетический домен `@parents.snr.local` (как и все остальные роли) — использование произвольного домена сломало бы вход. Явно отмечено в шапке миграции и в этом отчёте, не скрыто.
+
+`public.student_groups` INSERT на 3 новых учеников автоматически создал по **6 direct chat_threads** каждому (триггер `trg_student_group_added_direct_chats`, инфраструктура Промт 7.2) — подтверждено эмпирически, ручной `seed_direct_chats` не понадобился.
+
+`parent_students` заполнена JOIN'ом по `username`, а не только по временной таблице новых учеников — поэтому одним запросом покрыла и новых, и переименованных существующих детей.
+
+### Часть 5 — backfill учебных данных для 3 новых учеников
+
+`REAL_STUDENT_USERNAMES`/`GRADE_PROFILES`/`HOMEWORK_PROFILES` в `_backfill-shared.mjs` расширены (farrukh_10=профиль sherzod_10, rustam_03=профиль nodira_07, malika_07=профиль aziz_03 — зеркалирование по прямому указанию промта). Диапазон `2026-07-07..2026-07-14` (DB `now()` дошло до 14 июля в процессе сессии — соответствует формулировке промта "7 июля - вчера").
+
+Запуски (`backfill-grades.mjs`/`backfill-attendance.mjs` с диапазоном дат, `backfill-homework.mjs`/`backfill-chat-messages.mjs` без аргументов — последний намеренно в режиме `fillEmptyThreads()`, чтобы точечно закрыть именно 18 новых пустых direct-тредов, а не тронуть уже заполненные групповые):
+
+| Скрипт | Кандидатов | Вставлено | Примечание |
+|---|---|---|---|
+| backfill-grades | 2016 | 1961 | из них 1890 — демо-пул (те же 3 группы, ранее пропущенный диапазон дат — не новый баг, сторонний эффект расширения диапазона) |
+| backfill-attendance | 2016 | 1686 | итого 2016 после прогона |
+| backfill-homework | 567 | 551 (488 оценено) | 69 пропущено как "ещё не наступил срок" |
+| backfill-chat-messages (fillEmptyThreads) | — | 49 сообщений в 18 тредах | 0 групповых тредов тронуто |
+
+### Часть 6 — финальная проверка COUNT (SELECT, после всех операций)
+
+`students`=96 всего, `parents`=3, `parent_students`=6 (1+2+3, ровно как в спецификации). Все 6 реальных учеников: `grades=21, attendance=21` (старые 3 — БЕЗ ИЗМЕНЕНИЙ по сравнению с состоянием до этого промта, новые 3 — идентичное покрытие). `homework_submissions` естественно варьируется (4-8) по факту домашки в группе. `chat_participants`=7 у каждого (6 direct + 1 групповой) — соответствует требованию "6 direct chat_threads на нового ученика".
+
+Связи родитель→дети подтверждены: Ismailov Bakhtiyor→[Ismailov Sherzod], Rakhimov Odil→[Rakhimov Rustam, Rakhimova Nodira], Karimov Sardor→[Karimova Malika, Karimov Farrukh, Karimov Aziz].
+
+### Побочная находка и фикс: Vercel деплой был сломан ДО этого промта (не по его вине)
+
+Оба коммита промта (`fd3ec9b`, `9d9f3e7`) после пуша показали `failure` на Vercel. Расследование (`vercel inspect --logs`) вскрыло `ERR_PNPM_OUTDATED_LOCKFILE`: `pnpm-lock.yaml` содержал запись `@google/generative-ai`, которой нет в закоммиченном `apps/web/package.json` (эта зависимость — локальный, никогда не коммиченный черновик package.json для одноразового Gemini-скрипта `generate-weekend.mjs`). Рассинхрон УЖЕ существовал в коммите `020ead5` (МОБ-1, до этого промта) — тот коммит трогал общий монорепо-lockfile, пока в рабочем дереве стояла незакоммиченная правка package.json, и рассинхрон утёк в закоммиченный lockfile. `020ead5` сам сломал Vercel-деплой (подтверждено постфактум через `vercel ls` — реальная ошибка сборки за 11с), но это осталось незамеченным, потому что тогда проверялся только iOS OTA, а не веб-деплой. Это ТОЧНАЯ рекурренция уже однажды пофикшенного бага (`ecabdbd`, 12 июля).
+
+Ни один из двух коммитов промта 8.2 сам по себе не трогал `package.json`/`pnpm-lock.yaml` — оба упали, унаследовав уже сломанное состояние, а не из-за собственных изменений (одна — чистая SQL-миграция, другая — правка Node-скрипта вне сборки Next.js).
+
+Фикс — тем же проверенным способом: `package.json` временно отведён в stash (закоммиченное состояние без строки `@google/generative-ai`), `pnpm install` регенерировал lockfile, локальная правка `package.json` восстановлена обратно (сам файл сознательно остаётся незакоммиченным). Коммит `8ae224d`. Проверено:
+- `pnpm install --frozen-lockfile` в чистом git-worktree на новом HEAD — проходит (ранее падал за секунды).
+- Реальный live-домен (`eduos.snruz.uz` — алиас `snruz.uz` без поддомена ведёт на ПОСТОРОННИЙ, не-Vercel сайт на Google-инфраструктуре, обнаружено и не перепутано) отвечает 200 на `/login` и корректно редиректит с `/`.
+- Vercel помечает `8ae224d` как "success — Skipped, Not affected" (lockfile-only изменение не задело ни один app-воркспейс по мнению turbo-ignore) — это НЕ полноценная пересборка, поэтому фикс дополнительно верифицирован напрямую (frozen-lockfile install + прод-домен), а не только по зелёной галочке GitHub.
+- Функциональные изменения самого промта 8.2 (миграция 125, backfill) живут в Supabase — отдельном hosted-сервисе, не зависящем от Vercel-сборки веб-приложения; они уже были активны сразу после применения независимо от статуса Vercel.
+
+### Коммиты
+
+| # | Заголовок | SHA |
+|---|---|---|
+| 1 | `chore(users): rebuild parents and add 3 students (Ismailov, Rakhimov, Karimov families)` | `fd3ec9b` |
+| 2 | `chore(seed): backfill learning data for new students` | `9d9f3e7` |
+| 3 | `fix(deps): re-sync pnpm-lock.yaml with committed apps/web/package.json` | `8ae224d` |
+
+### Созданные аккаунты
+
+**Ученики** (пароль `student2026`): `rustam_03` (Rakhimov Rustam, 3-А), `farrukh_10` (Karimov Farrukh, 10-А), `malika_07` (Karimova Malika, 7-А).
+**Родители** (пароль `parent2026`): `parent_ismailov` (Ismailov Bakhtiyor), `parent_rakhimov` (Rakhimov Odil), `parent_karimov` (Karimov Sardor).
+
+### ЧТО ПРОВЕРИТЬ ВРУЧНУЮ
+
+- Веб под `parent_ismailov` — видит 1 ребёнка (Ismailov Sherzod), без переключателя.
+- Веб под `parent_rakhimov` — видит 2 детей (Rakhimova Nodira, Rakhimov Rustam) с переключателем.
+- Веб под `parent_karimov` — видит 3 детей (Karimov Aziz, Karimov Farrukh, Karimova Malika) с переключателем.
+- `rustam_03`/`farrukh_10`/`malika_07` — логин, видят собственное расписание/оценки/чаты (не чужие).
+- `teacher_karim` — теперь курирует по 2 ученика в каждом из 3 классов.
+- `teacher_prog` (и другие предметные учителя) — видят новых учеников в списках чатов.
+
