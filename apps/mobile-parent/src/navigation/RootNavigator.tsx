@@ -1,18 +1,18 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import LoginScreen from "../screens/LoginScreen";
-import DashboardScreen from "../screens/DashboardScreen";
+import MainNavigator from "./MainNavigator";
 import type { ParentProfile } from "../lib/auth";
 
 type RootStackParamList = {
   Login: undefined;
-  Dashboard: { profile: ParentProfile };
+  Main: { profile: ParentProfile };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-/** Стек Login → Dashboard. Оба экрана рисуют собственный header/topbar,
- *  поэтому нативный header навигатора всегда скрыт. */
+/** Стек Login → Main (табы + стек-экраны внутри). Оба верхнеуровневых
+ *  экрана рисуют собственный header/topbar, нативный header скрыт. */
 export default function RootNavigator({
   initialProfile,
 }: {
@@ -21,22 +21,22 @@ export default function RootNavigator({
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName={initialProfile ? "Dashboard" : "Login"}
+        initialRouteName={initialProfile ? "Main" : "Login"}
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="Login">
           {({ navigation }) => (
             <LoginScreen
-              onLoggedIn={(profile) => navigation.replace("Dashboard", { profile })}
+              onLoggedIn={(profile) => navigation.replace("Main", { profile })}
             />
           )}
         </Stack.Screen>
         <Stack.Screen
-          name="Dashboard"
+          name="Main"
           initialParams={initialProfile ? { profile: initialProfile } : undefined}
         >
           {({ navigation, route }) => (
-            <DashboardScreen
+            <MainNavigator
               profile={route.params.profile}
               onLoggedOut={() => navigation.replace("Login")}
             />

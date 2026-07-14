@@ -496,6 +496,58 @@ export interface Dictionary {
     greeting: string;
     myChildren: string;
     comingSoonSection: string;
+    // Промт МОБ-1 — 7 экранов (Главная/Успехи/ДЗ/Расписание/Уведомления/Сообщения/Профиль)
+    tabProgress: string;
+    homeSubtitle: string; // "Вот что происходит у {name} сегодня"
+    childClassLabel: string; // "{n} класс" fallback когда группы нет
+    statArrival: string;
+    statLessons: string;
+    statAttended: string;
+    statNextLesson: string;
+    childStatusAtSchool: string;
+    childStatusHome: string;
+    balanceMealTitle: string; // TODO(payments)
+    balanceAccountTitle: string; // TODO(payments)
+    sumCurrency: string;
+    insightTitle: string; // TODO(ai-insight)
+    insightBadgeNew: string;
+    insightMockBody: string; // TODO(ai-insight)
+    insightBtnProgress: string;
+    insightBtnMessageTeacher: string;
+    quickActionsTitle: string;
+    quickActionSchedule: string;
+    quickActionHomework: string;
+    quickActionGrades: string;
+    quickActionAttendance: string;
+    quickActionPayments: string;
+    quickActionMessages: string;
+    strengthsTitle: string;
+    growthAreasTitle: string;
+    gradesEmpty: string;
+    hwStatsTotal: string;
+    hwStatsDone: string;
+    hwStatsLeft: string;
+    hwTabAll: string;
+    hwTabActive: string;
+    hwTabDone: string;
+    hwActiveTitle: string;
+    hwRecentlyChecked: string;
+    scheduleSummary: string; // "{n} уроков сегодня"
+    scheduleEmptyDay: string;
+    scheduleBreak: string;
+    messagesEmptyTitle: string;
+    messagesEmptyDescription: string;
+    profileChildren: string;
+    profileAddChild: string;
+    profileSettings: string;
+    profileNotifRow: string;
+    profileLanguageRow: string;
+    profileVersion: string; // "SNR EduOS · версия {v}"
+    childIdMock: string; // TODO(child-id-format)
+    errorGeneric: string;
+    notParentExitBtn: string;
+    filterAll: string;
+    filterUnread: string;
   };
   homework: {
     title: string;
