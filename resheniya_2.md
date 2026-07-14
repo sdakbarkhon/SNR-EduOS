@@ -969,3 +969,67 @@ DB `now()` на момент аудита: `2026-07-13 05:53:22 UTC`.
 - `teacher_karim` — теперь курирует по 2 ученика в каждом из 3 классов.
 - `teacher_prog` (и другие предметные учителя) — видят новых учеников в списках чатов.
 
+## Диагностика: жалоба «rustam_03/farrukh_10/malika_07 не видны в UI родителя/учителя» (2026-07-15)
+
+**Гипотеза пользователя не подтвердилась.** Запрошено проверить `students.school_id`/`is_active`/`is_deleted`
+для 3 «сломанных» vs 3 «рабочих» учеников. Колонок `is_active` и `is_deleted` в `students` **не существует
+вообще** — реальное поле называется `status` (enum `student_status`, `DEFAULT 'active'`), и оно уже
+корректно дефолтится. Значит пункт «б» исходного промта (миграция с DEFAULT для `is_active`/`is_deleted`)
+неприменим к текущей схеме — эти колонки никогда не создавались.
+
+### Что проверено (read-only, через Management API, `postgres`-роль)
+
+Все 6 учеников (`sherzod_10`, `nodira_07`, `aziz_03`, `rustam_03`, `farrukh_10`, `malika_07`) дают
+**идентичный, консистентный результат** по каждой из проверок:
+
+| Проверка | Результат |
+|---|---|
+| `students.school_id` | у всех 6 одинаковый `a0a0a0a0-0000-0000-0000-000000000001` |
+| `students.status` | у всех 6 `active` |
+| `students.user_id` → `auth.users` | у всех 6 есть, `email_confirmed_at` заполнен, `banned_until`/`deleted_at` пустые |
+| `student_groups` (группа) | у всех 6 есть строка, `group.school_id` совпадает со `students.school_id` |
+| `parent_students` (связь с родителем) | ровно 1/2/3 на `parent_ismailov`/`parent_rakhimov`/`parent_karimov`, как и требовалось |
+| Академические данные | `attendance`≈24, `lesson_grades`≈21, `homework_submissions` 4-8 — у всех 6 сопоставимые числа, ни у кого не 0 |
+| RLS-политики и функции (`is_my_child`, `is_my_teacher_group`, `current_school_id`, `fn_is_admin`) | логика группо-/связко-ориентированная, не username-specific — не может давать разный результат при идентичных исходных данных |
+| Код (`admin/students/page.tsx`, `admin/parents/page.tsx`, `packages/core/src/queries/parent.ts::getParentContext`) | полностью data-driven, без хардкода имён/лимитов/пагинации; `grep` по репо на все 6 username'ов — 0 совпадений в коде |
+| Кэширование (`lib/supabase/server.ts`, `lib/cached-queries.ts`) | только React `cache()` per-request дедуп (не персистентный HTTP-кэш); страницы используют `cookies()` → принудительно динамические, ISR/fetch-кэш не участвует |
+
+Единственное найденное отличие — `auth.users.raw_user_meta_data` у 3 старых учеников (`sherzod_10` и др.)
+пустой `{}`, у 3 новых — `{"username": "...", "email_verified": true}`. Это чисто косметическая разница из
+способа создания (старые вставлены по шаблону миграции 80/97, новые — по миграции 125), она не используется
+нигде в коде для входа/видимости (`signInWithUsername` резолвит email по детерминированному домену
+`@students.snr.local`, не через metadata) — не является причиной жалобы.
+
+**Вывод**: на уровне БД и кода сейчас нет никакого расхождения между «рабочими» и «сломанными» учениками —
+это в точности совпадает с финальной проверкой COUNT из Промт 8.2 выше (`parent_students=6 (1+2+3)`,
+family-связки подтверждены). Наиболее вероятное объяснение — жалоба основана на живой проверке, сделанной
+**до** завершения бэкофилла/миграции 125 в этой же сессии (пункт «ЧТО ПРОВЕРИТЬ ВРУЧНУЮ» выше оставался не
+отмечен как пройденный), либо это была разовая проблема кэша браузера/сессии на стороне клиента, которая
+read-only diagnostics с сервера в принципе не могут увидеть.
+
+### SQL для правки — НЕ ТРЕБУЕТСЯ
+
+Формальных расхождений не найдено, поэтому корректирующий `UPDATE` не нужен. Если после живой проверки
+(п. ниже) баг всё же подтвердится — сначала нужно точно указать, в каком именно экране/компоненте ученик не
+появляется (это сузит причину до конкретного запроса/RLS-политики, не покрытой этим списком).
+
+### Проверочный SQL (тот же, что уже прогнан выше — для повторной проверки после вашей живой проверки)
+
+```sql
+SELECT s.username, s.full_name, s.school_id, s.status, s.user_id,
+       sg.group_id, g.name AS group_name,
+       (SELECT count(*) FROM attendance a WHERE a.student_id = s.id) AS attendance_count,
+       (SELECT count(*) FROM lesson_grades lg WHERE lg.student_id = s.id) AS grades_count,
+       (SELECT count(*) FROM homework_submissions hs WHERE hs.student_id = s.id) AS hw_sub_count,
+       (SELECT count(*) FROM parent_students ps WHERE ps.student_id = s.id) AS parent_links_count
+FROM students s
+LEFT JOIN student_groups sg ON sg.student_id = s.id
+LEFT JOIN groups g ON g.id = sg.group_id
+WHERE s.username IN ('sherzod_10','nodira_07','aziz_03','rustam_03','farrukh_10','malika_07')
+ORDER BY s.username;
+```
+
+**Обещание**: после вашей живой проверки под `parent_karimov`/`parent_rakhimov`/`teacher_karim` — если баг
+воспроизведётся, сообщите конкретный экран/URL и что именно видно (пустой список? ошибка? не хватает 1 из
+3?) — это даст зацепку, которую read-only SQL с сервера не мог найти.
+
