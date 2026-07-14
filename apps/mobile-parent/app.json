@@ -4,7 +4,10 @@
     "slug": "snr-eduos-parent",
     "scheme": "snreduosparent",
     "version": "1.0.0",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -37,17 +40,17 @@
       ],
       "expo-secure-store"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "e70cc3d7-9f08-4d64-8475-d14712098d0b"
-      }
-    },
-    "owner": "new_assassin",
+    "owner": "snreduos",
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "extra": {
+      "eas": {
+        "projectId": "b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"
+      }
+    },
     "updates": {
-      "url": "https://u.expo.dev/e70cc3d7-9f08-4d64-8475-d14712098d0b"
+      "url": "https://u.expo.dev/b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"
     }
   }
 }
