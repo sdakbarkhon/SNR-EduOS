@@ -4,7 +4,7 @@
 import type { Db } from "../supabase/factory";
 import type {
   AnnouncementScope, AnnouncementCategory, Announcement,
-  TeacherAnnouncement, StudentAnnouncement, AppNotification,
+  TeacherAnnouncement, StudentAnnouncement, ParentAnnouncement, AppNotification,
 } from "../types";
 
 // ── Teacher / Admin: announcements ──
@@ -192,6 +192,44 @@ export const markAnnouncementRead = async (db: Db, announcementId: string, stude
   const { error } = await (db as any).from("announcement_reads")
     .upsert({ announcement_id: announcementId, student_id: studentId }, { onConflict: "announcement_id,student_id", ignoreDuplicates: true });
   if (error && error.code !== "23505") throw error;
+};
+
+// ── Parent: announcements (Промт МОБ-4, migration 126) ──
+// RLS on `announcements` denied parents outright before migration 126 (no
+// parent-identity path in any policy qual) — parents previously only saw a
+// truncated preview via notifications (kind='announcement'). Now that the
+// new "parent reads announcements for their children" SELECT policy exists,
+// this mirrors getStudentAnnouncements' shape/ordering exactly.
+export const getParentAnnouncements = async (db: Db, limit = 100): Promise<ParentAnnouncement[]> => {
+  const { data, error } = await (db as any).from("announcements")
+    .select("*, teacher:teachers(full_name), admin:admins(full_name)")
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((a) => ({
+    ...a,
+    authorName: a.teacher?.full_name ?? a.admin?.full_name ?? null,
+    isFromAdmin: a.admin_id != null,
+    teacher: undefined,
+    admin: undefined,
+  })) as ParentAnnouncement[];
+};
+
+export const getParentAnnouncementById = async (db: Db, id: string): Promise<ParentAnnouncement | null> => {
+  const { data, error } = await (db as any).from("announcements")
+    .select("*, teacher:teachers(full_name), admin:admins(full_name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    ...data,
+    authorName: data.teacher?.full_name ?? data.admin?.full_name ?? null,
+    isFromAdmin: data.admin_id != null,
+    teacher: undefined,
+    admin: undefined,
+  } as ParentAnnouncement;
 };
 
 // ── Notifications (any role; RLS limits to own) ──

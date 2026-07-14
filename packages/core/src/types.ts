@@ -704,6 +704,12 @@ export type StudentAnnouncement = Announcement & {
   teacherName: string | null;
   isRead: boolean;
 };
+// Промт МОБ-4 — parent-facing (migration 126: RLS now grants parents SELECT
+// on announcements for their own children, scoped via parent_students).
+export type ParentAnnouncement = Announcement & {
+  authorName: string | null; // teacher OR admin full_name, whichever is set
+  isFromAdmin: boolean;
+};
 export type NotificationKind =
   | "announcement" | "new_homework" | "new_grade" | "homework_graded"
   | "lesson_material" | "student_excused" | "student_submitted"

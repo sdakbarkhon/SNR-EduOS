@@ -635,6 +635,46 @@ export interface Dictionary {
 
     reviewsAllTitle: string;
     reviewsAllEmpty: string;
+
+    // Промт МОБ-4 — сообщения (#24), чат с учителем (#25), объявления (#26/#27), поддержка mock (#28).
+    msgFilterChats: string;
+    msgFilterAnnouncements: string;
+    msgFilterServices: string;
+    msgServiceSupportTitle: string;
+    msgServiceSupportDesc: string;
+    msgSearchMockNotice: string;
+    msgComposeMockNotice: string;
+
+    threadCallMockTitle: string;
+    threadCallMockNotice: string;
+    threadAttachMockNotice: string;
+    threadEmptyDesc: string;
+
+    annListTitle: string;
+    annSourceAdmin: string;
+    annDetailBackToMessages: string;
+    annImportantBadge: string;
+
+    supportTitle: string;
+    supportOnlineStatus: string;
+    supportAvgResponseLabel: string;
+    supportAvgResponseValue: string;
+    supportPopularQuestionsTitle: string;
+    supportChipTuition: string;
+    supportChipMeals: string;
+    supportChipReceipts: string;
+    supportChipRefund: string;
+    supportSendMockNotice: string;
+    supportDialogUser1: string;
+    supportDialogSupport1: string;
+    supportDialogUser2: string;
+    supportDialogSupport2Title: string;
+    supportDialogSupport2Body: string;
+    supportReplyTuition: string;
+    supportReplyMeals: string;
+    supportReplyReceiptsTitle: string;
+    supportReplyReceiptsBody: string;
+    supportReplyRefund: string;
   };
   homework: {
     title: string;

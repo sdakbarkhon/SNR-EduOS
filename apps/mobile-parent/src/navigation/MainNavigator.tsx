@@ -9,6 +9,10 @@ import SubjectDetailScreen from "../screens/SubjectDetailScreen";
 import SkillsScreen from "../screens/SkillsScreen";
 import AttendanceDetailScreen from "../screens/AttendanceDetailScreen";
 import TeacherReviewsScreen from "../screens/TeacherReviewsScreen";
+import MessageThreadScreen from "../screens/MessageThreadScreen";
+import AnnouncementsScreen from "../screens/AnnouncementsScreen";
+import AnnouncementDetailScreen from "../screens/AnnouncementDetailScreen";
+import SupportScreen from "../screens/SupportScreen";
 import { ParentDataProvider } from "../context/ParentDataContext";
 import type { ParentProfile } from "../lib/auth";
 
@@ -26,6 +30,11 @@ export type MainStackParamList = {
   Skills: { childId: string };
   AttendanceDetail: { childId: string };
   TeacherReviews: { childId: string };
+  // Промт МОБ-4 — сообщения/объявления/поддержка.
+  MessageThread: { threadId: string };
+  Announcements: undefined;
+  AnnouncementDetail: { id: string };
+  Support: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -55,6 +64,10 @@ export default function MainNavigator({
         <Stack.Screen name="Skills" component={SkillsScreen} />
         <Stack.Screen name="AttendanceDetail" component={AttendanceDetailScreen} />
         <Stack.Screen name="TeacherReviews" component={TeacherReviewsScreen} />
+        <Stack.Screen name="MessageThread" component={MessageThreadScreen} />
+        <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
+        <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
+        <Stack.Screen name="Support" component={SupportScreen} />
       </Stack.Navigator>
     </ParentDataProvider>
   );
