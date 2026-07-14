@@ -208,14 +208,6 @@ export default function LoginScreen({
           </View>
         </ScrollView>
         </KeyboardAvoidingView>
-        {/* Временный маркер версии билда — визуально подтвердить, что OTA-
-            апдейт долетел до устройства. Убрать после подтверждения. */}
-        <Text
-          style={{ position: "absolute", bottom: 8, right: 12, fontSize: 10, color: "#B0B7C3" }}
-          pointerEvents="none"
-        >
-          v1.6
-        </Text>
       </SafeAreaView>
     </View>
   );

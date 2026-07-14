@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { getUnreadThreadCount } from "@snr/core";
 import { useEffect, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HomeScreen from "../screens/HomeScreen";
 import ProgressScreen from "../screens/ProgressScreen";
 import PaymentsScreen from "../screens/PaymentsScreen";
@@ -11,6 +12,10 @@ import { getSupabase } from "../lib/supabase";
 import { useAppLocale } from "../i18n";
 import { colors } from "../theme";
 import type { ParentProfile } from "../lib/auth";
+
+// Базовая высота содержимого таб-бара (иконка+подпись+внутренние отступы)
+// БЕЗ учёта нижнего safe-area inset — сам inset прибавляется отдельно ниже.
+const TAB_BAR_CONTENT_HEIGHT = 58;
 
 export type TabParamList = {
   Home: undefined;
@@ -39,6 +44,7 @@ export default function TabNavigator({
 }) {
   const { d } = useAppLocale();
   const [unread, setUnread] = useState(0);
+  const insets = useSafeAreaInsets();
 
   // Бейдж непрочитанных на "Сообщения" — из данных (RLS: только мои треды),
   // не хардкод. Опрос раз в 30с — без realtime-подписки для первого захода.
@@ -68,7 +74,12 @@ export default function TabNavigator({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: { borderTopColor: colors.border, height: 58, paddingBottom: 8, paddingTop: 6 },
+        tabBarStyle: {
+          borderTopColor: colors.border,
+          height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 6,
+        },
         tabBarLabelStyle: { fontSize: 10.5, fontWeight: "600" },
         tabBarIcon: ({ color, size }) => (
           <Ionicons name={ICONS[route.name as keyof TabParamList]} size={size ? size - 3 : 20} color={color} />
