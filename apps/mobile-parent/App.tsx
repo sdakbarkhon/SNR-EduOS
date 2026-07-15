@@ -8,6 +8,7 @@ import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { getSupabase } from "./src/lib/supabase";
 import { fetchParentProfile, type ParentProfile } from "./src/lib/auth";
+import { LocaleProvider } from "./src/i18n";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -95,10 +96,12 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <RootNavigator initialProfile={initialProfile} />
-      </SafeAreaProvider>
+      <LocaleProvider>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <RootNavigator initialProfile={initialProfile} />
+        </SafeAreaProvider>
+      </LocaleProvider>
     </ErrorBoundary>
   );
 }
