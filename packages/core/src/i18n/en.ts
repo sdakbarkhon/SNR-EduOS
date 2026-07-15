@@ -923,7 +923,7 @@ export const en: Dictionary = {
     stopShowing: "Stop showing",
     teacherShowing: "Teacher is showing material",
     unsupportedFormat: "This format is not supported for showing",
-    supportedFormats: "Supported: PDF, video, images",
+    supportedFormats: "Supported: PDF, video, images, Office documents",
     lessonMustBeActive: "The lesson must be started",
     onlyTeacherCanClose: "Only the teacher can close this",
     minimizeDemo: "Minimize",

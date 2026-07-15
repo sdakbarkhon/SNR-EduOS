@@ -1860,6 +1860,12 @@ export function TeacherLessonDetailView({
               ) : kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={demoMaterialUrl} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
+              ) : kind === "office" ? (
+                <iframe
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(demoMaterialUrl)}`}
+                  title={name}
+                  className="h-full w-full border-0 bg-white"
+                />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
                   <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>

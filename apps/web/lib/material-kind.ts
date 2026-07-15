@@ -11,7 +11,7 @@ function extOf(s: string): string {
   return (s.split(".").pop() ?? "").toLowerCase();
 }
 
-export function demoKind(name: string, url?: string | null): "pdf" | "video" | "image" | "other" {
+export function demoKind(name: string, url?: string | null): "pdf" | "video" | "image" | "office" | "other" {
   const exts = [extOf(name)];
   if (url) {
     try {
@@ -21,5 +21,11 @@ export function demoKind(name: string, url?: string | null): "pdf" | "video" | "
   if (exts.includes("pdf")) return "pdf";
   if (exts.some((e) => ["mp4", "webm", "ogg", "mov", "m4v"].includes(e))) return "video";
   if (exts.some((e) => ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"].includes(e))) return "image";
+  // Same extension set as FileViewerModal.tsx's OFFICE_EXTS — rendered via
+  // the same Microsoft Office Online Viewer iframe there; this file previously
+  // had no "office" case at all, so any .pptx/.docx demoed live fell into
+  // "other" and showed "формат не поддерживается" for BOTH the teacher's own
+  // preview and the students' broadcast (they share this classifier).
+  if (exts.some((e) => ["pptx", "docx", "ppt", "doc", "xlsx", "xls"].includes(e))) return "office";
   return "other";
 }

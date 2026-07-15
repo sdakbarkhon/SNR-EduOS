@@ -923,7 +923,7 @@ export const uz: Dictionary = {
     stopShowing: "Ko'rsatishni to'xtatish",
     teacherShowing: "O'qituvchi material ko'rsatmoqda",
     unsupportedFormat: "Bu format ko'rsatish uchun qo'llab-quvvatlanmaydi",
-    supportedFormats: "Qo'llab-quvvatlanadi: PDF, video, rasmlar",
+    supportedFormats: "Qo'llab-quvvatlanadi: PDF, video, rasmlar, Office hujjatlari",
     lessonMustBeActive: "Dars boshlangan bo'lishi kerak",
     onlyTeacherCanClose: "Faqat o'qituvchi yopa oladi",
     minimizeDemo: "Yig'ish",

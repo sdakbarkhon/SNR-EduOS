@@ -923,7 +923,7 @@ export const ru: Dictionary = {
     stopShowing: "Остановить демонстрацию",
     teacherShowing: "Учитель показывает материал",
     unsupportedFormat: "Этот формат не поддерживается для демонстрации",
-    supportedFormats: "Поддерживаются: PDF, видео, картинки",
+    supportedFormats: "Поддерживаются: PDF, видео, картинки, документы Office",
     lessonMustBeActive: "Урок должен быть начат",
     onlyTeacherCanClose: "Только учитель может закрыть",
     minimizeDemo: "Свернуть",
