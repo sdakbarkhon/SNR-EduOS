@@ -2063,3 +2063,161 @@ Flash дешевле Sonnet **в ~40x на input и в ~50x на output** для
   Node-вызовы реального Gemini API (текст, JSON-mode, responseSchema, systemInstruction+история, Pro-квота
   429).
 
+## МОБ-7 — DailyStatus + EduOS Assistant Insight + Все сервисы (2026-07-15)
+
+Финальные 3 экрана из 34 запланированных для `apps/mobile-parent`. Один коммит (`6911e77`), пуш
+`origin main`, Vercel READY на этом SHA, OTA опубликована для обеих платформ одной командой.
+
+### Экраны (3) — тип данных / файл / API
+
+| # | Экран | Тип данных | Файл | API endpoint |
+|---|---|---|---|---|
+| v7 | Статус дня | real (живой таймлайн уроков, статус пересчитывается на клиенте раз в 60с) | `DailyStatusScreen.tsx` | — (прямой Supabase через `getChildDailyStatus`, `packages/core/src/queries/parent.ts`) |
+| v8 | EduOS Assistant Insight | real (Gemini-анализ за 30 дней, задуманный недельный кэш в БД + secure-store) | `InsightScreen.tsx` | `POST /api/mobile/insight` (новый, `apps/web/app/api/mobile/insight/route.ts`) |
+| v10 | Все сервисы | hybrid (9 активных карточек → на реальные экраны, 5 карточек — заглушка ComingSoon) | `AllServicesScreen.tsx` + `ComingSoonScreen.tsx` | — |
+
+Плюс два виджета-превью на Главном экране (v1, `HomeScreen.tsx`): "Сейчас в школе" (та же
+`getChildDailyStatus`, свёрнута в одну строку) и "Инсайт недели" (читает только локальный
+secure-store кэш `mob8.insight.<childId>` — без лишнего вызова Gemini с каждого открытия таба).
+
+### Новый API endpoint: bearer-авторизация вместо cookie
+
+Мобильный `fetch()` не несёт cookies, поэтому `POST /api/mobile/insight` **не** использует
+cookie-based `createClient()` из `lib/supabase/server.ts` (как остальные AI-роуты веба) — вместо
+этого новый `apps/web/lib/supabase/bearer.ts` (`createBearerClient(accessToken)`, обычный
+`@supabase/supabase-js` клиент с глобальным заголовком `Authorization: Bearer`). Мобильный клиент
+(`apps/mobile-parent/src/lib/webApi.ts`) берёт `access_token` из текущей Supabase-сессии и шлёт его
+в заголовке. Адрес веб-API (`https://snr-edu-os-web.vercel.app`) зашит в `app.json` → `expo.extra.
+webApiBaseUrl` — читается через `Constants.expoConfig.extra`, который обновляется при каждом OTA
+(проверено по существующему коду `supabase.ts`), поэтому не потребовалась новая нативная сборка.
+
+### Миграция 128 — НЕ применена к hosted (по прямой инструкции), SQL ниже для ручного запуска
+
+```sql
+-- Промт МОБ-7, ЧАСТЬ 2 — v8 "EduOS Assistant Insight". Хранит сгенерированный
+-- Gemini AI-анализ успеваемости/посещаемости/ДЗ ребёнка по неделям: и как
+-- недельный кэш (API проверяет БД первым, не дёргает Gemini повторно в
+-- течение 7 дней), и как история версий для аудита (никогда не
+-- перезаписывается — каждая генерация своя строка).
+--
+-- INSERT — только через service_role в apps/web/app/api/mobile/insight/
+-- route.ts (createAdminClient(), см. gemini-client.ts). Ни одной INSERT-
+-- политики для authenticated/anon НЕ создаётся — это тот же идиом, что уже
+-- используют admins (миграция 20260623000042_admin_role.sql: "Only
+-- service_role can insert/update/delete... (no INSERT/UPDATE/DELETE
+-- policies → только service_role может писать)"), а не отдельная явная
+-- политика "WITH CHECK (true) FOR service_role" — service_role и так
+-- обходит RLS целиком, явная политика для него ничего не даёт, только
+-- создаёт ложное впечатление, что запись разрешена кому-то ещё.
+--
+-- SELECT — через уже существующий SECURITY DEFINER-хелпер is_my_child()
+-- (миграция 74/126), а не через ручной inline-subquery по parent_students/
+-- parents/auth.uid() — так делают уже 4+ существующих политики в проекте
+-- (см. миграцию 76_parent_grades_visibility_gap.sql), сохраняем идиом.
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.parent_insights (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  child_id uuid NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  locale text NOT NULL DEFAULT 'ru',
+  insight_json jsonb NOT NULL,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS parent_insights_child_locale_generated_idx
+  ON public.parent_insights (child_id, locale, generated_at DESC);
+
+ALTER TABLE public.parent_insights ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "parent_can_read_own_children_insights" ON public.parent_insights;
+CREATE POLICY "parent_can_read_own_children_insights"
+  ON public.parent_insights FOR SELECT
+  USING (public.is_my_child(child_id));
+
+INSERT INTO supabase_migrations.schema_migrations (version)
+VALUES ('128')
+ON CONFLICT (version) DO NOTHING;
+
+COMMIT;
+```
+
+**Важно про поведение ДО применения миграции**: код endpoint'а устойчив к отсутствию таблицы —
+Supabase-клиент не бросает исключение на "relation does not exist", просто возвращает пустой
+результат, поэтому эндпоинт не падает. Но реального недельного кэша сейчас нет: каждый вызов
+`/api/mobile/insight` заново генерирует ответ через Gemini (подтверждено живым тестом — см. ниже),
+а попытка записи строки в `parent_insights` тихо проваливается. После применения миграции кэш
+заработает без каких-либо изменений в коде.
+
+### OTA-публикация
+
+`eas-cli update --branch preview --message "МОБ-7: DailyStatus + AssistantInsight + AllServices"
+--non-interactive` (без `--platform`, обе платформы одной командой):
+
+| Platform | Runtime version | Update group ID | Update ID |
+|---|---|---|---|
+| iOS | `exposdk:54.0.0` | `cd6bf05f-0cff-4498-a2d7-c516d70a94e8` | `019f6584-40f0-78bc-a89e-26846f48ce3f` |
+| Android | `1.0.0` | `05dfa3e1-1d86-4625-8a6e-2eed239a8eda` | `019f6584-40f0-7013-b044-7d9b643cb065` |
+
+Опубликовано: 2026-07-15, commit `6911e77`. Подтверждено `eas update:list --branch preview --limit 4`
+— оба group ID первые в списке для своих runtimeVersion.
+
+### Живой тест `/api/mobile/insight` (локально, `next start`, до применения миграции 128)
+
+Полный код "заказчика" (миграция не применена) недоступен для теста на hosted напрямую через
+собственный Node-скрипт против прод-URL без деплоя — вместо этого билд собран и поднят локально
+(`next start`), реальный вход `parent_ismailov`/`parent2026` через `@supabase/supabase-js` против
+**той же hosted БД**, реальный вызов Gemini:
+
+- `POST /api/mobile/insight` без заголовка `Authorization` → `401 {"error":"Unauthorized"}`.
+- С валидным `access_token` parent_ismailov, `childId` = привязанный ребёнок этого родителя,
+  `locale: "ru"` → `200`, осмысленный JSON: `summary` + 5 инсайтов (`grades`/`homework`/`attendance`/
+  `recommendation`), с корректно посчитанными агрегатами из реальных таблиц `attendance`/
+  `lesson_grades`/`homework`/`homework_submissions` (конкретные учебные показатели ребёнка намеренно
+  не приводятся в этом файле — не место для персональных данных реального ученика в git-истории).
+- Повторный вызов с `force: true` → снова `200`, новый (не идентичный) текст от Gemini — ожидаемо,
+  т.к. кэш не работает без миграции 128 (см. выше).
+- Тестовый файл-скрипт удалён после проверки, в коммит не входит.
+
+### Отклонения от буквального промта (не молчком)
+
+1. **"Все сервисы": 9 активных карточек, а не 8** — промт явно перечислил 8 активных (Оплаты/
+   Расписание/ДЗ/Оценки/Посещаемость/Сообщения/Статус дня/EduOS Assistant Insight) и оставил
+   "Поддержка" на выбор ("или переход на существующий SupportScreen из МОБ-4"). Выбрано — активная
+   карточка на уже готовый `SupportScreen`, отсюда 9 активных / 5 заглушек вместо дословных 8/6.
+2. **Миграция 128 — идиом вместо буквального SQL** — см. комментарий в самом файле миграции выше:
+   явная `WITH CHECK (true) FOR service_role`-политика заменена на "ноль INSERT-политик" (service_role
+   и так обходит RLS), тот же паттерн, что уже используют admins в проекте.
+3. **`insightBtnProgress` (кнопка на MOCK-карточке Insight главного экрана) сменила смысл** — раньше
+   вела в никуда (`View`, не `Pressable`) и подписана "Посмотреть прогресс"; теперь ведёт на реальный
+   экран Insight, подпись переведена под новый смысл на 3 языках ("Открыть анализ" / "View insight" /
+   "Tahlilni ochish") — единственное место использования этого ключа в кодовой базе (проверено grep).
+
+### Оценка стоимости Gemini на один инсайт (по официальным ценам, грубо)
+
+Живой ответ (см. тест выше): ~2100 символов JSON ≈ ~550 output-токенов (Gemini считает не 1:1 с
+символами, оценка "на глаз" как и в предыдущих разделах этого файла). Промпт (контекст за 30 дней —
+оценки/посещаемость/ДЗ по одному ребёнку — плюс шаблон инструкции) — оценочно ~600-800 input-токенов.
+
+| | Input $/1M | Output $/1M | Токенов на 1 инсайт (оценка) | Цена за 1 инсайт |
+|---|---|---|---|---|
+| Gemini 2.5 Flash | $0.075 | $0.30 | ~700 in / ~550 out | ≈ $0.00022 |
+
+При включённом недельном кэше (после применения миграции 128) — это НЕ цена за открытие экрана, а
+цена за **одно** обновление в неделю на одного ребёнка. Для всех 6 текущих детей в системе — ≈
+$0.0013/неделю суммарно, то есть практически бесплатно даже при полном охвате.
+
+### Что НЕ сделано и почему
+
+- **Миграция 128 не применена к hosted** — по прямой инструкции заказчика ("дать мне SQL в отчёте
+  для ручного применения через Dashboard"). До применения недельный кэш `/api/mobile/insight` не
+  работает (каждый вызов — новая генерация через Gemini), сам эндпоинт при этом не ломается (см. выше).
+- **Живая проверка через Expo Go на устройстве** — не проводилась, по прямой инструкции заказчика
+  ("Не проверять через Expo Go — это делаю я на устройстве"). Верификация ограничена: typecheck ×3
+  пакета (`mobile-parent`/`core`/`web`), prod build `apps/web` (роут `/api/mobile/insight` собрался),
+  Vercel READY на `6911e77`, живой Node-тест `/api/mobile/insight` против hosted БД и реального Gemini
+  (401 без токена + 200 с реальными данными parent_ismailov, см. выше).
+- **Экран "Все сервисы": 5 заглушек (Транспорт/Столовая/Медкабинет/Кружки/Библиотека)** — плоский
+  `ComingSoonScreen` без какой-либо реальной логики, как и запрошено.
+
