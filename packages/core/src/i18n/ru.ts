@@ -1547,6 +1547,7 @@ export const ru: Dictionary = {
       lessonNotStarted: "Урок ещё не начат",
       waitingForTeacher: "Учитель готовит следующий этап…",
       studentsSeeThis: "Все ученики видят этот этап",
+      activateFailed: "Не удалось активировать этап. Попробуйте ещё раз.",
     },
     live: {
       start: "Начать Live",

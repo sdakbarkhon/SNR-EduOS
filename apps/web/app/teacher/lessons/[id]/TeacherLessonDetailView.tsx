@@ -706,6 +706,7 @@ export function TeacherLessonDetailView({
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
   const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
+  const [stageActivationError, setStageActivationError] = useState<string | null>(null);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [viewStage, setViewStage] = useState<LessonStage | null>(null);
   const [startingLesson, setStartingLesson] = useState(false);
@@ -1026,10 +1027,14 @@ export function TeacherLessonDetailView({
   async function handleActivateStage(stageId: string) {
     if (status !== "in_progress") return;
     setActivatingStageId(stageId);
+    setStageActivationError(null);
     try {
       await setActiveStage(db, lesson.id, stageId);
       setActiveStageId(stageId);
-    } catch { /* noop */ } finally {
+    } catch (e) {
+      console.error("[TeacherLessonDetailView] activate stage failed:", e);
+      setStageActivationError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : dl.activeStage.activateFailed);
+    } finally {
       setActivatingStageId(null);
     }
   }
@@ -1333,6 +1338,7 @@ export function TeacherLessonDetailView({
                 {dl.activeStage.manageStages}
               </h3>
             </div>
+            {stageActivationError && <p className="text-xs text-red-500">{stageActivationError}</p>}
 
             <div className="flex flex-col divide-y divide-violet-100 rounded-xl border border-violet-100 bg-white overflow-hidden">
               {middleStages.map((stage) => {

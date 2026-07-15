@@ -1033,3 +1033,139 @@ ORDER BY s.username;
 воспроизведётся, сообщите конкретный экран/URL и что именно видно (пустой список? ошибка? не хватает 1 из
 3?) — это даст зацепку, которую read-only SQL с сервера не мог найти.
 
+## Баг: активация этапа урока не работает в демо-режиме (2026-07-15, миграция 127 — ЖДЁТ подтверждения)
+
+**Корень бага одной строкой**: `trg_stamp_is_demo` (миграция 110, функция `fn_stamp_is_demo()`) блокирует
+ЛЮБОЙ `UPDATE` от демо-сессии на реальной (`is_demo=false`) строке `lessons`/`lesson_stages` — а после
+переезда демо-режима на "реальный аккаунт + `user_sessions.is_demo=true`" (Промт 3) демо-учитель = реальный
+`teacher_prog`/`teacher_math`/... со своими реальными уроками (в БД **0 демо-уроков, 397 реальных** —
+подтверждено `SELECT count(*) FILTER (WHERE is_demo)/(WHERE NOT is_demo) FROM lessons`), поэтому
+`lessons.active_stage_id UPDATE` (то, что делает клик «Активировать этап») падает на этом триггере
+на 100% уроков демо-учителя. Найдена вторая, компенсирующая диагностику причина: клиентский обработчик
+`handleActivateStage` глотал ошибку молча (`catch { /* noop */ }`), поэтому баг выглядел как «клик вообще
+не срабатывает», а не как отклонённый запрос.
+
+### Путь кода
+
+- Кнопка: `apps/web/app/teacher/lessons/[id]/TeacherLessonDetailView.tsx` — секция "Активация этапов"
+  (~строка 1332), кнопки в цикле по `middleStages` вызывают `handleActivateStage(stage.id)`.
+- Обработчик: `handleActivateStage` (было — строки 1026-1035) → `setActiveStage(db, lesson.id, stageId)`
+  из `packages/core/src/queries/index.ts:2065` → `db.from("lessons").update({ active_stage_id: stageId })`.
+- RLS на `lessons`/`lesson_stages` (UPDATE): проверены, **не имеют отношения к багу** — оба построены
+  на `is_my_teacher_group()`/группе, не блокируют демо-сессию (демо-учитель = реальный `auth.uid()`
+  реального учителя, у него реальный `teacher_id` в `groups.teacher_id`/`subjects.teacher_id`). Блокировка
+  происходит НИЖЕ RLS — в `BEFORE UPDATE` триггере.
+- Триггер: `trg_stamp_is_demo BEFORE INSERT OR DELETE OR UPDATE ON lessons/lesson_stages` →
+  `fn_stamp_is_demo()`: `IF OLD.is_demo=false AND is_demo_session() THEN RAISE EXCEPTION
+  'editing_real_data_in_demo'`. `is_demo_session()` читает `user_sessions WHERE user_id=auth.uid() AND
+  is_demo` — таблица и её "ноль RLS-политик, доступ только через SECURITY DEFINER RPC" в порядке, как и
+  задумано миграцией 110.
+- Realtime/сторона ученика — **не источник бага**: `lessons`/`lesson_stages` в publication
+  `supabase_realtime`; подписка ученика (`LessonWorkspaceView.tsx`, канал `useRealtimeChannel(...,
+  "lessons", "id=eq.${lesson.id}", ...)`) фильтрует только по конкретному `lesson.id`, без school_id/user_id
+  — демо-сессия ученика подписалась бы штатно. Плюс есть fallback-поллинг раз в 3с. Раз UPDATE у учителя
+  падает на триггере до записи в БД — транслировать нечего, это симптом, не отдельная причина.
+
+### Что исправлено в коде (уже в этом коммите, DB не тронута)
+
+`apps/web/app/teacher/lessons/[id]/TeacherLessonDetailView.tsx`:
+```diff
+   async function handleActivateStage(stageId: string) {
+     if (status !== "in_progress") return;
+     setActivatingStageId(stageId);
++    setStageActivationError(null);
+     try {
+       await setActiveStage(db, lesson.id, stageId);
+       setActiveStageId(stageId);
+-    } catch { /* noop */ } finally {
++    } catch (e) {
++      console.error("[TeacherLessonDetailView] activate stage failed:", e);
++      setStageActivationError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : dl.activeStage.activateFailed);
++    } finally {
+       setActivatingStageId(null);
+     }
+   }
+```
+Плюс новое состояние `stageActivationError` и его рендер (`text-red-500`, тот же паттерн, что у
+`stepError` в этом же файле) прямо над списком этапов. `isDemoEditBlockedError` уже существовал в
+`lib/useIsDemoSession.ts` (написан для ровно этого случая миграцией 110), но нигде не был подключён —
+теперь подключён. Новый i18n-ключ `lessons.activeStage.activateFailed` (types.ts + ru/en/uz). Это делает
+баг видимым (ошибка вместо тишины), но **само по себе не разблокирует активацию** — без миграции 127
+демо-учитель по-прежнему увидит `d.demoMode.cannotEditRealData` на каждом клике.
+
+### SQL для ручного применения (миграция `127_demo_stage_activation_exempt.sql`, файл уже в репо, НЕ применена к hosted)
+
+```sql
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.fn_stamp_is_demo()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF auth.uid() IS NOT NULL THEN
+      NEW.is_demo := public.is_demo_session();
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'lessons'
+     AND to_jsonb(NEW) - 'active_stage_id' = to_jsonb(OLD) - 'active_stage_id' THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'lesson_stages'
+     AND to_jsonb(NEW) - 'current_slide_index' = to_jsonb(OLD) - 'current_slide_index' THEN
+    RETURN NEW;
+  END IF;
+
+  IF pg_trigger_depth() <= 1
+     AND OLD.is_demo = false
+     AND public.is_demo_session() THEN
+    RAISE EXCEPTION 'editing_real_data_in_demo' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    NEW.is_demo := OLD.is_demo;
+    RETURN NEW;
+  END IF;
+
+  RETURN OLD;
+END;
+$function$;
+
+INSERT INTO supabase_migrations.schema_migrations (version)
+VALUES ('127') ON CONFLICT (version) DO NOTHING;
+
+COMMIT;
+```
+
+Почему `CREATE OR REPLACE` одной функции, а не новая политика/триггер: тот же единственный триггер
+`trg_stamp_is_demo` продолжает существовать без изменений (`DROP`/`CREATE TRIGGER` не нужны) — меняется
+только его функция. `to_jsonb(NEW) - 'col' = to_jsonb(OLD) - 'col'` означает "изменилась только эта
+колонка, всё остальное в строке идентично" — если когда-нибудь код обновит `active_stage_id` вместе с
+чем-то ещё реальным одним `UPDATE`, исключение НЕ сработает и блок вернётся (безопасно к будущим
+изменениям, не только к текущему `setActiveStage`/`setCurrentSlide`, которые обновляют ровно одну
+колонку).
+
+**P2 учтено**: когда демо-режим станет просто "баннер поверх реального аккаунта" без отдельного пула, весь
+`fn_stamp_is_demo()` (и `is_demo`-колонки под ним) скорее всего уйдёт целиком — тогда это исключение
+удалится вместе с остальной функцией одним махом, а не потребует отдельного отката. Фикс нужен СЕЙЧАС, а
+не может ждать P2: демо-режим прямо сейчас нерабочий для самой демонстрируемой фичи (живой урок), P2 не
+имеет обозначенного срока в этой сессии.
+
+### Проверочный сценарий (для вас)
+
+1. Войти как `teacher_prog`/`teacher_math`/`teacher_english`/`teacher_russian`/`teacher_robot` через
+   демо-режим (реальный аккаунт + флаг `is_demo` в сессии — как это сейчас устроено).
+2. Открыть урок в статусе "Идёт" (`in_progress`), кликнуть «Активировать» на любом этапе.
+3. **До применения миграции 127**: под красным текстом появится "В демо-режиме нельзя редактировать
+   реальные данные" (текст `d.demoMode.cannotEditRealData`) — ошибка теперь видна, но клик по-прежнему не
+   срабатывает (ожидаемо, это только клиентская часть фикса).
+4. **После применения миграции 127**: тот же клик — этап активируется, `activeStageId` обновляется в UI
+   учителя. Открыть тот же урок под `demo2026` (пул демо-учеников) в другой вкладке/браузере — активный
+   этап должен смениться синхронно (realtime, без перезагрузки).
+5. Реальная (не демо) сессия того же `teacher_prog` на его же уроке — активация работает как и раньше
+   (не должна была ломаться этим багом, `is_demo_session()`=false для неё).
+

@@ -1547,6 +1547,7 @@ export const uz: Dictionary = {
       lessonNotStarted: "Dars hali boshlanmagan",
       waitingForTeacher: "O'qituvchi keyingi bosqichni tayyorlamoqda…",
       studentsSeeThis: "Barcha o'quvchilar ushbu bosqichni ko'radi",
+      activateFailed: "Bosqichni faollashtirib bo'lmadi. Qayta urinib ko'ring.",
     },
     live: {
       start: "Live boshlash",

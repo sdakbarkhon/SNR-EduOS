@@ -1582,6 +1582,7 @@ export interface Dictionary {
       lessonNotStarted: string;    // "Урок ещё не начат"
       waitingForTeacher: string;   // "Учитель готовит следующий этап…"
       studentsSeeThis: string;     // "Все ученики видят этот этап"
+      activateFailed: string;      // "Не удалось активировать этап. Попробуйте ещё раз."
     };
     // Live coding (migration 64) — учитель пишет код в реальном времени
     live: {

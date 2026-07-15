@@ -1547,6 +1547,7 @@ export const en: Dictionary = {
       lessonNotStarted: "Lesson hasn't started yet",
       waitingForTeacher: "Teacher is preparing the next stage…",
       studentsSeeThis: "All students see this stage",
+      activateFailed: "Couldn't activate the stage. Please try again.",
     },
     live: {
       start: "Start Live",
