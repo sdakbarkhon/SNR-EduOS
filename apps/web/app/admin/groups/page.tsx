@@ -9,7 +9,7 @@ export default async function AdminGroupsPage({
   const { action } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: groups }, { data: teachers }] = await Promise.all([
+  const [{ data: groups, error: groupsError }, { data: teachers, error: teachersError }] = await Promise.all([
     supabase
       .from("groups")
       .select(
@@ -18,6 +18,8 @@ export default async function AdminGroupsPage({
       .order("name"),
     supabase.from("teachers").select("id, full_name").order("full_name"),
   ]);
+  if (groupsError) console.error("[AdminGroupsPage] groups query failed:", groupsError.message);
+  if (teachersError) console.error("[AdminGroupsPage] teachers query failed:", teachersError.message);
 
   return (
     <GroupsView

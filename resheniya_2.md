@@ -1169,3 +1169,105 @@ COMMIT;
 5. Реальная (не демо) сессия того же `teacher_prog` на его же уроке — активация работает как и раньше
    (не должна была ломаться этим багом, `is_demo_session()`=false для неё).
 
+## Аудит: "поиск не работает ВЕЗДЕ" (2026-07-15)
+
+**Корень бага одной строкой**: НЕТ единого сломанного компонента и НЕТ проваленного onChange-wiring —
+12 независимых мест поиска (student/teacher/admin/superadmin) диагностированы параллельно (12 subagents),
+и в КАЖДОМ controlled-input → state → filter-предикат → рендер оказались правильно связаны. Найдены две
+реальные, но РАЗНЫЕ причины: (1) **подтверждённый активный баг** — `KnowledgeBaseFilePicker.tsx` сбрасывал
+`query`/`selected` и перезапускал fetch при КАЖДОМ ре-рендере родителя, пока модалка открыта (нестабильный
+`groupIds`-массив как dependency useEffect), стирая то, что учитель уже начал искать; (2) **системный, но
+на момент проверки НЕ активный** анти-паттерн — 6 admin/superadmin `page.tsx` глотали ошибку Supabase-
+запроса (`data ?? []` без чтения `error`), что сделало бы поиск "нерабочим" (пустой список для любого
+запроса) при сбое RLS/сети — но живая RLS-проверка (read-only) показала, что все нужные политики сейчас
+корректны для admin/teacher/superadmin, так что этот анти-паттерн СЕЙЧАС не является активной причиной,
+хотя исправлен на будущее.
+
+### Таблица инвентаризации (12 мест)
+
+| # | Место | Роль | Client/Server | Controlled? | Filter где | Debounce | Silent-fail | Наблюдение |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `(app)/books/BooksView.tsx` | student | Client | да | client useMemo | ✅ 300ms, wired верно | нет | код корректен |
+| 2 | `(app)/homework/HomeworkView.tsx` | student | Client | да | client useMemo | ✅ 300ms, wired верно | нет | код корректен (см. Часть 4 ниже — 6b105fc НЕ сломал) |
+| 3 | `(app)/materials/MaterialsView.tsx` | student | Client | да | client useMemo | ✅ 300ms, wired верно | upstream `safeQuery`, `.failed` не читается (но лог есть) | код корректен |
+| 4 | `admin/groups/GroupsView.tsx` | admin | Client | да | client filter (не memo) | нет (не нужен, in-memory) | upstream `data ?? []`, error проглочен — **ИСПРАВЛЕНО** | код корректен |
+| 5 | `admin/parents/new/NewParentForm.tsx` | admin | Client | да | client filter (не memo) | нет | upstream `data ?? []`, error проглочен — **ИСПРАВЛЕНО** | код корректен |
+| 6 | `admin/parents/ParentsView.tsx` | admin | Client | да | client filter (не memo) | нет | upstream `data ?? []`×4, error проглочен — **ИСПРАВЛЕНО** | код корректен (но фильтр только по `full_name`, не по телефону/детям — не баг, а узкий scope) |
+| 7 | `admin/students/StudentsView.tsx` | admin | Client | да | client filter (не memo) | нет | upstream `data ?? []`×2, error проглочен — **ИСПРАВЛЕНО** | код корректен |
+| 8 | `admin/teachers/TeachersView.tsx` | admin | Client | да | client filter (не memo) | нет | upstream `data ?? []`, error проглочен — **ИСПРАВЛЕНО** | код корректен |
+| 9 | `superadmin/admins/AdminsView.tsx` | superadmin | Client | да | client filter (не memo) | нет | upstream `data ?? []`×2, error проглочен — **ИСПРАВЛЕНО** | код корректен |
+| 10 | `teacher/books/TeacherBooksView.tsx` | teacher | Client | да | client useMemo | ✅ 300ms, wired верно | нет | код корректен, дефектов не найдено вообще |
+| 11 | `teacher/materials/TeacherMaterialsView.tsx` | teacher | Client | да | client useMemo | ✅ 300ms, wired верно | upstream `safeQuery`, `.failed` не читается (но лог есть) | код корректен |
+| 12 | `components/KnowledgeBaseFilePicker.tsx` (shared, teacher) | teacher | Client | да | client useMemo | нет (не нужен, in-memory) | fetch без `.catch()`, `data ?? []` | **АКТИВНЫЙ БАГ — ИСПРАВЛЕНО**: нестабильный `groupIds` в dependency useEffect сбрасывал поиск на каждый ре-рендер родителя |
+
+Родительский поиск (student/parent-role screens) не найден вообще — ни одного search-поля в `apps/web/app/parent/**` (грепом подтверждено отсутствие).
+
+### Диагностика 6b105fc (`/homework`) — НЕ СЛОМАН
+
+Перечитан построчно: `debouncedQuery` инициализируется `""`, `useEffect` с `setTimeout(300)` и `clearTimeout`
+cleanup — правильно; фильтр применяется только при `debouncedQuery.trim() !== ""`; условие `filtered`
+useMemo depends on `debouncedQuery` (не сырой `query`); лишних `console.log`/`warn` нет; семантика не
+менялась (title/description/subject — все три условия ИЛИ, как и было). Файл не менялся с коммита 6b105fc
+(`git log -1` подтверждает). Если заказчик по-прежнему видит "не работает" на `/homework` конкретно — это
+не регрессия этого коммита; нужен точный сценарий (что вводилось, у какого ученика, пусто ли ДЗ вообще).
+
+### Что исправлено — ЛОКАЛЬНО по списку файлов (не централизованный shared-компонент/хук, потому что его и
+не было — `useSearchFilter`/`useDebounce`/`*Search*.tsx` в репо не существуют, каждый экран реализует
+поиск независимо)
+
+**Подтверждённый активный баг** — `apps/web/components/KnowledgeBaseFilePicker.tsx`:
+```diff
++  // groupIds — новый массив-литерал на каждый рендер родителя; use его самого
++  // как dependency сбрасывало бы query/selected при КАЖДОМ ре-рендере, пока
++  // модалка открыта (таймеры/realtime в TeacherLessonDetailView).
++  const groupIdsKey = groupIds.join(",");
++
+   useEffect(() => {
+     if (!open) return;
+     setSelected(new Map());
+     setQuery("");
+     ...
+-    ]).then(([m, b]) => { ... setLoading(false); });
++    ]).then(([m, b]) => { ... setLoading(false); })
++      .catch((err) => { if (cancelled) return; console.error("[KnowledgeBaseFilePicker] failed to load materials/books:", err); setLoading(false); });
+     return () => { cancelled = true; };
+-  }, [open, groupIds]);
++  }, [open, groupIdsKey]);
+```
+Используется в `CreateHomeworkForm.tsx` и `TeacherLessonDetailView.tsx` ("Прикрепить материал") — обе точки
+входа передают `groupIds` новым литералом на каждый рендер, а `TeacherLessonDetailView` имеет 30с/15с
+таймеры + realtime во время `in_progress` урока, так что открытая модалка поиска материала теряла ввод
+учителя каждые 15-30 секунд.
+
+**Системный (6 файлов), но сейчас неактивный анти-паттерн** — везде один и тот же fix: читать `error` из
+Supabase-ответа и логировать, не менять поведение UI (fallback `?? []` остаётся):
+`admin/groups/page.tsx`, `admin/parents/new/page.tsx`, `admin/parents/page.tsx`, `admin/students/page.tsx`,
+`admin/teachers/page.tsx`, `superadmin/admins/page.tsx`. Пример (одинаковый паттерн везде):
+```diff
+-  const { data: teachers } = await supabase.from("teachers").select(...).order("full_name");
++  const { data: teachers, error: teachersError } = await supabase.from("teachers").select(...).order("full_name");
++  if (teachersError) console.error("[AdminTeachersPage] teachers query failed:", teachersError.message);
+```
+Два файла (`(app)/knowledge-base/page.tsx`, `teacher/knowledge-base/page.tsx`) уже используют существующий
+`lib/safe-query.ts::safeQuery` (написан в Промт 6 именно для этого класса бага) — они УЖЕ логируют через
+`console.error` внутри `safeQuery`, просто не показывают отдельный UI error-state (`.failed` не прокинут в
+компонент) — не трогал, это не silent-fail по установленному в проекте критерию (лог есть), это отдельная,
+меньшего приоритета UX-доработка.
+
+### Проверочный сценарий по ролям
+
+- **student**: `/homework` (уже проверялось в 6b105fc) — если снова "не работает", нужен точный запрос +
+  скриншот пустого/непустого списка ДО ввода текста.
+- **student**: `/materials` — ввести часть названия материала, список должен сузиться за ~300мс.
+- **teacher**: `/teacher/lessons/[id]` → «Прикрепить материал» → **главная проверка**: ввести текст в поиск,
+  подождать 20-30 секунд НЕ печатая (например, во время идущего урока) — до фикса поле очищалось само,
+  после фикса текст должен оставаться и результаты не должны сбрасываться.
+- **teacher**: `/teacher/homework/new` → тот же пикер материалов — тот же сценарий (30с пауза).
+- **admin**: `/admin/students` → ввести часть ФИО/логина/названия класса — список сужается сразу (без
+  debounce, синхронно).
+- **admin**: `/admin/teachers`, `/admin/parents`, `/admin/groups` — тот же паттерн.
+- **superadmin**: `/superadmin/admins` — тот же паттерн.
+- Если ЛЮБОЙ из этих экранов покажет ПУСТОЙ список ДАЖЕ С ОЧИЩЕННЫМ полем поиска — это теперь будет видно в
+  серверных логах Vercel (`console.error` с префиксом `[ИмяСтраницы]`) благодаря сегодняшнему фиксу; раньше
+  такой сбой был вообще не диагностируем.
+

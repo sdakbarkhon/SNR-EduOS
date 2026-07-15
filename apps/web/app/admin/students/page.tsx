@@ -9,7 +9,7 @@ export default async function AdminStudentsPage({
   const { action } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: students }, { data: groups }] = await Promise.all([
+  const [{ data: students, error: studentsError }, { data: groups, error: groupsError }] = await Promise.all([
     supabase
       .from("students")
       .select(
@@ -18,6 +18,8 @@ export default async function AdminStudentsPage({
       .order("full_name"),
     supabase.from("groups").select("id, name, subject").order("name"),
   ]);
+  if (studentsError) console.error("[AdminStudentsPage] students query failed:", studentsError.message);
+  if (groupsError) console.error("[AdminStudentsPage] groups query failed:", groupsError.message);
 
   return (
     <StudentsView

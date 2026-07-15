@@ -64,6 +64,15 @@ export function KnowledgeBaseFilePicker({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Map<string, PickedKnowledgeBaseFile>>(new Map());
 
+  // groupIds приходит как новый массив-литерал на каждый рендер родителя
+  // (см. TeacherLessonDetailView.tsx/CreateHomeworkForm.tsx) — использовать
+  // сам массив как dependency сбрасывал бы query/selected и перезапускал
+  // fetch при КАЖДОМ ре-рендере родителя, пока модалка открыта (например,
+  // от таймеров/realtime в уроке), стирая то, что учитель уже начал искать.
+  // groupIdsKey — стабильная строка, меняется только когда реально
+  // меняется состав групп.
+  const groupIdsKey = groupIds.join(",");
+
   useEffect(() => {
     if (!open) return;
     setSelected(new Map());
@@ -81,9 +90,14 @@ export function KnowledgeBaseFilePicker({
       setMaterials((m.data ?? []) as MaterialWithGroup[]);
       setBooks((b.data ?? []) as Book[]);
       setLoading(false);
+    }).catch((err) => {
+      if (cancelled) return;
+      console.error("[KnowledgeBaseFilePicker] failed to load materials/books:", err);
+      setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [open, groupIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, groupIdsKey]);
 
   const filteredMaterials = useMemo(
     () => materials.filter((m) => m.title.toLowerCase().includes(query.toLowerCase())),

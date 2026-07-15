@@ -6,12 +6,21 @@ export default async function AdminParentsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const [{ data: parents }, { data: links }, { data: invites }, { data: allStudents }] = await Promise.all([
+  const [
+    { data: parents, error: parentsError },
+    { data: links, error: linksError },
+    { data: invites, error: invitesError },
+    { data: allStudents, error: studentsError },
+  ] = await Promise.all([
     sb.from("parents").select("id, full_name, phone, user_id, created_at").order("full_name"),
     sb.from("parent_students").select("parent_id, student_id"),
     sb.from("parent_invites").select("id, parent_id, code, expires_at, used_at, created_at").order("created_at", { ascending: false }),
     sb.from("students").select("id, full_name, username").order("full_name"),
   ]);
+  if (parentsError) console.error("[AdminParentsPage] parents query failed:", parentsError.message);
+  if (linksError) console.error("[AdminParentsPage] parent_students query failed:", linksError.message);
+  if (invitesError) console.error("[AdminParentsPage] parent_invites query failed:", invitesError.message);
+  if (studentsError) console.error("[AdminParentsPage] students query failed:", studentsError.message);
 
   type ParentRow = { id: string; full_name: string; phone: string | null; user_id: string | null; created_at: string };
   type LinkRow = { parent_id: string; student_id: string };

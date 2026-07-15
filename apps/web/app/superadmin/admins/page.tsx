@@ -12,10 +12,12 @@ export default async function SuperAdminAdminsPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const [{ data: admins }, { data: schools }] = await Promise.all([
+  const [{ data: admins, error: adminsError }, { data: schools, error: schoolsError }] = await Promise.all([
     sb.from("admins").select("id, user_id, full_name, school_id, created_at").order("full_name"),
     sb.from("schools").select("id, name").order("name"),
   ]);
+  if (adminsError) console.error("[SuperAdminAdminsPage] admins query failed:", adminsError.message);
+  if (schoolsError) console.error("[SuperAdminAdminsPage] schools query failed:", schoolsError.message);
 
   const adminRows = (admins ?? []) as {
     id: string; user_id: string | null; full_name: string; school_id: string; created_at: string;
