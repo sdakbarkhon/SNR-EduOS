@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callClaude } from "@/lib/ai-claude";
+import { generateJSON } from "@/lib/ai/gemini-client";
+import {
+  buildHomeworkFilePrompt, buildHomeworkTestPrompt, buildHomeworkProgrammingPrompt, buildHomeworkBundlePrompt,
+} from "@/lib/ai/prompts";
 import { EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
 import type { CodeLanguage, ExternalServiceType } from "@snr/core";
 
@@ -71,135 +74,7 @@ interface GeneratedHomework {
   }>;
 }
 
-// ── Prompt builders ─────────────────────────────────────────────────────────
-
-function hintsLine(hints: string | undefined): string {
-  return hints && hints.trim() ? `\nДополнительные пожелания учителя: ${hints.trim()}` : "";
-}
-
-function buildFilePrompt(topic: string, level: string, hints: string | undefined): string {
-  return `Ты — методический ассистент для учителя в школе Узбекистана.
-
-ЗАДАЧА: Составить формулировку домашнего задания типа "файл" (ученик готовит и присылает файл/текстовый ответ).
-
-Тема задания: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
-
-Требования:
-- title — короткое ёмкое название задания (без кавычек).
-- description — чёткая инструкция для ученика: что именно нужно сделать и что сдать. Академический стиль, понятные формулировки для школьников, без markdown-разметки, без эмодзи.
-
-ВЕРНИ СТРОГО JSON (без markdown, без вступления, без комментариев):
-{
-  "title": "...",
-  "description": "..."
-}`;
-}
-
-function buildTestPrompt(topic: string, level: string, hints: string | undefined): string {
-  return `Ты — методический ассистент для учителя в школе Узбекистана.
-
-ЗАДАЧА: Составить тест (домашнее задание типа "тест") с вопросами с одним правильным ответом.
-
-Тема задания: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
-
-Требования:
-- title — короткое ёмкое название теста (без кавычек).
-- description — краткая инструкция для ученика (1–2 предложения), без markdown-разметки, без эмодзи.
-- questions — массив из 5–10 вопросов, каждый с полем "question" (текст вопроса), "options" (массив из 4 вариантов ответа) и "correctIndex" (индекс правильного варианта в options, начиная с 0). Ровно один правильный вариант на вопрос.
-- Вопросы должны проверять ПОНИМАНИЕ темы, а не запоминание формулировок или синтаксиса.
-
-ВЕРНИ СТРОГО JSON (без markdown, без вступления, без комментариев):
-{
-  "title": "...",
-  "description": "...",
-  "questions": [
-    { "question": "...", "options": ["...", "...", "...", "..."], "correctIndex": 0 }
-  ]
-}`;
-}
-
-function buildProgrammingPrompt(topic: string, level: string, hints: string | undefined): string {
-  const langHint = hints && /c\+\+|си\+\+|cpp/i.test(hints) ? "cpp"
-    : hints && /java(?!script)/i.test(hints) ? "java"
-    : hints && /javascript|js\b/i.test(hints) ? "javascript"
-    : "python";
-  return `Ты — методический ассистент для учителя в школе Узбекистана.
-
-ЗАДАЧА: Составить задание по программированию (домашнее задание типа "программирование").
-
-Тема задания: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
-Язык программирования по умолчанию: ${langHint} (используй его, если пожелания учителя явно не требуют другого из списка "python"|"javascript"|"cpp"|"java").
-
-Требования:
-- title — короткое ёмкое название задания (без кавычек).
-- description — условие задачи: что должна делать программа, входные/выходные данные. Академический стиль, без markdown-разметки, без эмодзи.
-- starterCode — код-скелет для ученика с комментарием/TODO, подсказывающим что реализовать (НЕ полное решение).
-- expectedOutput — то, что выведет на экран правильное решение (пример вывода).
-- language — "python", "javascript", "cpp" или "java".
-
-ВЕРНИ СТРОГО JSON (без markdown, без вступления, без комментариев):
-{
-  "title": "...",
-  "description": "...",
-  "starterCode": "...",
-  "expectedOutput": "...",
-  "language": "python"
-}`;
-}
-
-function buildBundlePrompt(topic: string, level: string, hints: string | undefined, requestedTypes: SubtaskType[]): string {
-  const typesInstruction = requestedTypes.length > 0
-    ? `Создай РОВНО ${requestedTypes.length} подзадач(и) — по одной подзадаче на каждый из следующих типов, СТРОГО в этом порядке: ${requestedTypes.join(", ")}.`
-    : `Сам выбери от 2 до 4 РАЗНЫХ типов подзадач из списка "file", "test", "code" и внешних сервисов ниже — те, что лучше всего подходят теме.`;
-
-  return `Ты — методический ассистент для учителя в школе Узбекистана.
-
-ЗАДАЧА: Составить домашнее задание типа "набор заданий" (bundle) — оно состоит из нескольких независимых подзадач разных типов, которые ученик решает по отдельности, а учитель оценивает весь набор ОДНОЙ общей оценкой.
-
-Тема задания: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
-
-Доступные типы подзадач:
-- "file" — ученик присылает файл/текстовый ответ. config всегда {} (пустой объект).
-- "test" — мини-тест с вопросами с одним правильным ответом. config = { "questions": [...] }, 3–5 вопросов (меньше, чем в полном тесте — это только часть набора), формат вопроса такой же как ниже.
-- "code" — задача по программированию. config = { "starterCode": "...", "language": "python"|"javascript"|"cpp"|"java", "expectedOutput": "..." }.
-- "${EXTERNAL_SERVICE_ORDER.join('", "')}" — задание во внешнем сервисе (${EXTERNAL_SERVICE_ORDER.join(", ")}). config ВСЕГДА {} (пустой объект) — НЕ придумывай ссылку на проект, она подставится автоматически. Вместо этого подробно опиши в поле "description" ЧТО именно ученик должен сделать в этом сервисе.
-
-${typesInstruction}
-
-Общие требования:
-- title — короткое ёмкое название всего набора заданий (без кавычек).
-- description — краткое общее описание набора для ученика (1–3 предложения), без markdown-разметки, без эмодзи.
-- Для каждой подзадачи заполни: "type", "title" (короткое название подзадачи), "description" (чёткая инструкция что сделать), "config" (по правилам типа выше).
-- Академический стиль, понятные формулировки для школьников, без эмодзи, без markdown-разметки внутри текстов.
-
-ВЕРНИ СТРОГО JSON (без markdown, без вступления, без комментариев):
-{
-  "title": "...",
-  "description": "...",
-  "subtasks": [
-    {
-      "type": "file"|"test"|"code"|"...",
-      "title": "...",
-      "description": "...",
-      "config": { }
-    }
-  ]
-}`;
-}
-
 // ── Normalization / validation ──────────────────────────────────────────────
-
-function stripFences(text: string): string {
-  return text
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-}
 
 function normalizeQuestions(raw: GenQuestion[] | undefined, max: number): NormalizedQuestion[] {
   if (!Array.isArray(raw)) return [];
@@ -317,44 +192,33 @@ export async function POST(req: NextRequest) {
     ? body.bundleSubtaskTypes.filter((t): t is SubtaskType => ALLOWED_SUBTASK_TYPES.includes(t as SubtaskType))
     : [];
 
-  const prompt = type === "file" ? buildFilePrompt(topic, level, hints)
-    : type === "test" ? buildTestPrompt(topic, level, hints)
-    : type === "programming" ? buildProgrammingPrompt(topic, level, hints)
-    : buildBundlePrompt(topic, level, hints, requestedSubtaskTypes);
+  const prompt = type === "file" ? buildHomeworkFilePrompt(topic, level, hints)
+    : type === "test" ? buildHomeworkTestPrompt(topic, level, hints)
+    : type === "programming" ? buildHomeworkProgrammingPrompt(topic, level, hints)
+    : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, EXTERNAL_SERVICE_ORDER);
 
   let result: GeneratedHomework | null = null;
   let lastError = "";
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
-    // No forced-JSON param — buildXPrompt() already instructs "return only
-    // JSON"; stripFences() below handles any stray markdown code fences.
-    const { text, error } = await callClaude(prompt, [], {
-      temperature: 0.8,
-      useSearch: false,
-    });
+    const { data: parsed, error } = await generateJSON<GenRaw>(prompt, null, { temperature: 0.8 });
 
-    if (error) {
+    if (error || !parsed) {
       console.error(`[ai-generate-homework] attempt ${attempt} error:`, error);
-      lastError = error;
+      lastError = error || "Generated JSON parse error";
       continue;
     }
 
-    try {
-      const parsed = JSON.parse(stripFences(text)) as GenRaw;
-      const normalized = type === "file" ? normalizeFileResult(parsed)
-        : type === "test" ? normalizeTestResult(parsed)
-        : type === "programming" ? normalizeProgrammingResult(parsed)
-        : normalizeBundleResult(parsed);
+    const normalized = type === "file" ? normalizeFileResult(parsed)
+      : type === "test" ? normalizeTestResult(parsed)
+      : type === "programming" ? normalizeProgrammingResult(parsed)
+      : normalizeBundleResult(parsed);
 
-      if (!normalized) {
-        lastError = "Generated homework failed validation";
-        continue;
-      }
-      result = normalized;
-    } catch (e: unknown) {
-      console.error("[ai-generate-homework] parse error:", text.slice(0, 300), (e as Error)?.message);
-      lastError = "Generated JSON parse error";
+    if (!normalized) {
+      lastError = "Generated homework failed validation";
+      continue;
     }
+    result = normalized;
   }
 
   if (!result) {

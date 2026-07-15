@@ -1016,7 +1016,7 @@ export const uz: Dictionary = {
   aiAssistant: {
     title: "AI-yordamchi",
     subtitle: "O'qishda aqlli yordamching — nimani xohlasang so'ra",
-    chatName: "EduOS AI",
+    chatName: "EduOS Assistant",
     onlineStatus: "Onlayn",
     welcomeTitle: "Salom! Men sening o'quv yordamchingman.",
     welcomeSubtitle: "Istalgan fan bo'yicha so'ra yoki mavzuni tushuntirishimni so'ra.",
@@ -1953,19 +1953,19 @@ export const uz: Dictionary = {
       loading: "O'ylamoqda…",
     },
     generateHomework: {
-      button: "EduOS AI orqali yaratish",
-      title: "EduOS AI orqali topshiriq yaratish",
+      button: "EduOS Assistant orqali yaratish",
+      title: "EduOS Assistant orqali topshiriq yaratish",
       topicLabel: "Topshiriq mavzusi",
       topicPlaceholder: "Masalan: Bir noma'lumli tenglamalar",
       levelLabel: "Sinf/daraja",
       hintsLabel: "Qo'shimcha izohlar (ixtiyoriy)",
       hintsPlaceholder: "Masalan: hayotiy misollar qo'sh",
       bundleTypesLabel: "Kichik topshiriq turlari (ixtiyoriy)",
-      bundleTypesHint: "Tanlamasangiz, EduOS AI turlarni o'zi tanlaydi",
+      bundleTypesHint: "Tanlamasangiz, EduOS Assistant turlarni o'zi tanlaydi",
       generateBtn: "Yaratish",
       generating: "Yaratilmoqda…",
       error: "Topshiriqni yaratib bo'lmadi. Qayta urinib ko'ring.",
-      appliedToast: "Topshiriq EduOS AI tomonidan to'ldirildi. Tekshirib, nashr qiling.",
+      appliedToast: "Topshiriq EduOS Assistant tomonidan to'ldirildi. Tekshirib, nashr qiling.",
     },
     generate: {
       button: "AI bosqichlari",
@@ -2019,8 +2019,8 @@ export const uz: Dictionary = {
     },
     fab: {
       welcome: [
-        "Salom! Men EduOS AI, o'qishda yordam berishga tayyorman",
-        "Salom! Mening ismim EduOS AI, tushunmagan narsangni so'ra",
+        "Salom! Men EduOS Assistant, o'qishda yordam berishga tayyorman",
+        "Salom! Mening ismim EduOS Assistant, tushunmagan narsangni so'ra",
       ],
       idle: [
         "Yordam kerakmi? Mendan so'ra",

@@ -1016,7 +1016,7 @@ export const ru: Dictionary = {
   aiAssistant: {
     title: "AI-помощник",
     subtitle: "Твой умный помощник в учёбе — спрашивай что угодно",
-    chatName: "EduOS AI",
+    chatName: "EduOS Assistant",
     onlineStatus: "В сети",
     welcomeTitle: "Привет! Я твой помощник по учёбе.",
     welcomeSubtitle: "Спроси меня про любой предмет или попроси объяснить тему.",
@@ -1953,19 +1953,19 @@ export const ru: Dictionary = {
       loading: "Думаю…",
     },
     generateHomework: {
-      button: "Сгенерировать через EduOS AI",
-      title: "Генерация задания через EduOS AI",
+      button: "Сгенерировать через EduOS Assistant",
+      title: "Генерация задания через EduOS Assistant",
       topicLabel: "Тема задания",
       topicPlaceholder: "Например: Уравнения с одной переменной",
       levelLabel: "Класс/уровень",
       hintsLabel: "Дополнительные пожелания (опционально)",
       hintsPlaceholder: "Например: добавь примеры из жизни",
       bundleTypesLabel: "Типы подзадач (опционально)",
-      bundleTypesHint: "Если не выбрать — EduOS AI сам решит, какие типы использовать",
+      bundleTypesHint: "Если не выбрать — EduOS Assistant сам решит, какие типы использовать",
       generateBtn: "Сгенерировать",
       generating: "Генерируем…",
       error: "Не удалось сгенерировать задание. Попробуйте ещё раз.",
-      appliedToast: "Задание заполнено через EduOS AI. Проверьте и опубликуйте.",
+      appliedToast: "Задание заполнено через EduOS Assistant. Проверьте и опубликуйте.",
     },
     generate: {
       button: "Этапы через ИИ",
@@ -2019,8 +2019,8 @@ export const ru: Dictionary = {
     },
     fab: {
       welcome: [
-        "Привет! Я EduOS AI, готов помочь в учёбе",
-        "Здравствуй! Меня зовут EduOS AI, спрашивай что непонятно",
+        "Привет! Я EduOS Assistant, готов помочь в учёбе",
+        "Здравствуй! Меня зовут EduOS Assistant, спрашивай что непонятно",
       ],
       idle: [
         "Нужна помощь? Спроси меня",

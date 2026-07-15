@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callClaude } from "@/lib/ai-claude";
+import { generateText } from "@/lib/ai/gemini-client";
 
 function getTashkentDate(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
 }
 
 // Промт 6.2.1: реальная причина 502 — не сам факт отказа AI-вызова (тот уже
-// был обработан как контролируемый JSON-ответ), а то, что callClaude()
+// был обработан как контролируемый JSON-ответ), а то, что generateText()
 // внутри себя ретраит с exponential backoff (1s/2s/4s) на 429/5xx, а
-// fetchAiFact() СВЕРХУ ретраит callClaude() ещё до 3 раз (если факт длиннее
+// fetchAiFact() СВЕРХУ ретраит generateText() ещё до 3 раз (если факт длиннее
 // 80 символов) — в худшем случае это легко уходит за 10-секундный лимit
 // serverless-функции на Vercel Hobby/Free, и платформа убивает функцию ДО
 // того, как код успевает вернуть свой собственный контролируемый JSON —
@@ -57,7 +57,7 @@ async function fetchAiFact(): Promise<string | null> {
     `Примеры: "Сердце синего кита весит около 600 кг." / "Антарктида — самая большая пустыня мира."`;
   let lastText: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const { text: raw, error } = await callClaude(prompt, [], { maxTokens: 128 });
+    const { text: raw, error } = await generateText(prompt, { maxTokens: 128 });
     if (error || !raw.trim()) break;
     // Clean leading/trailing markdown, quotes, dashes
     const text = raw
@@ -98,7 +98,7 @@ export async function GET() {
       return NextResponse.json({ text: cached.fact_text });
     }
 
-    // Generate new fact — hard timeout so a slow/retrying Claude call can
+    // Generate new fact — hard timeout so a slow/retrying Gemini call can
     // never push this route past Vercel's serverless function limit.
     const text = await withTimeout(fetchAiFact(), FETCH_TIMEOUT_MS);
     if (!text) {

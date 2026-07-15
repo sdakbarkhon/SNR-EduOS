@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callClaude } from "@/lib/ai-claude";
+import { generateJSON } from "@/lib/ai/gemini-client";
+import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 
 // Hard cap on Imagen calls per generation (keeps us within maxDuration).
@@ -39,235 +40,6 @@ const SUBJECT_NAME_TO_BOOK_SLUG: Record<string, string> = {
   "Биология": "biology",
   "История": "history",
 };
-
-type CurriculumTopicContext = {
-  title: string;
-  description: string | null;
-  estimatedLessons: number;
-};
-
-function buildPrompt(input: {
-  topic: string;
-  grade: number;
-  subject: string;
-  durationMin: number;
-  overallDifficulty: string;
-  materials: AttachedMaterial[];
-  curriculumTopic?: CurriculumTopicContext | null;
-  kbMaterials?: string[];
-}): string {
-  const hasFiles = input.materials.length > 0;
-  const materialsContext = hasFiles
-    ? input.materials
-        .map((m) => `=== Материал "${m.title}" ===\n${m.text}`)
-        .join("\n\n")
-    : "Материалы не прикреплены.";
-
-  // Промт 4: тема из учебного плана — первичный контекст, когда lessons.curriculum_topic_id
-  // указан на СОЗДАНИИ урока (существующие уроки этого поля не имеют — секция просто не рендерится).
-  const curriculumSection = input.curriculumTopic ? `
-
-ТЕМА ИЗ УЧЕБНОГО ПЛАНА (первичный контекст — используй как основу урока):
-- Название темы: ${input.curriculumTopic.title}
-${input.curriculumTopic.description ? `- Описание темы: ${input.curriculumTopic.description}\n` : ""}- Ожидаемое количество уроков на эту тему: ${input.curriculumTopic.estimatedLessons}
-${input.kbMaterials && input.kbMaterials.length > 0
-    ? `\nДоступные материалы: ${input.kbMaterials.join("; ")}`
-    : ""}` : "";
-
-  // Optimal stage count based on lesson duration
-  const stageCount = input.durationMin <= 30 ? "2–3" :
-    input.durationMin <= 45 ? "3–4" :
-    input.durationMin <= 60 ? "4–5" :
-    input.durationMin <= 90 ? "5–6" : "6–8";
-
-  // Minimum DISTINCT content_type values expected across the lesson (repeats within
-  // a demo→practice→task code progression don't count against this).
-  const varietyMin = input.durationMin <= 30 ? 2 :
-    input.durationMin <= 60 ? 3 : 4;
-
-  // IMPORTANT: this must be driven by the TOPIC, never by the subject name alone.
-  // Subjects like "Информатика"/"Робототехника"/"Программирование" also cover
-  // GeoGebra/PhET/Arduino/web topics — matching on the subject string used to force
-  // EVERY lesson under those subjects into an all-Python "code" progression,
-  // which is exactly why the AI never proposed geogebra/phet/wokwi/codesandbox.
-  const topicLower = input.topic.toLowerCase();
-  const PYTHON_TOPIC_HINTS = [
-    "python", "питон", "цикл", "функци", "алгоритм", "перемен", "массив",
-    "список", "рекурси", "условн", "структур данн",
-  ];
-  const OTHER_TOOL_HINTS = [
-    "блочн", "arduino", "ардуино",
-    "светодиод", "датчик", "схем", "wokwi", "микроконтроллер", "html", "css",
-    "javascript", "сайт", "веб", "квиз", "kahoot",
-    "qia", "повторени",
-    "geogebra", "геогебра", "phet", "симуляц", "desmos", "калькулятор граф",
-    "blockly", "visualgo", "сортировк", "p5.js", "p5js", "excalidraw", "доска",
-    "learningapps", "learning apps", "sqlonline", "sql",
-    "h5p", "memory game", "мемори", "интерактивная картинка", "drag-n-drop", "перетаскивание",
-  ];
-  const mentionsPython = PYTHON_TOPIC_HINTS.some((kw) => topicLower.includes(kw));
-  const mentionsOtherTool = OTHER_TOOL_HINTS.some((kw) => topicLower.includes(kw));
-  const isProgramming = mentionsPython && !mentionsOtherTool;
-
-  const programmingSection = isProgramming ? `
-
-СПЕЦИАЛЬНЫЕ ПРАВИЛА ДЛЯ ЭТАПОВ PYTHON (тема урока про циклы/функции/алгоритмы/переменные):
-Используй паттерн прогрессии из 3 этапов, ВСЕ с content_type="code" (student увидит редактор кода на каждом):
-1. DEMO-этап: stage_type="theory", title начинается с "Демо:", starter_code = ПОЛНЫЙ рабочий код примера (ученик видит и может запустить), description объясняет что происходит в коде, teacher_notes = краткие педагогические подсказки (не дублируй код сюда).
-2. PRACTICE-этап: stage_type="task", title начинается с "Практика:", starter_code = скелет с TODO-комментариями для ученика, description = что нужно дополнить, teacher_notes = готовое решение.
-3. TASK-этап (если время позволяет): stage_type="task", title начинается с "Задание:", starter_code = только комментарии-инструкции (без кода), description = условие задачи, teacher_notes = эталонное решение.
-
-Для КАЖДОГО из 3 этапов заполняй programming_language ("python" или "cpp" — по умолчанию "python").
-ОБЯЗАТЕЛЬНО заполняй starter_code для ВСЕХ трёх этапов (включая DEMO — это код, который увидит ученик)!
-Это правило действует ТОЛЬКО для этих 2–3 этапов практики — остальные этапы урока (введение, квиз) всё равно
-должны быть presentation/quiz_qia, а не code.` : "";
-
-  return `Ты — методический ассистент для учителя в школе Узбекистана.
-
-ЗАДАЧА: Создать ОПТИМАЛЬНЫЙ ПЛАН урока из ${stageCount} последовательных этапов на ${input.durationMin} минут.
-Суммарная длительность всех этапов должна быть РОВНО ${input.durationMin} минут.
-
-ВХОДНЫЕ ДАННЫЕ:
-- Класс: ${input.grade}
-- Предмет: ${input.subject}
-- Тема урока: ${input.topic}
-- Длительность урока: ${input.durationMin} минут
-- Общий уровень сложности: ${input.overallDifficulty}
-
-МАТЕРИАЛЫ ОТ УЧИТЕЛЯ:
-${materialsContext}
-${curriculumSection}
-${programmingSection}
-
-ТИПЫ КОНТЕНТА (выбирай по ТЕМЕ урока и классу — НЕ только по названию предмета):
-- "presentation" — теория/объяснение (stage_type: "theory")
-- "code" — программирование в Monaco редакторе (stage_type: "task")
-- "quiz_qia" — асинхронный тест с вопросами (stage_type: "task")
-- "quiz_kahoot" — синхронный live-квиз с таймером (stage_type: "task")
-- "wokwi" — Arduino/электроника симуляция, классы 7–11
-- "codesandbox" — веб-разработка HTML/CSS/JS, классы 9–11
-- "geogebra" — графики, геометрия, статистика (математика), классы 5–11
-- "phet" — симуляции по физике, химии, биологии, классы 6–11
-- "desmos" — графический калькулятор и алгебра, классы 7–11
-- "blockly_games" — визуальное блочное программирование, младшие классы 1–6
-- "visualgo" — визуализация алгоритмов и структур данных, классы 8–11
-- "p5js" — creative coding, рисование и анимация через JavaScript, классы 7–11
-- "excalidraw" — виртуальная доска для схем и диаграмм, любые классы
-- "learningapps" — интерактивные упражнения и мини-игры, классы 1–9
-- "sqlonline" — SQL-запросы в браузере, классы 9–11
-- "h5p" — H5P Interactive: интерактивные задания (memory games, drag-n-drop, интерактивные картинки, квизы). Универсально для любых предметов
-
-ВАЖНО: название предмета ("Информатика", "Робототехника", "Программирование") само по себе
-НЕ означает что все этапы должны быть "code" — эти предметы охватывают ВСЕ инструменты выше
-(GeoGebra, PhET, Arduino/Wokwi, веб, Python и другие). Решает ТЕМА урока, а не название предмета.
-
-ПОДСКАЗКА ПО КЛЮЧЕВЫМ СЛОВАМ В ТЕМЕ:
-- "GeoGebra", "график", "геометрия", "статистика" → content_type="geogebra"
-- "PhET", "симуляция", "опыт", "физика", "химия", "биология" → content_type="phet"
-- "Desmos", "калькулятор", "график функции", "алгебра" → content_type="desmos"
-- "Blockly", "блоки", "визуальное программирование", "игра" (младшие классы) → content_type="blockly_games"
-- "VisuAlgo", "алгоритм", "сортировка", "структуры данных" (визуализация) → content_type="visualgo"
-- "p5.js", "creative coding", "рисование кодом", "анимация" (JavaScript) → content_type="p5js"
-- "Excalidraw", "схема", "диаграмма", "доска" → content_type="excalidraw"
-- "LearningApps", "интерактивное упражнение", "мини-игра" → content_type="learningapps"
-- "SQL", "база данных", "запросы" (старшие классы) → content_type="sqlonline"
-- "H5P", "memory game", "мемори", "интерактивная картинка", "drag-n-drop", "перетаскивание" → content_type="h5p"
-- "Arduino", "светодиод", "датчик", "схема", "робот", "микроконтроллер" → content_type="wokwi"
-- "HTML", "CSS", "JavaScript", "веб", "сайт", "страница" → content_type="codesandbox"
-- "Python", "циклы", "функции", "алгоритмы", "переменные" → content_type="code"
-- "квиз", "тест", "проверка", "повторение" → content_type="quiz_qia" или "quiz_kahoot"
-
-ОБЯЗАТЕЛЬНОЕ РАЗНООБРАЗИЕ ЭТАПОВ:
-- В плане урока должно быть МИНИМУМ ${varietyMin} РАЗНЫХ content_type (повторы одного типа
-  внутри демо→практика→задание прогрессии не считаются — это один "тип" по смыслу).
-- НЕЛЬЗЯ делать урок только из presentation+code, если тема подсказывает другой инструмент
-  (см. подсказку по ключевым словам выше) — это скучно и не соответствует теме.
-- КАЖДЫЙ урок обязан содержать хотя бы один этап content_type="quiz_qia" или "quiz_kahoot"
-  для проверки понимания (обычно в середине или конце урока), кроме уроков короче 20 минут.
-
-СЛОЖНОСТЬ:
-Уровень: ${input.overallDifficulty}
-- easy: больше теории, базовые понятия, простые задачи
-- medium: баланс теории и практики
-- hard: упор на практику, сложные задачи, углубление
-
-ДЛЯ ЭТАПОВ ТЕОРИИ (content_type='presentation'):
-Сгенерируй массив слайдов презентации в поле "slides".
-Каждый слайд содержит:
-- layout: ОДИН ИЗ "title" | "split" | "quote" | "code" | "default" (см. правила ниже)
-- title: заголовок слайда (текст)
-- content: содержимое в формате markdown (заголовки ##, списки -, **жирный**, параграфы)
-- image_prompt: описание картинки НА АНГЛИЙСКОМ для генерации (только для layout='split')
-- code: { language, content } — только для layout='code'
-- quote: { text, author? } — только для layout='quote'
-
-ПРАВИЛА ВЫБОРА layout:
-- 'title' — ПЕРВЫЙ слайд урока: крупный заголовок темы + короткое вводное описание
-- 'split' — визуальная концепция (объект, схема, процесс) — ОБЯЗАТЕЛЬНО заполни image_prompt
-- 'code' — есть фрагмент кода для показа (для программирования/информатики) — заполни code.language и code.content
-- 'quote' — важное определение или ключевая мысль крупным текстом — заполни quote.text (и quote.author, если это цитата человека, иначе не указывай)
-- 'default' — обычный слайд с заголовком и текстом/списком (используй чаще всего)
-
-Типичная структура: 1 слайд 'title' в начале, затем 3–5 слайдов 'default'/'split'/'code' по содержимому,
-изредка один 'quote' для ключевого определения. НЕ делай все слайды одного layout.
-
-ВАЖНО ДЛЯ СЛАЙДОВ:
-- НИКАКИХ эмодзи в контенте
-- Академический стиль, понятные формулировки для школьников
-- Сам реши сколько слайдов нужно (обычно 3–6 на тему)
-
-ДЛЯ ЭТАПОВ КВИЗА (content_type='quiz_qia'):
-Обязательно заполни поле "quiz" с 3–5 вопросами:
-{
-  "quiz": {
-    "questions": [
-      { "text": "Что такое переменная?", "options": ["Место в памяти для значения", "Функция для вычислений", "Тип данных", "Оператор сравнения"], "correct_index": 0 }
-    ]
-  }
-}
-- correct_index — индекс правильного варианта в "options", начиная с 0. Ровно один правильный вариант.
-- Вопросы проверяют ПОНИМАНИЕ концепции темы урока, а не запоминание синтаксиса.
-- Для content_type='quiz_kahoot' поле "quiz" НЕ заполняй — учитель добавит вопросы вручную позже.
-
-ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='geogebra'|'phet'|'desmos'|'blockly_games'|'visualgo'|'p5js'|'excalidraw'|'learningapps'|'sqlonline'|'wokwi'|'codesandbox'|'h5p'):
-- Ссылку (URL) НЕ указывай — система сама подставит редактор по умолчанию.
-- Обязательно заполни description (что именно должен сделать ученик в редакторе) и teacher_notes
-  (на что учителю обратить внимание при демонстрации/проверке), например:
-  - geogebra: teacher_notes = "Начни с построения графика на своём экране, потом дай ученикам самим поэкспериментировать с параметрами"
-  - wokwi: teacher_notes = "Проверь понимание: попроси ученика объяснить что делает каждый провод"
-  - quiz_qia: teacher_notes = "Разбери каждую ошибку — вопросы про смысл понятия, а не про синтаксис"
-
-ФОРМАТ КАЖДОГО ЭТАПА:
-{
-  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"wokwi"|"codesandbox"|"geogebra"|"phet"|"desmos"|"blockly_games"|"visualgo"|"p5js"|"excalidraw"|"learningapps"|"sqlonline"|"h5p",
-  "stage_type": "theory"|"task",
-  "title": "Короткое название",
-  "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",
-  "teacher_notes": "Педагогические подсказки для учителя: на что обратить внимание, типичные ошибки, решение, эталонный код",
-  "starter_code": "Код для этапа content_type='code' — полный для DEMO, скелет для PRACTICE, только комментарии для TASK",
-  "programming_language": "python"|"cpp",
-  "slides": [
-    { "layout": "title", "title": "...", "content": "..." },
-    { "layout": "split", "title": "...", "content": "## ...\\n- ...", "image_prompt": "..." },
-    { "layout": "code", "title": "...", "content": "Пояснение к коду", "code": { "language": "python", "content": "def f():\\n    pass" } },
-    { "layout": "quote", "title": "...", "content": "", "quote": { "text": "...", "author": "..." } }
-  ],
-  "quiz": { "questions": [ { "text": "...", "options": ["...", "...", "...", "..."], "correct_index": 0 } ] },
-  "difficulty": "easy"|"medium"|"hard",
-  "duration_min": число
-}
-(поле slides — ТОЛЬКО для content_type='presentation'; поле quiz — ТОЛЬКО для content_type='quiz_qia'; для остальных опусти оба)
-
-ВЕРНИ СТРОГО JSON (без markdown, без вступления):
-{
-  "stages": [ ... ${stageCount} этапов, МИНИМУМ ${varietyMin} разных content_type ... ],
-  "recommendedSearches": ["запрос 1", "запрос 2", "запрос 3"],
-  "classGrade": ${input.grade},
-  "notes": "Краткий комментарий учителю о структуре урока"
-}
-
-ВАЖНО: ТОЛЬКО валидный JSON. Заголовки и описания на русском. starter_code только для code-этапов.`;
-}
 
 interface GenSlide {
   layout?: string;
@@ -405,14 +177,6 @@ function normalizeStage(s: GenStage): GenStage | null {
   return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, programming_language, slides, quiz };
 }
 
-function stripFences(text: string): string {
-  return text
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-}
-
 export async function POST(req: NextRequest) {
   const db = await createClient();
 
@@ -522,7 +286,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const prompt = buildPrompt({
+  const prompt = buildLessonGenerationPrompt({
     topic: body.topic.trim(), grade, subject, durationMin, overallDifficulty, materials,
     curriculumTopic, kbMaterials,
   });
@@ -532,43 +296,36 @@ export async function POST(req: NextRequest) {
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
     const useSearch = wantSearch && attempt === 0;
-    // No forced-JSON param — buildPrompt() already instructs "return only
-    // JSON"; stripFences() below handles any stray markdown code fences.
-    const { text, error } = await callClaude(prompt, [], {
+    const { data: parsed, error } = await generateJSON<GenResult>(prompt, null, {
+      model: "pro",
       temperature: 0.85,
       useSearch,
     });
 
-    if (error) {
+    if (error || !parsed) {
       console.error(`[ai-generate] attempt ${attempt} error:`, error);
-      lastError = error;
+      lastError = error || "Generated JSON parse error";
       continue;
     }
 
-    try {
-      const parsed = JSON.parse(stripFences(text)) as GenResult;
-      const rawStages = Array.isArray(parsed.stages) ? parsed.stages : [];
-      const stages = rawStages
-        .map(normalizeStage)
-        .filter((s): s is GenStage => s !== null);
-      if (stages.length === 0) {
-        lastError = "Generated stages failed validation";
-        continue;
-      }
-      result = {
-        lesson_title_suggestion: parsed.lesson_title_suggestion ?? "",
-        lesson_description_suggestion: parsed.lesson_description_suggestion ?? "",
-        stages,
-        recommendedSearches: Array.isArray(parsed.recommendedSearches)
-          ? parsed.recommendedSearches.filter((q) => typeof q === "string").slice(0, 6)
-          : [],
-        classGrade: grade,
-        notes: typeof parsed.notes === "string" ? parsed.notes : "",
-      };
-    } catch (e: unknown) {
-      console.error("[ai-generate] parse error:", text.slice(0, 300), (e as Error)?.message);
-      lastError = "Generated JSON parse error";
+    const rawStages = Array.isArray(parsed.stages) ? parsed.stages : [];
+    const stages = rawStages
+      .map(normalizeStage)
+      .filter((s): s is GenStage => s !== null);
+    if (stages.length === 0) {
+      lastError = "Generated stages failed validation";
+      continue;
     }
+    result = {
+      lesson_title_suggestion: parsed.lesson_title_suggestion ?? "",
+      lesson_description_suggestion: parsed.lesson_description_suggestion ?? "",
+      stages,
+      recommendedSearches: Array.isArray(parsed.recommendedSearches)
+        ? parsed.recommendedSearches.filter((q) => typeof q === "string").slice(0, 6)
+        : [],
+      classGrade: grade,
+      notes: typeof parsed.notes === "string" ? parsed.notes : "",
+    };
   }
 
   if (!result) {

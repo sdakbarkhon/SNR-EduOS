@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import { getDictionary, type Locale, type CodeLanguage, type ExternalServiceType } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { EduOSAiIcon } from "@/components/EduOSAiIcon";
+import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, EXTERNAL_SERVICE_ORDER, isExternalService } from "@/lib/external-services";
 
@@ -120,7 +120,7 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, onA
       <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
         {/* Header */}
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-6 py-4">
-          <EduOSAiIcon className="h-9 w-9" />
+          <EduOSAssistantIcon className="h-9 w-9" />
           <h3 className="flex-1 text-[16px] font-bold text-brand-ink">{t.title}</h3>
           <button
             onClick={onClose}

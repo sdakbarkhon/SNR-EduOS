@@ -22,7 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch } from "lucide-react";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
-import { EduOSAiIcon } from "@/components/EduOSAiIcon";
+import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { CodeEditor } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, isExternalService, validateServiceUrl, EXTERNAL_SERVICE_ORDER, getServicesForSubject } from "@/lib/external-services";
@@ -332,7 +332,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
             onClick={() => setAiGenerateOpen(true)}
             className="flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-600 shadow-sm transition-all hover:bg-orange-50"
           >
-            <EduOSAiIcon className="h-5 w-5" />
+            <EduOSAssistantIcon className="h-5 w-5" />
             {d.ai.generateHomework.button}
           </button>
         )}

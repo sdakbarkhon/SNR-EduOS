@@ -1016,7 +1016,7 @@ export const en: Dictionary = {
   aiAssistant: {
     title: "AI Assistant",
     subtitle: "Your smart study assistant — ask anything",
-    chatName: "EduOS AI",
+    chatName: "EduOS Assistant",
     onlineStatus: "Online",
     welcomeTitle: "Hi! I'm your study assistant.",
     welcomeSubtitle: "Ask me about any subject or ask me to explain a topic.",
@@ -1953,19 +1953,19 @@ export const en: Dictionary = {
       loading: "Thinking…",
     },
     generateHomework: {
-      button: "Generate with EduOS AI",
-      title: "Generate assignment with EduOS AI",
+      button: "Generate with EduOS Assistant",
+      title: "Generate assignment with EduOS Assistant",
       topicLabel: "Assignment topic",
       topicPlaceholder: "E.g. One-variable equations",
       levelLabel: "Grade/level",
       hintsLabel: "Extra notes (optional)",
       hintsPlaceholder: "E.g. add real-life examples",
       bundleTypesLabel: "Subtask types (optional)",
-      bundleTypesHint: "Leave unset and EduOS AI will choose the types itself",
+      bundleTypesHint: "Leave unset and EduOS Assistant will choose the types itself",
       generateBtn: "Generate",
       generating: "Generating…",
       error: "Couldn't generate the assignment. Please try again.",
-      appliedToast: "Assignment filled in by EduOS AI. Review and publish.",
+      appliedToast: "Assignment filled in by EduOS Assistant. Review and publish.",
     },
     generate: {
       button: "AI Stages",
@@ -2019,8 +2019,8 @@ export const en: Dictionary = {
     },
     fab: {
       welcome: [
-        "Hi! I'm EduOS AI, ready to help with your studies",
-        "Hello! My name is EduOS AI, ask what you don't understand",
+        "Hi! I'm EduOS Assistant, ready to help with your studies",
+        "Hello! My name is EduOS Assistant, ask what you don't understand",
       ],
       idle: [
         "Need help? Ask me",

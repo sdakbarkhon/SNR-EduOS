@@ -1028,7 +1028,7 @@ export interface Dictionary {
   aiAssistant: {
     title: string;             // "AI-помощник"
     subtitle: string;          // "Твой умный помощник в учёбе — спрашивай что угодно"
-    chatName: string;          // "EduOS AI"
+    chatName: string;          // "EduOS Assistant"
     onlineStatus: string;      // "В сети"
     welcomeTitle: string;      // "Привет! Я твой помощник по учёбе."
     welcomeSubtitle: string;   // "Спроси меня про любой предмет или попроси объяснить тему."

@@ -5,11 +5,7 @@ import { Bot, Send, MoreHorizontal, Calculator, Languages, Bug, BookOpen } from 
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { callAiChat } from "@/app/actions/ai";
-
-const STUDENT_SYSTEM = `Ты — дружелюбный помощник для школьников.
-Помогай с любыми вопросами кратко и понятно.
-Используй простой язык. Не используй markdown-разметку.
-Пиши обычным текстом без специальных символов форматирования.`;
+import { EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 
 const SUGGESTION_ICONS = [Calculator, Languages, Bug, BookOpen];
 
@@ -39,7 +35,7 @@ export function AiAssistantView() {
     setLoading(true);
 
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
-    const result = await callAiChat(STUDENT_SYSTEM, trimmed, history);
+    const result = await callAiChat(EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT, trimmed, history);
     const aiText = "error" in result ? t.errorFallback : result.text;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
     setLoading(false);

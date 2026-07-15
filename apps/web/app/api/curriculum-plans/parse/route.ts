@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callClaude } from "@/lib/ai-claude";
+import { generateJSON } from "@/lib/ai/gemini-client";
+import { buildCurriculumParsePrompt } from "@/lib/ai/prompts";
 import { extractText } from "@/lib/file-extractors";
 
 // Промт 4, Часть 3 — парсит PDF/DOCX учебный план в список тем через AI.
@@ -19,39 +20,11 @@ const MAX_TOPICS = 40;
 
 type ParsedTopic = { title: string; description: string | null; estimated_lessons: number };
 
-function stripFences(text: string): string {
-  return text
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-}
-
 function isPdfOrDocx(file: File): "pdf" | "docx" | null {
   const name = file.name.toLowerCase();
   if (file.type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
   if (file.type === ALLOWED_MIME[1] || name.endsWith(".docx")) return "docx";
   return null;
-}
-
-function buildPrompt(planText: string): string {
-  return `Ты — методический ассистент для учителя в школе Узбекистана.
-
-Раскладай текст учебного плана на упорядоченный список тем в порядке следования.
-Верни СТРОГО JSON массив (без markdown, без пояснений вне JSON), формат:
-[{"title": "...", "description": "...", "estimated_lessons": 1}, ...]
-
-ПРАВИЛА:
-- title — короткое название темы (на русском).
-- description — 1-2 предложения, что именно изучается в теме (может быть пустой строкой, если в плане нет деталей).
-- estimated_lessons — целое число уроков на тему (по умолчанию 1, если план явно не указывает больше).
-- Порядок массива = порядок следования тем в плане.
-- Максимум ${MAX_TOPICS} тем — если тем в плане больше, объедини близкие по смыслу.
-- Если в тексте нет явной структуры (нумерации/заголовков) — определи темы по смыслу самостоятельно, разбив содержание на логические блоки.
-- Только валидный JSON, ничего больше.
-
-ТЕКСТ УЧЕБНОГО ПЛАНА:
-${planText}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -103,26 +76,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Файл пуст или не удалось извлечь текст" }, { status: 400 });
   }
 
-  const prompt = buildPrompt(planText);
+  const prompt = buildCurriculumParsePrompt(planText, MAX_TOPICS);
   let lastError: string | null = null;
   let topics: ParsedTopic[] | null = null;
 
   for (let attempt = 0; attempt < 3 && !topics; attempt++) {
-    const { text, error } = await callClaude(prompt, []);
-    if (error) { lastError = error; continue; }
-    try {
-      const parsed = JSON.parse(stripFences(text));
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("empty");
-      topics = parsed.slice(0, MAX_TOPICS).map((t: Partial<ParsedTopic>) => ({
-        title: String(t.title ?? "").trim() || "Без названия",
-        description: t.description ? String(t.description).trim() : null,
-        estimated_lessons: Number.isFinite(t.estimated_lessons) && Number(t.estimated_lessons) > 0
-          ? Math.round(Number(t.estimated_lessons))
-          : 1,
-      }));
-    } catch {
-      lastError = "Не удалось разобрать ответ AI";
+    const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, null, { model: "pro" });
+    if (error || !Array.isArray(parsed) || parsed.length === 0) {
+      lastError = error || "Не удалось разобрать ответ AI";
+      continue;
     }
+    topics = parsed.slice(0, MAX_TOPICS).map((t) => ({
+      title: String(t.title ?? "").trim() || "Без названия",
+      description: t.description ? String(t.description).trim() : null,
+      estimated_lessons: Number.isFinite(t.estimated_lessons) && Number(t.estimated_lessons) > 0
+        ? Math.round(Number(t.estimated_lessons))
+        : 1,
+    }));
   }
 
   if (!topics) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callClaude } from "@/lib/ai-claude";
+import { chat } from "@/lib/ai/gemini-client";
+import { EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 
 const DAILY_LIMIT = 10;
 
@@ -126,15 +127,7 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(20);
 
-  const systemPrompt = `Ты — дружелюбный помощник для школьника на онлайн-уроке. Твоё имя — Робокот 🤖.
-
-ПРАВИЛА (СТРОГО):
-1. Ты НИКОГДА не даёшь готовое решение задачи. Только наводящие вопросы и подход.
-2. Ты НИКОГДА не пишешь полный код за ученика. Можешь показать ПРИНЦИП на маленьком абстрактном примере.
-3. Если это квиз/тест — ты НЕ называешь правильный ответ. Можешь только намекнуть, объяснить тему вопроса.
-4. Отвечай ПРОСТО и КОРОТКО. 2-4 предложения максимум.
-5. Используй эмодзи иногда (1-2 на ответ).
-6. Если ученик настойчиво просит готовый ответ — мягко откажи и объясни что лучше думать самому.
+  const systemPrompt = `${EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT}
 
 КОНТЕКСТ УРОКА:
 Предмет: ${lessonSubject}
@@ -152,10 +145,10 @@ ${stageCtx}
     { role: "user" as const, content: body.user_message },
   ];
 
-  const { text, error } = await callClaude(systemPrompt, chatMessages);
+  const { text, error } = await chat(systemPrompt, chatMessages);
 
   if (error) {
-    console.error("[ai-chat] callClaude returned error:", error);
+    console.error("[ai-chat] chat() returned error:", error);
     // Do NOT insert to DB on error — counter must not increment for failed requests
     return NextResponse.json({ error }, { status: 500 });
   }
