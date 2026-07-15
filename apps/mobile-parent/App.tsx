@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
+import * as Updates from "expo-updates";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import RootNavigator from "./src/navigation/RootNavigator";
@@ -18,9 +19,37 @@ function timeout(ms: number): Promise<never> {
   });
 }
 
+/** По умолчанию expo-updates скачивает новый OTA-бандл в фоне на холодном
+ *  старте, но применяет его только на СЛЕДУЮЩЕМ холодном старте — сама
+ *  текущая сессия продолжает работать на старом JS. Без явного
+ *  check+fetch+reload здесь пользователь, открывший приложение один раз,
+ *  никогда не увидит только что опубликованный фикс, пока не закроет и не
+ *  откроет приложение ЕЩЁ раз (а многие просто сворачивают, а не закрывают
+ *  полностью). Это и объясняло "у одного телефона работает, у остальных —
+ *  Ошибка соединения": фикс конфигурации Supabase URL/ANON_KEY (app.json's
+ *  expo.extra) был опубликован через OTA корректно, но большинство
+ *  устройств просто не успели забрать и ПРИМЕНИТЬ его за один запуск.
+ *  Не блокирует ready/сплэш — если апдейт найден, reloadAsync() перезапускает
+ *  весь JS-рантайм сразу, независимо от того, что уже успело отрендериться. */
+async function checkForUpdateAndReload() {
+  if (__DEV__ || !Updates.isEnabled) return;
+  try {
+    const check = await Updates.checkForUpdateAsync();
+    if (!check.isAvailable) return;
+    await Updates.fetchUpdateAsync();
+    await Updates.reloadAsync();
+  } catch (e) {
+    console.error("[App] OTA update check/fetch/reload failed:", e);
+  }
+}
+
 export default function App() {
   const [ready, setReady] = useState(false);
   const [initialProfile, setInitialProfile] = useState<ParentProfile | null>(null);
+
+  useEffect(() => {
+    checkForUpdateAndReload();
+  }, []);
 
   useEffect(() => {
     (async () => {
