@@ -30,8 +30,6 @@ export function TeacherKnowledgeBaseView({
 
   return (
     <div className="text-slate-800">
-      <h1 className="mb-5 text-3xl font-bold tracking-tight text-slate-800">{d.title}</h1>
-
       <div className="mb-6 flex gap-2 rounded-2xl bg-slate-100/80 p-1.5">
         <button
           onClick={() => setTab("materials")}

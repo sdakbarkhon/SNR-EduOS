@@ -8,7 +8,7 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
-import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X } from "lucide-react";
+import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
 
@@ -134,12 +134,19 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [localHW, setLocalHW] = useState<HomeworkItem[]>(homework);
   const [busyId, setBusyId] = useState<string | null>(null);
   // null on server + first client render → no overdue counted until after mount,
   // keeping SSR and hydration identical (avoids React error #418).
   const [nowIso, setNowIso] = useState<string | null>(null);
   useEffect(() => { setNowIso(new Date().toISOString()); }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
   const filtered = localHW.filter((hw) => {
     if (groupFilter !== "all" && hw.group.id !== groupFilter) return false;
@@ -149,17 +156,28 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   });
 
   const urgencyFiltered = useMemo(() => {
-    if (urgencyFilter === "all" || nowIso === null) return filtered;
-    const week = 7 * 24 * 3_600_000;
-    return filtered.filter((hw) => {
-      if (!hw.due_date) return urgencyFilter === "later";
-      const diff = new Date(hw.due_date).getTime() - new Date(nowIso).getTime();
-      if (urgencyFilter === "this_week") return diff > 0 && diff <= week;
-      if (urgencyFilter === "next_week") return diff > week && diff <= 2 * week;
-      return diff > 2 * week;
-    });
+    let items = filtered;
+    if (urgencyFilter !== "all" && nowIso !== null) {
+      const week = 7 * 24 * 3_600_000;
+      items = items.filter((hw) => {
+        if (!hw.due_date) return urgencyFilter === "later";
+        const diff = new Date(hw.due_date).getTime() - new Date(nowIso).getTime();
+        if (urgencyFilter === "this_week") return diff > 0 && diff <= week;
+        if (urgencyFilter === "next_week") return diff > week && diff <= 2 * week;
+        return diff > 2 * week;
+      });
+    }
+    const q = query.trim().toLowerCase();
+    if (q) {
+      items = items.filter((hw) =>
+        hw.title.toLowerCase().includes(q) ||
+        hw.group.name.toLowerCase().includes(q) ||
+        getSubjectConfig(hw.group.subject).label.toLowerCase().includes(q),
+      );
+    }
+    return items;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, urgencyFilter, nowIso]);
+  }, [filtered, urgencyFilter, nowIso, query]);
 
 
   // Tri-color donut over all works (file submissions + test attempts)
@@ -248,10 +266,19 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
     <div className="flex max-w-7xl flex-col gap-8 lg:flex-row">
       {/* Main */}
       <div className="flex-1">
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">{d.teacher.homeworkTitle}</h1>
+        <div className="mb-8 flex items-center gap-4">
+          <div className="group relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-blue-600" />
+            <input
+              type="text"
+              value={rawQuery}
+              onChange={(e) => setRawQuery(e.target.value)}
+              placeholder="Поиск по названию, группе или предмету…"
+              className="w-full rounded-[16px] border border-white/50 bg-white/60 py-3 pl-11 pr-4 text-sm font-medium text-gray-700 shadow-sm backdrop-blur outline-none transition-all placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
           <Link href="/teacher/homework/new"
-            className="flex items-center rounded-[12px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700">
+            className="flex shrink-0 items-center rounded-[12px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700">
             <Plus className="mr-2 h-5 w-5" />
             {d.teacher.createBtn.replace("+ ", "")}
           </Link>

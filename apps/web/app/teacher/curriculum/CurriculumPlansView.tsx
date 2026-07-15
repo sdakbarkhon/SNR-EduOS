@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ClipboardList, Upload, X, Plus, Trash2, GripVertical, FileText, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ClipboardList, Upload, X, Plus, Trash2, GripVertical, FileText, AlertTriangle, Search } from "lucide-react";
 import {
   createCurriculumPlan, replaceCurriculumPlan, uploadCurriculumPlanFile,
   getCurriculumPlanForGroupSubject, getDictionary,
@@ -29,6 +29,22 @@ export function CurriculumPlansView({
   const d = getDictionary(locale as Locale).curriculum;
   const [plans, setPlans] = useState(initialPlans);
   const [uploadModal, setUploadModal] = useState(false);
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
+
+  const filteredPlans = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return plans;
+    return plans.filter((p) =>
+      (p.group_name ?? "").toLowerCase().includes(q) ||
+      (p.subject_name ?? "").toLowerCase().includes(q),
+    );
+  }, [plans, query]);
 
   function handleSaved(saved: CurriculumPlanWithTopics) {
     setPlans((prev) => [saved, ...prev.filter((p) => !(p.group_id === saved.group_id && p.subject_id === saved.subject_id))]);
@@ -36,28 +52,32 @@ export function CurriculumPlansView({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
-            <ClipboardList className="h-5 w-5" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900">{d.title}</h1>
+      <div className="flex items-center gap-4">
+        <div className="group relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-blue-600" />
+          <input
+            type="text"
+            value={rawQuery}
+            onChange={(e) => setRawQuery(e.target.value)}
+            placeholder="Поиск по группе или предмету…"
+            className="w-full rounded-xl border border-slate-200 bg-white/60 py-2.5 pl-11 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          />
         </div>
         <button
           onClick={() => setUploadModal(true)}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
+          className="flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
         >
           <Upload className="h-4 w-4" /> {d.uploadPlan}
         </button>
       </div>
 
-      {plans.length === 0 ? (
+      {filteredPlans.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-10 text-center text-sm text-slate-400">
-          Пока нет ни одного плана. Загрузите первый — AI разложит его на темы.
+          {plans.length === 0 ? "Пока нет ни одного плана. Загрузите первый — AI разложит его на темы." : "Ничего не найдено"}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {plans.map((p) => (
+          {filteredPlans.map((p) => (
             <div key={p.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{p.subject_name}</p>
               <h3 className="mt-1 truncate text-base font-bold text-slate-900">{p.group_name}</h3>

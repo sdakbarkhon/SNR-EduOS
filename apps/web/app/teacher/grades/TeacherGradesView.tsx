@@ -188,8 +188,6 @@ export function TeacherGradesView({ groups, stats }: Props) {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-[22px] font-bold text-brand-ink">Журнал оценок</h1>
-
       {/* KPI */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {kpis.map((k) => (

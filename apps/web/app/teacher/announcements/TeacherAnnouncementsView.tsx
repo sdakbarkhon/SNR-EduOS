@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Megaphone, Pin, PinOff, Trash2, Users, User, Globe, BookOpen, CalendarDays, AlertTriangle, Bell } from "lucide-react";
+import { Plus, Megaphone, Pin, PinOff, Trash2, Users, User, Globe, BookOpen, CalendarDays, AlertTriangle, Bell, Search } from "lucide-react";
 import {
   getDictionary, togglePinAnnouncement, deleteAnnouncement,
   type Locale, type TeacherAnnouncement, type AnnouncementCategory,
@@ -30,6 +30,24 @@ export function TeacherAnnouncementsView({
   const [list, setList] = useState(initial);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
+
+  const filteredList = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((a) =>
+      a.title.toLowerCase().includes(q) ||
+      a.body.toLowerCase().includes(q) ||
+      (a.groupName ?? "").toLowerCase().includes(q) ||
+      (a.targetStudentName ?? "").toLowerCase().includes(q),
+    );
+  }, [list, query]);
 
   async function togglePin(a: TeacherAnnouncement) {
     setList((p) => p.map((x) => (x.id === a.id ? { ...x, is_pinned: !x.is_pinned } : x)).sort((x, y) => Number(y.is_pinned) - Number(x.is_pinned)));
@@ -58,21 +76,30 @@ export function TeacherAnnouncementsView({
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-brand-ink">{t.title}</h1>
-        <button onClick={() => setFormOpen(true)} className="flex items-center gap-2 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-brand-blue/25 hover:brightness-110">
+      <div className="flex items-center gap-4">
+        <div className="group relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-blue-600" />
+          <input
+            type="text"
+            value={rawQuery}
+            onChange={(e) => setRawQuery(e.target.value)}
+            placeholder="Поиск по объявлениям…"
+            className="w-full rounded-xl border border-white/50 bg-white/60 py-2.5 pl-11 pr-4 text-sm font-medium text-brand-ink shadow-sm backdrop-blur outline-none transition-all placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+          />
+        </div>
+        <button onClick={() => setFormOpen(true)} className="flex shrink-0 items-center gap-2 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-brand-blue/25 hover:brightness-110">
           <Plus size={16} /> {t.create}
         </button>
       </div>
 
-      {list.length === 0 ? (
+      {filteredList.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-[24px] border border-white/70 bg-white/60 py-20 text-center backdrop-blur-xl">
           <Megaphone className="h-10 w-10 text-slate-300" />
-          <p className="text-sm text-brand-ink-muted">{t.empty}</p>
+          <p className="text-sm text-brand-ink-muted">{list.length === 0 ? t.empty : d.homework.noResultsTitle}</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {list.map((a) => {
+          {filteredList.map((a) => {
             const aud = audience(a);
             const date = new Date(a.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" });
             const catCfg = CATEGORY_CFG[a.category ?? "general"];

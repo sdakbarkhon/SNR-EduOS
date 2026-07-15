@@ -1,11 +1,12 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getDictionary, getSubjectConfig, pluralizeStudents } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
-import { Users, MoreVertical } from "lucide-react";
+import { Users, MoreVertical, Search } from "lucide-react";
 
 interface Props {
   groups: Array<{ id: string; name: string; subject: string; schedule_days: string | null; enrolled: Array<{ student_id: string }> }>;
@@ -28,6 +29,13 @@ function classBadge(name: string): string {
 export function TeacherGroupsView({ groups, grades, attendance }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 300);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
   // Build per-group stats; keep only groups with students AND some real data.
   const cards = groups
@@ -47,17 +55,36 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
     })
     .filter((c) => c.studentCount > 0 && c.hasData);
 
+  const filteredCards = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return cards;
+    return cards.filter(({ group }) =>
+      group.name.toLowerCase().includes(q) ||
+      getSubjectConfig(group.subject).label.toLowerCase().includes(q) ||
+      (group.schedule_days ?? "").toLowerCase().includes(q),
+    );
+  }, [cards, query]);
+
   return (
     <div className="max-w-6xl space-y-8">
-      <h1 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">{d.teacher.navGroups}</h1>
+      <div className="group relative max-w-sm">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-blue-600" />
+        <input
+          type="text"
+          value={rawQuery}
+          onChange={(e) => setRawQuery(e.target.value)}
+          placeholder="Поиск по классу, предмету или расписанию…"
+          className="w-full rounded-[16px] border border-white/50 bg-white/60 py-3 pl-11 pr-4 text-sm font-medium text-gray-700 shadow-sm backdrop-blur outline-none transition-all placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+        />
+      </div>
 
-      {cards.length === 0 ? (
+      {filteredCards.length === 0 ? (
         <div className="rounded-[20px] border border-white/80 bg-white/70 p-8 text-center text-brand-ink-muted">
           {d.common.none}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {cards.map(({ group, studentCount, avgGrade, attendancePct }, idx) => {
+          {filteredCards.map(({ group, studentCount, avgGrade, attendancePct }, idx) => {
             const cfg = getSubjectConfig(group.subject);
             const { Icon: GroupSubjectIcon } = resolveSubjectIcon(group.subject);
             const badge = classBadge(group.name);
