@@ -69,3 +69,33 @@ export const CURRICULUM_TOPICS_SCHEMA: ResponseSchema = {
     required: ["title", "description", "estimated_lessons"],
   },
 };
+
+// Промт МОБ-7 (v8 "EduOS Assistant Insight", apps/web/app/api/mobile/insight/route.ts).
+export const PARENT_INSIGHT_SCHEMA: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    summary: { type: SchemaType.STRING },
+    insights: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          title: { type: SchemaType.STRING },
+          body: { type: SchemaType.STRING },
+          category: {
+            type: SchemaType.STRING,
+            enum: ["attendance", "grades", "homework", "progress", "recommendation"],
+            format: "enum",
+          },
+          sentiment: {
+            type: SchemaType.STRING,
+            enum: ["positive", "neutral", "warning"],
+            format: "enum",
+          },
+        },
+        required: ["title", "body", "category", "sentiment"],
+      },
+    },
+  },
+  required: ["summary", "insights"],
+};

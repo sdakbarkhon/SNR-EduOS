@@ -138,6 +138,126 @@ export async function getChildDailyStats(db: Db, studentId: string, dateStr: str
   };
 }
 
+// Промт МОБ-7 (v7 "Статус дня") — та же основа, что DAILY_LESSON_SELECT, но
+// с реальным учителем ПРЕДМЕТА (subjects.teacher_id), а не только куратором
+// группы: разные предметы в один день у разных учителей, куратор — только
+// fallback, если у предмета учитель не назначен.
+const DAILY_STATUS_LESSON_SELECT =
+  "id, group_id, title, topic, starts_at, ends_at, duration_minutes, room, status, " +
+  "subject:subjects(id, name, icon, color, teacher:teachers!subjects_teacher_id_fkey(id, full_name)), " +
+  "group:groups!inner(id, name, teacher:teachers!groups_teacher_id_fkey(id, full_name))";
+
+export type DailyStatusLesson = {
+  id: string;
+  title: string;
+  subjectName: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  room: string | null;
+  teacherName: string | null;
+  attendanceStatus: AttendanceStatus | null; // null = ещё не отмечено
+};
+
+export type ChildDailyStatus = {
+  isDayOff: boolean; // сегодня нет уроков у группы ребёнка
+  lessons: DailyStatusLesson[];
+  totalLessons: number;
+  attendedCount: number;
+  missedCount: number;
+  gradesToday: { subjectName: string; grade: number }[];
+  homeworkAssignedToday: number;
+};
+
+type DailyStatusLessonRow = {
+  id: string; title: string | null; starts_at: string; ends_at: string | null; room: string | null; group_id: string;
+  subject: { id: string; name: string; teacher: { id: string; full_name: string } | null } | null;
+  group: { id: string; name: string; teacher: { id: string; full_name: string } | null } | null;
+};
+
+/** Полный "Статус дня" ребёнка (v7): timeline уроков сегодня с посещаемостью
+ *  + итоги дня (оценки, ДЗ). dateStr — YYYY-MM-DD, Asia/Tashkent. Клиент сам
+ *  вычисляет "идёт сейчас / перемена / прошёл / впереди" по starts_at/ends_at
+ *  и текущему времени (обновляется раз в 60с) — здесь только сырые данные. */
+export async function getChildDailyStatus(db: Db, studentId: string, dateStr: string): Promise<ChildDailyStatus> {
+  const { data: groupRows, error: groupErr } = await db
+    .from("student_groups")
+    .select("group_id")
+    .eq("student_id", studentId);
+  if (groupErr) throw groupErr;
+  const groupIds = ((groupRows ?? []) as { group_id: string }[]).map((r) => r.group_id);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: lessonRows, error: lessonsErr } = await (db as any)
+    .from("lessons")
+    .select(DAILY_STATUS_LESSON_SELECT)
+    .gte("starts_at", `${dateStr}T00:00:00+05:00`)
+    .lte("starts_at", `${dateStr}T23:59:59+05:00`)
+    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
+    .order("starts_at");
+  if (lessonsErr) throw lessonsErr;
+  const rawLessons = (lessonRows ?? []) as unknown as DailyStatusLessonRow[];
+  const lessonIds = rawLessons.map((l) => l.id);
+
+  let attendanceRows: Array<{ lesson_id: string; status: AttendanceStatus }> = [];
+  if (lessonIds.length > 0) {
+    const { data, error } = await db
+      .from("attendance")
+      .select("lesson_id, status")
+      .eq("student_id", studentId)
+      .in("lesson_id", lessonIds);
+    if (error) throw error;
+    attendanceRows = (data ?? []) as typeof attendanceRows;
+  }
+  const attendanceByLesson = new Map(attendanceRows.map((r) => [r.lesson_id, r.status]));
+
+  const lessons: DailyStatusLesson[] = rawLessons.map((l) => ({
+    id: l.id,
+    title: l.title ?? l.subject?.name ?? "",
+    subjectName: l.subject?.name ?? null,
+    startsAt: l.starts_at,
+    endsAt: l.ends_at,
+    room: l.room,
+    teacherName: l.subject?.teacher?.full_name ?? l.group?.teacher?.full_name ?? null,
+    attendanceStatus: attendanceByLesson.get(l.id) ?? null,
+  }));
+
+  const attendedCount = lessons.filter((l) => l.attendanceStatus === "present").length;
+  const missedCount = lessons.filter((l) => l.attendanceStatus === "absent_excused" || l.attendanceStatus === "absent_unexcused").length;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: gradeRows, error: gradesErr } = await (db as any)
+    .from("lesson_grades")
+    .select("grade, lesson:lessons!inner(subject:subjects(name))")
+    .eq("student_id", studentId)
+    .gte("graded_at", `${dateStr}T00:00:00+05:00`)
+    .lte("graded_at", `${dateStr}T23:59:59+05:00`);
+  if (gradesErr) throw gradesErr;
+  const gradesToday = ((gradeRows ?? []) as unknown as Array<{ grade: number; lesson: { subject: { name: string } | null } | null }>)
+    .map((r) => ({ subjectName: r.lesson?.subject?.name ?? "—", grade: r.grade }));
+
+  let homeworkAssignedToday = 0;
+  if (groupIds.length > 0) {
+    const { count, error: hwErr } = await db
+      .from("homework")
+      .select("id", { count: "exact", head: true })
+      .in("group_id", groupIds)
+      .gte("created_at", `${dateStr}T00:00:00+05:00`)
+      .lte("created_at", `${dateStr}T23:59:59+05:00`);
+    if (hwErr) throw hwErr;
+    homeworkAssignedToday = count ?? 0;
+  }
+
+  return {
+    isDayOff: lessons.length === 0,
+    lessons,
+    totalLessons: lessons.length,
+    attendedCount,
+    missedCount,
+    gradesToday,
+    homeworkAssignedToday,
+  };
+}
+
 export type ChildSubjectGrade = {
   subjectId: string;
   subjectName: string;

@@ -795,6 +795,68 @@ export interface Dictionary {
     secSessionEndBtn: string;
     secSessionEndedNotice: string;
     secLoginHistoryTitle: string;
+
+    // Промт МОБ-7 — v7 Статус дня.
+    dailyStatusTitle: string;
+    dailyStatusDayOffTitle: string;
+    dailyStatusDayOffDesc: string;
+    dailyStatusArrivedTitle: string;
+    dailyStatusArrivedMock: string;
+    dailyStatusOnLesson: string;
+    dailyStatusBreakLabel: string; // "Перемена, ещё {n} мин"
+    dailyStatusSummaryTitle: string;
+    dailyStatusSummaryTotal: string;
+    dailyStatusSummaryAttended: string;
+    dailyStatusSummaryMissed: string;
+    dailyStatusSummaryGrades: string;
+    dailyStatusSummaryHomework: string;
+    dailyStatusHomeWidgetDone: string;
+    homeNowAtSchoolTitle: string;
+
+    // Промт МОБ-7 — v8 EduOS Assistant Insight.
+    insightEmptyTitle: string;
+    insightEmptyDesc: string;
+    insightStaleLabel: string;
+    insightRefreshBtn: string;
+    insightCategoryRecommendation: string;
+    homeInsightWeekTitle: string;
+
+    // Промт МОБ-7 — v10 Все сервисы.
+    allServicesTitle: string;
+    allServicesSearchPlaceholder: string;
+    allServicesSearchEmpty: string;
+    allServicesPaymentsLabel: string;
+    allServicesPaymentsSubtitle: string;
+    allServicesScheduleLabel: string;
+    allServicesScheduleSubtitle: string;
+    allServicesHomeworkLabel: string;
+    allServicesHomeworkSubtitle: string;
+    allServicesGradesLabel: string;
+    allServicesGradesSubtitle: string;
+    allServicesAttendanceLabel: string;
+    allServicesAttendanceSubtitle: string;
+    allServicesMessagesLabel: string;
+    allServicesMessagesSubtitle: string;
+    allServicesDailyStatusLabel: string;
+    allServicesDailyStatusSubtitle: string;
+    allServicesInsightLabel: string;
+    allServicesInsightSubtitle: string;
+    allServicesTransportLabel: string;
+    allServicesTransportSubtitle: string;
+    allServicesCafeteriaLabel: string;
+    allServicesCafeteriaSubtitle: string;
+    allServicesMedicalLabel: string;
+    allServicesMedicalSubtitle: string;
+    allServicesClubsLabel: string;
+    allServicesClubsSubtitle: string;
+    allServicesLibraryLabel: string;
+    allServicesLibrarySubtitle: string;
+    allServicesSupportLabel: string;
+    allServicesSupportSubtitle: string;
+    comingSoonTag: string;
+    comingSoonTitle: string;
+    comingSoonDesc: string;
+    homeSeeAllServices: string;
   };
   homework: {
     title: string;

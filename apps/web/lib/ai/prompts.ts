@@ -162,6 +162,49 @@ title — короткое название темы на русском. descri
 ${planText}`;
 }
 
+// ── Родительский AI-инсайт (МОБ-7, v8 "EduOS Assistant Insight") ───────────
+// Что делает: анализирует успеваемость/посещаемость/ДЗ ребёнка за 30 дней и
+// даёт родителю 4-6 конкретных инсайтов + общий вывод одной строкой.
+// Вход: агрегированные метрики за 30 дней (см. InsightDataContext) + locale.
+// Выход: JSON { summary, insights: [...] } — форма обеспечена
+// PARENT_INSIGHT_SCHEMA (schemas.ts).
+export type InsightDataContext = {
+  childName: string;
+  className: string;
+  averageGrade: number | null;
+  attendancePercent: number;
+  missedLessons: number;
+  homeworkOnTime: number;
+  homeworkTotal: number;
+  homeworkOverdue: number;
+  subjectGrades: { subjectName: string; average: number }[];
+};
+
+const INSIGHT_LOCALE_INSTRUCTION: Record<"ru" | "uz" | "en", string> = {
+  ru: "Пиши на русском.",
+  uz: "O'zbek tilida yoz.",
+  en: "Write in English.",
+};
+
+export function buildParentInsightPrompt(data: InsightDataContext, locale: "ru" | "uz" | "en"): string {
+  const subjectsLine = data.subjectGrades.length > 0
+    ? data.subjectGrades.map((s) => `${s.subjectName}: ${s.average.toFixed(1)}`).join(", ")
+    : "нет данных";
+
+  return `Ты — школьный AI-ассистент. Проанализируй данные ученика ${data.childName}, класс ${data.className}, и дай 4-6 конкретных инсайтов для родителя.
+
+Данные ученика за последние 30 дней:
+- Средний балл: ${data.averageGrade != null ? data.averageGrade.toFixed(1) : "нет оценок"}
+- Посещаемость: ${data.attendancePercent}% (пропущено уроков: ${data.missedLessons})
+- Сдано ДЗ вовремя: ${data.homeworkOnTime}/${data.homeworkTotal}
+- Просроченных ДЗ: ${data.homeworkOverdue}
+- Оценки по предметам: ${subjectsLine}
+
+summary — общий вывод одной строкой. insights — массив из 4-6 объектов: title (короткий заголовок), body (2-4 предложения), category (одна из: attendance, grades, homework, progress, recommendation), sentiment (positive/neutral/warning).
+
+Тон: тёплый, поддерживающий, конкретный. Не выдумывай факты — используй только приведённые данные. ${INSIGHT_LOCALE_INSTRUCTION[locale]}`;
+}
+
 // ── Генерация плана урока (этапы/слайды/квиз) ───────────────────────────────
 // Что делает: строит полный план урока из последовательных этапов
 // (presentation/code/quiz_qia/внешние редакторы), включая слайды теории и

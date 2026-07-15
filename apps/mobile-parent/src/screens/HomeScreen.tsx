@@ -3,16 +3,27 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { getChildDailyStats, format, type ChildDailyStats } from "@snr/core";
-import { useMemo } from "react";
+import { getChildDailyStats, getChildDailyStatus, format, type ChildDailyStats, type ChildDailyStatus } from "@snr/core";
+import { useEffect, useMemo, useState } from "react";
 import { useAppLocale } from "../i18n";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { useParentData, useSelectedChild } from "../context/ParentDataContext";
 import { getSupabase } from "../lib/supabase";
+import { getJSON } from "../lib/mockStorage";
 import { ScreenSkeleton, ErrorState, EmptyState } from "../components/ScreenState";
 import { colors, radii, shadow, spacing } from "../theme";
 import type { ParentProfile } from "../lib/auth";
 import type { MainStackParamList } from "../navigation/MainNavigator";
+
+type CachedInsight = { summary: string; insights: Array<{ title: string; body: string; sentiment: "positive" | "neutral" | "warning" }> };
+
+// Приоритет "самого важного" инсайта для превью на главном: warning (требует
+// внимания) > positive (похвалить) > neutral — тот же принцип "highest
+// sentiment", что просил промт.
+function pickTopInsight(cached: CachedInsight): CachedInsight["insights"][number] | null {
+  const bySentiment = (s: string) => cached.insights.find((i) => i.sentiment === s);
+  return bySentiment("warning") ?? bySentiment("positive") ?? cached.insights[0] ?? null;
+}
 
 function todayStr(): string {
   // Asia/Tashkent (UTC+5) — тот же сдвиг, что и на вебе (getTashkentWeekMonday).
@@ -29,6 +40,28 @@ function fmtTime(iso: string | null): string | null {
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
+type NowStatus = { icon: keyof typeof Ionicons.glyphMap; color: string; text: string };
+
+function computeNowStatus(status: ChildDailyStatus, d: ReturnType<typeof useAppLocale>["d"]): NowStatus {
+  if (status.isDayOff) {
+    return { icon: "sunny-outline", color: colors.success, text: d.parentMobile.dailyStatusDayOffTitle };
+  }
+  const now = Date.now();
+  for (const lesson of status.lessons) {
+    const start = new Date(lesson.startsAt).getTime();
+    const end = lesson.endsAt ? new Date(lesson.endsAt).getTime() : start + 45 * 60000;
+    if (now >= start && now <= end) {
+      return { icon: "school-outline", color: colors.success, text: `${d.parentMobile.dailyStatusOnLesson}: ${lesson.subjectName ?? lesson.title}` };
+    }
+  }
+  const next = status.lessons.find((l) => new Date(l.startsAt).getTime() > now);
+  if (next) {
+    const minutes = Math.max(0, Math.round((new Date(next.startsAt).getTime() - now) / 60000));
+    return { icon: "time-outline", color: colors.textSecondary, text: format(d.parentMobile.dailyStatusBreakLabel, { n: minutes }) };
+  }
+  return { icon: "checkmark-done-outline", color: colors.textMuted, text: d.parentMobile.dailyStatusHomeWidgetDone };
+}
+
 export default function HomeScreen({ profile }: { profile: ParentProfile }) {
   const { d } = useAppLocale();
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -40,6 +73,24 @@ export default function HomeScreen({ profile }: { profile: ParentProfile }) {
     () => (child ? getChildDailyStats(getSupabase(), child.id, date) : Promise.resolve(null)),
     [child?.id, date],
   );
+
+  // Промт МОБ-7 — виджет "Сейчас в школе" (v7 preview): та же getChildDailyStatus,
+  // что и полный DailyStatusScreen, просто без построения timeline на клиенте.
+  const dailyStatus = useAsyncData<ChildDailyStatus | null>(
+    () => (child ? getChildDailyStatus(getSupabase(), child.id, date) : Promise.resolve(null)),
+    [child?.id, date],
+  );
+
+  // Промт МОБ-7 — виджет "Инсайт недели" (v8 preview): читает ТОЛЬКО локальный
+  // secure-store кэш (тот же ключ, что InsightScreen), никакого API-вызова с
+  // главного экрана — не хотим тратить Gemini-запрос на каждое открытие таба.
+  const [weekInsight, setWeekInsight] = useState<CachedInsight | null>(null);
+  useEffect(() => {
+    if (!child) { setWeekInsight(null); return; }
+    getJSON<CachedInsight>(`mob8.insight.${child.id}`).then(setWeekInsight);
+  }, [child?.id]);
+  const topInsight = weekInsight ? pickTopInsight(weekInsight) : null;
+  const nowStatus = dailyStatus.data ? computeNowStatus(dailyStatus.data, d) : null;
 
   const initialsStr = useMemo(() => (child ? initials(child.fullName) : ""), [child]);
 
@@ -181,6 +232,27 @@ export default function HomeScreen({ profile }: { profile: ParentProfile }) {
                 )}
               </View>
 
+              {/* Промт МОБ-7 — превью v7 "Статус дня": та же getChildDailyStatus, что
+                  и полный экран, свёрнутая в одну строку с текущим статусом ребёнка. */}
+              {nowStatus && (
+                <Pressable
+                  onPress={() => nav.navigate("DailyStatus")}
+                  style={({ pressed }) => [{
+                    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card,
+                    borderRadius: radii.xl, padding: 13, marginBottom: spacing.md, opacity: pressed ? 0.85 : 1, ...shadow.soft,
+                  }]}
+                >
+                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: nowStatus.color + "22", alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name={nowStatus.icon} size={18} color={nowStatus.color} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: "600", color: colors.textMuted, marginBottom: 2 }}>{d.parentMobile.homeNowAtSchoolTitle}</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "700", color: colors.textPrimary }}>{nowStatus.text}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+                </Pressable>
+              )}
+
               {/* MOCK: балансы — TODO(payments) заменить на реальные getPayments/getCharges при подключении оплат */}
               <View style={{ flexDirection: "row", gap: 10, marginBottom: spacing.md }}>
                 <Pressable
@@ -211,22 +283,42 @@ export default function HomeScreen({ profile }: { profile: ParentProfile }) {
                 </Pressable>
               </View>
 
-              {/* MOCK: EduOS Insight — TODO(ai-insight) заменить на реальный AI-анализ, когда появится источник данных */}
-              <View style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderAlt, borderRadius: radii.xxl, padding: 15, marginBottom: spacing.lg }}>
+              {/* Промт МОБ-7 — превью v8 EduOS Assistant Insight: показывает инсайт
+                  с наивысшим приоритетом из локального кэша (тот же ключ, что и
+                  InsightScreen), иначе — прежний "coming soon" мок-текст. */}
+              <Pressable
+                onPress={() => nav.navigate("Insight")}
+                style={({ pressed }) => [{
+                  backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderAlt, borderRadius: radii.xxl,
+                  padding: 15, marginBottom: spacing.lg, opacity: pressed ? 0.92 : 1,
+                }]}
+              >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
                     <Ionicons name="sparkles" size={14} color="#fff" />
                   </View>
-                  <Text style={{ fontSize: 13.5, fontWeight: "700", color: colors.primary }}>{d.parentMobile.insightTitle}</Text>
-                  <View style={{ backgroundColor: colors.accentCoral, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 6 }}>
-                    <Text style={{ fontSize: 8.5, fontWeight: "800", color: "#fff" }}>{d.parentMobile.insightBadgeNew}</Text>
-                  </View>
+                  <Text style={{ fontSize: 13.5, fontWeight: "700", color: colors.primary }}>{d.parentMobile.homeInsightWeekTitle}</Text>
+                  {!topInsight && (
+                    <View style={{ backgroundColor: colors.accentCoral, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 6 }}>
+                      <Text style={{ fontSize: 8.5, fontWeight: "800", color: "#fff" }}>{d.parentMobile.insightBadgeNew}</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={{ fontSize: 12.5, lineHeight: 18, color: colors.textPrimary, marginBottom: 13 }}>{d.parentMobile.insightMockBody}</Text>
+                {topInsight ? (
+                  <>
+                    <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "700", color: colors.textPrimary, marginBottom: 3 }}>{topInsight.title}</Text>
+                    <Text numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginBottom: 13 }}>{topInsight.body}</Text>
+                  </>
+                ) : (
+                  <Text style={{ fontSize: 12.5, lineHeight: 18, color: colors.textPrimary, marginBottom: 13 }}>{d.parentMobile.insightMockBody}</Text>
+                )}
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <View style={{ flex: 1.15, height: 38, borderRadius: radii.sm, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
+                  <Pressable
+                    onPress={() => nav.navigate("Insight")}
+                    style={{ flex: 1.15, height: 38, borderRadius: radii.sm, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
+                  >
                     <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>{d.parentMobile.insightBtnProgress}</Text>
-                  </View>
+                  </Pressable>
                   <Pressable
                     onPress={() => nav.getParent()?.navigate("Messages" as never)}
                     style={{ flex: 1, height: 38, borderRadius: radii.sm, backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.chipBg, alignItems: "center", justifyContent: "center" }}
@@ -234,10 +326,15 @@ export default function HomeScreen({ profile }: { profile: ParentProfile }) {
                     <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>{d.parentMobile.insightBtnMessageTeacher}</Text>
                   </Pressable>
                 </View>
-              </View>
+              </Pressable>
 
               {/* Быстрые действия */}
-              <Text style={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary, marginBottom: 11 }}>{d.parentMobile.quickActionsTitle}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 11 }}>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary }}>{d.parentMobile.quickActionsTitle}</Text>
+                <Pressable onPress={() => nav.navigate("AllServices")} hitSlop={8}>
+                  <Text style={{ fontSize: 12.5, fontWeight: "700", color: colors.primary }}>{d.parentMobile.homeSeeAllServices}</Text>
+                </Pressable>
+              </View>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 9 }}>
                 {[
                   { label: d.parentMobile.quickActionSchedule, icon: "calendar-outline" as const, bg: "#EFEAFF", color: colors.primary, onPress: () => nav.navigate("Schedule") },

@@ -1,3 +1,4 @@
+import type { Ionicons } from "@expo/vector-icons";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import TabNavigator from "./TabNavigator";
 import ScheduleScreen from "../screens/ScheduleScreen";
@@ -22,6 +23,10 @@ import DocumentsScreen from "../screens/DocumentsScreen";
 import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
 import PaymentMethodsScreen from "../screens/PaymentMethodsScreen";
 import SecurityScreen from "../screens/SecurityScreen";
+import DailyStatusScreen from "../screens/DailyStatusScreen";
+import InsightScreen from "../screens/InsightScreen";
+import AllServicesScreen from "../screens/AllServicesScreen";
+import ComingSoonScreen from "../screens/ComingSoonScreen";
 import { ParentDataProvider } from "../context/ParentDataContext";
 import type { ParentProfile } from "../lib/auth";
 import type { Bill } from "../lib/mockPaymentsData";
@@ -54,6 +59,11 @@ export type MainStackParamList = {
   NotificationSettings: undefined;
   PaymentMethods: undefined;
   Security: undefined;
+  // Промт МОБ-7 — v7/v8/v10.
+  DailyStatus: undefined;
+  Insight: undefined;
+  AllServices: undefined;
+  ComingSoon: { service: string; icon: keyof typeof Ionicons.glyphMap };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -96,6 +106,10 @@ export default function MainNavigator({
         <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
         <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
         <Stack.Screen name="Security" component={SecurityScreen} />
+        <Stack.Screen name="DailyStatus" component={DailyStatusScreen} />
+        <Stack.Screen name="Insight" component={InsightScreen} />
+        <Stack.Screen name="AllServices" component={AllServicesScreen} />
+        <Stack.Screen name="ComingSoon" component={ComingSoonScreen} />
       </Stack.Navigator>
     </ParentDataProvider>
   );
