@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { buildCurriculumParsePrompt } from "@/lib/ai/prompts";
+import { CURRICULUM_TOPICS_SCHEMA } from "@/lib/ai/schemas";
 import { extractText } from "@/lib/file-extractors";
 
 // Промт 4, Часть 3 — парсит PDF/DOCX учебный план в список тем через AI.
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
   let topics: ParsedTopic[] | null = null;
 
   for (let attempt = 0; attempt < 3 && !topics; attempt++) {
-    const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, null, { model: "pro" });
+    const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, CURRICULUM_TOPICS_SCHEMA, { model: "pro" });
     if (error || !Array.isArray(parsed) || parsed.length === 0) {
       lastError = error || "Не удалось разобрать ответ AI";
       continue;

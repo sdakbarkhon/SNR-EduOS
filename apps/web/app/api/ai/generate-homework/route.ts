@@ -4,6 +4,7 @@ import { generateJSON } from "@/lib/ai/gemini-client";
 import {
   buildHomeworkFilePrompt, buildHomeworkTestPrompt, buildHomeworkProgrammingPrompt, buildHomeworkBundlePrompt,
 } from "@/lib/ai/prompts";
+import { HOMEWORK_FILE_SCHEMA, HOMEWORK_TEST_SCHEMA, HOMEWORK_PROGRAMMING_SCHEMA } from "@/lib/ai/schemas";
 import { EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
 import type { CodeLanguage, ExternalServiceType } from "@snr/core";
 
@@ -197,11 +198,19 @@ export async function POST(req: NextRequest) {
     : type === "programming" ? buildHomeworkProgrammingPrompt(topic, level, hints)
     : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, EXTERNAL_SERVICE_ORDER);
 
+  // bundle остаётся без строгой схемы — см. комментарий в lib/ai/schemas.ts
+  // (config-форма зависит от значения соседнего поля "type", Gemini responseSchema
+  // не выражает discriminated union).
+  const schema = type === "file" ? HOMEWORK_FILE_SCHEMA
+    : type === "test" ? HOMEWORK_TEST_SCHEMA
+    : type === "programming" ? HOMEWORK_PROGRAMMING_SCHEMA
+    : null;
+
   let result: GeneratedHomework | null = null;
   let lastError = "";
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
-    const { data: parsed, error } = await generateJSON<GenRaw>(prompt, null, { temperature: 0.8 });
+    const { data: parsed, error } = await generateJSON<GenRaw>(prompt, schema, { temperature: 0.8 });
 
     if (error || !parsed) {
       console.error(`[ai-generate-homework] attempt ${attempt} error:`, error);

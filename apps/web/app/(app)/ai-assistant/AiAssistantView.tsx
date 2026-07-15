@@ -9,6 +9,15 @@ import { EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 
 const SUGGESTION_ICONS = [Calculator, Languages, Bug, BookOpen];
 
+// Промт "Gemini migration", ЧАСТЬ 5.3 — раньше вся история чата (растёт без
+// ограничений в клиентском state) целиком уходила на сервер при КАЖДОМ новом
+// сообщении. Отправляем только последние 15 — простая обрезка без
+// суммаризации (упрощённый вариант, явно разрешённый ТЗ вместо
+// summary-каждые-20-сообщений — экономия input-токенов важнее полного
+// сохранения контекста для этого чата). В UI видна вся история, обрезается
+// только то, что уходит в запрос.
+const MAX_HISTORY_MESSAGES = 15;
+
 type Message = { role: "user" | "model"; text: string };
 
 export function AiAssistantView() {
@@ -34,7 +43,7 @@ export function AiAssistantView() {
     setInput("");
     setLoading(true);
 
-    const history = messages.map((m) => ({ role: m.role, text: m.text }));
+    const history = messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({ role: m.role, text: m.text }));
     const result = await callAiChat(EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT, trimmed, history);
     const aiText = "error" in result ? t.errorFallback : result.text;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
