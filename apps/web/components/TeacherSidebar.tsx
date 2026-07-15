@@ -25,7 +25,10 @@ const STORAGE_KEY = "teacher_sidebar_collapsed";
 // then visibly animates to collapsed with the "expand" icon on every load.
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-const teacherNavItems = [
+// Exported for TeacherTopbar.tsx — the page-title-instead-of-search shown
+// there matches pathname against this same {href, label} list, so sidebar
+// and header always agree on what the current page is called.
+export const teacherNavItems = [
   { key: "home",       href: "/teacher/dashboard",    icon: Home,          label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
   { key: "lessons",    href: "/teacher/lessons",      icon: CalendarDays,  label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLessons },
   { key: "curriculum", href: "/teacher/curriculum",   icon: ClipboardList, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navCurriculumPlans },
