@@ -675,6 +675,126 @@ export interface Dictionary {
     supportReplyReceiptsTitle: string;
     supportReplyReceiptsBody: string;
     supportReplyRefund: string;
+
+    // Промт МОБ-5 — Оплаты (Баланс/Счета/Checkout/История/Чек/Кошелёк ребёнка).
+    payBalanceTitle: string;
+    payTopUpBtn: string;
+    payPayBillBtn: string;
+    payHistoryBtn: string;
+    payNearestTitle: string;
+    payNearestNone: string;
+    payRecentTitle: string;
+    payRecentEmpty: string;
+    payDueLabel: string; // "Срок: {date}"
+    payOverdueTag: string;
+    payViewAllBills: string;
+
+    billsTitle: string;
+    billsEmpty: string;
+    billsDueLabel: string; // "Срок оплаты: {date}"
+
+    checkoutTitle: string;
+    checkoutMethodLabel: string;
+    checkoutAddCardBtn: string;
+    checkoutNoCards: string;
+    checkoutPayBtn: string; // "Оплатить {amount}"
+    checkoutProcessing: string;
+    checkoutSuccessTitle: string;
+    checkoutSuccessDesc: string; // "Счёт «{title}» оплачен"
+    checkoutBackBtn: string;
+
+    historyTitle: string;
+    historyEmpty: string;
+
+    receiptTitle: string;
+    receiptSchoolName: string;
+    receiptSchoolDetails: string;
+    receiptPayerLabel: string;
+    receiptItemLabel: string;
+    receiptTotalLabel: string;
+    receiptDateLabel: string;
+    receiptShareBtn: string;
+    receiptShareMockNotice: string;
+
+    walletTitle: string;
+    walletBalanceLabel: string;
+    walletTopUpBtn: string;
+    walletRecentTitle: string;
+    walletEmpty: string;
+    walletTopUpSuccessTitle: string;
+    walletTopUpSuccessDesc: string;
+
+    // Промт МОБ-6 — Профиль расширенно (Ребёнок/Родитель/Документы/
+    // Уведомления/Способы оплаты/Безопасность).
+    childProfGenderLabel: string;
+    childProfGenderMale: string;
+    childProfGenderFemale: string;
+    childProfWriteCuratorBtn: string;
+    childProfSubjectsTitle: string;
+    childProfSubjectsEmpty: string;
+    childProfStatusTitle: string;
+    childProfStatusActive: string;
+    childProfStatusInactive: string;
+    childProfEnrolledLabel: string;
+    childProfNoThreadNotice: string;
+
+    parentProfEmailLabel: string;
+    parentProfEditBtn: string;
+    parentProfEditSoon: string;
+    parentProfDocumentsRow: string;
+    parentProfNotificationsRow: string;
+    parentProfPaymentMethodsRow: string;
+    parentProfSecurityRow: string;
+
+    docTitle: string;
+    docStatusUploaded: string;
+    docStatusNeedsUpdate: string;
+    docStatusMissing: string;
+    docUploadBtn: string;
+    docPreviewTitle: string;
+    docUploadSuccessTitle: string;
+    docUploadSuccessDesc: string;
+
+    notifSetTitle: string;
+    notifSetGrades: string;
+    notifSetHomework: string;
+    notifSetAttendance: string;
+    notifSetAnnouncements: string;
+    notifSetTeacherMessages: string;
+    notifSetPayments: string;
+    notifSetQuietHoursTitle: string;
+    notifSetQuietHoursDesc: string; // "С {from} до {to}"
+
+    pmTitle: string;
+    pmPrimaryTag: string;
+    pmMakePrimaryBtn: string;
+    pmDeleteBtn: string;
+    pmAddBtn: string;
+    pmAddTitle: string;
+    pmCardNumberLabel: string;
+    pmExpiryLabel: string;
+    pmCvvLabel: string;
+    pmInvalidNotice: string;
+    pmDetailUsageTitle: string;
+    pmDetailUsageEmpty: string;
+    pmDeleteConfirmTitle: string;
+    pmDeleteConfirmBtn: string;
+
+    secTitle: string;
+    secBiometricRow: string;
+    secBiometricEnabled: string;
+    secPinRow: string;
+    secPinChangeBtn: string;
+    secPinEnterTitle: string;
+    secPinCreateTitle: string;
+    secPinRepeatTitle: string;
+    secPinMismatch: string;
+    secSessionsTitle: string;
+    secSessionActiveNow: string;
+    secSessionDaysAgo: string; // "{n} дн. назад"
+    secSessionEndBtn: string;
+    secSessionEndedNotice: string;
+    secLoginHistoryTitle: string;
   };
   homework: {
     title: string;

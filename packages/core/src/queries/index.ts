@@ -821,7 +821,7 @@ export const getStudentById = async (db: Db, studentId: string) => {
   const { data, error } = await (db as any)
     .from("students")
     .select(
-      "id, full_name, birth_date, avatar_url, balance, status, " +
+      "id, full_name, birth_date, avatar_url, balance, status, created_at, " +
       "curator:teachers!curator_id(id, full_name, phone), " +
       "student_groups(groups(id, name, subject, teacher:teachers!groups_teacher_id_fkey(id, full_name, phone)))",
     )
@@ -830,7 +830,7 @@ export const getStudentById = async (db: Db, studentId: string) => {
   if (error) throw error;
   return data as {
     id: string; full_name: string; birth_date: string | null; avatar_url: string | null;
-    balance: number; status: StudentStatus;
+    balance: number; status: StudentStatus; created_at: string;
     curator: { id: string; full_name: string; phone: string | null } | null;
     student_groups: Array<{ groups: { id: string; name: string; subject: string; teacher: { id: string; full_name: string; phone: string | null } | null } | null }>;
   };

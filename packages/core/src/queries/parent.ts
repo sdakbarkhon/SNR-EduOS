@@ -195,3 +195,35 @@ export async function getChildGradesSummary(db: Db, studentId: string): Promise<
 
   return { average, subjects, strengths, growthAreas };
 }
+
+export type GroupSubjectTeacher = {
+  subjectId: string;
+  subjectName: string;
+  icon: string | null;
+  color: string | null;
+  teacherId: string | null;
+  teacherName: string | null;
+};
+
+/** Промт МОБ-6 — все предметы группы ребёнка со своими учителями (для блока
+ *  "Предметы и учителя" в полном профиле ребёнка). Один запрос на всю группу,
+ *  а не по одному на предмет (в отличие от getChildSubjectDetail, который
+ *  резолвит ровно один предмет для экрана деталей). */
+export async function getGroupSubjectTeachers(db: Db, groupId: string): Promise<GroupSubjectTeacher[]> {
+  const { data, error } = await db
+    .from("subjects")
+    .select("id, name, icon, color, is_active, teacher:teachers!subjects_teacher_id_fkey(id, full_name)")
+    .eq("group_id", groupId)
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw error;
+  type Row = { id: string; name: string; icon: string | null; color: string | null; teacher: { id: string; full_name: string } | null };
+  return ((data ?? []) as unknown as Row[]).map((s) => ({
+    subjectId: s.id,
+    subjectName: s.name,
+    icon: s.icon,
+    color: s.color,
+    teacherId: s.teacher?.id ?? null,
+    teacherName: s.teacher?.full_name ?? null,
+  }));
+}

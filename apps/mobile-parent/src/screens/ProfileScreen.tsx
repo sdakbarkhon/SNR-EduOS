@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -33,11 +33,19 @@ export default function ProfileScreen({
   const { locale, d, setLocale } = useAppLocale();
   const nav = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { data: parentCtx, loading, error, refresh, selectedChildId, selectChild } = useParentData();
-  const [notifOn, setNotifOn] = useState(true);
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSupabase().auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+  }, []);
 
   async function onLogout() {
     await getSupabase().auth.signOut();
     onLoggedOut();
+  }
+
+  function onEdit() {
+    Alert.alert(d.parentMobile.parentProfEditSoon);
   }
 
   return (
@@ -46,13 +54,25 @@ export default function ProfileScreen({
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 32 }}>
           <Text style={{ fontSize: 23, fontWeight: "800", color: colors.textPrimary, marginBottom: 16 }}>{d.nav.profile}</Text>
 
-          <View style={{ backgroundColor: colors.card, borderRadius: radii.xxl, padding: 16, flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 12, ...shadow.card }}>
-            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>{initials(profile.fullName)}</Text>
+          <View style={{ backgroundColor: colors.card, borderRadius: radii.xxl, padding: 16, marginBottom: 12, ...shadow.card }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 12 }}>
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>{initials(profile.fullName)}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 16.5, fontWeight: "800", color: colors.textPrimary }}>{profile.fullName}</Text>
+                {parentCtx?.parentPhone ? <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>{parentCtx.parentPhone}</Text> : null}
+              </View>
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 16.5, fontWeight: "800", color: colors.textPrimary }}>{profile.fullName}</Text>
-              {parentCtx?.parentPhone ? <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>{parentCtx.parentPhone}</Text> : null}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }}>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={{ fontSize: 10.5, fontWeight: "600", color: colors.textMuted, marginBottom: 3 }}>{d.parentMobile.parentProfEmailLabel}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 12.5, fontWeight: "600", color: colors.textPrimary }}>{email ?? d.common.none}</Text>
+              </View>
+              <Pressable onPress={onEdit} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, flexDirection: "row", alignItems: "center", gap: 5 }]}>
+                <Ionicons name="create-outline" size={15} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>{d.parentMobile.parentProfEditBtn}</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -98,19 +118,13 @@ export default function ProfileScreen({
                 {d.parentMobile.profileSettings}
               </Text>
               <View style={{ backgroundColor: colors.card, borderRadius: radii.xl, paddingHorizontal: 14, marginBottom: 12, ...shadow.soft }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: "#FFF3E4", alignItems: "center", justifyContent: "center" }}>
-                    <Ionicons name="notifications-outline" size={18} color={colors.accentOrange} />
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 13.5, fontWeight: "600", color: colors.textPrimary }}>{d.parentMobile.profileNotifRow}</Text>
-                  <Pressable
-                    onPress={() => setNotifOn((v) => !v)}
-                    style={{ width: 46, height: 28, borderRadius: 14, backgroundColor: notifOn ? colors.primary : colors.border, justifyContent: "center" }}
-                  >
-                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", marginLeft: notifOn ? 21 : 3 }} />
-                  </Pressable>
-                </View>
+                <SettingsRow icon="document-text-outline" iconBg="#EFEAFF" iconColor={colors.primary} label={d.parentMobile.parentProfDocumentsRow} onPress={() => nav.navigate("Documents")} />
+                <SettingsRow icon="notifications-outline" iconBg="#FFF3E4" iconColor={colors.accentOrange} label={d.parentMobile.parentProfNotificationsRow} onPress={() => nav.navigate("NotificationSettings")} />
+                <SettingsRow icon="card-outline" iconBg={colors.successBg} iconColor={colors.success} label={d.parentMobile.parentProfPaymentMethodsRow} onPress={() => nav.navigate("PaymentMethods")} />
+                <SettingsRow icon="shield-checkmark-outline" iconBg={colors.dangerBg} iconColor={colors.danger} label={d.parentMobile.parentProfSecurityRow} onPress={() => nav.navigate("Security")} last />
+              </View>
 
+              <View style={{ backgroundColor: colors.card, borderRadius: radii.xl, paddingHorizontal: 14, marginBottom: 12, ...shadow.soft }}>
                 <View style={{ paddingVertical: 11 }}>
                   <Text style={{ fontSize: 13.5, fontWeight: "600", color: colors.textPrimary, marginBottom: 8 }}>{d.parentMobile.profileLanguageRow}</Text>
                   <View style={{ flexDirection: "row", gap: 8 }}>
@@ -148,5 +162,25 @@ export default function ProfileScreen({
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+function SettingsRow({ icon, iconBg, iconColor, label, onPress, last }: {
+  icon: keyof typeof Ionicons.glyphMap; iconBg: string; iconColor: string; label: string; onPress: () => void; last?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [{
+        flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 11,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.border, opacity: pressed ? 0.85 : 1,
+      }]}
+    >
+      <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: iconBg, alignItems: "center", justifyContent: "center" }}>
+        <Ionicons name={icon} size={18} color={iconColor} />
+      </View>
+      <Text style={{ flex: 1, fontSize: 13.5, fontWeight: "600", color: colors.textPrimary }}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+    </Pressable>
   );
 }

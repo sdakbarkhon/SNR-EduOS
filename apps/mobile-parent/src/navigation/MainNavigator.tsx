@@ -13,8 +13,18 @@ import MessageThreadScreen from "../screens/MessageThreadScreen";
 import AnnouncementsScreen from "../screens/AnnouncementsScreen";
 import AnnouncementDetailScreen from "../screens/AnnouncementDetailScreen";
 import SupportScreen from "../screens/SupportScreen";
+import BillsScreen from "../screens/BillsScreen";
+import CheckoutScreen from "../screens/CheckoutScreen";
+import PaymentHistoryScreen from "../screens/PaymentHistoryScreen";
+import ReceiptScreen from "../screens/ReceiptScreen";
+import ChildWalletScreen from "../screens/ChildWalletScreen";
+import DocumentsScreen from "../screens/DocumentsScreen";
+import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
+import PaymentMethodsScreen from "../screens/PaymentMethodsScreen";
+import SecurityScreen from "../screens/SecurityScreen";
 import { ParentDataProvider } from "../context/ParentDataContext";
 import type { ParentProfile } from "../lib/auth";
+import type { Bill } from "../lib/mockPaymentsData";
 
 export type MainStackParamList = {
   Tabs: undefined;
@@ -35,6 +45,15 @@ export type MainStackParamList = {
   Announcements: undefined;
   AnnouncementDetail: { id: string };
   Support: undefined;
+  Bills: undefined;
+  Checkout: { bill: Bill };
+  PaymentHistory: undefined;
+  Receipt: { recordId: string };
+  ChildWallet: undefined;
+  Documents: undefined;
+  NotificationSettings: undefined;
+  PaymentMethods: undefined;
+  Security: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -68,6 +87,15 @@ export default function MainNavigator({
         <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
         <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
         <Stack.Screen name="Support" component={SupportScreen} />
+        <Stack.Screen name="Bills" component={BillsScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+        <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
+        <Stack.Screen name="Receipt" component={ReceiptScreen} />
+        <Stack.Screen name="ChildWallet" component={ChildWalletScreen} />
+        <Stack.Screen name="Documents" component={DocumentsScreen} />
+        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+        <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+        <Stack.Screen name="Security" component={SecurityScreen} />
       </Stack.Navigator>
     </ParentDataProvider>
   );
