@@ -1375,11 +1375,15 @@ async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | n
   const { data: userRes } = await db.auth.getUser();
   const userId = userRes?.user?.id;
   if (!userId) return null;
-  const { data: teacher } = await db2
+  const { data: teacher, error: teacherErr } = await db2
     .from("teachers")
     .select("id, subject_slug, my_subjects:subjects!teacher_id(id)")
     .eq("user_id", userId)
     .maybeSingle();
+  // Fail closed (5222b73): раньше сбой этого запроса молча возвращал null →
+  // фильтр отключался и ПРЕДМЕТНИК ВИДЕЛ ВСЕ УРОКИ. Ошибку бросаем — пустой
+  // список с ошибкой в логах лучше тихой утечки чужого расписания.
+  if (teacherErr) throw teacherErr;
   if (!teacher) return null;
   if (!teacher.subject_slug) return { teacherId: teacher.id, subjectIds: null };
   return {

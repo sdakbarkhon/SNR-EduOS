@@ -1025,7 +1025,7 @@ export function TeacherLessonDetailView({
   // ── Active stage control ────────────────────────────────────────────────────
 
   async function handleActivateStage(stageId: string) {
-    if (status !== "in_progress") return;
+    if (status !== "in_progress" || isCurator) return;
     setActivatingStageId(stageId);
     setStageActivationError(null);
     try {
@@ -1092,6 +1092,12 @@ export function TeacherLessonDetailView({
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const isLessonCompleted = status === "completed";
+  // Куратор (teachers.subject_slug=NULL, teacher_karim) — наблюдательная роль:
+  // видит уроки всех своих групп, но не редактирует. UI скрывает мутирующие
+  // контролы тем же способом, что для завершённого урока; настоящий
+  // enforcement — subject-scope RLS (миграция 131).
+  const isCurator = !teacher.subject_slug;
+  const readOnly = isLessonCompleted || isCurator;
   const style = getSubjectStyle(lesson.group.subject);
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
@@ -1153,7 +1159,7 @@ export function TeacherLessonDetailView({
         actions={
           <>
             {/* Manual start/end (§7.6) — pg_cron auto-transitions still run independently */}
-            {status === "scheduled" && (
+            {status === "scheduled" && !isCurator && (
               <button
                 onClick={handleStartLesson}
                 disabled={startingLesson}
@@ -1162,7 +1168,7 @@ export function TeacherLessonDetailView({
                 {startingLesson ? "…" : dl.startLessonBtn}
               </button>
             )}
-            {status === "in_progress" && (
+            {status === "in_progress" && !isCurator && (
               <button
                 onClick={handleEndLesson}
                 disabled={endingLesson}
@@ -1212,6 +1218,14 @@ export function TeacherLessonDetailView({
         }
       />
 
+      {/* Куратор — только просмотр (жёстко по-русски, как "Куратор" в TeacherHeaderInfo) */}
+      {isCurator && (
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+          <Lock className="h-4 w-4 shrink-0" />
+          Режим куратора — только просмотр. Изменять урок может учитель предмета.
+        </div>
+      )}
+
       {/* Inline attendance reminder (5–15 min before end) */}
       {status === "in_progress" && (
         <AttendanceReminderBanner
@@ -1233,7 +1247,7 @@ export function TeacherLessonDetailView({
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.materialsTitle}</h2>
-          {!isLessonCompleted && (
+          {!readOnly && (
             <button onClick={() => setUploadModal(true)}
               className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95">
               {dl.addMaterialLabel}
@@ -1268,7 +1282,7 @@ export function TeacherLessonDetailView({
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
                       <Download className="h-4 w-4" />
                     </button>
-                    {!isLessonCompleted && (
+                    {!readOnly && (
                       <button
                         onClick={() => { if (matEditBlocked) return; setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
                         disabled={matEditBlocked}
@@ -1281,7 +1295,7 @@ export function TeacherLessonDetailView({
                 </div>
 
                 {/* Show-to-class control (only while the lesson is live) */}
-                {status === "in_progress" && (
+                {status === "in_progress" && !isCurator && (
                   demoMaterialId === mat.id ? (
                     <div className="flex items-center gap-2">
                       <span className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
@@ -1311,7 +1325,7 @@ export function TeacherLessonDetailView({
       <section className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-sm backdrop-blur-xl space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
-          {!isLessonCompleted && (
+          {!readOnly && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setAiGenerateOpen(true)}
@@ -1329,8 +1343,9 @@ export function TeacherLessonDetailView({
           )}
         </div>
 
-        {/* Активация этапов — раньше отдельная секция, теперь верх блока "Этапы" (§7.4) */}
-        {(status === "in_progress" || status === "scheduled") && middleStages.length > 0 && (
+        {/* Активация этапов — раньше отдельная секция, теперь верх блока "Этапы" (§7.4).
+            Куратору блок управления скрыт целиком (активация/live-code — мутации). */}
+        {(status === "in_progress" || status === "scheduled") && !isCurator && middleStages.length > 0 && (
           <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-violet-500" />
@@ -1459,7 +1474,7 @@ export function TeacherLessonDetailView({
 
           {/* Middle stages */}
           {middleStages.length === 0 ? (
-            !isLessonCompleted && (
+            !readOnly && (
               <div
                 onClick={() => setStageModal({ mode: "add" })}
                 className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-6 text-slate-400 transition-all hover:border-blue-300 hover:text-blue-500"
@@ -1547,8 +1562,8 @@ export function TeacherLessonDetailView({
                   </button>
                 )}
 
-                {/* Kahoot: launch live game */}
-                {stage.content_type === "quiz_kahoot" && (
+                {/* Kahoot: launch live game (мутация — куратору скрыто) */}
+                {stage.content_type === "quiz_kahoot" && !isCurator && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setKahootStage(stage); }}
                     className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
@@ -1558,7 +1573,7 @@ export function TeacherLessonDetailView({
                 )}
 
                 {/* Actions */}
-                {!isLessonCompleted && (
+                {!readOnly && (
                 <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {reorderingStageId === stage.id ? (
                     // Спиннер на этапе, по которому идёт reorder

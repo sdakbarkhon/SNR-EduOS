@@ -19,6 +19,10 @@ export type Teacher = {
   full_name: string;
   avatar_url: string | null;
   created_at: string;
+  /** Slug предмета учителя (programming/robotics/math/english/russian).
+   *  NULL = куратор общего управления (teacher_karim) — наблюдательная роль.
+   *  Optional: колонка добавлена миграцией 109, часть селектов её не берёт. */
+  subject_slug?: string | null;
 };
 
 export type Student = {

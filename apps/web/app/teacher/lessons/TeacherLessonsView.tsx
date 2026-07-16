@@ -201,10 +201,11 @@ function CardMenu({
 
 // ── LessonCard ────────────────────────────────────────────────────────────────
 function LessonCard({
-  lesson, now, onEdit, onDelete,
+  lesson, now, onEdit, onDelete, readOnly = false,
 }: {
   lesson: LessonItem; now: Date;
   onEdit: (l: LessonItem) => void; onDelete: (l: LessonItem) => void;
+  readOnly?: boolean;
 }) {
   const displayTitle = lesson.title ?? lesson.topic ?? fmtDate(lesson.starts_at);
   const timeRange = lesson.ends_at
@@ -233,7 +234,9 @@ function LessonCard({
           </div>
         </div>
       </Link>
-      <CardMenu onEdit={() => onEdit(lesson)} onDelete={() => onDelete(lesson)} editBlocked={editBlocked} />
+      {!readOnly && (
+        <CardMenu onEdit={() => onEdit(lesson)} onDelete={() => onDelete(lesson)} editBlocked={editBlocked} />
+      )}
     </div>
   );
 }
@@ -539,11 +542,14 @@ export function TeacherLessonsView({
   groups,
   teacherSubjects,
   loadError = false,
+  isCurator = false,
 }: {
   lessons: LessonItem[];
   groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
   loadError?: boolean;
+  /** Куратор (subject_slug=NULL) — только просмотр: без создания/меню карточек. */
+  isCurator?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -777,12 +783,14 @@ export function TeacherLessonsView({
               <h3 className="text-sm font-bold capitalize text-[#1D1D1F]">
                 {fmtDayHeader(selectedDayKey)}
               </h3>
-              <button
-                onClick={openCreate}
-                className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
-              >
-                <Plus className="h-3.5 w-3.5" /> Создать урок
-              </button>
+              {!isCurator && (
+                <button
+                  onClick={openCreate}
+                  className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Создать урок
+                </button>
+              )}
             </div>
 
             {/* Lesson list or empty state */}
@@ -792,17 +800,19 @@ export function TeacherLessonsView({
                   <CalendarDays className="h-6 w-6 text-gray-300" />
                 </div>
                 <p className="text-sm font-medium text-gray-400">На этот день уроков нет</p>
-                <button
-                  onClick={openCreate}
-                  className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                >
-                  + Создать урок
-                </button>
+                {!isCurator && (
+                  <button
+                    onClick={openCreate}
+                    className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  >
+                    + Создать урок
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
                 {dayLessons.map(l => (
-                  <LessonCard key={l.id} lesson={l} now={now} onEdit={openEdit} onDelete={openDelete} />
+                  <LessonCard key={l.id} lesson={l} now={now} onEdit={openEdit} onDelete={openDelete} readOnly={isCurator} />
                 ))}
               </div>
             )}
