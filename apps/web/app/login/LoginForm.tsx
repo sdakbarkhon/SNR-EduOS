@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles, GraduationCap as StudentCap } from "lucide-react";
+import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
-import { loginWithUsername, demoLogin } from "@/app/actions/auth";
+import { loginWithUsername } from "@/app/actions/auth";
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 import { Logo } from "@/components/Logo";
 
@@ -46,7 +46,6 @@ export function LoginForm({ locale }: { locale: Locale }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
-  const [demoStudentLoading, setDemoStudentLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -73,31 +72,6 @@ export function LoginForm({ locale }: { locale: Locale }) {
     setNotice(msg);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(null), 2500);
-  }
-
-  // P2: «Демо ученик» — прямой claim без модалки. Любой из ~96 учеников
-  // пула, случайно, редирект на /dashboard. Модалка нужна только для
-  // учителей (там выбор предмета).
-  async function onDemoStudent() {
-    setDemoStudentLoading(true);
-    setError(null);
-    try {
-      const result = await demoLogin({ kind: "student" });
-      if (!result.ok) {
-        setDemoStudentLoading(false);
-        setError(result.error === "all_busy" ? d.demoMode.allBusy : d.demoMode.loginFailed);
-        return;
-      }
-      sessionStorage.setItem("show-demo-welcome", "true");
-      startTransition(() => {
-        router.replace(result.dest);
-        router.refresh();
-      });
-    } catch (err) {
-      console.error("[demo-student] error:", err);
-      setDemoStudentLoading(false);
-      setError(d.demoMode.loginFailed);
-    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -263,36 +237,21 @@ export function LoginForm({ locale }: { locale: Locale }) {
             <div className="h-px flex-1 bg-white/40" />
           </div>
 
-          {/* P2: две демо-кнопки на месте прежней единой «Демо». Ученик — прямой
-              claim без модалки. Учитель — модалка с 5 предметниками. Ниже — прежний
-              OAuth-ряд из 3 кнопок. */}
-          <div className="mb-2 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={onDemoStudent}
-              disabled={demoStudentLoading || isPending}
-              title={d.demoMode.studentButtonLabel}
-              className="group flex items-center justify-center gap-1.5 rounded-xl border border-white/80 bg-white/70 py-3 shadow-sm backdrop-blur-sm transition hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <StudentCap className="h-4 w-4 text-emerald-500 group-hover:text-emerald-600" />
-              <span className="text-xs font-medium text-slate-700 group-hover:text-slate-900">
-                {demoStudentLoading ? d.demoMode.loginProgress : d.demoMode.studentShortLabel}
-              </span>
-            </button>
+          {/* P2-фикс (revert бага А): вернули ОДНУ кнопку «Демо» (расположение —
+              как до пачки 2, первая ячейка OAuth-ряда). Открывает DemoRoleModal
+              с 6 карточками (1 ученик + 5 предметников). */}
+          <div className="grid grid-cols-4 gap-2">
             <button
               type="button"
               onClick={() => setShowDemoModal(true)}
-              disabled={demoStudentLoading || isPending}
-              title={d.demoMode.teacherButtonLabel}
-              className="group flex items-center justify-center gap-1.5 rounded-xl border border-white/80 bg-white/70 py-3 shadow-sm backdrop-blur-sm transition hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+              title={d.demoMode.buttonLabel}
+              className="group flex items-center justify-center gap-1 rounded-xl border border-white/80 bg-white/70 py-3 shadow-sm backdrop-blur-sm transition hover:bg-white hover:shadow-md"
             >
               <Sparkles className="h-4 w-4 text-violet-500 group-hover:text-violet-600" />
               <span className="text-xs font-medium text-slate-700 group-hover:text-slate-900">
-                {d.demoMode.teacherShortLabel}
+                {d.demoMode.shortLabel}
               </span>
             </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => showNotice(t.comingSoon)}

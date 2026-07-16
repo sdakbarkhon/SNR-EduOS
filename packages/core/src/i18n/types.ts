@@ -1124,7 +1124,7 @@ export interface Dictionary {
     buttonLabel: string;   // "Демо-режим"
     shortLabel: string;    // "Демо" — for the compact OAuth-row button
     buttonHint: string;    // "Попробуйте платформу без регистрации"
-    modalTitle: string;    // "Демо-режим"
+    modalTitle: string;    // "Выберите демо-роль"
     modalSubtitle: string; // "Выберите роль чтобы попробовать платформу"
     loginBtn: string;      // "Войти"
     loginProgress: string; // "Вход..."
@@ -1150,15 +1150,14 @@ export interface Dictionary {
     allBusy: string;       // "Все демо-аккаунты заняты, попробуйте через несколько минут"
     loginFailed: string;   // демо-логин не удался по иной причине (не занятость пула)
     cannotEditRealData: string; // tooltip/ошибка: в демо нельзя менять реальные записи
-    // P2 (пачка 2) — две отдельные кнопки на /login: «Демо ученик» (прямой claim)
-    // и «Демо учитель» (модалка с 5 предметниками, где занятые серые).
-    studentButtonLabel: string;    // hover-title кнопки «Демо ученик»
-    studentShortLabel: string;     // компактный лейбл кнопки на форме
-    teacherButtonLabel: string;    // hover-title кнопки «Демо учитель»
-    teacherShortLabel: string;     // компактный лейбл кнопки на форме
-    modalTitleTeacher: string;     // заголовок модалки «Демо учитель»
-    modalSubtitleTeacher: string;  // подзаголовок модалки «Демо учитель»
-    slotOccupied: string;          // «занят» под карточкой предметника
+    // P2-фикс (revert бага А пачки 2) — ОДНА кнопка «Демо» (buttonLabel/
+    // shortLabel выше) открывает модалку с 6 карточками: 1 ученик (случайный
+    // из пула) + 5 предметников. Раздельные studentButtonLabel/
+    // teacherButtonLabel/modalTitleTeacher/modalSubtitleTeacher из
+    // ошибочного разделения на 2 кнопки — убраны.
+    modalCardStudent: string;      // подпись карточки-ученика в модалке ("Ученик")
+    modalCardTeacher: string;      // заголовок секции предметников в модалке ("Учителя")
+    slotOccupied: string;          // «занят» под занятой карточкой (ученик ИЛИ предметник)
     parentButtonLabel: string;     // мобилка LoginScreen: «Демо родитель»
   };
   announcements: {
