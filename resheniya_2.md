@@ -2565,3 +2565,89 @@ v_session_token := replace(gen_random_uuid()::text, '-', '') ||
 
 - Мобилка не тронута (по вводной — заблокирована Google-аккаунтом, OTA не публикуем).
 - Живая проверка — за заказчиком.
+
+
+---
+
+## P3-фикс (после P2-фикса) — восстановить 3 карточки классов + фикс footer
+
+**Дата:** 2026-07-16.
+**Скоуп:** только `apps/web`.
+
+### Контекст
+
+Предыдущий фикс (P2-фикс, коммиты `8405ae0`/`1e894b7`/`4d868e8`) вернул единую кнопку «Демо», но модалка внутри показывала 6 карточек (1 общая «Ученик» + 5 предметников) — это НЕ соответствовало исходной структуре «до Пачки 2». Оригинальная модалка (проверено `git show d1442e4^:apps/web/components/DemoRoleModal.tsx`) имела 8 карточек: 3 класса учеников (3-й/7-й/10-й, каждый с иконкой Baby/Backpack/Laptop и своим цветом) + 5 предметников. Клик по классу должен давать случайного ученика **только из этого класса**, а не из общего пула ~96.
+
+Также в модалке висела устаревшая надпись «Данные тестовые. Автосброс через 3 часа неактивности.» — эта логика (пул + 3ч сброс) убрана ещё в Пачке 2 (миграция 110), актуальная модель — 15 мин неактивности, без сброса данных.
+
+### Схема: как определяется класс ученика
+
+`students.grade` — текстовая колонка формата `'N класс'` (`'3 класс'`, `'7 класс'`, `'10 класс'`). Проверено live-запросом к hosted БД: 31+31+31 = 93 активных ученика с заполненным `grade`, распределены поровну по трём классам. **Найдена аномалия**: 3 реальных аккаунта (`rustam_03`, `farrukh_10`, `malika_07`) имеют `grade = NULL`, несмотря на то что username явно указывает класс — legacy-данные, не заполненные при создании. Они **не участвуют** в grade-scoped claim (как и не должны — RPC фильтрует по `students.grade`, не по username), но продолжают участвовать в старом «бесклассовом» режиме (`p_grade_level IS NULL`), который остался для обратной совместимости. **Вне скоупа этого фикса** — заказчику стоит решить, нужно ли backfill'ить `grade` для этих трёх (отдельная задача).
+
+### Часть 1 — Миграция 135: `claim_demo_slot` принимает `grade_level`
+
+Файл: [`supabase/migrations/135_demo_slot_student_by_grade.sql`](supabase/migrations/135_demo_slot_student_by_grade.sql).
+
+`CREATE OR REPLACE FUNCTION claim_demo_slot(p_role text, p_subject_slug text DEFAULT NULL, p_grade_level integer DEFAULT NULL)` — новая 3-параметровая сигнатура:
+- `role='student'` + `p_grade_level` указан (3/7/10) → фильтр `WHERE split_part(s.grade, ' ', 1) = p_grade_level::text`.
+- `role='student'` + `p_grade_level IS NULL` → как раньше, случайный из всех активных (обратная совместимость).
+- `role='teacher'`/`'parent'` → `p_grade_level` принудительно обнуляется (не применим).
+- Старая 2-параметровая перегрузка `claim_demo_slot(text, text)` — **DROP** (после обновления обоих callers на 3-параметровую сигнатуру в этом же деплое — иначе PostgREST мог бы неоднозначно резолвить вызов с 2 именованными аргументами между двумя перегрузками).
+
+Smoke-test в конце файла (`DO $$...$$`): claim+release по всем 3 классам, плюс бесклассовый режим, плюс teacher — с `RAISE NOTICE`.
+
+### Часть 2 — `/api/demo/status`: `occupied_grades` вместо `student_available`
+
+[`apps/web/app/api/demo/status/route.ts`](apps/web/app/api/demo/status/route.ts) переписан:
+- `occupied_subjects: string[]` — без изменений логики.
+- `occupied_grades: number[]` — для каждого класса из `[3,7,10]`: класс считается занятым, если `count(активных lease role='student' с учениками из этого класса) >= count(активных учеников этого класса)`. Между `demo_leases` и `students` нет прямого FK (обе ссылаются на `auth.users`), поэтому join делается вручную в JS (два параллельных запроса через `service_role`, который обходит RLS на `demo_leases`).
+
+### Часть 3 — `/api/demo/claim` + `demoLogin`: принимают `grade_level`
+
+- [`apps/web/app/api/demo/claim/route.ts`](apps/web/app/api/demo/claim/route.ts) — тело `POST` принимает `grade_level?: number | null`, валидирует `∈ {3,7,10}`, передаёт как `p_grade_level` в RPC.
+- [`apps/web/app/actions/auth.ts`](apps/web/app/actions/auth.ts) — `demoLogin({kind:'student', gradeLevel?: 3|7|10})`, передаёт `p_grade_level` в тот же RPC-вызов.
+
+### Часть 4 — `DemoRoleModal.tsx`: 8 карточек
+
+[`apps/web/components/DemoRoleModal.tsx`](apps/web/components/DemoRoleModal.tsx) переписан:
+- Секция «Ученики» (заголовок `d.modalSectionStudents`) — 3 карточки классов, дизайн 1-в-1 с оригиналом до Пачки 2: 3-й класс — `Baby`/`from-emerald-500 to-teal-600`, 7-й — `Backpack`/`from-blue-500 to-cyan-600`, 10-й — `Laptop`/`from-orange-500 to-red-600`.
+- Секция «Учителя» (заголовок `d.modalCardTeacher`) — 5 карточек предметников, без изменений с прошлого фикса.
+- Занятость: `occupied_grades`/`occupied_subjects` из `/api/demo/status` → серая карточка, `Lock`-иконка, надпись `d.slotOccupied` («занят»), disabled. Race-handling сохранён (`all_busy` → локально помечаем занятым + toast).
+- Footer — актуальный текст вместо «автосброс через 3 часа».
+
+### Часть 5 — i18n
+
+`packages/core/src/i18n/{types,ru,en,uz}.ts`:
+- Убран `modalCardStudent` (одиночная карточка).
+- Добавлены: `modalSectionStudents` («Ученики»), `modalCardGrade3` («3-й класс»), `modalCardGrade7` («7-й класс»), `modalCardGrade10` («10-й класс»).
+- `resetNote` обновлён: было «Данные тестовые. Автосброс через 3 часа неактивности.» → стало «Вы входите в реальный аккаунт. Ваши действия сохраняются. Слот освобождается через 15 минут неактивности.» (en/uz аналогично).
+- `modalCardTeacher` (секционный заголовок «Учителя») — без изменений с прошлого фикса.
+
+### SQL для применения (135)
+
+```sql
+-- См. supabase/migrations/135_demo_slot_student_by_grade.sql — файл целиком.
+-- CREATE OR REPLACE + DROP старой 2-параметровой перегрузки в конце.
+-- Применять ПОСЛЕ 134.
+```
+
+### Проверки
+
+- `pnpm --filter web tsc --noEmit` — OK
+- `pnpm --filter core tsc --noEmit` — OK
+- `pnpm --filter web build` — OK
+
+### Проверочный сценарий
+
+1. `/login` → кнопка «Демо» → модалка → секция «Ученики» (3 карточки классов) + секция «Учителя» (5 карточек).
+2. Клик «3-й класс» → случайный ученик 3-А (например `aziz_03` или `demo_student_3_XX`), редирект `/dashboard`, баннер.
+3. В incognito снова «3-й класс» → другой ученик 3-А (не тот же самый).
+4. Продолжать открывать incognito-вкладки, занимая 3-й класс — когда все активные ученики класса заняты, карточка «3-й класс» становится серой с «занят».
+5. То же для 7-го и 10-го классов.
+6. Учителя работают как в прошлом фиксе (без изменений).
+
+### Что не сделано
+
+- Применение миграции 135 — заказчик через Dashboard SQL Editor (после 134).
+- Backfill `grade` для 3 legacy-аккаунтов без класса (`rustam_03`/`farrukh_10`/`malika_07`) — отдельная задача, вне скоупа.
+- Живая проверка — за заказчиком.
