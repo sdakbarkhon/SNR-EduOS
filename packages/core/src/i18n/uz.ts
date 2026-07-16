@@ -1140,6 +1140,7 @@ export const uz: Dictionary = {
     modalTitleTeacher: "Demo rejim: o'qituvchi",
     modalSubtitleTeacher: "Fanni tanlang — o'sha fan o'qituvchisining hisobiga kirasiz",
     slotOccupied: "band",
+    parentButtonLabel: "Demo ota-ona",
     welcomeTitle: "Demo rejim",
     welcomeText: "Barcha ma'lumotlar sinov uchun.",
     welcomeOk: "Tushundim",

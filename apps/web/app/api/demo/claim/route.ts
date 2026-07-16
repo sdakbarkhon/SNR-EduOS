@@ -119,5 +119,12 @@ export async function POST(req: Request) {
     role,
     redirect_to: redirectFor(role),
     username: row.username,
+    // Мобилка вызывает этот же endpoint из LoginScreen (без Bearer) — ей
+    // нужны реальные creds для supabase.auth.signInWithPassword. Веб
+    // ЭТОТ endpoint не использует (у него server action demoLogin), так
+    // что возврат creds никого не помещает.
+    email: row.email,
+    password: row.password,
+    session_token: row.session_token,
   });
 }

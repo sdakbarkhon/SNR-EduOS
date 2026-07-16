@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import * as Updates from "expo-updates";
@@ -6,9 +6,11 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
+import { DemoBanner } from "./src/components/DemoBanner";
 import { getSupabase } from "./src/lib/supabase";
 import { fetchParentProfile, type ParentProfile } from "./src/lib/auth";
 import { LocaleProvider } from "./src/i18n";
+import { DemoSessionProvider } from "./src/context/DemoSessionContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -25,13 +27,7 @@ function timeout(ms: number): Promise<never> {
  *  текущая сессия продолжает работать на старом JS. Без явного
  *  check+fetch+reload здесь пользователь, открывший приложение один раз,
  *  никогда не увидит только что опубликованный фикс, пока не закроет и не
- *  откроет приложение ЕЩЁ раз (а многие просто сворачивают, а не закрывают
- *  полностью). Это и объясняло "у одного телефона работает, у остальных —
- *  Ошибка соединения": фикс конфигурации Supabase URL/ANON_KEY (app.json's
- *  expo.extra) был опубликован через OTA корректно, но большинство
- *  устройств просто не успели забрать и ПРИМЕНИТЬ его за один запуск.
- *  Не блокирует ready/сплэш — если апдейт найден, reloadAsync() перезапускает
- *  весь JS-рантайм сразу, независимо от того, что уже успело отрендериться. */
+ *  откроет приложение ЕЩЁ раз. */
 async function checkForUpdateAndReload() {
   if (__DEV__ || !Updates.isEnabled) return;
   try {
@@ -47,6 +43,9 @@ async function checkForUpdateAndReload() {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [initialProfile, setInitialProfile] = useState<ParentProfile | null>(null);
+  // P2: rootNavRef позволяет DemoBanner дёрнуть переход обратно на Login
+  // после signOut. Прокидываем через onDemoLoggedOut в RootNavigator.
+  const onDemoLogoutRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     checkForUpdateAndReload();
@@ -54,9 +53,6 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      // Сплэш убираем СРАЗУ, до всей async-цепочки: даже если инициализация
-      // ниже упадёт или зависнет, приложение никогда не застрянет на сплэше.
-      // Пока идёт init, показываем спиннер (ready=false), затем — навигатор.
       SplashScreen.hideAsync().catch(() => {});
       try {
         await Promise.race([
@@ -68,7 +64,6 @@ export default function App() {
               if (profile) {
                 setInitialProfile(profile);
               } else {
-                // Сессия есть, но это не родитель (или строка parents исчезла) — выходим.
                 await db.auth.signOut();
               }
             }
@@ -76,8 +71,7 @@ export default function App() {
           timeout(STARTUP_TIMEOUT_MS),
         ]);
       } catch {
-        // Ошибка на старте (сеть/хранилище/таймаут) не должна блокировать вход —
-        // просто идём на LoginScreen как при отсутствии сессии.
+        // Ошибка на старте не блокирует вход — идём на LoginScreen.
       } finally {
         setReady(true);
       }
@@ -97,10 +91,19 @@ export default function App() {
   return (
     <ErrorBoundary>
       <LocaleProvider>
-        <SafeAreaProvider>
-          <StatusBar style="dark" />
-          <RootNavigator initialProfile={initialProfile} />
-        </SafeAreaProvider>
+        <DemoSessionProvider>
+          <SafeAreaProvider>
+            <StatusBar style="dark" />
+            {/* P2: баннер над навигатором — виден на всех экранах после
+                демо-логина. Внутри сам определяет isDemo и возвращает null
+                для реальных сессий. */}
+            <DemoBanner onLoggedOut={() => onDemoLogoutRef.current()} />
+            <RootNavigator
+              initialProfile={initialProfile}
+              onDemoLogoutRefSet={(fn) => { onDemoLogoutRef.current = fn; }}
+            />
+          </SafeAreaProvider>
+        </DemoSessionProvider>
       </LocaleProvider>
     </ErrorBoundary>
   );

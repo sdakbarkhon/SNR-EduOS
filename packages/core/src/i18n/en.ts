@@ -1140,6 +1140,7 @@ export const en: Dictionary = {
     modalTitleTeacher: "Demo mode: teacher",
     modalSubtitleTeacher: "Pick a subject — you'll enter the account of that subject's teacher",
     slotOccupied: "occupied",
+    parentButtonLabel: "Demo parent",
     welcomeTitle: "Demo mode",
     welcomeText: "All data is test data.",
     welcomeOk: "Got it",

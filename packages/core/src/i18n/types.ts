@@ -1159,6 +1159,7 @@ export interface Dictionary {
     modalTitleTeacher: string;     // заголовок модалки «Демо учитель»
     modalSubtitleTeacher: string;  // подзаголовок модалки «Демо учитель»
     slotOccupied: string;          // «занят» под карточкой предметника
+    parentButtonLabel: string;     // мобилка LoginScreen: «Демо родитель»
   };
   announcements: {
     title: string;

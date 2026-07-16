@@ -15,7 +15,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Locale } from "@snr/core";
 import { useAppLocale } from "../i18n";
-import { loginAsParent, NotParentError, type ParentProfile } from "../lib/auth";
+import { loginAsParent, NotParentError, fetchParentProfile, type ParentProfile } from "../lib/auth";
+import { claimDemoSlot } from "../lib/demoApi";
+import { useDemoSession } from "../context/DemoSessionContext";
+import { getSupabase } from "../lib/supabase";
 
 const ORANGE_FROM = "#F97316";
 const ORANGE_TO = "#FBBF24";
@@ -40,11 +43,13 @@ export default function LoginScreen({
   onLoggedIn: (profile: ParentProfile) => void;
 }) {
   const { locale, d, setLocale } = useAppLocale();
+  const { setDemoSession } = useDemoSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   async function onSubmit() {
     if (!username.trim() || !password) return;
@@ -70,6 +75,50 @@ export default function LoginScreen({
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  // P2: «Демо родитель» — claim свободного parent-аккаунта через
+  // /api/demo/claim, локальный signInWithPassword под ним, сохраняем
+  // session_token в SecureStore (heartbeat/release будет им пользоваться),
+  // редиректим в Main.
+  async function onDemoParent() {
+    setDemoLoading(true);
+    setError(null);
+    try {
+      const claim = await claimDemoSlot("parent");
+      const db = getSupabase();
+      const { error: signInError } = await db.auth.signInWithPassword({
+        email: claim.email,
+        password: claim.password,
+      });
+      if (signInError) {
+        console.error("[LoginScreen] demo signIn failed:", signInError.message);
+        setError(d.demoMode.loginFailed);
+        return;
+      }
+      const profile = await fetchParentProfile();
+      if (!profile) {
+        console.error("[LoginScreen] demo signIn ok, but parents row missing");
+        await db.auth.signOut();
+        setError(d.demoMode.loginFailed);
+        return;
+      }
+      // Порядок важен: SecureStore ПЕРЕД onLoggedIn — DemoBanner подхватит
+      // isDemo из контекста как только флаг обновится, но чтобы избежать
+      // race с redirect'ом на Main рендер получит уже полный state.
+      await setDemoSession(claim.session_token);
+      onLoggedIn(profile);
+    } catch (e) {
+      const msg = (e as Error)?.message ?? "";
+      if (msg === "no_available_slot") {
+        setError(d.demoMode.allBusy);
+      } else {
+        console.error("[LoginScreen] demo claim failed:", e);
+        setError(d.demoMode.loginFailed);
+      }
+    } finally {
+      setDemoLoading(false);
     }
   }
 
@@ -164,7 +213,7 @@ export default function LoginScreen({
 
             {error ? <Text style={{ color: "#DC2626", fontSize: 13 }}>{error}</Text> : null}
 
-            <Pressable onPress={onSubmit} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
+            <Pressable onPress={onSubmit} disabled={loading || demoLoading} style={{ opacity: (loading || demoLoading) ? 0.7 : 1 }}>
               <LinearGradient
                 colors={[ORANGE_FROM, ORANGE_TO]}
                 start={{ x: 0, y: 0 }}
@@ -179,6 +228,37 @@ export default function LoginScreen({
                   </Text>
                 )}
               </LinearGradient>
+            </Pressable>
+
+            {/* P2: «Демо родитель» — прямой claim свободного parent-аккаунта из
+                пула (3 родителя). Расположена под submit-кнопкой в той же
+                секции gap:16, как отдельная демо-строка. */}
+            <Pressable
+              onPress={onDemoParent}
+              disabled={loading || demoLoading}
+              style={({ pressed }) => ({
+                borderRadius: 14,
+                paddingVertical: 13,
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 8,
+                backgroundColor: "#F4F6FB",
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                opacity: (loading || demoLoading) ? 0.65 : (pressed ? 0.85 : 1),
+              })}
+            >
+              {demoLoading ? (
+                <ActivityIndicator color="#4A5568" />
+              ) : (
+                <>
+                  <Ionicons name="sparkles-outline" size={16} color="#7C3AED" />
+                  <Text style={{ color: "#4A5568", fontWeight: "600", fontSize: 15 }}>
+                    {d.demoMode.parentButtonLabel}
+                  </Text>
+                </>
+              )}
             </Pressable>
           </View>
 

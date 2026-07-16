@@ -1140,6 +1140,7 @@ export const ru: Dictionary = {
     modalTitleTeacher: "Демо-режим: учитель",
     modalSubtitleTeacher: "Выберите предмет — попадёте в аккаунт учителя этого предмета",
     slotOccupied: "занят",
+    parentButtonLabel: "Демо родитель",
     welcomeTitle: "Вы в демо-режиме",
     welcomeText: "Все данные тестовые.",
     welcomeOk: "Понятно",
