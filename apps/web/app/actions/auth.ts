@@ -112,7 +112,7 @@ export async function loginWithUsername(
 export async function demoLogin(
   target:
     | { kind: "teacher"; slug: "programming" | "robotics" | "math" | "english" | "russian" }
-    | { kind: "student" }
+    | { kind: "student"; gradeLevel?: 3 | 7 | 10 }
     | { kind: "parent" },
 ): Promise<LoginResult> {
   const admin = createAdminClient();
@@ -120,12 +120,16 @@ export async function demoLogin(
 
   const role = target.kind;
   const subjectSlug = target.kind === "teacher" ? target.slug : null;
+  // P3-фикс: карточка класса в DemoRoleModal передаёт gradeLevel — случайный
+  // ученик берётся ТОЛЬКО из этого класса (миграция 135, students.grade).
+  const gradeLevel = target.kind === "student" ? target.gradeLevel ?? null : null;
 
-  // 1) claim slot через новый RPC (миграция 133).
+  // 1) claim slot через RPC (миграции 133/135).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: claimed, error: claimError } = await (admin.rpc as any)("claim_demo_slot", {
     p_role: role,
     p_subject_slug: subjectSlug,
+    p_grade_level: gradeLevel,
   });
   if (claimError) {
     const msg = claimError.message ?? "";

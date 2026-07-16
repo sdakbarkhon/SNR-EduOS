@@ -1,14 +1,14 @@
 // P2 — POST /api/demo/claim
 // Занять свободный аккаунт из пула (student/teacher/parent) через RPC
-// claim_demo_slot (миграция 133), залогинить его сервер-сайд и вернуть
-// клиенту куки + destination.
+// claim_demo_slot (миграции 133/135), залогинить его сервер-сайд и
+// вернуть клиенту куки + destination.
 //
 // Используется:
-//   • веб /login (LoginForm: «Демо ученик» / модалка «Демо учитель»)
+//   • веб /login (DemoRoleModal: 3 карточки классов + 5 предметников)
 //   • мобилка apps/mobile-parent LoginScreen «Демо родитель»
 //
 // Логика:
-//   1) parse body { role, subject_slug? }
+//   1) parse body { role, subject_slug?, grade_level? }
 //   2) rpc claim_demo_slot → username/email/password/session_token/user_id
 //   3) signInWithPassword под этим email — Supabase server client ставит
 //      свои auth cookies через cookies() адаптер
@@ -27,6 +27,8 @@ type Role = "student" | "teacher" | "parent";
 interface ClaimBody {
   role?: string;
   subject_slug?: string | null;
+  // P3-фикс: класс ученика (3/7/10) — миграция 135. Только для role='student'.
+  grade_level?: number | null;
 }
 
 interface ClaimSlotRow {
@@ -61,6 +63,10 @@ export async function POST(req: Request) {
   if (role === "teacher" && !subjectSlug) {
     return NextResponse.json({ error: "subject_slug_required" }, { status: 400 });
   }
+  const gradeLevel = role === "student" ? body.grade_level ?? null : null;
+  if (gradeLevel !== null && ![3, 7, 10].includes(gradeLevel)) {
+    return NextResponse.json({ error: "invalid_grade_level" }, { status: 400 });
+  }
 
   // 1) claim через service_role — anon-ветку тоже поддерживает RPC (GRANT
   // anon в 133), но service_role надёжнее для http-контекста без сессии.
@@ -69,6 +75,7 @@ export async function POST(req: Request) {
   const { data: claimed, error: claimError } = await (admin.rpc as any)("claim_demo_slot", {
     p_role: role,
     p_subject_slug: subjectSlug,
+    p_grade_level: gradeLevel,
   });
   if (claimError) {
     const msg = claimError.message ?? "";

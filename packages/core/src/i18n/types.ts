@@ -1130,7 +1130,9 @@ export interface Dictionary {
     loginProgress: string; // "Вход..."
     bannerText: string;    // "Вы в демо-режиме. Все данные тестовые."
     bannerLogout: string;  // "Выйти"
-    resetNote: string;     // "Данные тестовые. Автосброс через 3 часа неактивности."
+    resetNote: string;     // P3-фикс: было "Данные тестовые. Автосброс через 3 часа
+                            // неактивности." (устарело — этой логики нет с Пачки 2).
+                            // Актуально: "Вы входите в реальный аккаунт..." + инфо про 15 мин.
     welcomeTitle: string;  // "Вы в демо-режиме"
     welcomeText: string;   // "Все данные тестовые."
     welcomeOk: string;     // "Понятно"
@@ -1151,13 +1153,18 @@ export interface Dictionary {
     loginFailed: string;   // демо-логин не удался по иной причине (не занятость пула)
     cannotEditRealData: string; // tooltip/ошибка: в демо нельзя менять реальные записи
     // P2-фикс (revert бага А пачки 2) — ОДНА кнопка «Демо» (buttonLabel/
-    // shortLabel выше) открывает модалку с 6 карточками: 1 ученик (случайный
-    // из пула) + 5 предметников. Раздельные studentButtonLabel/
+    // shortLabel выше) открывает модалку. Раздельные studentButtonLabel/
     // teacherButtonLabel/modalTitleTeacher/modalSubtitleTeacher из
     // ошибочного разделения на 2 кнопки — убраны.
-    modalCardStudent: string;      // подпись карточки-ученика в модалке ("Ученик")
+    // P3-фикс — модалка вернулась к исходной структуре «до Пачки 2»:
+    // 3 карточки классов (случайный ученик ИЗ ЭТОГО класса, не из общего
+    // пула) вместо одной общей карточки «Ученик» (modalCardStudent убран).
+    modalSectionStudents: string;  // заголовок секции классов в модалке ("Ученики")
+    modalCardGrade3: string;       // подпись карточки 3-го класса
+    modalCardGrade7: string;       // подпись карточки 7-го класса
+    modalCardGrade10: string;      // подпись карточки 10-го класса
     modalCardTeacher: string;      // заголовок секции предметников в модалке ("Учителя")
-    slotOccupied: string;          // «занят» под занятой карточкой (ученик ИЛИ предметник)
+    slotOccupied: string;          // «занят» под занятой карточкой (класс ИЛИ предметник)
     parentButtonLabel: string;     // мобилка LoginScreen: «Демо родитель»
   };
   announcements: {
