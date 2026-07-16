@@ -112,6 +112,23 @@ export function AiAssistantView() {
               <p className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-500">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> {t.onlineStatus}
               </p>
+              {/* Пачка 4, Задача 0A — перенесено из-под поля ввода. Фон —
+                  тот же фиолетовый градиент, что у аватара чата (в самой
+                  шапке нет сплошной заливки, поэтому "белый текст на
+                  фиолетовом" реализован как маленькая пилюля). */}
+              {usage && (
+                <p
+                  className={`mt-1 inline-block w-fit rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 px-2.5 py-0.5 text-[11px] font-semibold opacity-85 ${
+                    usage.remaining < 50
+                      ? "text-red-300"
+                      : usage.remaining <= 100
+                        ? "text-yellow-300"
+                        : "text-white"
+                  }`}
+                >
+                  {t.usageLimitLabel.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}
+                </p>
+              )}
             </div>
             <MoreHorizontal className="h-5 w-5 text-slate-300" />
           </div>
@@ -181,22 +198,6 @@ export function AiAssistantView() {
               <Send className="h-5 w-5" />
             </button>
           </div>
-
-          {/* Пачка 3, Задача 2 — глобальный дневной лимит Gemini. Цвет по
-              remaining: >100 серый, 50-100 жёлтый, <50 красный. */}
-          {usage && (
-            <p
-              className={`px-4 pb-3 text-center text-xs font-medium ${
-                usage.remaining < 50
-                  ? "text-red-500"
-                  : usage.remaining <= 100
-                    ? "text-amber-500"
-                    : "text-slate-400"
-              }`}
-            >
-              {t.usageLimitLabel.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}
-            </p>
-          )}
         </div>
 
         {/* Right rail */}
