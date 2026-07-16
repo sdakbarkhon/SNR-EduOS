@@ -3,45 +3,43 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { cookies, headers } from "next/headers";
-import {
-  signInWithUsername,
-  usernameToEmail,
-  TEACHER_EMAIL_DOMAIN,
-  DEMO_EMAIL_DOMAIN,
-} from "@snr/core";
+import { signInWithUsername } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEMO_SESSION_COOKIE, sessionIdFromAccessToken } from "@/lib/single-session";
 
-// PROMT 3 single-session: логин теперь ТОЛЬКО через эти server actions —
-// это единственная точка, где регистрируется user_sessions-строка (одна
-// активная сессия на аккаунт, все роли). Клиентский signInWithPassword в
-// LoginForm/DemoRoleModal убран: сессия без строки в user_sessions будет
-// немедленно выкинута middleware'ом.
-
-/** Демо-карточка предмета → реальный предметный учитель (миграция 109). */
-const DEMO_TEACHER_BY_SLUG: Record<string, string> = {
-  programming: "teacher_prog",
-  robotics: "teacher_robot",
-  math: "teacher_math",
-  english: "teacher_english",
-  russian: "teacher_russian",
-};
+// P2 (пачка 2) — переработка демо-режима. Демо-логика теперь живёт в
+// endpoints apps/web/app/api/demo/*, но demoLogin остаётся как «серверный
+// wrapper» для DemoRoleModal (там уже был контракт server action —
+// сохраняем для минимальных изменений в UI). Внутри он ровно то же,
+// что делает /api/demo/claim: RPC claim_demo_slot → signInWithPassword →
+// cookies.
 
 type LoginResult =
   | { ok: true; dest: string; isDemo: boolean }
   | { ok: false; error: "invalid" | "failed" | "all_busy" };
 
+interface ClaimSlotRow {
+  username: string | null;
+  email: string;
+  password: string;
+  session_token: string;
+  user_id: string;
+}
+
 /**
- * Вытесняет предыдущую сессию аккаунта (DELETE+INSERT в user_sessions) и
- * ставит/чистит демо-куку. Если вытесненная сессия была демо — немедленно
- * зачищает её следы (reset_demo_data_for_user): новый демо-гость получает
- * чистую площадку, реальный владелец не видит демо-мусор.
+ * Регистрирует новую single-session-строку в user_sessions (одна активная
+ * сессия на аккаунт, все роли — миграция 110). В P2 больше НЕ пишет is_demo
+ * и demo_started_at (эти колонки убраны миграцией 132) и НЕ вызывает
+ * reset_demo_data_for_user (функция удалена миграцией 132) — демо-данные
+ * больше не отделяются от реальных.
+ *
+ * Демо-cookie snr-demo-session ставится/чистится в endpoints /api/demo/*
+ * (для новой lease-логики) или в signOut() (при выходе).
  */
 async function registerSession(opts: {
   userId: string;
   accessToken: string;
-  isDemo: boolean;
 }): Promise<void> {
   const sessionId = sessionIdFromAccessToken(opts.accessToken);
   if (!sessionId) {
@@ -50,51 +48,22 @@ async function registerSession(opts: {
 
   const admin = createAdminClient();
 
-  const { data: evicted, error: deleteError } = await admin
+  const { error: deleteError } = await admin
     .from("user_sessions")
     .delete()
-    .eq("user_id", opts.userId)
-    .select("is_demo, created_at")
-    .maybeSingle();
+    .eq("user_id", opts.userId);
   if (deleteError) {
     throw new Error(`single-session: evict failed: ${deleteError.message}`);
   }
-  if (evicted?.is_demo) {
-    const { error: resetError } = await admin.rpc("reset_demo_data_for_user", {
-      p_user_id: opts.userId,
-      p_since: evicted.created_at,
-    });
-    if (resetError) {
-      // Не блокируем логин: orphan-sweep в reset_expired_demo_sessions()
-      // добёрет хвосты в течение 3 часов.
-      console.error("[auth] reset_demo_data_for_user failed:", resetError.message);
-    }
-  }
 
   const ua = (await headers()).get("user-agent");
-  const demoStartedAt = opts.isDemo ? new Date().toISOString() : null;
   const { error: insertError } = await admin.from("user_sessions").insert({
     user_id: opts.userId,
     session_id: sessionId,
     device_info: ua ? ua.slice(0, 512) : null,
-    is_demo: opts.isDemo,
-    demo_started_at: demoStartedAt,
   });
   if (insertError) {
     throw new Error(`single-session: register failed: ${insertError.message}`);
-  }
-
-  const cookieStore = await cookies();
-  if (opts.isDemo) {
-    cookieStore.set(DEMO_SESSION_COOKIE, JSON.stringify({ demo_started_at: demoStartedAt }), {
-      // Сознательно НЕ httpOnly — см. комментарий у DEMO_SESSION_COOKIE.
-      httpOnly: false,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-    });
-  } else {
-    cookieStore.delete(DEMO_SESSION_COOKIE);
   }
 }
 
@@ -127,96 +96,111 @@ export async function loginWithUsername(
   }
 
   const user = result.data.user;
-  // Прямой логин в пул-аккаунт demo_student_* по паролю — тоже демо-сессия.
-  const isDemo = (user.email ?? "").endsWith(`@${DEMO_EMAIL_DOMAIN}`);
   await registerSession({
     userId: user.id,
     accessToken: result.data.session.access_token,
-    isDemo,
   });
 
-  return { ok: true, dest: await resolveDest(supabase, user.id), isDemo };
+  // Обычный логин — не демо. Cookie DEMO_SESSION_COOKIE ставится ТОЛЬКО
+  // при demoLogin (или endpoint /api/demo/claim). Здесь защитно снимаем
+  // если она осталась от предыдущей демо-сессии этого же браузера.
+  (await cookies()).delete(DEMO_SESSION_COOKIE);
+
+  return { ok: true, dest: await resolveDest(supabase, user.id), isDemo: false };
 }
 
 export async function demoLogin(
   target:
     | { kind: "teacher"; slug: "programming" | "robotics" | "math" | "english" | "russian" }
-    | { kind: "student"; grade: "3" | "7" | "10" },
+    | { kind: "student" }
+    | { kind: "parent" },
 ): Promise<LoginResult> {
+  const admin = createAdminClient();
   const supabase = await createClient();
 
-  if (target.kind === "teacher") {
-    // Прямой логин под РЕАЛЬНЫМ предметным учителем с флагом демо-сессии.
-    // Пул демо-учителей удалён миграцией 110.
-    const username = DEMO_TEACHER_BY_SLUG[target.slug];
-    if (!username) return { ok: false, error: "failed" };
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: usernameToEmail(username, TEACHER_EMAIL_DOMAIN),
-      password: process.env.DEMO_TEACHER_PASSWORD ?? "password123",
-    });
-    if (error || !data.session) return { ok: false, error: "failed" };
-    await registerSession({
-      userId: data.user.id,
-      accessToken: data.session.access_token,
-      isDemo: true,
-    });
-    return { ok: true, dest: "/teacher/dashboard", isDemo: true };
+  const role = target.kind;
+  const subjectSlug = target.kind === "teacher" ? target.slug : null;
+
+  // 1) claim slot через новый RPC (миграция 133).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: claimed, error: claimError } = await (admin.rpc as any)("claim_demo_slot", {
+    p_role: role,
+    p_subject_slug: subjectSlug,
+  });
+  if (claimError) {
+    const msg = claimError.message ?? "";
+    if (msg.includes("no_available_slot")) {
+      return { ok: false, error: "all_busy" };
+    }
+    console.error("[demoLogin] claim rpc error:", claimError);
+    return { ok: false, error: "failed" };
+  }
+  const row = (claimed as ClaimSlotRow[] | null)?.[0];
+  if (!row) return { ok: false, error: "all_busy" };
+
+  // 2) signIn под этим email — Supabase server client ставит auth cookies.
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: row.email,
+    password: row.password,
+  });
+  if (error || !data.session) {
+    // Rollback lease чтобы не залипло на 15 мин.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (admin.rpc as any)("release_demo_slot", { p_session_token: row.session_token });
+    console.error("[demoLogin] signIn error:", error?.message);
+    return { ok: false, error: "failed" };
   }
 
-  // Ученики остаются пулом (90 аккаунтов demo_student_{grade}_NN). RPC теперь
-  // server-only (EXECUTE у anon/authenticated отозван миграцией 110).
-  const admin = createAdminClient();
-  const { data: claimed, error: claimError } = await admin.rpc("claim_demo_account", {
-    p_kind: "student",
-    p_grade: target.grade,
-  });
-  const account = claimed?.[0];
-  if (claimError || !account) return { ok: false, error: "all_busy" };
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: account.email,
-    password: "demo2026",
-  });
-  if (error || !data.session) return { ok: false, error: "failed" };
   await registerSession({
     userId: data.user.id,
     accessToken: data.session.access_token,
-    isDemo: true,
   });
-  return { ok: true, dest: "/dashboard", isDemo: true };
+
+  // 3) ставим демо-cookie с session_token — используется useIsDemoSession,
+  // DemoBanner, DemoHeartbeat и endpoint'ами heartbeat/release.
+  (await cookies()).set(DEMO_SESSION_COOKIE, row.session_token, {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 15 * 60,
+  });
+
+  const dest =
+    role === "teacher" ? "/teacher/dashboard" :
+    role === "parent"  ? "/parent/dashboard"  :
+                         "/dashboard";
+  return { ok: true, dest, isDemo: true };
 }
 
 export async function signOut() {
   const supabase = await createClient();
-  // Промт «скорость», Задача 6: getUser() (сеть до Supabase Auth) + admin
-  // .update() (сеть до Postgres) раньше выполнялись последовательно ДО
-  // signOut()+redirect() — клик «Выйти» ждал оба round trip'а. getSession()
-  // читает user.id из cookie локально; сама запись в user_sessions —
-  // best-effort бухгалтерия для крона, не требует сетевой auth-проверки.
   const {
     data: { session },
   } = await supabase.auth.getSession();
   const userId = session?.user?.id;
 
-  if (userId) {
-    // Строку user_sessions НЕ удаляем — только штампуем last_activity.
-    // Так «вышел >3ч назад» и «неактивен 3ч» для крона — одно условие
-    // (reset_expired_demo_sessions v2, миграция 110). after() откладывает
-    // запись до момента когда redirect-ответ уже отправлен браузеру —
-    // редирект больше не ждёт её.
-    after(async () => {
-      const admin = createAdminClient();
+  const cookieStore = await cookies();
+  const demoToken = cookieStore.get(DEMO_SESSION_COOKIE)?.value ?? null;
+
+  // Release lease + штамп last_activity — best-effort (не блокируем редирект).
+  after(async () => {
+    const admin = createAdminClient();
+    if (demoToken) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin.rpc as any)("release_demo_slot", { p_session_token: demoToken });
+    }
+    if (userId) {
       await admin
         .from("user_sessions")
         .update({ last_activity: new Date().toISOString() })
         .eq("user_id", userId);
-    });
-  }
+    }
+  });
 
   // scope:'local' — глобальный signOut отозвал бы refresh-токен сессии,
-  // которая только что вытеснила эту (login нового устройства использует
-  // тот же auth-аккаунт).
+  // которая только что вытеснила эту.
   await supabase.auth.signOut({ scope: "local" });
-  (await cookies()).delete(DEMO_SESSION_COOKIE);
+  cookieStore.delete(DEMO_SESSION_COOKIE);
   redirect("/login");
 }

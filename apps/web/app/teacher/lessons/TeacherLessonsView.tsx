@@ -29,7 +29,9 @@ type LessonItem = {
   topic: string | null; title: string | null;
   starts_at: string; ends_at: string | null; room: string | null;
   status: string; started_at: string | null; ended_at: string | null;
-  is_demo: boolean;
+  // P2: is_demo дропнут миграцией 132. Optional для BC — useDemoEditBlocked
+  // теперь всегда false, ветка dead code, но callers оставлены как есть.
+  is_demo?: boolean;
   group: { id: string; name: string; subject: string };
 };
 type FormState = {

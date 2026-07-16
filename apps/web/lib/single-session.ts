@@ -1,13 +1,14 @@
-// Single-session (PROMT 3): общие константы/хелперы для server actions,
-// middleware и клиентского useIsDemoSession. Файл без server-only зависимостей —
-// импортируется и из Edge middleware, и из клиентских компонентов.
+// Single-session (PROMT 3) + P2 демо-lease: общие константы/хелперы.
+// Файл без server-only зависимостей — импортируется и из Edge middleware,
+// и из клиентских компонентов.
 
 /**
- * Кука демо-сессии. НЕ httpOnly сознательно: клиентский хук useIsDemoSession()
- * читает её для UI-ограничений (disabled-кнопки на реальных записях). Это не
- * секрет и не граница безопасности — подделка куки меняет только вид кнопок,
- * жёсткий запрет живёт в БД (триггер fn_stamp_is_demo, ошибка
- * editing_real_data_in_demo).
+ * Кука демо-сессии. Значение — session_token от RPC claim_demo_slot
+ * (миграция 133), используется для heartbeat / release / определения
+ * «сейчас в демо». НЕ httpOnly сознательно: клиентский хук
+ * useIsDemoSession() читает её для рендера баннера. В P2 запись реальных
+ * данных из демо-сессии больше не блокируется (триггер fn_stamp_is_demo
+ * снят миграцией 132) — демо-режим ≡ вход в реальный аккаунт + баннер.
  */
 export const DEMO_SESSION_COOKIE = "snr-demo-session";
 

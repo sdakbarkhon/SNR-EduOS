@@ -1,30 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Code2, Bot, Calculator, Languages, BookOpen, Baby, Backpack, Laptop } from "lucide-react";
+import { X, Loader2, Lock, Code2, Bot, Calculator, Languages, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { defaultLocale, getDictionary } from "@snr/core";
 import { demoLogin } from "@/app/actions/auth";
 
-// PROMT 3 (rework) — клик по предметной карточке = прямой логин под РЕАЛЬНЫМ
-// предметным учителем (teacher_prog/robot/math/english/russian) с флагом
-// демо-сессии (user_sessions.is_demo + кука snr-demo-session). Пул из 25
-// demo_teacher_* удалён миграцией 110. Ученики остаются пулом
-// demo_student_{grade}_NN через claim_demo_account (теперь server-only).
-type StudentGrade = "10" | "7" | "3";
+// P2: модалка «Демо учитель» — только 5 предметников (без учеников/классов).
+// Ученики теперь через отдельную кнопку «Демо ученик» без модалки. Слот
+// каждого предметника выделен персонально: если он занят — «занят», серый,
+// disabled. Статус занятости берётся из /api/demo/teacher-status
+// (RPC get_occupied_teacher_subjects — миграция 133).
+
 type TeacherSlug = "programming" | "robotics" | "math" | "english" | "russian";
 
-interface StudentRole {
-  kind: "student";
-  grade: StudentGrade;
-  labelKey: "roleStudent10" | "roleStudent7" | "roleStudent3";
-  Icon: typeof Code2;
-  color: string;
-}
-
 interface TeacherRole {
-  kind: "teacher";
   subjectSlug: TeacherSlug;
   labelKey:
     | "roleTeacherProgramming"
@@ -36,51 +27,63 @@ interface TeacherRole {
   color: string;
 }
 
-const STUDENT_ROLES: StudentRole[] = [
-  { kind: "student", grade: "3", labelKey: "roleStudent3", Icon: Baby, color: "from-emerald-500 to-teal-600" },
-  { kind: "student", grade: "7", labelKey: "roleStudent7", Icon: Backpack, color: "from-blue-500 to-cyan-600" },
-  { kind: "student", grade: "10", labelKey: "roleStudent10", Icon: Laptop, color: "from-orange-500 to-red-600" },
-];
-
 const TEACHER_ROLES: TeacherRole[] = [
-  { kind: "teacher", subjectSlug: "programming", labelKey: "roleTeacherProgramming", Icon: Code2,      color: "from-sky-500 to-blue-600" },
-  { kind: "teacher", subjectSlug: "robotics",    labelKey: "roleTeacherRobotics",    Icon: Bot,        color: "from-indigo-500 to-violet-600" },
-  { kind: "teacher", subjectSlug: "math",        labelKey: "roleTeacherMath",        Icon: Calculator, color: "from-amber-500 to-orange-500" },
-  { kind: "teacher", subjectSlug: "english",     labelKey: "roleTeacherEnglish",     Icon: Languages,  color: "from-rose-500 to-pink-600" },
-  { kind: "teacher", subjectSlug: "russian",     labelKey: "roleTeacherRussian",     Icon: BookOpen,   color: "from-red-500 to-rose-600" },
+  { subjectSlug: "programming", labelKey: "roleTeacherProgramming", Icon: Code2,      color: "from-sky-500 to-blue-600" },
+  { subjectSlug: "robotics",    labelKey: "roleTeacherRobotics",    Icon: Bot,        color: "from-indigo-500 to-violet-600" },
+  { subjectSlug: "math",        labelKey: "roleTeacherMath",        Icon: Calculator, color: "from-amber-500 to-orange-500" },
+  { subjectSlug: "english",     labelKey: "roleTeacherEnglish",     Icon: Languages,  color: "from-rose-500 to-pink-600" },
+  { subjectSlug: "russian",     labelKey: "roleTeacherRussian",     Icon: BookOpen,   color: "from-red-500 to-rose-600" },
 ];
 
 export function DemoRoleModal({ onClose }: { onClose: () => void }) {
   const d = getDictionary(defaultLocale).demoMode;
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [occupied, setOccupied] = useState<Set<string>>(new Set());
+  const [statusLoading, setStatusLoading] = useState(true);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  async function claim(kind: "student" | "teacher", grade: StudentGrade | null, subjectSlug: TeacherSlug | null, key: string, redirectTo: string) {
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStatus() {
+      setStatusLoading(true);
+      try {
+        const res = await fetch("/api/demo/teacher-status", { cache: "no-store" });
+        const j: { occupied_subjects?: string[] } = await res.json();
+        if (!cancelled) setOccupied(new Set(j.occupied_subjects ?? []));
+      } catch {
+        // если статус не грузится — показываем все как свободные, RPC на
+        // claim всё равно вернёт no_available_slot если реально занято.
+        if (!cancelled) setOccupied(new Set());
+      } finally {
+        if (!cancelled) setStatusLoading(false);
+      }
+    }
+    void loadStatus();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function claim(slug: TeacherSlug, key: string) {
     setLoading(key);
     setError("");
     try {
-      // Server action: сам логинит (учитель — прямой вход под teacher_{slug},
-      // ученик — claim из пула), вытесняет предыдущую сессию аккаунта
-      // (single-session) и ставит демо-куку.
-      const result =
-        kind === "teacher" && subjectSlug
-          ? await demoLogin({ kind: "teacher", slug: subjectSlug })
-          : grade
-            ? await demoLogin({ kind: "student", grade })
-            : null;
-      if (!result) throw new Error("invalid demo target");
+      const result = await demoLogin({ kind: "teacher", slug });
       if (!result.ok) {
-        setError(result.error === "all_busy" ? d.allBusy : d.loginFailed);
+        if (result.error === "all_busy") {
+          // Race: между рендером и кликом кто-то занял этот слот.
+          // Обновляем occupied и показываем toast.
+          setOccupied((prev) => new Set([...prev, slug]));
+          setError(d.allBusy);
+        } else {
+          setError(d.loginFailed);
+        }
         setLoading(null);
         return;
       }
       sessionStorage.setItem("show-demo-welcome", "true");
-      // `loading`/`isPending` intentionally stay true straight through navigation
-      // so the button keeps its spinner until the destination page renders.
       startTransition(() => {
-        router.replace(redirectTo);
+        router.replace(result.dest);
         router.refresh();
       });
     } catch (err) {
@@ -95,11 +98,11 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-4xl rounded-3xl bg-white p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-3xl rounded-3xl bg-white p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{d.modalTitle}</h2>
-            <p className="mt-1 text-sm text-slate-500">{d.modalSubtitle}</p>
+            <h2 className="text-2xl font-bold text-slate-900">{d.modalTitleTeacher}</h2>
+            <p className="mt-1 text-sm text-slate-500">{d.modalSubtitleTeacher}</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100">
             <X className="h-5 w-5 text-slate-500" />
@@ -110,66 +113,44 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
         )}
 
-        {/* Students */}
-        <div className="mb-6">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">{d.sectionStudents}</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {STUDENT_ROLES.map((role) => {
-              const key = `student-${role.grade}`;
-              const label = d[role.labelKey];
-              const busy = loading !== null || isPending;
-              return (
-                <button
-                  key={key}
-                  onClick={() => claim(role.kind, role.grade, null, key, "/dashboard")}
-                  disabled={busy}
-                  className="group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-6 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
-                >
-                  <div className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${role.color} text-white`}>
-                    <role.Icon className="h-8 w-8" />
-                  </div>
-                  <p className="text-center font-bold text-slate-900">{label}</p>
-                  <div className="mt-4 w-full">
-                    <span className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r ${role.color} py-2 text-sm font-medium text-white ${loading === key ? "opacity-50" : ""}`}>
-                      {loading === key && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      {loading === key ? d.loginProgress : d.loginBtn}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {TEACHER_ROLES.map((role) => {
+            const key = `teacher-${role.subjectSlug}`;
+            const label = d[role.labelKey];
+            const isOccupied = occupied.has(role.subjectSlug);
+            const busy = loading !== null || isPending;
+            const disabled = busy || isOccupied || statusLoading;
+            return (
+              <button
+                key={key}
+                onClick={() => claim(role.subjectSlug, key)}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={
+                  isOccupied
+                    ? "group flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-slate-100 p-5 opacity-60 cursor-not-allowed"
+                    : "group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-5 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
+                }
+              >
+                <div className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${isOccupied ? "from-slate-400 to-slate-500" : role.color} text-white`}>
+                  {isOccupied ? <Lock className="h-6 w-6" /> : <role.Icon className="h-7 w-7" />}
+                </div>
+                <p className="text-center text-sm font-bold leading-tight text-slate-900">{label}</p>
+                <div className="mt-3 w-full">
+                  {isOccupied ? (
+                    <span className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-500 py-1.5 text-xs font-medium text-white">
+                      {d.slotOccupied}
                     </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Teachers by subject */}
-        <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">{d.sectionTeachers}</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {TEACHER_ROLES.map((role) => {
-              const key = `teacher-${role.subjectSlug}`;
-              const label = d[role.labelKey];
-              const busy = loading !== null || isPending;
-              return (
-                <button
-                  key={key}
-                  onClick={() => claim(role.kind, null, role.subjectSlug, key, "/teacher/dashboard")}
-                  disabled={busy}
-                  className="group flex flex-col items-center rounded-2xl border-2 border-slate-200 p-5 transition-all hover:border-violet-400 hover:shadow-xl disabled:opacity-50"
-                >
-                  <div className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${role.color} text-white`}>
-                    <role.Icon className="h-7 w-7" />
-                  </div>
-                  <p className="text-center text-sm font-bold leading-tight text-slate-900">{label}</p>
-                  <div className="mt-3 w-full">
+                  ) : (
                     <span className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r ${role.color} py-1.5 text-xs font-medium text-white ${loading === key ? "opacity-50" : ""}`}>
                       {loading === key && <Loader2 className="h-3 w-3 animate-spin" />}
                       {loading === key ? d.loginProgress : d.loginBtn}
                     </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-400">{d.resetNote}</p>
