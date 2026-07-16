@@ -1250,6 +1250,14 @@ export const uz: Dictionary = {
     notifyAnnouncement: "Admin e'lonlari",
     notifyLeaveRequest: "Ruxsat so'rovlari",
   },
+  viewer: {
+    close: "Yopish",
+    zoomIn: "Kattalashtirish",
+    zoomOut: "Kichiklashtirish",
+    resetZoom: "100%",
+    loadFailed: "Bu faylni ko'rish uchun ochib bo'lmadi",
+    loading: "Yuklanmoqda…",
+  },
   materials: {
     title: "O'quv materiallari",
     searchPlaceholder: "Materiallarni qidirish…",

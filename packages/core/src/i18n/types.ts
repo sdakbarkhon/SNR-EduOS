@@ -1274,6 +1274,17 @@ export interface Dictionary {
     notifyLeaveRequest: string;
     notifyTitle: string;
   };
+  // Пачка 3, Задача 4 — полноэкранный просмотр материалов (FileViewerModal)
+  // с зумом/панорамированием. Отдельный от 'materials' (тот — про список/
+  // фильтры страницы) и 'demo' (тот — про live-показ материала классу).
+  viewer: {
+    close: string;      // aria-label кнопки закрытия (X)
+    zoomIn: string;      // aria-label кнопки "+"
+    zoomOut: string;      // aria-label кнопки "-"
+    resetZoom: string;   // текст/aria-label кнопки "100%"
+    loadFailed: string;  // TextPreview: не удалось открыть файл
+    loading: string;     // TextPreview: загрузка
+  };
   materials: {
     title: string;
     searchPlaceholder: string;

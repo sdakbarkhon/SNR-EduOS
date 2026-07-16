@@ -1250,6 +1250,14 @@ export const ru: Dictionary = {
     notifyAnnouncement: "Объявления от администратора",
     notifyLeaveRequest: "Запросы отпроситься",
   },
+  viewer: {
+    close: "Закрыть",
+    zoomIn: "Увеличить",
+    zoomOut: "Уменьшить",
+    resetZoom: "100%",
+    loadFailed: "Не удалось открыть этот файл для просмотра",
+    loading: "Загрузка…",
+  },
   materials: {
     title: "Учебные материалы",
     searchPlaceholder: "Поиск материалов…",

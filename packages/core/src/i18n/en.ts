@@ -1250,6 +1250,14 @@ export const en: Dictionary = {
     notifyAnnouncement: "Admin announcements",
     notifyLeaveRequest: "Leave requests",
   },
+  viewer: {
+    close: "Close",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    resetZoom: "100%",
+    loadFailed: "Couldn't open this file for preview",
+    loading: "Loading…",
+  },
   materials: {
     title: "Learning Materials",
     searchPlaceholder: "Search materials…",

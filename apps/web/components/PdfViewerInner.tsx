@@ -19,7 +19,11 @@ pdfjs.GlobalWorkerOptions.workerSrc =
  * fallback UI). No page-turn sync between clients — each viewer owns its own
  * page number locally.
  */
-export function PdfViewerInner({ url, title }: { url: string; title?: string }) {
+// Пачка 3, Задача 4 — scale (опционально, default 1) домножает width при
+// рендере страницы (react-pdf: "If you define width and scale at the same
+// time, the width will be multiplied by a given factor") — управляется
+// зум-контролами FileViewerModal через Ctrl+Scroll/+/-/100%.
+export function PdfViewerInner({ url, title, scale = 1 }: { url: string; title?: string; scale?: number }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).demo;
   const [numPages, setNumPages] = useState(0);
@@ -64,7 +68,7 @@ export function PdfViewerInner({ url, title }: { url: string; title?: string }) 
           loading={<div className="p-8 text-slate-500">{t.pdfLoading}</div>}
           error={<div className="p-8 text-red-500">{t.pdfLoadError}</div>}
         >
-          <Page pageNumber={pageNumber} width={pageWidth} className="shadow-2xl" />
+          <Page pageNumber={pageNumber} width={pageWidth} scale={scale} className="shadow-2xl" />
         </Document>
       </div>
 
