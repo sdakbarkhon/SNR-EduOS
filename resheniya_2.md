@@ -2774,3 +2774,150 @@ GROUP BY h.id, h.title, h.content_type;
 - **`content_type='bundle'`** — не реализовано (нет таких ДЗ в текущем диапазоне дат; если появятся — скрипт залогирует warning и пропустит, не упадёт).
 - **`quiz_answers`** (индивидуальные ответы на каждый вопрос quiz) — не генерируются, только агрегат `quiz_attempts` (total_questions/correct_count/total_score). Экономит объём и сложность без потери видимого результата (UI показывает именно агрегат).
 - **Старые `backfill-{attendance,grades,homework}.mjs`** — не чинил (пишут `is_demo`, сейчас сломаны после 132) — вне скоупа этой задачи, для справки зафиксировано находкой.
+
+---
+
+## Пачка 3 — 5 UX-улучшений одним промтом — 2026-07-16
+
+**Дата:** 2026-07-16. **Скоуп:** только `apps/web` (мобилка не тронута — заблокирована Google-аккаунтом заказчика).
+
+Коммиты (checkpoint между парами 1-2, 3-4, 5, как просил заказчик):
+
+| # | SHA | Сообщение | Vercel |
+|---|---|---|---|
+| 1 | `b72e1b0` | feat(ui): rename "Закончить урок" to "Выйти из урока" for students + feat(ai): global Gemini usage limit under chat (migration 136) | ✅ READY (`dpl_CR5Kf3zgRdLhiSYWmq65gnHSmGtN`) |
+| 2 | `dc766bd` | feat(teacher): Run button in live code demonstration with client-side runner + broadcast | ✅ READY (`dpl_2RookH57PxinF6kkZp397kFwPEAB`) |
+| 3 | `ba7f215` | feat(materials): fullscreen viewer with mouse-wheel zoom and drag | ✅ READY (`dpl_9LGV7jeZ7uHn11zHcC3WxrzYUmJQ`) |
+| 4 | `e60f593` | fix(sandbox): service icons visible on large screens | ✅ READY (`dpl_BThkTFr8FzY2L2EniSUMyGBYGTut`) |
+
+### Задача 1 — "Закончить урок" → "Выйти из урока" (только у ученика)
+
+**Было:** и ученик, и учитель на активном уроке видели одну и ту же кнопку «Закончить урок», обе вызывали один и тот же `endLesson(db, lesson.id)` — то есть клик ученика **полностью завершал урок для всех**, включая учителя и остальных учеников. Это был не только текстовый, но и поведенческий баг.
+
+**Стало:**
+- У ученика ([`apps/web/app/(app)/lessons/[id]/LessonWorkspaceView.tsx`](apps/web/app/(app)/lessons/[id]/LessonWorkspaceView.tsx)) — кнопка теперь называется «Выйти из урока» (иконка `LogOut`), клик просто делает `router.push("/schedule")` — ученик уходит с экрана, урок продолжается для остальных. `endLesson`/подтверждение через `window.confirm` убраны для этого пути (выход больше не деструктивен, подтверждение не нужно).
+- У учителя — кнопка «Закончить урок» и вызов `endLesson` не тронуты, полностью завершает урок для всех.
+- i18n: добавлен новый ключ `lesson.leaveLessonBtn` (ru: «Выйти из урока», en: «Leave lesson», uz: «Darsdan chiqish») во все 4 файла (`types.ts`/`ru.ts`/`en.ts`/`uz.ts`), рядом с существующим `endLessonBtn` учителя.
+
+**Файлы:** `apps/web/app/(app)/lessons/[id]/LessonWorkspaceView.tsx`, `packages/core/src/i18n/{types,ru,en,uz}.ts`.
+
+**Как проверить руками:** зайти учеником на активный урок → кнопка снизу называется «Выйти из урока» с иконкой выхода → клик мгновенно уводит на `/schedule` без диалога подтверждения → урок остаётся активным для учителя/других учеников (проверить с параллельной вкладкой учителя). У учителя на том же уроке кнопка по-прежнему «Закончить урок» и завершает урок полностью.
+
+### Задача 2 — глобальный AI-лимит Gemini под чатом ассистента
+
+**Было:** чат EduOS Assistant не показывал никакого счётчика использования — ни лимита, ни того, сколько запросов осталось на сегодня.
+
+**Стало:** реализован вариант B (таблица + RPC, надёжный вариант из промта, не in-memory):
+- Новая таблица `public.ai_usage_log(day date PRIMARY KEY, requests_count integer, updated_at timestamptz)` — миграция 136.
+- `increment_ai_usage()` — SECURITY DEFINER, инкрементирует счётчик текущего дня (день считается по `Asia/Tashkent`), `ON CONFLICT (day) DO UPDATE`.
+- `get_ai_usage_today()` — SECURITY DEFINER, возвращает текущий счётчик (0 если записи ещё нет).
+- [`apps/web/lib/ai/gemini-client.ts`](apps/web/lib/ai/gemini-client.ts) — проверено: все AI-вызовы (`generateText`/`generateJSON`/`generateContent`/чат) идут через единый `withRetry()`. Добавлен fire-and-forget `bumpAiUsage()` прямо в точке успеха `withRetry()` — единственная точка, инкремент не может быть пропущен ни одним вызывающим кодом.
+- [`apps/web/app/api/ai/usage/route.ts`](apps/web/app/api/ai/usage/route.ts) (новый) — `GET` → `{ used, limit: 250, remaining }`.
+- [`apps/web/app/(app)/ai-assistant/AiAssistantView.tsx`](apps/web/app/(app)/ai-assistant/AiAssistantView.tsx) — при открытии и раз в 30 сек фетчит `/api/ai/usage`; при отправке сообщения — оптимистично декрементирует `remaining`, затем сверяет с ответом сервера. Под полем ввода строка «Осталось запросов сегодня: X / 250» — серый цвет при `remaining > 100`, жёлтый при `50 ≤ remaining ≤ 100`, красный при `remaining < 50`. Показывается всем ролям (компонент общий).
+- i18n: `aiAssistant.usageLimitLabel` с плейсхолдерами `{remaining}`/`{limit}` во всех 4 файлах.
+
+**Файлы:** `supabase/migrations/136_ai_usage_log.sql` (новый), `apps/web/lib/ai/gemini-client.ts`, `apps/web/app/api/ai/usage/route.ts` (новый), `apps/web/app/(app)/ai-assistant/AiAssistantView.tsx`, `packages/core/src/i18n/{types,ru,en,uz}.ts`.
+
+**Миграция 136 (не применена — заказчик применяет сам через Dashboard SQL Editor):**
+
+```sql
+CREATE TABLE public.ai_usage_log (
+  day date PRIMARY KEY,
+  requests_count integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION public.increment_ai_usage()
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_count integer;
+BEGIN
+  INSERT INTO public.ai_usage_log (day, requests_count)
+  VALUES ((now() AT TIME ZONE 'Asia/Tashkent')::date, 1)
+  ON CONFLICT (day) DO UPDATE
+    SET requests_count = ai_usage_log.requests_count + 1,
+        updated_at = now()
+  RETURNING requests_count INTO v_count;
+  RETURN v_count;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.get_ai_usage_today()
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_count integer;
+BEGIN
+  SELECT requests_count INTO v_count
+  FROM public.ai_usage_log
+  WHERE day = (now() AT TIME ZONE 'Asia/Tashkent')::date;
+  RETURN COALESCE(v_count, 0);
+END $$;
+
+GRANT EXECUTE ON FUNCTION public.increment_ai_usage() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_ai_usage_today() TO anon, authenticated, service_role;
+```
+
+(Полный файл со smoke-test-блоком — [`supabase/migrations/136_ai_usage_log.sql`](supabase/migrations/136_ai_usage_log.sql).)
+
+**Как проверить руками:** применить миграцию 136 → открыть чат ассистента любой ролью → под полем ввода появляется «Осталось запросов сегодня: 250 / 250» → отправить сообщение → число уменьшается сразу (оптимистично), после ответа не «скачет» (сверка с сервером). Открыть тот же чат во второй вкладке — число там тоже обновится в течение 30 сек. До применения миграции `/api/ai/usage` возвращает `{used:0, limit:250, remaining:250, error:"rpc_error"}` — не ломает чат, просто лимит не считается.
+
+### Задача 3 — кнопка Run в live-демонстрации учителя
+
+**Было:** во время live-трансляции кода у учителя было только поле редактора — код транслировался ученикам через `postgres_changes`-подписку на `lesson_stages`, но выполнить его и показать результат было нельзя.
+
+**Стало:**
+- Уточнение по факту инвентаризации: «piston API» из промта заказчика больше не существует как публичный сервис (emkc.org ушёл на closed whitelist в 2026); в проекте уже есть свой клиентский раннер [`apps/web/lib/code-runner.ts`](apps/web/lib/code-runner.ts) (`runCode({language, code, stdin})` — Pyodide для Python, JSCPP для C++, iframe-sandbox для JS) — тот же, что использует песочница `/projects`. Кнопка Run использует именно его.
+- [`apps/web/components/lesson-stages/TeacherLiveCodeControl.tsx`](apps/web/components/lesson-stages/TeacherLiveCodeControl.tsx) — рядом с редактором добавлена кнопка «▶ Run» (спиннер во время выполнения), под редактором — панель «Вывод» (`<pre>`). Отдельный Supabase Realtime **broadcast**-канал `stage-run-{stage.id}` (НЕ тот же механизм, что синхронизирует код через `postgres_changes` — сделано намеренно отдельным каналом, чтобы не трогать рабочую синхронизацию кода; вывод эфемерный, в БД не пишется). После выполнения — `channel.send({type:'broadcast', event:'output', payload:{content, exitCode}})`.
+- [`apps/web/app/(app)/lessons/[id]/CodeStageView.tsx`](apps/web/app/(app)/lessons/[id]/CodeStageView.tsx) — подписка на тот же broadcast-канал, `liveOutput` сбрасывается в пустую строку при завершении трансляции.
+- [`apps/web/components/lesson-stages/StudentLiveViewer.tsx`](apps/web/components/lesson-stages/StudentLiveViewer.tsx) — новый необязательный проп `output`; панель «Вывод» показывается только если `output` не пустой (скрыта иначе).
+- Обработка ошибок: если раннер бросает исключение — `{stdout:"", stderr:"", error: String(e)}`, показывается как «Не удалось запустить код»; stderr/ошибки кода — красным.
+- i18n: ключи «Запустить»/«Вывод»/связанные — в `lesson.code`-неймспейсе всех 4 файлов.
+
+**Файлы:** `apps/web/components/lesson-stages/TeacherLiveCodeControl.tsx`, `apps/web/app/(app)/lessons/[id]/CodeStageView.tsx`, `apps/web/components/lesson-stages/StudentLiveViewer.tsx`.
+
+**Как проверить руками:** учитель открывает урок → live-демонстрация кода → пишет код (Python или C++) → «▶ Run» → под редактором появляется вывод. У ученика на том же уроке (вторая вкладка/инкогнито) в live-viewer под кодом появляется тот же вывод в реальном времени. Написать код с ошибкой (например, `1/0` в Python) → и учитель, и ученик видят traceback в панели вывода.
+
+### Задача 4 — полноэкранный просмотр материалов + зум
+
+**Было:** [`apps/web/components/FileViewerModal.tsx`](apps/web/components/FileViewerModal.tsx) уже был `fixed inset-0` (полноэкранный, из более раннего фикса «Формат не поддерживается»), но без зума и панорамирования — PDF/картинка/офис-файл показывались в фиксированном масштабе.
+
+**Стало:**
+- Зум `Ctrl+Scroll` (обычный scroll не перехватывается — не ломает внутреннюю прокрутку PDF/office-iframe), кнопки `−`/`100%`/`+` в шапке, клавиши `+`/`-`/`0`/`Esc`. Диапазон 100%–400%, шаг 25%.
+- Drag-панорамирование при zoom > 100% — курсор `grab`/`grabbing`. Для PDF свой drag-handler **не** повешен намеренно — у `react-pdf` уже есть собственный `overflow-auto`-скролл, зум там идёт через нативный проп `scale` (чётче, чем CSS-transform, т.к. canvas перерисовывается на реальном разрешении); для изображений и Office-iframe — CSS `transform: translate() scale()`.
+- Найден и исправлен реальный баг при реализации: при drag-панорамировании поверх Office Online Viewer iframe курсор «терялся» на границе iframe (mousemove над iframe уходит в его собственный document, не всплывает к родителю) — исправлено временным `pointer-events: none` на iframe на время активного drag.
+- [`apps/web/components/PdfViewerInner.tsx`](apps/web/components/PdfViewerInner.tsx) — новый необязательный проп `scale` (default `1`, обратная совместимость), домножает `width` в `<Page>`.
+- Добавлена i18n (у этого компонента её вообще не было — все строки были хардкожены на русском): новый неймспейс `viewer` (`close`/`zoomIn`/`zoomOut`/`resetZoom`/`loadFailed`/`loading`) во всех 4 файлах.
+- Мобильная адаптация не трогалась (по прямому указанию заказчика — «НЕ трогать, только веб на десктопе»).
+
+**Файлы:** `apps/web/components/FileViewerModal.tsx`, `apps/web/components/PdfViewerInner.tsx`, `packages/core/src/i18n/{types,ru,en,uz}.ts`.
+
+**Что НЕ сделано (осознанно, вне скоупа):** в кодовой базе есть ещё 3 отдельные реализации похожих вьюеров (инлайн-оверлей live-демонстрации, лайтбокс `HomeworkHintPanel`) — они **не переделывались**, задача касалась именно `FileViewerModal` (использован в Библиотеке/Материалах группы, 5 мест вызова, все проверены на обратную совместимость пропов).
+
+**Как проверить руками:** открыть материал урока (PDF) на весь экран → `Ctrl+Scroll` вверх — страница увеличивается, кнопка `100%` в шапке показывает актуальный процент → `Ctrl+Scroll` вниз до 100% → зажать ЛКМ и потаскать увеличенную страницу (панорама через нативный скролл PDF-контейнера). То же для изображения (drag работает через CSS-transform) и `.pptx`/`.docx` (Office Online Viewer — drag не теряет курсор на границе iframe). `Esc` закрывает в любой момент, `+`/`-`/`0` дублируют кнопки.
+
+### Задача 5 — иконки сервисов в песочнице не видны на больших экранах
+
+**Инвентаризация (важно для понимания фикса):** прочитаны полностью `apps/web/app/(app)/projects/SandboxView.tsx`, `ProjectsView.tsx`, `AppShell.tsx`, `StudentSidebar.tsx`, `lib/sandbox-tools.ts` — grid-разметка (`grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5`), обёртки `max-w-7xl`/`min-[1440px]:max-w-[1600px]`, ширина сайдбара (`lg:w-64 min-[1600px]:w-80`) — везде корректные, явных переполнений/обрезаний по CSS-размерам не найдено. Гипотеза заказчика («проблема с CSS размерами в grid-layout») **не подтвердилась** — реальная причина оказалась в другом слое.
+
+**Реальная причина (подтверждена эмпирически, не только по чтению кода):** `apps/web/tailwind.config.ts`'s `content`-glob сканировал только `./app/**`, `./components/**` и 2 shared-пакета — **`./lib/**` не был включён**. Иконки сервисов красятся через динамически собранный класс `` bg-gradient-to-br ${tool.gradient} `` ([`apps/web/lib/sandbox-tools.ts`](apps/web/lib/sandbox-tools.ts), например `"from-sky-400 to-blue-500"`) — а Tailwind JIT ищет литеральные строки классов только в файлах, попадающих под `content`. Поскольку `lib/sandbox-tools.ts` не сканировался, все 16 уникальных `from-*`/`to-*` классов градиентов **вырезались из продакшен-сборки полностью**. Без фона плитки иконка (`text-white`, то есть белая заливка) сливается с почти белой карточкой (`bg-white/70`) — не «не рендерится», а буквально невидима на глаз.
+
+Проверено дважды сборкой (`pnpm --filter web build` + grep по сгенерированному `.next/static/css/*.css`):
+- **До фикса:** 0 из 16 классов (`from-sky-400`, `to-blue-500`, `from-lime-500`, `to-green-600`, `from-fuchsia-500`, `to-purple-600`, и т.д.) присутствуют в собранном CSS.
+- **После фикса** (чистая пересборка с удалением `.next`): все 16 классов присутствуют.
+
+Почему заметно именно «на больших экранах»: это не screen-size-специфичный баг сам по себе (белые-на-белом иконки невидимы на любом разрешении), но при `lg:grid-cols-5` все 13 плиток помещаются на экран без прокрутки на широком мониторе — заказчик видел сразу все сломанные иконки одним взглядом, тогда как на узком экране/при скролле это легче не заметить.
+
+**Фикс:** добавлена одна строка `"./lib/**/*.{ts,tsx}"` в `content` массив `apps/web/tailwind.config.ts`. Сами иконки (SVG/компоненты Lucide), grid-разметка, брейкпоинты — не тронуты, как и просил заказчик.
+
+**Файлы:** `apps/web/tailwind.config.ts` (1 строка).
+
+**Как проверить руками:** зайти в `/projects` (Песочница) с любой ролью на широком мониторе (1920+/2560+) — все 13 плиток сервисов показывают цветные градиентные иконки (не пустые белые квадраты). Проверить также на 1440 и на планшете 768×1024 (эмулятор Chrome DevTools) — иконки и раскладка (2/3/5 колонок по брейкпоинтам) без изменений и без регрессий.
+
+### Прогон (все 5 задач разом)
+
+- `pnpm --filter web type-check` (`tsc --noEmit`) — OK
+- `pnpm --filter core type-check` (`tsc --noEmit`) — OK
+- `pnpm --filter web build` — OK (прогонялся несколько раз, включая чистую пересборку с удалением `.next` для проверки задачи 5)
+
+### Что не сделано во всей Пачке 3
+
+- **Живая интерактивная проверка в браузере** — не проводилась в этой сессии. Инструментарий Browser-pane в этой конкретной сессии столкнулся с окружательной проблемой: форма логина (`LoginForm.tsx`, использует `<Suspense fallback={null}>` — код, существовавший до этой сессии) не активировалась после стриминг-SSR ни через клики по pixel-координатам, ни через programmatic `.click()` — подтверждено, что это не баг кода этой Пачки (продакшен-сборка компилируется чисто на каждом шаге, dev-сервер отдаёт чистые 200-ответы). Заказчик сам сказал «Живую проверку делаю я» — верификация в этой сессии ограничена typecheck + prod build + построчным код-ревью + (для задачи 5) эмпирической проверкой сгенерированного CSS.
+- **3 других вьюера материалов** (инлайн-оверлей live-демо, лайтбокс `HomeworkHintPanel`) — не переведены на зум/полноэкран, см. «Что НЕ сделано» в задаче 4.
+- **Применение миграции 136** — заказчик сам через Supabase Dashboard SQL Editor.
