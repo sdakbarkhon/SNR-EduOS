@@ -1914,15 +1914,21 @@ export const getTeacherLessonView = async (
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
-  const teacherId = lesson.group.teacher_id;
+  // Учитель урока — РЕАЛЬНЫЙ ПРЕДМЕТНИК (subjects.teacher_id, перепривязан
+  // миграцией 109); groups.teacher_id — куратор группы (teacher_karim), он
+  // используется только как fallback для legacy-уроков, у которых предмет
+  // не назначен или у предмета нет учителя. Тот же паттерн, что в parent.ts
+  // (DAILY_STATUS_LESSON_SELECT).
+  const curatorId = lesson.group.teacher_id;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+  const SUBJECT_WITH_TEACHER = "name, icon, color, teacher:teachers!subjects_teacher_id_fkey(id, full_name)";
   const subjectQuery = lesson.subject_id
-    ? db2.from("subjects").select("name, icon, color").eq("id", lesson.subject_id).maybeSingle()
-    : db2.from("subjects").select("name, icon, color").eq("group_id", lesson.group_id).limit(1).maybeSingle();
-  const [teacherRes, materialsRes, stagesRes, subjectRes] = await Promise.all([
-    teacherId
-      ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
+    ? db2.from("subjects").select(SUBJECT_WITH_TEACHER).eq("id", lesson.subject_id).maybeSingle()
+    : db2.from("subjects").select(SUBJECT_WITH_TEACHER).eq("group_id", lesson.group_id).limit(1).maybeSingle();
+  const [curatorRes, materialsRes, stagesRes, subjectRes] = await Promise.all([
+    curatorId
+      ? db.from("teachers").select("id, full_name").eq("id", curatorId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db2.from("lesson_materials").select("*").eq("lesson_id", lessonId).order("created_at"),
     db2.from("lesson_stages").select("*").eq("lesson_id", lessonId).order("position"),
@@ -1932,8 +1938,17 @@ export const getTeacherLessonView = async (
   const { teacher_id: _tid, ...groupData } = lesson.group;
   const materialsTyped = materialsRes as { data: unknown[] | null; error: { message: string } | null };
   const stagesTyped = stagesRes as { data: unknown[] | null; error: { message: string } | null };
+  const subjectTyped = subjectRes as {
+    data: { name: string; icon: string | null; color: string | null; teacher: { id: string; full_name: string } | null } | null;
+    error: { message: string } | null;
+  };
+  const curatorTyped = curatorRes as { data: { id: string; full_name: string } | null; error: { message: string } | null };
   if (materialsTyped.error) console.error("[getTeacherLessonView] lesson_materials query failed:", materialsTyped.error.message);
   if (stagesTyped.error) console.error("[getTeacherLessonView] lesson_stages query failed:", stagesTyped.error.message);
+  // Сбой любого из этих двух рендерится как "урок без учителя/предмета" —
+  // неотличимо от урока, где они правда не назначены (паттерн 5222b73).
+  if (subjectTyped.error) console.error("[getTeacherLessonView] subjects query failed:", subjectTyped.error.message);
+  if (curatorTyped.error) console.error("[getTeacherLessonView] teachers (curator fallback) query failed:", curatorTyped.error.message);
   return {
     id: lesson.id, group_id: lesson.group_id, lesson_no: lesson.lesson_no,
     topic: lesson.topic, title: lesson.title, description: lesson.description,
@@ -1943,11 +1958,11 @@ export const getTeacherLessonView = async (
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
-    subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
-    subjectIcon: ((subjectRes as { data: { icon: string | null } | null }).data?.icon) ?? null,
-    subjectColor: ((subjectRes as { data: { color: string | null } | null }).data?.color) ?? null,
+    subjectName: subjectTyped.data?.name ?? null,
+    subjectIcon: subjectTyped.data?.icon ?? null,
+    subjectColor: subjectTyped.data?.color ?? null,
     group: groupData,
-    teacher: (teacherRes.data as { id: string; full_name: string } | null),
+    teacher: subjectTyped.data?.teacher ?? curatorTyped.data,
     materials: (materialsTyped.data ?? []) as LessonMaterial[],
     stages: (stagesTyped.data ?? []) as LessonStage[],
   };
@@ -1975,17 +1990,21 @@ export const getStudentLessonView = async (
     group: { id: string; name: string; subject: string; teacher_id: string | null };
   };
 
-  const teacherId = lesson.group.teacher_id;
+  // Учитель урока — РЕАЛЬНЫЙ ПРЕДМЕТНИК (subjects.teacher_id); куратор группы
+  // (groups.teacher_id, teacher_karim) — только fallback, если у урока нет
+  // предмета или у предмета не назначен учитель. См. getTeacherLessonView.
+  const curatorId = lesson.group.teacher_id;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db3 = db as any;
   // Subject name: prefer the lesson's actual subject_id FK; fall back to the
   // group's (legacy lessons without subject_id may have NULL).
+  const SUBJECT_WITH_TEACHER = "name, icon, color, teacher:teachers!subjects_teacher_id_fkey(id, full_name)";
   const subjectQuery = lesson.subject_id
-    ? db3.from("subjects").select("name, icon, color").eq("id", lesson.subject_id).maybeSingle()
-    : db3.from("subjects").select("name, icon, color").eq("group_id", lesson.group_id).limit(1).maybeSingle();
-  const [teacherRes, materialsRes, stagesRaw, subjectRes] = await Promise.all([
-    teacherId
-      ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
+    ? db3.from("subjects").select(SUBJECT_WITH_TEACHER).eq("id", lesson.subject_id).maybeSingle()
+    : db3.from("subjects").select(SUBJECT_WITH_TEACHER).eq("group_id", lesson.group_id).limit(1).maybeSingle();
+  const [curatorRes, materialsRes, stagesRaw, subjectRes] = await Promise.all([
+    curatorId
+      ? db.from("teachers").select("id, full_name").eq("id", curatorId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     // Промт "презентации/skeleton" — Задача Б: select("*") instead of an
     // explicit column list specifically so this stays deploy-order-agnostic
@@ -2003,11 +2022,18 @@ export const getStudentLessonView = async (
   const { teacher_id: _tid, ...groupData } = lesson.group;
   const materialsTyped = materialsRes as { data: unknown[] | null; error: { message: string } | null };
   const stagesTyped = stagesRaw as { data: unknown[] | null; error: { message: string } | null };
+  const subjectTyped = subjectRes as {
+    data: { name: string; icon: string | null; color: string | null; teacher: { id: string; full_name: string } | null } | null;
+    error: { message: string } | null;
+  };
+  const curatorTyped = curatorRes as { data: { id: string; full_name: string } | null; error: { message: string } | null };
   if (materialsTyped.error) console.error("[getStudentLessonView] lesson_materials query failed:", materialsTyped.error.message);
   // lesson_stages — самое важное здесь: сбой рендерится как "0 этапов",
   // неотличимо от урока, где этапы правда ещё не созданы (тот же паттерн,
   // что "Выходной"/пустые оценки).
   if (stagesTyped.error) console.error("[getStudentLessonView] lesson_stages query failed:", stagesTyped.error.message);
+  if (subjectTyped.error) console.error("[getStudentLessonView] subjects query failed:", subjectTyped.error.message);
+  if (curatorTyped.error) console.error("[getStudentLessonView] teachers (curator fallback) query failed:", curatorTyped.error.message);
 
   // Flatten progress array → single object | null per stage
   const stagesWithProgress = (stagesTyped.data ?? []).map((s) => {
@@ -2025,11 +2051,11 @@ export const getStudentLessonView = async (
     room: lesson.room,
     active_stage_id: lesson.active_stage_id,
     demo_material_id: lesson.demo_material_id,
-    subjectName: ((subjectRes as { data: { name: string } | null }).data?.name) ?? null,
-    subjectIcon: ((subjectRes as { data: { icon: string | null } | null }).data?.icon) ?? null,
-    subjectColor: ((subjectRes as { data: { color: string | null } | null }).data?.color) ?? null,
+    subjectName: subjectTyped.data?.name ?? null,
+    subjectIcon: subjectTyped.data?.icon ?? null,
+    subjectColor: subjectTyped.data?.color ?? null,
     group: groupData,
-    teacher: (teacherRes.data as { id: string; full_name: string } | null),
+    teacher: subjectTyped.data?.teacher ?? curatorTyped.data,
     materials: (materialsTyped.data ?? []) as LessonMaterial[],
     stages: stagesWithProgress as LessonStageWithProgress[],
   };
@@ -4007,9 +4033,12 @@ export const cancelLeaveRequest = async (
 
 // ─── STUDENT SCHEDULE QUERIES (iter3-p2b) ────────────────────────────────────
 
+// Учитель урока = предметник (subjects.teacher_id, миграция 109);
+// group.teacher (groups_teacher_id_fkey) — куратор, в UI используется
+// только как fallback: l.subject?.teacher ?? l.group.teacher.
 const LESSON_SUBJECT_SELECT =
   "id, group_id, title, topic, starts_at, ends_at, duration_minutes, room, status, " +
-  "subject:subjects(id, name, icon, color), " +
+  "subject:subjects(id, name, icon, color, teacher:teachers!subjects_teacher_id_fkey(id, full_name)), " +
   "group:groups!inner(id, name, teacher:teachers!groups_teacher_id_fkey(id, full_name, avatar_url))";
 
 /** Уроки ученика на конкретную дату (в Asia/Tashkent UTC+5).

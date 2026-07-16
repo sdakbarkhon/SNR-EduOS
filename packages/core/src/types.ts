@@ -60,7 +60,9 @@ export type SubjectWithGroup = Subject & {
   teacher: { id: string; full_name: string } | null;
 };
 
-/** Урок с join'ами на subject и teacher (для экрана расписания). */
+/** Урок с join'ами на subject и teacher (для экрана расписания).
+ *  subject.teacher — реальный предметник (subjects.teacher_id);
+ *  group.teacher — куратор группы, в UI только fallback. */
 export type LessonWithSubject = {
   id: string;
   group_id: string;
@@ -71,7 +73,10 @@ export type LessonWithSubject = {
   duration_minutes: number | null;
   room: string | null;
   status: LessonStatus;
-  subject: { id: string; name: string; icon: string; color: string } | null;
+  subject: {
+    id: string; name: string; icon: string; color: string;
+    teacher?: { id: string; full_name: string } | null;
+  } | null;
   group: {
     id: string;
     name: string;

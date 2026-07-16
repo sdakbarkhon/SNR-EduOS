@@ -112,7 +112,7 @@ export function ScheduleView({
                               {l.subject?.name ?? l.group.name}
                             </p>
                             <p className="truncate text-xs text-gray-400">
-                              {formatTime(l.starts_at)} · {l.group.teacher?.full_name ?? "—"}
+                              {formatTime(l.starts_at)} · {l.subject?.teacher?.full_name ?? l.group.teacher?.full_name ?? "—"}
                               {l.room ? ` · ${l.room}` : ""}
                             </p>
                           </div>
