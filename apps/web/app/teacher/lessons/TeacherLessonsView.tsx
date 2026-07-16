@@ -330,6 +330,15 @@ function LessonFormModal({
   // Groups that have at least one subject assigned to this teacher
   const groupsWithSubjects = groups.filter(g => teacherSubjects.some(s => s.group_id === g.id));
 
+  // ЧАСТЬ В: предметник после серверного фильтра видит ровно один предмет на
+  // группу — выбираем его сразу, чтобы не заставлять кликать единственный пункт.
+  useEffect(() => {
+    if (groupSubjects.length === 1 && form.subjectId !== groupSubjects[0]!.id) {
+      set("subjectId", groupSubjects[0]!.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.groupId]);
+
   // Промт 4, Часть 5 — тема из плана. ТОЛЬКО при создании урока (Часть 5:
   // "форму редактирования — селектор не добавлять"), только когда у пары
   // (группа, предмет) есть план.
@@ -357,6 +366,11 @@ function LessonFormModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.groupId)   { setError("Выберите группу"); return; }
+    // ЧАСТЬ В: предмет обязателен при создании — subject-scope RLS (131)
+    // отклоняет INSERT урока без предмета, а уроки с subject_id=NULL были бы
+    // невидимы предметникам (filterBySubject). В edit предмет не меняется
+    // (updateLesson не принимает subject_id) — там не требуем.
+    if (mode === "create" && !form.subjectId) { setError("Выберите предмет"); return; }
     if (!form.date)      { setError("Укажите дату"); return; }
     if (!form.startTime) { setError("Укажите время начала"); return; }
     setSaving(true); setError("");
