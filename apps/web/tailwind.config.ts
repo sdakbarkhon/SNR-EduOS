@@ -6,6 +6,7 @@ const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
+    "./lib/**/*.{ts,tsx}",
     "../../packages/core/src/**/*.{ts,tsx}",
     "../../packages/ui-tokens/src/**/*.{ts,tsx}",
   ],
