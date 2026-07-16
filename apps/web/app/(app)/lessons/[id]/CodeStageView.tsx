@@ -78,6 +78,8 @@ export function CodeStageView({
 
   const [isLive, setIsLive] = useState(!!stage.is_live_active);
   const [liveCode, setLiveCodeValue] = useState(stage.live_code ?? "");
+  // Пачка 3, Задача 3 — вывод последнего Run учителя (broadcast, не БД).
+  const [liveOutput, setLiveOutput] = useState("");
 
   const readOnly = isSubmitted;
 
@@ -105,11 +107,33 @@ export function CodeStageView({
     `id=eq.${stage.id}`,
     (payload) => {
       const active = payload.new?.is_live_active;
-      if (typeof active === "boolean") setIsLive(active);
+      if (typeof active === "boolean") {
+        setIsLive(active);
+        // Свежий Live-показ не должен начинаться со старого вывода
+        // предыдущего запуска — сбрасываем при каждом старте/остановке.
+        if (!active) setLiveOutput("");
+      }
       const lc = payload.new?.live_code;
       if (typeof lc === "string" || lc === null) setLiveCodeValue(lc ?? "");
     },
   );
+
+  // Пачка 3, Задача 3 — отдельный broadcast-канал для результата Run учителя
+  // (не postgres_changes, как код выше — вывод эфемерный, в БД не пишется).
+  useEffect(() => {
+    const channel = db
+      .channel(`stage-run-${stage.id}`)
+      .on(
+        "broadcast",
+        { event: "output" },
+        (msg: { payload?: { content?: string } }) => {
+          if (typeof msg.payload?.content === "string") setLiveOutput(msg.payload.content);
+        },
+      )
+      .subscribe();
+    return () => { db.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage.id]);
 
   function errMessage(err: string): string {
     if (err === "compile") return dc.compileError;
@@ -341,7 +365,7 @@ export function CodeStageView({
         cancelText={d.common.cancel}
       />
 
-      {isLive && <StudentLiveViewer code={liveCode} language={language} />}
+      {isLive && <StudentLiveViewer code={liveCode} language={language} output={liveOutput} />}
     </div>
   );
 }

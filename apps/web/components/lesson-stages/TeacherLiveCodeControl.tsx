@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Play, Loader2 } from "lucide-react";
 import { getDictionary, startLive, stopLive, setLiveCode } from "@snr/core";
 import type { Locale, LessonStage, CodeStageConfig, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CodeEditor } from "@/components/CodeEditor";
+import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 const THROTTLE_MS = 500;
 
@@ -13,13 +16,22 @@ const THROTTLE_MS = 500;
  * Teacher's live-coding panel for the active code stage. Start/Stop toggles
  * `is_live_active`; while live, keystrokes are throttled (leading + trailing
  * write, at most one per THROTTLE_MS) into `live_code`, which Realtime
- * delivers to StudentLiveViewer. Stopping (or unmounting mid-live, e.g. the
- * teacher switches to a different stage) turns live off so students aren't
- * left staring at a stale broadcast.
+ * (postgres_changes) delivers to StudentLiveViewer. Stopping (or unmounting
+ * mid-live, e.g. the teacher switches to a different stage) turns live off so
+ * students aren't left staring at a stale broadcast.
+ *
+ * Пачка 3, Задача 3 — кнопка "Run": выполняет код тем же клиентским раннером,
+ * что песочница/этапы урока (apps/web/lib/code-runner.ts — Piston вышел из
+ * строя в феврале 2026, весь запуск теперь client-side: Pyodide/JSCPP/
+ * iframe-sandbox, серверного piston-эндпоинта в проекте не существует).
+ * Результат показывается локально И транслируется ученикам ОТДЕЛЬНЫМ
+ * broadcast-каналом stage-run-<id> (не через postgres_changes, как код —
+ * вывод эфемерный, персистить в БД не нужно, миграция не требуется).
  */
 export function TeacherLiveCodeControl({ stage }: { stage: LessonStage }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.live;
+  const dc = getDictionary(locale as Locale).lesson.code;
   const db = createClient();
 
   const cfg = (stage.config ?? {}) as Partial<CodeStageConfig>;
@@ -29,11 +41,27 @@ export function TeacherLiveCodeControl({ stage }: { stage: LessonStage }) {
   const [active, setActive] = useState(!!stage.is_live_active);
   const [code, setCode] = useState(stage.live_code ?? starter);
   const [toggling, setToggling] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<RunResult | null>(null);
 
   const activeRef = useRef(active);
   useEffect(() => { activeRef.current = active; }, [active]);
 
   const throttleRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; last: number }>({ timer: null, last: 0 });
+
+  // Broadcast-канал для трансляции результата запуска — отдельный от
+  // postgres_changes, которым синхронизируется сам код (setLiveCode).
+  const runChannelRef = useRef<RealtimeChannel | null>(null);
+  useEffect(() => {
+    const channel = db.channel(`stage-run-${stage.id}`);
+    channel.subscribe();
+    runChannelRef.current = channel;
+    return () => {
+      db.removeChannel(channel);
+      runChannelRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage.id]);
 
   function pushCode(v: string) {
     const state = throttleRef.current;
@@ -72,6 +100,46 @@ export function TeacherLiveCodeControl({ stage }: { stage: LessonStage }) {
     }
   }
 
+  // Те же коды ошибок, что CodeStageView.tsx (isHtml здесь не нужен — live-
+  // демонстрация не поддерживает html-превью, только текстовый вывод).
+  function errMessage(err: string): string {
+    if (err === "compile") return dc.compileError;
+    if (err === "timeout") return dc.timeout;
+    if (err.startsWith("exit:")) return `${dc.error} (exit ${err.slice(5)})`;
+    if (err.startsWith("net:")) return `${dc.error}: ${err.slice(4)}`;
+    if (isUnsupportedCppFeatureError(err)) return dc.cppUnsupported;
+    return err;
+  }
+  function resultToString(r: RunResult | null): string {
+    if (!r) return "";
+    let s = "";
+    if (r.stdout) s += r.stdout;
+    if (r.stderr) s += `\n[stderr]\n${r.stderr}`;
+    if (r.error) s += `\n[${errMessage(r.error)}]`;
+    return s.trim();
+  }
+
+  async function handleRun() {
+    setRunning(true);
+    let r: RunResult;
+    try {
+      r = await runCode({ language, code });
+    } catch (e) {
+      r = { stdout: "", stderr: "", error: String(e) };
+    }
+    setResult(r);
+    setRunning(false);
+
+    if (active) {
+      const outputText = resultToString(r);
+      void runChannelRef.current?.send({
+        type: "broadcast",
+        event: "output",
+        payload: { content: outputText, exitCode: r.error ? 1 : 0 },
+      });
+    }
+  }
+
   // Auto-stop if the teacher navigates away / switches stages while live.
   useEffect(() => {
     return () => {
@@ -80,6 +148,8 @@ export function TeacherLiveCodeControl({ stage }: { stage: LessonStage }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.id]);
+
+  const outputText = resultToString(result);
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -99,8 +169,28 @@ export function TeacherLiveCodeControl({ stage }: { stage: LessonStage }) {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1">
-        <CodeEditor value={code} onChange={handleChange} language={language} height="100%" />
+      <div className="flex min-h-0 flex-[3] flex-col gap-2">
+        <div className="flex shrink-0 items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{dc.editorLabel}</span>
+          <button
+            onClick={handleRun}
+            disabled={running || !code.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            {running ? dc.running : dc.run}
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <CodeEditor value={code} onChange={handleChange} language={language} height="100%" />
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+        <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-slate-400">{dc.output}</span>
+        <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-900 px-3 py-2.5 text-xs text-slate-100">
+          {outputText || <span className="text-slate-500">{dc.emptyOutput}</span>}
+        </pre>
       </div>
     </div>
   );

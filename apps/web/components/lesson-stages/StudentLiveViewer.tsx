@@ -13,10 +13,15 @@ import { CodeViewer } from "@/components/CodeEditor";
  * with fresh content on every teacher keystroke without managing its own
  * fetch/subscription. No close control: only the teacher stopping live
  * (is_live_active → false, synced via Realtime) dismisses it.
+ *
+ * Пачка 3, Задача 3 — `output` (опционально): результат последнего Run
+ * учителя, транслируется отдельным broadcast-каналом (не postgres_changes —
+ * см. CodeStageView.tsx). Панель "Вывод" скрыта, если output пустой/не задан.
  */
-export function StudentLiveViewer({ code, language }: { code: string; language: CodeLanguage }) {
+export function StudentLiveViewer({ code, language, output }: { code: string; language: CodeLanguage; output?: string }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const dc = d.lesson.code;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-900">
@@ -31,9 +36,15 @@ export function StudentLiveViewer({ code, language }: { code: string; language: 
         <span className="truncate text-sm font-medium text-white">{d.lesson.live.title}</span>
         <span className="ml-auto shrink-0 text-xs text-white/50">{d.demo.onlyTeacherCanClose}</span>
       </div>
-      <div className="min-h-0 flex-1">
+      <div className={`min-h-0 ${output ? "flex-[3]" : "flex-1"}`}>
         <CodeViewer value={code} language={language} height="100%" />
       </div>
+      {output && (
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5 border-t border-white/10 bg-slate-950/60 px-6 py-3">
+          <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-white/40">{dc.output}</span>
+          <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap text-xs text-slate-100">{output}</pre>
+        </div>
+      )}
     </div>,
     document.body,
   );
