@@ -1102,6 +1102,8 @@ export interface Dictionary {
     tipTitle: string;          // "Совет дня"
     tipBody: string;
     suggestions: string[];     // 4 quick-prompt chips
+    // Пачка 3, Задача 2 — глобальный дневной лимит Gemini под чатом (миграция 136).
+    usageLimitLabel: string;   // "Осталось запросов сегодня: {remaining} / {limit}" — интерполируются
   };
   demo: {
     showToClass: string;       // "Показать классу"
@@ -1549,9 +1551,10 @@ export interface Dictionary {
     inProgressAutoNote: string;        // "Урок идёт."
     inProgressMins: string;            // "Длится {n} мин."
     startLessonBtn: string;            // "Начать урок" — БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6
-    endLessonBtn: string;              // "Закончить урок"
-    endLessonConfirm: string;          // confirm text before manual end
+    endLessonBtn: string;              // "Закончить урок" — ТОЛЬКО учитель, завершает урок для всех
+    endLessonConfirm: string;          // confirm text before manual end (учитель)
     reloadPage: string;                // "Обновить страницу" — reload button next to endLessonBtn
+    leaveLessonBtn: string;            // "Выйти из урока" — ученик, чисто клиентская навигация, урок продолжается для остальных
     liveScores: {                      // §7.7 — live quiz_qia/quiz_kahoot scores table
       title: string;
       student: string;

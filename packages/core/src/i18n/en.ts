@@ -1086,6 +1086,7 @@ export const en: Dictionary = {
     quickTopicsSubtitle: "Tap to ask",
     tipTitle: "Tip of the day",
     tipBody: "Ask questions one part at a time — it's easier to work through a hard topic step by step.",
+    usageLimitLabel: "Requests remaining today: {remaining} / {limit}",
     suggestions: [
       "Help me solve an equation",
       "Translate a text into English",
@@ -1514,6 +1515,7 @@ export const en: Dictionary = {
     startLessonBtn: "Start lesson",
     endLessonBtn: "End lesson",
     endLessonConfirm: "End the lesson now? This can't be undone.",
+    leaveLessonBtn: "Leave lesson",
     reloadPage: "Reload page",
     liveScores: {
       title: "Live results",

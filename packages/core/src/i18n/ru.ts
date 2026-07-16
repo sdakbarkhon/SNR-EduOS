@@ -1086,6 +1086,7 @@ export const ru: Dictionary = {
     quickTopicsSubtitle: "Нажми, чтобы спросить",
     tipTitle: "Совет дня",
     tipBody: "Задавай вопросы по частям — так проще разобраться в сложной теме шаг за шагом.",
+    usageLimitLabel: "Осталось запросов сегодня: {remaining} / {limit}",
     suggestions: [
       "Помоги решить уравнение",
       "Переведи текст на английский",
@@ -1514,6 +1515,7 @@ export const ru: Dictionary = {
     startLessonBtn: "Начать урок",
     endLessonBtn: "Закончить урок",
     endLessonConfirm: "Закончить урок сейчас? Действие нельзя отменить.",
+    leaveLessonBtn: "Выйти из урока",
     reloadPage: "Обновить страницу",
     liveScores: {
       title: "Результаты в реальном времени",

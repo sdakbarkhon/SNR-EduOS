@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   Clock, Check, FileText, FileCode2, File, ChevronsLeft, ChevronsRight,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
-  Maximize2, Minimize2, Bot, RefreshCw,
+  Maximize2, Minimize2, Bot, RefreshCw, LogOut,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask,
-  getMaterialDownloadUrl, endLesson,
+  getMaterialDownloadUrl,
 } from "@snr/core";
 import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -287,7 +287,6 @@ export function LessonWorkspaceView({
   const [countdown, setCountdown] = useState(5);
   const [completedElapsed, setCompletedElapsed] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [endingLesson, setEndingLesson] = useState(false);
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
@@ -477,19 +476,15 @@ export function LessonWorkspaceView({
   const activePos = activeMiddleStage?.position ?? -1;
   const isCompleted = lesson.status === "completed";
 
-  // Manual "Закончить урок" (§7.6) — available to student too, not just teacher.
-  // fn_auto_end_lessons keeps running independently; this just fires it early.
-  // No router.refresh() here on purpose — the existing realtime/poll below
-  // (applyLessonLiveUpdate) picks up the status flip and shows the completion
-  // modal, same as when the teacher or pg_cron ends the lesson.
-  async function handleEndLesson() {
-    if (endingLesson || !window.confirm(dl.endLessonConfirm)) return;
-    setEndingLesson(true);
-    try {
-      await endLesson(db, lesson.id);
-    } catch {
-      setEndingLesson(false);
-    }
+  // Пачка 3, Задача 1 — "Выйти из урока": ученик просто покидает экран урока
+  // (клиентская навигация), урок НЕ завершается для остальных. Раньше эта
+  // кнопка вызывала endLesson(db, lesson.id) — тот же самый глобальный
+  // UPDATE lessons.status='completed', что и учительская кнопка "Закончить
+  // урок" (см. RLS-политику "student ends own in-progress lesson", миграция
+  // 117) — клик одного ученика реально завершал урок для ВСЕЙ группы.
+  // Теперь это чисто клиентское действие без запроса к БД.
+  function handleLeaveLesson() {
+    router.push("/schedule");
   }
   // middleStages: visible stages for sidebar stepper (position ≤ active, or all if completed)
   const middleStages = isCompleted
@@ -808,11 +803,11 @@ export function LessonWorkspaceView({
             )}
             {!isCompleted && (
               <button
-                onClick={handleEndLesson}
-                disabled={endingLesson}
-                className="flex items-center gap-2 rounded-[11px] border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+                onClick={handleLeaveLesson}
+                className="flex items-center gap-2 rounded-[11px] border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100"
               >
-                {endingLesson ? "…" : dl.endLessonBtn}
+                <LogOut className="h-4 w-4" />
+                {dl.leaveLessonBtn}
               </button>
             )}
             <button

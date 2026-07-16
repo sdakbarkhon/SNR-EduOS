@@ -18,7 +18,24 @@ const SUGGESTION_ICONS = [Calculator, Languages, Bug, BookOpen];
 // только то, что уходит в запрос.
 const MAX_HISTORY_MESSAGES = 15;
 
+// Пачка 3, Задача 2 — глобальный дневной лимит Gemini под чатом (миграция
+// 136). Обновляется раз в 30с (polling — в проекте нет прецедента realtime
+// для этого чата, см. инвентаризацию) + оптимистично при отправке
+// сообщения, скорректировано по факту после ответа сервера.
+const USAGE_POLL_INTERVAL_MS = 30_000;
+
 type Message = { role: "user" | "model"; text: string };
+type AiUsage = { used: number; limit: number; remaining: number };
+
+async function fetchAiUsage(): Promise<AiUsage | null> {
+  try {
+    const res = await fetch("/api/ai/usage", { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as AiUsage;
+  } catch {
+    return null;
+  }
+}
 
 export function AiAssistantView() {
   const { locale } = useLocale();
@@ -28,11 +45,23 @@ export function AiAssistantView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [usage, setUsage] = useState<AiUsage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      const u = await fetchAiUsage();
+      if (!cancelled && u) setUsage(u);
+    }
+    void refresh();
+    const interval = setInterval(refresh, USAGE_POLL_INTERVAL_MS);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   async function send(text: string) {
     const trimmed = text.trim();
@@ -42,12 +71,16 @@ export function AiAssistantView() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
+    // Оптимистично уменьшаем счётчик сразу (не ждём ответа AI) — корректируем
+    // на реальное значение после того, как запрос отработает (успешно или нет).
+    setUsage((prev) => (prev ? { ...prev, used: prev.used + 1, remaining: Math.max(0, prev.remaining - 1) } : prev));
 
     const history = messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({ role: m.role, text: m.text }));
     const result = await callAiChat(EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT, trimmed, history);
     const aiText = "error" in result ? t.errorFallback : result.text;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
     setLoading(false);
+    void fetchAiUsage().then((u) => { if (u) setUsage(u); });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -148,6 +181,22 @@ export function AiAssistantView() {
               <Send className="h-5 w-5" />
             </button>
           </div>
+
+          {/* Пачка 3, Задача 2 — глобальный дневной лимит Gemini. Цвет по
+              remaining: >100 серый, 50-100 жёлтый, <50 красный. */}
+          {usage && (
+            <p
+              className={`px-4 pb-3 text-center text-xs font-medium ${
+                usage.remaining < 50
+                  ? "text-red-500"
+                  : usage.remaining <= 100
+                    ? "text-amber-500"
+                    : "text-slate-400"
+              }`}
+            >
+              {t.usageLimitLabel.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}
+            </p>
+          )}
         </div>
 
         {/* Right rail */}

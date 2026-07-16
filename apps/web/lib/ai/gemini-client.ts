@@ -12,6 +12,28 @@ import {
   type Tool,
 } from "@google/generative-ai";
 import { resolveModel, type AiModelTier } from "./config";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// Пачка 3, Задача 2 — глобальный дневной счётчик вызовов Gemini (X/250,
+// миграция 136). withRetry() — единственная точка, через которую проходят
+// ВСЕ реальные HTTP-вызовы к Gemini (generateText/generateContent/
+// generateJSON/chat), поэтому инкремент здесь покрывает всё приложение
+// сразу, без правок в каждом вызывающем месте. streamChat() эту функцию не
+// использует (не подключён ни к одному роуту, см. комментарий ниже) —
+// соответственно не считается, что корректно: посчитан должен быть только
+// реальный расход квоты.
+// Fire-and-forget: сбой счётчика не должен ронять саму AI-фичу.
+// as any: increment_ai_usage() из миграции 136 ещё не в сгенерённых
+// database.types.ts (тот же паттерн, что claim_demo_slot и др. в Пачке 2).
+function bumpAiUsage(): void {
+  (createAdminClient().rpc as any)("increment_ai_usage")
+    .then(({ error }: { error: { message: string } | null }) => {
+      if (error) console.error("[gemini-client] increment_ai_usage failed:", error.message);
+    })
+    .catch((e: unknown) => {
+      console.error("[gemini-client] increment_ai_usage threw:", (e as Error)?.message);
+    });
+}
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000; // 1s, 2s, 4s
@@ -94,6 +116,7 @@ async function withRetry(
     try {
       const text = await run(tier);
       console.log(`[gemini-client] ${label} done, response length:`, text.length);
+      bumpAiUsage();
       return { text, error: null };
     } catch (e: unknown) {
       if (e instanceof GoogleGenerativeAIFetchError) {

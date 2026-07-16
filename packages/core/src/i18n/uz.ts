@@ -1086,6 +1086,7 @@ export const uz: Dictionary = {
     quickTopicsSubtitle: "So'rash uchun bosing",
     tipTitle: "Kunning maslahati",
     tipBody: "Savollarni qismlarga bo'lib ber — murakkab mavzuni qadam-baqadam tushunish osonroq.",
+    usageLimitLabel: "Bugun qolgan so'rovlar: {remaining} / {limit}",
     suggestions: [
       "Tenglamani yechishga yordam ber",
       "Matnni ingliz tiliga tarjima qil",
@@ -1514,6 +1515,7 @@ export const uz: Dictionary = {
     startLessonBtn: "Darsni boshlash",
     endLessonBtn: "Darsni tugatish",
     endLessonConfirm: "Darsni hozir tugatasizmi? Bu amalni bekor qilib bo'lmaydi.",
+    leaveLessonBtn: "Darsdan chiqish",
     reloadPage: "Sahifani yangilash",
     liveScores: {
       title: "Jonli natijalar",
