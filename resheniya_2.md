@@ -2482,3 +2482,86 @@ SELECT * FROM public.claim_demo_slot('teacher', 'math'); -- ok снова
 - **Full cleanup dead code** (callers `useDemoEditBlocked` / `isDemoEditBlockedError` в ~10 файлах) — оставлены как есть, ветки dead, но безвредны. Постепенная зачистка в будущих коммитах.
 - **DemoBanner положение над status bar на мобилке** — сейчас над `SafeAreaProvider`, при живой проверке возможен визуальный шов; если так — обернуть в `SafeAreaView` (2 строчки правки).
 - **OTA публикация** — публикуется отдельно (см. финальный отчёт).
+
+
+---
+
+## P2-фикс (после apply 132/133) — revert бага А + фикс бага Б
+
+**Дата:** 2026-07-16.
+**Скоуп:** только `apps/web` (мобилку не трогали — заблокирована Google-аккаунтом `snreduos`, OTA не публикуем).
+
+### Контекст
+
+После применения миграций 132/133 заказчиком обнаружены 2 бага:
+
+**Баг А — неверная интерпретация «не менять расположение».** До Пачки 2 на `/login` была ОДНА кнопка «Демо», открывавшая модалку с выбором роли (3 класса учеников + 5 учителей = 8 карточек). В Пачке 2 это по ошибке развалили на ДВЕ отдельные кнопки («Демо ученик» прямой claim без модалки + «Демо учитель» с модалкой из 5 карточек) — заказчик просил не трогать *расположение* элемента, а не убирать саму модалку.
+
+**Баг Б — `gen_random_bytes` не резолвится.** RPC `claim_demo_slot` (миграция 133) падал на строке `encode(gen_random_bytes(32), 'hex')`:
+```
+ERROR: 42883: function gen_random_bytes(integer) does not exist
+```
+Причина: в Supabase `pgcrypto` живёт в схеме `extensions`, а `SET search_path = public, auth` в 133 её не видела без явной квалификации. Из-за этого демо-логин на вебе был полностью сломан (любой клик по демо-кнопке → «Не удалось войти в демо-режим»).
+
+### Исправление бага А — 1 кнопка + модалка на 6 карточек
+
+**Новая модель модалки** (не старая 3+5 = 8, а по актуальной P2-архитектуре пулов):
+- 1 карточка «Ученик» — случайный из ~96 (пул после конверсии 90 demo→real в 132), БЕЗ выбора класса (старая модель с 3 классами удалена вместе со старой демо-инфрой в 132 — пул теперь единый).
+- 5 карточек предметников (Программирование/Робототехника/Математика/Английский/Русский) — без изменений с Пачки 2.
+- Куратор `teacher_karim` в модалке не участвует (не предметник, `subject_slug=NULL`).
+- Занятость каждой карточки — серая, disabled, надпись «занят». Для ученика это условие `student_available=false` (все 96 заняты одновременно — статистически почти невозможно, но UI-ветка есть).
+
+**Файлы:**
+- [`apps/web/app/login/LoginForm.tsx`](apps/web/app/login/LoginForm.tsx) — убран `onDemoStudent`, `demoStudentLoading`, `StudentCap` импорт; кнопка вернулась к исходному виду (первая ячейка `grid-cols-4` OAuth-ряда, `title={d.demoMode.buttonLabel}`, клик → `setShowDemoModal(true)`).
+- [`apps/web/components/DemoRoleModal.tsx`](apps/web/components/DemoRoleModal.tsx) — переписан: карточка «Ученик» (широкая, сверху) + секция «Учителя» с 5 карточками ниже. Обе claim-функции (`claimStudent`/`claimTeacher`) используют существующий `demoLogin` server action (без изменений сигнатуры — `{kind:'student'}` уже поддерживался).
+- [`apps/web/app/api/demo/status/route.ts`](apps/web/app/api/demo/status/route.ts) — новый endpoint, заменяет `teacher-status`. Возвращает `{ student_available, occupied_subjects }` одним запросом (2 параллельных select через service_role: count активных students минус активные student-leases; occupied subject_slug из тех же demo_leases). `teacher-status/route.ts` удалён (единственный caller — DemoRoleModal, переключён на новый).
+- i18n (`packages/core/src/i18n/{types,ru,en,uz}.ts`): удалены `studentButtonLabel/studentShortLabel/teacherButtonLabel/teacherShortLabel/modalTitleTeacher/modalSubtitleTeacher`; добавлены `modalCardStudent` («Ученик»), `modalCardTeacher` («Учителя», секционный заголовок); `modalTitle` уточнён на «Выберите демо-роль» (было общее «Демо-режим»); `buttonLabel`/`shortLabel`/`modalSubtitle`/`slotOccupied` переиспользованы без изменений.
+
+### Исправление бага Б — миграция 134
+
+Файл: [`supabase/migrations/134_fix_claim_demo_slot_gen_bytes.sql`](supabase/migrations/134_fix_claim_demo_slot_gen_bytes.sql).
+
+`CREATE OR REPLACE FUNCTION claim_demo_slot(...)` — тело идентично 133, кроме одной строки генерации токена:
+```sql
+-- было (133, падало):
+v_session_token := encode(gen_random_bytes(32), 'hex');
+
+-- стало (134):
+v_session_token := replace(gen_random_uuid()::text, '-', '') ||
+                    replace(gen_random_uuid()::text, '-', '');
+```
+`gen_random_uuid()` встроена в ядро PostgreSQL 13+ (Supabase = PG15) — extensions не нужны, тот же факт уже зафиксирован комментарием в `20260614000001_enums.sql`. Два UUID без дефисов = 64 hex-символа — та же энтропия, что 32 случайных байта.
+
+Проверено grep'ом по всем `supabase/migrations/*.sql`: `gen_random_bytes` использовался ТОЛЬКО в `claim_demo_slot` — остальные функции 133 (`heartbeat_demo_slot`, `release_demo_slot`, `get_occupied_teacher_subjects`, `sweep_expired_demo_leases`) его не звали и правки не требуют.
+
+В конце файла — `DO $$ ... $$` smoke-test: claim+release по всем трём ролям (student/teacher-math/parent) с `RAISE NOTICE`.
+
+### SQL для применения (134)
+
+```sql
+-- См. supabase/migrations/134_fix_claim_demo_slot_gen_bytes.sql — файл целиком.
+-- Идемпотентно (CREATE OR REPLACE), безопасно перезапускать.
+```
+
+### Что делать заказчику
+
+1. Открыть Supabase Dashboard SQL Editor.
+2. Скопировать содержимое `supabase/migrations/134_fix_claim_demo_slot_gen_bytes.sql` целиком, выполнить.
+3. В конце файла автоматически прогонится smoke-test (3 `RAISE NOTICE`) — если все три прошли без ERROR, RPC исправен.
+4. Дождаться Vercel READY на коммите с фиксом фронта (SHA — см. отчёт).
+5. Живая проверка `/login` → «Демо» → модалка на 6 карточек → клик по «Ученик» / любому предметнику.
+
+### Проверочный сценарий
+
+1. `/login` → ровно ОДНА кнопка «Демо» (не две).
+2. Клик → модалка с 6 карточками: «Ученик» сверху, 5 предметников снизу под заголовком «Учителя».
+3. Клик по «Ученик» → случайный аккаунт из пула, редирект `/dashboard`, жёлтый баннер.
+4. В incognito снова «Демо» → «Ученик» — доступен (95 других свободны, карточка НЕ серая).
+5. Клик по «Математика» → `teacher_math`, редирект `/teacher/dashboard`, баннер.
+6. В incognito снова «Демо» → «Математика» серая, «занят», disabled.
+7. «Выйти из демо» в баннере → `/login`, `demo_leases.released_at` заполнен.
+
+### Что не сделано
+
+- Мобилка не тронута (по вводной — заблокирована Google-аккаунтом, OTA не публикуем).
+- Живая проверка — за заказчиком.
