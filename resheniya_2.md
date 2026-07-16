@@ -2331,3 +2331,154 @@ ownership-фильтра) уроки ЧУЖИХ предметов. Клиент
   дня) уже был правильный.
 - **Живая проверка в браузере** — за заказчиком (по вводной). Автопроверки: typecheck core/web/
   mobile-parent, prod build ×3, живые Node-тесты запросов А и В против hosted БД (read-only).
+
+
+---
+
+## P2 (пачка 2) — Переработка демо-режима: real accounts + lease
+
+**Дата:** 2026-07-16.
+**Коммиты:** [12d19d4](https://github.com/MIPTKBoy/SNREduOS/commit/12d19d4) + [8b9dfb8](https://github.com/MIPTKBoy/SNREduOS/commit/8b9dfb8) + [d1442e4](https://github.com/MIPTKBoy/SNREduOS/commit/d1442e4) + [d7559bf](https://github.com/MIPTKBoy/SNREduOS/commit/d7559bf).
+**Мигр:** 132 (снос старого) + 133 (demo_leases).
+
+### Целевая модель
+- Демо-режим = вход в РЕАЛЬНЫЙ аккаунт из пула + жёлтый баннер сверху "Вы в демо-режиме…".
+- **Никакого is_demo-флага на данных, никакого разделения записей.**
+- Пулы: студент — любой из ~96 active (90 конвертированных + 6 реальных); учитель — точечно по subject_slug (teacher_prog/robot/math/english/russian; куратор karim исключён); родитель — любой из 3.
+- Timeout неактивности 15 мин, heartbeat 5 мин, кнопка «Выйти из демо» → мгновенный release.
+- Демо-идентификация — cookie `snr-demo-session` со значением `session_token` (не JSON как раньше).
+
+### А. Инвентаризация (что было и уходит)
+
+Найдено полное описание старой инфры (см. mig 99 + 110 + 118 + 127):
+
+| Категория | Артефакт |
+|---|---|
+| Таблицы | `public.demo_sessions` (пул из 99, 90 строк), `public.user_sessions` (single-session, оставляем без `is_demo`/`demo_started_at`) |
+| Функции | `is_demo_session()`, `fn_stamp_is_demo()`, `claim_demo_account(text,text)`, `touch_demo_session()`, `reset_demo_data_for_user(uuid,timestamptz)`, `reset_expired_demo_sessions()` — **все дропаются** |
+| Триггеры | `trg_stamp_is_demo` BEFORE INSERT/UPDATE/DELETE на 10 таблицах: `lessons`, `lesson_stages`, `lesson_materials`, `homework`, `attendance`, `lesson_grades`, `homework_submissions`, `test_submissions`, `classwork_submissions`, `course_materials` |
+| Колонки | `is_demo` на 10 доменных таблицах + `user_sessions.is_demo` + `user_sessions.demo_started_at` — **все дропаются** |
+| Индексы | `idx_*_is_demo` (10 партиальных) + `idx_user_sessions_demo` |
+| pg_cron | `reset-expired-demo-sessions` (`*/30 * * * *`, зарегистрирован в 99) |
+| RLS-политики | ВНУТРИ 131 4 политики `lessons` + helper `teacher_can_write_lesson` ссылаются на `is_demo` — **переписаны в 132 без ветки is_demo** (parity для старого demo-пула, снесённого в 110) |
+| auth.users | 90 `demo_student_XX_XX@demo.snr.local` с `user_metadata.is_demo=true` — **конвертируются в реальные** |
+
+### Б. Миграция 132 — снос старой инфры + конвертация 90 demo → real
+
+Файл: [`supabase/migrations/132_remove_demo_infra_convert_demo_to_real.sql`](supabase/migrations/132_remove_demo_infra_convert_demo_to_real.sql) (259 строк).
+
+**Порядок операций (важен для атомарности):**
+1. Снять pg_cron `reset-expired-demo-sessions`
+2. DROP trg_stamp_is_demo с 10 таблиц
+3. DROP функций (fn_stamp_is_demo, claim_demo_account обе сигнатуры, reset_demo_data_for_user, reset_expired_demo_sessions, touch_demo_session)
+4. Переписать `touch_user_session()` без UPDATE demo_sessions (иначе после DROP таблицы функция бы падала)
+5. **Переписать 4 политики lessons + `teacher_can_write_lesson()` БЕЗ is_demo-ветки** ← без этого шаг 8 упадёт с «policy depends on column»
+6. DROP `is_demo_session()`
+7. DROP 11 индексов `idx_*_is_demo` / `idx_user_sessions_demo`
+8. DROP колонки `is_demo` с 10 таблиц + `user_sessions.is_demo` + `user_sessions.demo_started_at`
+9. DROP TABLE `public.demo_sessions` CASCADE
+10. UPDATE 90 `auth.users`: убрать `is_demo` из `raw_user_meta_data`, `encrypted_password = crypt('password123', gen_salt('bf'))`
+11. Регистрация в `supabase_migrations.schema_migrations`
+
+**Rollback тяжёлый** — рекомендую `pg_dump` перед применением.
+
+### В. Миграция 133 — demo_leases + 4 RPC
+
+Файл: [`supabase/migrations/133_demo_leases.sql`](supabase/migrations/133_demo_leases.sql) (313 строк).
+
+Таблица `public.demo_leases`:
+- `id uuid`, `user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE`, `role text CHECK IN (student|teacher|parent)`, `subject_slug text` (только для teacher), `session_token text UNIQUE`, `claimed_at`, `last_activity_at`, `released_at`, `school_id`
+- Индексы: `(role, released_at, last_activity_at)`; частичные UNIQUE `(session_token) WHERE released_at IS NULL` и `(user_id) WHERE released_at IS NULL`
+- RLS enabled, ZERO client policies — доступ строго через RPC
+
+RPC (все `SECURITY DEFINER`, `GRANT EXECUTE TO anon, authenticated, service_role`):
+- `claim_demo_slot(p_role text, p_subject_slug text DEFAULT NULL)` — sweep 15-min + RAISE если пусто → возвращает `(username, email, password, session_token, user_id)`. Для teacher фильтр по `teachers.subject_slug` (не по `subjects.slug` — такой колонки нет).
+- `heartbeat_demo_slot(p_session_token text)` → boolean (продлевает `last_activity_at`)
+- `release_demo_slot(p_session_token text)` → boolean (ставит `released_at = now()`)
+- `get_occupied_teacher_subjects()` → `TABLE(subject_slug text)` (для UI-модалки)
+- `sweep_expired_demo_leases()` — внутренний, `service_role` only
+
+### Г. Веб (endpoints + LoginForm + DemoRoleModal + чистка)
+
+Новые API-роуты `apps/web/app/api/demo/*`:
+- `POST /claim` (для мобилки — веб использует server action)
+- `POST /heartbeat`
+- `POST /release`
+- `GET /teacher-status`
+
+`apps/web/app/actions/auth.ts`:
+- `demoLogin({kind, slug?})` полностью переписан — единственная ветка через `claim_demo_slot` RPC (было отдельно teacher direct-login + student claim_demo_account).
+- `registerSession` больше не пишет `is_demo`/`demo_started_at` (колонки удалены).
+- `signOut` через `after()` дёргает `release_demo_slot(cookie token)`.
+
+`apps/web/app/login/LoginForm.tsx`:
+- Прежняя единая кнопка «Демо» разбита на две в отдельной строке над OAuth-рядом: **«Демо ученик»** (прямой claim без модалки) и **«Демо учитель»** (открывает модалку). OAuth-ряд сузился до 3 колонок.
+
+`apps/web/components/DemoRoleModal.tsx`:
+- Убраны 3 ученические карточки (класс 3/7/10) — пул случайный, выбор не нужен.
+- Осталось 5 карточек предметников; занятые (`GET /api/demo/teacher-status`) рендерятся серыми, disabled, с лейблом `d.slotOccupied`.
+- Race handling: `all_busy` → добавляем slug в occupied.
+
+`apps/web/lib/useIsDemoSession.ts`:
+- `useIsDemoSession` остаётся (баннер).
+- `useDemoEditBlocked` и `isDemoEditBlockedError` — **neutered (всегда false)**. Триггер `fn_stamp_is_demo` снят миграцией 132 → ошибка `editing_real_data_in_demo` больше не возникает. Callers (~10 файлов) не тронуты — dead code, но безвредны.
+
+`apps/web/components/DemoHeartbeat.tsx`:
+- Дёргает `POST /api/demo/heartbeat` (было `sb.rpc('touch_user_session')`).
+
+Чистка `.select('is_demo')` в `packages/core/src/queries/index.ts` (иначе PostgREST после DROP COLUMN упадёт):
+- `getTeacherAllLessons`, `getTeacherLessonsByMonth`, `getGroupAttendance`.
+
+i18n: +7 ключей в `demoMode` (ru/uz/en) — studentButtonLabel, studentShortLabel, teacherButtonLabel, teacherShortLabel, modalTitleTeacher, modalSubtitleTeacher, slotOccupied.
+
+### Д. Мобилка (LoginScreen + DemoBanner + heartbeat)
+
+Новые файлы:
+- [`src/lib/demoApi.ts`](apps/mobile-parent/src/lib/demoApi.ts) — `claimDemoSlot`, `heartbeatDemoSlot`, `releaseDemoSlot`. Без Bearer (webApi.ts требует Bearer, а demo-claim идёт до входа).
+- [`src/context/DemoSessionContext.tsx`](apps/mobile-parent/src/context/DemoSessionContext.tsx) — SecureStore-persistent `snr_demo_session_token` + heartbeat 5 мин + `setDemoSession/clearDemoSession`.
+- [`src/components/DemoBanner.tsx`](apps/mobile-parent/src/components/DemoBanner.tsx) — жёлтая полоса RN с иконкой alert-circle и кнопкой выхода.
+
+Модифицированы:
+- `App.tsx` — обёртка `LocaleProvider → DemoSessionProvider → SafeAreaProvider`. `<DemoBanner>` над `<RootNavigator>`, `onDemoLogoutRef` ref для перехода на Login после signOut.
+- `src/navigation/RootNavigator.tsx` — принимает `onDemoLogoutRefSet` проп; внутренний `DemoLogoutRegistrar` регистрирует `navigation.reset({routes:[{name:'Login'}]})`.
+- `src/screens/LoginScreen.tsx` — новая кнопка **«Демо родитель»** под submit-кнопкой (та же секция gap:16, Sparkles иконка). Клик → `claimDemoSlot('parent')` → `signInWithPassword` → `fetchParentProfile` → `setDemoSession(token)` → `onLoggedIn(profile)`.
+
+i18n: +1 ключ `demoMode.parentButtonLabel`.
+
+### Е. SQL для ручного применения
+
+Оба файла применить через **Supabase Dashboard SQL Editor** ПОСЛЕДОВАТЕЛЬНО:
+1. Сначала **132** — снос старой инфры + конверсия 90 аккаунтов. **Снять `pg_dump` до применения** (rollback тяжёлый — 12 dropped функций + 11 dropped колонок).
+2. Затем **133** — таблица `demo_leases` + 4 RPC.
+
+После применения — 8-шаговый проверочный скрипт в конце каждого файла.
+
+### Ж. Проверочный сценарий (заказчику)
+
+**Веб `/login`:**
+1. Клик «Демо ученик» → без модалки, редирект `/dashboard`, жёлтый баннер сверху. `username` — случайный из ~96 (посмотреть в Sidebar).
+2. Клик «Демо учитель» → модалка с 5 карточками. Клик по «Математика» → редирект `/teacher/dashboard`, баннер, залогинен как `teacher_math`.
+3. В другом браузере/incognito снова «Демо учитель» → «Математика» показана серой с надписью «занят», клик disabled. Через 15 мин неактивности первой сессии — снова доступна.
+4. Клик «Выйти из демо» в баннере → редирект `/login`, `demo_leases.released_at` заполнен (SQL check).
+
+**Мобилка (Expo Go / preview APK):**
+1. LoginScreen → кнопка «Демо родитель» под submit. Клик → жёлтый баннер сверху виден на всех экранах табов, залогинен как один из 3 родителей.
+2. Клик по кнопке в баннере → возврат на LoginScreen, `demo_leases.released_at` заполнен.
+
+**RPC-smoke test (после apply):**
+```sql
+-- В Supabase SQL Editor
+SELECT * FROM public.claim_demo_slot('teacher', 'math'); -- ok
+SELECT * FROM public.claim_demo_slot('teacher', 'math'); -- ERROR no_available_slot
+SELECT * FROM public.get_occupied_teacher_subjects();    -- {math}
+SELECT public.release_demo_slot(<token>);                -- true
+SELECT * FROM public.claim_demo_slot('teacher', 'math'); -- ok снова
+```
+
+### З. Что не сделано
+
+- **Живая проверка** (веб + мобилка) — за заказчиком после apply миграций (по вводной).
+- **Автоматические RPC-тесты** из части 6 (Node-скрипт claim × 100) — не гоняю, т.к. `claim_demo_slot` не существует до apply 133 на hosted БД. Оставляю в комментариях каждой миграции как ручной чек-скрипт.
+- **Full cleanup dead code** (callers `useDemoEditBlocked` / `isDemoEditBlockedError` в ~10 файлах) — оставлены как есть, ветки dead, но безвредны. Постепенная зачистка в будущих коммитах.
+- **DemoBanner положение над status bar на мобилке** — сейчас над `SafeAreaProvider`, при живой проверке возможен визуальный шов; если так — обернуть в `SafeAreaView` (2 строчки правки).
+- **OTA публикация** — публикуется отдельно (см. финальный отчёт).
