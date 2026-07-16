@@ -2651,3 +2651,126 @@ Smoke-test в конце файла (`DO $$...$$`): claim+release по всем 
 - Применение миграции 135 — заказчик через Dashboard SQL Editor (после 134).
 - Backfill `grade` для 3 legacy-аккаунтов без класса (`rustam_03`/`farrukh_10`/`malika_07`) — отдельная задача, вне скоупа.
 - Живая проверка — за заказчиком.
+
+
+---
+
+## Пачка 2.5 — Исторический бэкфилл учебных данных (7-16 июля 2026)
+
+**Дата:** 2026-07-16.
+**Скоуп:** только `apps/web/scripts/` (два новых файла), никаких SQL-миграций.
+
+### Цель
+
+Клиентское демо должно выглядеть как реальная работающая школа с полной историей за прошедшую неделю: посещаемость, оценки за уроки, результаты quiz-этапов, сдачи и оценки ДЗ — для всех ~96 активных учеников (90 конвертированных из демо + 6 реальных, миграция 132).
+
+### Файлы
+
+- [`apps/web/scripts/lib/backfill-templates.mjs`](apps/web/scripts/lib/backfill-templates.mjs) — шаблоны комментариев/ответов, weighted-random примитивы.
+- [`apps/web/scripts/backfill-historical.mjs`](apps/web/scripts/backfill-historical.mjs) — основной скрипт.
+
+### Расхождения ТЗ ↔ реальная схема (подтверждено live-запросом к hosted БД)
+
+| ТЗ предполагало | Реальность | Как адаптировано |
+|---|---|---|
+| `attendance.status`: present/absent/sick | CHECK допускает только `present`/`absent_excused`/`absent_unexcused` | `absent_unexcused`="absent" (8%), `absent_excused`="sick" (2%) |
+| `lesson_grades.grade_value` | Колонка называется `grade` | Использована `grade` |
+| `homework.due_at` | Колонка `due_date` | Использована `due_date` |
+| `homework.lesson_id` — обязательна связь | Всегда `NULL` — ДЗ привязано только к `group_id` | Аудитория ДЗ = вся группа (индивидуальных ДЗ в схеме нет) |
+| `content_type`: TEXT/CODE/TEST_MC (3 вида) | 16 значений в CHECK. В диапазоне дат: `programming`×6, `wokwi`×1, `test`×3 | `programming` → `code_text`; всё остальное (кроме test/bundle) → `answer_text` |
+| Quiz → `quiz_submissions` | Реальная таблица — `quiz_attempts` (migration 39), с `quiz_questions` уже сгенерированными Gemini (6 вопросов/этап) | Пишем `quiz_attempts` с `total_questions`/`correct_count`/`total_score` по реальному числу вопросов и очков этапа |
+| `content_type='test'` — просто вариант в HOMEWORK_ANSWERS | Отдельная система: `test_questions`/`test_submissions`/`test_answers`, НЕ через `homework_submissions` | Пишем `test_submissions` (`score`/`max_score`), без per-question `test_answers` |
+| `content_type='bundle'` | Отдельная система `homework_subtasks` (migration 87) | В диапазоне 07-07..07-16 такого ДЗ нет — скрипт логирует warning и пропускает, если встретится |
+| Комментарии учителя — где-то отдельно | Прямые колонки: `lesson_grades.comment`, `homework_submissions.teacher_comment` | Используются напрямую, `chat_messages` не участвует |
+| `is_demo` в существующих `backfill-{attendance,grades,homework}.mjs` | Колонка убрана миграцией 132 — старые скрипты сейчас сломаны при повторном запуске | Новый скрипт `is_demo` нигде не пишет; старые скрипты не трогали (не входит в эту задачу) |
+
+### Триггеры (важно для корректности `graded_by`)
+
+`set_grading_meta()` — `BEFORE UPDATE` (не `INSERT`) на `homework_submissions`/`test_submissions`: при `UPDATE` с изменением `grade` сам проставляет `graded_at:=now()`, `graded_by:=current_teacher_id()` — но `current_teacher_id()` резолвится через `auth.uid()`, которого под `service_role` нет (→ `NULL`). Старый `backfill-homework.mjs` обходил это двойным `UPDATE`. Наш скрипт делает **один `INSERT`** сразу со всеми полями (`grade`, `graded_by`, `graded_at`) — триггер на `INSERT` не срабатывает, исторически точные значения не перезатираются, `graded_by` корректно указывает на реального учителя.
+
+Побочный эффект: `trg_homework_submission_notify` (`AFTER INSERT`) создаёт уведомление учителю на каждую сдачу — ожидаемо и желательно для реализма истории.
+
+### Алгоритм
+
+1. **Контекст**: активные ученики (+ `--only-student` фильтр), группы, `student_groups`, реальные (не-stub) предметы → учитель, прошедшие уроки в диапазоне (`status='completed' AND ends_at<now()`), ДЗ по `due_date`, quiz-этапы (`content_type IN ('quiz_qia','quiz_kahoot')`) с реальным количеством вопросов/очков.
+2. **Pre-check**: bulk-`SELECT` существующих ключей (`lesson_id:student_id` для attendance/grades, `stage_id:student_id` для quiz, `homework_id:student_id` для submissions) в `Set`/`Map` — идемпотентность через явную проверку, **не** `ON CONFLICT DO NOTHING` (по прямому указанию ТЗ — чтобы видеть реальное состояние: сколько уже было / сколько создано).
+3. **Уроки** (по каждому, для каждого ученика группы):
+   - `attendance` — если нет записи, генерируем статус (90/8/2) и создаём.
+   - `lesson_grades` — **только для present** (существующих ИЛИ только что созданных — связность сохраняется даже для старых данных).
+   - `quiz_attempts` — только для present + только для этапов с реальными вопросами.
+4. **ДЗ** (по каждому, для каждого ученика группы): состояние сдачи (75/15/10) → `programming` → `code_text`, `test` → `test_submissions{score,max_score}`, всё остальное → `answer_text`; оценка (5=30/4=40/3=25/2=5) + комментарий по категории, `graded_at` = `submitted_at`+1-2 дня (капается на "сейчас").
+5. **Батчинг**: очередь по 200 записей на таблицу, флаш при заполнении + принудительный флаш в конце — каждый `INSERT` одним запросом = одна транзакция.
+6. **Финальная проверка**: пересчёт распределений `attendance.status` и `lesson_grades.grade` по всем данным в диапазоне (не только созданным этим прогоном).
+
+### Как запустить
+
+```bash
+cd apps/web
+node --env-file=.env.local scripts/backfill-historical.mjs --dry-run
+# проверить вывод
+node --env-file=.env.local scripts/backfill-historical.mjs --confirm-real-data
+```
+
+Доп. флаги: `--start-date=YYYY-MM-DD` / `--end-date=YYYY-MM-DD` (default 07-07/07-16), `--only-student=<username>` (тест на одном ученике), `--resume-from=<N>` (пропустить N уроков).
+
+Без `--confirm-real-data` скрипт **всегда** уходит в dry-run — гейт проверен (`node ... --only-student=X` без флагов → `Режим: DRY-RUN`).
+
+### Результат dry-run на hosted БД (2026-07-16)
+
+```
+Учеников: 96
+Уроков в диапазоне: 91, реально прошедших: 91
+ДЗ в диапазоне: 10 — {"programming":6,"test":3,"wokwi":1}
+Quiz-этапов: 90
+Уже есть: attendance=1177, lesson_grades=127, quiz_attempts=0, homework_submissions=19, test_submissions=0
+
+ИТОГО (DRY-RUN):
+  attendance: +1735
+  lesson_grades: +1556
+  quiz_attempts: +1635
+  homework_submissions: +191
+  test_submissions: +86
+  Ошибок: 0
+```
+
+Итого attendance после прогона: 1177+1735=2912 = ровно 91 урок × 32 ученика — полное покрытие. `lesson_grades` заметно меньше «present»-ожидания, потому что часть УЖЕ существующих attendance-записей помечена `absent_unexcused` (унаследовано из более раннего состояния БД) — скрипт корректно НЕ ставит оценки за эти уроки, соблюдая связность даже для чужих старых данных.
+
+### Проверочный SQL (после боевого запуска)
+
+```sql
+-- Кто заполнен, сколько записей
+SELECT s.username, s.grade,
+  (SELECT count(*) FROM attendance WHERE student_id = s.id AND marked_at >= '2026-07-07') as att,
+  (SELECT count(*) FROM lesson_grades WHERE student_id = s.id AND graded_at >= '2026-07-07') as grades,
+  (SELECT count(*) FROM homework_submissions WHERE student_id = s.id AND submitted_at >= '2026-07-07') as hw
+FROM students s
+WHERE s.status = 'active'
+ORDER BY s.grade, s.username;
+
+-- Распределение оценок за уроки (ожидание: 5≈30%, 4≈40%, 3≈25%, 2≈5%)
+SELECT grade, count(*),
+  round(100.0 * count(*) / sum(count(*)) OVER (), 1) as pct
+FROM lesson_grades
+WHERE graded_at >= '2026-07-07'
+GROUP BY grade ORDER BY grade;
+
+-- Распределение attendance (ожидание: present≈90%, absent_unexcused≈8%, absent_excused≈2%)
+SELECT status, count(*),
+  round(100.0 * count(*) / sum(count(*)) OVER (), 1) as pct
+FROM attendance
+WHERE marked_at >= '2026-07-07'
+GROUP BY status ORDER BY status;
+
+-- Домашка: сдано/оценено
+SELECT h.title, h.content_type, count(hs.id) as submitted, avg(hs.grade) as avg_grade
+FROM homework h LEFT JOIN homework_submissions hs ON hs.homework_id = h.id
+WHERE h.due_date >= '2026-07-07' AND h.due_date < '2026-07-17'
+GROUP BY h.id, h.title, h.content_type;
+```
+
+### Что не сделано
+
+- **Боевой запуск** (`--confirm-real-data`) — заказчик запускает сам (по вводной, ~5200 записей, оценка времени — несколько минут на батч-инсерты).
+- **`content_type='bundle'`** — не реализовано (нет таких ДЗ в текущем диапазоне дат; если появятся — скрипт залогирует warning и пропустит, не упадёт).
+- **`quiz_answers`** (индивидуальные ответы на каждый вопрос quiz) — не генерируются, только агрегат `quiz_attempts` (total_questions/correct_count/total_score). Экономит объём и сложность без потери видимого результата (UI показывает именно агрегат).
+- **Старые `backfill-{attendance,grades,homework}.mjs`** — не чинил (пишут `is_demo`, сейчас сломаны после 132) — вне скоупа этой задачи, для справки зафиксировано находкой.
