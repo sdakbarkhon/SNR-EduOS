@@ -2318,16 +2318,51 @@ export const uploadLessonMaterial = async (
   return data as LessonMaterial;
 };
 
+/** Пачка 4 — материал урока как ссылка на видео (YouTube/RuTube), без
+ *  загрузки в Storage. embedUrl — уже нормализованный (см. lib/video-url.ts
+ *  parseVideoUrl/toEmbedUrl на стороне apps/web — это packages/core, сюда
+ *  парсинг URL не тащим, вызывающий код передаёт готовые значения). */
+export const addLessonMaterialVideo = async (
+  db: Db,
+  input: {
+    lessonId: string;
+    teacherId: string;
+    title: string;
+    platform: 'youtube' | 'rutube';
+    sourceUrl: string;
+    embedUrl: string;
+    visibility?: 'all' | 'teacher_only';
+  },
+): Promise<LessonMaterial> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_materials")
+    .insert({
+      lesson_id: input.lessonId,
+      title: input.title,
+      content_type: `video_${input.platform}`,
+      external_url: input.embedUrl,
+      source_url: input.sourceUrl,
+      uploaded_by: input.teacherId,
+      visibility: input.visibility ?? 'all',
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as LessonMaterial;
+};
+
 /** Удаляет материал из Storage и БД. Файл из Storage НЕ удаляется, если это
  *  линк на Базу знаний (from_knowledge_base) — тот же файл used ещё
- *  course_materials/books записью, удаление сломало бы её. */
+ *  course_materials/books записью, удаление сломало бы её — ИЛИ если это
+ *  video-материал (storagePath пуст, нечего удалять в Storage). */
 export const deleteLessonMaterial = async (
   db: Db,
   materialId: string,
-  storagePath: string,
+  storagePath: string | null,
   fromKnowledgeBase = false,
 ): Promise<void> => {
-  if (!fromKnowledgeBase) {
+  if (!fromKnowledgeBase && storagePath) {
     await db.storage.from("lesson-materials").remove([storagePath]);
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

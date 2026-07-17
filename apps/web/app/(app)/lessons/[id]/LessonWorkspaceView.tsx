@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Clock, Check, FileText, FileCode2, File, ChevronsLeft, ChevronsRight,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
-  Maximize2, Minimize2, Bot, RefreshCw, LogOut,
+  Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -51,7 +51,8 @@ function fmtElapsed(ms: number): string {
 }
 
 
-function materialIcon(name: string): { Icon: typeof FileText; cls: string } {
+function materialIcon(name: string, contentType?: LessonMaterial["content_type"]): { Icon: typeof FileText; cls: string } {
+  if (contentType && contentType !== "file") return { Icon: Play, cls: "bg-gradient-to-br from-red-500 to-rose-600 text-white" };
   const ext = (name.split(".").pop() ?? "").toLowerCase();
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return { Icon: ImageIcon, cls: "bg-purple-50 text-purple-500" };
   if (ext === "pdf") return { Icon: FileText, cls: "bg-rose-50 text-rose-500" };
@@ -206,7 +207,7 @@ function TaskStubModal({
 }
 
 // ── MaterialViewerModal ────────────────────────────────────────────────────────
-type ViewerMaterial = { url: string; type: "pdf" | "image" | "other"; title: string };
+type ViewerMaterial = { url: string; type: "pdf" | "image" | "embed" | "other"; title: string };
 
 function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: () => void }) {
   const { locale } = useLocale();
@@ -221,14 +222,16 @@ function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: (
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <p className="truncate text-sm font-medium text-white">{mat.title}</p>
         <div className="flex items-center gap-2">
-          <a
-            href={mat.url}
-            download
-            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {d.common.download}
-          </a>
+          {mat.type !== "embed" && (
+            <a
+              href={mat.url}
+              download
+              className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {d.common.download}
+            </a>
+          )}
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
@@ -248,6 +251,15 @@ function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: (
             src={mat.url}
             alt={mat.title}
             className="max-h-full max-w-full object-contain"
+          />
+        )}
+        {mat.type === "embed" && (
+          <iframe
+            src={mat.url}
+            title={mat.title}
+            className="h-full w-full border-0 bg-black"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
           />
         )}
       </div>
@@ -514,7 +526,8 @@ export function LessonWorkspaceView({
     if (!url) return;
     const fname = m.file_original_name ?? m.title;
     const kind = demoKind(fname, url);
-    const viewerType: ViewerMaterial["type"] = kind === "pdf" ? "pdf" : kind === "image" ? "image" : "other";
+    const viewerType: ViewerMaterial["type"] =
+      kind === "pdf" ? "pdf" : kind === "image" ? "image" : kind === "embed" ? "embed" : "other";
     if (viewerType === "other") {
       window.open(url, "_blank", "noopener,noreferrer");
     } else {
@@ -620,7 +633,7 @@ export function LessonWorkspaceView({
               )}
               {lesson.materials.map((m) => {
                 const fname = m.file_original_name ?? m.title;
-                const { Icon, cls } = materialIcon(fname);
+                const { Icon, cls } = materialIcon(fname, m.content_type);
                 const url = materialUrls[m.id];
                 return (
                   <button
@@ -733,7 +746,8 @@ export function LessonWorkspaceView({
                   const fname = m.file_original_name ?? m.title;
                   const rawExt = (fname.split(".").pop() ?? "").toLowerCase();
                   const ext = rawExt.toUpperCase();
-                  const { Icon, cls } = materialIcon(fname);
+                  const isVideo = m.content_type !== "file";
+                  const { Icon, cls } = materialIcon(fname, m.content_type);
 
                   return (
                     <li key={m.id}>
@@ -748,7 +762,7 @@ export function LessonWorkspaceView({
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[13px] font-bold text-[#2C3350] group-hover:text-[#6A4FE6]">{m.title}</p>
                           <p className="text-[11.5px] text-[#9CA0B4]">
-                            {[ext, fmtBytes(m.file_size_bytes)].filter(Boolean).join(" · ")}
+                            {isVideo ? dl.materialVideoTag : [ext, fmtBytes(m.file_size_bytes)].filter(Boolean).join(" · ")}
                           </p>
                         </div>
                       </button>
@@ -890,6 +904,14 @@ export function LessonWorkspaceView({
               ) : mat && url && kind === "video" ? (
                 // eslint-disable-next-line jsx-a11y/media-has-caption
                 <video src={url} controls className="h-full w-full object-contain" />
+              ) : mat && url && kind === "embed" ? (
+                <iframe
+                  src={url}
+                  title={name}
+                  className="h-full w-full border-0 bg-black"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
               ) : mat && url && kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={url} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />

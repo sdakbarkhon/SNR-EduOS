@@ -38,8 +38,14 @@ export default async function LessonPage({
   const materialUrls: Record<string, string> = {};
   await Promise.all(
     lesson.materials.map(async (m) => {
+      // Пачка 4 — видео-материал не в Storage (file_storage_path=null),
+      // getLessonMaterialUrl упал бы на нём; embed-URL уже готов на записи.
+      if (m.content_type !== "file") {
+        if (m.external_url) materialUrls[m.id] = m.external_url;
+        return;
+      }
       try {
-        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path, undefined, m.kb_bucket ?? "lesson-materials");
+        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path!, undefined, m.kb_bucket ?? "lesson-materials");
       } catch { /* skip if URL generation fails */ }
     }),
   );

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, MapPin, Check, Eye, BookOpen, FileText, Clock, ClipboardList } from "lucide-react";
+import { ChevronLeft, MapPin, Check, Eye, BookOpen, FileText, Clock, ClipboardList, Play } from "lucide-react";
 import type { StudentLessonView, LessonStageWithProgress, ContentType } from "@snr/core";
 import { getSubjectStyle } from "@snr/core";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
@@ -199,6 +199,7 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {lesson.materials.map((m) => {
               const url = materialUrls[m.id];
+              const isVideo = m.content_type !== "file";
               return (
                 <button
                   key={m.id}
@@ -207,12 +208,14 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
                   onClick={() => url && setViewerMaterial({ url, title: m.title, fileName: m.file_original_name })}
                   className="group flex items-center gap-3 rounded-2xl border border-white bg-white/70 p-4 text-left shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                    <FileText className="h-4 w-4" />
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isVideo ? "bg-gradient-to-br from-red-500 to-rose-600 text-white" : "bg-blue-50 text-blue-600"}`}>
+                    {isVideo ? <Play className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{m.title}</p>
-                    {m.file_size_bytes && (
+                    {isVideo ? (
+                      <p className="text-xs text-red-500">Видео</p>
+                    ) : m.file_size_bytes && (
                       <p className="text-xs text-gray-400">{fmtBytes(m.file_size_bytes)}</p>
                     )}
                   </div>

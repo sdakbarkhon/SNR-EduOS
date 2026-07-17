@@ -318,7 +318,9 @@ export type LessonMaterial = {
   id: string;
   lesson_id: string;
   title: string;
-  file_storage_path: string;
+  // migration 138 — nullable: video-материалы (content_type != 'file') не
+  // загружены в Storage, у них нет storage-пути вообще.
+  file_storage_path: string | null;
   file_size_bytes: number | null;
   file_original_name: string | null;
   uploaded_by: string | null;
@@ -330,6 +332,14 @@ export type LessonMaterial = {
   // не загружен заново; kb_bucket — какой Storage-бакет резолвить/НЕ трогать при удалении.
   from_knowledge_base: boolean;
   kb_bucket: 'materials' | 'books' | null;
+  // migration 138 — ссылка на видео (YouTube/RuTube) вместо загруженного
+  // файла. content_type='file' (default) — обычный материал, остальные
+  // поля этой группы NULL. external_url — уже нормализованный embed-URL
+  // (готов для <iframe src>), source_url — то, что вставил учитель (для
+  // отображения "откуда").
+  content_type: 'file' | 'video_youtube' | 'video_rutube';
+  external_url: string | null;
+  source_url: string | null;
 };
 
 // migration 116 — Промт 4: учебные планы. teacher_id/group_id/subject_id

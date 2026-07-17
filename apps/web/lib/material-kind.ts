@@ -7,11 +7,17 @@
 // isn't reliable — the title fallback often has no file extension at all —
 // so a genuine PDF could be classified as "other" and rejected as "not a PDF"
 // even though the storage object itself is a real PDF (Iter5 hotfix P14.2).
+import { isVideoEmbedUrl } from "./video-url";
+
 function extOf(s: string): string {
   return (s.split(".").pop() ?? "").toLowerCase();
 }
 
-export function demoKind(name: string, url?: string | null): "pdf" | "video" | "image" | "office" | "other" {
+// Пачка 4 — "embed" — ссылка на YouTube/RuTube (lesson_materials.content_type
+// video_youtube/video_rutube). Определяется по url (уже нормализованный
+// embed-URL), не по расширению — у таких ссылок его нет.
+export function demoKind(name: string, url?: string | null): "pdf" | "video" | "image" | "office" | "embed" | "other" {
+  if (isVideoEmbedUrl(url)) return "embed";
   const exts = [extOf(name)];
   if (url) {
     try {

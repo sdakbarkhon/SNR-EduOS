@@ -7,6 +7,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { PdfViewer } from "@/components/PdfViewer";
+import { isVideoEmbedUrl } from "@/lib/video-url";
 
 // Shared in-app viewer for Knowledge Base files (Библиотека + Материалы
 // группы, student and teacher sides) — routes by file type instead of
@@ -31,7 +32,7 @@ import { PdfViewer } from "@/components/PdfViewer";
 //   - text: зум не применяется (не входит в "PDF/изображения/презентации"
 //     из ТЗ) — тулбар зума для этого типа скрыт.
 
-export type FileViewerKind = "pdf" | "image" | "office" | "text";
+export type FileViewerKind = "pdf" | "image" | "office" | "text" | "embed";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
@@ -45,6 +46,10 @@ const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
 const OFFICE_EXTS = ["pptx", "docx", "ppt", "doc", "xlsx", "xls"];
 
 export function resolveFileViewerKind(name: string, url?: string | null): FileViewerKind {
+  // Пачка 4 — ссылка на YouTube/RuTube (уже нормализованный embed-URL,
+  // содержит распознаваемый хост) — определяется до расширения-эвристики,
+  // у таких ссылок расширения нет вовсе.
+  if (isVideoEmbedUrl(url)) return "embed";
   const exts = [extOf(name)];
   if (url) {
     try { exts.push(extOf(new URL(url).pathname)); } catch { /* not absolute — ignore */ }
@@ -101,7 +106,9 @@ export function FileViewerModal({
   const { locale } = useLocale();
   const dv = getDictionary(locale as Locale).viewer;
   const kind = resolveFileViewerKind(fileName || title, url);
-  const zoomable = kind !== "text";
+  // embed (YouTube/RuTube iframe) — свои встроенные плеер-контролы, зум
+  // поверх них не нужен и не входил в ТЗ ("PDF/изображения/презентации").
+  const zoomable = kind !== "text" && kind !== "embed";
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -245,6 +252,15 @@ export function FileViewerModal({
               style={isDragging ? { pointerEvents: "none" } : undefined}
             />
           </div>
+        )}
+        {kind === "embed" && (
+          <iframe
+            src={url}
+            title={title}
+            className="h-full w-full border-0 bg-black"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
         )}
         {kind === "text" && <TextPreview url={url} />}
       </div>

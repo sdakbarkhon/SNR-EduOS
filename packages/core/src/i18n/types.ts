@@ -1542,6 +1542,9 @@ export interface Dictionary {
     materialVisibilityAll: string;     // "Видно всем"
     materialVisibilityTeacher: string; // "Только для учителя"
     materialTeacherOnlyBadge: string;  // "Только для учителя"
+    materialVideoUrlLabel: string;     // "или вставить ссылку на видео (YouTube / RuTube)"
+    materialInvalidVideoUrl: string;   // "Ссылка должна быть на YouTube или RuTube"
+    materialVideoTag: string;          // "Видео"
     bannerStarted: string;             // "Урок начался!"
     bannerGo: string;                  // "Перейти →"
     // Reminder modal (teacher, 5 min before end)

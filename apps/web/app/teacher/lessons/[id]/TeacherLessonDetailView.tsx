@@ -9,13 +9,13 @@ import {
   ChevronUp, ChevronDown, Code2, Puzzle, CircuitBoard,
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
-  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3, Hand,
+  Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3, Hand, Play, Link2,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
-  linkLessonMaterialFromKnowledgeBase,
+  linkLessonMaterialFromKnowledgeBase, addLessonMaterialVideo,
   getSubjectStyle, getLessonExcuseRequests,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
@@ -48,6 +48,7 @@ import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { TeacherLiveCodeControl } from "@/components/lesson-stages/TeacherLiveCodeControl";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { demoKind } from "@/lib/material-kind";
+import { parseVideoUrl } from "@/lib/video-url";
 import { PdfViewer } from "@/components/PdfViewer";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
@@ -734,13 +735,23 @@ export function TeacherLessonDetailView({
     if (!demoMaterialId) { setDemoMaterialUrl(null); return; }
     const mat = materials.find((m) => m.id === demoMaterialId);
     if (!mat) { setDemoMaterialUrl(null); return; }
+    // Пачка 4 — видео-материал не в Storage (file_storage_path=null),
+    // getLessonMaterialUrl упал бы на нём; embed-URL уже готов на самой записи.
+    if (mat.content_type !== "file") { setDemoMaterialUrl(mat.external_url); return; }
     let cancelled = false;
-    getLessonMaterialUrl(db, mat.file_storage_path, undefined, mat.kb_bucket ?? "lesson-materials")
+    getLessonMaterialUrl(db, mat.file_storage_path!, undefined, mat.kb_bucket ?? "lesson-materials")
       .then((url) => { if (!cancelled) setDemoMaterialUrl(url); })
       .catch(() => { if (!cancelled) setDemoMaterialUrl(null); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoMaterialId]);
+
+  // Пачка 4 — локальный preview для видео-материалов, независимый от
+  // "Show to class" (который транслирует всему классу и требует
+  // status==='in_progress'). Просмотр учителем своего же видео должен
+  // работать на любом статусе урока.
+  const [previewMaterialId, setPreviewMaterialId] = useState<string | null>(null);
+  const previewMaterial = previewMaterialId ? materials.find((m) => m.id === previewMaterialId) ?? null : null;
 
   const [uploadModal, setUploadModal] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
@@ -754,6 +765,25 @@ export function TeacherLessonDetailView({
   // exclusive with uploadFile (see handleUpload).
   const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
   const [showKBPicker, setShowKBPicker] = useState(false);
+  // Пачка 4 — третий взаимоисключающий вариант: ссылка на YouTube/RuTube
+  // вместо файла. Валидность — производное значение (parseVideoUrl), не
+  // отдельный кусок state, чтобы не рассинхронизировалось с полем ввода.
+  const [uploadVideoUrl, setUploadVideoUrl] = useState("");
+  const parsedVideoUrl = uploadVideoUrl.trim() ? parseVideoUrl(uploadVideoUrl.trim()) : null;
+  const videoUrlInvalid = uploadVideoUrl.trim().length > 0 && !parsedVideoUrl;
+  const hasFileChoice = !!uploadFile;
+  const hasVideoChoice = uploadVideoUrl.trim().length > 0;
+  const hasKBChoice = !!pickedFromKB;
+
+  function resetUploadModal() {
+    setUploadModal(false);
+    setUploadTitle("");
+    setUploadFile(null);
+    setUploadFileError("");
+    setUploadVideoUrl("");
+    setPickedFromKB(null);
+    setUploadVisibility('all');
+  }
 
   // Заказчик: материалы урока принимают ТОЛЬКО PDF. Проверяем и MIME
   // (application/pdf — надёжно только когда браузер его правильно
@@ -1042,7 +1072,8 @@ export function TeacherLessonDetailView({
   // ── Material CRUD ───────────────────────────────────────────────────────────
 
   async function handleUpload() {
-    if (uploading || (!uploadFile && !pickedFromKB) || !uploadTitle.trim()) return;
+    const canSave = hasFileChoice || hasKBChoice || (hasVideoChoice && parsedVideoUrl);
+    if (uploading || !canSave || !uploadTitle.trim()) return;
     setUploading(true);
     try {
       const mat = pickedFromKB
@@ -1051,16 +1082,18 @@ export function TeacherLessonDetailView({
             storagePath: pickedFromKB.storagePath, kbBucket: pickedFromKB.source === "book" ? "books" : "materials",
             fileSizeBytes: pickedFromKB.sizeBytes, visibility: uploadVisibility,
           })
+        : parsedVideoUrl
+        ? await addLessonMaterialVideo(db, {
+            lessonId: lesson.id, teacherId: teacher.id, title: uploadTitle.trim(),
+            platform: parsedVideoUrl.platform, sourceUrl: uploadVideoUrl.trim(), embedUrl: parsedVideoUrl.embedUrl,
+            visibility: uploadVisibility,
+          })
         : await uploadLessonMaterial(db, {
             lessonId: lesson.id, teacherId: teacher.id, file: uploadFile!,
             title: uploadTitle.trim(), visibility: uploadVisibility,
           });
       setMaterials((prev) => [...prev, mat]);
-      setUploadModal(false);
-      setUploadTitle("");
-      setUploadFile(null);
-      setPickedFromKB(null);
-      setUploadVisibility('all');
+      resetUploadModal();
     } catch { /* noop */ } finally { setUploading(false); }
   }
 
@@ -1085,6 +1118,7 @@ export function TeacherLessonDetailView({
   }
 
   async function handleDownloadMaterial(mat: LessonMaterial) {
+    if (!mat.file_storage_path) return; // video-материал — нечего скачивать, кнопка и так скрыта
     const url = await getLessonMaterialUrl(db, mat.file_storage_path, mat.file_original_name ?? mat.title, mat.kb_bucket ?? "lesson-materials").catch(() => null);
     if (url) window.open(url, "_blank");
   }
@@ -1260,28 +1294,43 @@ export function TeacherLessonDetailView({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {materials.map((mat) => {
               const matEditBlocked = isDemoSession && !mat.is_demo;
+              const isVideo = mat.content_type !== "file";
               return (
               <div key={mat.id} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{mat.title}</p>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
-                      {mat.visibility === 'teacher_only' && (
-                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                          {dl.materialTeacherOnlyBadge}
-                        </span>
-                      )}
+                  <button
+                    type="button"
+                    onClick={() => { if (isVideo) setPreviewMaterialId(mat.id); }}
+                    disabled={!isVideo}
+                    className={`flex min-w-0 flex-1 items-center gap-3 text-left ${isVideo ? "cursor-pointer" : "cursor-default"}`}
+                  >
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isVideo ? "bg-gradient-to-br from-red-500 to-rose-600 text-white" : "bg-blue-50 text-blue-600"}`}>
+                      {isVideo ? <Play className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                     </div>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{mat.title}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {mat.file_size_bytes && <p className="text-xs text-gray-400">{fmtBytes(mat.file_size_bytes)}</p>}
+                        {isVideo && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                            {dl.materialVideoTag}
+                          </span>
+                        )}
+                        {mat.visibility === 'teacher_only' && (
+                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                            {dl.materialTeacherOnlyBadge}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
                   <div className="flex shrink-0 gap-1">
-                    <button onClick={() => handleDownloadMaterial(mat)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
-                      <Download className="h-4 w-4" />
-                    </button>
+                    {!isVideo && (
+                      <button onClick={() => handleDownloadMaterial(mat)}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={dl.download}>
+                        <Download className="h-4 w-4" />
+                      </button>
+                    )}
                     {!readOnly && (
                       <button
                         onClick={() => { if (matEditBlocked) return; setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
@@ -1678,7 +1727,7 @@ export function TeacherLessonDetailView({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">{dl.addMaterialTitle}</h3>
-              <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadFileError(""); setPickedFromKB(null); setUploadVisibility('all'); }}
+              <button onClick={resetUploadModal}
                 className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
@@ -1688,6 +1737,45 @@ export function TeacherLessonDetailView({
                   placeholder={dl.materialTitlePlaceholder}
                   className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
               </div>
+
+              {/* Блок 1 — файл */}
+              <div className={hasVideoChoice || hasKBChoice ? "pointer-events-none opacity-40" : undefined}>
+                <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleMaterialFileChange} disabled={hasVideoChoice || hasKBChoice} />
+                <button onClick={() => fileRef.current?.click()} disabled={hasVideoChoice || hasKBChoice}
+                  className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
+                  <Upload className="h-5 w-5" />
+                  {uploadFile ? uploadFile.name : "Выбрать PDF файл (макс. 50 МБ)"}
+                </button>
+                {uploadFileError && <p className="text-center text-[12px] text-red-500">{uploadFileError}</p>}
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                <div className="h-px flex-1 bg-gray-200" /> или <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              {/* Блок 2 — ссылка на видео (YouTube/RuTube) */}
+              <div className={hasFileChoice || hasKBChoice ? "pointer-events-none opacity-40" : undefined}>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+                  <Link2 className="h-3.5 w-3.5" /> {dl.materialVideoUrlLabel}
+                </label>
+                <input
+                  type="text"
+                  value={uploadVideoUrl}
+                  onChange={(e) => setUploadVideoUrl(e.target.value)}
+                  disabled={hasFileChoice || hasKBChoice}
+                  placeholder="https://..."
+                  className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 ${
+                    videoUrlInvalid ? "border-red-300 focus:border-red-500 focus:ring-red-100" : "border-gray-200 focus:border-blue-500 focus:ring-blue-100"
+                  }`}
+                />
+                {videoUrlInvalid && <p className="mt-1 text-[12px] text-red-500">{dl.materialInvalidVideoUrl}</p>}
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                <div className="h-px flex-1 bg-gray-200" /> или <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              {/* Блок 3 — из базы знаний */}
               {pickedFromKB ? (
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
                   <div className="flex min-w-0 items-center gap-2 text-sm text-blue-800">
@@ -1699,27 +1787,19 @@ export function TeacherLessonDetailView({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleMaterialFileChange} />
-                  <button onClick={() => fileRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
-                    <Upload className="h-5 w-5" />
-                    {uploadFile ? uploadFile.name : "Выбрать PDF файл (макс. 50 МБ)"}
-                  </button>
-                  {uploadFileError && <p className="text-center text-[12px] text-red-500">{uploadFileError}</p>}
-                  <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                    <div className="h-px flex-1 bg-gray-200" /> или <div className="h-px flex-1 bg-gray-200" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowKBPicker(true)}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500"
-                  >
-                    <FolderSearch className="h-5 w-5" />
-                    {d.knowledgeBase.browse}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowKBPicker(true)}
+                  disabled={hasFileChoice || hasVideoChoice}
+                  className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500 ${
+                    hasFileChoice || hasVideoChoice ? "pointer-events-none opacity-40" : ""
+                  }`}
+                >
+                  <FolderSearch className="h-5 w-5" />
+                  {d.knowledgeBase.browse}
+                </button>
               )}
+
               {/* Visibility toggle */}
               <div className="flex gap-2">
                 <button
@@ -1736,9 +1816,11 @@ export function TeacherLessonDetailView({
                 </button>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setUploadModal(false); setUploadTitle(""); setUploadFile(null); setUploadFileError(""); setPickedFromKB(null); setUploadVisibility('all'); }}
+                <button onClick={resetUploadModal}
                   className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.common.cancel}</button>
-                <button onClick={handleUpload} disabled={uploading || (!uploadFile && !pickedFromKB) || !uploadTitle.trim()}
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading || !uploadTitle.trim() || !(hasFileChoice || hasKBChoice || (hasVideoChoice && parsedVideoUrl))}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                   {uploading ? dl.uploading : dl.saveBtn}
                 </button>
@@ -1872,6 +1954,14 @@ export function TeacherLessonDetailView({
               ) : kind === "video" ? (
                 // eslint-disable-next-line jsx-a11y/media-has-caption
                 <video src={demoMaterialUrl} controls className="h-full w-full object-contain" />
+              ) : kind === "embed" ? (
+                <iframe
+                  src={demoMaterialUrl}
+                  title={name}
+                  className="h-full w-full border-0 bg-black"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
               ) : kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={demoMaterialUrl} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
@@ -1892,6 +1982,34 @@ export function TeacherLessonDetailView({
           document.body,
         );
       })()}
+
+      {/* Пачка 4 — локальный preview видео-материала (клик по карточке).
+          Независим от demo_material_id/"Show to class" — работает на любом
+          статусе урока, не транслируется ученикам. */}
+      {previewMaterial && previewMaterial.external_url && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
+          <div className="flex shrink-0 items-center gap-3 bg-black px-6 py-3 text-white">
+            <Play className="h-4 w-4 shrink-0 text-red-400" />
+            <span className="truncate text-sm font-medium">{previewMaterial.title}</span>
+            <button
+              onClick={() => setPreviewMaterialId(null)}
+              className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+            >
+              <X className="h-3.5 w-3.5" /> {d.viewer.close}
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden bg-black">
+            <iframe
+              src={previewMaterial.external_url}
+              title={previewMaterial.title}
+              className="h-full w-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Student raised hand — blocking notification */}
       {mounted && raisedHandModal && typeof document !== "undefined" && createPortal(
