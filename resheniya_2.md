@@ -2921,3 +2921,9 @@ GRANT EXECUTE ON FUNCTION public.get_ai_usage_today() TO anon, authenticated, se
 - **Живая интерактивная проверка в браузере** — не проводилась в этой сессии. Инструментарий Browser-pane в этой конкретной сессии столкнулся с окружательной проблемой: форма логина (`LoginForm.tsx`, использует `<Suspense fallback={null}>` — код, существовавший до этой сессии) не активировалась после стриминг-SSR ни через клики по pixel-координатам, ни через programmatic `.click()` — подтверждено, что это не баг кода этой Пачки (продакшен-сборка компилируется чисто на каждом шаге, dev-сервер отдаёт чистые 200-ответы). Заказчик сам сказал «Живую проверку делаю я» — верификация в этой сессии ограничена typecheck + prod build + построчным код-ревью + (для задачи 5) эмпирической проверкой сгенерированного CSS.
 - **3 других вьюера материалов** (инлайн-оверлей live-демо, лайтбокс `HomeworkHintPanel`) — не переведены на зум/полноэкран, см. «Что НЕ сделано» в задаче 4.
 - **Применение миграции 136** — заказчик сам через Supabase Dashboard SQL Editor.
+
+---
+
+## Пачка 4 — фикс `school_id` в `generate-lessons-jul19-25.mjs` — 2026-07-17
+
+Прод-прогон `--confirm` упал на первом же `INSERT` в `lesson_stages` (`null value in column "school_id"` — NOT NULL constraint) — три места (scaffold-этапы Этапа A, content-этапы и `quiz_questions` Этапа B) не передавали `school_id`, хотя parent-урок его имеет. Исправлено во всех трёх (`SCHOOL_ID` константа, уже использовалась для `lessons`-insert). Заодно проверено `backfill-historical.mjs` — там багa нет (все 5 `enqueue()`-вызовов уже включают `school_id`). Создана также миграция [`137_adjust_lesson_duration_outside_focus_window.sql`](supabase/migrations/137_adjust_lesson_duration_outside_focus_window.sql) (та же логика, что `apps/web/scripts/shrink-lessons-out-of-window.sql`, оформленная как пронумерованная миграция).

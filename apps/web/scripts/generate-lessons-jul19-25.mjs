@@ -398,8 +398,8 @@ async function stageA_insertJuly25() {
   // его уже имеет (создаётся обычным flow планирования, не этим скриптом);
   // для новых строк, вставленных напрямую, создаём вручную.
   const scaffoldRows = inserted.flatMap((l) => [
-    { lesson_id: l.id, position: 0, stage_role: "start", title: "Старт", config: {} },
-    { lesson_id: l.id, position: 9999, stage_role: "summary", title: "Итог", config: {} },
+    { lesson_id: l.id, school_id: SCHOOL_ID, position: 0, stage_role: "start", title: "Старт", config: {} },
+    { lesson_id: l.id, school_id: SCHOOL_ID, position: 9999, stage_role: "summary", title: "Итог", config: {} },
   ]);
   const { error: scaffoldErr } = await db.from("lesson_stages").insert(scaffoldRows);
   if (scaffoldErr) throw new Error(`stageA scaffold stages: ${scaffoldErr.message}`);
@@ -569,7 +569,7 @@ async function stageB_generateContent() {
     for (const stage of stagesToInsert) {
       const { data: insertedStage, error: insErr } = await db
         .from("lesson_stages")
-        .insert({ lesson_id: lessonSpec.id, ...stage })
+        .insert({ lesson_id: lessonSpec.id, school_id: SCHOOL_ID, ...stage })
         .select("id, content_type")
         .single();
       if (insErr) {
@@ -582,7 +582,7 @@ async function stageB_generateContent() {
 
     if (quizStageId && parsed.quiz.questions?.length) {
       const rows = parsed.quiz.questions.map((q, qi) => ({
-        stage_id: quizStageId, position: qi, question_text: q.text, options: q.options,
+        stage_id: quizStageId, school_id: SCHOOL_ID, position: qi, question_text: q.text, options: q.options,
         correct_option_index: q.correct_index, points: 1, time_per_question_seconds: 20,
       }));
       const { error: qErr } = await db.from("quiz_questions").insert(rows);
