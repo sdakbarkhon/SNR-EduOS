@@ -29,8 +29,8 @@ export function Topbar({
         </h1>
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center justify-center">
-        <AnnouncementTicker />
+      <div className="flex min-w-0 flex-1 items-center">
+        <AnnouncementTicker stretch />
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">

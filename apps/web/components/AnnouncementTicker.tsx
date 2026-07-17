@@ -5,7 +5,17 @@ import { Megaphone } from "lucide-react";
 import { getUnreadTickerAnnouncements, markTickerAnnouncementsRead, type Announcement } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 
-export function AnnouncementTicker({ onlyFromAdmins = false }: { onlyFromAdmins?: boolean }) {
+export function AnnouncementTicker({
+  onlyFromAdmins = false,
+  stretch = false,
+}: {
+  onlyFromAdmins?: boolean;
+  /** Пачка 4, Задача C — растянуть на всю доступную ширину родителя
+      (студенческий Topbar, flex-1 слот) вместо фиксированного
+      maxWidth. По умолчанию false — TeacherTopbar (fixed-width
+      кластер справа с колокольчиком) остаётся без изменений. */
+  stretch?: boolean;
+}) {
   const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
   const uidRef = useRef<string | null>(null);
   const [tickers, setTickers] = useState<Announcement[]>([]);
@@ -82,8 +92,8 @@ export function AnnouncementTicker({ onlyFromAdmins = false }: { onlyFromAdmins?
 
   return (
     <div
-      className="flex items-center gap-2 overflow-hidden rounded-xl border border-amber-200/60 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-800 backdrop-blur-md"
-      style={{ maxWidth: "min(520px, 44vw)" }}
+      className={`flex items-center gap-2 overflow-hidden rounded-xl border border-amber-200/60 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-800 backdrop-blur-md ${stretch ? "w-full" : ""}`}
+      style={stretch ? undefined : { maxWidth: "min(520px, 44vw)" }}
     >
       <Megaphone className="h-3.5 w-3.5 shrink-0 text-amber-500" />
       <span
