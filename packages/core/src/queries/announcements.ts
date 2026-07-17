@@ -183,9 +183,12 @@ export const getUnreadTickerAnnouncements = async (
 export const markTickerAnnouncementsRead = async (db: Db, userId: string, announcementIds: string[]): Promise<void> => {
   if (announcementIds.length === 0) return;
   const rows = announcementIds.map((id) => ({ user_id: userId, announcement_id: id }));
-  await (db as any).from("announcement_user_reads")
-    .upsert(rows, { onConflict: "user_id,announcement_id", ignoreDuplicates: true })
-    .catch(() => null);
+  // v2 query builder is a thenable, not a real Promise — it has no .catch()
+  // method (calling it threw "TypeError: ... .catch is not a function" and
+  // crashed the whole handler, uncaught). Destructure the error instead.
+  const { error } = await (db as any).from("announcement_user_reads")
+    .upsert(rows, { onConflict: "user_id,announcement_id", ignoreDuplicates: true });
+  if (error) console.error("[markTickerAnnouncementsRead] upsert failed:", error.message);
 };
 
 export const markAnnouncementRead = async (db: Db, announcementId: string, studentId: string): Promise<void> => {

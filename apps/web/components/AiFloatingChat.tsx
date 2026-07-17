@@ -27,6 +27,24 @@ function loadHistory(): Message[] {
   }
 }
 
+// Пачка 4, Задача B — этот плавающий виджет является ОТДЕЛЬНОЙ от
+// AiAssistantView.tsx копией шапки чата (скопирована до того, как там
+// появился дневной лимит Gemini, миграция 136) — лимит сюда не попадал
+// вообще, это не баг рендера, а отсутствующий код. Та же логика, что и
+// в AiAssistantView.tsx: опрос раз в 30с + оптимистичный декремент.
+const USAGE_POLL_INTERVAL_MS = 30_000;
+type AiUsage = { used: number; limit: number; remaining: number };
+
+async function fetchAiUsage(): Promise<AiUsage | null> {
+  try {
+    const res = await fetch("/api/ai/usage", { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as AiUsage;
+  } catch {
+    return null;
+  }
+}
+
 export function AiFloatingChat({ onClose }: { onClose: () => void }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -36,11 +54,23 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [usage, setUsage] = useState<AiUsage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMessages(loadHistory());
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      const u = await fetchAiUsage();
+      if (!cancelled && u) setUsage(u);
+    }
+    void refresh();
+    const interval = setInterval(refresh, USAGE_POLL_INTERVAL_MS);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   useEffect(() => {
@@ -64,12 +94,14 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
+    setUsage((prev) => (prev ? { ...prev, used: prev.used + 1, remaining: Math.max(0, prev.remaining - 1) } : prev));
 
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
     const result = await callAiChat(STUDENT_SYSTEM, trimmed, history);
     const aiText = "error" in result ? t.errorFallback : result.text;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
     setLoading(false);
+    void fetchAiUsage().then((u) => { if (u) setUsage(u); });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -91,6 +123,19 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
           <p className="flex items-center gap-1.5 text-[11px] font-semibold text-white/80">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> {t.onlineStatus}
           </p>
+          {usage && (
+            <p
+              className={`mt-0.5 text-[11px] font-semibold opacity-85 ${
+                usage.remaining < 50
+                  ? "text-red-300"
+                  : usage.remaining <= 100
+                    ? "text-yellow-300"
+                    : "text-white/85"
+              }`}
+            >
+              {t.usageLimitLabel.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}
+            </p>
+          )}
         </div>
         <button
           onClick={onClose}
