@@ -37,9 +37,15 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ragDb = db as any;
 
+  // lesson_stages <-> lessons имеет ДВА FK-пути (миграция 54 добавила
+  // lessons.active_stage_id -> lesson_stages.id, "текущий активный этап
+  // урока", в обратную сторону от естественного lesson_stages.lesson_id
+  // -> lessons.id) — без явного hint PostgREST не может выбрать
+  // однозначно и падает с "more than one relationship was found".
+  // Явно указываем нужный FK: lesson_stages_lesson_id_fkey.
   let query = ragDb
     .from("lesson_stages")
-    .select("id, school_id, lesson_id, lessons!inner(starts_at, group_id)")
+    .select("id, school_id, lesson_id, lessons!lesson_stages_lesson_id_fkey!inner(starts_at, group_id)")
     .eq("stage_role", "middle");
 
   if (date_from) query = query.gte("lessons.starts_at", date_from);
