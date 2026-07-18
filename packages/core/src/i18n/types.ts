@@ -243,6 +243,26 @@ export interface Dictionary {
     navAnnouncements: string;
     navParents: string;
     navProfile: string;
+    navChats: string;
+    // Пачка 7.20 — read-only chat viewer
+    chats: {
+      title: string;
+      readOnly: string;
+      filters: {
+        type: string;
+        teacher: string;
+        group: string;
+        dateRange: string;
+      };
+      types: {
+        direct: string;
+        lesson: string;
+        all: string;
+      };
+      emptyList: string;
+      selectPrompt: string;
+      messageCount: string; // "{count} сообщений"
+    };
     // subjects
     subjectsTitle: string;
     subjectsSelectGroup: string;
