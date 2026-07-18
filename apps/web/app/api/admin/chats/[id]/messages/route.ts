@@ -1,13 +1,19 @@
 // Пачка 7.20 — read-only полная переписка одного чата для admin.
-// id либо реальный chat_threads.id (прямой чат), либо синтетический
-// "lesson__{student_id}__{lesson_id}" (lesson-scoped AI-помощник) —
-// см. lib/admin-chats.ts.
+// id либо реальный chat_threads.id (personal 'direct' или групповой
+// 'group' чат), либо синтетический "lesson__{student_id}__{lesson_id}"
+// (lesson-scoped AI-помощник) — см. lib/admin-chats.ts.
+//
+// Резолвинг отправителя для thread-based чатов обобщён через
+// chat_participants (thread_id, user_id, role_in_thread) — работает
+// одинаково для direct (student+teacher, и в будущем parent+teacher) и
+// group (curator+students ИЛИ curator+parents): role_in_thread говорит,
+// в какой таблице (teachers/students/parents) искать user_id.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUserRole } from "@/lib/auth";
-import { decodeLessonChatId, AI_PARTICIPANT, type AdminChatMessage, type AdminChatSummary } from "@/lib/admin-chats";
+import { decodeLessonChatId, AI_PARTICIPANT, type AdminChatMessage, type AdminChatInfo } from "@/lib/admin-chats";
 
 const DEFAULT_LIMIT = 100;
 
@@ -42,6 +48,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { data: adminRow } = await sb.from("admins").select("school_id").eq("user_id", user.id).maybeSingle();
     if (!adminRow?.school_id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+    // studentId/lessonId приходят напрямую из URL (decodeLessonChatId), не
+    // из БД — прежде чем service-role'ом (bypass RLS) резолвить имя/тему,
+    // явно проверяем, что ОБА принадлежат школе админа. Без этого пара из
+    // чужой школы вернула бы 200 с реальным именем ученика/темой урока
+    // чужой школы (messages были бы пустыми, но label — нет) — cross-
+    // tenant утечка PII + oracle существования пары, найдено ревью перед
+    // коммитом.
+    const [{ data: studentRow }, { data: lessonRow }] = await Promise.all([
+      adminDb.from("students").select("full_name").eq("id", lessonRef.studentId).eq("school_id", adminRow.school_id).maybeSingle(),
+      adminDb.from("lessons").select("topic").eq("id", lessonRef.lessonId).eq("school_id", adminRow.school_id).maybeSingle(),
+    ]);
+    if (!studentRow || !lessonRow) return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    const studentName = studentRow.full_name ?? "?";
+
     let q = adminDb
       .from("ai_chat_messages")
       .select("id, role, content, created_at")
@@ -52,12 +72,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { data: rows, error } = await q.order("created_at", { ascending: true }).limit(limit);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    const [{ data: studentRow }, { data: lessonRow }] = await Promise.all([
-      adminDb.from("students").select("full_name").eq("id", lessonRef.studentId).maybeSingle(),
-      adminDb.from("lessons").select("topic").eq("id", lessonRef.lessonId).maybeSingle(),
-    ]);
-    const studentName = studentRow?.full_name ?? "?";
 
     const messages: AdminChatMessage[] = ((rows ?? []) as Array<{ id: string; role: string; content: string; created_at: string }>).map((m) => ({
       id: m.id,
@@ -74,12 +88,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .eq("lesson_id", lessonRef.lessonId)
       .eq("school_id", adminRow.school_id);
     const lastAt = messages.length ? messages[messages.length - 1]!.created_at : new Date(0).toISOString();
+    const topic = lessonRow?.topic ?? "урок";
 
-    const chatInfo: AdminChatSummary = {
+    const chatInfo: AdminChatInfo = {
       id,
       type: "lesson_ai_helper",
-      participant_1: { id: lessonRef.studentId, name: studentName, role: "student" },
-      participant_2: { ...AI_PARTICIPANT, name: `${AI_PARTICIPANT.name} (${lessonRow?.topic ?? "урок"})` },
+      label: `${studentName} · AI-помощник (${topic})`,
       lesson_id: lessonRef.lessonId,
       last_message_at: lastAt,
       message_count: count ?? messages.length,
@@ -88,14 +102,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ messages, chat_info: chatInfo });
   }
 
-  // ── Прямой чат (chat_threads/chat_messages) — обычный cookie-клиент,
-  //    RLS уже пускает admin'а. ──────────────────────────────────────
+  // ── Personal ('direct') или групповой ('group') чат — cookie-клиент,
+  //    RLS после миграции 142 пускает admin'а на оба kind. ────────────
   const { data: thread, error: threadErr } = await sb
     .from("chat_threads")
-    .select("id, kind, student_id, teacher_id, updated_at")
+    .select("id, kind, student_id, teacher_id, group_id, title, updated_at")
     .eq("id", id)
     .single();
-  if (threadErr || !thread || thread.kind !== "direct") {
+  if (threadErr || !thread || (thread.kind !== "direct" && thread.kind !== "group")) {
     return NextResponse.json({ error: "Chat not found" }, { status: 404 });
   }
 
@@ -104,44 +118,70 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { data: msgRows, error: msgErr } = await q.order("created_at", { ascending: true }).limit(limit);
   if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
 
-  const [{ data: teacherRow }, { data: studentRow }, { count }] = await Promise.all([
-    thread.teacher_id ? sb.from("teachers").select("full_name").eq("id", thread.teacher_id).maybeSingle() : Promise.resolve({ data: null }),
-    thread.student_id ? sb.from("students").select("full_name").eq("id", thread.student_id).maybeSingle() : Promise.resolve({ data: null }),
-    sb.from("chat_messages").select("id", { count: "exact", head: true }).eq("thread_id", id),
+  // Резолвим ВСЕХ участников треда через chat_participants → auth user_id
+  // → (teachers|students|parents) по role_in_thread. Работает одинаково
+  // для direct (student+teacher) и group (curator+students ИЛИ
+  // curator+parents) — раньше direct-ветка резолвила только teacher/
+  // student вручную и не умела показать parent-отправителя вообще.
+  const { data: participantRows } = await sb
+    .from("chat_participants")
+    .select("user_id, role_in_thread")
+    .eq("thread_id", id);
+  const participants = (participantRows ?? []) as Array<{ user_id: string; role_in_thread: string }>;
+
+  const teacherAuthIds = participants.filter((p) => p.role_in_thread === "teacher" || p.role_in_thread === "curator").map((p) => p.user_id);
+  const studentAuthIds = participants.filter((p) => p.role_in_thread === "student").map((p) => p.user_id);
+  const parentAuthIds = participants.filter((p) => p.role_in_thread === "parent").map((p) => p.user_id);
+
+  const [{ data: teacherRows }, { data: studentRows }, { data: parentRows }] = await Promise.all([
+    teacherAuthIds.length ? sb.from("teachers").select("id, full_name, user_id").in("user_id", teacherAuthIds) : Promise.resolve({ data: [] }),
+    studentAuthIds.length ? sb.from("students").select("id, full_name, user_id").in("user_id", studentAuthIds) : Promise.resolve({ data: [] }),
+    parentAuthIds.length ? sb.from("parents").select("id, full_name, user_id").in("user_id", parentAuthIds) : Promise.resolve({ data: [] }),
   ]);
-  const teacherName = teacherRow?.full_name ?? "?";
-  const studentName = studentRow?.full_name ?? "?";
 
-  // sender_id на chat_messages — auth.users id учителя или ученика этого
-  // треда (только двое участников в 'direct'), различаем сравнением с
-  // teacher_id/student_id самого треда через отдельный lookup, т.к.
-  // sender_id — auth.uid(), не teachers.id/students.id напрямую.
-  const [{ data: teacherAuth }, { data: studentAuth }] = await Promise.all([
-    thread.teacher_id ? sb.from("teachers").select("user_id").eq("id", thread.teacher_id).maybeSingle() : Promise.resolve({ data: null }),
-    thread.student_id ? sb.from("students").select("user_id").eq("id", thread.student_id).maybeSingle() : Promise.resolve({ data: null }),
-  ]);
+  type NamedRow = { id: string; full_name: string; user_id: string };
+  const senderByAuthId = new Map<string, { id: string; name: string; role: string }>();
+  ((teacherRows ?? []) as NamedRow[]).forEach((t) => senderByAuthId.set(t.user_id, { id: t.id, name: t.full_name, role: "teacher" }));
+  ((studentRows ?? []) as NamedRow[]).forEach((s) => senderByAuthId.set(s.user_id, { id: s.id, name: s.full_name, role: "student" }));
+  ((parentRows ?? []) as NamedRow[]).forEach((p) => senderByAuthId.set(p.user_id, { id: p.id, name: p.full_name, role: "parent" }));
 
-  const messages: AdminChatMessage[] = ((msgRows ?? []) as Array<{ id: string; sender_id: string | null; body: string; created_at: string }>).map((m) => {
-    const isTeacher = m.sender_id && teacherAuth?.user_id === m.sender_id;
-    const isStudent = m.sender_id && studentAuth?.user_id === m.sender_id;
-    return {
-      id: m.id,
-      sender: isTeacher
-        ? { id: thread.teacher_id, name: teacherName, role: "teacher" }
-        : isStudent
-          ? { id: thread.student_id, name: studentName, role: "student" }
-          : { id: m.sender_id ?? "", name: "?", role: "unknown" },
-      content: m.body,
-      created_at: m.created_at,
-      is_ai: false,
-    };
-  });
+  const messages: AdminChatMessage[] = ((msgRows ?? []) as Array<{ id: string; sender_id: string | null; body: string; created_at: string }>).map((m) => ({
+    id: m.id,
+    sender: (m.sender_id && senderByAuthId.get(m.sender_id)) || { id: m.sender_id ?? "", name: "?", role: "unknown" },
+    content: m.body,
+    created_at: m.created_at,
+    is_ai: false,
+  }));
 
-  const chatInfo: AdminChatSummary = {
+  const { count } = await sb.from("chat_messages").select("id", { count: "exact", head: true }).eq("thread_id", id);
+
+  let label: string | null;
+  let chatType: AdminChatInfo["type"];
+  if (thread.kind === "direct") {
+    const teacherName = senderByAuthId.get(participants.find((p) => p.role_in_thread === "teacher")?.user_id ?? "")?.name ?? "?";
+    if (thread.student_id !== null) {
+      const studentName = senderByAuthId.get(participants.find((p) => p.role_in_thread === "student")?.user_id ?? "")?.name ?? "?";
+      chatType = "teacher_student";
+      label = `${teacherName} ↔ ${studentName}`;
+    } else {
+      const parentName = senderByAuthId.get(participants.find((p) => p.role_in_thread === "parent")?.user_id ?? "")?.name ?? "?";
+      chatType = "parent_teacher";
+      label = `${teacherName} ↔ ${parentName}`;
+    }
+  } else {
+    chatType = "class_group";
+    label = thread.title ?? null;
+    if (!label && thread.group_id) {
+      const { data: groupRow } = await sb.from("groups").select("name").eq("id", thread.group_id).maybeSingle();
+      label = groupRow?.name ?? null;
+    }
+    label = label ?? "Групповой чат";
+  }
+
+  const chatInfo: AdminChatInfo = {
     id: thread.id,
-    type: "direct_teacher_student",
-    participant_1: { id: thread.teacher_id ?? "", name: teacherName, role: "teacher" },
-    participant_2: { id: thread.student_id ?? "", name: studentName, role: "student" },
+    type: chatType,
+    label: label ?? "Групповой чат",
     last_message_at: thread.updated_at,
     message_count: count ?? messages.length,
   };

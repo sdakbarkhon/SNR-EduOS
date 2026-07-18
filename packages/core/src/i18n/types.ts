@@ -255,9 +255,11 @@ export interface Dictionary {
         dateRange: string;
       };
       types: {
-        direct: string;
-        lesson: string;
         all: string;
+        parentTeacher: string;
+        teacherStudent: string;
+        classGroup: string;
+        lessonAiHelper: string;
       };
       emptyList: string;
       selectPrompt: string;

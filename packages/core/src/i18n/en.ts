@@ -264,9 +264,11 @@ export const en: Dictionary = {
         dateRange: "Date range",
       },
       types: {
-        direct: "Direct",
-        lesson: "Lessons",
         all: "All",
+        parentTeacher: "Parent ↔ teacher",
+        teacherStudent: "Teacher ↔ student",
+        classGroup: "Class group chat",
+        lessonAiHelper: "Lesson AI helper",
       },
       emptyList: "No chats match the selected filters",
       selectPrompt: "Select a chat to view",

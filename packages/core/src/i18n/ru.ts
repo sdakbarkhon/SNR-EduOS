@@ -264,9 +264,11 @@ export const ru: Dictionary = {
         dateRange: "Период",
       },
       types: {
-        direct: "Прямые",
-        lesson: "Уроки",
         all: "Все",
+        parentTeacher: "Родитель ↔ учитель",
+        teacherStudent: "Учитель ↔ ученик",
+        classGroup: "Групповой чат класса",
+        lessonAiHelper: "AI-помощник урока",
       },
       emptyList: "Нет чатов по выбранным фильтрам",
       selectPrompt: "Выберите чат для просмотра",

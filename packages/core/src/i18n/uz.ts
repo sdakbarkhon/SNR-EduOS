@@ -264,9 +264,11 @@ export const uz: Dictionary = {
         dateRange: "Davr",
       },
       types: {
-        direct: "To'g'ridan-to'g'ri",
-        lesson: "Darslar",
         all: "Hammasi",
+        parentTeacher: "Ota-ona ↔ o'qituvchi",
+        teacherStudent: "O'qituvchi ↔ o'quvchi",
+        classGroup: "Sinf guruh chati",
+        lessonAiHelper: "Dars AI-yordamchisi",
       },
       emptyList: "Tanlangan filtrlar bo'yicha chatlar yo'q",
       selectPrompt: "Ko'rish uchun chatni tanlang",

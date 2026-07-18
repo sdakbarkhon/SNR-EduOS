@@ -3,15 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { MessagesSquare, Eye, Loader2, Bot } from "lucide-react";
+import { MessagesSquare, Eye, Loader2, Bot, Users, Heart, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+type ChatType = "parent_teacher" | "teacher_student" | "class_group" | "lesson_ai_helper";
+type FilterType = "all" | ChatType;
 type ChatParticipant = { id: string; name: string; role: string };
 type ChatSummary = {
   id: string;
-  type: "direct_teacher_student" | "direct_teacher_parent" | "lesson_ai_helper";
-  participant_1: ChatParticipant;
-  participant_2: ChatParticipant;
+  type: ChatType;
+  label: string;
+  avatar_name: string;
   lesson_id?: string;
   last_message_at: string;
   message_count: number;
@@ -23,6 +25,7 @@ type ChatMessage = {
   created_at: string;
   is_ai: boolean;
 };
+type CategoryCounts = Record<ChatType, number>;
 
 function Avatar({ name }: { name: string }) {
   const initials = name.split(" ").slice(0, 2).map((w) => w[0]).join("") || "?";
@@ -33,21 +36,29 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
+function TypeIcon({ type }: { type: ChatType }) {
+  if (type === "lesson_ai_helper") return <Bot size={12} className="ml-1 inline text-blue-500" />;
+  if (type === "class_group") return <Users size={12} className="ml-1 inline text-emerald-500" />;
+  if (type === "parent_teacher") return <Heart size={12} className="ml-1 inline text-rose-500" />;
+  return <UserRound size={12} className="ml-1 inline text-slate-400" />;
+}
+
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
 }
 
 export function AdminChatsView({
-  teachers, groups,
+  teachers, groups, categoryCounts,
 }: {
   teachers: Array<{ id: string; full_name: string }>;
   groups: Array<{ id: string; name: string }>;
+  categoryCounts: CategoryCounts;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dc = d.admin.chats;
 
-  const [type, setType] = useState<"all" | "direct" | "lesson">("all");
+  const [type, setType] = useState<FilterType>("all");
   const [teacherId, setTeacherId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -63,6 +74,16 @@ export function AdminChatsView({
   const [loadingMessages, setLoadingMessages] = useState(false);
 
   const requestSeq = useRef(0);
+
+  // Дропдаун "Тип чата": "Все" всегда, остальные категории — только если
+  // сейчас в БД есть хотя бы один такой чат (Пачка 7.20-2, ЧАСТЬ 3).
+  const typeOptions: Array<{ value: FilterType; label: string }> = [
+    { value: "all", label: dc.types.all },
+    ...(categoryCounts.parent_teacher > 0 ? [{ value: "parent_teacher" as const, label: dc.types.parentTeacher }] : []),
+    ...(categoryCounts.teacher_student > 0 ? [{ value: "teacher_student" as const, label: dc.types.teacherStudent }] : []),
+    ...(categoryCounts.class_group > 0 ? [{ value: "class_group" as const, label: dc.types.classGroup }] : []),
+    ...(categoryCounts.lesson_ai_helper > 0 ? [{ value: "lesson_ai_helper" as const, label: dc.types.lessonAiHelper }] : []),
+  ];
 
   const loadChats = useCallback(async (cursor?: string) => {
     setLoadingList(true);
@@ -100,7 +121,7 @@ export function AdminChatsView({
       const res = await fetch(`/api/admin/chats/${encodeURIComponent(chat.id)}/messages`);
       const data = await res.json();
       setMessages(data.messages ?? []);
-      if (data.chat_info) setActiveInfo(data.chat_info);
+      if (data.chat_info) setActiveInfo((prev) => ({ ...(prev as ChatSummary), ...data.chat_info }));
     } finally {
       setLoadingMessages(false);
     }
@@ -117,11 +138,9 @@ export function AdminChatsView({
 
           <label className="flex flex-col gap-1 text-[12px] font-medium text-slate-500">
             {dc.filters.type}
-            <select value={type} onChange={(e) => setType(e.target.value as typeof type)}
+            <select value={type} onChange={(e) => setType(e.target.value as FilterType)}
               className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] text-slate-800 outline-none focus:border-violet-400">
-              <option value="all">{dc.types.all}</option>
-              <option value="direct">{dc.types.direct}</option>
-              <option value="lesson">{dc.types.lesson}</option>
+              {typeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
           </label>
 
@@ -161,30 +180,27 @@ export function AdminChatsView({
             <p className="p-4 text-center text-[13px] text-slate-400">{dc.emptyList}</p>
           ) : (
             <div className="space-y-1">
-              {chats.map((chat) => {
-                const isLesson = chat.type === "lesson_ai_helper";
-                return (
-                  <button
-                    key={chat.id}
-                    onClick={() => openChat(chat)}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 rounded-[14px] p-2.5 text-left transition-colors",
-                      activeId === chat.id ? "bg-violet-100" : "hover:bg-slate-50",
-                    )}
-                  >
-                    <Avatar name={chat.participant_1.name} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-semibold text-slate-800">
-                        {chat.participant_1.name} {isLesson ? <Bot size={12} className="ml-1 inline text-blue-500" /> : `↔ ${chat.participant_2.name}`}
-                      </div>
-                      <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{fmtDate(chat.last_message_at)}</span>
-                        <span>{dc.messageCount.replace("{count}", String(chat.message_count))}</span>
-                      </div>
+              {chats.map((chat) => (
+                <button
+                  key={chat.id}
+                  onClick={() => openChat(chat)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-[14px] p-2.5 text-left transition-colors",
+                    activeId === chat.id ? "bg-violet-100" : "hover:bg-slate-50",
+                  )}
+                >
+                  <Avatar name={chat.avatar_name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-semibold text-slate-800">
+                      {chat.label} <TypeIcon type={chat.type} />
                     </div>
-                  </button>
-                );
-              })}
+                    <div className="mt-0.5 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>{fmtDate(chat.last_message_at)}</span>
+                      <span>{dc.messageCount.replace("{count}", String(chat.message_count))}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
               {hasMore && (
                 <button
                   onClick={() => loadChats(chats[chats.length - 1]?.last_message_at)}
@@ -210,6 +226,7 @@ export function AdminChatsView({
           <>
             <div className="flex items-center gap-2 rounded-t-[20px] border-b border-amber-100 bg-amber-50 px-4 py-2.5 text-[12px] font-semibold text-amber-700">
               <Eye size={14} /> {dc.readOnly}
+              {activeInfo && <span className="ml-auto font-normal text-amber-600/80">{activeInfo.label}</span>}
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {loadingMessages ? (
