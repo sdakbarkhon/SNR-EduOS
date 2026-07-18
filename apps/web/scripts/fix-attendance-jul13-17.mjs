@@ -10,37 +10,37 @@
 // ЖИВАЯ ПРОВЕРКА ПЕРЕД НАПИСАНИЕМ (эта сессия, hosted БД, полная
 // пагинация — не первые 1000 строк):
 //   - Уроков 13-17 июля: 47. Всего attendance в этом диапазоне: 1504.
-//   - Гейт marked_by IS NULL AND status='absent_unexcused': РОВНО 1380
-//     строк (не ~1440, как предполагалось). marked_by IS NULL САМ ПО СЕБЕ
-//     (без фильтра по статусу) даёт ТЕ ЖЕ 1380 — ни одной строки с
-//     marked_by=NULL и другим статусом нет, гейт однозначный и чистый.
-//   - 11 строк — marked_by IS NOT NULL И status=absent_unexcused
-//     (органичные, настоящие неявки, отмеченные учителем) — НЕ трогаем.
-//   - 112 present + 1 absent_excused — тоже органичные, marked_by
-//     заполнен — НЕ трогаем. 1380+112+1+11=1504, сходится.
+//   - Гейт marked_by IS NULL: РОВНО 1380 строк на момент прошлой
+//     проверки (заказчик подтвердил ожидание ~1440 — расхождение
+//     небольшое, не критично; финальное число даст сам dry-run/confirm
+//     на актуальном состоянии БД).
+//   - Строки с marked_by IS NOT NULL (органичные, настоящие отметки
+//     учителя) — НЕ трогаем вообще, гейт их не касается.
 //
-// СХЕМА (важные расхождения с исходным промтом, подтверждены
-// live-запросом и миграциями):
-//   - attendance НЕ имеет колонок created_at/updated_at вообще (только
-//     recorded_at и marked_at). "updated_at = случайный timestamp в
-//     течение урока" реализовано через marked_at (это и есть поле,
-//     выдавшее bulk-сидинг — идентичные/дробно-секундные значения не по
-//     конкретному ученику). recorded_at (ближайший аналог created_at) —
-//     НЕ трогаем, как и просили ("created_at не менять").
-//   - attendance_status — НЕ native enum на практике: миграция
-//     20260614000001_enums.sql создавала enum ('present','absent','late'),
-//     но миграция 20260623000043_remove_late_status.sql заменила его на
-//     text + CHECK (status IN ('present','absent_excused',
-//     'absent_unexcused')) — 'late' убрали, 'sick' в этой схеме НИКОГДА
-//     не существовал. 'sick' из промта — сводим в 'absent_excused' (та
-//     же конвенция, что уже задокументирована в
-//     scripts/lib/backfill-templates.mjs и в backfill-historical.mjs:
-//     absent_excused = "sick"/справка из ТЗ). Итоговое распределение:
-//     present=90%, absent_excused=5% (3%+2% sick слиты), absent_unexcused=5%.
-//   - teacher_id урока — та же резолюция, что в backfill-historical-
-//     jul7-17.mjs: subjects.teacher_id по subject_id урока, иначе
-//     groups.teacher_id (куратор) — lessons.teacher_id НЕ существует
-//     как колонка (см. диагностику предыдущего хода).
+// СХЕМА (важные расхождения с промтом "Вариант B", подтверждены
+// миграциями — заказчик подтвердил финальное решение после того, как
+// я показал эти факты):
+//   - attendance_status — НЕ 3 значения из промта ('present'/'absent'/
+//     'late'). Миграция 20260614000001_enums.sql создавала native enum
+//     ('present','absent','late'), но 20260623000043_remove_late_
+//     status.sql («Remove 'late' from attendance status ... this
+//     migration removes it for good») заменила его на text + CHECK
+//     (status IN ('present','absent_excused','absent_unexcused')).
+//     Ни 'late', ни голого 'absent' в реальной схеме НЕТ — писать их
+//     означало бы упасть на CHECK-constraint. По заказу ("без excused")
+//     оба небазовых случая (было бы absent 8% + late 2% = 10%) сведены
+//     в единственный доступный "не-present" статус — absent_unexcused.
+//     Итог: present=90%, absent_unexcused=10%, absent_excused не
+//     используется вообще.
+//   - attendance НЕ имеет колонок created_at/updated_at (только
+//     recorded_at и marked_at) — "обновить timestamp" реализовано через
+//     marked_at (то самое поле, что выдало bulk-сидинг); recorded_at не
+//     трогаем.
+//   - teacher_id — ТОЛЬКО subjects.teacher_id по lessons.subject_id, БЕЗ
+//     fallback на куратора группы (по прямому указанию заказчика — это
+//     "готовое поле", ничего вычислять не нужно). Если вдруг NULL —
+//     урок целиком пропускается с явным логом, а не молча берётся
+//     куратор.
 
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
@@ -92,13 +92,11 @@ console.log(`Фикс bulk-сидинговой attendance ${START_DATE}..${END_
 console.log(`Режим: ${DRY_RUN ? "DRY-RUN (ничего не пишем в БД)" : "БОЕВОЙ (пишем в БД)"}`);
 console.log("═".repeat(70));
 
-// ── распределение: present 90%, absent_excused 5% (3%+2% sick слиты),
-// absent_unexcused 5% ────────────────────────────────────────────────────
+// ── распределение (Вариант B, нормализовано под реальный enum):
+// present 90%, absent_unexcused 10% (absent 8% + late 2% из промта,
+// 'late' физически не существует — см. шапку файла) ─────────────────────
 function pickStatus() {
-  const r = Math.random();
-  if (r < 0.90) return "present";
-  if (r < 0.95) return "absent_excused";
-  return "absent_unexcused";
+  return Math.random() < 0.90 ? "present" : "absent_unexcused";
 }
 function randomInt(min, max) { return Math.floor(min + Math.random() * (max - min + 1)); }
 
@@ -144,22 +142,23 @@ async function main() {
   const lessonById = new Map(lessons.map((l) => [l.id, l]));
   const lessonIds = lessons.map((l) => l.id);
 
+  // teacher_id — ТОЛЬКО subjects.teacher_id, без fallback на куратора
+  // (прямое указание заказчика). is_stub=false фильтр оставлен — стаб-
+  // предметы (Биология/История/...) не участвуют в реальном расписании
+  // и не должны случайно матчиться, если бы у них был teacher_id.
   const subjects = await fetchAllRows("subjects", "id, teacher_id", (q) => q.eq("is_stub", false));
   const teacherBySubject = new Map(subjects.map((s) => [s.id, s.teacher_id]));
-  const groups = await fetchAllRows("groups", "id, teacher_id", (q) => q);
-  const curatorByGroup = new Map(groups.map((g) => [g.id, g.teacher_id]));
   const groupNames = await fetchAllRows("groups", "id, name", (q) => q);
   const groupNameById = new Map(groupNames.map((g) => [g.id, g.name]));
 
-  // Гейт: marked_by IS NULL AND status='absent_unexcused' (подтверждено
-  // live — совпадает 1:1 с "marked_by IS NULL" без доп. фильтра, но
-  // фильтруем явно по обоим условиям, как в промте, для документальной
-  // точности гейта).
+  // Гейт: ТОЛЬКО marked_by IS NULL (заказчик убрал доп. условие по
+  // статусу — уже проверено, что оно ничего не меняло: строки с
+  // marked_by=NULL и НЕ absent_unexcused не встречаются).
   const dirtyRows = await fetchAllRows(
     "attendance", "id, lesson_id, student_id, status, marked_by",
-    (q) => q.in("lesson_id", lessonIds).is("marked_by", null).eq("status", "absent_unexcused"),
+    (q) => q.in("lesson_id", lessonIds).is("marked_by", null),
   );
-  console.log(`Строк под гейтом (marked_by IS NULL AND status='absent_unexcused'): ${dirtyRows.length}`);
+  console.log(`Строк под гейтом (marked_by IS NULL): ${dirtyRows.length}`);
 
   const byLesson = new Map();
   for (const r of dirtyRows) {
@@ -168,8 +167,8 @@ async function main() {
     byLesson.set(r.lesson_id, arr);
   }
 
-  const stats = { updated: 0, errors: 0 };
-  const totalByStatus = { present: 0, absent_excused: 0, absent_unexcused: 0 };
+  const stats = { updated: 0, errors: 0, skippedLessonsNoTeacher: 0 };
+  const totalByStatus = { present: 0, absent_unexcused: 0 };
   const queue = [];
 
   const lessonsWithDirty = [...byLesson.keys()];
@@ -177,16 +176,22 @@ async function main() {
     const lessonId = lessonsWithDirty[i];
     const lesson = lessonById.get(lessonId);
     const rows = byLesson.get(lessonId);
-    const teacherId = teacherBySubject.get(lesson.subject_id) ?? curatorByGroup.get(lesson.group_id) ?? null;
     const dateLabel = lesson.starts_at.slice(0, 10);
     const groupName = groupNameById.get(lesson.group_id) ?? "?";
 
-    let present = 0, excused = 0, unexcused = 0;
+    // Только subjects.teacher_id, без fallback на куратора — если NULL,
+    // урок целиком пропускается (по прямому указанию заказчика).
+    const teacherId = teacherBySubject.get(lesson.subject_id) ?? null;
+    if (!teacherId) {
+      console.warn(`[${i + 1}/${lessonsWithDirty.length}] ${dateLabel} · ${groupName} → SKIPPED (subjects.teacher_id IS NULL для subject_id=${lesson.subject_id}, ${rows.length} строк не тронуты)`);
+      stats.skippedLessonsNoTeacher++;
+      continue;
+    }
+
+    let present = 0, unexcused = 0;
     for (const row of rows) {
       const newStatus = pickStatus();
-      if (newStatus === "present") present++;
-      else if (newStatus === "absent_excused") excused++;
-      else unexcused++;
+      if (newStatus === "present") present++; else unexcused++;
 
       const newMarkedAt = new Date(new Date(lesson.starts_at).getTime() + randomInt(0, 30) * 60000).toISOString();
       queue.push({
@@ -199,18 +204,18 @@ async function main() {
       });
     }
     totalByStatus.present += present;
-    totalByStatus.absent_excused += excused;
     totalByStatus.absent_unexcused += unexcused;
 
     await flushUpdates(queue, stats);
-    console.log(`[${i + 1}/${lessonsWithDirty.length}] ${dateLabel} · ${groupName} → updated ${rows.length} records (present=${present}, absent_excused=${excused}, absent_unexcused=${unexcused})`);
+    console.log(`[${i + 1}/${lessonsWithDirty.length}] ${dateLabel} · ${groupName} → updated ${rows.length} records (present=${present}, absent=${unexcused})`);
   }
   await flushUpdates(queue, stats);
 
   console.log("\n" + "═".repeat(70));
   console.log("ИТОГ:");
   console.log(`  Всего обновлено: ${stats.updated}`);
-  console.log(`  Разбивка по новым статусам: present=${totalByStatus.present}, absent_excused=${totalByStatus.absent_excused}, absent_unexcused=${totalByStatus.absent_unexcused}`);
+  console.log(`  Разбивка по новым статусам: present=${totalByStatus.present}, absent_unexcused=${totalByStatus.absent_unexcused}`);
+  console.log(`  Пропущено уроков (subjects.teacher_id IS NULL): ${stats.skippedLessonsNoTeacher}`);
   console.log(`  Ошибок: ${stats.errors}`);
   console.log(`  Время: ${((Date.now() - startedAt) / 1000).toFixed(1)}с`);
 
