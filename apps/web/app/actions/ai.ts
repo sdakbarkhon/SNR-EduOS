@@ -6,6 +6,13 @@ import { getCurrentUserRole } from "@/lib/auth";
 import { computeEmbedding } from "@/lib/ai/embeddings";
 
 const RAG_TOP_K = 5;
+// Ниже этого порога совпадение считается нерелевантным — не подмешиваем
+// в контекст случайный шум топ-5, если ученик спросил о чём-то, чего в
+// его уроках просто нет.
+const RAG_SIMILARITY_THRESHOLD = 0.5;
+
+const RAG_NO_CONTEXT_HINT =
+  "\n\n(Примечание: специфичных учебных материалов ученика по этому вопросу не найдено — отвечай из общих знаний, не выдавай ответ за официальный материал школы.)";
 
 type RetrievedChunk = {
   lesson_stage_id: string;
@@ -23,13 +30,16 @@ export type AiChatSource = {
   similarity: number;
 };
 
+type RagContext =
+  | { kind: "found"; contextBlock: string; sources: AiChatSource[] }
+  | { kind: "no_context" };
+
 /** Пачка 5.1: для студентов подмешивает в systemPrompt релевантные
  *  фрагменты из lesson_stages их группы (RAG) — retrieval через
  *  match_lesson_stage_embeddings() (миграция 139). Для остальных ролей
- *  поведение не меняется. */
-async function buildRagContext(
-  userMessage: string,
-): Promise<{ contextBlock: string; sources: AiChatSource[] } | null> {
+ *  (и при системных сбоях embedding/RPC) возвращает null — поведение
+ *  не меняется, без "нет материалов"-подсказки, т.к. это не тот случай. */
+async function buildRagContext(userMessage: string): Promise<RagContext | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -61,8 +71,11 @@ async function buildRagContext(
     return null;
   }
 
-  const chunks = (data ?? []) as RetrievedChunk[];
-  if (chunks.length === 0) return { contextBlock: "", sources: [] };
+  // Студент без группы или без ещё проиндексированных материалов даёт
+  // тот же результат — RPC просто вернёт 0 строк в обоих случаях
+  // (student_groups join), различать их отдельным запросом не нужно.
+  const chunks = ((data ?? []) as RetrievedChunk[]).filter((c) => c.similarity >= RAG_SIMILARITY_THRESHOLD);
+  if (chunks.length === 0) return { kind: "no_context" };
 
   const contextBlock = chunks
     .map(
@@ -78,7 +91,7 @@ async function buildRagContext(
     similarity: c.similarity,
   }));
 
-  return { contextBlock, sources };
+  return { kind: "found", contextBlock, sources };
 }
 
 export async function callAiChat(
@@ -89,12 +102,14 @@ export async function callAiChat(
   const rag = await buildRagContext(userMessage);
 
   let effectiveSystemPrompt = systemPrompt;
-  if (rag && rag.contextBlock) {
+  if (rag?.kind === "found") {
     effectiveSystemPrompt = `${systemPrompt}
 
 КОНТЕКСТ ИЗ УРОКОВ УЧЕНИКА (используй для ответа, если он релевантен вопросу; не выдумывай факты сверх этого списка и не упоминай, что это "контекст" или "источники" — отвечай естественно, как будто просто знаешь материал):
 
 ${rag.contextBlock}`;
+  } else if (rag?.kind === "no_context") {
+    effectiveSystemPrompt = `${systemPrompt}${RAG_NO_CONTEXT_HINT}`;
   }
 
   const messages = [
@@ -106,7 +121,7 @@ ${rag.contextBlock}`;
   ];
   const { text, error } = await chat(effectiveSystemPrompt, messages);
   if (error) return { error };
-  return rag && rag.sources.length > 0 ? { text, sources_used: rag.sources } : { text };
+  return rag?.kind === "found" ? { text, sources_used: rag.sources } : { text };
 }
 
 export async function getStudyTip(): Promise<{ text: string } | { error: string }> {

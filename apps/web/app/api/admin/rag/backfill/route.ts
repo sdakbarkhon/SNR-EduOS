@@ -1,6 +1,8 @@
-// Пачка 5.1 — Задача D: ставит существующие lesson_stages (theory/
-// quiz_qia/practice) в очередь на переиндексацию для RAG. Сам эмбеддинг
-// НЕ считает — это делает /api/cron/rag-process-queue (async, по расписанию).
+// Пачка 5.1 — Задача D: ставит существующие lesson_stages (stage_role =
+// 'middle' — единственное реальное значение, покрывающее theory/quiz/
+// practice; 'start'/'summary' не индексируются) в очередь на
+// переиндексацию для RAG. Сам эмбеддинг НЕ считает — это делает
+// /api/cron/rag-process-queue (async, по расписанию).
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
   let query = ragDb
     .from("lesson_stages")
     .select("id, school_id, lesson_id, lessons!inner(starts_at, group_id)")
-    .in("stage_role", ["theory", "quiz_qia", "practice"]);
+    .eq("stage_role", "middle");
 
   if (date_from) query = query.gte("lessons.starts_at", date_from);
   if (date_to) query = query.lte("lessons.starts_at", date_to);

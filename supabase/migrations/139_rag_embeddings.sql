@@ -6,22 +6,36 @@
 -- обработки (lesson_stages_embedding_queue) + триггеры, которые ставят
 -- этапы в очередь при изменении контента.
 --
--- РАСХОЖДЕНИЕ С ИСХОДНЫМ ТЗ (важно): lesson_stages НЕ имеет колонки
--- `content` — текст теории живёт в JSONB-колонке `slides` (массив
--- слайдов, у каждого свой content), текст practice — в
--- `description`/`teacher_notes`, а текст quiz — вообще в ОТДЕЛЬНОЙ
--- таблице `quiz_questions` (question_text/options), не в lesson_stages
--- вовсе. Поэтому:
---   - Триггер "AFTER INSERT OR UPDATE OF content, stage_role" из ТЗ
---     невозможен буквально — заменён на UPDATE OF slides, description,
---     teacher_notes, stage_role (те колонки lesson_stages, что реально
---     несут текст theory/practice).
---   - Добавлен ВТОРОЙ триггер на quiz_questions (INSERT/UPDATE) —
---     ставит в очередь РОДИТЕЛЬСКИЙ stage_id, потому что именно тут
---     появляется/меняется текст quiz-этапа. Без этого триггера quiz_qia
---     этапы никогда бы не переиндексировались после первого раза
---     (лежащий в их основе текст в другой таблице, lesson_stages-
---     триггер его не видит).
+-- РАСХОЖДЕНИЕ С ИСХОДНЫМ ТЗ (важно, проверено live-запросом к БД):
+--
+-- 1) lesson_stages НЕ имеет колонки `content` — текст теории живёт в
+--    JSONB-колонке `slides` (массив слайдов, у каждого свой content),
+--    текст practice/прочих задач — в `description`/`teacher_notes`, а
+--    текст quiz — вообще в ОТДЕЛЬНОЙ таблице `quiz_questions`
+--    (question_text/options), не в lesson_stages вовсе.
+--
+-- 2) КРИТИЧНО: stage_role в реальных данных принимает только 3 значения —
+--    'start' / 'middle' / 'summary' (структурная позиция этапа в уроке).
+--    Значений 'theory'/'quiz_qia'/'practice' у stage_role НЕ БЫВАЕТ —
+--    условие "stage_role IN ('theory','quiz_qia','practice')" из
+--    первой версии этой миграции никогда не было истинным ни для одной
+--    строки, т.е. очередь никогда бы не наполнялась. Реальный дискриминатор
+--    типа контента — content_type: 'presentation' (теория, есть slides),
+--    'quiz_qia'/'quiz_kahoot' (квиз, текст в quiz_questions), и ряд
+--    прочих 'task'-типов (code/learningapps/geogebra/wokwi/blockly_games —
+--    описание задания в description/teacher_notes, если оно есть).
+--    "Не индексировать start/summary" из ТЗ реализовано как
+--    stage_role = 'middle' — это и есть единственный настоящий фильтр
+--    "не start и не summary" (никакая другая комбинация start/summary
+--    не даёт content_type='presentation'/'quiz_qia'/etc. в природе).
+--
+-- Итог: триггер 1 стоит на UPDATE OF slides, description, teacher_notes,
+-- stage_role, content_type (любая из этих колонок может задать/изменить
+-- индексируемый текст) и фильтрует по stage_role = 'middle'. Триггер 2
+-- на quiz_questions (INSERT/UPDATE) ставит в очередь РОДИТЕЛЬСКИЙ
+-- stage_id — без него quiz-этапы никогда бы не переиндексировались
+-- после первого раза (текст лежит в другой таблице, lesson_stages-
+-- триггер его не видит).
 --
 -- Embedding-модель — Gemini text-embedding-004, размерность 768
 -- (apps/web/lib/ai/embeddings.ts). Cosine similarity — HNSW индекс.
@@ -70,14 +84,14 @@ CREATE INDEX lesson_stages_embedding_queue_fifo_idx
 ALTER TABLE public.lesson_stages_embedding_queue ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.lesson_stages_embedding_queue FROM anon, authenticated;
 
--- ── 3. Триггер на lesson_stages (theory/practice — текст меняется
---      прямо в этой таблице) ─────────────────────────────────────────
+-- ── 3. Триггер на lesson_stages (theory/practice/прочие task —
+--      текст меняется прямо в этой таблице) ──────────────────────────
 CREATE OR REPLACE FUNCTION public.fn_enqueue_lesson_stage_embedding()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF NEW.stage_role IN ('theory', 'quiz_qia', 'practice') THEN
+  IF NEW.stage_role = 'middle' THEN
     INSERT INTO public.lesson_stages_embedding_queue (lesson_stage_id, school_id)
     VALUES (NEW.id, NEW.school_id)
     ON CONFLICT (lesson_stage_id) DO UPDATE
@@ -88,7 +102,7 @@ END;
 $$;
 
 CREATE TRIGGER trg_enqueue_lesson_stage_embedding
-  AFTER INSERT OR UPDATE OF slides, description, teacher_notes, stage_role
+  AFTER INSERT OR UPDATE OF slides, description, teacher_notes, stage_role, content_type
   ON public.lesson_stages
   FOR EACH ROW
   EXECUTE FUNCTION public.fn_enqueue_lesson_stage_embedding();
@@ -103,7 +117,7 @@ DECLARE
   v_stage_role text;
 BEGIN
   SELECT stage_role INTO v_stage_role FROM public.lesson_stages WHERE id = NEW.stage_id;
-  IF v_stage_role = 'quiz_qia' THEN
+  IF v_stage_role = 'middle' THEN
     INSERT INTO public.lesson_stages_embedding_queue (lesson_stage_id, school_id)
     VALUES (NEW.stage_id, NEW.school_id)
     ON CONFLICT (lesson_stage_id) DO UPDATE
@@ -174,10 +188,9 @@ COMMIT;
 
 -- ── После применения — проверить руками: ─────────────────────────────
 --   1) SELECT count(*) FROM lesson_stages_embedding_queue;
---      -- если на момент применения уже есть theory/practice/quiz_qia
---      -- этапы (INSERT/UPDATE до этой миграции не считается — триггер
---      -- только на будущие изменения), для них очередь будет пустой,
---      -- пока не запущен /api/admin/rag/backfill.
+--      -- существующие 'middle'-этапы (созданные до этой миграции) в
+--      -- очередь НЕ попадают — триггер реагирует только на будущие
+--      -- INSERT/UPDATE. Для них нужен POST /api/admin/rag/backfill.
 --   2) UPDATE lesson_stages SET description = description WHERE
---      stage_role='practice' LIMIT 1; -- проверка триггера 1
+--      stage_role='middle' LIMIT 1; -- проверка триггера 1
 --      SELECT * FROM lesson_stages_embedding_queue; -- ожидание: 1 строка
