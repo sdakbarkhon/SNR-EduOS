@@ -5,7 +5,7 @@ import {
   BookOpen, Plus, MoreHorizontal, Trash2, X, Upload, Check, Library, Search,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { insertBook, getSubjectStyle } from "@snr/core";
+import { insertBook, getSubjectStyle, subjects as subjectConfig } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
@@ -24,19 +24,20 @@ const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
   chemistry:   ["#9B5DE5", "#6D28D9"],
   biology:     ["#2DBE7E", "#15803D"],
   history:     ["#B5793A", "#78350F"],
+  russian:     ["#DC2626", "#991B1B"],
 };
 
-const SUBJECT_LABELS: Record<string, string> = {
-  math:        "Математика",
-  physics:     "Физика",
-  programming: "Программирование",
-  robotics:    "Робототехника",
-  english:     "Английский",
-  informatics: "Информатика",
-  chemistry:   "Химия",
-  biology:     "Биология",
-  history:     "История",
-};
+// Пачка «предметы книг»: раньше был отдельный хардкод-дубль (9 предметов,
+// без "русский", с расхождением в лейблах вроде "Английский" vs канонiческого
+// "Английский язык") — теперь берём labels из единого конфига @snr/core
+// (packages/core/src/config/subjects.ts), как того требует CLAUDE.md §6
+// ("конфиг цвет+иконка на предмет — один файл"). Полный набор (не только
+// 5 отбираемых в форме "Добавить книгу", см. BOOK_SUBJECT_KEYS ниже) —
+// нужен, чтобы карточки/бейджи существующих книг с любым subject корректно
+// резолвили label, а не падали на raw-key fallback.
+const SUBJECT_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(subjectConfig).map(([key, cfg]) => [key, cfg.label]),
+);
 
 function getBookGradient(subject: string): string {
   const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
@@ -60,17 +61,15 @@ function formatSize(bytes: number): string {
 }
 
 const BOOK_TYPES = ["Учебник", "Конспект", "Сборник", "Справочник"] as const;
-const SUBJECTS = [
-  { value: "math",        label: "Математика" },
-  { value: "physics",     label: "Физика" },
-  { value: "programming", label: "Программирование" },
-  { value: "robotics",    label: "Робототехника" },
-  { value: "english",     label: "Английский" },
-  { value: "informatics", label: "Информатика" },
-  { value: "chemistry",   label: "Химия" },
-  { value: "biology",     label: "Биология" },
-  { value: "history",     label: "История" },
-] as const;
+// Дропдаун "Предмет" формы "Добавить книгу" — ТОЛЬКО активные предметы с
+// реальным контентом (проверено live: все 8 существующих книг — programming
+// (3) / robotics (3) / math (2), ни одна не осиротеет). Физика/Химия/
+// Биология/История — предметы-заглушки без уроков, Информатика дублирует
+// Программирование — намеренно исключены отсюда (labels для НИХ всё равно
+// остаются в SUBJECT_LABELS выше, на случай если где-то в данных встретится
+// старое значение — только сам выбор в форме сужен).
+const BOOK_SUBJECT_KEYS = ["programming", "robotics", "math", "english", "russian"] as const;
+const SUBJECTS = BOOK_SUBJECT_KEYS.map((value) => ({ value, label: getSubjectStyle(value).label }));
 
 // ── TeacherBookDetailModal ────────────────────────────────────────────
 
@@ -273,7 +272,7 @@ function UploadModal({
 }) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [subject, setSubject] = useState<string>(SUBJECTS[0].value);
+  const [subject, setSubject] = useState<string>(BOOK_SUBJECT_KEYS[0]);
   const [bookType, setBookType] = useState<typeof BOOK_TYPES[number]>("Учебник");
   const [description, setDescription] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);

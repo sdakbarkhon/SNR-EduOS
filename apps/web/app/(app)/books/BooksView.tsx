@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Star, BookOpen, Library, X, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getSubjectStyle, addBookFavorite, removeBookFavorite } from "@snr/core";
+import { getSubjectStyle, addBookFavorite, removeBookFavorite, subjects as subjectConfig } from "@snr/core";
 import type { Book } from "@snr/core";
 import { getBookFileUrl } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
@@ -23,19 +23,19 @@ const SUBJECT_GRADIENTS: Record<string, [string, string]> = {
   chemistry:   ["#9B5DE5", "#6D28D9"],
   biology:     ["#2DBE7E", "#15803D"],
   history:     ["#B5793A", "#78350F"],
+  russian:     ["#DC2626", "#991B1B"],
 };
 
-const SUBJECT_LABELS: Record<string, string> = {
-  math:        "Математика",
-  physics:     "Физика",
-  programming: "Программирование",
-  robotics:    "Робототехника",
-  english:     "Английский",
-  informatics: "Информатика",
-  chemistry:   "Химия",
-  biology:     "Биология",
-  history:     "История",
-};
+// Держим labels в синхроне с apps/web/app/teacher/books/TeacherBooksView.tsx
+// и единым конфигом @snr/core (packages/core/src/config/subjects.ts) — этот
+// файл раньше был отдельным хардкод-дублем без "русский" и с расхождением
+// "Английский" vs канонического "Английский язык"; фильтр здесь сам по себе
+// data-driven (список берётся из реальных книг), но лейблы резолвились
+// именно отсюда, так что рассинхрон был бы виден при первой же книге с
+// новым предметом.
+const SUBJECT_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(subjectConfig).map(([key, cfg]) => [key, cfg.label]),
+);
 
 function getBookGradient(subject: string): string {
   const [from, to] = SUBJECT_GRADIENTS[subject] ?? ["#64748B", "#334155"];
