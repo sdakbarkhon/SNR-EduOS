@@ -142,6 +142,7 @@ function TaskStubModal({
         learningapps:   d.stageContentLearningapps,
         sqlonline:      d.stageContentSqlonline,
         h5p:            d.stageContentH5p,
+        typerun:        d.stageContentTyperun,
       }[stage.content_type] ?? stage.content_type
     : null;
 

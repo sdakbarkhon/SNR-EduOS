@@ -1054,6 +1054,7 @@ export const en: Dictionary = {
       learningapps: { name: "Learning Apps", description: "Interactive exercises and mini-games for lessons" },
       sqlonline: { name: "SQL Online", description: "SQL queries in the browser (SQLite) — for older students" },
       h5p: { name: "H5P Interactive", description: "Interactive tasks: memory games, quizzes, drag-n-drop. Works for any subject" },
+      typerun: { name: "Typing Trainer", description: "Improve your typing speed and accuracy" },
     },
     projects: {
       myProjects: "My projects",
@@ -1462,6 +1463,7 @@ export const en: Dictionary = {
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
     stageContentH5p: "H5P Interactive",
+    stageContentTyperun: "TypeRun",
     stageContentQuizQia: "Quiz (QIA)",
     stageContentQuizKahoot: "Quiz game (Kahoot)",
     stageStepLabel: "Stage {n}",

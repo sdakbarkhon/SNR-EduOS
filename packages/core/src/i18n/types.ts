@@ -1064,6 +1064,7 @@ export interface Dictionary {
       learningapps: { name: string; description: string };
       sqlonline: { name: string; description: string };
       h5p: { name: string; description: string };
+      typerun: { name: string; description: string };
     };
     // migration 118 — Промт 5Б: автосохранение + именованные проекты
     // (только CodeSandbox — python/cpp, единственный режим с реальным
@@ -1497,6 +1498,7 @@ export interface Dictionary {
     stageContentLearningapps: string;  // "Learning Apps"
     stageContentSqlonline: string;     // "SQL Online"
     stageContentH5p: string;           // "H5P Interactive"
+    stageContentTyperun: string;       // "TypeRun"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"
     stageStepLabel: string;            // "Этап {n}"

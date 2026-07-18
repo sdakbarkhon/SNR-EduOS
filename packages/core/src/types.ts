@@ -119,7 +119,7 @@ export type LessonContentType =
   | 'presentation' | 'code'
   | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
-  | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'h5p'
+  | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'h5p' | 'typerun'
   | 'quiz_qia' | 'quiz_kahoot';
 
 // Сложность этапа (migration 55) — задаётся учителем или ИИ-генератором.
@@ -227,7 +227,7 @@ export type CodeSubmission = {
 export type ExternalServiceType =
   | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
-  | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'h5p';
+  | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'h5p' | 'typerun';
 
 /** Stored in lesson_stages.config for external-service stages. */
 export interface ExternalServiceConfig {

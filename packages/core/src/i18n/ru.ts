@@ -1054,6 +1054,7 @@ export const ru: Dictionary = {
       learningapps: { name: "Learning Apps", description: "Интерактивные упражнения и мини-игры для уроков" },
       sqlonline: { name: "SQL Online", description: "SQL-запросы в браузере (SQLite) — для старших классов" },
       h5p: { name: "H5P Interactive", description: "Интерактивные задания: memory games, квизы, drag-n-drop. Универсально для любых предметов" },
+      typerun: { name: "Тренажёр печати", description: "Улучшай скорость и точность печати" },
     },
     projects: {
       myProjects: "Мои проекты",
@@ -1462,6 +1463,7 @@ export const ru: Dictionary = {
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
     stageContentH5p: "H5P Interactive",
+    stageContentTyperun: "TypeRun",
     stageContentQuizQia: "Тест (QIA)",
     stageContentQuizKahoot: "Квиз-игра (Kahoot)",
     stageStepLabel: "Этап {n}",

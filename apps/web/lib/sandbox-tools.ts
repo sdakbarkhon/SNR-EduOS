@@ -5,13 +5,13 @@
 
 import {
   CircuitBoard, Code2, Terminal, Ruler, FlaskConical, LineChart, Puzzle,
-  Shuffle, Palette, PenTool, Brain, Database, Grid3x3, type LucideIcon,
+  Shuffle, Palette, PenTool, Brain, Database, Grid3x3, Keyboard, type LucideIcon,
 } from "lucide-react";
 
 export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
-  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "h5p";
+  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "h5p" | "typerun";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -113,5 +113,15 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     kind: "code",
     Icon: Terminal,
     gradient: "from-emerald-500 to-teal-600",
+  },
+  {
+    // Пачка 6.1 — тренажёр печати. MonkeyType (изначальный выбор) отдаёт
+    // X-Frame-Options: DENY — не встраивается физически. Заменён на
+    // typerun.top (проверено curl -I — блокирующих заголовков нет).
+    id: "typerun",
+    kind: "iframe",
+    embedUrl: "https://typerun.top/#rus_basic",
+    Icon: Keyboard,
+    gradient: "from-red-500 to-rose-600",
   },
 ];

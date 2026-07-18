@@ -10,6 +10,7 @@ import {
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3, Hand, Play, Link2,
+  Keyboard,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
@@ -74,6 +75,7 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   learningapps:   <Brain className="h-4 w-4" />,
   sqlonline:      <Database className="h-4 w-4" />,
   h5p:            <Grid3x3 className="h-4 w-4" />,
+  typerun:        <Keyboard className="h-4 w-4" />,
 };
 
 function fmtDate(iso: string): string {
@@ -101,7 +103,7 @@ const THEORY_CONTENT_TYPES: LessonContentType[] = ["presentation"];
 const TASK_CONTENT_TYPES: LessonContentType[] = [
   "code", "wokwi", "codesandbox", "quiz_qia", "quiz_kahoot",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
-  "h5p",
+  "h5p", "typerun",
 ];
 
 function StageModal({
@@ -1161,6 +1163,7 @@ export function TeacherLessonDetailView({
       learningapps:   dl.stageContentLearningapps,
       sqlonline:      dl.stageContentSqlonline,
       h5p:            dl.stageContentH5p,
+      typerun:        dl.stageContentTyperun,
     };
     return map[ct] ?? ct;
   }

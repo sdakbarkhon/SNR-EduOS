@@ -1,7 +1,7 @@
 // Whitelist + URL validation for the external-service lesson stages.
-// All twelve services (wokwi, codesandbox, geogebra, phet, desmos,
-// blockly_games, visualgo, p5js, excalidraw, learningapps, sqlonline, h5p)
-// support iframe embed.
+// All thirteen services (wokwi, codesandbox, geogebra, phet, desmos,
+// blockly_games, visualgo, p5js, excalidraw, learningapps, sqlonline, h5p,
+// typerun) support iframe embed.
 
 import type { ExternalServiceType } from "@snr/core";
 
@@ -179,6 +179,23 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
     errorMsg: `Неверная ссылка. Ожидается ссылка на задание из H5P (${H5P_BASE_URL}/player/...)`,
     description: "Интерактивные задания: memory games, квизы, drag-n-drop. Универсально для любых предметов",
   },
+
+  // Пачка 6.1 — тренажёр скорости печати. MonkeyType (изначально выбранный)
+  // отдаёт X-Frame-Options: DENY + CSP frame-ancestors 'none' — физически
+  // не встраивается (подтверждено curl -I). typerun.top проверен той же
+  // проверкой — заголовков, блокирующих iframe, нет.
+  typerun: {
+    name: "TypeRun",
+    embedSupported: true,
+    // Фиксированный URL без параметров — typerun.top не имеет концепции
+    // "своего проекта" как Wokwi/GeoGebra, поэтому паттерн просто
+    // подтверждает домен, а не конкретный путь/курс.
+    urlPattern: /^https?:\/\/(www\.)?typerun\.top\/?(#[\w-]*)?$/i,
+    extractEmbedUrl: (url) => url.trim(),
+    placeholder: "https://typerun.top/#rus_basic",
+    errorMsg: "Неверная ссылка. Ожидается ссылка на TypeRun (typerun.top)",
+    description: "Тренажёр скорости и точности печати",
+  },
 };
 
 // Used when a teacher didn't attach a specific project URL (lesson stage,
@@ -197,12 +214,13 @@ export const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   learningapps: "https://learningapps.org/",
   sqlonline: "https://sqlime.org/",
   h5p: "https://h5p.eduos.snruz.uz/library",
+  typerun: "https://typerun.top/#rus_basic",
 };
 
-// Canonical display order for the 12 services (teacher-facing type pickers).
+// Canonical display order for the 13 services (teacher-facing type pickers).
 export const EXTERNAL_SERVICE_ORDER: ExternalServiceType[] = [
   "wokwi", "codesandbox", "geogebra", "phet", "desmos", "blockly_games",
-  "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline", "h5p",
+  "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline", "h5p", "typerun",
 ];
 
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — filters the 12-service picker by subject
@@ -221,8 +239,9 @@ export const SUBJECT_SERVICE_MAP: Record<string, ExternalServiceType[]> = {
 };
 
 // Always offered regardless of subject (§5.3: "универсальные, можно
-// вставлять любому предмету где уместно").
-const UNIVERSAL_SERVICES: ExternalServiceType[] = ["excalidraw"];
+// вставлять любому предмету где уместно"). typerun (Пачка 6.1) —
+// печать полезна на любом предмете, не привязана к конкретному.
+const UNIVERSAL_SERVICES: ExternalServiceType[] = ["excalidraw", "typerun"];
 // PhET is science-flavored (§5.3: "больше для естественных наук") — offered
 // for stub science subjects that have no dedicated mapping above, used
 // sparingly rather than added to every subject.
@@ -243,7 +262,7 @@ export function isExternalService(ct: string | null | undefined): ct is External
     ct === "wokwi" || ct === "codesandbox" ||
     ct === "geogebra" || ct === "phet" || ct === "desmos" || ct === "blockly_games" ||
     ct === "visualgo" || ct === "p5js" || ct === "excalidraw" || ct === "learningapps" ||
-    ct === "sqlonline" || ct === "h5p"
+    ct === "sqlonline" || ct === "h5p" || ct === "typerun"
   );
 }
 
