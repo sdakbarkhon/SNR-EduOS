@@ -874,6 +874,7 @@ export interface Dictionary {
     submittedOn: string; // "Сдано {date}"
     grade: string;
     teacherComment: string;
+    aiReviewPending: string;
     noTasks: string;
     // новые ключи #19
     eyebrow: string;
@@ -1892,6 +1893,18 @@ export interface Dictionary {
     reviewCorrect: string;
     reviewWrong: string;
     reviewPending: string;
+    aiReviewNavLabel: string;
+    aiReviewPageTitle: string;
+    aiReviewEmpty: string;
+    aiGrade: string;
+    aiFeedbackStrengths: string;
+    aiFeedbackWeaknesses: string;
+    aiFeedbackSuggestions: string;
+    aiFeedbackSummary: string;
+    aiReviewStudentAnswer: string;
+    aiReviewConfirmBtn: string;
+    aiReviewEditConfirmBtn: string;
+    aiReviewManualBtn: string;
     groupsTitle: string;
     groupStudents: string;
     groupAttendance: string;

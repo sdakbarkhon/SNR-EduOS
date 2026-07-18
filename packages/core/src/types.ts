@@ -499,6 +499,21 @@ export type Homework = {
   created_at: string;
 };
 
+// Пачка 5.3 (migration 140) — AI-проверка текстовых/код-ответов, ждёт
+// подтверждения учителем прежде чем grade/teacher_comment станут видны
+// ученику (см. HomeworkSubmission.ai_review_status ниже).
+export type AiHomeworkFeedback = {
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
+  summary: string;
+};
+export type AiReviewStatus =
+  | 'pending_ai'
+  | 'ai_reviewed_pending_teacher'
+  | 'teacher_approved'
+  | 'teacher_declined_manual_grade';
+
 export type HomeworkSubmission = {
   id: string;
   homework_id: string;
@@ -513,6 +528,12 @@ export type HomeworkSubmission = {
   grade: number | null;
   teacher_comment: string | null;
   status: SubmissionStatus;
+  ai_grade: number | null;                    // migration 140
+  ai_feedback: AiHomeworkFeedback | null;      // migration 140
+  ai_review_status: AiReviewStatus | null;     // migration 140
+  ai_reviewed_at: string | null;               // migration 140
+  teacher_approved_at: string | null;          // migration 140
+  teacher_approved_by: string | null;          // migration 140
 };
 
 /** Homework с join'ом группы и опциональной сдачей студента. */

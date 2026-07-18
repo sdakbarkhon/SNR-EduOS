@@ -199,18 +199,28 @@ function SubmissionBlock({
           }),
         )}
       </div>
-      {sub.grade != null && (
+      {sub.ai_review_status === "pending_ai" || sub.ai_review_status === "ai_reviewed_pending_teacher" ? (
         <div className="mt-3 border-t border-slate-100 pt-3">
-          <span className="text-sm font-semibold text-slate-700">
-            {d.homework.grade}: {sub.grade}
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+            {d.homework.aiReviewPending}
           </span>
         </div>
-      )}
-      {sub.teacher_comment && (
-        <div className="mt-2 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
-          <span className="font-medium">{d.homework.teacherComment}: </span>
-          {sub.teacher_comment}
-        </div>
+      ) : (
+        <>
+          {sub.grade != null && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <span className="text-sm font-semibold text-slate-700">
+                {d.homework.grade}: {sub.grade}
+              </span>
+            </div>
+          )}
+          {sub.teacher_comment && (
+            <div className="mt-2 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
+              <span className="font-medium">{d.homework.teacherComment}: </span>
+              {sub.teacher_comment}
+            </div>
+          )}
+        </>
       )}
 
       {sub.status !== "graded" && (

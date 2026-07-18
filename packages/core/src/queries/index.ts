@@ -1254,6 +1254,82 @@ export const gradeSubmission = async (
   if (error) throw error;
 };
 
+// ─── Пачка 5.3: AI-проверка ДЗ (migration 140) ─────────────────────────
+
+export type TeacherAiPendingReview = {
+  id: string;
+  homework_id: string;
+  answer_text: string | null;
+  code_text: string | null;
+  submitted_at: string;
+  ai_grade: number | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ai_feedback: any;
+  student: { id: string; full_name: string; avatar_url: string | null };
+  homework: { id: string; title: string; content_type: string; group: { name: string; subject: string } };
+};
+
+/** Все сдачи, для которых AI уже дал оценку/feedback и ждёт подтверждения
+ *  учителя (ai_review_status='ai_reviewed_pending_teacher'), по ВСЕМ
+ *  домашним заданиям учителя (не по одному ДЗ — кросс-ДЗ очередь "На
+ *  проверке ИИ"). RLS ("teacher reads submissions in own groups",
+ *  is_my_teacher_group) уже сужает выборку без явного фильтра по teacher_id. */
+export const getTeacherAiPendingReviews = (db: Db) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (db as any)
+    .from("homework_submissions")
+    .select(
+      "id, homework_id, answer_text, code_text, submitted_at, ai_grade, ai_feedback, " +
+      "student:students!inner(id, full_name, avatar_url), " +
+      "homework:homework!inner(id, title, content_type, group:groups!inner(name, subject))",
+    )
+    .eq("ai_review_status", "ai_reviewed_pending_teacher")
+    .order("submitted_at", { ascending: true })
+    .then(unwrap) as Promise<TeacherAiPendingReview[]>;
+
+async function finalizeAiHomeworkReview(
+  db: Db,
+  { submissionId, grade, comment, aiReviewStatus }: {
+    submissionId: string; grade: number; comment: string;
+    aiReviewStatus: "teacher_approved" | "teacher_declined_manual_grade";
+  },
+): Promise<void> {
+  const { data: teacherId } = await db.rpc("current_teacher_id");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any)
+    .from("homework_submissions")
+    .update({
+      grade,
+      teacher_comment: comment,
+      status: "graded",
+      ai_review_status: aiReviewStatus,
+      teacher_approved_at: new Date().toISOString(),
+      teacher_approved_by: teacherId ?? null,
+    })
+    .eq("id", submissionId);
+  if (error) throw error;
+}
+
+/** Подтвердить (как есть или изменив) AI-оценку сдачи ДЗ — финализирует
+ *  grade/teacher_comment (те же колонки, что ручная gradeSubmission) и
+ *  закрывает AI-review как teacher_approved. Один и тот же вызов что для
+ *  "Подтвердить" (grade/comment = значения AI без изменений), что для
+ *  "Изменить и подтвердить" (grade/comment = отредактированные учителем) —
+ *  разницы для БД нет, поля и так редактируемые. */
+export const approveAiHomeworkReview = (
+  db: Db,
+  input: { submissionId: string; grade: number; comment: string },
+): Promise<void> => finalizeAiHomeworkReview(db, { ...input, aiReviewStatus: "teacher_approved" });
+
+/** "Проверить вручную без ИИ" — учитель игнорирует AI-оценку и ставит
+ *  свою с нуля. Тоже закрывает запись как проверенную (иначе она навсегда
+ *  осталась бы в списке "На проверке ИИ", т.к. только gradeSubmission()
+ *  ai_review_status не трогает). */
+export const declineAiHomeworkReview = (
+  db: Db,
+  input: { submissionId: string; grade: number; comment: string },
+): Promise<void> => finalizeAiHomeworkReview(db, { ...input, aiReviewStatus: "teacher_declined_manual_grade" });
+
 const NATIVE_CONTENT_TYPES = ["file", "test", "programming", "bundle"] as const;
 
 /** Создать ДЗ (file/test/programming/bundle или один из 12 внешних сервисов). Returns created homework record. */

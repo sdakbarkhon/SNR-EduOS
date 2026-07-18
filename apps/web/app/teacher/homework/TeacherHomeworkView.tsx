@@ -8,7 +8,7 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
-import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search } from "lucide-react";
+import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
 
@@ -277,6 +277,11 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
               className="w-full rounded-[16px] border border-white/50 bg-white/60 py-3 pl-11 pr-4 text-sm font-medium text-gray-700 shadow-sm backdrop-blur outline-none transition-all placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
+          <Link href="/teacher/homework/ai-review"
+            className="flex shrink-0 items-center gap-1.5 rounded-[12px] border border-white/50 bg-white/60 px-4 py-3 text-sm font-semibold text-brand-ink shadow-sm backdrop-blur transition-all hover:bg-white/90">
+            <Sparkles className="h-4 w-4 text-brand-blue" />
+            {d.teacher.aiReviewNavLabel}
+          </Link>
           <Link href="/teacher/homework/new"
             className="flex shrink-0 items-center rounded-[12px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700">
             <Plus className="mr-2 h-5 w-5" />

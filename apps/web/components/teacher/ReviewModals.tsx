@@ -2,11 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { getDictionary, gradeSubmission, getTestAnswersForSubmission, getSubmissionFileUrl } from "@snr/core";
+import {
+  getDictionary, gradeSubmission, getTestAnswersForSubmission, getSubmissionFileUrl,
+  approveAiHomeworkReview, declineAiHomeworkReview,
+  type TeacherAiPendingReview, type AiHomeworkFeedback,
+} from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { Download, Paperclip, X } from "lucide-react";
+import { Download, Paperclip, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 
@@ -309,6 +313,142 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
               className="flex-1 rounded-[12px] py-2.5 text-[14px] font-bold text-white disabled:opacity-50"
               style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)" }}>
               {saving ? d.common.loading : "Сохранить балл"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function FeedbackBlock({ label, items }: { label: string; items: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <p className="mb-1 text-[12px] font-semibold uppercase tracking-widest text-brand-ink-muted">{label}</p>
+      <ul className="space-y-1 rounded-[12px] bg-slate-50 p-3">
+        {items.map((item, i) => (
+          <li key={i} className="text-[13px] text-brand-ink">• {item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Пачка 5.3 — модалка подтверждения AI-проверки ДЗ: показывает
+ *  структурированный feedback (strengths/weaknesses/suggestions/summary),
+ *  редактируемые оценка+комментарий (префилл AI-значениями), и либо
+ *  подтверждение (кнопка меняет подпись в зависимости от того, правил ли
+ *  учитель поля — функционально это один и тот же вызов), либо переход
+ *  в ручной режим без AI. */
+export function AiReviewModal({ review, onClose, onResolved }: {
+  review: TeacherAiPendingReview;
+  onClose: () => void;
+  onResolved: () => void;
+}) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const supabase = createClient();
+  const feedback = review.ai_feedback as AiHomeworkFeedback | null;
+
+  const [manualMode, setManualMode] = useState(false);
+  const [grade, setGrade] = useState(review.ai_grade != null ? String(review.ai_grade) : "");
+  const [comment, setComment] = useState(feedback?.summary ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isEdited = manualMode
+    || String(review.ai_grade ?? "") !== grade
+    || (feedback?.summary ?? "") !== comment;
+
+  async function submit() {
+    const gradeNum = Number(grade.trim());
+    if (!grade.trim() || isNaN(gradeNum) || gradeNum < 2 || gradeNum > 5) {
+      setError("Введите оценку от 2 до 5");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const fn = manualMode ? declineAiHomeworkReview : approveAiHomeworkReview;
+      await fn(supabase, { submissionId: review.id, grade: gradeNum, comment: comment.trim() });
+      onResolved();
+    } catch (e: unknown) {
+      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const answerText = review.answer_text ?? review.code_text;
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center p-4" onClick={onClose}
+      style={{ zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <h2 className="flex items-center gap-1.5 text-[16px] font-bold text-brand-ink">
+              <Sparkles size={15} className="text-brand-blue" /> {review.homework.title}
+            </h2>
+            <p className="text-[12px] text-brand-ink-muted mt-0.5">{review.student.full_name}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
+        </div>
+
+        <div className="overflow-y-auto max-h-[60vh] px-6 py-4 space-y-4">
+          <div>
+            <p className="mb-1 text-[12px] font-semibold uppercase tracking-widest text-brand-ink-muted">
+              {d.teacher.aiReviewStudentAnswer}
+            </p>
+            <div className="rounded-[12px] bg-slate-50 p-3 text-[13px] text-brand-ink whitespace-pre-wrap">
+              {answerText || d.homework.noFile}
+            </div>
+          </div>
+
+          {!manualMode && feedback && (
+            <div className="space-y-3">
+              <FeedbackBlock label={d.teacher.aiFeedbackStrengths} items={feedback.strengths} />
+              <FeedbackBlock label={d.teacher.aiFeedbackWeaknesses} items={feedback.weaknesses} />
+              <FeedbackBlock label={d.teacher.aiFeedbackSuggestions} items={feedback.suggestions} />
+              {feedback.summary && (
+                <div className="rounded-[12px] bg-blue-50 p-3 text-[13px] italic text-blue-800">
+                  {feedback.summary}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium text-brand-ink-muted">
+                {manualMode ? d.teacher.reviewGrade : d.teacher.aiGrade} (2–5)
+              </span>
+              <input type="number" min={2} max={5} value={grade} onChange={(e) => setGrade(e.target.value)}
+                className="w-24 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-[14px] font-bold text-brand-ink focus:outline-none focus:border-brand-blue/50" />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.reviewComment}</span>
+              <textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)}
+                className="rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-[13px] text-brand-ink focus:outline-none focus:border-brand-blue/50 resize-none" />
+            </label>
+          </div>
+          {error && <p className="text-[13px] text-danger">{error}</p>}
+        </div>
+
+        <div className="border-t border-slate-100 px-6 py-4 space-y-2">
+          <button onClick={submit} disabled={saving}
+            className="w-full rounded-[12px] py-2.5 text-[14px] font-bold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)" }}>
+            {saving ? d.common.loading : manualMode ? d.teacher.reviewSend : isEdited ? d.teacher.aiReviewEditConfirmBtn : d.teacher.aiReviewConfirmBtn}
+          </button>
+          {!manualMode && (
+            <button
+              onClick={() => { setManualMode(true); setGrade(""); setComment(""); }}
+              className="w-full rounded-[12px] border border-slate-200 py-2 text-[12px] font-semibold text-brand-ink-muted hover:bg-slate-50">
+              {d.teacher.aiReviewManualBtn}
             </button>
           )}
         </div>
