@@ -2,5 +2,11 @@
   "buildCommand": "pnpm turbo run build --filter=web",
   "outputDirectory": ".next",
   "installCommand": "pnpm install",
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/rag-process-queue",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }
