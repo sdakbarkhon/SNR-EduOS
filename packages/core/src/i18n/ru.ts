@@ -1376,6 +1376,7 @@ export const ru: Dictionary = {
       empty: "Контент этапа не подготовлен",
       slideOf: "Слайд {current} из {total}",
       teacherOnly: "Только учитель может переключать слайды",
+      fullscreenTitle: "Презентация",
     },
     contentSource: {
       label: "Источник контента",
@@ -2219,5 +2220,6 @@ export const ru: Dictionary = {
     sectionTeachers: "Учителя",
     sectionGroupChats: "Групповые чаты",
     sectionDirectChats: "Личные чаты",
+    emojiPicker: "Эмодзи",
   },
 };

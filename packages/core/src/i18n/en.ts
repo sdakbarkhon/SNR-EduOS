@@ -1376,6 +1376,7 @@ export const en: Dictionary = {
       empty: "Stage content is not ready yet",
       slideOf: "Slide {current} of {total}",
       teacherOnly: "Only the teacher can switch slides",
+      fullscreenTitle: "Presentation",
     },
     contentSource: {
       label: "Content source",
@@ -2219,5 +2220,6 @@ export const en: Dictionary = {
     sectionTeachers: "Teachers",
     sectionGroupChats: "Group chats",
     sectionDirectChats: "Direct chats",
+    emojiPicker: "Emoji",
   },
 };

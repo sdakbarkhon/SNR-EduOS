@@ -1406,6 +1406,7 @@ export interface Dictionary {
       empty: string;
       slideOf: string;
       teacherOnly: string;
+      fullscreenTitle: string; // header shown in the auto-fullscreen student presentation overlay
     };
     contentSource: {
       label: string;
@@ -2264,5 +2265,6 @@ export interface Dictionary {
     sectionTeachers: string;      // "Учителя" — секция личных чатов у ученика
     sectionGroupChats: string;    // "Групповые чаты" — секция у учителя
     sectionDirectChats: string;   // "Личные чаты" — секция у учителя (сгруппировано по классу)
+    emojiPicker: string;          // title/aria-label кнопки-смайлика у поля ввода
   };
 }

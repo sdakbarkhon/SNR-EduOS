@@ -21,6 +21,7 @@ import { RaiseHandButton } from "./RaiseHandButton";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { AiChatPanel } from "./AiChatPanel";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
+import { StudentPresentationViewer } from "@/components/lesson-stages/StudentPresentationViewer";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
 import { ExternalStageModal } from "./ExternalStageModal";
@@ -576,6 +577,16 @@ export function LessonWorkspaceView({
   const currentCfg = currentCenterStage ? ((currentCenterStage.config ?? {}) as QuizConfigForStage) : null;
   const currentIsQuiz = currentCenterStage?.content_type === "quiz_qia";
   const currentIsKahoot = currentCenterStage?.content_type === "quiz_kahoot";
+  // Часть 2 — fullscreen презентации у ученика: чисто derived boolean от уже
+  // существующего activeStageId/currentCenterStage (тот же realtime-канал
+  // lesson-student-${lesson.id}, что синхронизирует смену этапа — НИКАКОЙ
+  // новой подписки). Слайд-навигация (stage-slide-${stageId} внутри самого
+  // SlideViewer) не затронута вообще — см. StudentPresentationViewer.tsx.
+  // !demoMaterialId — учитель показывает материал классу приоритетнее
+  // презентации (та же логика, что уже "выгоняет" из openTaskStageId).
+  const isPresentationFullscreen =
+    !isCompleted && !demoMaterialId &&
+    currentCenterStage?.stage_type === "theory" && !!currentCenterStage?.slides?.length;
 
   return (
     <div className="flex h-screen">
@@ -934,6 +945,25 @@ export function LessonWorkspaceView({
         );
       })()}
 
+      {/* Часть 2 — fullscreen презентации у ученика: teacher активировал
+          theory-этап с готовыми slides → авто-fullscreen, без действий
+          ученика. Тот же derived-boolean паттерн, что demoMaterialId выше;
+          снимается сам, когда activeStageId меняется (teacher переключает
+          этап) — та же realtime-подписка lesson-student-${lesson.id}, что
+          уже используется для centerStages, ничего нового не подписывается.
+          Единственный смонтированный SlideViewer — инлайн-рендер этого же
+          стейджа ниже скрыт, пока isPresentationFullscreen истинен (см.
+          `!isPresentationFullscreen &&` перед <SlideViewer> в centerStages.map). */}
+      {mounted && isPresentationFullscreen && currentCenterStage?.slides && (
+        <StudentPresentationViewer
+          slides={currentCenterStage.slides}
+          stageId={currentCenterStage.id}
+          initialSlide={currentCenterStage.current_slide_index ?? 0}
+          lessonStatus={lesson.status}
+          onExportPptx={() => exportSlidesToPptx(currentCenterStage.slides ?? [], currentCenterStage.title)}
+        />
+      )}
+
       {/* Teacher changed stage banner */}
       {stageChangedBanner && (
         <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-800 shadow-sm">
@@ -1026,6 +1056,16 @@ export function LessonWorkspaceView({
                       Students never drive navigation — they follow the teacher's
                       current_slide_index via Realtime inside SlideViewer. */}
                   {!isCodeOrExternal && (
+                    // Gated on the SAME `mounted` check as the portal below (not just
+                    // isPresentationFullscreen alone) — found by review: gating only on
+                    // isPresentationFullscreen suppressed the inline render before
+                    // `mounted` flips true (e.g. on page load/reload while a presentation
+                    // is already active), while the portal waits for `mounted`, leaving a
+                    // one-paint gap with no slide content visible at all. Matching both
+                    // conditions means the inline view keeps rendering until the exact
+                    // instant the portal takes over — no gap, still exactly one mounted
+                    // <SlideViewer> at a time.
+                    mounted && isPresentationFullscreen ? null : // rendered fullscreen via StudentPresentationViewer portal above — avoid a second SlideViewer mount
                     stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
                       <div className="mb-3">
                         <SlideViewer

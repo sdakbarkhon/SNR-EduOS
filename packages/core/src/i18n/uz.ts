@@ -1376,6 +1376,7 @@ export const uz: Dictionary = {
       empty: "Bosqich kontenti hali tayyor emas",
       slideOf: "Slayd {current} / {total}",
       teacherOnly: "Faqat o'qituvchi slaydlarni almashtira oladi",
+      fullscreenTitle: "Taqdimot",
     },
     contentSource: {
       label: "Kontent manbasi",
@@ -2219,5 +2220,6 @@ export const uz: Dictionary = {
     sectionTeachers: "O'qituvchilar",
     sectionGroupChats: "Guruh chatlari",
     sectionDirectChats: "Shaxsiy chatlar",
+    emojiPicker: "Emoji",
   },
 };

@@ -18,6 +18,7 @@ import { useRealtimeChannel } from "@/lib/realtime";
 import { useLocale } from "../LocaleProvider";
 import { Avatar } from "../Avatar";
 import { dayKey, dayLabel } from "./dateGroups";
+import { EmojiPicker } from "./EmojiPicker";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -185,6 +186,25 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
       e.preventDefault();
       handleSend();
     }
+  }
+
+  // Часть 3 — эмодзи в чатах: вставляет эмодзи в позицию курсора (не просто
+  // в конец). Юникод-эмодзи — обычный текст в composerText, никаких
+  // отдельных полей/вложений; sendChatMessage() отправляет body как есть.
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    if (!el) {
+      setComposerText((prev) => prev + emoji);
+      return;
+    }
+    const start = el.selectionStart ?? composerText.length;
+    const end = el.selectionEnd ?? composerText.length;
+    setComposerText(composerText.slice(0, start) + emoji + composerText.slice(end));
+    const cursor = start + emoji.length;
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(cursor, cursor);
+    });
   }
 
   const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
@@ -437,6 +457,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
             <div className="shrink-0 border-t border-gray-100 p-3">
               {sendError && <p className="mb-1.5 text-xs font-medium text-red-500">{d.chat.sendError}</p>}
               <div className="flex items-end gap-2">
+                <EmojiPicker onSelect={insertEmoji} />
                 <textarea
                   ref={textareaRef}
                   value={composerText}
