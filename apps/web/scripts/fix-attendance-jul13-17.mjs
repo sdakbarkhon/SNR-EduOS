@@ -118,16 +118,24 @@ async function fetchAllRows(table, selectCols, applyFilters) {
 
 const BATCH_SIZE = 200;
 async function flushUpdates(queue, stats) {
+  // ЧИСТЫЙ UPDATE, не upsert/insert — upsert() шлёт INSERT ... ON CONFLICT,
+  // и Postgres валидирует NOT NULL (school_id) на самом INSERT ещё до
+  // того, как решит идти в ветку ON CONFLICT, даже если конфликт
+  // гарантированно случится. school_id/остальные поля не в SET —
+  // не трогаются, как и просили.
   while (queue.length > 0) {
     const chunk = queue.splice(0, Math.min(BATCH_SIZE, queue.length));
     if (DRY_RUN) { stats.updated += chunk.length; continue; }
-    const { error } = await db.from("attendance").upsert(chunk, { onConflict: "id" });
-    if (error) {
-      console.error(`  ОШИБКА при UPDATE ${chunk.length} строк: ${error.message}`);
-      stats.errors += chunk.length;
-      continue;
+    const results = await Promise.all(chunk.map((row) =>
+      db.from("attendance")
+        .update({ status: row.status, marked_by: row.marked_by, marked_at: row.marked_at })
+        .eq("id", row.id)
+        .is("marked_by", null),
+    ));
+    for (const { error } of results) {
+      if (error) { console.error(`  ОШИБКА при UPDATE строки: ${error.message}`); stats.errors++; }
+      else stats.updated++;
     }
-    stats.updated += chunk.length;
   }
 }
 
