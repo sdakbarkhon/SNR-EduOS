@@ -120,8 +120,11 @@ export function LoginForm({ locale }: { locale: Locale }) {
           по центру, над карточкой. mb-10 (40px) — отступ до карточки;
           h-[76px] → ширина ≈226px (диапазон 200-240px по аспекту логотипа
           849:285). Иконка-шапочка выпускника осталась внутри карточки, как
-          была изначально (см. ниже). */}
-      <Logo priority className="mb-10 h-[76px]" />
+          была изначально (см. ниже).
+          lg:hidden — на lg+ уже виден большой логотип в BrandingColumn
+          (page.tsx: тот же breakpoint, "hidden ... lg:flex"); без этого
+          на широком экране показывались оба логотипа одновременно. */}
+      <Logo priority className="mb-10 h-[76px] lg:hidden" />
 
       <div
         className="relative w-full overflow-hidden rounded-[2rem] border border-white/40 bg-white/70 backdrop-blur-xl"
