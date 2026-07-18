@@ -37,8 +37,10 @@
 -- после первого раза (текст лежит в другой таблице, lesson_stages-
 -- триггер его не видит).
 --
--- Embedding-модель — Gemini text-embedding-004, размерность 768
--- (apps/web/lib/ai/embeddings.ts). Cosine similarity — HNSW индекс.
+-- Embedding-модель — Gemini gemini-embedding-001 с outputDimensionality:768
+-- (text-embedding-004 изначально планировалась, но не существует на
+-- v1beta — заменена после живого 404 при первом backfill; см.
+-- apps/web/lib/ai/embeddings.ts). Cosine similarity — HNSW индекс.
 
 BEGIN;
 
