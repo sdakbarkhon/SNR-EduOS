@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/cron/rag-process-queue",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
