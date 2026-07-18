@@ -1,29 +1,23 @@
 "use client";
 
 import { LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { signOut } from "@/app/actions/auth";
+import { useLogout, LogoutOverlay } from "./LogoutOverlay";
 
-/** Промт «скорость», Задача 6: раньше — <form action={signOut}>, клик ждал
- *  полный server-action round trip (auth + БД до Frankfurt) до навигации.
- *  Клиентский редирект СРАЗУ + signOut() в фоне (та же схема, что уже
- *  использует TeacherSidebar.handleLogout()) — единая реализация. */
+/** Единый паттерн выхода для всех ролей — см. LogoutOverlay.tsx. */
 export function LogoutButton() {
-  const router = useRouter();
-
-  function handleClick() {
-    router.replace("/login");
-    signOut().catch(() => {});
-  }
+  const { loggingOut, logout } = useLogout();
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label="Выйти"
-      className="text-text-muted transition hover:text-danger"
-    >
-      <LogOut size={20} />
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={logout}
+        aria-label="Выйти"
+        className="text-text-muted transition hover:text-danger"
+      >
+        <LogOut size={20} />
+      </button>
+      {loggingOut && <LogoutOverlay />}
+    </>
   );
 }

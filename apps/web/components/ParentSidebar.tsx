@@ -21,7 +21,7 @@ import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
-import { signOut } from "@/app/actions/auth";
+import { useLogout, LogoutOverlay } from "./LogoutOverlay";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "./Logo";
@@ -56,6 +56,7 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
   const pathname = usePathname();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const { loggingOut, logout } = useLogout();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -190,20 +191,20 @@ export function ParentSidebar({ selectedChildId }: { selectedChildId: string | n
       </nav>
 
       <div className="border-t border-white/20 pt-4 px-2">
-        <form action={signOut}>
-          <button
-            type="submit"
-            title={d.parent.role}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
-              isCollapsed && "justify-center",
-            )}
-          >
-            <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
-            {!isCollapsed && <span className="font-medium">{d.parentNav.logout}</span>}
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={logout}
+          title={d.parent.role}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
+            isCollapsed && "justify-center",
+          )}
+        >
+          <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
+          {!isCollapsed && <span className="font-medium">{d.parentNav.logout}</span>}
+        </button>
       </div>
+      {loggingOut && <LogoutOverlay />}
     </aside>
   );
 }

@@ -19,7 +19,7 @@ import { GlassCard } from "@/components";
 import { SubjectIcon } from "@/components";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { useLocale } from "@/components/LocaleProvider";
-import { signOut } from "@/app/actions/auth";
+import { useLogout, LogoutOverlay } from "@/components/LogoutOverlay";
 import type { Locale } from "@snr/core";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
@@ -67,6 +67,7 @@ export function ProfileView({
   const { theme, setTheme } = useTheme();
   const { locale, setLocale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const { loggingOut, logout } = useLogout();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("profile");
   const [student, setStudent] = useState(initialStudent);
@@ -196,15 +197,17 @@ export function ProfileView({
       </div>
 
       {/* Logout */}
-      <form action={signOut} className="mt-8">
+      <div className="mt-8">
         <button
-          type="submit"
+          type="button"
+          onClick={logout}
           className="w-full flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/70 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-100 dark:border-rose-800/50 dark:bg-rose-900/20 dark:text-rose-400"
         >
           <LogOut size={16} />
           {d.profile.logout}
         </button>
-      </form>
+      </div>
+      {loggingOut && <LogoutOverlay />}
     </GlassCard>
   );
 

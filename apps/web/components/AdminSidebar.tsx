@@ -11,7 +11,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
-import { signOut } from "@/app/actions/auth";
+import { useLogout, LogoutOverlay } from "./LogoutOverlay";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "admin_sidebar_collapsed";
@@ -27,6 +27,7 @@ export function AdminSidebar() {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const da = d.admin;
+  const { loggingOut, logout } = useLogout();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -130,20 +131,20 @@ export function AdminSidebar() {
 
       {/* Logout */}
       <div className="border-t border-white/20 pt-4 px-2">
-        <form action={signOut}>
-          <button
-            type="submit"
-            title="Выйти"
-            className={cn(
-              "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
-              isCollapsed && "justify-center",
-            )}
-          >
-            <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
-            {!isCollapsed && <span className="font-medium">Выйти</span>}
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={logout}
+          title="Выйти"
+          className={cn(
+            "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
+            isCollapsed && "justify-center",
+          )}
+        >
+          <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
+          {!isCollapsed && <span className="font-medium">Выйти</span>}
+        </button>
       </div>
+      {loggingOut && <LogoutOverlay />}
     </aside>
   );
 }

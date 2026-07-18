@@ -2,7 +2,7 @@
 
 import { AlertCircle, LogOut } from "lucide-react";
 import { defaultLocale, getDictionary } from "@snr/core";
-import { signOut } from "@/app/actions/auth";
+import { useLogout, LogoutOverlay } from "./LogoutOverlay";
 
 /**
  * `isDemo` is computed server-side (PROMT 3: from the `snr-demo-session`
@@ -13,14 +13,9 @@ import { signOut } from "@/app/actions/auth";
  */
 export function DemoBanner({ isDemo }: { isDemo: boolean }) {
   const d = getDictionary(defaultLocale).demoMode;
+  const { loggingOut, logout } = useLogout();
 
   if (!isDemo) return null;
-
-  async function handleLogout() {
-    // Server action: штампует user_sessions.last_activity, снимает
-    // auth-cookie (scope local) и демо-куку, редиректит на /login.
-    await signOut();
-  }
 
   return (
     <>
@@ -34,13 +29,14 @@ export function DemoBanner({ isDemo }: { isDemo: boolean }) {
           <span className="text-sm font-medium text-yellow-900">{d.bannerText}</span>
         </div>
         <button
-          onClick={handleLogout}
+          onClick={logout}
           className="flex shrink-0 items-center gap-1.5 rounded-lg bg-yellow-900 px-3 py-1 text-xs font-medium text-yellow-100 hover:bg-yellow-950"
         >
           <LogOut className="h-3.5 w-3.5" />
           {d.bannerLogout}
         </button>
       </div>
+      {loggingOut && <LogoutOverlay />}
     </>
   );
 }

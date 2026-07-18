@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
-import { signOut } from "@/app/actions/auth";
+import { useLogout, LogoutOverlay } from "./LogoutOverlay";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "teacher_sidebar_collapsed";
@@ -49,9 +49,9 @@ export function TeacherSidebar() {
   // prefetch off, that can take a beat. Tracking the just-clicked href lets
   // the active highlight react instantly instead of waiting on the route.
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const router = useRouter();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const { loggingOut, logout } = useLogout();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -114,15 +114,6 @@ export function TeacherSidebar() {
       try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* blocked */ }
       return next;
     });
-  }
-
-  // Navigate away immediately — don't make the user wait on the
-  // Supabase (Frankfurt) round trip before the screen changes. Сам выход —
-  // через server action (single-session: штампует last_activity, снимает
-  // auth- и демо-куки).
-  function handleLogout() {
-    router.replace("/login");
-    signOut().catch(() => {});
   }
 
   const isCollapsed = mounted && collapsed;
@@ -200,7 +191,7 @@ export function TeacherSidebar() {
       <div className="shrink-0 border-t border-white/20 pt-4 px-2">
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={logout}
           title="Выйти"
           className={cn(
             "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
@@ -211,6 +202,7 @@ export function TeacherSidebar() {
           {!isCollapsed && <span className="font-medium">Выйти</span>}
         </button>
       </div>
+      {loggingOut && <LogoutOverlay />}
     </aside>
   );
 }

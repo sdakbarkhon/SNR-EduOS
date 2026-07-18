@@ -15,6 +15,7 @@ export const uz: Dictionary = {
     minutes: "daqiqa",
     seconds: "soniya",
     download: "Yuklab olish",
+    loggingOut: "Chiqilmoqda...",
   },
   status: {
     now: "Hozir",
