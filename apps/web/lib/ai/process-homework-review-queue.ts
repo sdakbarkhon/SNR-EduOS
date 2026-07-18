@@ -30,6 +30,7 @@ export async function processHomeworkReviewQueueBatch(
   db: any,
   batchLimit: number,
 ): Promise<ProcessHomeworkQueueBatchResult> {
+  console.log("[batch] start, batchLimit:", batchLimit);
   const { data: queueRows, error: queueErr } = await db
     .from("ai_homework_review_queue")
     .select("submission_id, school_id, attempts")
@@ -37,10 +38,12 @@ export async function processHomeworkReviewQueueBatch(
     .order("enqueued_at", { ascending: true })
     .limit(batchLimit);
   if (queueErr) throw new Error(queueErr.message);
+  console.log("[batch] queue fetched:", (queueRows ?? []).length);
 
   const results: ProcessHomeworkQueueBatchResult = { processed: 0, errors: 0 };
 
   for (const row of queueRows ?? []) {
+    console.log("[batch] processing item:", row.submission_id);
     try {
       const { data: submission, error: subErr } = await db
         .from("homework_submissions")
@@ -79,6 +82,7 @@ export async function processHomeworkReviewQueueBatch(
       }
 
       const answerText: string = submission.answer_text || submission.code_text || "";
+      console.log("[batch] AI call start:", row.submission_id);
       const review = await reviewHomework({
         homework_title: homework.title,
         homework_description: homework.description ?? "",
@@ -86,6 +90,7 @@ export async function processHomeworkReviewQueueBatch(
         answer_text: answerText,
         group_grade: gradeFromGroupName(homework.group?.name),
       });
+      console.log("[batch] AI call end:", row.submission_id);
 
       const { error: updateErr } = await db
         .from("homework_submissions")

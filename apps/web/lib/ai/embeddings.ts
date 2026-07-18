@@ -24,6 +24,11 @@
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const EMBEDDING_DIMENSIONS = 768;
 const EMBED_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`;
+// Раскрыто при диагностике зависшего /api/admin/homework-review/process-batch
+// (Пачка 5.3): здесь тоже не было таймаута на fetch — до сих пор работало
+// только потому, что embedContent обычно быстрый, не потому что был
+// какой-то защитный механизм. Тот же риск, что и в reviewHomework().
+const GEMINI_TIMEOUT_MS = 25000;
 
 function getApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -46,6 +51,8 @@ export async function computeEmbedding(text: string): Promise<number[]> {
 
   let otherErrorRetried = false;
   for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
     try {
       const res = await fetch(`${EMBED_ENDPOINT}?key=${apiKey}`, {
         method: "POST",
@@ -54,6 +61,7 @@ export async function computeEmbedding(text: string): Promise<number[]> {
           content: { parts: [{ text }] },
           outputDimensionality: EMBEDDING_DIMENSIONS,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -71,6 +79,7 @@ export async function computeEmbedding(text: string): Promise<number[]> {
       }
       return values;
     } catch (e) {
+      const isTimeout = (e as Error)?.name === "AbortError";
       const is429 = (e as Error & { status?: number })?.status === 429;
       if (is429 && attempt < BACKOFF_429_MS.length) {
         const delay = BACKOFF_429_MS[attempt]!; // guarded by attempt < BACKOFF_429_MS.length above
@@ -78,12 +87,20 @@ export async function computeEmbedding(text: string): Promise<number[]> {
         await sleep(delay);
         continue;
       }
+      if (isTimeout && !otherErrorRetried) {
+        otherErrorRetried = true;
+        console.warn(`[embeddings] timeout after ${GEMINI_TIMEOUT_MS}ms, 1 retry`);
+        continue;
+      }
+      if (isTimeout) throw new Error(`embedContent timed out after ${GEMINI_TIMEOUT_MS}ms (2 attempts)`);
       if (!is429 && !otherErrorRetried) {
         otherErrorRetried = true;
         console.warn(`[embeddings] error "${(e as Error)?.message}", 1 retry`);
         continue;
       }
       throw e;
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

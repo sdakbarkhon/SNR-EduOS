@@ -5,9 +5,17 @@
 // (withRetry() внутри gemini-client.ts имеет свой backoff 1с/2с/4с,
 // здесь по ТЗ нужен 5с/15с/45с).
 
-import { GoogleGenerativeAI, GoogleGenerativeAIFetchError } from "@google/generative-ai";
+import { GoogleGenerativeAI, GoogleGenerativeAIFetchError, GoogleGenerativeAIAbortError } from "@google/generative-ai";
 
 const MODEL = "gemini-2.5-flash";
+// Ни SDK, ни голый fetch не имеют дефолтного таймаута — подвисший
+// generateContent() без явного timeout может держать serverless-функцию
+// живой до убийства платформой (Vercel Hobby — 10с), а клиентский fetch()
+// при этом никогда не получает ни ответ, ни ошибку. AbortController + SDK's
+// SingleRequestOptions.signal — задокументированный, поддерживаемый способ
+// (@google/generative-ai .d.ts: SingleRequestOptions.signal/timeout),
+// а не обход внутренностей SDK.
+const GEMINI_TIMEOUT_MS = 25000;
 
 export type HomeworkReview = {
   grade: 2 | 3 | 4 | 5;
@@ -93,17 +101,35 @@ export async function reviewHomework(input: {
   let text = "";
   let otherErrorRetried = false;
   for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    console.log(`[homework-review] AI call start (attempt ${attempt + 1})`);
     try {
-      const result = await model.generateContent(userPrompt);
+      const result = await model.generateContent(userPrompt, { signal: controller.signal });
       text = result.response.text();
+      console.log("[homework-review] AI call end (ok)");
       break;
     } catch (e) {
+      const isTimeout = e instanceof GoogleGenerativeAIAbortError || (e as Error)?.name === "AbortError";
       const is429 = e instanceof GoogleGenerativeAIFetchError && e.status === 429;
+      console.log(`[homework-review] AI call end (${isTimeout ? "timeout" : is429 ? "429" : "error"})`);
       if (is429 && attempt < BACKOFF_429_MS.length) {
         const delay = BACKOFF_429_MS[attempt]!;
         console.warn(`[homework-review] 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${BACKOFF_429_MS.length})`);
         await sleep(delay);
         continue;
+      }
+      if (isTimeout) {
+        // Таймаут — не 429 (квота), но и не обязательно постоянная
+        // проблема (сетевой затор) — тот же "1 ретрай" бюджет, что и
+        // прочие ошибки, чтобы не тратить весь serverless-таймаут на
+        // повторный 25-секундный подвис.
+        if (!otherErrorRetried) {
+          otherErrorRetried = true;
+          console.warn(`[homework-review] timeout after ${GEMINI_TIMEOUT_MS}ms, 1 retry`);
+          continue;
+        }
+        throw new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS}ms (2 attempts)`);
       }
       if (!is429 && !otherErrorRetried) {
         otherErrorRetried = true;
@@ -112,6 +138,8 @@ export async function reviewHomework(input: {
         continue;
       }
       throw e;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

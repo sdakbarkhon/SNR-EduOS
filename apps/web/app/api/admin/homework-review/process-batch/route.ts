@@ -12,6 +12,7 @@ import { processHomeworkReviewQueueBatch, HOMEWORK_QUEUE_MAX_ATTEMPTS } from "@/
 const BATCH_LIMIT = 20;
 
 export async function POST(req: NextRequest) {
+  console.log("[batch] start");
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
   if (role !== "admin" && role !== "super_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  console.log("[batch] auth checked, role:", role);
 
   const db = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
