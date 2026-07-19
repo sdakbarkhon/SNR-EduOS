@@ -54,6 +54,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
+import { attachBooksToLesson } from "./_backfill-shared.mjs";
 
 // ── env + clients (service-role — паттерн backfill-historical.mjs) ────────
 function loadEnvFallback() {
@@ -98,9 +99,14 @@ if (CONFIRM && EXPLICIT_DRY) {
 const LIMIT_PER_RUN = Number(opt("limit-per-run", "40")) || 40;
 const SKIP_INSERTS = flag("skip-inserts");
 
-// ── date scope — ЖЁСТКО 19-25 июля, все 7 дней учебные ────────────────────
-const START_DATE = "2026-07-19";
-const END_DATE = "2026-07-25"; // inclusive
+// ── date scope — по умолчанию 19-25 июля (как было), переопределяемо
+//    флагами --start-date/--end-date (Пачка «18-23», без правки констант
+//    внутри файла — тот же паттерн CLI-опций, что limit-per-run). Этап A
+//    (insert 9 уроков на 25.07) НЕ зависит от этого диапазона — он всегда
+//    про конкретно 25.07, поэтому для диапазонов, не включающих 25.07,
+//    запускать с --skip-inserts. ────────────────────────────────────────
+const START_DATE = opt("start-date", "2026-07-19");
+const END_DATE = opt("end-date", "2026-07-25"); // inclusive
 const TZ_OFFSET = "+05:00";
 const rangeStartIso = `${START_DATE}T00:00:00${TZ_OFFSET}`;
 const rangeEndExclusiveIso = new Date(new Date(`${END_DATE}T00:00:00${TZ_OFFSET}`).getTime() + 86400000).toISOString();
@@ -271,6 +277,20 @@ ${practiceKind ? `- practice_kind: ${practiceKind}\n` : ""}- Длительно�
 }
 
 // ── Gemini-вызов с ретраями (п.8: 429 → 5с/15с/45с, макс 3; другое → 1 ретрай 3с) ──
+// Защита от лимита: реальный RPD free-tier у gemini-2.5-flash оказался
+// намного ниже, чем 250 (см. прошлый прогон — quotaId
+// "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue 20).
+// Backoff 5с/15с/45с осмыслен только для ПОМИНУТНОГО (RPM) лимита — для
+// ДНЕВНОГО (RPD) ретраи заведомо бесполезны (та же ошибка повторится и
+// после 45с, и на следующем уроке, и на следующем после него — очередь из
+// N оставшихся уроков впустую сожгла бы N×~65с на гарантированно
+// провальные ретраи). quotaId в теле 429-ошибки различает RPD от RPM —
+// при обнаружении RPD бросаем ОСОБУЮ ошибку с isDailyQuota=true СРАЗУ,
+// без единого ретрая, чтобы вызывающий цикл (stageB_generateContent) мог
+// остановиться чисто, а не перемалывать всю оставшуюся очередь.
+function isDailyQuotaError(e) {
+  return /GenerateRequestsPerDay/i.test(e.message ?? "");
+}
 async function callGeminiWithRetry(systemPrompt, userPrompt) {
   const model = genAI.getGenerativeModel({
     model: modelName,
@@ -285,6 +305,10 @@ async function callGeminiWithRetry(systemPrompt, userPrompt) {
       const result = await model.generateContent(userPrompt);
       return result.response;
     } catch (e) {
+      if (isDailyQuotaError(e)) {
+        e.isDailyQuota = true;
+        throw e;
+      }
       const is429 = e.status === 429 || /429|rate.?limit|quota/i.test(e.message ?? "");
       if (is429 && attempt < BACKOFF_429_MS.length) {
         const delay = BACKOFF_429_MS[attempt];
@@ -412,7 +436,7 @@ async function stageB_generateContent() {
 
   const { data: allLessons, error: fetchErr } = await db
     .from("lessons")
-    .select("id, starts_at, group:groups(name), subject:subjects(name)")
+    .select("id, starts_at, group:groups(name), subject:subjects(name, teacher_id)")
     .gte("starts_at", rangeStartIso)
     .lt("starts_at", rangeEndExclusiveIso)
     .order("starts_at", { ascending: true });
@@ -501,6 +525,14 @@ async function stageB_generateContent() {
     try {
       response = await callGeminiWithRetry(isFull ? FULL_SYSTEM_PROMPT : SIMPLE_SYSTEM_PROMPT, userPrompt);
     } catch (e) {
+      if (e.isDailyQuota) {
+        // Дневной (RPD) лимит исчерпан — чистая остановка, БЕЗ попытки
+        // прогнать остаток очереди (все они гарантированно 429 тем же
+        // способом). Прогресс уже сохранён построчно (saveLog после
+        // каждого урока) — повторный запуск подхватит с этого места.
+        console.warn(`${logPrefix} → ДНЕВНОЙ ЛИМИТ ИСЧЕРПАН (RPD) — чистая остановка, оставшиеся ${batch.length - i} урок(ов) в этом запуске не тронуты.`);
+        return { done, skipped: pending.length - i, errors, total: emptyLessons.length, stoppedOnDailyQuota: true, stoppedAt: { id: lessonSpec.id, starts_at: lessonSpec.starts_at, subject: subjectName, group: groupName } };
+      }
       console.error(`${logPrefix} → ERROR (Gemini: ${(e.message ?? "").split("\n")[0]})`);
       log.results.push({ id: lessonSpec.id, starts_at: lessonSpec.starts_at, subject: subjectName, group: groupName, error: e.message });
       saveLog(log);
@@ -589,13 +621,26 @@ async function stageB_generateContent() {
       if (qErr) { console.error(`  !! quiz_questions insert failed: ${qErr.message}`); writeOk = false; }
     }
 
+    // Пачка «240 пустых уроков», ЧАСТЬ 3 — финальный шаг: прицепить до 3
+    // книг БЗ того же предмета (без Gemini, чистое сопоставление). Best-
+    // effort — не влияет на writeOk/done, этапы уже успешно записаны.
+    let materialsAttached = 0;
+    try {
+      const matResult = await attachBooksToLesson(db, {
+        lessonId: lessonSpec.id, subjectName, teacherId: lessonSpec.subject?.teacher_id ?? null, maxBooks: 3,
+      });
+      materialsAttached = matResult.attached;
+    } catch (e) {
+      console.error(`  !! attachBooksToLesson failed: ${e.message}`);
+    }
+
     log.done[lessonSpec.id] = true;
     log.results.push({
       id: lessonSpec.id, starts_at: lessonSpec.starts_at, subject: subjectName, group: groupName,
-      format: isFull ? "FULL" : "SIMPLE", topic, usage: usageMeta, writeOk,
+      format: isFull ? "FULL" : "SIMPLE", topic, usage: usageMeta, writeOk, materialsAttached,
     });
     saveLog(log);
-    console.log(`${logPrefix} [${isFull ? "FULL" : "SIMPLE"}] → ${writeOk ? "OK" : "PARTIAL"}: "${topic}"`);
+    console.log(`${logPrefix} [${isFull ? "FULL" : "SIMPLE"}] → ${writeOk ? "OK" : "PARTIAL"}: "${topic}" (материалов: ${materialsAttached})`);
     done++;
   }
 
@@ -618,8 +663,16 @@ async function main() {
     console.log(`  Осталось в очереди (вне limit-per-run): ${result.skipped}`);
     console.log(`  Ошибок: ${result.errors}`);
     console.log(`  Всего empty на момент запуска: ${result.total}`);
+    if (result.stoppedOnDailyQuota) {
+      console.log(`  ⚠ ОСТАНОВЛЕНО: дневной лимит (RPD) исчерпан.`);
+      console.log(`    Последний урок в очереди на момент остановки: ${result.stoppedAt.subject} · ${result.stoppedAt.group} · ${result.stoppedAt.starts_at} (id ${result.stoppedAt.id})`);
+      console.log(`    Прогресс сохранён в чекпоинте — повторный запуск продолжит с этого места (или со следующей доступной модели-фолбэка).`);
+    }
     const { data: usageToday } = await db.rpc("get_ai_usage_today");
-    console.log(`  ai_usage_log сегодня: ${usageToday ?? "?"} / 250`);
+    // Реальный RPD free-tier у gemini-2.5-flash оказался НЕ 250 (см.
+    // комментарий у isDailyQuotaError) — печатаем сырое число без
+    // вводящего в заблуждение "/250".
+    console.log(`  ai_usage_log сегодня: ${usageToday ?? "?"}`);
   }
   console.log(`  Время выполнения: ${((Date.now() - startedAt) / 1000).toFixed(1)}с`);
   console.log("═".repeat(70));

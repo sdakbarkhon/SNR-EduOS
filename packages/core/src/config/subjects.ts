@@ -33,3 +33,15 @@ export function getSubjectStyle(subject: string | null | undefined): SubjectStyl
 export function getSubjectConfig(subject: string | null | undefined): SubjectStyle {
   return getSubjectStyle(subject);
 }
+
+// Обратный поиск: RU-название предмета урока (lessons.subject_id ->
+// subjects.name, напр. "Английский язык") -> canonical-ключ этого же
+// конфига (напр. "english") — тот же ключ, что books.subject. Один
+// источник правды (сам subjects выше), а не отдельный параллельный словарь.
+export function getSubjectKeyByLabel(label: string | null | undefined): string | null {
+  if (!label) return null;
+  for (const [key, cfg] of Object.entries(subjects)) {
+    if (cfg.label === label) return key;
+  }
+  return null;
+}

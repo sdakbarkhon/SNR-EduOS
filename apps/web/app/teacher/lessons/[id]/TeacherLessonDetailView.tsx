@@ -2071,6 +2071,8 @@ export function TeacherLessonDetailView({
                 ))
               : 45
           }
+          teacherId={teacher.id}
+          subjectName={lesson.subjectName ?? null}
           onClose={() => setAiGenerateOpen(false)}
           onAdded={async () => {
             const fresh = await getLessonStages(db, lesson.id);

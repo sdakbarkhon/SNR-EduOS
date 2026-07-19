@@ -25,6 +25,69 @@ export function makeServiceRoleClient() {
 
 export const SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
 
+// Пачка «240 пустых уроков», ЧАСТЬ 3 — RU-название предмета урока
+// (lessons.subject_id -> subjects.name) -> slug books.subject. Зеркалит
+// packages/core/src/config/subjects.ts (там же getSubjectKeyByLabel() —
+// тот же маппинг для TS/TSX-кода приложения, единый источник правды); .mjs-
+// скрипты в apps/web/scripts не импортируют @snr/core (нет build-шага для
+// пакета), поэтому здесь — намеренная зеркальная копия, держать в синхроне
+// вручную при добавлении новых предметов.
+export const SUBJECT_NAME_TO_BOOK_SLUG = {
+  "Программирование": "programming",
+  "Робототехника": "robotics",
+  "Математика": "math",
+  "Английский язык": "english",
+  "Русский язык": "russian",
+};
+
+// Прицепляет до maxBooks книг БЗ того же предмета к уроку, БЕЗ дублирования
+// файла (copy-by-reference: file_storage_path/kb_bucket='books' — та же
+// insert-схема, что linkLessonMaterialFromKnowledgeBase в
+// packages/core/src/queries/index.ts, реиспользовать который отсюда нельзя
+// см. выше). Идемпотентно: если у урока уже есть хоть один
+// kb_bucket='books' материал — пропускает целиком (не пытается точечно
+// дедуплицировать по конкретной книге). db — service-role клиент: пишет
+// school_id ЯВНО, т.к. DEFAULT current_school_id() у lesson_materials
+// зависит от auth.uid(), которого нет под service-role.
+export async function attachBooksToLesson(db, { lessonId, subjectName, teacherId, maxBooks = 3 }) {
+  const slug = SUBJECT_NAME_TO_BOOK_SLUG[subjectName ?? ""];
+  if (!slug) return { attached: 0, reason: "no_slug_mapping" };
+
+  const { data: existing, error: existErr } = await db
+    .from("lesson_materials")
+    .select("id")
+    .eq("lesson_id", lessonId)
+    .eq("kb_bucket", "books")
+    .limit(1);
+  if (existErr) throw new Error(`attachBooksToLesson existing check: ${existErr.message}`);
+  if (existing?.length) return { attached: 0, reason: "already_has_materials" };
+
+  const { data: books, error: booksErr } = await db
+    .from("books")
+    .select("id, title, file_storage_path, file_size_bytes")
+    .eq("subject", slug)
+    .order("created_at", { ascending: true })
+    .limit(maxBooks);
+  if (booksErr) throw new Error(`attachBooksToLesson books fetch: ${booksErr.message}`);
+  if (!books?.length) return { attached: 0, reason: "no_books_for_subject" };
+
+  const rows = books.map((b) => ({
+    lesson_id: lessonId,
+    school_id: SCHOOL_ID,
+    title: b.title,
+    file_storage_path: b.file_storage_path,
+    file_size_bytes: b.file_size_bytes,
+    file_original_name: b.title,
+    uploaded_by: teacherId ?? null,
+    visibility: "all",
+    from_knowledge_base: true,
+    kb_bucket: "books",
+  }));
+  const { error: insErr } = await db.from("lesson_materials").insert(rows);
+  if (insErr) throw new Error(`attachBooksToLesson insert: ${insErr.message}`);
+  return { attached: rows.length, reason: "ok" };
+}
+
 // Промт 8.2: + 3 новых реальных ученика (rustam_03/farrukh_10/malika_07,
 // миграция 125) — по профилю зеркалят одного из исходных трёх (см. ниже).
 export const REAL_STUDENT_USERNAMES = ["sherzod_10", "nodira_07", "aziz_03", "rustam_03", "farrukh_10", "malika_07"];

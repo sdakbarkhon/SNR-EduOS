@@ -8,7 +8,7 @@ import {
   Paperclip, Search, Copy, ExternalLink,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Grid3x3,
 } from "lucide-react";
-import { addLessonStage, replaceQuizQuestions, getDictionary } from "@snr/core";
+import { addLessonStage, replaceQuizQuestions, getDictionary, linkLessonMaterialFromKnowledgeBase, getSubjectKeyByLabel } from "@snr/core";
 import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide, QuizQuestionInput } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -106,12 +106,18 @@ export function AiGenerateStagesModal({
   lessonId,
   lessonTopic,
   lessonDurationMin,
+  teacherId,
+  subjectName,
   onClose,
   onAdded,
 }: {
   lessonId: string;
   lessonTopic: string | null;
   lessonDurationMin: number;
+  /** Пачка «240 пустых уроков», ЧАСТЬ 3 — для финального шага "прицепить
+      материалы БЗ по предмету" после генерации этапов (см. addToLesson). */
+  teacherId: string;
+  subjectName: string | null;
   onClose: () => void;
   onAdded: () => void;
 }) {
@@ -167,6 +173,38 @@ export function AiGenerateStagesModal({
     return () => { cancelled = true; };
   }, [lessonId]);
 
+  // Пачка «240 пустых уроков», ЧАСТЬ 3 — до 3 книг БЗ того же предмета,
+  // без дублирования файла (copy-by-reference, та же схема, что модалка
+  // "Прикрепить материал"). Идемпотентно: если у урока уже есть материал
+  // из БЗ (kb_bucket='books') — не трогает.
+  async function attachBooksFromKnowledgeBase() {
+    const slug = getSubjectKeyByLabel(subjectName);
+    if (!slug) return;
+
+    const { data: existing } = await db
+      .from("lesson_materials")
+      .select("id")
+      .eq("lesson_id", lessonId)
+      .eq("kb_bucket", "books")
+      .limit(1);
+    if (existing?.length) return;
+
+    const { data: books } = await db
+      .from("books")
+      .select("id, title, file_storage_path, file_size_bytes")
+      .eq("subject", slug)
+      .order("created_at", { ascending: true })
+      .limit(3);
+    if (!books?.length) return;
+
+    for (const b of books) {
+      await linkLessonMaterialFromKnowledgeBase(db, {
+        lessonId, teacherId, title: b.title, storagePath: b.file_storage_path,
+        kbBucket: "books", fileSizeBytes: b.file_size_bytes,
+      });
+    }
+  }
+
   const addToLesson = useCallback(async (stages: GeneratedStage[]) => {
     const toAdd = stages.map((s) => ({ ...s }));
     // Rescale durations to fit lesson duration
@@ -218,6 +256,12 @@ export function AiGenerateStagesModal({
           await replaceQuizQuestions(db, newStage.id, questions).catch(() => null);
         }
       }
+      // Пачка «240 пустых уроков», ЧАСТЬ 3 — финальный шаг: прицепить до 3
+      // книг БЗ того же предмета (БЕЗ вызова Gemini, чистое сопоставление
+      // subjectName -> canonical slug -> books.subject). Best-effort — этапы
+      // уже успешно добавлены к этому моменту, сбой здесь НЕ должен
+      // показывать ошибку пользователю.
+      await attachBooksFromKnowledgeBase().catch(() => null);
       setPhase("added");
       setTimeout(() => { onAdded(); onClose(); }, 1200);
     } catch {
@@ -225,7 +269,7 @@ export function AiGenerateStagesModal({
     } finally {
       setAdding(false);
     }
-  }, [db, lessonId, duration, onAdded, onClose, t.error]);
+  }, [db, lessonId, duration, teacherId, subjectName, onAdded, onClose, t.error]);
 
   const generate = useCallback(async () => {
     if (!topic.trim()) return;
