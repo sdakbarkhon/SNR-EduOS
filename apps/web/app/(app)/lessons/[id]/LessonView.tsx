@@ -53,7 +53,6 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
   const style = getSubjectStyle(lesson.group.subject);
 
   const stages = [...lesson.stages].sort((a, b) => a.position - b.position);
-  const doneCount = stages.filter((s) => s.is_completed || s.progress?.is_completed).length;
 
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
@@ -65,6 +64,13 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
   const isScheduled   = false;
   const isInProgress  = false;
   const isCompleted   = true;
+
+  // Завершённый урок: все этапы "пройдены", независимо от per-stage
+  // is_completed/progress.is_completed — авто-завершение по расписанию не
+  // помечает пропущенные учеником middle-этапы, но раз урок закончен, для
+  // студента это уже не имеет значения (симметрично учительскому виду,
+  // TeacherLessonDetailView.tsx's isLessonCompleted).
+  const doneCount = stages.filter((s) => isCompleted || s.is_completed || s.progress?.is_completed).length;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
@@ -145,7 +151,7 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
           <div className="relative flex items-center justify-between px-4">
             <div className="absolute left-[60px] right-[60px] top-[18px] z-0 h-[2px] bg-gray-200" />
             {stages.map((stage: LessonStageWithProgress) => {
-              const isDone = stage.is_completed || stage.progress?.is_completed;
+              const isDone = isCompleted || stage.is_completed || stage.progress?.is_completed;
               return (
                 <button
                   key={stage.id}
