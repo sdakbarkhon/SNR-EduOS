@@ -1145,6 +1145,12 @@ export function TeacherLessonDetailView({
     .filter((s) => s.stage_role === "middle")
     .sort((a, b) => a.position - b.position);
 
+  // Завершённый урок: все этапы визуально "пройдены", независимо от
+  // покейсово выставленного is_completed/was_activated (эти поля могут быть
+  // неактуальны для урока, завершённого не через обычный start/endLesson поток).
+  const startPassed = isLessonCompleted || Boolean(startStage?.is_completed);
+  const summaryPassed = isLessonCompleted || Boolean(summaryStage?.is_completed);
+
   function contentLabel(ct: LessonContentType): string {
     const map: Record<LessonContentType, string> = {
       presentation:   dl.stageContentPresentation,
@@ -1508,17 +1514,17 @@ export function TeacherLessonDetailView({
           {/* Start stage */}
           {startStage && (
             <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-              startStage.is_completed
+              startPassed
                 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
                 : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
             }`}>
               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                startStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
+                startPassed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
               }`}>
-                {startStage.is_completed ? <Check className="h-4 w-4" /> : "→"}
+                {startPassed ? <Check className="h-4 w-4" /> : "→"}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageStartLabel}</span>
-              {startStage.is_completed && (
+              {startPassed && (
                 <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
               )}
             </div>
@@ -1540,7 +1546,11 @@ export function TeacherLessonDetailView({
               <div
                 key={stage.id}
                 onClick={() => setViewStage(stage)}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 transition-colors hover:border-blue-200 hover:bg-blue-50/30 dark:border-white/10 dark:bg-white/5"
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                  isLessonCompleted
+                    ? "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100/60 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+                    : "border-slate-100 bg-white hover:border-blue-200 hover:bg-blue-50/30 dark:border-white/10 dark:bg-white/5"
+                }`}
               >
                 {/* Position + type badge */}
                 <div className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
@@ -1669,17 +1679,17 @@ export function TeacherLessonDetailView({
           {/* Summary stage */}
           {summaryStage && (
             <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-              summaryStage.is_completed
+              summaryPassed
                 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
                 : "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5"
             }`}>
               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                summaryStage.is_completed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
+                summaryPassed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "bg-slate-100 text-slate-500"
               }`}>
                 <Check className="h-4 w-4" />
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{dl.stageSummaryLabel}</span>
-              {summaryStage.is_completed && (
+              {summaryPassed && (
                 <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">Пройден</span>
               )}
             </div>
