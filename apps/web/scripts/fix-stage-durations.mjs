@@ -73,14 +73,16 @@ async function main() {
     byLesson.get(s.lesson_id).push(s);
   }
 
-  // Only lessons where ALL middle stages have duration_min set (matches the
-  // live investigation: 175 lessons fully set, 1 partial-null lesson left
-  // untouched entirely — its non-null subset isn't a coherent "full estimate"
-  // to rescale against).
+  // Lessons with at least one middle stage carrying a duration_min. Stages
+  // with duration_min=NULL (never AI-estimated, e.g. manually added by a
+  // teacher) are excluded from the rescale set itself and left untouched —
+  // matching how the UI already treats null as "no time shown" (?? 0) — but
+  // the lesson is still a rescale candidate if ANY of its stages have a
+  // value, since that value still contributes to the displayed sum.
   const candidateLessonIds = [...byLesson.entries()]
-    .filter(([, stgs]) => stgs.every((s) => s.duration_min != null))
+    .filter(([, stgs]) => stgs.some((s) => s.duration_min != null))
     .map(([lid]) => lid);
-  console.log(`Уроков с полностью заданными duration_min у всех middle-этапов: ${candidateLessonIds.length}`);
+  console.log(`Уроков хотя бы с одним заданным duration_min среди middle-этапов: ${candidateLessonIds.length}`);
 
   const lessons = [];
   for (let i = 0; i < candidateLessonIds.length; i += 200) {
@@ -95,7 +97,8 @@ async function main() {
     const lesson = lessonById.get(lid);
     if (!lesson) continue;
     const actualMin = Math.round((new Date(lesson.ends_at) - new Date(lesson.starts_at)) / 60000);
-    const stgs = byLesson.get(lid).slice().sort((a, b) => a.position - b.position);
+    const allStgs = byLesson.get(lid).slice().sort((a, b) => a.position - b.position);
+    const stgs = allStgs.filter((s) => s.duration_min != null); // rescale only stages that already carry a value
     const currentSum = stgs.reduce((s, x) => s + x.duration_min, 0);
     if (currentSum === actualMin) continue; // already correct — idempotent skip
 
