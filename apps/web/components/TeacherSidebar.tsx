@@ -35,9 +35,16 @@ export const teacherNavItems = [
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
   { key: "knowledgeBase", href: "/teacher/knowledge-base", icon: GraduationCap, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navKnowledgeBase },
-  { key: "notifications", href: "/teacher/notifications",  icon: Bell,      label: (d: ReturnType<typeof getDictionary>) => d.nav.notifications },
+  // Ночной прогон, ЧАСТЬ 3: убрано из бокового меню — доступ только через
+  // колокольчик (NotificationsBell) в шапке, который ведёт на
+  // /teacher/notifications (табы «Уведомления»/«Объявления», отдельный
+  // маршрут /teacher/announcements упразднён — объявления теперь только
+  // вкладка внутри этой страницы). Остаётся в этом массиве (не удалён
+  // совсем), чтобы TeacherTopbar.tsx по-прежнему находил заголовок
+  // страницы по pathname — hideFromSidebar вырезает именно из рендера
+  // списка ниже, не из title-матчинга.
+  { key: "notifications", href: "/teacher/notifications",  icon: Bell,      label: (d: ReturnType<typeof getDictionary>) => d.nav.notifications, hideFromSidebar: true },
   { key: "messages",   href: "/teacher/messages",     icon: MessageCircle, label: (d: ReturnType<typeof getDictionary>) => d.nav.messages },
-  { key: "announce",   href: "/teacher/announcements",icon: Megaphone,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.announcements.nav },
   { key: "projects",   href: "/teacher/projects",     icon: Briefcase,     label: (d: ReturnType<typeof getDictionary>) => d.teacher.projects.nav },
   { key: "groups",     href: "/teacher/groups",       icon: Users,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGroups },
   { key: "settings",   href: "/teacher/settings",     icon: Settings,      label: (d: ReturnType<typeof getDictionary>) => d.settings.title },

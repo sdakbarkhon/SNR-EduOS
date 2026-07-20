@@ -2,19 +2,19 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, Clock,
-  FolderOpen, Trash2, Check, ExternalLink,
+  FolderOpen, Trash2, Check,
 } from "lucide-react";
 import {
   getDictionary, getMyNotifications, markNotificationRead,
   markAllNotificationsRead, deleteNotification,
-  type Locale, type AppNotification, type NotificationKind,
+  type Locale, type AppNotification, type NotificationKind, type TeacherAnnouncement,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
+import { TeacherAnnouncementsView } from "../announcements/TeacherAnnouncementsView";
 
 const ICONS: Record<NotificationKind, typeof Bell> = {
   announcement: Megaphone,
@@ -59,7 +59,15 @@ function groupByDate(items: AppNotification[], today: string, yesterday: string,
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
 }
 
-export function TeacherNotificationsView({ initialNotifications }: { initialNotifications: AppNotification[] }) {
+export function TeacherNotificationsView({
+  initialNotifications, teacherId, announcements, groups, students,
+}: {
+  initialNotifications: AppNotification[];
+  teacherId: string;
+  announcements: TeacherAnnouncement[];
+  groups: Array<{ id: string; name: string }>;
+  students: Array<{ id: string; full_name: string }>;
+}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.notifications;
@@ -163,7 +171,7 @@ export function TeacherNotificationsView({ initialNotifications }: { initialNoti
 
   const now = useMemo(() => nowMs !== null ? new Date(nowMs) : null, [nowMs]);
   const unread = items.filter((n) => !n.is_read).length;
-  const groups = useMemo(() => groupByDate(items, t.today, t.yesterday, now), [items, t.today, t.yesterday, now]);
+  const dateGroups = useMemo(() => groupByDate(items, t.today, t.yesterday, now), [items, t.today, t.yesterday, now]);
 
   return (
     <div className="mx-auto max-w-2xl text-slate-800">
@@ -204,7 +212,7 @@ export function TeacherNotificationsView({ initialNotifications }: { initialNoti
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            {groups.map(({ label, items: groupItems }) => (
+            {dateGroups.map(({ label, items: groupItems }) => (
               <section key={label}>
                 <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-slate-400" suppressHydrationWarning>
                   {label}
@@ -263,20 +271,12 @@ export function TeacherNotificationsView({ initialNotifications }: { initialNoti
         )
       )}
 
-      {/* Announcements tab — link to management page */}
+      {/* Announcements tab — full management view embedded directly (was a
+          separate /teacher/announcements route, duplicating this page;
+          folded in here per ЧАСТЬ 3, root cause of the old empty stub tab
+          below). */}
       {activeTab === "announcements" && (
-        <div className="flex flex-col items-center gap-4 rounded-3xl border border-white/50 bg-white/60 py-16 text-center backdrop-blur-xl">
-          <Megaphone className="h-12 w-12 text-blue-400" />
-          <p className="text-base font-semibold text-slate-700">{d.announcements.title}</p>
-          <p className="text-sm text-slate-400">{d.announcements.dashboardEmpty}</p>
-          <Link
-            href="/teacher/announcements"
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
-          >
-            <ExternalLink size={15} />
-            {d.teacher.announcements.nav}
-          </Link>
-        </div>
+        <TeacherAnnouncementsView teacherId={teacherId} announcements={announcements} groups={groups} students={students} />
       )}
     </div>
   );
