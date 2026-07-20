@@ -50,7 +50,7 @@ import { TeacherLiveCodeControl } from "@/components/lesson-stages/TeacherLiveCo
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { demoKind } from "@/lib/material-kind";
 import { parseVideoUrl } from "@/lib/video-url";
-import { PdfViewer } from "@/components/PdfViewer";
+import { DemoMaterialContent } from "@/components/DemoMaterialContent";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
@@ -1962,28 +1962,8 @@ export function TeacherLessonDetailView({
               </div>
             </div>
             <div className="flex-1 overflow-auto bg-white">
-              {kind === "pdf" ? (
-                <PdfViewer url={demoMaterialUrl} title={name} />
-              ) : kind === "video" ? (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={demoMaterialUrl} controls className="h-full w-full object-contain" />
-              ) : kind === "embed" ? (
-                <iframe
-                  src={demoMaterialUrl}
-                  title={name}
-                  className="h-full w-full border-0 bg-black"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={demoMaterialUrl} alt={name} className="mx-auto h-full max-h-full w-full object-contain" />
-              ) : kind === "office" ? (
-                <iframe
-                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(demoMaterialUrl)}`}
-                  title={name}
-                  className="h-full w-full border-0 bg-white"
-                />
+              {kind !== "other" ? (
+                <DemoMaterialContent url={demoMaterialUrl} title={name} kind={kind} />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
                   <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>
