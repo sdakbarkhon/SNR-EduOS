@@ -152,7 +152,6 @@ export const uz: Dictionary = {
     nextReward: "Keyingi mukofotgacha",
     streakTitle: "G'alaba seriyasi",
     streakDays: "{n} kun ketma-ket!",
-    qaNewLesson: "Yangi dars",
     goalsTitle: "Sen yangi cho'qqilar sari yo'ldasan!",
     goalsSubtitle: "Yana bir oz — va sen yangi mukofot olasan 🏆",
     viewGoals: "Maqsadlarni ko'rish",

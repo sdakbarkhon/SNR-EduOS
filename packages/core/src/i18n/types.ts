@@ -137,7 +137,6 @@ export interface Dictionary {
     // Iter5 P9 — CD dashboard v2 redesign
     streakTitle: string;       // "Серия успехов"
     streakDays: string;        // "{n} дней подряд!"
-    qaNewLesson: string;       // "Новый урок" (5th quick action)
     goalsTitle: string;        // "Ты на пути к новым вершинам!"
     goalsSubtitle: string;     // "Ещё немного, и ты получишь новую награду 🏆"
     viewGoals: string;         // "Смотреть цели" (stub)
