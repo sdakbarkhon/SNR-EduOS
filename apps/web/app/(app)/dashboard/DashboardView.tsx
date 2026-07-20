@@ -36,6 +36,15 @@ function dayOfYear(d: Date): number {
   return Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
 }
 
+// Школа работает в Ташкенте (UTC+5) — "сегодня" должно быть посчитано по
+// этому фиксированному смещению, а не по локальному часовому поясу
+// сервера/браузера (тот может отличаться от Ташкента). Тот же паттерн, что
+// уже используется в LessonsView.tsx (dateKey()) для той же задачи.
+const TZ_MS = 5 * 60 * 60 * 1000;
+function tashkentDateKey(d: Date): string {
+  return new Date(d.getTime() + TZ_MS).toISOString().slice(0, 10);
+}
+
 export function DashboardView({
   student,
   lessons,
@@ -130,7 +139,7 @@ export function DashboardView({
   // same hydration-safety reason above.
   const todayLessonsAll = now
     ? lessons
-        .filter((l) => new Date(l.starts_at).toDateString() === now.toDateString())
+        .filter((l) => tashkentDateKey(new Date(l.starts_at)) === tashkentDateKey(now))
         .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
     : [];
   // Widget shows at most 3 — the ones still relevant (in progress or upcoming),
