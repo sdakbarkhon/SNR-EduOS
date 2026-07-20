@@ -890,9 +890,26 @@ export const getTeacherGroups = (db: Db) =>
     .order("name")
     .then(unwrap);
 
-/** Оценки в группах учителя (RLS ограничивает своими). group_id + score для агрегации. */
+/** Оценки в группах учителя (RLS ограничивает своими), для карточки "Средний
+ *  балл" на дашборде. Ночной прогон, ЧАСТЬ 7 — раньше читал из `grades`
+ *  (общая, ни разу не заполняемая таблица — 0 строк во всей БД), поэтому
+ *  карточка всегда показывала "—". Реальные оценки лежат в `lesson_grades`
+ *  (шкала 1-5, привязана к lesson_id/student_id, не к group_id напрямую —
+ *  group_id берём через join на lessons); RLS "teacher reads lesson grades
+ *  in own groups" уже ограничивает видимость своими группами, как и раньше
+ *  с `grades`. grade переименован в score здесь же — вызывающий код
+ *  (TeacherDashboardView.tsx) уже ожидает именно это имя поля. */
 export const getTeacherGrades = (db: Db) =>
-  db.from("grades").select("group_id, score").then(unwrap);
+  db
+    .from("lesson_grades")
+    .select("grade, lesson:lessons!inner(group_id)")
+    .then(unwrap)
+    .then((rows) =>
+      (rows as unknown as Array<{ grade: number; lesson: { group_id: string | null } }>).map((r) => ({
+        group_id: r.lesson.group_id,
+        score: r.grade,
+      })),
+    );
 
 /** Посещаемость в группах учителя — статус + group_id урока (для % по группе). */
 export const getTeacherAttendance = (db: Db) =>
