@@ -221,11 +221,12 @@ export function LessonsView({
   const firstName = studentName.split(" ")[0] ?? studentName;
   const nowMs = now?.getTime() ?? null;
 
-  // Сейчас / Далее (пересчитывается каждые 30 сек через setInterval выше)
+  // Сейчас / Прошедший / Далее — строго по текущему времени (не по
+  // lesson.status, который может отставать от реальности: cron-автостарт/
+  // финиш урока крутится по расписанию, а не мгновенно). Пересчитывается
+  // каждые 30 сек через setInterval выше.
   const currentId = nowMs !== null
-    ? todayLessons.find((l) =>
-        l.status === "in_progress" || (nowMs >= lessonStartMs(l) && nowMs <= lessonEndMs(l)),
-      )?.id ?? null
+    ? todayLessons.find((l) => nowMs >= lessonStartMs(l) && nowMs <= lessonEndMs(l))?.id ?? null
     : null;
   const nextLesson = nowMs !== null
     ? todayLessons.find((l) => lessonStartMs(l) > nowMs) ?? null
@@ -296,15 +297,16 @@ export function LessonsView({
               {todayLessons.map((l) => {
                 const color = lessonColor(l);
                 const isNow = l.id === currentId;
+                const isPast = !isNow && nowMs !== null && nowMs > lessonEndMs(l);
                 const isNext = !isNow && l.id === nextLesson?.id;
                 return (
                   <button
                     key={l.id}
                     onClick={() => router.push(`/lessons/${l.id}`)}
-                    className="group w-56 shrink-0 text-left lg:w-60"
+                    className={cn("group w-56 shrink-0 text-left lg:w-60", isPast && "opacity-55 saturate-[0.6]")}
                   >
                     <div className="mb-1.5 px-1">
-                      <span className="text-xs font-bold text-slate-500">{timeLabel(l)}</span>
+                      <span className="text-sm font-extrabold text-slate-700">{timeLabel(l)}</span>
                       <div className="mt-1 h-1 w-12 rounded-full" style={{ backgroundColor: color }} />
                     </div>
                     <div
@@ -315,10 +317,12 @@ export function LessonsView({
                       style={{
                         background: isNow
                           ? "linear-gradient(135deg, #EDE9FE 0%, #F5F3FF 60%, #FCF8FF 100%)"
+                          : isPast
+                          ? "linear-gradient(135deg, #F1F5F9 0%, #F8FAFC 100%)"
                           : `linear-gradient(135deg, ${color}0F 0%, ${color}26 100%), #ffffff`,
                       }}
                     >
-                      <h4 className="truncate text-base font-extrabold text-slate-800">{lessonName(l)}</h4>
+                      <h4 className={cn("truncate text-base font-extrabold", isPast ? "text-slate-500" : "text-slate-800")}>{lessonName(l)}</h4>
                       <p className="mt-0.5 text-sm font-medium text-slate-500">
                         {l.room ? `${cap(d.dashboard.room)} ${l.room}` : " "}
                       </p>
