@@ -1,9 +1,19 @@
 "use client";
 
-import { getDictionary } from "@snr/core";
-import type { Locale, LessonSlide } from "@snr/core";
-import { useLocale } from "@/components/LocaleProvider";
+import type { LessonSlide } from "@snr/core";
 import { SlideViewer } from "./SlideViewer";
+
+// Грубая CSS-only оценка "всего остального" над презентацией на странице
+// урока (LessonHeaderBar + паддинги/gap колонки) и высоты нижней панели
+// навигации SlideViewer (кнопки + точки-индикаторы) — чтобы слайд вписался
+// по высоте БЕЗ скролла страницы, без ResizeObserver/JS-измерений.
+// SlideViewer сам держит 16:9 (aspect-video) для тела слайда — ограничивая
+// max-width контейнера по этой же пропорции от доступной высоты, итоговая
+// высота вписывается сама. overflow-y-auto на внешнем контейнере — safety
+// net на случай, если оценка констант неточна (тогда скроллится локально
+// сам блок презентации, а не вся страница).
+const CHROME_ABOVE_PX = 230;
+const NAV_PANEL_PX = 90;
 
 /**
  * Крупное отображение активной презентации у ученика — раньше это был
@@ -27,30 +37,25 @@ export function StudentPresentationViewer({
   lessonStatus: string;
   onExportPptx: () => void;
 }) {
-  const { locale } = useLocale();
-  const d = getDictionary(locale as Locale);
-
   return (
-    <div className="rounded-2xl bg-slate-900 p-3 shadow-xl sm:p-5">
-      <div className="mb-3 flex items-center gap-3">
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-        </span>
-        <span className="shrink-0 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-red-300">
-          LIVE
-        </span>
-        <span className="truncate text-sm font-medium text-white">{d.lesson.slides.fullscreenTitle}</span>
+    <div
+      className="mx-auto w-full overflow-y-auto"
+      style={{ maxHeight: `calc(100vh - ${CHROME_ABOVE_PX}px)` }}
+    >
+      <div
+        className="mx-auto"
+        style={{ maxWidth: `calc((100vh - ${CHROME_ABOVE_PX}px - ${NAV_PANEL_PX}px) * 16 / 9)` }}
+      >
+        <SlideViewer
+          slides={slides}
+          canExport
+          onExportPptx={onExportPptx}
+          isTeacher={false}
+          stageId={stageId}
+          initialSlide={initialSlide}
+          lessonStatus={lessonStatus}
+        />
       </div>
-      <SlideViewer
-        slides={slides}
-        canExport
-        onExportPptx={onExportPptx}
-        isTeacher={false}
-        stageId={stageId}
-        initialSlide={initialSlide}
-        lessonStatus={lessonStatus}
-      />
     </div>
   );
 }
