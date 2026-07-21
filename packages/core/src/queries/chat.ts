@@ -104,16 +104,19 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
   const groupById = new Map<string, { name: string; teacher_id: string | null }>();
   const subjectNameByGroupTeacher = new Map<string, string>();
   if (directStudentIds.length) {
-    const { data: sgRows } = await sb.from("student_groups").select("student_id, group_id").in("student_id", directStudentIds);
+    const { data: sgRows, error: sgErr } = await sb.from("student_groups").select("student_id, group_id").in("student_id", directStudentIds);
+    if (sgErr) console.error("[getMyThreadSummaries] student_groups enrichment failed:", sgErr.message);
     for (const sg of (sgRows ?? []) as any[]) {
       if (!groupIdByStudentId.has(sg.student_id)) groupIdByStudentId.set(sg.student_id, sg.group_id);
     }
     const groupIds = Array.from(new Set(Array.from(groupIdByStudentId.values())));
     if (groupIds.length) {
-      const [{ data: groupRows }, { data: subjectRows }] = await Promise.all([
+      const [{ data: groupRows, error: groupErr }, { data: subjectRows, error: subjectErr }] = await Promise.all([
         sb.from("groups").select("id, name, teacher_id").in("id", groupIds),
         sb.from("subjects").select("group_id, teacher_id, name").in("group_id", groupIds),
       ]);
+      if (groupErr) console.error("[getMyThreadSummaries] groups enrichment failed:", groupErr.message);
+      if (subjectErr) console.error("[getMyThreadSummaries] subjects enrichment failed:", subjectErr.message);
       for (const g of (groupRows ?? []) as any[]) groupById.set(g.id, { name: g.name, teacher_id: g.teacher_id });
       for (const s of (subjectRows ?? []) as any[]) {
         if (!s.teacher_id) continue;
