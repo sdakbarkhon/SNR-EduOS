@@ -798,8 +798,12 @@ export const submitHomework = (db: Db, input: SubmissionInput) =>
   db.from("homework_submissions").insert(input).select().single().then(unwrap);
 
 // --- Оценки ---
+// Было db.from("grades") — легаси таблица, ни разу не заполняемая (0 строк во
+// всей БД, тот же баг что чинили у getTeacherGrades ниже). Функция нигде не
+// вызывается (dead code), но исправлено на lesson_grades, чтобы не оставлять
+// мину на будущее (см. отчёт задачи "Оценки").
 export const getGrades = (db: Db) =>
-  db.from("grades").select("*").order("graded_at", { ascending: false }).then(unwrap);
+  db.from("lesson_grades").select("*").order("graded_at", { ascending: false }).then(unwrap);
 
 // --- Оплаты / списания ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -921,9 +925,18 @@ export const getTeacherAttendance = (db: Db) =>
 // --- Этап 2: Оценки и прогресс ---
 
 /** Одна оценка ученика (файл, тест, классная, этап урока), нормализованная для журнала. */
+/** Таблица-источник конкретной оценки — нужна модалке деталей, чтобы знать
+ *  где смотреть содержимое сдачи (getGradeSubmissionDetail), и фильтру
+ *  Все/За задания/За урок (gradeCategory), чтобы не путаться в kind
+ *  "programming", который бывает из ДВУХ разных источников (см. ниже). */
+export type GradeSourceTable =
+  | "homework_submissions" | "test_submissions" | "classwork_submissions"
+  | "project_submissions" | "lesson_stage_progress" | "lesson_grades";
+
 export type StudentGradeItem = {
   id: string;
   kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson";
+  sourceTable: GradeSourceTable;
   title: string;
   subject: string;
   groupName: string;
@@ -932,6 +945,16 @@ export type StudentGradeItem = {
   display: string; // "4/5" или "85/100"
   comment: string | null;
 };
+
+/** "За задания" / "За урок" для фильтра на экране оценок (ученик и учитель).
+ *  Классификация ПО ИСТОЧНИКУ, не по kind — kind "programming" бывает и от
+ *  homework (задание на дом), и от lesson_stage_progress (этап "код" прямо
+ *  на уроке), так что сам по себе kind это различить не может. */
+export function gradeCategory(sourceTable: GradeSourceTable): "assignment" | "lesson" {
+  return sourceTable === "homework_submissions" || sourceTable === "test_submissions" || sourceTable === "project_submissions"
+    ? "assignment"
+    : "lesson";
+}
 
 type HwJoin = { title: string; content_type: string; group: { subject: string; name: string } | null };
 
@@ -964,6 +987,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     items.push({
       id: r.id,
       kind: r.homework?.content_type === "programming" ? "programming" : "file",
+      sourceTable: "homework_submissions",
       title: r.homework?.title ?? "",
       subject: r.homework?.group?.subject ?? "",
       groupName: r.homework?.group?.name ?? "",
@@ -981,6 +1005,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     const hasGrade = r.grade != null;
     items.push({
       id: r.id, kind: "test",
+      sourceTable: "test_submissions",
       title: r.homework?.title ?? "",
       subject: r.homework?.group?.subject ?? "",
       groupName: r.homework?.group?.name ?? "",
@@ -1005,6 +1030,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     }>) {
       items.push({
         id: r.id, kind: "classwork",
+        sourceTable: "classwork_submissions",
         title: r.classwork?.title ?? "Классная работа",
         subject: r.classwork?.lesson?.group?.subject ?? "",
         groupName: r.classwork?.lesson?.group?.name ?? "",
@@ -1031,6 +1057,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     }>) {
       items.push({
         id: r.id, kind: "project",
+        sourceTable: "project_submissions",
         title: r.project?.title ?? "Проект",
         subject: r.project?.group?.subject ?? "",
         groupName: r.project?.group?.name ?? "",
@@ -1072,6 +1099,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       items.push({
         id: r.id,
         kind,
+        sourceTable: "lesson_stage_progress",
         title: r.stage?.title ?? "Задание урока",
         subject: r.stage?.lesson?.group?.subject ?? "",
         groupName: r.stage?.lesson?.group?.name ?? "",
@@ -1098,6 +1126,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     }>) {
       items.push({
         id: r.id, kind: "lesson",
+        sourceTable: "lesson_grades",
         title: r.lesson?.title ?? "Урок",
         subject: r.lesson?.group?.subject ?? "",
         groupName: r.lesson?.group?.name ?? "",
@@ -1111,6 +1140,115 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
 
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;
+};
+
+/** Содержимое одной оценённой работы — для модалки деталей на экране
+ *  "Оценки" (ученик и учитель, только просмотр). Загружается ОТДЕЛЬНО, по
+ *  клику на конкретную оценку (не раздуваем getStudentGrades() лишними
+ *  джойнами на каждую строку списка). Все поля опциональны — модалка
+ *  показывает «—» / скрывает секцию там, где для данного типа оценки
+ *  нечего показать (см. sourceTable/kind в StudentGradeItem). */
+export type GradeSubmissionDetail = {
+  answerText: string | null;
+  codeText: string | null;
+  fileName: string | null;
+  fileUrl: string | null;
+  testScore: number | null;
+  testMaxScore: number | null;
+  externalLink: string | null;
+};
+
+const EMPTY_GRADE_DETAIL: GradeSubmissionDetail = {
+  answerText: null, codeText: null, fileName: null, fileUrl: null,
+  testScore: null, testMaxScore: null, externalLink: null,
+};
+
+export const getGradeSubmissionDetail = async (
+  db: Db,
+  sourceTable: GradeSourceTable,
+  id: string,
+  kind: StudentGradeItem["kind"],
+): Promise<GradeSubmissionDetail> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  try {
+    switch (sourceTable) {
+      case "homework_submissions": {
+        const { data, error } = await db2.from("homework_submissions")
+          .select("answer_text, code_text, file_storage_path, file_original_name")
+          .eq("id", id).maybeSingle();
+        if (error) throw error;
+        if (!data) return EMPTY_GRADE_DETAIL;
+        let fileUrl: string | null = null;
+        if (data.file_storage_path) {
+          try { fileUrl = await getSubmissionFileUrl(db, data.file_storage_path, data.file_original_name ?? undefined); }
+          catch (e) { console.error("[getGradeSubmissionDetail] homework file url failed:", (e as Error)?.message); }
+        }
+        return {
+          ...EMPTY_GRADE_DETAIL,
+          answerText: data.answer_text ?? null,
+          codeText: data.code_text ?? null,
+          fileName: data.file_original_name ?? null,
+          fileUrl,
+        };
+      }
+      case "test_submissions": {
+        const { data, error } = await db2.from("test_submissions")
+          .select("score, max_score").eq("id", id).maybeSingle();
+        if (error) throw error;
+        return { ...EMPTY_GRADE_DETAIL, testScore: data?.score ?? null, testMaxScore: data?.max_score ?? null };
+      }
+      case "classwork_submissions": {
+        const { data, error } = await db2.from("classwork_submissions")
+          .select("text_answer, file_storage_path, file_original_name, test_score, test_max")
+          .eq("id", id).maybeSingle();
+        if (error) throw error;
+        if (!data) return EMPTY_GRADE_DETAIL;
+        let fileUrl: string | null = null;
+        if (data.file_storage_path) {
+          try { fileUrl = await getClassworkFileUrl(db, data.file_storage_path); }
+          catch (e) { console.error("[getGradeSubmissionDetail] classwork file url failed:", (e as Error)?.message); }
+        }
+        return {
+          ...EMPTY_GRADE_DETAIL,
+          answerText: data.text_answer ?? null,
+          fileName: data.file_original_name ?? null,
+          fileUrl,
+          testScore: data.test_score ?? null,
+          testMaxScore: data.test_max ?? null,
+        };
+      }
+      case "project_submissions":
+        // project_attachments/бакет project-files нигде в приложении сейчас
+        // не читаются (только сид-скрипт, живого пути нет) — не строим здесь
+        // непроверенное чтение файлов вслепую. Общие поля (предмет/дата/
+        // оценка/комментарий) модалка покажет и без этого.
+        return EMPTY_GRADE_DETAIL;
+      case "lesson_stage_progress": {
+        const { data, error } = await db2.from("lesson_stage_progress")
+          .select("submission_data").eq("id", id).maybeSingle();
+        if (error) throw error;
+        const sd = (data?.submission_data ?? null) as
+          | { code?: string; correct?: number; total?: number; link?: string }
+          | null;
+        if (!sd) return EMPTY_GRADE_DETAIL;
+        if (kind === "programming") return { ...EMPTY_GRADE_DETAIL, codeText: sd.code ?? null };
+        if (kind === "quiz" || kind === "kahoot") {
+          return { ...EMPTY_GRADE_DETAIL, testScore: sd.correct ?? null, testMaxScore: sd.total ?? null };
+        }
+        if (kind === "external") return { ...EMPTY_GRADE_DETAIL, externalLink: sd.link ?? null };
+        return EMPTY_GRADE_DETAIL;
+      }
+      case "lesson_grades":
+        // Оценка за урок — участие/поведение, отдельной "сдачи" тут нет.
+        return EMPTY_GRADE_DETAIL;
+      default:
+        return EMPTY_GRADE_DETAIL;
+    }
+  } catch (e) {
+    console.error("[getGradeSubmissionDetail] failed:", (e as Error)?.message ?? e);
+    return EMPTY_GRADE_DETAIL;
+  }
 };
 
 /** Данные для матричного журнала учителя по одной группе. */

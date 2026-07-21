@@ -2205,6 +2205,11 @@ export interface Dictionary {
     allSubjects: string;        // "Все предметы"
     allTypes: string;           // "Все типы"
     allPeriods: string;         // "Все сроки"
+    // Задача "Оценки" — сегментированный переключатель Все/За задания/За урок
+    // (стиль tabToday/tabWeek), отдельно от гранулярного typeFilter выше.
+    filterAll: string;          // "Все"
+    filterAssignment: string;   // "За задания"
+    filterLesson: string;       // "За урок"
     periodWeek: string;         // "Эта неделя"
     periodMonth: string;        // "Этот месяц"
     periodSemester: string;     // "Этот семестр"
@@ -2236,6 +2241,19 @@ export interface Dictionary {
       dateLabel: string;        // "Дата"
       subjectLabel: string;     // "Предмет"
       gradeLabel: string;       // "Оценка"
+      // Задача "Оценки" — детали сдачи (текст/код/файл/результат теста).
+      typeLabel: string;        // "Тип"
+      typeAssignment: string;   // "За задание"
+      typeLesson: string;       // "За урок"
+      studentLabel: string;     // "Ученик" — только в модалке учителя
+      submissionLabel: string;  // "Сдача"
+      noSubmission: string;     // "Нет сданной работы"
+      testResultLabel: string;  // "Результат"
+      fileLabel: string;        // "Файл"
+      openFileBtn: string;      // "Открыть файл"
+      externalLinkLabel: string; // "Ссылка"
+      noExternalLink: string;   // "Ссылка не указана"
+      loadingLabel: string;     // "Загрузка…"
       commentLabel: string;     // "Комментарий учителя"
       noComment: string;        // "Учитель пока не оставил комментарий"
       closeBtn: string;         // "Закрыть"
