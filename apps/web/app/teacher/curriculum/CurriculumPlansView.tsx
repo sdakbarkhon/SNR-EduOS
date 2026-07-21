@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardList, Upload, X, Plus, Trash2, GripVertical, FileText, AlertTriangle, Search } from "lucide-react";
+import Link from "next/link";
+import { Upload, X, Plus, Trash2, GripVertical, FileText, AlertTriangle, Search, ChevronRight } from "lucide-react";
 import {
   createCurriculumPlan, replaceCurriculumPlan, uploadCurriculumPlanFile,
   getCurriculumPlanForGroupSubject, getDictionary,
@@ -78,11 +79,18 @@ export function CurriculumPlansView({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {filteredPlans.map((p) => (
-            <div key={p.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{p.subject_name}</p>
-              <h3 className="mt-1 truncate text-base font-bold text-slate-900">{p.group_name}</h3>
-              <p className="mt-2 text-sm text-slate-500">{p.topics.length} {topicWord(p.topics.length)}</p>
-            </div>
+            <Link
+              key={p.id}
+              href={`/teacher/curriculum/${p.id}`}
+              className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{p.subject_name}</p>
+                <h3 className="mt-1 truncate text-base font-bold text-slate-900">{p.group_name}</h3>
+                <p className="mt-2 text-sm text-slate-500">{p.topics.length} {topicWord(p.topics.length)}</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+            </Link>
           ))}
         </div>
       )}

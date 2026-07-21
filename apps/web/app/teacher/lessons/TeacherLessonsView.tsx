@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, Plus,
@@ -567,6 +567,7 @@ export function TeacherLessonsView({
   isCurator?: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const dc = getDictionary(defaultLocale).common;
   const dbRef = useRef(createClient());
@@ -591,6 +592,24 @@ export function TeacherLessonsView({
   const [formModal, setFormModal] = useState<"create" | "edit" | null>(null);
   const [editLesson, setEditLesson] = useState<LessonItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LessonItem | null>(null);
+
+  // Учебные планы, Часть 2В — "Использовать как заготовки": переход сюда с
+  // ?newLesson=1&groupId=&subjectId= из карточки плана открывает форму
+  // создания урока с уже выбранными группой/предметом — дропдаун тем плана
+  // (в LessonFormModal) подхватывает их сам по (groupId, subjectId), больше
+  // ничего не нужно.
+  const [presetGroupSubject, setPresetGroupSubject] = useState<{ groupId: string; subjectId: string } | null>(null);
+  useEffect(() => {
+    if (searchParams.get("newLesson") !== "1") return;
+    const groupId = searchParams.get("groupId") ?? "";
+    const subjectId = searchParams.get("subjectId") ?? "";
+    if (!groupId) return;
+    setPresetGroupSubject({ groupId, subjectId });
+    setEditLesson(null);
+    setFormModal("create");
+    router.replace("/teacher/lessons", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mountedRef = useRef(false);
 
@@ -843,7 +862,9 @@ export function TeacherLessonsView({
           initial={
             formModal === "edit" && editLesson
               ? lessonToForm(editLesson)
-              : emptyForm(groups[0]?.id ?? "")
+              : presetGroupSubject
+                ? { ...emptyForm(presetGroupSubject.groupId), subjectId: presetGroupSubject.subjectId }
+                : emptyForm(groups[0]?.id ?? "")
           }
           onClose={() => setFormModal(null)}
           onSave={handleSave}
