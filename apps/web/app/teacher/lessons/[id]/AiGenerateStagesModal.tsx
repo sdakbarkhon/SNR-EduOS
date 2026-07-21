@@ -264,8 +264,9 @@ export function AiGenerateStagesModal({
       await attachBooksFromKnowledgeBase().catch(() => null);
       setPhase("added");
       setTimeout(() => { onAdded(); onClose(); }, 1200);
-    } catch {
-      setGenError(t.error);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setGenError(detail ? `${t.error}: ${detail}` : t.error);
     } finally {
       setAdding(false);
     }
