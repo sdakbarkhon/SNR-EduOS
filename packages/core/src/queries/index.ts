@@ -3373,12 +3373,18 @@ export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
     throw new Error("startLesson: обновление не затронуло ни одной строки (нет прав или урок не найден)");
   }
   // Отмечаем этап Старт (stage_role='start') выполненным — не фатально для
-  // основного перехода статуса, но ошибка не должна тонуть молча.
-  const { error: stageError } = await db2.from("lesson_stages")
+  // основного перехода статуса (ошибка уже была non-fatal, только лог), и
+  // ничего в UI на неё не завязано. Fire-and-forget, а не await: caller ждёт
+  // только подтверждения lessons.status, второй round-trip до Supabase не
+  // должен добавляться в критический путь "клик -> открылся урок" (диагностика
+  // задержки старта урока у ученика, 21.07 — see report).
+  db2.from("lesson_stages")
     .update({ is_completed: true, completed_at: new Date().toISOString() })
     .eq("lesson_id", lessonId)
-    .eq("stage_role", "start");
-  if (stageError) console.error("[startLesson] lesson_stages update failed:", stageError.message);
+    .eq("stage_role", "start")
+    .then(({ error: stageError }: { error: { message: string } | null }) => {
+      if (stageError) console.error("[startLesson] lesson_stages update failed:", stageError.message);
+    });
 };
 
 /** Ручное завершение урока (кнопка "Закончить урок" — учитель или ученик, БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6).
