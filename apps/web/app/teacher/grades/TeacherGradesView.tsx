@@ -14,8 +14,11 @@ import {
   ReviewModal, TestReviewModal,
   type ReviewSubmission, type ReviewTestSub, type ReviewQuestion,
 } from "@/components/teacher/ReviewModals";
+import { LessonGradeDetailModal } from "./LessonGradeDetailModal";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/cn";
+
+type CategoryFilter = "all" | "assignment" | "lesson";
 
 interface Props {
   groups: Array<{ id: string; name: string; subject: string }>;
@@ -65,6 +68,8 @@ export function TeacherGradesView({ groups, stats }: Props) {
   const [loading, setLoading] = useState(false);
   const [lessonGrades, setLessonGrades] = useState<LessonGradeRow[]>([]);
   const [showAllLessonGrades, setShowAllLessonGrades] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [selectedLessonGrade, setSelectedLessonGrade] = useState<LessonGradeRow | null>(null);
 
   // Review modal state
   const [reviewSub, setReviewSub] = useState<ReviewSubmission | null>(null);
@@ -199,6 +204,31 @@ export function TeacherGradesView({ groups, stats }: Props) {
         ))}
       </div>
 
+      {/* Все / За задания / За урок — тот же сегментированный переключатель,
+          что и у ученика. Здесь страница уже состоит из 2 секций (матрица
+          заданий/тестов + таблица оценок за уроки), так что фильтр просто
+          управляет видимостью каждой секции, без переработки самих таблиц. */}
+      <div className="flex w-fit rounded-full bg-white/70 p-1 shadow-sm">
+        {([
+          { value: "all", label: "Все" },
+          { value: "assignment", label: "За задания" },
+          { value: "lesson", label: "За урок" },
+        ] as { value: CategoryFilter; label: string }[]).map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setCategoryFilter(opt.value)}
+            className={cn(
+              "rounded-full px-5 py-2 text-sm font-bold transition-all",
+              categoryFilter === opt.value
+                ? "bg-brand-blue text-white shadow-md"
+                : "text-brand-ink-muted hover:text-brand-ink",
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* Top panel: group selector + export */}
       <div className="flex flex-wrap items-center gap-3">
         <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
@@ -212,8 +242,8 @@ export function TeacherGradesView({ groups, stats }: Props) {
         </button>
       </div>
 
-      {/* Matrix */}
-      {loading ? (
+      {/* Matrix (секция "За задания") */}
+      {categoryFilter !== "lesson" && (loading ? (
         <div className="rounded-[20px] border border-white/80 bg-white/70 p-8 text-center text-brand-ink-muted">{d.common.loading}</div>
       ) : !matrix || matrix.students.length === 0 ? (
         <div className="rounded-[20px] border border-white/80 bg-white/70 p-8 text-center text-brand-ink-muted">
@@ -315,10 +345,10 @@ export function TeacherGradesView({ groups, stats }: Props) {
             </tfoot>
           </table>
         </div>
-      )}
+      ))}
 
-      {/* Lesson grades section */}
-      {lessonGrades.length > 0 && (
+      {/* Lesson grades section (секция "За урок") */}
+      {categoryFilter !== "assignment" && lessonGrades.length > 0 && (
         <div className="overflow-hidden rounded-[20px] border border-white/80 bg-white/70 p-4 backdrop-blur-xl"
           style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
           <h3 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-slate-400">
@@ -337,7 +367,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
               </thead>
               <tbody>
                 {(showAllLessonGrades ? lessonGrades : lessonGrades.slice(0, 5)).map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/40">
+                  <tr key={r.id} onClick={() => setSelectedLessonGrade(r)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-violet-50/40">
                     <td className="px-3 py-2 font-semibold text-slate-800">{r.student_name}</td>
                     <td className="px-3 py-2 text-slate-500">
                       {r.lesson_no ? `Урок ${r.lesson_no}` : new Date(r.lesson_starts_at).toLocaleDateString("ru", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" })}
@@ -368,6 +398,15 @@ export function TeacherGradesView({ groups, stats }: Props) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Оценка за урок — только просмотр, правку не делаем в этой задаче */}
+      {selectedLessonGrade && (
+        <LessonGradeDetailModal
+          row={selectedLessonGrade}
+          t={d.grades.detailModal}
+          onClose={() => setSelectedLessonGrade(null)}
+        />
       )}
 
       {/* Review modals */}

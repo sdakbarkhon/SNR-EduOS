@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Star, BookOpen, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
-import { getDictionary, getSubjectConfig } from "@snr/core";
+import { getDictionary, getSubjectConfig, gradeCategory } from "@snr/core";
 import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
@@ -18,6 +18,7 @@ interface Props {
 
 type TypeFilter = "all" | StudentGradeItem["kind"];
 type PeriodFilter = "all" | "week" | "month" | "semester";
+type CategoryFilter = "all" | "assignment" | "lesson";
 type SortValue = "date_desc" | "date_asc" | "grade_desc" | "grade_asc" | "subject";
 type Tier = 5 | 4 | 3 | 2 | 1;
 
@@ -29,7 +30,7 @@ function gradeColor(g5: number | null): string {
   return "text-red-500";
 }
 
-function kindLabel(kind: StudentGradeItem["kind"], d: Dictionary): string {
+export function kindLabel(kind: StudentGradeItem["kind"], d: Dictionary): string {
   switch (kind) {
     case "test": return d.homework.typeTest;
     case "programming": return d.homework.typeProgramming;
@@ -43,7 +44,7 @@ function kindLabel(kind: StudentGradeItem["kind"], d: Dictionary): string {
   }
 }
 
-const KIND_BADGE: Record<StudentGradeItem["kind"], string> = {
+export const KIND_BADGE: Record<StudentGradeItem["kind"], string> = {
   classwork: "bg-purple-100 text-purple-700",
   test: "bg-violet-100 text-violet-700",
   programming: "bg-emerald-100 text-emerald-700",
@@ -137,6 +138,7 @@ export function GradesView({ grades }: Props) {
   const t = d.grades;
 
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [sortValue, setSortValue] = useState<SortValue>("date_desc");
@@ -188,6 +190,7 @@ export function GradesView({ grades }: Props) {
   const barValues = chronological.slice(-5).map((g) => g.grade5 ?? 0);
 
   const filtered = grades.filter((g) => {
+    if (categoryFilter !== "all" && gradeCategory(g.sourceTable) !== categoryFilter) return false;
     if (subjectFilter !== "all" && g.subject !== subjectFilter) return false;
     if (typeFilter !== "all" && g.kind !== typeFilter) return false;
     if (!withinPeriod(g.date, periodFilter)) return false;
@@ -275,6 +278,30 @@ export function GradesView({ grades }: Props) {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Table card */}
         <div className="min-w-0 flex-1 rounded-[24px] border border-white bg-white/80 p-6 shadow-md backdrop-blur-xl">
+          {/* Все / За задания / За урок — сегментированный переключатель,
+              стиль как у "Сегодня/Неделя" в расписании (rounded-full
+              bg-white p-1 shadow-sm контейнер + пилюли внутри). */}
+          <div className="mb-4 flex w-fit rounded-full bg-white p-1 shadow-sm">
+            {([
+              { value: "all", label: t.filterAll },
+              { value: "assignment", label: t.filterAssignment },
+              { value: "lesson", label: t.filterLesson },
+            ] as { value: CategoryFilter; label: string }[]).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setCategoryFilter(opt.value)}
+                className={cn(
+                  "rounded-full px-5 py-2 text-sm font-bold transition-all",
+                  categoryFilter === opt.value
+                    ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-md shadow-violet-500/25"
+                    : "text-slate-500 hover:text-slate-800",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button onClick={() => setSubjectFilter("all")} className={pillClass(subjectFilter === "all")}>{t.allSubjects}</button>
             {subjects.map((s) => {
@@ -396,7 +423,16 @@ export function GradesView({ grades }: Props) {
         </aside>
       </div>
 
-      {selected && <GradeDetailModal grade={selected} locale={locale} t={t.detailModal} onClose={() => setSelected(null)} />}
+      {selected && (
+        <GradeDetailModal
+          grade={selected}
+          locale={locale}
+          t={t.detailModal}
+          kindLabelText={kindLabel(selected.kind, d)}
+          kindBadgeClass={KIND_BADGE[selected.kind]}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
