@@ -55,13 +55,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Разрешены только PDF и DOCX файлы" }, { status: 400 });
   }
 
-  // Куратор группы — та же проверка, что RLS curriculum_plans_insert
-  // (can_manage_curriculum_plan): парсинг не пишет в БД, но уже тратит
-  // реальные AI-токены, поэтому не должен быть открыт произвольному учителю.
+  // Та же проверка владения, что RLS can_manage_curriculum_plan (миграция 120):
+  // владелец — учитель предмета (subjects.teacher_id) ИЛИ куратор группы
+  // (groups.teacher_id). Парсинг не пишет в БД, но уже тратит реальные
+  // AI-токены, поэтому не должен быть открыт произвольному учителю.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: group } = await (db as any)
-    .from("groups").select("id, teacher_id").eq("id", groupId).maybeSingle();
-  if (!group || group.teacher_id !== teacher.id) {
+  const [{ data: subject, error: subjectError }, { data: group, error: groupError }] = await Promise.all([
+    (db as any).from("subjects").select("id, teacher_id").eq("id", subjectId).maybeSingle(),
+    (db as any).from("groups").select("id, teacher_id").eq("id", groupId).maybeSingle(),
+  ]);
+  if (subjectError || groupError) {
+    return NextResponse.json({ error: (subjectError ?? groupError)?.message ?? "Ошибка проверки доступа" }, { status: 500 });
+  }
+  const isSubjectOwner = subject?.teacher_id === teacher.id;
+  const isGroupOwner = group?.teacher_id === teacher.id;
+  if (!isSubjectOwner && !isGroupOwner) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
