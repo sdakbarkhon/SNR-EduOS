@@ -1,15 +1,77 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { Bot, Send, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
 import { callAiChat } from "@/app/actions/ai";
+import { SyntaxHighlighter, oneDark } from "./lesson-stages/highlighter";
 
+// function-plot (+ d3) — тяжёлая связка, нужна редко (только когда AI
+// реально прислал ```chart), не должна попадать в основной бандл
+// AppShell → AiFloatingButton → AiFloatingChat, который грузится на каждой
+// странице ученика. ssr:false — function-plot трогает DOM напрямую.
+const ChartBlock = dynamic(() => import("./ChartBlock").then((m) => m.ChartBlock), {
+  ssr: false,
+  loading: () => <div className="my-1 h-[200px] animate-pulse rounded-xl bg-slate-100" />,
+});
+
+// Формат ```chart блока — держать ТОЧНО синхронно с парсером
+// (apps/web/lib/chart-spec.ts) и с рендером (apps/web/components/ChartBlock.tsx).
 const STUDENT_SYSTEM = `Ты — дружелюбный помощник для школьников.
-Помогай с любыми вопросами кратко и понятно.
-Используй простой язык. Не используй markdown-разметку.
-Пиши обычным текстом без специальных символов форматирования.`;
+Помогай с любыми вопросами кратко и понятно. Используй простой язык.
+
+Визуализация (используй только когда это реально помогает, не в каждом ответе):
+- Если вопрос касается математики или физики и уместна формула — записывай её в LaTeX: инлайн-формулы через $...$ прямо в строке текста; отдельно стоящие (крупные) формулы — знаки $$ каждый на СВОЕЙ строке, а сама формула между ними на отдельной строке, например:
+$$
+a^2 + b^2 = c^2
+$$
+Не пиши $$формула$$ в одну строку — так формула не отрендерится крупным блоком.
+- Если полезно показать график функции y=f(x) — вставь блок в точности такого формата:
+\`\`\`chart
+type: function
+expr: x^2
+domain: -5, 5
+\`\`\`
+где expr — выражение от x (например x^2, sin(x), 2*x+1), domain — нижняя и верхняя граница x через запятую.
+- На обычных вопросах, не требующих формул или графиков, отвечай обычным текстом — без LaTeX и без chart-блоков.
+- Не злоупотребляй визуализациями.`;
+
+// code-блоки (```python и т.п.) рендерятся тем же подсвечивателем, что и
+// везде в проекте (см. lesson-stages/markdownCode.tsx — та же логика,
+// продублирована здесь напрямую вместо reuse через объект-компонент, чтобы
+// не бороться с типами react-markdown при делегировании) — ```chart
+// перехватывается раньше и уходит в ChartBlock, остальные языки/инлайн-код
+// не меняются.
+const messageComponents: Components = {
+  code({ className, children, ...props }) {
+    const match = /language-(\w+)/.exec(className ?? "");
+    if (match?.[1] === "chart") {
+      return <ChartBlock spec={String(children).replace(/\n$/, "")} />;
+    }
+    if (match) {
+      return (
+        <SyntaxHighlighter
+          language={match[1]}
+          style={oneDark}
+          customStyle={{ margin: 0, borderRadius: "0.75rem", fontSize: "0.9rem" }}
+        >
+          {String(children).replace(/\n$/, "")}
+        </SyntaxHighlighter>
+      );
+    }
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
 
 // sessionStorage (not localStorage): a fresh browser session starts a clean
 // chat, but navigating between pages or closing/reopening the widget within
@@ -181,8 +243,12 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
                     <Bot className="h-3.5 w-3.5" />
                   </div>
-                  <div className="max-w-[82%] whitespace-pre-wrap rounded-[16px] rounded-tl-md bg-[#F3F1FB] px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-700">
-                    {m.text}
+                  <div className="max-w-[82%] rounded-[16px] rounded-tl-md bg-[#F3F1FB] px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-700">
+                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0 [&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={messageComponents}>
+                        {m.text}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ),
