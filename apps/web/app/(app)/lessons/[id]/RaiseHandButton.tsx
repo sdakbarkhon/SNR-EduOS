@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 
-export function RaiseHandButton({ lessonId, studentId }: { lessonId: string; studentId: string }) {
+export function RaiseHandButton({ lessonId, studentId, compact = false }: { lessonId: string; studentId: string; compact?: boolean }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.lesson.raisedHand;
@@ -55,14 +55,17 @@ export function RaiseHandButton({ lessonId, studentId }: { lessonId: string; stu
       <button
         onClick={onRaise}
         disabled={raised || busy}
-        className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all duration-200 disabled:opacity-60 ${
+        title={compact ? (raised ? t.raised : t.raise) : undefined}
+        className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border font-semibold transition-all duration-200 disabled:opacity-60 ${
+          compact ? "w-9" : "px-3 text-xs"
+        } ${
           raised
             ? "border-amber-200 bg-amber-50 text-amber-700"
             : "border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
         }`}
       >
         <Hand className={`h-3.5 w-3.5 ${raised ? "animate-pulse" : ""}`} />
-        <span>{raised ? t.raised : t.raise}</span>
+        {!compact && <span className="text-xs">{raised ? t.raised : t.raise}</span>}
       </button>
       {error && (
         <span className="absolute right-0 top-full mt-1 whitespace-nowrap rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">

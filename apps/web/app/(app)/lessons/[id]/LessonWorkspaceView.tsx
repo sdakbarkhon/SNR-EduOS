@@ -318,20 +318,46 @@ export function LessonWorkspaceView({
     localStorage.setItem("lesson-sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // Real browser Fullscreen API toggle (Часть 2 — "Во весь экран" button).
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  useEffect(() => {
-    function onChange() { setIsFullscreen(!!document.fullscreenElement); }
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-  function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => null);
-    } else {
-      document.documentElement.requestFullscreen().catch(() => null);
-    }
+  // Режим фокуса ("Во весь экран" button) — НЕ браузерный Fullscreen API,
+  // просто скрытие шапки урока + сворачивание бокового меню внутри страницы
+  // (контент получает освободившееся место). Локальный state, специально
+  // без localStorage — разовый режим на время просмотра, не должен
+  // персиститься между уроками. sidebarCollapsedBeforeFocusRef запоминает,
+  // в каком состоянии было меню ДО входа в фокус, чтобы восстановить его
+  // ровно таким же при выходе (а не всегда разворачивать).
+  const [focusMode, setFocusMode] = useState(false);
+  const sidebarCollapsedBeforeFocusRef = useRef(false);
+
+  function enterFocusMode() {
+    sidebarCollapsedBeforeFocusRef.current = sidebarCollapsed;
+    setSidebarCollapsed(true);
+    setFocusMode(true);
   }
+  function exitFocusMode() {
+    setSidebarCollapsed(sidebarCollapsedBeforeFocusRef.current);
+    setFocusMode(false);
+  }
+  function toggleFocusMode() {
+    if (focusMode) exitFocusMode(); else enterFocusMode();
+  }
+
+  // Esc — тоже выход из фокуса (снимается при выходе/размонтировании).
+  useEffect(() => {
+    if (!focusMode) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") exitFocusMode();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMode]);
+
+  // Сколько "остального" над презентацией: полная шапка урока в обычном
+  // режиме — почти ничего (только паддинг колонки) в фокус-режиме, где
+  // шапка скрыта. Используется StudentPresentationViewer, чтобы слайд
+  // вписывался по высоте (со внутренним скроллом, если всё же не влезает —
+  // см. Часть 2/3 отчёта).
+  const PRESENTATION_CHROME_ABOVE_PX = focusMode ? 50 : 210;
 
   // Auto-mark theory stages as studied when teacher activates them
   useEffect(() => {
@@ -615,8 +641,15 @@ export function LessonWorkspaceView({
           220px, на lg+ (>=1024) ширина как была. */}
       <aside className={`relative flex h-full shrink-0 flex-col gap-3.5 overflow-y-auto p-3 transition-all duration-300 ease-out ${sidebarCollapsed ? "w-16" : "w-[220px] lg:w-[266px]"}`}>
 
-          {/* Logo + collapse toggle — always visible */}
-          <div className="flex items-center justify-between rounded-2xl border border-[#ECEDF4] bg-white px-4 py-3 shadow-sm">
+          {/* Logo + collapse toggle — always visible. Свёрнутое состояние:
+              карточка раньше держала развёрнутый px-4 py-3 padding и
+              justify-between даже с одним ребёнком (сайдбар w-16=64px минус
+              его собственный p-3=24px даёт всего 40px на контент — кнопка
+              34px + px-4*2=32px padding переполняла эти 40px и вылезала за
+              край карточки). Свёрнутое состояние теперь без горизонтального
+              padding, кнопка отцентрирована и чуть меньше (32px, в тон
+              остальным иконкам collapsed-рельса ниже) — влезает с запасом. */}
+          <div className={`flex items-center rounded-2xl border border-[#ECEDF4] bg-white py-3 shadow-sm ${sidebarCollapsed ? "justify-center px-0" : "justify-between px-4"}`}>
             {!sidebarCollapsed && (
               <span className="truncate text-sm font-black">
                 <span className="text-[#FF9A3D]">SNR</span>{" "}
@@ -625,7 +658,7 @@ export function LessonWorkspaceView({
             )}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-[#ECEDF4] text-[#9A9FB4] transition-colors hover:bg-slate-50"
+              className={`flex shrink-0 items-center justify-center rounded-[10px] border border-[#ECEDF4] text-[#9A9FB4] transition-colors hover:bg-slate-50 ${sidebarCollapsed ? "h-8 w-8" : "h-[34px] w-[34px]"}`}
               title={sidebarCollapsed ? w.expand : w.collapse}
             >
               {sidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
@@ -826,7 +859,11 @@ export function LessonWorkspaceView({
       {/* Right column: top panel + stage content, scrolls independently
           of the full-height sidebar above. */}
       <div className="flex min-w-0 flex-1 flex-col space-y-5 overflow-y-auto px-4 py-5 md:px-6">
-      {/* Header bar */}
+      {/* Header bar — скрыт в режиме фокуса (см. компактную полоску иконок
+          ниже, которая заменяет его действия). Освободившееся место
+          автоматически достаётся контенту урока (presentation/этап) —
+          просто на один child в flex-col колонке меньше. */}
+      {!focusMode && (
       <LessonHeaderBar
         subjectIcon={lesson.subjectIcon}
         subjectColor={lesson.subjectColor}
@@ -854,11 +891,11 @@ export function LessonWorkspaceView({
               </button>
             )}
             <button
-              onClick={toggleFullscreen}
+              onClick={enterFocusMode}
               className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
             >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              <span className="hidden sm:inline">{isFullscreen ? w.fullscreenExit : w.fullscreen}</span>
+              <Maximize2 className="h-4 w-4" />
+              <span className="hidden sm:inline">{w.fullscreen}</span>
             </button>
             {lesson.teacher && (
               <div className="hidden items-center gap-2 rounded-[13px] border border-[#E6E7EF] bg-white py-1 pl-1 pr-3 sm:flex">
@@ -908,6 +945,42 @@ export function LessonWorkspaceView({
           </>
         }
       />
+      )}
+
+      {/* Компактная полоска иконок режима фокуса — заменяет действия скрытой
+          шапки (поднять руку / обновить / выйти из урока), плюс кнопка
+          выхода из фокуса (та же "Во весь экран", теперь только иконка).
+          Fixed, в углу поверх контента — не занимает место в потоке. */}
+      {focusMode && (
+        <div className="fixed right-4 top-4 z-40 flex items-center gap-1.5 rounded-2xl border border-[#ECEDF4] bg-white/95 p-1.5 shadow-lg backdrop-blur">
+          {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} compact />}
+          {!isCompleted && (
+            <button
+              onClick={() => window.location.reload()}
+              title={dl.reloadPage}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#5B6178] transition-colors hover:bg-slate-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          )}
+          {!isCompleted && (
+            <button
+              onClick={handleLeaveLesson}
+              title={dl.leaveLessonBtn}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={toggleFocusMode}
+            title={w.fullscreenExit}
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#6A4FE6] text-white transition-colors hover:bg-[#5A3FE0]"
+          >
+            <Minimize2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Teacher is showing a material to the whole class (Realtime broadcast).
           Fullscreen — no sidebar/topbar/scroll, and no close control on the
@@ -1045,6 +1118,7 @@ export function LessonWorkspaceView({
                         initialSlide={stage.current_slide_index ?? 0}
                         lessonStatus={lesson.status}
                         onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                        chromeAbovePx={PRESENTATION_CHROME_ABOVE_PX}
                       />
                     ) : stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
                       <div className="mb-3">
