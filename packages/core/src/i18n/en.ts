@@ -135,7 +135,7 @@ export const en: Dictionary = {
     learnMore: "Learn more",
     quickActions: "Quick actions",
     qaHomework: "My homework",
-    qaFiles: "My files",
+    qaFiles: "Knowledge Base",
     qaTeacher: "Contact teacher",
     qaAI: "Ask AI",
     myProgress: "My progress",

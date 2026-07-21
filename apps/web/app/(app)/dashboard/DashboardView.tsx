@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Bot, BookOpen, Flame, Lock,
+  BookOpen, Flame, Lock,
   Sparkles, ArrowRight, FileText, Folder, UserPlus, Calendar,
   Check, Award, Trophy, Target, type LucideIcon,
 } from "lucide-react";
@@ -278,11 +278,10 @@ export function DashboardView({
           {/* Быстрые действия */}
           <div>
             <h2 className="mb-3.5 text-lg font-extrabold text-[#2A2A45]">{t.quickActions}</h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <QuickAction icon={<FileText />} bg="#FFF3DE" iconBg="#FFB020" iconColor="#fff" label={t.qaHomework} badge={activeHomeworkCount} href="/homework" />
               <QuickAction icon={<Folder />} bg="#E9F1FF" iconBg="#4E86F7" iconColor="#fff" label={t.qaFiles} href="/knowledge-base" />
               <QuickAction icon={<UserPlus />} bg="#FCE9F2" iconBg="#F368A8" iconColor="#fff" label={t.qaTeacher} onClick={() => showToast(d.auth.comingSoon)} />
-              <QuickAction icon={<Bot />} bg="#E4F7F1" iconBg="#23C4A3" iconColor="#fff" label={t.qaAI} href="/ai-assistant" />
             </div>
           </div>
 

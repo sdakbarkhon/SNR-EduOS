@@ -135,7 +135,7 @@ export const uz: Dictionary = {
     learnMore: "Ko'proq bilish",
     quickActions: "Tezkor amallar",
     qaHomework: "Mening topshirig'im",
-    qaFiles: "Mening fayllarim",
+    qaFiles: "Bilimlar bazasi",
     qaTeacher: "O'qituvchi bilan aloqa",
     qaAI: "AI'dan so'rash",
     myProgress: "Mening progressim",

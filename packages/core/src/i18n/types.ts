@@ -119,7 +119,7 @@ export interface Dictionary {
     learnMore: string;         // "Узнать больше" (fact-of-day card)
     quickActions: string;      // "Быстрые действия"
     qaHomework: string;        // "Моё задание"
-    qaFiles: string;           // "Мои файлы"
+    qaFiles: string;           // "База знаний" (ведёт на /knowledge-base, тот же раздел, что nav.knowledgeBase)
     qaTeacher: string;         // "Связь с учителем" (stub)
     qaAI: string;              // "Спросить AI"
     myProgress: string;        // "Мой прогресс"

@@ -13,9 +13,14 @@ export function BottomNav() {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
 
+  // "ai" отфильтрован — AI-ассистент теперь только floating-кнопка
+  // (AiFloatingButton.tsx), не отдельный пункт меню. Тот же паттерн, что
+  // уже применён в StudentSidebar.tsx для десктопного сайдбара.
+  const items = navItems.filter((item) => item.key !== "ai");
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-10 flex justify-around border-t px-2 py-1 backdrop-blur-xl md:hidden" style={{ background: "var(--bottomnav-bg)", borderColor: "var(--bottomnav-border)" }}>
-      {navItems.map((item) => {
+      {items.map((item) => {
         const active = pathname.startsWith(item.href);
         const Icon = item.icon;
         return (

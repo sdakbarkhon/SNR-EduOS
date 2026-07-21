@@ -135,7 +135,7 @@ export const ru: Dictionary = {
     learnMore: "Узнать больше",
     quickActions: "Быстрые действия",
     qaHomework: "Моё задание",
-    qaFiles: "Мои файлы",
+    qaFiles: "База знаний",
     qaTeacher: "Связь с учителем",
     qaAI: "Спросить AI",
     myProgress: "Мой прогресс",
