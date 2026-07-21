@@ -6,15 +6,16 @@ import { useRouter } from "next/navigation";
 import {
   Clock, Check, FileText, FileCode2, File, ChevronsLeft, ChevronsRight,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
-  Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play,
+  Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play, CheckCircle2,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
-  markTheoryStudied, submitStageTask,
+  markTheoryStudied, submitStageTask, endLesson,
   getMaterialDownloadUrl,
 } from "@snr/core";
 import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { useToast } from "@/components/Toast";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
 import { RaiseHandButton } from "./RaiseHandButton";
@@ -288,6 +289,7 @@ export function LessonWorkspaceView({
   const dl = d.lesson;
   const router = useRouter();
   const db = createClient();
+  const showToast = useToast();
   const style = getSubjectStyle(lesson.group.subject);
 
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
@@ -526,6 +528,26 @@ export function LessonWorkspaceView({
   // Теперь это чисто клиентское действие без запроса к БД.
   function handleLeaveLesson() {
     router.push("/schedule");
+  }
+
+  // "Закончить урок" — ОТДЕЛЬНАЯ от "Выйти из урока" кнопка: реально
+  // переводит lessons.status -> 'completed' для ВСЕЙ группы, той же
+  // endLesson(), что и учитель (RLS-политика "student ends own in-progress
+  // lesson", миграция 117, уже разрешает это ученику своей группы — не
+  // выдумываем новую логику, зеркалим TeacherLessonDetailView.handleEndLesson
+  // 1-в-1: тот же confirm, тот же toast-on-error, тот же reload на успехе).
+  const [endingLesson, setEndingLesson] = useState(false);
+  async function handleFinishLesson() {
+    if (endingLesson || !window.confirm(dl.endLessonConfirm)) return;
+    setEndingLesson(true);
+    try {
+      await endLesson(db, lesson.id);
+      window.location.reload();
+    } catch (e) {
+      console.error("[LessonWorkspaceView] endLesson failed:", (e as Error)?.message ?? e);
+      showToast(d.common.error);
+      setEndingLesson(false);
+    }
   }
   // middleStages: visible stages for sidebar stepper (position ≤ active, or all if completed)
   const middleStages = isCompleted
@@ -890,6 +912,16 @@ export function LessonWorkspaceView({
                 {dl.leaveLessonBtn}
               </button>
             )}
+            {!isCompleted && (
+              <button
+                onClick={handleFinishLesson}
+                disabled={endingLesson}
+                className="flex items-center gap-2 rounded-[11px] bg-amber-500 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-600 disabled:opacity-60"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {endingLesson ? "…" : dl.endLessonBtn}
+              </button>
+            )}
             <button
               onClick={enterFocusMode}
               className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
@@ -970,6 +1002,16 @@ export function LessonWorkspaceView({
               className="flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50"
             >
               <LogOut className="h-4 w-4" />
+            </button>
+          )}
+          {!isCompleted && (
+            <button
+              onClick={handleFinishLesson}
+              disabled={endingLesson}
+              title={dl.endLessonBtn}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500 text-white transition-colors hover:bg-amber-600 disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" />
             </button>
           )}
           <button
