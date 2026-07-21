@@ -41,6 +41,7 @@ import { AttendanceRollCall } from "./AttendanceRollCall";
 import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
+import { useToast } from "@/components/Toast";
 import { useIsDemoSession, isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
 import { CodeEditor } from "@/components/CodeEditor";
@@ -805,11 +806,11 @@ export function TeacherLessonDetailView({
   }
 
   const db = createClient();
+  const showToast = useToast();
   const rollCallRef = useRef<HTMLDivElement>(null);
   const [status] = useState<LessonStatus>(lesson.status);
   const [startedAt] = useState<string | null>(lesson.started_at);
   const [endedAt] = useState<string | null>(lesson.ended_at);
-  const [elapsedMin, setElapsedMin] = useState(0);
 
 
   const [confirmDeleteMatOpen, setConfirmDeleteMatOpen] = useState(false);
@@ -905,16 +906,11 @@ export function TeacherLessonDetailView({
   const excusedMap: Record<string, string> = {};
   for (const e of excuses) excusedMap[e.student_id] = e.reason;
 
-  useEffect(() => {
-    if (status !== "in_progress" || !startedAt) return;
-    const tick = () => setElapsedMin(Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000));
-    tick();
-    const id = setInterval(tick, 30000);
-    return () => clearInterval(id);
-  }, [status, startedAt]);
-
-  // ── Manual start/end (§7.6 — available to both teacher and student; auto-start/
-  // auto-end by pg_cron still run independently and simply find nothing to do). ──
+  // ── Manual start/end (решение 21.07 — авто-старт/авто-финиш по времени
+  // временно отключены, см. миграция 143: pg_cron jobs auto-start-lessons/
+  // auto-end-lessons сняты с расписания, функции не удалены — чтобы вернуть
+  // авто-режим позже, снова запланировать те же cron.schedule(...).
+  // Управление уроком теперь ИСКЛЮЧИТЕЛЬНО через эти две ручные кнопки. ──
 
   async function handleStartLesson() {
     if (startingLesson) return;
@@ -922,7 +918,9 @@ export function TeacherLessonDetailView({
     try {
       await startLesson(db, lesson.id);
       window.location.reload();
-    } catch {
+    } catch (e) {
+      console.error("[TeacherLessonDetailView] startLesson failed:", (e as Error)?.message ?? e);
+      showToast(d.common.error);
       setStartingLesson(false);
     }
   }
@@ -933,7 +931,9 @@ export function TeacherLessonDetailView({
     try {
       await endLesson(db, lesson.id);
       window.location.reload();
-    } catch {
+    } catch (e) {
+      console.error("[TeacherLessonDetailView] endLesson failed:", (e as Error)?.message ?? e);
+      showToast(d.common.error);
       setEndingLesson(false);
     }
   }
@@ -1224,15 +1224,12 @@ export function TeacherLessonDetailView({
         }
         pills={
           <>
-            {status === "scheduled" && (
-              <LessonHeaderPill icon={<Clock className="h-4 w-4 text-[#9CA0B4]" />}>
-                {dl.scheduledAutoNote}
-              </LessonHeaderPill>
-            )}
+            {/* status === "scheduled": нейтрально — дата/время уже показаны
+                отдельным pill'ом ниже (timeRange · fmtDate), без "идёт"/
+                "просрочено"/"начнётся автоматически" (решение 21.07). */}
             {status === "in_progress" && (
               <LessonHeaderPill tone="live" icon={<span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />}>
                 {dl.inProgressAutoNote}
-                {elapsedMin > 0 && ` · ${dl.inProgressMins.replace("{n}", String(elapsedMin))}`}
               </LessonHeaderPill>
             )}
             {status === "completed" && (

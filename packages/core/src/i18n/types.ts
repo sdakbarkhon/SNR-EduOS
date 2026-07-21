@@ -1441,7 +1441,7 @@ export interface Dictionary {
     hintComingSoon: string;       // "Скоро будет доступно"
     // Iter5 P14 — waiting screen (scheduled lesson)
     untilStart: string;           // "до начала" (countdown label)
-    autoOpen: string;             // "Урок откроется автоматически"
+    autoOpen: string;             // "Урок откроется, когда его начнёт учитель"
     planStagesSummary: string;    // "{count} этапов · {minutes} мин"
     planStagesSummaryNoDuration: string; // "{count} этапов" (no duration_min set)
     planTopicPrefix: string;      // "Тема ·"
@@ -1586,10 +1586,8 @@ export interface Dictionary {
     makeAttendance: string;            // "Сделать перекличку"
     openAttendance: string;            // "Открыть посещаемость"
     openGrades: string;                // "Оценки"
-    // Lesson auto-status (pg_cron, no manual start/end)
-    scheduledAutoNote: string;         // "Урок начнётся автоматически по расписанию"
+    // Lesson status — manual start/end only (решение 21.07, авто-режим по времени отключён)
     inProgressAutoNote: string;        // "Урок идёт."
-    inProgressMins: string;            // "Длится {n} мин."
     startLessonBtn: string;            // "Начать урок" — БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6
     endLessonBtn: string;              // "Закончить урок" — ТОЛЬКО учитель, завершает урок для всех
     endLessonConfirm: string;          // confirm text before manual end (учитель)

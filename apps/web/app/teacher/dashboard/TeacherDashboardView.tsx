@@ -134,10 +134,16 @@ function findHeroLesson(
 ): { lesson: TodayLesson; mode: Exclude<HeroMode, "none"> } | null {
   const active = lessons.find((l) => l.status === "in_progress");
   if (active) return { lesson: active, mode: "in_progress" };
+  // "soon" ловит и уроки, чьё время уже прошло, но которые учитель ещё не
+  // начал вручную (решение 21.07 — авто-старта по времени больше нет, эта
+  // "дыра" раньше почти не встречалась, pg_cron закрывал её за ~1-5 мин).
+  // Без нижней границы diff>0 такой урок раньше вообще не находился ни
+  // одним из трёх .find() — HeroBlock показывал неверное "Уроки на сегодня
+  // завершены" при живом незапущенном уроке.
   const soon = lessons.find((l) => {
     if (l.status !== "scheduled") return false;
     const diff = new Date(l.starts_at).getTime() - now.getTime();
-    return diff > 0 && diff <= 3_600_000;
+    return diff <= 3_600_000;
   });
   if (soon) return { lesson: soon, mode: "soon" };
   const next = lessons.find((l) => l.status === "scheduled" && new Date(l.starts_at) > now);
@@ -168,16 +174,19 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
   const { lesson, mode } = hit;
   const cfg = getSubjectConfig(lesson.group.subject);
 
-  const durMin = mode === "in_progress"
-    ? Math.floor((now.getTime() - new Date(lesson.starts_at).getTime()) / 60000)
-    : null;
+  // "soon" ловит и уже просроченные-но-не-начатые уроки (см. findHeroLesson)
+  // — tillMin отрицателен в этом случае, что нельзя показывать как обратный
+  // отсчёт ("До начала: -12 мин" выглядело бы как раз тем самым "просрочено",
+  // которого решение 21.07 просит избегать). isOverdue разводит эти два
+  // случая на разные, оба нейтральные (без красного/тревожного) варианты.
   const tillMin = mode === "soon"
     ? Math.ceil((new Date(lesson.starts_at).getTime() - now.getTime()) / 60000)
     : null;
+  const isOverdueUnstarted = mode === "soon" && tillMin !== null && tillMin <= 0;
 
   const containerCls =
     mode === "in_progress" ? "bg-emerald-50/60 border-emerald-200" :
-    mode === "soon"        ? "bg-yellow-50/60 border-yellow-200" :
+    mode === "soon" && !isOverdueUnstarted ? "bg-yellow-50/60 border-yellow-200" :
                              "bg-white/60 border-slate-200/60";
 
   const badge = mode === "in_progress" ? (
@@ -188,7 +197,7 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
       </span>
       Идёт сейчас
     </span>
-  ) : mode === "soon" ? (
+  ) : mode === "soon" && !isOverdueUnstarted ? (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-3 py-1 text-[12px] font-bold text-yellow-900">
       <Clock className="h-3 w-3" /> Скоро начнётся
     </span>
@@ -198,11 +207,11 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
     </span>
   );
 
-  const counter = durMin != null ? (
-    <span className="text-[13px] font-medium text-emerald-700">
-      Длится {durMin} {pluralMin(durMin)}
-    </span>
-  ) : tillMin != null ? (
+  // Часть 3 (решение 21.07): счётчик "Длится N мин" убран полностью — в
+  // in_progress статус меняется только вручную, elapsed-с-момента-старта
+  // не показываем нигде в статусной строке/hero. "До начала" остаётся
+  // только для реально предстоящих уроков (isOverdueUnstarted их исключает).
+  const counter = tillMin != null && !isOverdueUnstarted ? (
     <span className="text-[13px] font-medium text-yellow-700">
       До начала: {tillMin} {pluralMin(tillMin)}
     </span>

@@ -8,7 +8,7 @@ import {
   Presentation, Code2, ClipboardCheck, Trophy, Puzzle, BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getSubjectStyle, formatTime, formatDate, getDictionary, startLesson } from "@snr/core";
+import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
@@ -87,7 +87,6 @@ export function PreLessonView({
   // duration_min), fetched separately from `lesson.stages` so we never ship
   // config/slides/quiz data to the client before the lesson actually starts.
   const [stages, setStages] = useState<LessonStagePreview[] | null>(null);
-  const [startingLesson, setStartingLesson] = useState(false);
 
   useEffect(() => {
     // createClient() must run only in the browser (accesses document.cookie)
@@ -161,20 +160,6 @@ export function PreLessonView({
     }
   }
 
-  // Manual "Начать урок" (§7.6) — available to student too, not just teacher.
-  // Auto-start by pg_cron keeps running independently; this just fires it early.
-  async function handleStartLesson() {
-    const db = dbRef.current;
-    if (!db || startingLesson) return;
-    setStartingLesson(true);
-    try {
-      await startLesson(db, lesson.id);
-      router.refresh();
-    } catch {
-      setStartingLesson(false);
-    }
-  }
-
   async function cancelExcuse() {
     const db = dbRef.current;
     if (!studentId || !db) return;
@@ -195,7 +180,13 @@ export function PreLessonView({
   // digits stay readable, but the string itself must also stay short enough
   // to fit the ring (see counterSizeClass below) — long labels use a smaller
   // font instead of overflowing the circle.
-  const isUrgent = secsUntil !== null && secsUntil < 60;
+  // secsUntil is clamped to >=0 (Math.max above) — once the scheduled start
+  // time passes without the teacher manually starting the lesson (решение
+  // 21.07, никакого авто-старта больше нет), it sits at exactly 0 forever.
+  // isUrgent must exclude that case (secsUntil > 0 below), or the ring/text
+  // stay in red "hurry up" mode indefinitely instead of settling into a
+  // neutral waiting state once the lesson is simply overdue-but-unstarted.
+  const isUrgent = secsUntil !== null && secsUntil > 0 && secsUntil < 60;
   const showCounter = secsUntil !== null && secsUntil <= 3600;
   const counterText = (() => {
     if (secsUntil === null) return "—:—";
@@ -375,22 +366,13 @@ export function PreLessonView({
             </div>
           </div>
 
-          {/* Auto-open note */}
+          {/* Открывается само (realtime/polling), когда учитель нажмёт
+              "Начать урок" вручную — решение 21.07, текст больше не
+              обещает автоматический старт по расписанию. */}
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-5 py-2 text-sm font-semibold text-white/70">
             <Bell className="h-[18px] w-[18px] text-orange-300" />
             {dl.autoOpen}
           </div>
-
-          {/* Manual start (§7.6) — same effect as auto-start, just immediate */}
-          {studentId && (
-            <button
-              onClick={handleStartLesson}
-              disabled={startingLesson}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-bold text-violet-700 shadow-lg transition hover:bg-white/90 active:scale-95 disabled:opacity-60"
-            >
-              {startingLesson ? "…" : dl.startLessonBtn}
-            </button>
-          )}
 
           {/* Excuse button (replaces the old "Перейти сейчас") */}
           {studentId && excuse !== undefined && !excuse && (
