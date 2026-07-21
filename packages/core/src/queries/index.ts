@@ -3354,19 +3354,31 @@ export const getGroupLessonsInDateRange = async (
   return (data ?? []) as Array<{ starts_at: string; ends_at: string | null }>;
 };
 
-/** Переводит урок в статус 'in_progress', отмечает этап Старт выполненным. */
+/** Переводит урок в статус 'in_progress' (учитель ИЛИ ученик своей группы —
+ *  RLS-политики "teacher updates own group lessons" / "student starts own
+ *  scheduled lesson"), отмечает этап Старт выполненным.
+ *  .select("id") + явная проверка affected-rows — если RLS отклонит UPDATE
+ *  (например для роли без нужной политики), Supabase вернёт data: [] БЕЗ
+ *  error, и без этой проверки вызов молча "успевал бы" ничего не изменив
+ *  (silent-fail, реф 5222b73) — теперь это видимая ошибка для вызывающего. */
 export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
-  const { error } = await db2.from("lessons")
+  const { data, error } = await db2.from("lessons")
     .update({ status: "in_progress", started_at: new Date().toISOString() })
-    .eq("id", lessonId);
+    .eq("id", lessonId)
+    .select("id");
   if (error) throw error;
-  // Отмечаем этап Старт (stage_role='start') выполненным
-  await db2.from("lesson_stages")
+  if (!data || data.length === 0) {
+    throw new Error("startLesson: обновление не затронуло ни одной строки (нет прав или урок не найден)");
+  }
+  // Отмечаем этап Старт (stage_role='start') выполненным — не фатально для
+  // основного перехода статуса, но ошибка не должна тонуть молча.
+  const { error: stageError } = await db2.from("lesson_stages")
     .update({ is_completed: true, completed_at: new Date().toISOString() })
     .eq("lesson_id", lessonId)
     .eq("stage_role", "start");
+  if (stageError) console.error("[startLesson] lesson_stages update failed:", stageError.message);
 };
 
 /** Ручное завершение урока (кнопка "Закончить урок" — учитель или ученик, БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6).

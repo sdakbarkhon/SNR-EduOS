@@ -4,17 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Bell,
+  ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Play,
   Presentation, Code2, ClipboardCheck, Trophy, Puzzle, BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
+import { getSubjectStyle, formatTime, formatDate, getDictionary, startLesson } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { useToast } from "@/components/Toast";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 
@@ -70,11 +71,18 @@ export function PreLessonView({
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
   const router = useRouter();
+  const showToast = useToast();
   const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
   const style = getSubjectStyle(lesson.group.subject);
 
   // Live clock (client-only — null on SSR to avoid hydration mismatch)
   const [nowMs, setNowMs] = useState<number | null>(null);
+  // Ученик тоже может начать урок — та же startLesson(), что и учитель
+  // (packages/core/src/queries/index.ts), полноценный переход lessons.status
+  // -> 'in_progress' для всех, не локальный "вход в просмотр". Требует
+  // RLS-политики "student starts own scheduled lesson" (см. отчёт — SQL для
+  // менеджера, не применена этой правкой).
+  const [starting, setStarting] = useState(false);
 
   // Excuse request state
   const [excuse, setExcuse] = useState<ExcuseRequest | null | undefined>(undefined);
@@ -138,6 +146,24 @@ export function PreLessonView({
       router.refresh();
     }
   }, [secsUntil, router]);
+
+  async function handleStartLesson() {
+    const db = dbRef.current;
+    if (!db || starting) return;
+    setStarting(true);
+    try {
+      await startLesson(db, lesson.id);
+      // Не сбрасываем starting=false тут — успешный старт переводит
+      // lesson.status в 'in_progress', router.refresh() перерендерит
+      // серверный компонент выше (LessonView.tsx), тот сам переключит с
+      // PreLessonView на LessonWorkspaceView — этот компонент размонтируется.
+      router.refresh();
+    } catch (e) {
+      console.error("[PreLessonView] startLesson failed:", (e as Error)?.message ?? e);
+      showToast(d.common.error);
+      setStarting(false);
+    }
+  }
 
   async function submitExcuse() {
     const db = dbRef.current;
@@ -366,13 +392,21 @@ export function PreLessonView({
             </div>
           </div>
 
-          {/* Открывается само (realtime/polling), когда учитель нажмёт
-              "Начать урок" вручную — решение 21.07, текст больше не
-              обещает автоматический старт по расписанию. */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-5 py-2 text-sm font-semibold text-white/70">
-            <Bell className="h-[18px] w-[18px] text-orange-300" />
-            {dl.autoOpen}
-          </div>
+          {/* Раньше здесь был статический текст "Урок откроется, когда его
+              начнёт учитель" — теперь ученик тоже может начать урок сам,
+              той же startLesson(), что и учитель (handleStartLesson выше,
+              полноценный status -> 'in_progress' для всех, не локальный
+              вход). Realtime/polling выше по-прежнему подхватывают старт,
+              если урок первым начнёт учитель — кнопка не единственный путь,
+              просто ещё один. */}
+          <button
+            onClick={handleStartLesson}
+            disabled={starting}
+            className="inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-8 py-3 text-base font-bold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-60 disabled:hover:translate-y-0"
+          >
+            <Play className="h-5 w-5" fill="currentColor" />
+            {starting ? "…" : dl.startLessonBtn}
+          </button>
 
           {/* Excuse button (replaces the old "Перейти сейчас") */}
           {studentId && excuse !== undefined && !excuse && (
