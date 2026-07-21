@@ -75,10 +75,13 @@ function lessonHeight(l: TodayLesson): number {
 
 type LessonPalette = { bg: string; border: string; label: string; sub: string };
 
-function lessonPalette(status: string, isPastScheduled: boolean): LessonPalette {
+// Решение 21.07 (отключение авто-режима, миграция 143): scheduled-урок,
+// чьё время уже прошло, но который не начали вручную, остаётся нейтральным
+// "Запланирован" (синий) — статуса "Пропущен"/красного больше нет нигде,
+// включая эту почасовую шкалу дня.
+function lessonPalette(status: string): LessonPalette {
   if (status === "in_progress")  return { bg: "bg-yellow-50",  border: "border-l-yellow-400",  label: "text-yellow-900",  sub: "text-yellow-600" };
   if (status === "completed")    return { bg: "bg-emerald-50", border: "border-l-emerald-400", label: "text-emerald-900", sub: "text-emerald-600" };
-  if (isPastScheduled)           return { bg: "bg-red-50",     border: "border-l-red-400",     label: "text-red-900",     sub: "text-red-500"    };
   return                                { bg: "bg-blue-50",    border: "border-l-blue-400",    label: "text-blue-900",    sub: "text-blue-600"   };
 }
 
@@ -353,8 +356,7 @@ export function TeacherDashboardView({
                 {todayLessons.map((lesson) => {
                   const top    = lessonTop(lesson);
                   const height = lessonHeight(lesson);
-                  const isPast = lesson.status === "scheduled" && now != null && new Date(lesson.starts_at) < now;
-                  const pal    = lessonPalette(lesson.status, isPast);
+                  const pal    = lessonPalette(lesson.status);
                   const cfg    = getSubjectConfig(lesson.group.subject);
                   return (
                     <Link

@@ -40,14 +40,19 @@ type FormState = {
   // Промт 4, Часть 5 — тема из учебного плана; null/"" = "своя тема" (title — свободный ввод как раньше).
   curriculumTopicId: string;
 };
-type EffectiveStatus = "scheduled" | "in_progress" | "completed" | "missed";
-type DayStatus = "in_progress" | "overdue" | "completed" | "scheduled" | null;
+type EffectiveStatus = "scheduled" | "in_progress" | "completed";
+type DayStatus = "in_progress" | "completed" | "scheduled" | null;
 
 // ── Effective status ──────────────────────────────────────────────────────────
-function getEffectiveStatus(lesson: LessonItem, now: Date): EffectiveStatus {
+// Решение (после отключения авто-режима, миграции 143): урок без ручного
+// старта остаётся "Запланирован" независимо от того, сколько времени прошло
+// с starts_at — статуса "Пропущен"/"missed" в системе больше нет. Прошедшие
+// дни закрывает полуночный крон close-past-lessons (00:00 Ташкент), в
+// течение дня показываем нейтральный "Запланирован" (не трогать этот крон —
+// он уже работает правильно).
+function getEffectiveStatus(lesson: LessonItem): EffectiveStatus {
   if (lesson.status === "in_progress") return "in_progress";
   if (lesson.status === "completed")   return "completed";
-  if (lesson.status === "scheduled" && new Date(lesson.starts_at) < now) return "missed";
   return "scheduled";
 }
 
@@ -62,34 +67,29 @@ const EFF_BADGE: Record<EffectiveStatus, { label: string; cls: string; dot?: boo
   scheduled:   { label: "Запланирован", cls: "bg-blue-100 text-blue-700 border border-blue-200" },
   in_progress: { label: "Идёт сейчас", cls: "bg-yellow-100 text-yellow-800 border border-yellow-200", dot: true },
   completed:   { label: "Завершён",    cls: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
-  missed:      { label: "Пропущен",   cls: "bg-red-100 text-red-700 border border-red-200" },
 };
 // Card background (soft fill)
 const EFF_CARD_BG: Record<EffectiveStatus, string> = {
   scheduled:   "bg-blue-50",
   in_progress: "bg-yellow-50",
   completed:   "bg-emerald-50",
-  missed:      "bg-red-50",
 };
 // Left border colour
 const EFF_BORDER: Record<EffectiveStatus, string> = {
   scheduled:   "border-l-blue-400",
   in_progress: "border-l-yellow-400",
   completed:   "border-l-emerald-400",
-  missed:      "border-l-red-400",
 };
 // Dot colour (used both in legend and in calendar cells)
 const EFF_DOT: Record<EffectiveStatus, string> = {
   scheduled:   "bg-blue-400",
   in_progress: "bg-yellow-400",
   completed:   "bg-emerald-400",
-  missed:      "bg-red-400",
 };
 
 // Calendar cell background (aggregate)
 const DAY_BG: Record<NonNullable<DayStatus>, string> = {
   in_progress: "bg-yellow-50/70 border border-yellow-200",
-  overdue:     "bg-red-50/70 border border-red-200",
   completed:   "bg-emerald-50/70 border border-emerald-200",
   scheduled:   "bg-blue-50/70 border border-blue-200",
 };
@@ -114,10 +114,9 @@ function getCalendarGrid(year: number, month: number): Date[] {
   return days;
 }
 
-function aggregateDayStatus(dayLessons: LessonItem[], now: Date): DayStatus {
+function aggregateDayStatus(dayLessons: LessonItem[]): DayStatus {
   if (dayLessons.length === 0) return null;
   if (dayLessons.some(l => l.status === "in_progress")) return "in_progress";
-  if (dayLessons.some(l => l.status === "scheduled" && new Date(l.starts_at) < now)) return "overdue";
   if (dayLessons.every(l => l.status === "completed")) return "completed";
   return "scheduled";
 }
@@ -203,9 +202,9 @@ function CardMenu({
 
 // ── LessonCard ────────────────────────────────────────────────────────────────
 function LessonCard({
-  lesson, now, onEdit, onDelete, readOnly = false,
+  lesson, onEdit, onDelete, readOnly = false,
 }: {
-  lesson: LessonItem; now: Date;
+  lesson: LessonItem;
   onEdit: (l: LessonItem) => void; onDelete: (l: LessonItem) => void;
   readOnly?: boolean;
 }) {
@@ -213,7 +212,7 @@ function LessonCard({
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
     : fmtTime(lesson.starts_at);
-  const eff = getEffectiveStatus(lesson, now);
+  const eff = getEffectiveStatus(lesson);
   const badge = EFF_BADGE[eff];
   const editBlocked = useDemoEditBlocked(lesson.is_demo);
 
@@ -724,7 +723,7 @@ export function TeacherLessonsView({
                 const isToday    = key === todayKey;
                 const isSelected = key === selectedDayKey;
                 const dayData    = byDay.get(key) ?? [];
-                const aggStatus  = aggregateDayStatus(dayData, now);
+                const aggStatus  = aggregateDayStatus(dayData);
 
                 let cellCls =
                   "relative flex flex-col items-center rounded-xl p-1 transition-all hover:scale-105 cursor-pointer min-h-[52px] ";
@@ -750,7 +749,7 @@ export function TeacherLessonsView({
                     {dayData.length > 0 && (
                       <div className="mt-1.5 flex items-center justify-center gap-0.5">
                         {dayData.slice(0, 3).map((l, di) => {
-                          const eff = getEffectiveStatus(l, now);
+                          const eff = getEffectiveStatus(l);
                           return (
                             <span key={di} className={`h-1.5 w-1.5 rounded-full ${
                               isSelected ? "bg-white/80" : EFF_DOT[eff]
@@ -778,7 +777,6 @@ export function TeacherLessonsView({
                   ["in_progress", "Идёт сейчас"],
                   ["scheduled",   "Запланирован"],
                   ["completed",   "Завершён"],
-                  ["missed",      "Пропущен"],
                 ] as [EffectiveStatus, string][]
               ).map(([s, label]) => (
                 <div key={s} className="flex items-center gap-1.5">
@@ -828,7 +826,7 @@ export function TeacherLessonsView({
             ) : (
               <div className="space-y-2">
                 {dayLessons.map(l => (
-                  <LessonCard key={l.id} lesson={l} now={now} onEdit={openEdit} onDelete={openDelete} readOnly={isCurator} />
+                  <LessonCard key={l.id} lesson={l} onEdit={openEdit} onDelete={openDelete} readOnly={isCurator} />
                 ))}
               </div>
             )}
