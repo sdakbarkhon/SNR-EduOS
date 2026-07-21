@@ -50,6 +50,56 @@ export async function getCurriculumPlanForGroupSubject(
   };
 }
 
+/** Один план по id (страница деталей плана: клик по карточке). Та же форма
+ *  ответа, что getCurriculumPlanForGroupSubject, просто другой фильтр. */
+export async function getCurriculumPlanById(db: Db, planId: string): Promise<CurriculumPlanWithTopics | null> {
+  const { data, error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .select("*, group:groups(name), subject:subjects(name), topics:curriculum_plan_topics(*)")
+    .eq("id", planId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const p = data as CurriculumPlan & { group: { name: string } | null; subject: { name: string } | null; topics: CurriculumPlanTopic[] };
+  return {
+    ...p,
+    group_name: p.group?.name,
+    subject_name: p.subject?.name,
+    topics: (p.topics ?? []).sort((a, b) => a.order_index - b.order_index),
+  };
+}
+
+/** Правка темы (Часть 1 — переименование). Описание намеренно не редактируется
+ *  из UI детали плана — только название, как в спеке задачи. */
+export async function updateCurriculumPlanTopic(
+  db: Db,
+  topicId: string,
+  patch: { title: string },
+): Promise<void> {
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plan_topics")
+    .update({ title: patch.title })
+    .eq("id", topicId);
+  if (error) throw error;
+}
+
+/** Переставляет темы плана — order_index := позиция в массиве orderedTopicIds. */
+export async function reorderCurriculumPlanTopics(
+  db: Db,
+  orderedTopicIds: string[],
+): Promise<void> {
+  const results = await Promise.all(
+    orderedTopicIds.map((id, i) => (db as AnyDb).from("curriculum_plan_topics").update({ order_index: i }).eq("id", id)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+}
+
+export async function deleteCurriculumPlanTopic(db: Db, topicId: string): Promise<void> {
+  const { error } = await (db as AnyDb).from("curriculum_plan_topics").delete().eq("id", topicId);
+  if (error) throw error;
+}
+
 /** Темы плана + сколько НОВЫХ уроков (curriculum_topic_id) уже используют
  *  каждую — для лейбла "использована в N уроках" в селекторе формы урока. */
 export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Promise<CurriculumTopicWithUsage[]> {

@@ -3335,6 +3335,25 @@ export const getTeacherLessonsByMonth = async (
   return filterBySubject((data ?? []) as unknown as TeacherLessonListItem[], filter);
 };
 
+/** Уроки конкретной группы в диапазоне дат (Asia/Tashkent, [fromDate, toDate]
+ *  включительно, формат YYYY-MM-DD) — для проверки занятости слотов при
+ *  авто-раскладке уроков из учебного плана (Промт: "Учебные планы", Часть 2А). */
+export const getGroupLessonsInDateRange = async (
+  db: Db,
+  groupId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Array<{ starts_at: string; ends_at: string | null }>> => {
+  const { data, error } = await db
+    .from("lessons")
+    .select("starts_at, ends_at")
+    .eq("group_id", groupId)
+    .gte("starts_at", `${fromDate}T00:00:00+05:00`)
+    .lte("starts_at", `${toDate}T23:59:59+05:00`);
+  if (error) throw error;
+  return (data ?? []) as Array<{ starts_at: string; ends_at: string | null }>;
+};
+
 /** Переводит урок в статус 'in_progress', отмечает этап Старт выполненным. */
 export const startLesson = async (db: Db, lessonId: string): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
