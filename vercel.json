@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/homework-review-process",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/close-past-lessons",
+      "schedule": "0 19 * * *"
     }
   ]
 }
