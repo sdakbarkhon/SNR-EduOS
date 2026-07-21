@@ -30,6 +30,9 @@ export function TeacherShell({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
 
+  // Сообщения — фиксированная Telegram-раскладка, см. AppShell.tsx для того же паттерна.
+  const isMessagesRoute = pathname === "/teacher/messages";
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--shell-gradient)" }}>
       <TeacherSidebar />
@@ -43,8 +46,8 @@ export function TeacherShell({
         <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-[60px]" style={{ background: "var(--shell-overlay)" }} />
 
         <TeacherTopbar headerInfo={headerInfo} />
-        <main className="flex-1 overflow-y-auto px-4 pb-20 pt-1 md:px-8 md:pb-8">
-          <div className="mx-auto w-full min-[1440px]:max-w-[1600px]">
+        <main className={cn("flex-1 px-4 pb-20 pt-1 md:px-8 md:pb-8", isMessagesRoute ? "overflow-hidden" : "overflow-y-auto")}>
+          <div className={cn("mx-auto w-full min-[1440px]:max-w-[1600px]", isMessagesRoute && "h-full")}>
             {children}
           </div>
         </main>

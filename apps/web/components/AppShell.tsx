@@ -33,6 +33,11 @@ export function AppShell({
   const active = navItems.find((i) => pathname.startsWith(i.href));
   const title = active ? active.label(d) : d.common.appName;
 
+  // Сообщения — фиксированная Telegram-раскладка (список/лента/поле ввода со
+  // своим скроллом каждая, см. MessagesView.tsx) требует, чтобы {children}
+  // реально получил высоту от <main>, а не сам скроллился вместе с ним.
+  const isMessagesRoute = pathname === "/messages";
+
   // Fullscreen lesson workspace — hide chrome so the stage content gets full viewport
   const isFullscreenLesson = /^\/lessons\/[^/]+/.test(pathname);
   if (isFullscreenLesson) {
@@ -60,8 +65,8 @@ export function AppShell({
         {/* Правая колонка */}
         <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]">
           <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
-          <main className="flex-1 overflow-y-auto pb-20 md:pb-1">
-            <div className="mx-auto w-full min-[1440px]:max-w-[1600px]">
+          <main className={cn("flex-1 pb-20 md:pb-1", isMessagesRoute ? "overflow-hidden" : "overflow-y-auto")}>
+            <div className={cn("mx-auto w-full min-[1440px]:max-w-[1600px]", isMessagesRoute && "h-full")}>
               {children}
             </div>
           </main>

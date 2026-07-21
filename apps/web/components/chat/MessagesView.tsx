@@ -60,6 +60,12 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Telegram-style автоскролл: лента скроллится вниз только если пользователь
+  // и так был внизу (или только что открыл тред/отправил сообщение) — если он
+  // прокрутил вверх читать историю, новое сообщение его вниз не дёргает.
+  const feedRef = useRef<HTMLDivElement>(null);
+  const wasAtBottomRef = useRef(true);
+  const BOTTOM_THRESHOLD_PX = 100;
 
   async function refreshThreads() {
     const rows = await getMyThreadSummaries(db).catch((e) => {
@@ -133,7 +139,20 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
+  // Открыли тред (или сменили) — считаем, что мы "внизу", пока пользователь
+  // сам не проскроллит вверх (см. handleFeedScroll ниже).
   useEffect(() => {
+    wasAtBottomRef.current = true;
+  }, [activeThreadId]);
+
+  function handleFeedScroll() {
+    const el = feedRef.current;
+    if (!el) return;
+    wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+  }
+
+  useEffect(() => {
+    if (!wasAtBottomRef.current) return;
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, activeThreadId]);
 
@@ -168,6 +187,8 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
       edited_at: null,
       deleted_at: null,
     };
+    // Своё сообщение всегда возвращает к низу ленты, даже если читали историю выше.
+    wasAtBottomRef.current = true;
     setMessages((prev) => [...prev, optimistic]);
     try {
       const saved = await sendChatMessage(db, activeThreadId, body);
@@ -297,7 +318,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   }
 
   return (
-    <div className="flex h-full min-h-[520px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+    <div className="flex h-full overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
       {/* Промт 6.2: на md-lg (планшет, 768-1024) 320px фиксированной ширины
           списка чатов зажимало область сообщений — сужена до 230px, на lg+
           (десктоп) ширина как была. */}
@@ -307,7 +328,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
         <div className="shrink-0 border-b border-gray-100 px-4 py-4">
           <h1 className="text-lg font-bold text-gray-800">{d.chat.title}</h1>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="scrollbar-hide flex-1 overflow-y-auto">
           {loadedThreads && threads.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-gray-400">
@@ -415,7 +436,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
               </div>
             </div>
 
-            <div className="flex-1 space-y-1 overflow-y-auto px-4 py-4">
+            <div ref={feedRef} onScroll={handleFeedScroll} className="scrollbar-hide flex-1 space-y-1 overflow-y-auto px-4 py-4">
               {messages.length === 0 && (
                 <div className="flex h-full items-center justify-center text-sm text-gray-400">{d.chat.noMessagesInThread}</div>
               )}
