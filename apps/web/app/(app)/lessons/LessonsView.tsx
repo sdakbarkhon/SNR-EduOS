@@ -225,8 +225,18 @@ export function LessonsView({
   // lesson.status, который может отставать от реальности: cron-автостарт/
   // финиш урока крутится по расписанию, а не мгновенно). Пересчитывается
   // каждые 30 сек через setInterval выше.
+  //
+  // Замирание: когда время дошло до последнего урока дня и он побыл
+  // "Сейчас", эта метка ОСТАЁТСЯ на нём после его окончания (до полуночи
+  // Ташкента, когда день реально закроет крон) — иначе после последнего
+  // урока никто не "Сейчас", и день выглядит незаконченным/повисшим.
+  const lastTodayLesson = todayLessons.length > 0
+    ? ([...todayLessons].sort((a, b) => lessonStartMs(b) - lessonStartMs(a))[0] ?? null)
+    : null;
+  const dayIsOver = nowMs !== null && lastTodayLesson !== null && nowMs > lessonEndMs(lastTodayLesson);
   const currentId = nowMs !== null
-    ? todayLessons.find((l) => nowMs >= lessonStartMs(l) && nowMs <= lessonEndMs(l))?.id ?? null
+    ? (todayLessons.find((l) => nowMs >= lessonStartMs(l) && nowMs <= lessonEndMs(l))?.id
+        ?? (dayIsOver ? lastTodayLesson!.id : null))
     : null;
   const nextLesson = nowMs !== null
     ? todayLessons.find((l) => lessonStartMs(l) > nowMs) ?? null
@@ -297,13 +307,16 @@ export function LessonsView({
               {todayLessons.map((l) => {
                 const color = lessonColor(l);
                 const isNow = l.id === currentId;
-                const isPast = !isNow && nowMs !== null && nowMs > lessonEndMs(l);
+                // Прошедшие уроки — нейтральный вид (без спец-метки, без
+                // приглушения), поэтому isPast больше нигде не нужен для
+                // стилизации ниже (замирание последнего урока дня на
+                // "Сейчас" реализовано выше, через currentId).
                 const isNext = !isNow && l.id === nextLesson?.id;
                 return (
                   <button
                     key={l.id}
                     onClick={() => router.push(`/lessons/${l.id}`)}
-                    className={cn("group w-56 shrink-0 text-left lg:w-60", isPast && "opacity-55 saturate-[0.6]")}
+                    className="group w-56 shrink-0 text-left lg:w-60"
                   >
                     <div className="mb-1.5 px-1">
                       <span className="text-sm font-extrabold text-slate-700">{timeLabel(l)}</span>
@@ -317,12 +330,10 @@ export function LessonsView({
                       style={{
                         background: isNow
                           ? "linear-gradient(135deg, #EDE9FE 0%, #F5F3FF 60%, #FCF8FF 100%)"
-                          : isPast
-                          ? "linear-gradient(135deg, #F1F5F9 0%, #F8FAFC 100%)"
                           : `linear-gradient(135deg, ${color}0F 0%, ${color}26 100%), #ffffff`,
                       }}
                     >
-                      <h4 className={cn("truncate text-base font-extrabold", isPast ? "text-slate-500" : "text-slate-800")}>{lessonName(l)}</h4>
+                      <h4 className="truncate text-base font-extrabold text-slate-800">{lessonName(l)}</h4>
                       <p className="mt-0.5 text-sm font-medium text-slate-500">
                         {l.room ? `${cap(d.dashboard.room)} ${l.room}` : " "}
                       </p>

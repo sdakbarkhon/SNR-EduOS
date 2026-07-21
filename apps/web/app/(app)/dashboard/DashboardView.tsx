@@ -142,19 +142,21 @@ export function DashboardView({
         .filter((l) => tashkentDateKey(new Date(l.starts_at)) === tashkentDateKey(now))
         .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
     : [];
-  // Widget shows at most 3 — the ones still relevant (in progress or upcoming),
-  // not lessons that already finished. Same past/now/next formula as the
-  // per-item badges below, factored out so the cutoff and the badges agree.
+  // Уроки сегодня видны ВЕСЬ день — раньше прошедшие вычищались отсюда, из-за
+  // чего после последнего урока дня виджет считал день "пустым" и показывал
+  // "Нет уроков" вместо реального расписания. "Нет уроков" теперь — это
+  // ТОЛЬКО пустой todayLessonsAll (см. проверку ниже), не "все прошли".
   const MAX_TODAY_WIDGET = 3;
-  const todayLessonsUpcoming = now
-    ? todayLessonsAll.filter((l) => {
-        const end = l.ends_at ? new Date(l.ends_at) : null;
-        const isPastLesson = !!end && now > end;
-        return !isPastLesson;
-      })
-    : [];
-  const todayLessons = todayLessonsUpcoming.slice(0, MAX_TODAY_WIDGET);
-  const hasMoreToday = todayLessonsUpcoming.length > MAX_TODAY_WIDGET;
+  const lastLessonOfDay = todayLessonsAll.length > 0 ? todayLessonsAll[todayLessonsAll.length - 1] : null;
+  const dayIsOver = now !== null && !!lastLessonOfDay?.ends_at && now > new Date(lastLessonOfDay.ends_at);
+  // Пока день не закончился — виджет показывает первые MAX_TODAY_WIDGET по
+  // времени (как раньше). Когда день закончился — хвост списка, чтобы
+  // "замёрзший" на "Сейчас" последний урок дня точно попал в кадр (см.
+  // isNow ниже), а не был бы обрезан, если уроков в дне больше лимита виджета.
+  const todayLessons = dayIsOver
+    ? todayLessonsAll.slice(-MAX_TODAY_WIDGET)
+    : todayLessonsAll.slice(0, MAX_TODAY_WIDGET);
+  const hasMoreToday = todayLessonsAll.length > MAX_TODAY_WIDGET;
   const subjectById = new Map(mySubjects.map((s) => [s.id, s]));
 
   // Per-subject progress: completed vs. total lessons for that subject_id.
@@ -416,7 +418,12 @@ export function DashboardView({
                 const SubIcon = sub ? (LUCIDE_ICONS[sub.icon] ?? BookOpen) : BookOpen;
                 const start = new Date(lesson.starts_at);
                 const end = lesson.ends_at ? new Date(lesson.ends_at) : null;
-                const isNow = now !== null && now >= start && (!end || now <= end);
+                // Замирание: последний урок дня, когда его время уже прошло
+                // (день окончен), продолжает считаться "Сейчас" — до полуночи
+                // Ташкента, когда крон реально закроет день. Остальные
+                // прошедшие уроки — нейтральные, без метки.
+                const isFrozenLast = dayIsOver && lastLessonOfDay?.id === lesson.id;
+                const isNow = isFrozenLast || (now !== null && now >= start && (!end || now <= end));
                 const isNext = !isNow && now !== null && start.getTime() - now.getTime() > 0
                   && start.getTime() - now.getTime() < 15 * 60 * 1000;
                 const isPast = !isNow && !isNext && now !== null && !!end && now > end;
@@ -426,7 +433,7 @@ export function DashboardView({
                     key={lesson.id}
                     href={`/lessons/${lesson.id}`}
                     className="flex items-center gap-2.5 rounded-2xl p-2.5 transition hover:bg-[#F7F5FF]"
-                    style={{ background: isNow ? "#F4F0FF" : undefined, opacity: isPast ? 0.6 : 1 }}
+                    style={{ background: isNow ? "#F4F0FF" : undefined }}
                   >
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tileColor }} />
                     <div
@@ -453,16 +460,12 @@ export function DashboardView({
                       <span className="shrink-0 rounded-[10px] bg-[#FFF3DE] px-2.5 py-1 text-[11px] font-extrabold text-[#FFB020]">
                         {t.next}
                       </span>
-                    ) : isPast ? (
-                      <span className="shrink-0 rounded-[10px] bg-[#F1F1F5] px-2.5 py-1 text-[11px] font-extrabold text-[#9A9AB5]">
-                        {t.finished}
-                      </span>
                     ) : null}
                   </Link>
                 );
               })}
 
-              {now && todayLessons.length === 0 && (
+              {now && todayLessonsAll.length === 0 && (
                 <p className="py-8 text-center text-sm text-[#9A9AB5]">{t.noLessonsToday}</p>
               )}
             </div>
