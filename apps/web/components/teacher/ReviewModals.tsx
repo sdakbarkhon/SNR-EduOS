@@ -10,9 +10,20 @@ import {
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { Download, Paperclip, X, Sparkles } from "lucide-react";
+import { Download, Link as LinkIcon, Paperclip, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
+
+/** answer_text у внешних сервисов — ссылка на работу ученика (http/https). */
+function isHttpUrl(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return /^https?:\/\/\S+$/i.test(text.trim());
+}
+/** Скриншот/фото сдачи — показываем превью, не только кнопкой скачивания. */
+function isImagePath(path: string | null | undefined): boolean {
+  if (!path) return false;
+  return /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(path);
+}
 
 export type ReviewQuestion = {
   id: string;
@@ -55,7 +66,20 @@ export function ReviewModal({ submission, onClose, onGraded }: {
   const [comment, setComment] = useState(submission.teacher_comment ?? "");
   const [saving, setSaving] = useState(false);
   const [dlLoading, setDlLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Превью скриншота/фото сдачи (в т.ч. внешние сервисы). .error не глотаем.
+  useEffect(() => {
+    let cancelled = false;
+    if (isImagePath(submission.file_storage_path)) {
+      getSubmissionFileUrl(supabase, submission.file_storage_path!)
+        .then((url) => { if (!cancelled) setPreviewUrl(url); })
+        .catch((e) => console.error("[ReviewModal] preview url failed:", (e as Error)?.message ?? e));
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submission.file_storage_path]);
 
   async function downloadWork() {
     if (!submission.file_storage_path) return;
@@ -102,12 +126,33 @@ export function ReviewModal({ submission, onClose, onGraded }: {
         <div className="overflow-y-auto max-h-[60vh] px-6 py-4 space-y-4">
           <div>
             <h3 className="mb-2 text-[13px] font-semibold text-brand-ink-muted">{d.teacher.reviewAnswers}</h3>
-            {submission.answer_text ? (
+            {submission.answer_text && isHttpUrl(submission.answer_text) ? (
+              <a
+                href={submission.answer_text.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 break-all rounded-[12px] bg-slate-50 p-3 text-[13px] font-medium text-brand-blue hover:underline"
+              >
+                <LinkIcon size={13} className="shrink-0" />
+                {submission.answer_text.trim()}
+              </a>
+            ) : submission.answer_text ? (
               <div className="rounded-[12px] bg-slate-50 p-3 text-[13px] text-brand-ink whitespace-pre-wrap">
                 {submission.answer_text}
               </div>
             ) : (
               <p className="text-[13px] text-brand-ink-muted">{d.homework.noFile}</p>
+            )}
+            {/* Превью скриншота/фото — над карточкой файла. */}
+            {previewUrl && (
+              <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt={submission.file_original_name ?? "submission"}
+                  className="max-h-72 w-auto rounded-[12px] border border-slate-100 object-contain"
+                />
+              </a>
             )}
             {submission.file_storage_path && (
               <div className="mt-2 flex items-center gap-3 rounded-[10px] border border-slate-100 bg-slate-50 p-2.5">

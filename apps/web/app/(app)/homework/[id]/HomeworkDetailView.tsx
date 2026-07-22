@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, FileText, Maximize2, Minimize2, Paperclip, Send, X } from "lucide-react";
+import { ArrowLeft, Download, FileText, Link as LinkIcon, Maximize2, Minimize2, Paperclip, Send, X } from "lucide-react";
 import {
   getDictionary,
   getSubjectStyle,
@@ -37,6 +37,19 @@ function downloadViaLink(url: string, filename: string) {
   a.href = url;
   a.download = filename;
   a.click();
+}
+
+/** answer_text у внешних сервисов — ссылка на работу ученика; распознаём http(s). */
+function isHttpUrl(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const t = text.trim();
+  return /^https?:\/\/\S+$/i.test(t);
+}
+
+/** Файл-скриншот внешней работы показываем превью, не только кнопкой скачивания. */
+function isImagePath(path: string | null | undefined): boolean {
+  if (!path) return false;
+  return /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(path);
 }
 
 /** Card for the teacher's attachment on a homework. */
@@ -132,6 +145,20 @@ function SubmissionBlock({
   const d = getDictionary(locale as Locale);
   const sub = hw.submission!;
   const [dlLoading, setDlLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Превью скриншота/фото (внешние сервисы и любые image-сдачи) — тянем
+  // signed URL один раз при монтировании. .error логируем, не глотаем.
+  useEffect(() => {
+    let cancelled = false;
+    if (isImagePath(sub.file_storage_path)) {
+      getSubmissionFileUrl(sb, sub.file_storage_path!)
+        .then((url) => { if (!cancelled) setPreviewUrl(url); })
+        .catch((e) => console.error("[SubmissionBlock] preview url failed:", (e as Error)?.message ?? e));
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sub.file_storage_path]);
 
   const handleFileDownload = async () => {
     if (!sub.file_storage_path) return;
@@ -160,9 +187,25 @@ function SubmissionBlock({
       <span className={`mb-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusCls}`}>
         {statusLabel}
       </span>
-      {/* Отправленный текстовый ответ — под явным заголовком «Ваш ответ»,
-          whitespace-pre-wrap для многострочных эссе/сочинений. */}
-      {sub.answer_text && (
+      {/* Отправленный ответ: ссылка (внешние сервисы — answer_text это URL) →
+          кликабельная ссылка; иначе — текстовый ответ (эссе/сочинение) с
+          whitespace-pre-wrap. */}
+      {sub.answer_text && isHttpUrl(sub.answer_text) ? (
+        <div className="mb-2">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+            {d.homework.yourWorkLink}
+          </p>
+          <a
+            href={sub.answer_text.trim()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 break-all rounded-xl bg-slate-50 p-3 text-sm font-medium text-brand-blue hover:underline"
+          >
+            <LinkIcon size={14} className="flex-shrink-0" />
+            {sub.answer_text.trim()}
+          </a>
+        </div>
+      ) : sub.answer_text ? (
         <div className="mb-2">
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
             {d.homework.yourAnswer}
@@ -171,11 +214,23 @@ function SubmissionBlock({
             {sub.answer_text}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Ни текста, ни файла — не показываем пустой блок, только короткую метку. */}
       {!sub.answer_text && !sub.file_storage_path && !sub.file_url && (
         <p className="mb-2 text-sm italic text-slate-400">{d.homework.notSubmittedYet}</p>
+      )}
+
+      {/* Превью скриншота/фото (image-сдача) — над карточкой файла. */}
+      {previewUrl && (
+        <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="mb-2 block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={sub.file_original_name ?? "submission"}
+            className="max-h-72 w-auto rounded-xl border border-slate-100 object-contain"
+          />
+        </a>
       )}
 
       {/* New storage-backed file */}
@@ -261,9 +316,14 @@ function SubmissionBlock({
 function SubmitForm({
   hw,
   onSuccess,
+  external = false,
 }: {
   hw: HomeworkWithSubmission;
   onSuccess?: () => void;
+  // Внешние сервисы (wokwi/geogebra/…): текстовое поле становится ссылкой на
+  // работу, файл — скриншот/фото. Достаточно чего-то одного (валидация та же —
+  // текст ИЛИ файл). Ссылка кладётся в answer_text, как у обычных file-заданий.
+  external?: boolean;
 }) {
   const router = useRouter();
   const sb = createClient();
@@ -341,14 +401,32 @@ function SubmitForm({
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
         {d.homework.submit}
       </p>
+      {external && (
+        <p className="mb-3 text-xs text-slate-500">{d.homework.externalSubmitHint}</p>
+      )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={d.homework.answerPlaceholder}
-          rows={4}
-          className="w-full resize-none rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none"
-        />
+        {external ? (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+              {d.homework.externalLinkLabel}
+            </span>
+            <input
+              type="url"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="https://…"
+              className="w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none"
+            />
+          </label>
+        ) : (
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={d.homework.answerPlaceholder}
+            rows={4}
+            className="w-full resize-none rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none"
+          />
+        )}
 
         {/* File drop zone */}
         <div
@@ -385,8 +463,12 @@ function SubmitForm({
               className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500 transition hover:border-brand-blue hover:text-brand-blue"
             >
               <Paperclip size={14} />
-              {status === "submitting" && file ? d.homework.uploadingFile : d.homework.attachFile}
-              <span className="text-xs text-slate-400 ml-1">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ</span>
+              {status === "submitting" && file
+                ? d.homework.uploadingFile
+                : external ? d.homework.externalPhotoLabel : d.homework.attachFile}
+              <span className="text-xs text-slate-400 ml-1">
+                {external ? d.homework.externalPhotoHint : "PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ"}
+              </span>
             </label>
           )}
         </div>
@@ -450,23 +532,6 @@ function ExternalServiceCard({ hw }: { hw: HomeworkWithSubmission }) {
           referrerPolicy="no-referrer-when-downgrade"
         />
       </div>
-    </GlassCard>
-  );
-}
-
-/** External-service homework isn't submitted to the teacher by design (the
- *  student works right inside the embedded service above). Instead of a
- *  misleading text/file submit form, show a short read-only note so there's
- *  no empty "your work" block. */
-function ExternalNoSubmissionNote() {
-  const { locale } = useLocale();
-  const d = getDictionary(locale as Locale);
-  return (
-    <GlassCard className="p-5">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
-        {d.homework.detailYourSubmission}
-      </p>
-      <p className="text-sm leading-relaxed text-slate-500">{d.homework.externalNoSubmission}</p>
     </GlassCard>
   );
 }
@@ -583,17 +648,15 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
 
       {isExternalService(hw.content_type) && <ExternalServiceCard hw={hw} />}
 
-      {/* Submission or Test */}
+      {/* Submission or Test. Внешние сервисы теперь тоже сдаются: ученик
+          прикрепляет фото/скриншот и/или ссылку — та же форма/SubmissionBlock,
+          что и у file-заданий, только с external-вариантом полей. */}
       {hw.content_type === "test" ? (
         <TestPlayer hw={hw} />
       ) : hw.submission && !resubmitMode ? (
         <SubmissionBlock hw={hw} onResubmit={() => setResubmitMode(true)} />
-      ) : isExternalService(hw.content_type) ? (
-        // Внешние сервисы не сдаются по дизайну — вместо формы отправки
-        // короткая метка «работа не отправляется» (без пустых блоков).
-        <ExternalNoSubmissionNote />
       ) : (
-        <SubmitForm hw={hw} onSuccess={() => setResubmitMode(false)} />
+        <SubmitForm hw={hw} external={isExternalService(hw.content_type)} onSuccess={() => setResubmitMode(false)} />
       )}
     </div>
   );

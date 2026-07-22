@@ -910,8 +910,13 @@ export interface Dictionary {
     detailDownload: string;
     detailYourSubmission: string;
     submittedCodeLabel: string;   // "Отправленный код" — read-only снимок сданного кода (programming)
-    externalNoSubmission: string; // внешний сервис: работа не отправляется по дизайну
+    externalNoSubmission: string; // внешний сервис: работа не отправляется по дизайну (deprecated, оставлено для совместимости)
     notSubmittedYet: string;      // "Ещё не отправлено" — когда сдачи нет
+    externalLinkLabel: string;    // "Ссылка на вашу работу" — поле ссылки в форме сдачи внешнего сервиса
+    externalPhotoLabel: string;   // "Прикрепить скриншот/фото"
+    externalPhotoHint: string;    // "JPG, PNG · до 50 МБ"
+    externalSubmitHint: string;   // "Прикрепите фото и/или вставьте ссылку на свою работу"
+    yourWorkLink: string;         // "Ссылка на работу" — заголовок над кликабельной ссылкой сдачи
     formSubmitting: string;
     formSuccess: string;
     formError: string;
