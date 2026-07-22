@@ -12,8 +12,12 @@
 //     урок: present≈90% / absent_unexcused≈8% / absent_excused≈2% (рандом).
 //   - lesson_grades для ~35% ПРИСУТСТВОВАВШИХ учеников урока, у кого ещё нет
 //     оценки за этот урок: 5≈30% / 4≈40% / 3≈25% / 2≈5%. Отсутствовавшим — нет.
-//   - ИДЕМПОТЕНТНО: (student,lesson) с уже существующей отметкой/оценкой
-//     пропускаются, дублей нет (ON CONFLICT DO NOTHING по unique-ключам).
+//   - ИДЕМПОТЕНТНО для нормальных дней: (student,lesson) с уже существующей
+//     отметкой/оценкой пропускаются, дублей нет (ON CONFLICT DO NOTHING).
+//   - «МУСОРНЫЕ ДНИ» (за день есть отметки, но НИ ОДНОГО present — битые данные,
+//     жалоба «все без причины отсутствовали») распознаются ПО ДАННЫМ (даты не
+//     хардкодятся) и ПЕРЕЗАПИСЫВАЮТСЯ целиком по нормальному распределению
+//     (ON CONFLICT DO UPDATE). Оценки на них ставятся по обновлённой посещаемости.
 //   - Всё кодом, БЕЗ AI. school_id задаётся ЯВНО из students.school_id
 //     (реф миграция 71 — под service-role DEFAULT current_school_id() → NULL).
 //   - graded_by = учитель группы (groups.teacher_id); уроки без учителя —
@@ -96,30 +100,63 @@ async function main() {
   }
   const daysSorted = Object.keys(byDay).sort();
   const firstNoPresent = daysSorted.find((k) => byDay[k].lessons > 0 && byDay[k].presentRows === 0) ?? null;
+
+  // «МУСОРНЫЙ ДЕНЬ» — за день есть отметки посещаемости, но НИ ОДНОГО present
+  // (existRows > 0 && presentRows === 0). Это битые данные (жалоба менеджера
+  // «все без причины отсутствовали»). Критерий вычисляется ПО ДАННЫМ, даты не
+  // хардкодятся. Для таких дней существующие отметки ПЕРЕЗАПИСЫВАЮТСЯ по
+  // нормальному распределению (present≈90/8/2). Дни с existRows === 0 (совсем
+  // нет отметок) — НЕ мусорные, заполняются обычным gap-fill'ом. Дни с
+  // present > 0 (реальная посещаемость) — только дополняются, не трогаем.
+  const garbageDays = new Set(daysSorted.filter((k) => byDay[k].existRows > 0 && byDay[k].presentRows === 0));
+
   console.log(`\n=== FINDINGS: покрытие посещаемости по дням (последние 18) ===`);
   for (const k of daysSorted.slice(-18)) {
     const s = byDay[k];
-    console.log(`  ${k}: уроков ${s.lessons}, ожидается отметок ${s.expected}, есть ${s.existRows} (present ${s.presentRows})`);
+    const tag = garbageDays.has(k) ? " ← МУСОР (перезапишем)" : s.existRows === 0 ? " ← пусто (заполним)" : "";
+    console.log(`  ${k}: уроков ${s.lessons}, ожидается отметок ${s.expected}, есть ${s.existRows} (present ${s.presentRows})${tag}`);
   }
   console.log(`\nПервый день, где present-отметок 0 (пробел начинается тут): ${firstNoPresent ?? "нет — present есть везде"}`);
+  console.log(`Мусорных дней (есть отметки, но present=0): ${garbageDays.size}${garbageDays.size ? " → " + [...garbageDays].sort().join(", ") : ""}`);
 
-  // ─── План заполнения (по ВСЕМ прошедшим урокам, идемпотентно) ───
-  const attRows = [];
+  // ─── План заполнения ───
+  // attGapRows      — обычные/пустые дни: дополняем недостающие (student,lesson), идемпотентно.
+  // attOverwriteRows — мусорные дни: пересоздаём отметки ВСЕХ учеников по нормальному
+  //                    распределению (upsert с обновлением на конфликте → перезапись absent→present).
+  const attGapRows = [];
+  const attOverwriteRows = [];
   const gradeRows = [];
   let skippedNoTeacher = 0, skippedNoSchool = 0;
   for (const lesson of pastLessons) {
+    const isGarbage = garbageDays.has(dayKey(lesson.starts_at));
     const students = studentsByGroup.get(lesson.group_id) ?? [];
     const existing = attByLesson.get(lesson.id) ?? new Map();
     const presentStudents = [];
-    for (const [sid, status] of existing) if (status === "present") presentStudents.push(sid);
-    for (const sid of students) {
-      if (existing.has(sid)) continue;
-      const school = schoolByStudent.get(sid);
-      if (!school) { skippedNoSchool++; continue; }
-      const status = pickAttStatus(Math.random());
-      attRows.push({ lesson_id: lesson.id, student_id: sid, status, school_id: school });
-      if (status === "present") presentStudents.push(sid);
+
+    if (isGarbage) {
+      // Перезапись: всем ученикам группы — свежая отметка по нормальному распределению.
+      for (const sid of students) {
+        const school = schoolByStudent.get(sid);
+        if (!school) { skippedNoSchool++; continue; }
+        const status = pickAttStatus(Math.random());
+        attOverwriteRows.push({ lesson_id: lesson.id, student_id: sid, status, school_id: school });
+        if (status === "present") presentStudents.push(sid);
+      }
+    } else {
+      // Обычный gap-fill: существующие отметки не трогаем, добавляем недостающие.
+      for (const [sid, status] of existing) if (status === "present") presentStudents.push(sid);
+      for (const sid of students) {
+        if (existing.has(sid)) continue;
+        const school = schoolByStudent.get(sid);
+        if (!school) { skippedNoSchool++; continue; }
+        const status = pickAttStatus(Math.random());
+        attGapRows.push({ lesson_id: lesson.id, student_id: sid, status, school_id: school });
+        if (status === "present") presentStudents.push(sid);
+      }
     }
+
+    // Оценки — по обновлённой посещаемости (present-набор пересчитан выше),
+    // ~35% присутствовавших без уже существующей оценки за этот урок.
     const teacherId = teacherByGroup.get(lesson.group_id);
     if (!teacherId) { skippedNoTeacher++; continue; }
     const alreadyGraded = lgByLesson.get(lesson.id) ?? new Set();
@@ -133,8 +170,9 @@ async function main() {
   }
 
   console.log(`\n=== ПЛАН ===`);
-  console.log(`  attendance к созданию: ${attRows.length}`);
-  console.log(`  lesson_grades к созданию: ${gradeRows.length}`);
+  console.log(`  attendance ПЕРЕЗАПИСАТЬ (мусорные дни): ${attOverwriteRows.length}`);
+  console.log(`  attendance ДОБАВИТЬ обычным путём (пустые/частичные дни): ${attGapRows.length}`);
+  console.log(`  lesson_grades к созданию (вкл. мусорные дни): ${gradeRows.length}`);
   console.log(`  уроков без учителя (оценки пропущены): ${skippedNoTeacher}; без school_id ученика: ${skippedNoSchool}`);
 
   if (!CONFIRMED) {
@@ -142,15 +180,27 @@ async function main() {
     return;
   }
 
-  console.log(`\nВставляю attendance…`);
-  let att = 0;
-  for (let i = 0; i < attRows.length; i += 500) {
-    const batch = attRows.slice(i, i + 500);
+  // Обычные/пустые дни — идемпотентно (ON CONFLICT DO NOTHING).
+  console.log(`\nДобавляю attendance (обычным путём)…`);
+  let attAdded = 0;
+  for (let i = 0; i < attGapRows.length; i += 500) {
+    const batch = attGapRows.slice(i, i + 500);
     const { error } = await db.from("attendance").upsert(batch, { onConflict: "student_id,lesson_id", ignoreDuplicates: true });
-    if (error) fail(`attendance insert (батч ${i}): ${error.message}`);
-    att += batch.length;
+    if (error) fail(`attendance gap insert (батч ${i}): ${error.message}`);
+    attAdded += batch.length;
   }
-  console.log(`  attendance вставлено: ${att}`);
+  console.log(`  добавлено: ${attAdded}`);
+
+  // Мусорные дни — ПЕРЕЗАПИСЬ (ON CONFLICT DO UPDATE: existing absent → нормальное распределение).
+  console.log(`Перезаписываю attendance (мусорные дни)…`);
+  let attOverwritten = 0;
+  for (let i = 0; i < attOverwriteRows.length; i += 500) {
+    const batch = attOverwriteRows.slice(i, i + 500);
+    const { error } = await db.from("attendance").upsert(batch, { onConflict: "student_id,lesson_id", ignoreDuplicates: false });
+    if (error) fail(`attendance overwrite (батч ${i}): ${error.message}`);
+    attOverwritten += batch.length;
+  }
+  console.log(`  перезаписано: ${attOverwritten}`);
   console.log(`Вставляю lesson_grades…`);
   let lg = 0;
   for (let i = 0; i < gradeRows.length; i += 500) {
