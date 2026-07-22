@@ -960,6 +960,8 @@ export const en: Dictionary = {
     activeBadge: "Active",
     submittedBadge: "Submitted",
     gradedBadgeLabel: "Graded",
+    notSubmittedBadge: "Not submitted",
+    pendingReviewBadge: "Sent for review",
     dueUntil: "Due {date}",
     heroAlt: "robot with backpack",
     test: {

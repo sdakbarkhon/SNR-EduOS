@@ -2043,6 +2043,17 @@ export const submitHomeworkBundle = async (db: Db, submissionId: string): Promis
   if (error) throw error;
 };
 
+/** Три состояния сдачи для явного статус-бейджа на экране задания у ученика
+ *  (задача "Задания" — «Не сдано»/«Отправлено на проверку»/«Оценено»).
+ *  Чистая функция без похода в БД — core остаётся UI-agnostic, перевод
+ *  бейджа берёт вызывающий компонент из словаря по этому ключу. */
+export type HomeworkSubmissionStatusKind = "not_submitted" | "pending_review" | "graded";
+export function homeworkSubmissionStatusKind(status: SubmissionStatus | null | undefined): HomeworkSubmissionStatusKind {
+  if (!status || status === "in_progress") return "not_submitted";
+  if (status === "graded") return "graded";
+  return "pending_review"; // 'submitted' | 'checking'
+}
+
 // ─── LESSON DETAIL ───────────────────────────────────────────────────────────
 
 /** Один урок со всеми связанными данными для страницы /lessons/[id].

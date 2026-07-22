@@ -960,6 +960,8 @@ export const uz: Dictionary = {
     activeBadge: "Faol",
     submittedBadge: "Topshirilgan",
     gradedBadgeLabel: "Baholangan",
+    notSubmittedBadge: "Topshirilmagan",
+    pendingReviewBadge: "Tekshiruvga yuborilgan",
     dueUntil: "{date} gacha",
     heroAlt: "ryukzakli robot",
     test: {

@@ -969,6 +969,8 @@ export interface Dictionary {
     activeBadge: string;       // "Активно"
     submittedBadge: string;    // "Сдано"
     gradedBadgeLabel: string;  // "Оценено"
+    notSubmittedBadge: string; // "Не сдано" — задача "Задания", явный статус на экране сдачи
+    pendingReviewBadge: string; // "Отправлено на проверку"
     dueUntil: string;          // "До {date}"
     heroAlt: string;           // подпись для decorative hero-блока
     test: {

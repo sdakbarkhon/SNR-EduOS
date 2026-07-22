@@ -960,6 +960,8 @@ export const ru: Dictionary = {
     activeBadge: "Активно",
     submittedBadge: "Сдано",
     gradedBadgeLabel: "Оценено",
+    notSubmittedBadge: "Не сдано",
+    pendingReviewBadge: "Отправлено на проверку",
     dueUntil: "До {date}",
     heroAlt: "робот с рюкзаком",
     test: {
