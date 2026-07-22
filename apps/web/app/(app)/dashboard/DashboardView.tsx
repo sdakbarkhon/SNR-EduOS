@@ -14,7 +14,7 @@ import {
   type Group,
   type Homework,
   type HomeworkSubmission,
-  type WeeklyStageProgress,
+  type TestSubmission,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +22,7 @@ import { useLocale } from "@/components";
 import { useToast } from "@/components/Toast";
 import { getClassLabel } from "@/lib/student-class-label";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
+import { Modal } from "@/components/Modal";
 import type { Database } from "@snr/core";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
@@ -50,15 +51,15 @@ export function DashboardView({
   lessons,
   homework,
   submissions,
+  testSubmissions,
   groups,
-  weeklyProgress,
 }: {
   student: Student;
   lessons: Lesson[];
   homework: Homework[];
   submissions: HomeworkSubmission[];
+  testSubmissions: TestSubmission[];
   groups: Group[];
-  weeklyProgress: WeeklyStageProgress;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -132,6 +133,7 @@ export function DashboardView({
   const submittedIds = new Set(submissions.map((s) => s.homework_id));
   const activeHomeworkCount = homework.filter((h) => !submittedIds.has(h.id)).length;
   const firstName = student.full_name.split(" ")[0] ?? student.full_name;
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
   const classLabel = getClassLabel(groups);
   const greeting = t.greetings[dayOfYear(now ?? new Date()) % t.greetings.length];
 
@@ -159,20 +161,43 @@ export function DashboardView({
   const hasMoreToday = todayLessonsAll.length > MAX_TODAY_WIDGET;
   const subjectById = new Map(mySubjects.map((s) => [s.id, s]));
 
-  // Per-subject progress: completed vs. total lessons for that subject_id.
-  // Stub subjects (is_active=false, БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 2.3) never have
-  // lessons, so a 0% ring for them would be meaningless clutter here — the
-  // full catalog (active+stub) has its own section below instead.
-  const subjectsWithProgress = mySubjects.filter((sub) => sub.is_active).map((sub) => {
-    const subjectLessons = lessons.filter((l) => l.subject_id === sub.id);
-    const total = subjectLessons.length;
-    const done = subjectLessons.filter((l) => l.status === "completed").length;
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { ...sub, percent };
-  });
+  // "Мой прогресс" (ЧАСТЬ 2) — доля СДАННЫХ заданий от ВЫДАННЫХ, за всё время
+  // (не за неделю: свежий полный ресет заданий делает "неделю" произвольным
+  // срезом). Источник: homework (выдано) + homework_submissions/
+  // test_submissions (сдано, RLS уже сужает обе выборки до своих же строк).
+  // Внешние сервисы (codesandbox/wokwi/geogebra/desmos/learningapps и т.д.)
+  // никогда не сдаются по дизайну — попадают в "выдано", никогда в "сдано",
+  // 100% для них недостижимо, и это ожидаемо (не 0%/деление на ноль).
+  const homeworkById = new Map(homework.map((h) => [h.id, h]));
+  const submittedHomeworkIds = new Set<string>([
+    ...submissions.map((s) => s.homework_id),
+    ...testSubmissions.map((ts) => ts.homework_id),
+  ]);
+  const totalAssignedCount = homework.length;
+  const totalSubmittedCount = homework.filter((h) => submittedHomeworkIds.has(h.id)).length;
+  const overallPercent = totalAssignedCount > 0 ? Math.round((totalSubmittedCount / totalAssignedCount) * 100) : 0;
 
-  const progressCirc = 2 * Math.PI * 45;
-  const progressOffset = progressCirc * (1 - weeklyProgress.percent / 100);
+  // Per-subject: то же самое (сдано/выдано), в разрезе subject_id — раньше
+  // считалось от completed/total LESSONS, к заданиям отношения не имело.
+  // Заодно средний балл по предмету (grade — дискретная 2..5 шкала что у
+  // homework_submissions, что у test_submissions) для модалки ниже.
+  // Stub subjects (is_active=false) никогда не имеют заданий — полный
+  // каталог (активные+заглушки) отдельно показан ниже в "Предметы класса".
+  const subjectsWithProgress = mySubjects.filter((sub) => sub.is_active).map((sub) => {
+    const subjectHomework = homework.filter((h) => h.subject_id === sub.id);
+    const total = subjectHomework.length;
+    const done = subjectHomework.filter((h) => submittedHomeworkIds.has(h.id)).length;
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    const grades: number[] = [];
+    for (const s of submissions) {
+      if (s.grade != null && homeworkById.get(s.homework_id)?.subject_id === sub.id) grades.push(s.grade);
+    }
+    for (const ts of testSubmissions) {
+      if (ts.grade != null && homeworkById.get(ts.homework_id)?.subject_id === sub.id) grades.push(ts.grade);
+    }
+    const avgGrade = grades.length > 0 ? grades.reduce((a, b) => a + b, 0) / grades.length : null;
+    return { ...sub, percent, total, done, avgGrade };
+  });
 
   const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((fallback, i) => {
     const label = now
@@ -200,36 +225,45 @@ export function DashboardView({
           <div className="flex flex-col gap-6 lg:flex-row">
             {/* Факт дня */}
             <div
-              className="relative flex min-h-[240px] flex-[1.08] flex-col overflow-hidden rounded-[24px] p-6 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
+              className="relative flex min-h-[240px] flex-[1.08] flex-col rounded-[24px] p-6 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
               style={{ background: "linear-gradient(135deg,#8E74F2 0%,#6A48E4 100%)" }}
             >
-              <span className="animate-twinkle absolute left-1/2 top-[70px] text-[15px] text-white/90">✦</span>
-              <span className="animate-twinkle absolute left-[44%] top-[140px] text-[11px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
-              <span className="animate-twinkle absolute right-11 top-9 text-[13px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
-              <div className="flex items-center gap-2 text-[16px] font-extrabold">
+              {/* Decorative layer, clipped to the rounded card corners and
+                  painted BEHIND the text/button below — previously these
+                  elements came after the text in DOM order and could paint
+                  on top of long fact text, on top of overflow-hidden on the
+                  card itself clipping wrapped lines outright (root cause of
+                  the mid-word cut-off bug). */}
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
+                <span className="animate-twinkle absolute left-1/2 top-[70px] text-[15px] text-white/90">✦</span>
+                <span className="animate-twinkle absolute left-[44%] top-[140px] text-[11px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
+                <span className="animate-twinkle absolute right-11 top-9 text-[13px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
+                <div className="animate-float-medium absolute bottom-6 right-16 text-[56px] leading-none">🌸</div>
+                <div className="animate-float-slow absolute -bottom-1 right-3 text-[100px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">🐝</div>
+              </div>
+
+              <div className="relative flex items-center gap-2 text-[16px] font-extrabold">
                 <Sparkles className="h-[22px] w-[22px] text-[#FFE08A]" /> {t.factOfDay}
               </div>
 
               {factLoading ? (
-                <div className="mt-4 flex gap-1.5 py-2">
+                <div className="relative mt-4 flex gap-1.5 py-2">
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:0ms]" />
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:150ms]" />
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:300ms]" />
                 </div>
               ) : (
-                <p className="mt-4 max-w-[58%] text-[21px] font-extrabold leading-snug">{aiFactText}</p>
+                <p className="relative mt-4 max-w-[85%] break-words text-[21px] font-extrabold leading-snug">{aiFactText}</p>
               )}
 
               {!factLoading && aiFactText && (
                 <button
                   onClick={learnMore}
-                  className="mt-auto flex items-center gap-2 self-start rounded-2xl bg-white px-5 py-3 text-[15px] font-extrabold text-[#6A48E4] shadow-[0_8px_18px_rgba(40,20,90,0.2)] transition hover:-translate-y-0.5"
+                  className="relative mt-auto flex items-center gap-2 self-start rounded-2xl bg-white px-5 py-3 text-[15px] font-extrabold text-[#6A48E4] shadow-[0_8px_18px_rgba(40,20,90,0.2)] transition hover:-translate-y-0.5"
                 >
                   {t.learnMore} <ArrowRight className="h-4 w-4" />
                 </button>
               )}
-              <div className="animate-float-medium pointer-events-none absolute bottom-6 right-16 text-[56px] leading-none">🌸</div>
-              <div className="animate-float-slow pointer-events-none absolute -bottom-1 right-3 text-[100px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">🐝</div>
             </div>
 
             {/* Серия успехов — заглушка (Iter5 P9) */}
@@ -288,19 +322,23 @@ export function DashboardView({
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Мой прогресс */}
-            <div className="relative overflow-hidden rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
+            {/* Мой прогресс — кликабельно, открывает модалку с разбивкой по предметам (ЧАСТЬ 2) */}
+            <button
+              type="button"
+              onClick={() => setProgressModalOpen(true)}
+              className="relative overflow-hidden rounded-[24px] bg-white p-[22px] text-left shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
+            >
               <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.myProgress}</h3>
               <div className="mt-3.5 flex items-center gap-2">
                 <div
                   className="relative flex h-[148px] w-[148px] shrink-0 items-center justify-center rounded-full shadow-[0_10px_22px_rgba(124,92,255,0.18)]"
-                  style={{ background: `conic-gradient(#7C5CFF 0% ${weeklyProgress.percent}%, #ECE7FB ${weeklyProgress.percent}% 100%)` }}
+                  style={{ background: `conic-gradient(#7C5CFF 0% ${overallPercent}%, #ECE7FB ${overallPercent}% 100%)` }}
                 >
                   <div className="flex h-[110px] w-[110px] flex-col items-center justify-center rounded-full bg-white">
                     <span className="text-[30px] font-black leading-none text-[#2A2A45]">
-                      {weeklyProgress.percent}<span className="text-[18px]">%</span>
+                      {overallPercent}<span className="text-[18px]">%</span>
                     </span>
-                    <span className="mt-1 text-center text-[11px] font-bold leading-tight text-[#9A9AB5]">{t.progressWeekly}</span>
+                    <span className="mt-1 text-center text-[11px] font-bold leading-tight text-[#9A9AB5]">{t.progressAllTime}</span>
                   </div>
                 </div>
                 <div className="relative flex min-h-[140px] flex-1 items-center justify-center">
@@ -309,7 +347,7 @@ export function DashboardView({
                   <div className="animate-float-medium text-[78px] leading-none drop-shadow-[0_10px_14px_rgba(90,60,180,0.24)]">🧑‍🚀</div>
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Мои предметы */}
             <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
@@ -510,6 +548,46 @@ export function DashboardView({
           </div>
         </aside>
       </div>
+
+      {/* "Мой прогресс" — разбивка по предметам (ЧАСТЬ 2), только просмотр */}
+      <Modal open={progressModalOpen} onClose={() => setProgressModalOpen(false)} title={t.myProgress}>
+        <div className="flex flex-col gap-3">
+          {subjectsWithProgress.length === 0 ? (
+            <p className="py-6 text-center text-sm text-[#9A9AB5]">{t.progressModalEmpty}</p>
+          ) : (
+            subjectsWithProgress.map((sub) => {
+              const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
+              return (
+                <div key={sub.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: sub.color }}>
+                    <SubIcon className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-extrabold text-[#2A2A45]">{sub.name}</p>
+                    <p className="text-xs font-semibold text-[#9A9AB5]">
+                      {sub.total > 0
+                        ? t.progressModalDoneOf.replace("{done}", String(sub.done)).replace("{total}", String(sub.total))
+                        : t.progressModalEmpty}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-lg font-black" style={{ color: sub.color }}>{sub.percent}%</p>
+                    <p className="text-[11px] font-semibold text-[#9A9AB5]">
+                      {t.progressModalAvgGrade}: {sub.avgGrade != null ? sub.avgGrade.toFixed(1) : t.progressModalNoGrades}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div className="mt-1 flex items-center justify-between rounded-2xl bg-[#F1EDFF] px-4 py-3.5">
+            <span className="text-sm font-extrabold text-[#2A2A45]">{t.progressModalTotal}</span>
+            <span className="text-lg font-black text-[#7C5CFF]">
+              {t.progressModalDoneOf.replace("{done}", String(totalSubmittedCount)).replace("{total}", String(totalAssignedCount))} · {overallPercent}%
+            </span>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

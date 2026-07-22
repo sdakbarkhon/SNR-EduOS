@@ -123,7 +123,12 @@ export interface Dictionary {
     qaTeacher: string;         // "Связь с учителем" (stub)
     qaAI: string;              // "Спросить AI"
     myProgress: string;        // "Мой прогресс"
-    progressWeekly: string;    // "Всего за неделю"
+    progressAllTime: string;   // "Выполнено заданий" — доля сдано/выдано за всё время (было "Всего за неделю", считалось по lesson_stages — заменено на homework-based расчёт)
+    progressModalDoneOf: string;  // "{done} из {total}"
+    progressModalAvgGrade: string; // "Средний балл"
+    progressModalNoGrades: string; // "—" когда нет оценённых сдач
+    progressModalTotal: string;    // "Итого"
+    progressModalEmpty: string;    // "Нет заданий" (0 assigned for this subject)
     seeAll: string;            // "Смотреть все" (subjects card)
     todaySchedule: string;     // "Расписание на сегодня"
     noLessonsToday: string;

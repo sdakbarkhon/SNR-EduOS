@@ -2,7 +2,7 @@ import {
   getHomework,
   getLessons,
   getMySubmissions,
-  getWeeklyStageProgress,
+  getMyTestSubmissions,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
@@ -11,23 +11,14 @@ import { DashboardView } from "./DashboardView";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [student, lessons, homework, submissions, groups] = await Promise.all([
+  const [student, lessons, homework, submissions, testSubmissions, groups] = await Promise.all([
     getMyStudent(supabase),
     getLessons(supabase),
     getHomework(supabase),
     getMySubmissions(supabase),
+    getMyTestSubmissions(supabase),
     getMyGroups(supabase),
   ]);
-
-  const now = Date.now();
-  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const weekLessonIds = lessons
-    .filter((l) => {
-      const t = new Date(l.starts_at).getTime();
-      return t >= weekAgo && t <= now;
-    })
-    .map((l) => l.id);
-  const weeklyProgress = await getWeeklyStageProgress(supabase, weekLessonIds);
 
   return (
     <DashboardView
@@ -35,8 +26,8 @@ export default async function DashboardPage() {
       lessons={lessons}
       homework={homework}
       submissions={submissions}
+      testSubmissions={testSubmissions}
       groups={groups}
-      weeklyProgress={weeklyProgress}
     />
   );
 }

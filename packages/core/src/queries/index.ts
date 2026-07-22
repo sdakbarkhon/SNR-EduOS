@@ -794,6 +794,14 @@ export const getMySubmissions = (db: Db) =>
     .then(unwrap)
     .then((rows) => rows as unknown as HomeworkSubmission[]);
 
+/** Собственные сдачи тестов ученика (RLS сужает до своих строк — тот же паттерн, что getMySubmissions выше). */
+export const getMyTestSubmissions = (db: Db) =>
+  db
+    .from("test_submissions")
+    .select("*")
+    .then(unwrap)
+    .then((rows) => rows as unknown as TestSubmission[]);
+
 export const submitHomework = (db: Db, input: SubmissionInput) =>
   db.from("homework_submissions").insert(input).select().single().then(unwrap);
 

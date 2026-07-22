@@ -497,6 +497,8 @@ export type Homework = {
   due_date: string | null;
   attachments: HomeworkAttachment[];
   created_at: string;
+  subject_id: string | null; // migration 107
+  content_type: ContentType;
 };
 
 // Пачка 5.3 (migration 140) — AI-проверка текстовых/код-ответов, ждёт
