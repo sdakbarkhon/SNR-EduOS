@@ -520,7 +520,11 @@ export function DashboardView({
             {mySubjects.length > 0 ? (
               <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
                 <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.classSubjectsTitle}</h3>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {/* 5 колонок на lg+ → 10 предметов = ровно 2 полных ряда, блок
+                    заполняет всю ширину справа без пустого поля; на узких —
+                    2–4 колонки. Длинные названия переносятся (break-words),
+                    карточки одинаковой высоты (min-h у названия + h-full). */}
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {[...mySubjects].sort((a, b) => Number(b.is_active) - Number(a.is_active)).map((sub) => {
                     const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
                     const card = (
@@ -529,7 +533,7 @@ export function DashboardView({
                         style={{ backgroundColor: sub.is_active ? `${sub.color}1F` : "#F1F1F5" }}
                       >
                         <div
-                          className="relative flex h-10 w-10 items-center justify-center rounded-[12px]"
+                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
                           style={{ background: sub.is_active ? sub.color : "#B7B7CE" }}
                         >
                           <SubIcon className="h-5 w-5 text-white" />
@@ -539,7 +543,7 @@ export function DashboardView({
                             </span>
                           )}
                         </div>
-                        <p className="line-clamp-2 text-[12px] font-bold leading-tight text-[#2A2A45]">{sub.name}</p>
+                        <p className="line-clamp-2 hyphens-auto w-full break-words text-center text-[12px] font-bold leading-tight text-[#2A2A45] min-h-[30px]" lang="ru">{sub.name}</p>
                       </div>
                     );
                     return sub.is_active ? (

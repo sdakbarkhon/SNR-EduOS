@@ -60,6 +60,12 @@ export type AiOptions = {
   temperature?: number;
   maxTokens?: number;
   useSearch?: boolean;
+  // thinkingBudget: 0 отключает «мышление» у Gemini 2.5 (thinking-модели).
+  // Критично для КОРОТКИХ ответов с малым maxTokens: иначе thinking-токены
+  // съедают весь maxOutputTokens и на видимый ответ остаётся 5-10 токенов →
+  // обрыв на полуслове (см. «Факт дня»). Проверено эмпирически: с
+  // thinkingBudget:0 факт приходит целым при maxTokens=256.
+  thinkingBudget?: number;
 };
 
 function searchTool(useSearch: boolean | undefined): Tool[] | undefined {
@@ -166,10 +172,14 @@ export async function generateText(prompt: string, options?: AiOptions): Promise
     const client = getClient();
     const model = client.getGenerativeModel({
       model: resolveModel(tier),
+      // thinkingConfig не описан в типах SDK v0.24.1, но пробрасывается в тело
+      // запроса и honored'ится API (проверено эмпирически) — cast обязателен.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       generationConfig: {
         ...(options?.maxTokens ? { maxOutputTokens: options.maxTokens } : {}),
         ...(options?.temperature != null ? { temperature: options.temperature } : {}),
-      },
+        ...(options?.thinkingBudget != null ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } } : {}),
+      } as any,
     });
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],

@@ -50,18 +50,21 @@ function fallbackFact(dateStr: string): string {
   return FALLBACK_FACTS[hash % FALLBACK_FACTS.length]!;
 }
 
-// Раньше факт требовался ≤80 символов, а если модель возвращала длиннее —
-// код резал его на 77 символов ПОСРЕДИ СЛОВА ("...си") и/или ретраил до 3 раз
-// (что уводило за 10-секундный лимит Vercel). Плюс кэш в daily_facts не
-// сохранялся (см. GET ниже — school_id), поэтому каждый заход генерил НОВЫЙ
-// факт и обрывал его по-разному. Теперь: один вызов, берём первое законченное
-// предложение, лимит 140 символов, обрезка строго ПО ГРАНИЦЕ СЛОВА + «…».
+// НАСТОЯЩАЯ причина обрыва «Факта дня» (3-й заход): resolveModel всегда даёт
+// gemini-2.5-flash — thinking-модель. При maxOutputTokens=200 «мышление»
+// съедало ~190 токенов (finishReason=MAX_TOKENS), на видимый ответ оставалось
+// ~6 → обрыв на 15-22 символах посреди слова, длина плавает (thinking плавает),
+// без многоточия. Подтверждено эмпирически + SQL к daily_facts («Пчёлы машут
+// кры», len=15). Фикс: thinkingBudget:0 отключает мышление → весь бюджет идёт
+// на ответ, факт приходит целым (finishReason=STOP, ~97 токенов, быстро).
+// maxTokens поднят до 256 с запасом. Первое предложение + обрезка по слову
+// оставлены как страховка.
 async function fetchAiFact(): Promise<string | null> {
   const MAX_LEN = 140;
   const prompt =
     `Один короткий интересный факт для школьников. СТРОГО: одно законченное предложение на русском языке, до 140 символов. Без вступления, без кавычек, без тире в начале. Только сам факт.\n` +
     `Примеры: "Сердце синего кита весит около 600 кг." / "Антарктида — самая большая пустыня мира."`;
-  const { text: raw, error } = await generateText(prompt, { maxTokens: 200 });
+  const { text: raw, error } = await generateText(prompt, { maxTokens: 256, thinkingBudget: 0 });
   if (error || !raw.trim()) return null;
   let text = raw
     .trim()
@@ -101,7 +104,12 @@ export async function GET() {
       .eq("fact_date", today)
       .maybeSingle()) as { data: { fact_text: string } | null };
 
-    if (cached?.fact_text) {
+    // Кэш валиден только если факт — ЗАКОНЧЕННОЕ предложение (оканчивается на
+    // .!?…). Обрезанные факты (напр. «Пчёлы машут кры» — наследие бага с
+    // thinking-токенами) НЕ отдаём из кэша, а перегенерируем и перезапишем.
+    // Это авто-инвалидирует сегодняшний битый факт без ручного DELETE.
+    const looksComplete = (s: string) => /[.!?…]$/.test(s.trim()) && s.trim().length >= 15;
+    if (cached?.fact_text && looksComplete(cached.fact_text)) {
       return NextResponse.json({ text: cached.fact_text });
     }
 
