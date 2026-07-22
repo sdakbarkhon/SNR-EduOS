@@ -12,6 +12,7 @@ import {
   getHomeworkSubtaskSubmissions,
   saveHomeworkSubtaskProgress,
   submitHomeworkBundle,
+  homeworkSubmissionStatusKind,
   type HomeworkWithSubmission,
   type HomeworkSubmission,
   type HomeworkSubtask,
@@ -22,6 +23,7 @@ import {
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, Modal, useLocale } from "@/components";
+import { useToast } from "@/components/Toast";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
@@ -75,15 +77,37 @@ function StatusBadge({ status, bd }: { status: "done" | "in_progress" | "not_sta
   );
 }
 
-/** Debounces saves per-subtask so fast typing doesn't spam the DB. */
+/** Debounces saves per-subtask so fast typing doesn't spam the DB.
+ *  flush() fires and awaits any still-pending saves immediately — doSubmit()
+ *  calls it before marking the bundle submitted, so a save queued right
+ *  before the "Отправить всё" click can no longer be lost when the debounce
+ *  timer gets cancelled (not fired) by unmount on router.push() (root cause
+ *  of "0 из N подзадач выполнено" showing after a real submission —
+ *  see задача "Задания", Часть 1). */
 function useDebouncedSave() {
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pending = useRef<Map<string, () => Promise<boolean>>>(new Map());
   useEffect(() => () => { timers.current.forEach((t) => clearTimeout(t)); }, []);
-  return useCallback((key: string, fn: () => void, delay = 800) => {
+  const schedule = useCallback((key: string, fn: () => Promise<boolean>, delay = 800) => {
     const existing = timers.current.get(key);
     if (existing) clearTimeout(existing);
-    timers.current.set(key, setTimeout(fn, delay));
+    pending.current.set(key, fn);
+    timers.current.set(key, setTimeout(() => {
+      timers.current.delete(key);
+      pending.current.delete(key);
+      fn();
+    }, delay));
   }, []);
+  const flush = useCallback(async (): Promise<boolean> => {
+    const fns = Array.from(pending.current.values());
+    timers.current.forEach((t) => clearTimeout(t));
+    timers.current.clear();
+    pending.current.clear();
+    if (fns.length === 0) return true;
+    const results = await Promise.all(fns.map((fn) => fn()));
+    return results.every(Boolean);
+  }, []);
+  return { schedule, flush };
 }
 
 function FileSubtaskEditor({
@@ -324,7 +348,8 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const debouncedSave = useDebouncedSave();
+  const showToast = useToast();
+  const { schedule: debouncedSave, flush: flushPendingSaves } = useDebouncedSave();
 
   useEffect(() => {
     let cancelled = false;
@@ -373,13 +398,19 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
     });
   }
 
-  async function persistRemote(subtaskId: string, content: Record<string, unknown>, completed: boolean) {
-    if (!submission) return;
+  async function persistRemote(subtaskId: string, content: Record<string, unknown>, completed: boolean): Promise<boolean> {
+    if (!submission) return false;
     try {
       const row = await saveHomeworkSubtaskProgress(sb, { submissionId: submission.id, subtaskId, content, completed });
       setSubtaskSubs((prev) => new Map(prev).set(subtaskId, row));
-    } catch {
-      // Best-effort autosave — local optimistic state already reflects the edit.
+      return true;
+    } catch (e) {
+      // Autosave during editing stays best-effort (local optimistic state
+      // already reflects the edit) — but no longer silent (реф 5222b73):
+      // logged here, and doSubmit() below re-checks via flush() before
+      // letting the bundle be marked submitted.
+      console.error("[BundleSolver] saveHomeworkSubtaskProgress failed:", (e as Error)?.message ?? e);
+      return false;
     }
   }
 
@@ -387,7 +418,7 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
     return (content: Record<string, unknown>, completed: boolean, immediate = false) => {
       persistLocal(subtaskId, content, completed);
       if (immediate) {
-        persistRemote(subtaskId, content, completed);
+        void persistRemote(subtaskId, content, completed);
       } else {
         debouncedSave(subtaskId, () => persistRemote(subtaskId, content, completed));
       }
@@ -401,10 +432,23 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
     if (!submission || submitting) return;
     setSubmitting(true);
     try {
+      // Flush any pending debounced subtask saves BEFORE marking the bundle
+      // submitted — otherwise a save queued right before this click can be
+      // dropped when the component unmounts (router.push below) mid-timer,
+      // leaving homework_subtask_submissions.completed stale for that
+      // subtask (root cause of the "0 из N подзадач выполнено" bug).
+      const flushed = await flushPendingSaves();
+      if (!flushed) {
+        showToast(d.common.error);
+        setSubmitting(false);
+        return;
+      }
       await submitHomeworkBundle(sb, submission.id);
       setConfirmOpen(false);
       router.push("/homework");
-    } finally {
+    } catch (e) {
+      console.error("[BundleSolver] submit failed:", (e as Error)?.message ?? e);
+      showToast(d.common.error);
       setSubmitting(false);
     }
   }
@@ -464,8 +508,17 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
         )}
         {alreadySubmitted && (
           <div className="mt-4 border-t border-slate-100 pt-4">
-            <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              {bd.submittedStatus}
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
+                homeworkSubmissionStatusKind(submission?.status) === "graded"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-blue-50 text-blue-700",
+              )}
+            >
+              {homeworkSubmissionStatusKind(submission?.status) === "graded"
+                ? d.homework.gradedBadgeLabel
+                : d.homework.pendingReviewBadge}
             </span>
           </div>
         )}
