@@ -39,7 +39,18 @@
 //   node scripts/reset-homework-generate-new.mjs                — dry-run
 //   CONFIRM=YES node scripts/reset-homework-generate-new.mjs    — реально
 
-import { makeServiceRoleClient, SCHOOL_ID } from "./_backfill-shared.mjs";
+// school_id НЕ импортируется как константа: под service-role клиентом
+// DEFAULT current_school_id() у всех "school_id"-колонок молча резолвится в
+// NULL (current_school_id() читает auth.uid(), которого нет без реальной
+// пользовательской сессии) — тот же паттерн, что уже задокументирован в
+// attachBooksToLesson() ниже в этом файле. Поэтому school_id резолвится из
+// РЕАЛЬНЫХ ДАННЫХ (subjects.school_id, который уже читаем для teacher_id) и
+// пробрасывается явно в КАЖДУЙ INSERT в таблицу, где колонка NOT NULL —
+// проверено по migration 71 (`ALTER TABLE ... ALTER COLUMN school_id SET NOT
+// NULL`) для ВСЕХ пяти таблиц, куда пишет этот скрипт: homework,
+// homework_submissions, test_questions, test_question_options,
+// test_submissions.
+import { makeServiceRoleClient } from "./_backfill-shared.mjs";
 
 const CONFIRMED = process.env.CONFIRM === "YES" || process.argv.includes("--confirm");
 
@@ -455,11 +466,14 @@ async function main() {
 
   const { data: subjects, error: subjErr } = await db
     .from("subjects")
-    .select("id, name, group_id, teacher_id")
+    .select("id, name, group_id, teacher_id, school_id")
     .in("name", SUBJECT_NAMES)
     .eq("is_active", true);
   if (subjErr) fail(`Ошибка запроса subjects: ${subjErr.message}`);
-  // subjectByGroupAndName["<group_id>|<subject_name>"] = { id, teacher_id }
+  for (const s of subjects) {
+    if (!s.school_id) fail(`У предмета "${s.name}" (группа ${s.group_id}) не заполнен school_id в БД — резолвить неоткуда, СТОП.`);
+  }
+  // subjectByGroupAndName["<group_id>|<subject_name>"] = { id, teacher_id, school_id }
   const subjectByGroupAndName = new Map();
   for (const s of subjects) subjectByGroupAndName.set(`${s.group_id}|${s.name}`, s);
   for (const className of CLASS_NAMES) {
@@ -578,7 +592,7 @@ async function main() {
       const dueDate = allDueDates[dateIdx++];
       const createdAt = spreadCreatedAt(dueDate);
       const row = {
-        group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: SCHOOL_ID,
+        group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: subj.school_id,
         title: topic.title, description: topic.description, content_type: "programming",
         due_date: dueDate, created_at: createdAt,
         programming_language: topic.language, starter_code: topic.starter_code, expected_output: topic.expected_output,
@@ -589,7 +603,7 @@ async function main() {
       if (CONFIRMED) {
         const { data: hwRow, error: hwInsErr } = await db.from("homework").insert(row).select("id").single();
         if (hwInsErr) fail(`Ошибка вставки homework "${topic.title}": ${hwInsErr.message}`);
-        await createSubmissionsForProgramming(db, hwRow.id, topic, classStudents, createdAt);
+        await createSubmissionsForProgramming(db, hwRow.id, topic, classStudents, createdAt, subj.school_id);
       }
     }
 
@@ -600,7 +614,7 @@ async function main() {
       const dueDate = allDueDates[dateIdx++];
       const createdAt = spreadCreatedAt(dueDate);
       const row = {
-        group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: SCHOOL_ID,
+        group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: subj.school_id,
         title: testBank.title, description: `Пройди тест по теме «${testBank.title}» — ${testBank.questions.length} вопросов, один правильный ответ на каждый.`,
         content_type: "test", due_date: dueDate, created_at: createdAt,
         test_duration_seconds: 600, test_auto_grade: true,
@@ -615,15 +629,15 @@ async function main() {
         for (let qi = 0; qi < testBank.questions.length; qi++) {
           const q = testBank.questions[qi];
           const { data: qRow, error: qErr } = await db.from("test_questions")
-            .insert({ homework_id: hwRow.id, question_text: q.q, question_type: "single_choice", order_index: qi })
+            .insert({ homework_id: hwRow.id, question_text: q.q, question_type: "single_choice", order_index: qi, school_id: subj.school_id })
             .select("id").single();
           if (qErr) fail(`Ошибка вставки test_questions для "${testBank.title}": ${qErr.message}`);
           questionIds.push(qRow.id);
-          const optRows = q.opts.map((text, oi) => ({ question_id: qRow.id, option_text: text, is_correct: oi === q.correct, order_index: oi }));
+          const optRows = q.opts.map((text, oi) => ({ question_id: qRow.id, option_text: text, is_correct: oi === q.correct, order_index: oi, school_id: subj.school_id }));
           const { error: optErr } = await db.from("test_question_options").insert(optRows);
           if (optErr) fail(`Ошибка вставки test_question_options для "${testBank.title}": ${optErr.message}`);
         }
-        await createTestSubmissions(db, hwRow.id, testBank.questions.length, classStudents, createdAt);
+        await createTestSubmissions(db, hwRow.id, testBank.questions.length, classStudents, createdAt, subj.school_id);
       }
     }
 
@@ -641,7 +655,7 @@ async function main() {
         const dueDate = allDueDates[dateIdx++];
         const createdAt = spreadCreatedAt(dueDate);
         const row = {
-          group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: SCHOOL_ID,
+          group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: subj.school_id,
           title, description, content_type: "file", due_date: dueDate, created_at: createdAt,
         };
         planned.homework++; planned.byClass[className].executable++;
@@ -650,7 +664,7 @@ async function main() {
         if (CONFIRMED) {
           const { data: hwRow, error: hwInsErr } = await db.from("homework").insert(row).select("id").single();
           if (hwInsErr) fail(`Ошибка вставки homework "${title}": ${hwInsErr.message}`);
-          await createFileSubmissions(db, hwRow.id, texts, classStudents, createdAt);
+          await createFileSubmissions(db, hwRow.id, texts, classStudents, createdAt, subj.school_id);
         }
       }
     }
@@ -662,7 +676,7 @@ async function main() {
       const dueDate = allDueDates[dateIdx++];
       const createdAt = spreadCreatedAt(dueDate);
       const row = {
-        group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: SCHOOL_ID,
+        group_id: group.id, subject_id: subj.id, teacher_id: subj.teacher_id, school_id: subj.school_id,
         title: ext.title, description: ext.description, content_type: ext.service,
         due_date: dueDate, created_at: createdAt,
         external_url: DEFAULT_EXTERNAL_URLS[ext.service],
@@ -713,7 +727,7 @@ function spreadCreatedAt(dueDateIso) {
   return new Date(created).toISOString();
 }
 
-async function createSubmissionsForProgramming(db, homeworkId, topic, classStudents, hwCreatedAt) {
+async function createSubmissionsForProgramming(db, homeworkId, topic, classStudents, hwCreatedAt, schoolId) {
   for (let i = 0; i < classStudents.length; i++) {
     const student = classStudents[i];
     const grade = rollGrade();
@@ -723,13 +737,14 @@ async function createSubmissionsForProgramming(db, homeworkId, topic, classStude
       homework_id: homeworkId, student_id: student.id, status: "graded",
       code_text: variant, submitted_at: submittedAt,
       grade, teacher_comment: commentFor(grade), graded_at: submittedAt,
+      school_id: schoolId,
     };
     const { error } = await db.from("homework_submissions").insert(row);
     if (error) fail(`Ошибка вставки homework_submissions (programming, ${student.username}): ${error.message}`);
   }
 }
 
-async function createFileSubmissions(db, homeworkId, texts, classStudents, hwCreatedAt) {
+async function createFileSubmissions(db, homeworkId, texts, classStudents, hwCreatedAt, schoolId) {
   for (const student of classStudents) {
     const grade = rollGrade();
     const tier = grade >= 4 ? "strong" : grade === 3 ? "good" : "weak";
@@ -742,13 +757,14 @@ async function createFileSubmissions(db, homeworkId, texts, classStudents, hwCre
       homework_id: homeworkId, student_id: student.id, status: "graded",
       answer_text: answerText, submitted_at: submittedAt,
       grade, teacher_comment: commentFor(grade), graded_at: submittedAt,
+      school_id: schoolId,
     };
     const { error } = await db.from("homework_submissions").insert(row);
     if (error) fail(`Ошибка вставки homework_submissions (file, ${student.username}): ${error.message}`);
   }
 }
 
-async function createTestSubmissions(db, homeworkId, totalQuestions, classStudents, hwCreatedAt) {
+async function createTestSubmissions(db, homeworkId, totalQuestions, classStudents, hwCreatedAt, schoolId) {
   const pctByGrade = { 5: 1.0, 4: 0.8, 3: 0.6, 2: 0.4 };
   for (const student of classStudents) {
     const grade = rollGrade();
@@ -758,7 +774,7 @@ async function createTestSubmissions(db, homeworkId, totalQuestions, classStuden
     const row = {
       homework_id: homeworkId, student_id: student.id,
       score, max_score: totalQuestions, grade,
-      submitted_at: submittedAt, graded_at: submittedAt, school_id: SCHOOL_ID,
+      submitted_at: submittedAt, graded_at: submittedAt, school_id: schoolId,
     };
     const { error } = await db.from("test_submissions").insert(row);
     if (error) fail(`Ошибка вставки test_submissions (${student.username}): ${error.message}`);
