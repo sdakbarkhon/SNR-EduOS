@@ -990,6 +990,8 @@ export const ru: Dictionary = {
       awaitingReview: "Ожидает проверки учителя",
       viewAnswers: "Просмотреть свои ответы",
       yourAnswer: "Ваш ответ",
+      correctAnswer: "Верный ответ",
+      answersUnavailable: "Ответы по вопросам недоступны",
     },
     programming: {
       language: "Язык программирования",

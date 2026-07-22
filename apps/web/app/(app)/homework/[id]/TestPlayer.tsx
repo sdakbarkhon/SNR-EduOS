@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle, Circle, Loader2, Play, Clock, ChevronDown } from "lucide-react";
+import { CheckCircle, Circle, XCircle, Loader2, Play, Clock, ChevronDown } from "lucide-react";
 import {
   getDictionary,
   getTestQuestions,
   getTestSubmission,
+  getTestAnswersForSubmission,
   startHomeworkTest,
   submitTest,
   type HomeworkWithSubmission,
   type TestQuestion,
   type TestSubmission,
+  type TestAnswer,
   type TestAnswerInput,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -55,11 +57,12 @@ function TestTimer({ endsAt, onTimeout, label }: { endsAt: number; onTimeout: ()
 }
 
 function Results({
-  hw, questions, submission, locale,
+  hw, questions, submission, answers, locale,
 }: {
   hw: HomeworkWithSubmission;
   questions: TestQuestion[];
   submission: TestSubmission;
+  answers: TestAnswer[];
   locale: Locale;
 }) {
   const d = getDictionary(locale);
@@ -68,6 +71,13 @@ function Results({
   const score = submission.score ?? 0;
   const max = submission.max_score ?? 0;
   const pct = max > 0 ? Math.round((score / max) * 100) : 0;
+
+  // Ответ ученика по каждому вопросу (selected_option_id / open_text).
+  const answerByQuestion = new Map(answers.map((a) => [a.question_id, a]));
+  // Раньше блок раскрывался в пустоту, когда вопросы не грузились (у сдачи не
+  // было started_at → RLS скрывал вопросы) и/или не было ни одной строки
+  // test_answers. Показываем разбор только когда реально есть что показать.
+  const canShowAnswers = questions.length > 0 && answers.length > 0;
 
   return (
     <GlassCard className="p-6">
@@ -89,42 +99,69 @@ function Results({
         </div>
       )}
 
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="mt-5 flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
-      >
-        <ChevronDown size={16} className={cn("transition-transform", open && "rotate-180")} />
-        {t.viewAnswers}
-      </button>
+      {canShowAnswers ? (
+        <>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="mt-5 flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+          >
+            <ChevronDown size={16} className={cn("transition-transform", open && "rotate-180")} />
+            {t.viewAnswers}
+          </button>
 
-      {open && (
-        <div className="mt-4 flex flex-col gap-4">
-          {questions.map((q, idx) => (
-            <div key={q.id} className="rounded-xl border border-slate-100 bg-white/80 p-4">
-              <div className="flex items-start gap-2 mb-3">
-                <span className="mt-0.5 shrink-0 text-xs font-bold text-slate-400">{idx + 1}.</span>
-                <p className="text-sm font-semibold text-slate-700">{q.question_text}</p>
-              </div>
-              {q.question_type === "single_choice" && (
-                <div className="flex flex-col gap-1.5">
-                  {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt) => (
-                    <div key={opt.id} className={cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
-                      opt.is_correct ? "bg-green-50 text-green-700 font-semibold" : "text-slate-600",
-                    )}>
-                      {opt.is_correct ? <CheckCircle size={14} className="text-green-600 shrink-0" /> : <Circle size={14} className="text-slate-300 shrink-0" />}
-                      {opt.option_text}
-                      {opt.is_correct && <span className="ml-1 text-xs text-green-600">— {d.homework.testCorrect}</span>}
+          {open && (
+            <div className="mt-4 flex flex-col gap-4">
+              {questions.map((q, idx) => {
+                const ans = answerByQuestion.get(q.id);
+                return (
+                  <div key={q.id} className="rounded-xl border border-slate-100 bg-white/80 p-4">
+                    <div className="mb-3 flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 text-xs font-bold text-slate-400">{idx + 1}.</span>
+                      <p className="text-sm font-semibold text-slate-700">{q.question_text}</p>
                     </div>
-                  ))}
-                </div>
-              )}
-              {q.question_type === "open" && (
-                <span className="text-xs font-semibold text-amber-600">{d.homework.testReview}</span>
-              )}
+                    {q.question_type === "single_choice" && (
+                      <div className="flex flex-col gap-1.5">
+                        {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt) => {
+                          const isPicked = ans?.selected_option_id === opt.id;
+                          const isCorrect = opt.is_correct;
+                          // green = верный; red = ученик выбрал неверный; нейтральный — остальные.
+                          const cls = isCorrect
+                            ? "bg-green-50 text-green-700 font-semibold"
+                            : isPicked
+                              ? "bg-red-50 text-red-700 font-semibold"
+                              : "text-slate-600";
+                          const Icon = isCorrect ? CheckCircle : isPicked ? XCircle : Circle;
+                          const iconCls = isCorrect ? "text-green-600" : isPicked ? "text-red-500" : "text-slate-300";
+                          return (
+                            <div key={opt.id} className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm", cls)}>
+                              <Icon size={14} className={cn("shrink-0", iconCls)} />
+                              {opt.option_text}
+                              {isCorrect && <span className="ml-1 text-xs text-green-600">— {t.correctAnswer}</span>}
+                              {isPicked && !isCorrect && <span className="ml-1 text-xs text-red-500">— {t.yourAnswer}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {q.question_type === "open" && (
+                      <div className="flex flex-col gap-1.5">
+                        {ans?.open_text && (
+                          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <span className="mr-1 text-xs font-semibold text-slate-400">{t.yourAnswer}:</span>
+                            {ans.open_text}
+                          </div>
+                        )}
+                        <span className="text-xs font-semibold text-amber-600">{d.homework.testReview}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
+          )}
+        </>
+      ) : (
+        <p className="mt-5 text-sm italic text-slate-400">{t.answersUnavailable}</p>
       )}
     </GlassCard>
   );
@@ -139,10 +176,24 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [submission, setSubmission] = useState<TestSubmission | null>(hw.test_submission ?? null);
   const [answers, setAnswers] = useState<Map<string, TestAnswerInput>>(new Map());
+  // Сданные ответы по вопросам (для разбора «Просмотреть свои ответы»).
+  const [submittedAnswers, setSubmittedAnswers] = useState<TestAnswer[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Разбор ответов сданного теста — свои строки видит сам ученик (RLS
+  // "student reads own test answers", миграция 17/71). .error не глотаем.
+  const loadSubmittedAnswers = useCallback(async (submissionId: string) => {
+    try {
+      const rows = (await getTestAnswersForSubmission(sb, submissionId)) as TestAnswer[];
+      setSubmittedAnswers(rows ?? []);
+    } catch (e) {
+      console.error("[TestPlayer] getTestAnswersForSubmission failed:", (e as Error)?.message ?? e);
+      setSubmittedAnswers([]);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -154,10 +205,14 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
       if (sub?.started_at) {
         setQuestions(await getTestQuestions(sb, hw.id));
       }
+      // Уже сдан → подтягиваем разбор ответов по вопросам.
+      if (sub?.score != null) {
+        await loadSubmittedAnswers(sub.id);
+      }
     } finally {
       setLoading(false);
     }
-  }, [hw.id, hw.test_submission]);
+  }, [hw.id, hw.test_submission, loadSubmittedAnswers]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -193,12 +248,13 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
     try {
       const result = await submitTest(sb, { homeworkId: hw.id, studentId, answers: answerList });
       setSubmission(result);
+      await loadSubmittedAnswers(result.id);
     } catch (e) {
       setError((e as Error).message ?? d.common.error);
     } finally {
       setSubmitting(false);
     }
-  }, [studentId, submitting, answers, hw.id, d.common.error]);
+  }, [studentId, submitting, answers, hw.id, d.common.error, loadSubmittedAnswers]);
 
   if (loading) {
     return (
@@ -211,7 +267,7 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
 
   // Already submitted → results
   if (isSubmitted && submission) {
-    return <Results hw={hw} questions={questions} submission={submission} locale={locale as Locale} />;
+    return <Results hw={hw} questions={questions} submission={submission} answers={submittedAnswers} locale={locale as Locale} />;
   }
 
   // Not started → start gate

@@ -990,6 +990,8 @@ export const en: Dictionary = {
       awaitingReview: "Awaiting teacher review",
       viewAnswers: "View my answers",
       yourAnswer: "Your answer",
+      correctAnswer: "Correct answer",
+      answersUnavailable: "Per-question answers unavailable",
     },
     programming: {
       language: "Programming language",

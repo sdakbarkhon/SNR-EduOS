@@ -990,6 +990,8 @@ export const uz: Dictionary = {
       awaitingReview: "O'qituvchi tekshiruvini kutmoqda",
       viewAnswers: "Javoblarimni ko'rish",
       yourAnswer: "Sizning javobingiz",
+      correctAnswer: "To'g'ri javob",
+      answersUnavailable: "Savollar bo'yicha javoblar mavjud emas",
     },
     programming: {
       language: "Dasturlash tili",

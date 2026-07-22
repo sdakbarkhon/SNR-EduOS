@@ -999,6 +999,8 @@ export interface Dictionary {
       awaitingReview: string;      // "Ожидает проверки учителя"
       viewAnswers: string;         // "Просмотреть свои ответы"
       yourAnswer: string;          // "Ваш ответ"
+      correctAnswer: string;       // "Верный ответ"
+      answersUnavailable: string;  // "Ответы по вопросам недоступны"
     };
     programming: {
       language: string;
