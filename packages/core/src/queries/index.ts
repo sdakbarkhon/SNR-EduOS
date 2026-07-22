@@ -7,6 +7,7 @@ import type { Db } from "../supabase/factory";
 import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
+import { getSubjectKeyByLabel } from "../config/subjects";
 
 export * from "./projects";
 export * from "./announcements";
@@ -964,7 +965,13 @@ export function gradeCategory(sourceTable: GradeSourceTable): "assignment" | "le
     : "lesson";
 }
 
-type HwJoin = { title: string; content_type: string; group: { subject: string; name: string } | null };
+// subject резолвится из subject_id конкретной записи (homework/lesson), НЕ из
+// groups.subject — тот столбец является заглушкой-артефактом, буквально
+// равной строке 'programming' у КАЖДОЙ группы с момента ресета Этапа 1 (см.
+// комментарий миграции 107) — использование group.subject подписывало ВСЕ
+// оценки одним предметом независимо от реального. groups.name (номер класса,
+// напр. "10-А") остаётся годным и используется как есть.
+type HwJoin = { title: string; content_type: string; group: { name: string } | null; subject: { name: string } | null };
 
 /** Все оценённые работы текущего ученика (RLS отдаёт только свои).
  *  studentId — опционально: parent-контекст сужает до ОДНОГО выбранного
@@ -973,9 +980,9 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
   // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
   // на hosted. Дата работы = submitted_at (для seed практически совпадает).
   const fileSel =
-    "id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+    "id, grade, teacher_comment, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(name), subject:subjects(name))";
   const testSel =
-    "id, score, max_score, grade, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(subject, name))";
+    "id, score, max_score, grade, submitted_at, homework:homework!inner(title, content_type, group:groups!inner(name), subject:subjects(name))";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fileQuery: any = db.from("homework_submissions").select(fileSel).not("grade", "is", null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -997,7 +1004,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       kind: r.homework?.content_type === "programming" ? "programming" : "file",
       sourceTable: "homework_submissions",
       title: r.homework?.title ?? "",
-      subject: r.homework?.group?.subject ?? "",
+      subject: getSubjectKeyByLabel(r.homework?.subject?.name) ?? "",
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
       grade5: r.grade,
@@ -1015,7 +1022,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       id: r.id, kind: "test",
       sourceTable: "test_submissions",
       title: r.homework?.title ?? "",
-      subject: r.homework?.group?.subject ?? "",
+      subject: getSubjectKeyByLabel(r.homework?.subject?.name) ?? "",
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
       grade5: hasGrade ? r.grade : (max > 0 ? (r.score / max) * 5 : null),
@@ -1026,7 +1033,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
   // Classwork submissions with grades
   try {
     const cwSel =
-      "id, grade, teacher_comment, submitted_at, classwork:classwork!inner(title, lesson:lessons!inner(group:groups!inner(subject, name)))";
+      "id, grade, teacher_comment, submitted_at, classwork:classwork!inner(title, lesson:lessons!inner(subject_id, group:groups!inner(name), subject:subjects(name)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cwQuery: any = (db as any).from("classwork_submissions").select(cwSel).not("grade", "is", null);
     if (studentId) cwQuery = cwQuery.eq("student_id", studentId);
@@ -1034,13 +1041,13 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     if (cwRes.error) console.error("[getStudentGrades] classwork_submissions error:", cwRes.error.message);
     for (const r of (cwRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string;
-      classwork: { title: string; lesson: { group: { subject: string; name: string } | null } | null } | null;
+      classwork: { title: string; lesson: { group: { name: string } | null; subject: { name: string } | null } | null } | null;
     }>) {
       items.push({
         id: r.id, kind: "classwork",
         sourceTable: "classwork_submissions",
         title: r.classwork?.title ?? "Классная работа",
-        subject: r.classwork?.lesson?.group?.subject ?? "",
+        subject: getSubjectKeyByLabel(r.classwork?.lesson?.subject?.name) ?? "",
         groupName: r.classwork?.lesson?.group?.name ?? "",
         date: r.submitted_at,
         grade5: r.grade,
@@ -1050,10 +1057,18 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     }
   } catch (e) { console.error("[getStudentGrades] classwork_submissions threw:", (e as Error)?.message); }
 
-  // Project submissions with grades (migration 33)
+  // Project submissions with grades (migration 33). NB: projects.subject —
+  // не FK на subjects (нет subject_id у этой таблицы, только текстовый
+  // слаг), и заполняется из ТОГО ЖЕ сломанного groups.subject на этапе
+  // создания проекта (см. TeacherProjectFormModal.tsx:35) — сейчас
+  // фактически всегда 'programming', как и раньше. Это read-only запрос,
+  // резолвить из project.subject напрямую (без join на group) — минимум
+  // корректнее (своя запись, не чужая), но саму ПРИЧИНУ (нет реального
+  // subject_id у projects) правкой запроса не убрать — нужна миграция +
+  // форма создания проекта с выбором предмета (см. отчёт, вне скоупа здесь).
   try {
     const projSel =
-      "id, grade, teacher_comment, submitted_at, graded_at, project:projects!inner(title, group:groups!inner(subject, name))";
+      "id, grade, teacher_comment, submitted_at, graded_at, project:projects!inner(title, subject, group:groups!inner(name))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let projQuery: any = (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
     if (studentId) projQuery = projQuery.eq("student_id", studentId);
@@ -1061,13 +1076,13 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     if (projRes.error) console.error("[getStudentGrades] project_submissions error:", projRes.error.message);
     for (const r of (projRes.data ?? []) as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string | null; graded_at: string | null;
-      project: { title: string; group: { subject: string; name: string } | null } | null;
+      project: { title: string; subject: string; group: { name: string } | null } | null;
     }>) {
       items.push({
         id: r.id, kind: "project",
         sourceTable: "project_submissions",
         title: r.project?.title ?? "Проект",
-        subject: r.project?.group?.subject ?? "",
+        subject: r.project?.subject ?? "",
         groupName: r.project?.group?.name ?? "",
         date: r.submitted_at ?? r.graded_at ?? "",
         grade5: r.grade,
@@ -1086,7 +1101,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     // one relationship was found" — confirmed live in production logs.
     const stageSel =
       "id, grade, teacher_comment, completed_at, graded_at, submission_data, " +
-      "stage:lesson_stages!inner(title, content_type, lesson:lessons!lesson_id(group:groups!inner(subject, name)))";
+      "stage:lesson_stages!inner(title, content_type, lesson:lessons!lesson_id(subject_id, group:groups!inner(name), subject:subjects(name)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
     if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
@@ -1096,7 +1111,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       id: string; grade: number; teacher_comment: string | null;
       completed_at: string | null; graded_at: string | null;
       submission_data: { kind?: string } | null;
-      stage: { title: string; content_type: string; lesson: { group: { subject: string; name: string } | null } | null } | null;
+      stage: { title: string; content_type: string; lesson: { group: { name: string } | null; subject: { name: string } | null } | null } | null;
     }>) {
       const ct = r.stage?.content_type ?? "";
       const kind: StudentGradeItem["kind"] =
@@ -1109,7 +1124,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         kind,
         sourceTable: "lesson_stage_progress",
         title: r.stage?.title ?? "Задание урока",
-        subject: r.stage?.lesson?.group?.subject ?? "",
+        subject: getSubjectKeyByLabel(r.stage?.lesson?.subject?.name) ?? "",
         groupName: r.stage?.lesson?.group?.name ?? "",
         date: r.graded_at ?? r.completed_at ?? "",
         grade5: r.grade,
@@ -1122,7 +1137,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
   // Lesson grades (migration 40)
   try {
     const lgSel =
-      "id, grade, comment, graded_at, lesson:lessons!inner(title, group:groups!inner(subject, name))";
+      "id, grade, comment, graded_at, lesson:lessons!inner(title, subject_id, group:groups!inner(name), subject:subjects(name))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let lgQuery: any = (db as any).from("lesson_grades").select(lgSel);
     if (studentId) lgQuery = lgQuery.eq("student_id", studentId);
@@ -1130,13 +1145,13 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     if (lgRes.error) console.error("[getStudentGrades] lesson_grades error:", lgRes.error.message);
     for (const r of (lgRes.data ?? []) as unknown as Array<{
       id: string; grade: number; comment: string | null; graded_at: string;
-      lesson: { title: string | null; group: { subject: string; name: string } | null } | null;
+      lesson: { title: string | null; group: { name: string } | null; subject: { name: string } | null } | null;
     }>) {
       items.push({
         id: r.id, kind: "lesson",
         sourceTable: "lesson_grades",
         title: r.lesson?.title ?? "Урок",
-        subject: r.lesson?.group?.subject ?? "",
+        subject: getSubjectKeyByLabel(r.lesson?.subject?.name) ?? "",
         groupName: r.lesson?.group?.name ?? "",
         date: r.graded_at,
         grade5: r.grade,
