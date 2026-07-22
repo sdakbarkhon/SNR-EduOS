@@ -75,8 +75,10 @@ export function AppShell({
 
         {/* Reachable from every student page except the fullscreen-lesson
             branch above (workspace/pre-lesson/presentations) — that branch
-            returns early and never reaches this JSX. */}
-        <AiFloatingButton />
+            returns early and never reaches this JSX. Also hidden on
+            /messages: the floating button overlapped the chat composer's
+            send button (see isMessagesRoute above). */}
+        {!isMessagesRoute && <AiFloatingButton />}
       </div>
     </ToastProvider>
   );
