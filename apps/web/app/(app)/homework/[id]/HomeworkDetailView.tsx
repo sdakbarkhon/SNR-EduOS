@@ -10,6 +10,7 @@ import {
   getHomeworkFileUrl,
   getHomeworkAttachmentUrl,
   getSubmissionFileUrl,
+  homeworkSubmissionStatusKind,
   type HomeworkWithSubmission,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -143,11 +144,22 @@ function SubmissionBlock({
     }
   };
 
+  const statusKind = homeworkSubmissionStatusKind(sub.status);
+  const statusLabel = statusKind === "graded" ? d.homework.gradedBadgeLabel
+    : statusKind === "pending_review" ? d.homework.pendingReviewBadge
+    : d.homework.notSubmittedBadge;
+  const statusCls = statusKind === "graded" ? "bg-emerald-50 text-emerald-700"
+    : statusKind === "pending_review" ? "bg-blue-50 text-blue-700"
+    : "bg-slate-100 text-slate-500";
+
   return (
     <GlassCard className="p-5">
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
         {d.homework.detailYourSubmission}
       </p>
+      <span className={`mb-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusCls}`}>
+        {statusLabel}
+      </span>
       {sub.answer_text ? (
         <div className="mb-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
           {sub.answer_text}

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import {
   getDictionary, getSubjectStyle, submitProgrammingHomework, getHomeworkTestsUrl,
+  homeworkSubmissionStatusKind,
   type HomeworkWithSubmission, type Locale,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -100,6 +101,17 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
   const runLabel = running
     ? (lang === "python" && !pyodideReady() ? dc.runFirst : lang === "cpp" ? dc.runningCpp : t.running)
     : t.run;
+
+  // Статус сдачи — раньше здесь не было НИЧЕГО (ни статуса, ни оценки, ни
+  // комментария учителя), даже после того как задание уже оценено (задача
+  // "Задания", Часть 2 — единственный тип ДЗ без этого блока).
+  const statusKind = homeworkSubmissionStatusKind(hw.submission?.status);
+  const statusLabel = statusKind === "graded" ? d.homework.gradedBadgeLabel
+    : statusKind === "pending_review" ? d.homework.pendingReviewBadge
+    : d.homework.notSubmittedBadge;
+  const statusCls = statusKind === "graded" ? "bg-emerald-50 text-emerald-700"
+    : statusKind === "pending_review" ? "bg-blue-50 text-blue-700"
+    : "bg-slate-100 text-slate-500";
   // HomeworkHintPanel is fixed/z-40 — it already floats above normal-flow
   // content, so no padding reservation is needed: the editor column fills
   // the full width and the panel overlays its right edge.
@@ -137,6 +149,38 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
               <p className="mt-4 whitespace-pre-wrap border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-700">
                 {hw.description}
               </p>
+            )}
+          </GlassCard>
+
+          <GlassCard className="p-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+              {d.homework.detailYourSubmission}
+            </p>
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusCls}`}>
+              {statusLabel}
+            </span>
+            {hw.submission?.submitted_at && (
+              <div className="mt-2 text-xs text-slate-400">
+                {d.homework.submittedOn.replace(
+                  "{date}",
+                  new Date(hw.submission.submitted_at).toLocaleDateString("ru-RU", {
+                    day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent",
+                  }),
+                )}
+              </div>
+            )}
+            {hw.submission?.grade != null && (
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <span className="text-sm font-semibold text-slate-700">
+                  {d.homework.grade}: {hw.submission.grade}
+                </span>
+              </div>
+            )}
+            {hw.submission?.teacher_comment && (
+              <div className="mt-2 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
+                <span className="font-medium">{d.homework.teacherComment}: </span>
+                {hw.submission.teacher_comment}
+              </div>
             )}
           </GlassCard>
 
