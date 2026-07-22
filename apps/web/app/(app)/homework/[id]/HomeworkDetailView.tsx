@@ -160,12 +160,22 @@ function SubmissionBlock({
       <span className={`mb-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusCls}`}>
         {statusLabel}
       </span>
-      {sub.answer_text ? (
-        <div className="mb-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-          {sub.answer_text}
+      {/* Отправленный текстовый ответ — под явным заголовком «Ваш ответ»,
+          whitespace-pre-wrap для многострочных эссе/сочинений. */}
+      {sub.answer_text && (
+        <div className="mb-2">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+            {d.homework.yourAnswer}
+          </p>
+          <div className="whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
+            {sub.answer_text}
+          </div>
         </div>
-      ) : (
-        <p className="mb-2 text-sm italic text-slate-400">{d.homework.noFile}</p>
+      )}
+
+      {/* Ни текста, ни файла — не показываем пустой блок, только короткую метку. */}
+      {!sub.answer_text && !sub.file_storage_path && !sub.file_url && (
+        <p className="mb-2 text-sm italic text-slate-400">{d.homework.notSubmittedYet}</p>
       )}
 
       {/* New storage-backed file */}
@@ -444,6 +454,23 @@ function ExternalServiceCard({ hw }: { hw: HomeworkWithSubmission }) {
   );
 }
 
+/** External-service homework isn't submitted to the teacher by design (the
+ *  student works right inside the embedded service above). Instead of a
+ *  misleading text/file submit form, show a short read-only note so there's
+ *  no empty "your work" block. */
+function ExternalNoSubmissionNote() {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  return (
+    <GlassCard className="p-5">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+        {d.homework.detailYourSubmission}
+      </p>
+      <p className="text-sm leading-relaxed text-slate-500">{d.homework.externalNoSubmission}</p>
+    </GlassCard>
+  );
+}
+
 export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   const router = useRouter();
   const { locale } = useLocale();
@@ -561,6 +588,10 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
         <TestPlayer hw={hw} />
       ) : hw.submission && !resubmitMode ? (
         <SubmissionBlock hw={hw} onResubmit={() => setResubmitMode(true)} />
+      ) : isExternalService(hw.content_type) ? (
+        // Внешние сервисы не сдаются по дизайну — вместо формы отправки
+        // короткая метка «работа не отправляется» (без пустых блоков).
+        <ExternalNoSubmissionNote />
       ) : (
         <SubmitForm hw={hw} onSuccess={() => setResubmitMode(false)} />
       )}

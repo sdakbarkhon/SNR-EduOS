@@ -13,7 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
-import { CodeEditor } from "@/components/CodeEditor";
+import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS, isHtmlLanguage } from "@/lib/code-languages";
 import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
 import { pyodideReady } from "@/lib/pyodide";
@@ -167,6 +167,19 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
                     day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent",
                   }),
                 )}
+              </div>
+            )}
+            {/* Отправленный код — read-only снимок именно того, что ушло
+                учителю. Раньше сданный код только молча подставлялся в рабочий
+                редактор справа (hw.submission.code_text в useState), и ученик
+                не видел «вот что я отправил», особенно если потом правил
+                редактор. Теперь это отдельный read-only блок. */}
+            {hw.submission?.code_text && (
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                  {d.homework.submittedCodeLabel}
+                </p>
+                <CodeViewer value={hw.submission.code_text} language={lang} minHeight={200} />
               </div>
             )}
             {hw.submission?.grade != null && (

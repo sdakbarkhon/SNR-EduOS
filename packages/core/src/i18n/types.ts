@@ -909,6 +909,9 @@ export interface Dictionary {
     detailAttachments: string;
     detailDownload: string;
     detailYourSubmission: string;
+    submittedCodeLabel: string;   // "Отправленный код" — read-only снимок сданного кода (programming)
+    externalNoSubmission: string; // внешний сервис: работа не отправляется по дизайну
+    notSubmittedYet: string;      // "Ещё не отправлено" — когда сдачи нет
     formSubmitting: string;
     formSuccess: string;
     formError: string;
