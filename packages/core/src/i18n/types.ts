@@ -123,6 +123,9 @@ export interface Dictionary {
     qaTeacher: string;         // "Связь с учителем" (stub)
     qaAI: string;              // "Спросить AI"
     myProgress: string;        // "Мой прогресс"
+    progressStatDone: string;      // "Сдано" — подпись цифры сдано/всего у кольца
+    progressStatRemaining: string; // "Осталось" — подпись цифры несданных заданий
+    streakEmpty: string;           // "Пока нет данных о посещаемости" — пустое состояние серии успехов
     progressAllTime: string;   // "Выполнено заданий" — доля сдано/выдано за всё время (было "Всего за неделю", считалось по lesson_stages — заменено на homework-based расчёт)
     progressModalDoneOf: string;  // "{done} из {total}"
     progressModalAvgGrade: string; // "Средний балл"

@@ -15,6 +15,7 @@ import {
   type Homework,
   type HomeworkSubmission,
   type TestSubmission,
+  type AttendanceStatus,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -27,11 +28,9 @@ import type { Database } from "@snr/core";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
 type SubjectRow = { id: string; name: string; group_id: string; icon: string; color: string; is_active: boolean };
+type AttendanceDay = { status: AttendanceStatus; startsAt: string };
 
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
-// Заглушка серии успехов — реальной таблицы стриков нет (Iter5 P9)
-const STREAK_DAYS = 7;
-const STREAK_DONE = [true, true, true, true, true, true, false];
 
 function dayOfYear(d: Date): number {
   return Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
@@ -45,6 +44,40 @@ const TZ_MS = 5 * 60 * 60 * 1000;
 function tashkentDateKey(d: Date): string {
   return new Date(d.getTime() + TZ_MS).toISOString().slice(0, 10);
 }
+// "YYYY-MM-DD" на i дней назад от опорного дня-ключа (UTC-арифметика по
+// дню-ключу, без TZ-дрейфа — Ташкент без переходов на летнее время).
+function dayKeyBack(baseKey: string, i: number): string {
+  const d = new Date(baseKey + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - i);
+  return d.toISOString().slice(0, 10);
+}
+
+// Цвет кольца прогресса по проценту (ЧАСТЬ 1): низкий → тёплый красно-оранжевый,
+// средний → жёлто-янтарный, высокий → зелёный. Пороги: <40 / 40–69 / ≥70.
+function ringColors(pct: number): { from: string; to: string; glow: string } {
+  if (pct >= 70) return { from: "#22C55E", to: "#4ADE80", glow: "rgba(34,197,94,0.38)" };
+  if (pct >= 40) return { from: "#F59E0B", to: "#FBBF24", glow: "rgba(245,158,11,0.34)" };
+  return { from: "#FB6B4A", to: "#FF9F45", glow: "rgba(251,107,74,0.34)" };
+}
+
+// Иллюстрация «Факта дня» по теме (ЧАСТЬ 2): факт генерит ИИ на лету, картинка
+// подбирается на фронте по ключевым словам темы. Не распознали — null →
+// дефолтная пчела (текущая). Порядок важен: более специфичные категории выше.
+const FACT_CATEGORIES: Array<{ emoji: string; kw: string[] }> = [
+  { emoji: "🪐", kw: ["марс", "планет", "космос", "звезд", "звёзд", "галакт", "солнц", "луна", "луны", "венер", "юпитер", "сатурн", "орбит", "астероид", "ракет", "метеор", "вселенн", "комет"] },
+  { emoji: "🐙", kw: ["осьминог", "кит", "жираф", "акул", "улитк", "собак", "кошк", "кошек", "животн", "птиц", "рыб", "насеком", "пчел", "слон", "лев", "тигр", "муравь", "паук", "зме", "лягуш", "дельфин"] },
+  { emoji: "🌿", kw: ["растен", "дерев", "лес", "цвет", "банан", "клубник", "ягод", "океан", "мор", "гор ", "пустын", "антарктид", "вулкан", "лёд", "лед", "погод", "дожд", "радуг"] },
+  { emoji: "💻", kw: ["компьютер", "вирус", "интернет", "робот", "телефон", "технолог", "двигател", "электрич", "алгоритм", "программ", "данн", "сеть", "чип"] },
+  { emoji: "🏛️", kw: ["древн", "век", "истори", "импери", "пирамид", "археолог", "средневеков", "война", "цивилизац", "фараон", "рыцар"] },
+  { emoji: "🔬", kw: ["ген", "молекул", "атом", "хими", "физик", "температур", "энерги", "свет", "градус", "эксперимент", "формул", "кислот", "металл", "медь", "железо", "мозг", "нейрон"] },
+  { emoji: "🧠", kw: ["человек", "тел", "серд", "кров", "кост", "позвонк", "язык", "отпечат", "палец", "пальц", "мышц", "глаз", "зуб", "сон", "мёд", "мед"] },
+];
+function factEmojiFor(text: string | null): string | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  for (const c of FACT_CATEGORIES) if (c.kw.some((k) => t.includes(k))) return c.emoji;
+  return null;
+}
 
 export function DashboardView({
   student,
@@ -53,6 +86,7 @@ export function DashboardView({
   submissions,
   testSubmissions,
   groups,
+  attendance,
 }: {
   student: Student;
   lessons: Lesson[];
@@ -60,6 +94,7 @@ export function DashboardView({
   submissions: HomeworkSubmission[];
   testSubmissions: TestSubmission[];
   groups: Group[];
+  attendance: AttendanceDay[];
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -105,7 +140,7 @@ export function DashboardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // AI fact of the day (unchanged logic from before the redesign).
+  // AI fact of the day.
   const [aiFactText, setAiFactText] = useState<string | null>(null);
   const [factLoading, setFactLoading] = useState(true);
 
@@ -136,6 +171,7 @@ export function DashboardView({
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const classLabel = getClassLabel(groups);
   const greeting = t.greetings[dayOfYear(now ?? new Date()) % t.greetings.length];
+  const factEmoji = factEmojiFor(aiFactText);
 
   // Today's lessons — only computed client-side once `now` is set, for the
   // same hydration-safety reason above.
@@ -151,23 +187,16 @@ export function DashboardView({
   const MAX_TODAY_WIDGET = 3;
   const lastLessonOfDay = todayLessonsAll.length > 0 ? todayLessonsAll[todayLessonsAll.length - 1] : null;
   const dayIsOver = now !== null && !!lastLessonOfDay?.ends_at && now > new Date(lastLessonOfDay.ends_at);
-  // Пока день не закончился — виджет показывает первые MAX_TODAY_WIDGET по
-  // времени (как раньше). Когда день закончился — хвост списка, чтобы
-  // "замёрзший" на "Сейчас" последний урок дня точно попал в кадр (см.
-  // isNow ниже), а не был бы обрезан, если уроков в дне больше лимита виджета.
   const todayLessons = dayIsOver
     ? todayLessonsAll.slice(-MAX_TODAY_WIDGET)
     : todayLessonsAll.slice(0, MAX_TODAY_WIDGET);
   const hasMoreToday = todayLessonsAll.length > MAX_TODAY_WIDGET;
   const subjectById = new Map(mySubjects.map((s) => [s.id, s]));
 
-  // "Мой прогресс" (ЧАСТЬ 2) — доля СДАННЫХ заданий от ВЫДАННЫХ, за всё время
-  // (не за неделю: свежий полный ресет заданий делает "неделю" произвольным
-  // срезом). Источник: homework (выдано) + homework_submissions/
-  // test_submissions (сдано, RLS уже сужает обе выборки до своих же строк).
-  // Внешние сервисы (codesandbox/wokwi/geogebra/desmos/learningapps и т.д.)
-  // никогда не сдаются по дизайну — попадают в "выдано", никогда в "сдано",
-  // 100% для них недостижимо, и это ожидаемо (не 0%/деление на ноль).
+  // "Мой прогресс" (расчёт из ed9b0f8 — НЕ меняется) — доля СДАННЫХ заданий от
+  // ВЫДАННЫХ, за всё время. Источник: homework (выдано) + homework_submissions/
+  // test_submissions (сдано). Внешние сервисы попадают в "выдано", никогда в
+  // "сдано" — 100% недостижимо, это по дизайну.
   const homeworkById = new Map(homework.map((h) => [h.id, h]));
   const submittedHomeworkIds = new Set<string>([
     ...submissions.map((s) => s.homework_id),
@@ -176,13 +205,16 @@ export function DashboardView({
   const totalAssignedCount = homework.length;
   const totalSubmittedCount = homework.filter((h) => submittedHomeworkIds.has(h.id)).length;
   const overallPercent = totalAssignedCount > 0 ? Math.round((totalSubmittedCount / totalAssignedCount) * 100) : 0;
+  const remainingCount = Math.max(0, totalAssignedCount - totalSubmittedCount);
+  // Средний балл по всем оценённым сдачам (те же данные, что per-subject ниже).
+  const allGradeVals = [
+    ...submissions.filter((s) => s.grade != null).map((s) => s.grade as number),
+    ...testSubmissions.filter((ts) => ts.grade != null).map((ts) => ts.grade as number),
+  ];
+  const overallAvg = allGradeVals.length ? allGradeVals.reduce((a, b) => a + b, 0) / allGradeVals.length : null;
 
-  // Per-subject: то же самое (сдано/выдано), в разрезе subject_id — раньше
-  // считалось от completed/total LESSONS, к заданиям отношения не имело.
-  // Заодно средний балл по предмету (grade — дискретная 2..5 шкала что у
-  // homework_submissions, что у test_submissions) для модалки ниже.
-  // Stub subjects (is_active=false) никогда не имеют заданий — полный
-  // каталог (активные+заглушки) отдельно показан ниже в "Предметы класса".
+  // Per-subject (используется В МОДАЛКЕ — НЕ удалять, даже что блок «Мои
+  // предметы» с дашборда убран): сдано/выдано + средний балл в разрезе subject.
   const subjectsWithProgress = mySubjects.filter((sub) => sub.is_active).map((sub) => {
     const subjectHomework = homework.filter((h) => h.subject_id === sub.id);
     const total = subjectHomework.length;
@@ -199,13 +231,101 @@ export function DashboardView({
     return { ...sub, percent, total, done, avgGrade };
   });
 
-  const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((fallback, i) => {
-    const label = now
-      ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1 + i)
-          .toLocaleDateString(localeStr, { weekday: "short" })
-      : fallback;
-    return { label, done: STREAK_DONE[i] };
-  });
+  // Кольцо прогресса: анимация заполнения — один проход при загрузке (ЧАСТЬ 1).
+  const [ringPct, setRingPct] = useState(0);
+  useEffect(() => {
+    const id = setTimeout(() => setRingPct(overallPercent), 120);
+    return () => clearTimeout(id);
+  }, [overallPercent]);
+  const ring = ringColors(overallPercent);
+  const RING_R = 54;
+  const RING_C = 2 * Math.PI * RING_R;
+  const ringOffset = RING_C * (1 - ringPct / 100);
+  const ringGradId = "progressRingGrad";
+
+  // ─── Серия успехов по посещаемости (ЧАСТЬ 3) ────────────────────────────
+  // День "успешный", если ученик был present на БОЛЬШИНСТВЕ своих уроков этого
+  // дня (present > total/2). Дни без уроков серию не прерывают — пропускаются.
+  const attByDay = new Map<string, { present: number; total: number }>();
+  for (const a of attendance) {
+    const k = tashkentDateKey(new Date(a.startsAt));
+    const cur = attByDay.get(k) ?? { present: 0, total: 0 };
+    cur.total++;
+    if (a.status === "present") cur.present++;
+    attByDay.set(k, cur);
+  }
+  const daySuccessful = (k: string): boolean | null => {
+    const s = attByDay.get(k);
+    if (!s || s.total === 0) return null; // нет уроков/данных
+    return s.present > s.total / 2;
+  };
+
+  const todayKey = now ? tashkentDateKey(now) : null;
+  // Стрик: назад от сегодня, дни без уроков пропускаем, обрыв на первом
+  // "неуспешном" дне-с-уроками.
+  let streak = 0;
+  if (todayKey) {
+    for (let i = 0; i < 90; i++) {
+      const dk = dayKeyBack(todayKey, i);
+      const ok = daySuccessful(dk);
+      if (ok === null) continue;
+      if (ok) streak++;
+      else break;
+    }
+  }
+
+  // Галочки Пн–Вс текущей недели по факту посещаемости.
+  const weekDayStates = (() => {
+    if (!todayKey) return [] as Array<{ label: string; state: "present" | "absent" | "none" | "future" }>;
+    const todayD = new Date(todayKey + "T00:00:00Z");
+    const dow = (todayD.getUTCDay() + 6) % 7; // 0=Пн … 6=Вс
+    const out: Array<{ label: string; state: "present" | "absent" | "none" | "future" }> = [];
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(todayD);
+      dd.setUTCDate(dd.getUTCDate() - dow + i);
+      const dk = dd.toISOString().slice(0, 10);
+      const label = dd.toLocaleDateString(localeStr, { weekday: "short", timeZone: "UTC" });
+      let state: "present" | "absent" | "none" | "future";
+      if (dk > todayKey) state = "future";
+      else {
+        const ok = daySuccessful(dk);
+        state = ok === null ? "none" : ok ? "present" : "absent";
+      }
+      out.push({ label, state });
+    }
+    return out;
+  })();
+
+  // Накопительный график посещаемости за последние 21 день (пришёл +1 / нет −1).
+  const graphPoints = (() => {
+    if (!todayKey) return [] as number[];
+    const pts: number[] = [];
+    let acc = 0;
+    for (let i = 20; i >= 0; i--) {
+      const ok = daySuccessful(dayKeyBack(todayKey, i));
+      if (ok === null) continue;
+      acc += ok ? 1 : -1;
+      pts.push(acc);
+    }
+    return pts;
+  })();
+  const hasGraph = graphPoints.length >= 2;
+  const graphPath = (() => {
+    if (!hasGraph) return null;
+    const minY = Math.min(...graphPoints);
+    const maxY = Math.max(...graphPoints);
+    const span = Math.max(1, maxY - minY);
+    const W = 320, H = 110, PAD = 8;
+    const stepX = (W - PAD * 2) / (graphPoints.length - 1);
+    const coords = graphPoints.map((v, i) => {
+      const x = PAD + i * stepX;
+      const y = PAD + (H - PAD * 2) * (1 - (v - minY) / span);
+      return [x, y] as const;
+    });
+    const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const area = `${line} L${coords[coords.length - 1]![0].toFixed(1)},${H} L${coords[0]![0].toFixed(1)},${H} Z`;
+    return { line, area };
+  })();
 
   return (
     <div className="flex flex-col gap-6">
@@ -228,18 +348,21 @@ export function DashboardView({
               className="relative flex min-h-[240px] flex-[1.08] flex-col rounded-[24px] p-6 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
               style={{ background: "linear-gradient(135deg,#8E74F2 0%,#6A48E4 100%)" }}
             >
-              {/* Decorative layer, clipped to the rounded card corners and
-                  painted BEHIND the text/button below — previously these
-                  elements came after the text in DOM order and could paint
-                  on top of long fact text, on top of overflow-hidden on the
-                  card itself clipping wrapped lines outright (root cause of
-                  the mid-word cut-off bug). */}
+              {/* Декор-слой позади текста, обрезан по скруглению карточки. */}
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
                 <span className="animate-twinkle absolute left-1/2 top-[70px] text-[15px] text-white/90">✦</span>
                 <span className="animate-twinkle absolute left-[44%] top-[140px] text-[11px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
                 <span className="animate-twinkle absolute right-11 top-9 text-[13px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
-                <div className="animate-float-medium absolute bottom-6 right-16 text-[56px] leading-none">🌸</div>
-                <div className="animate-float-slow absolute -bottom-1 right-3 text-[100px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">🐝</div>
+                {/* Иллюстрация по теме факта (ЧАСТЬ 2): при распознанной теме —
+                    тематический эмодзи; иначе дефолт — пчела + цветок. */}
+                {factEmoji ? (
+                  <div className="animate-float-slow absolute -bottom-1 right-3 text-[96px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">{factEmoji}</div>
+                ) : (
+                  <>
+                    <div className="animate-float-medium absolute bottom-6 right-16 text-[56px] leading-none">🌸</div>
+                    <div className="animate-float-slow absolute -bottom-1 right-3 text-[100px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">🐝</div>
+                  </>
+                )}
               </div>
 
               <div className="relative flex items-center gap-2 text-[16px] font-extrabold">
@@ -253,7 +376,7 @@ export function DashboardView({
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:300ms]" />
                 </div>
               ) : (
-                <p className="relative mt-4 max-w-[85%] break-words text-[21px] font-extrabold leading-snug">{aiFactText}</p>
+                <p className="relative mt-4 max-w-[72%] break-words text-[21px] font-extrabold leading-snug">{aiFactText}</p>
               )}
 
               {!factLoading && aiFactText && (
@@ -266,49 +389,61 @@ export function DashboardView({
               )}
             </div>
 
-            {/* Серия успехов — заглушка (Iter5 P9) */}
-            <div className="relative flex min-h-[240px] flex-1 flex-col overflow-hidden rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
+            {/* Серия успехов — реальные данные по посещаемости (ЧАСТЬ 3), клик → /attendance */}
+            <Link
+              href="/attendance"
+              className="group relative flex min-h-[240px] flex-1 flex-col overflow-hidden rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
+            >
               <div className="flex items-center gap-2 text-[16px] font-extrabold text-[#2A2A45]">
                 <Flame className="h-[22px] w-[22px] text-[#FF7A2E]" /> {t.streakTitle}
               </div>
               <div className="mt-2 flex items-baseline gap-2.5">
-                <span className="text-[42px] font-black leading-none text-[#7C5CFF]">{STREAK_DAYS}</span>
+                <span className="text-[42px] font-black leading-none text-[#7C5CFF]">{streak}</span>
                 <span className="text-[15px] font-bold text-[#8E8EA9]">{t.streakDays.replace("{n}", "").trim()}</span>
               </div>
               <div className="relative mt-1 flex-1">
-                <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="none" className="block overflow-visible">
-                  <defs>
-                    <linearGradient id="streakLine" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0" stopColor="#FFD36E" />
-                      <stop offset="1" stopColor="#FF9F2E" />
-                    </linearGradient>
-                    <linearGradient id="streakFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stopColor="rgba(255,183,62,.26)" />
-                      <stop offset="1" stopColor="rgba(255,183,62,0)" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M4,104 C46,100 66,92 96,88 C132,83 152,68 192,58 C230,49 252,28 306,14 L306,118 L4,118 Z" fill="url(#streakFill)" stroke="none" />
-                  <path d="M4,104 C46,100 66,92 96,88 C132,83 152,68 192,58 C230,49 252,28 306,14" fill="none" stroke="url(#streakLine)" strokeWidth={5} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                </svg>
+                {hasGraph && graphPath ? (
+                  <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="none" className="block overflow-visible">
+                    <defs>
+                      <linearGradient id="streakLine" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0" stopColor="#FFD36E" />
+                        <stop offset="1" stopColor="#FF9F2E" />
+                      </linearGradient>
+                      <linearGradient id="streakFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="rgba(255,183,62,.26)" />
+                        <stop offset="1" stopColor="rgba(255,183,62,0)" />
+                      </linearGradient>
+                    </defs>
+                    <path d={graphPath.area} fill="url(#streakFill)" stroke="none" />
+                    <path d={graphPath.line} fill="none" stroke="url(#streakLine)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <p className="text-center text-[12px] font-semibold text-[#B7B7CE]">{t.streakEmpty}</p>
+                  </div>
+                )}
               </div>
               <div className="mt-2 flex justify-between">
-                {weekDays.map((wd, i) => (
-                  <div key={i} className="flex flex-col items-center gap-1.5">
-                    <div
-                      className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[11px] font-black"
-                      style={{
-                        background: wd.done ? "#4E86F7" : "#EEF0F6",
-                        color: wd.done ? "#fff" : "#B7B7CE",
-                        boxShadow: wd.done ? "0 4px 10px rgba(78,134,247,.3)" : undefined,
-                      }}
-                    >
-                      {wd.done ? <Check className="h-3.5 w-3.5" /> : "·"}
+                {(weekDayStates.length ? weekDayStates : Array.from({ length: 7 }, () => ({ label: "", state: "none" as const }))).map((wd, i) => {
+                  const present = wd.state === "present";
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1.5">
+                      <div
+                        className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[11px] font-black"
+                        style={{
+                          background: present ? "#4E86F7" : wd.state === "absent" ? "#FDE4E4" : "#EEF0F6",
+                          color: present ? "#fff" : wd.state === "absent" ? "#E5484D" : "#B7B7CE",
+                          boxShadow: present ? "0 4px 10px rgba(78,134,247,.3)" : undefined,
+                        }}
+                      >
+                        {present ? <Check className="h-3.5 w-3.5" /> : wd.state === "absent" ? "×" : "·"}
+                      </div>
+                      <span className="text-[11px] font-bold capitalize text-[#9A9AB5]">{wd.label}</span>
                     </div>
-                    <span className="text-[11px] font-bold capitalize text-[#9A9AB5]">{wd.label}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Быстрые действия */}
@@ -321,106 +456,106 @@ export function DashboardView({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Мой прогресс — кликабельно, открывает модалку с разбивкой по предметам (ЧАСТЬ 2) */}
+          {/* РЯД: узкий «Мой прогресс» слева + «Предметы класса» справа (ЧАСТЬ 1).
+              На <lg складываются друг под друга. */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+            {/* Мой прогресс — узкий, градиентное кольцо с анимацией + цифры; клик → модалка */}
             <button
               type="button"
               onClick={() => setProgressModalOpen(true)}
               className="relative overflow-hidden rounded-[24px] bg-white p-[22px] text-left shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
             >
               <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.myProgress}</h3>
-              <div className="mt-3.5 flex items-center gap-2">
-                <div
-                  className="relative flex h-[148px] w-[148px] shrink-0 items-center justify-center rounded-full shadow-[0_10px_22px_rgba(124,92,255,0.18)]"
-                  style={{ background: `conic-gradient(#7C5CFF 0% ${overallPercent}%, #ECE7FB ${overallPercent}% 100%)` }}
-                >
-                  <div className="flex h-[110px] w-[110px] flex-col items-center justify-center rounded-full bg-white">
-                    <span className="text-[30px] font-black leading-none text-[#2A2A45]">
+
+              <div className="relative mt-4 flex flex-col items-center">
+                <div className="relative h-[168px] w-[168px]" style={{ filter: `drop-shadow(0 8px 18px ${ring.glow})` }}>
+                  <svg viewBox="0 0 132 132" className="h-full w-full -rotate-90">
+                    <defs>
+                      <linearGradient id={ringGradId} x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stopColor={ring.from} />
+                        <stop offset="1" stopColor={ring.to} />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="66" cy="66" r={RING_R} fill="none" stroke="#ECE7FB" strokeWidth="13" />
+                    <circle
+                      cx="66" cy="66" r={RING_R} fill="none"
+                      stroke={`url(#${ringGradId})`}
+                      strokeWidth="13"
+                      strokeLinecap="round"
+                      strokeDasharray={RING_C}
+                      strokeDashoffset={ringOffset}
+                      style={{ transition: "stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1)" }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-[34px] font-black leading-none text-[#2A2A45]">
                       {overallPercent}<span className="text-[18px]">%</span>
                     </span>
-                    <span className="mt-1 text-center text-[11px] font-bold leading-tight text-[#9A9AB5]">{t.progressAllTime}</span>
+                    <span className="mt-1 max-w-[92px] text-center text-[10.5px] font-bold leading-tight text-[#9A9AB5]">{t.progressAllTime}</span>
                   </div>
+                  <span className="animate-float-medium pointer-events-none absolute -right-1 -top-2 text-[34px] leading-none drop-shadow-[0_6px_10px_rgba(90,60,180,0.24)]">🧑‍🚀</span>
                 </div>
-                <div className="relative flex min-h-[140px] flex-1 items-center justify-center">
-                  <span className="animate-twinkle absolute left-6 top-[18px] text-xs text-[#FFC93C]">✦</span>
-                  <span className="animate-twinkle absolute bottom-[22px] right-3.5 text-[11px] text-[#B79BFF]" style={{ animationDelay: ".7s" }}>✦</span>
-                  <div className="animate-float-medium text-[78px] leading-none drop-shadow-[0_10px_14px_rgba(90,60,180,0.24)]">🧑‍🚀</div>
+
+                {/* Цифры (из существующего расчёта): сдано/всего, средний балл, осталось */}
+                <div className="mt-5 grid w-full grid-cols-3 gap-2">
+                  <div className="flex flex-col items-center rounded-[14px] bg-[#F4F1FE] px-2 py-2.5 text-center">
+                    <span className="text-[17px] font-black leading-none text-[#2A2A45]">{totalSubmittedCount}/{totalAssignedCount}</span>
+                    <span className="mt-1 text-[10.5px] font-bold text-[#9A9AB5]">{t.progressStatDone}</span>
+                  </div>
+                  <div className="flex flex-col items-center rounded-[14px] bg-[#F1F7FE] px-2 py-2.5 text-center">
+                    <span className="text-[17px] font-black leading-none text-[#2A2A45]">{overallAvg != null ? overallAvg.toFixed(1) : t.progressModalNoGrades}</span>
+                    <span className="mt-1 text-[10.5px] font-bold text-[#9A9AB5]">{t.progressModalAvgGrade}</span>
+                  </div>
+                  <div className="flex flex-col items-center rounded-[14px] bg-[#FFF3EC] px-2 py-2.5 text-center">
+                    <span className="text-[17px] font-black leading-none text-[#2A2A45]">{remainingCount}</span>
+                    <span className="mt-1 text-[10.5px] font-bold text-[#9A9AB5]">{t.progressStatRemaining}</span>
+                  </div>
                 </div>
               </div>
             </button>
 
-            {/* Мои предметы */}
-            <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.mySubjects}</h3>
-                <Link href="/lessons" className="text-[13px] font-extrabold text-[#7C5CFF] hover:underline">
-                  {t.seeAll}
-                </Link>
-              </div>
-              {subjectsWithProgress.length ? (
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  {subjectsWithProgress.slice(0, 3).map((sub) => {
+            {/* Предметы класса — полный каталог (перенесён сюда, справа от «Мой
+                прогресс», ЧАСТЬ 1). Рабочие предметы кликабельны (в /lessons);
+                заглушки (is_active=false) затемнены, клик → тост. */}
+            {mySubjects.length > 0 ? (
+              <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
+                <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.classSubjectsTitle}</h3>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {[...mySubjects].sort((a, b) => Number(b.is_active) - Number(a.is_active)).map((sub) => {
                     const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
-                    return (
-                      <div key={sub.id} className="flex flex-col gap-2 rounded-[18px] p-3.5" style={{ backgroundColor: `${sub.color}1F` }}>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-[13px]" style={{ background: sub.color, boxShadow: `0 6px 14px ${sub.color}66` }}>
+                    const card = (
+                      <div
+                        className={`flex h-full flex-col items-center gap-2 rounded-[16px] p-3 text-center transition ${sub.is_active ? "hover:-translate-y-0.5" : "opacity-60"}`}
+                        style={{ backgroundColor: sub.is_active ? `${sub.color}1F` : "#F1F1F5" }}
+                      >
+                        <div
+                          className="relative flex h-10 w-10 items-center justify-center rounded-[12px]"
+                          style={{ background: sub.is_active ? sub.color : "#B7B7CE" }}
+                        >
                           <SubIcon className="h-5 w-5 text-white" />
+                          {!sub.is_active && (
+                            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow">
+                              <Lock className="h-2.5 w-2.5 text-[#9A9AB5]" />
+                            </span>
+                          )}
                         </div>
-                        <p className="min-h-[31px] truncate text-[13px] font-extrabold leading-tight text-[#2A2A45]">{sub.name}</p>
-                        <p className="text-[20px] font-black" style={{ color: sub.color }}>{sub.percent}%</p>
-                        <div className="h-2 overflow-hidden rounded-full bg-white/60">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${sub.percent}%`, background: sub.color }} />
-                        </div>
+                        <p className="line-clamp-2 text-[12px] font-bold leading-tight text-[#2A2A45]">{sub.name}</p>
                       </div>
+                    );
+                    return sub.is_active ? (
+                      <Link key={sub.id} href="/lessons">{card}</Link>
+                    ) : (
+                      <button key={sub.id} type="button" onClick={() => showToast(t.subjectComingSoon)} className="text-left">
+                        {card}
+                      </button>
                     );
                   })}
                 </div>
-              ) : (
-                <p className="py-8 text-center text-sm text-[#9A9AB5]">{d.common.none}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Предметы класса — полный каталог (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 2.4).
-              Рабочие предметы кликабельны (ведут в /lessons); заглушки
-              (is_active=false) показаны затемнёнными с иконкой замка — клик
-              просто показывает тост "Скоро появится", без перехода. */}
-          {mySubjects.length > 0 && (
-            <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
-              <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.classSubjectsTitle}</h3>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {[...mySubjects].sort((a, b) => Number(b.is_active) - Number(a.is_active)).map((sub) => {
-                  const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
-                  const card = (
-                    <div
-                      className={`flex h-full flex-col items-center gap-2 rounded-[16px] p-3 text-center transition ${sub.is_active ? "hover:-translate-y-0.5" : "opacity-60"}`}
-                      style={{ backgroundColor: sub.is_active ? `${sub.color}1F` : "#F1F1F5" }}
-                    >
-                      <div
-                        className="relative flex h-10 w-10 items-center justify-center rounded-[12px]"
-                        style={{ background: sub.is_active ? sub.color : "#B7B7CE" }}
-                      >
-                        <SubIcon className="h-5 w-5 text-white" />
-                        {!sub.is_active && (
-                          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow">
-                            <Lock className="h-2.5 w-2.5 text-[#9A9AB5]" />
-                          </span>
-                        )}
-                      </div>
-                      <p className="line-clamp-2 text-[12px] font-bold leading-tight text-[#2A2A45]">{sub.name}</p>
-                    </div>
-                  );
-                  return sub.is_active ? (
-                    <Link key={sub.id} href="/lessons">{card}</Link>
-                  ) : (
-                    <button key={sub.id} type="button" onClick={() => showToast(t.subjectComingSoon)} className="text-left">
-                      {card}
-                    </button>
-                  );
-                })}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]" />
+            )}
+          </div>
 
           {/* Баннер целей — заглушка (Iter5 P9) */}
           <div
@@ -456,15 +591,10 @@ export function DashboardView({
                 const SubIcon = sub ? (LUCIDE_ICONS[sub.icon] ?? BookOpen) : BookOpen;
                 const start = new Date(lesson.starts_at);
                 const end = lesson.ends_at ? new Date(lesson.ends_at) : null;
-                // Замирание: последний урок дня, когда его время уже прошло
-                // (день окончен), продолжает считаться "Сейчас" — до полуночи
-                // Ташкента, когда крон реально закроет день. Остальные
-                // прошедшие уроки — нейтральные, без метки.
                 const isFrozenLast = dayIsOver && lastLessonOfDay?.id === lesson.id;
                 const isNow = isFrozenLast || (now !== null && now >= start && (!end || now <= end));
                 const isNext = !isNow && now !== null && start.getTime() - now.getTime() > 0
                   && start.getTime() - now.getTime() < 15 * 60 * 1000;
-                const isPast = !isNow && !isNext && now !== null && !!end && now > end;
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
                   <Link
@@ -549,7 +679,7 @@ export function DashboardView({
         </aside>
       </div>
 
-      {/* "Мой прогресс" — разбивка по предметам (ЧАСТЬ 2), только просмотр */}
+      {/* "Мой прогресс" — разбивка по предметам (модалка из ed9b0f8), только просмотр */}
       <Modal open={progressModalOpen} onClose={() => setProgressModalOpen(false)} title={t.myProgress}>
         <div className="flex flex-col gap-3">
           {subjectsWithProgress.length === 0 ? (

@@ -50,26 +50,33 @@ function fallbackFact(dateStr: string): string {
   return FALLBACK_FACTS[hash % FALLBACK_FACTS.length]!;
 }
 
+// Раньше факт требовался ≤80 символов, а если модель возвращала длиннее —
+// код резал его на 77 символов ПОСРЕДИ СЛОВА ("...си") и/или ретраил до 3 раз
+// (что уводило за 10-секундный лимит Vercel). Плюс кэш в daily_facts не
+// сохранялся (см. GET ниже — school_id), поэтому каждый заход генерил НОВЫЙ
+// факт и обрывал его по-разному. Теперь: один вызов, берём первое законченное
+// предложение, лимит 140 символов, обрезка строго ПО ГРАНИЦЕ СЛОВА + «…».
 async function fetchAiFact(): Promise<string | null> {
-  const MAX_LEN = 80;
+  const MAX_LEN = 140;
   const prompt =
-    `Один короткий интересный факт для школьников. СТРОГО: 1 предложение, максимум 80 символов на русском языке. Без вступления, без кавычек, без тире в начале. Только сам факт.\n` +
+    `Один короткий интересный факт для школьников. СТРОГО: одно законченное предложение на русском языке, до 140 символов. Без вступления, без кавычек, без тире в начале. Только сам факт.\n` +
     `Примеры: "Сердце синего кита весит около 600 кг." / "Антарктида — самая большая пустыня мира."`;
-  let lastText: string | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { text: raw, error } = await generateText(prompt, { maxTokens: 128 });
-    if (error || !raw.trim()) break;
-    // Clean leading/trailing markdown, quotes, dashes
-    const text = raw
-      .trim()
-      .replace(/^["""«»'\-—\*\s]+/, "")
-      .replace(/["""«»'\*\s]+$/, "")
-      .trim();
-    if (text.length <= MAX_LEN) return text;
-    lastText = text;
-    console.warn(`[daily-fact] attempt ${attempt + 1}: ${text.length} chars, retrying`);
+  const { text: raw, error } = await generateText(prompt, { maxTokens: 200 });
+  if (error || !raw.trim()) return null;
+  let text = raw
+    .trim()
+    .replace(/^["“”«»'\-—\*\s]+/, "")
+    .replace(/["“”«»'\*\s]+$/, "")
+    .trim();
+  // Только первое предложение (модель иногда добавляет второе).
+  const firstSentence = text.match(/^[^.!?]*[.!?]/);
+  if (firstSentence) text = firstSentence[0].trim();
+  if (text.length > MAX_LEN) {
+    const cut = text.slice(0, MAX_LEN);
+    const lastSpace = cut.lastIndexOf(" ");
+    text = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim() + "…";
   }
-  return lastText ? lastText.slice(0, 77) + "..." : null;
+  return text || null;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
@@ -106,8 +113,25 @@ export async function GET() {
       return NextResponse.json({ text: fallbackFact(today) });
     }
 
-    // Persist to DB (ignore conflict — another request may have inserted first)
-    await anyDb.from("daily_facts").upsert({ fact_date: today, fact_text: text }, { onConflict: "fact_date" });
+    // Persist to DB (ignore conflict — another request may have inserted first).
+    // КРИТИЧНО: миграция 71 добавила daily_facts.school_id NOT NULL DEFAULT
+    // current_school_id(). Под admin/service-role клиентом auth.uid() нет →
+    // дефолт молча резолвился в NULL → upsert падал, а его .error НЕ
+    // проверялся (реф 5222b73) → факт НИКОГДА не кэшировался → каждый заход
+    // генерил НОВЫЙ факт и обрывал его по-разному (root cause «На Марсе
+    // закаты си/юлу»). Фикс: резолвим school_id из данных (единственная школа)
+    // и проверяем .error.
+    const { data: school } = (await anyDb.from("schools").select("id").limit(1).maybeSingle()) as {
+      data: { id: string } | null;
+    };
+    if (school?.id) {
+      const { error: upsertErr } = await anyDb
+        .from("daily_facts")
+        .upsert({ fact_date: today, fact_text: text, school_id: school.id }, { onConflict: "fact_date" });
+      if (upsertErr) console.error("[daily-fact] cache upsert failed:", upsertErr.message);
+    } else {
+      console.error("[daily-fact] no school row found — fact not cached");
+    }
 
     return NextResponse.json({ text });
   } catch (e) {
