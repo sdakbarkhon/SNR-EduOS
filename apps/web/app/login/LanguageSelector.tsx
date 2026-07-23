@@ -39,7 +39,7 @@ export function LanguageSelector() {
       </button>
 
       {open && (
-        <div className="absolute bottom-full right-0 mb-2 min-w-[140px] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
+        <div className="absolute right-0 top-full mt-2 min-w-[140px] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
           {LANGUAGES.map((lang) => (
             <button
               key={lang.code}

@@ -109,9 +109,8 @@ export const ru: Dictionary = {
       subtitle: "Ваши данные под защитой.",
     },
     mobileApps: {
-      label: "Мобильное приложение для родителей",
-      android: "Установить на Android",
-      ios: "Установить на iOS",
+      android: "Скачать из Google Play",
+      ios: "Скачать из App Store",
       androidComingSoon: "Приложение скоро появится в Google Play",
       iosComingSoon: "Приложение скоро появится в App Store",
     },

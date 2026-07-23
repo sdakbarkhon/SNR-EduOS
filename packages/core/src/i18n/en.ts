@@ -109,9 +109,8 @@ export const en: Dictionary = {
       subtitle: "Your data is protected.",
     },
     mobileApps: {
-      label: "Mobile app for parents",
-      android: "Install on Android",
-      ios: "Install on iOS",
+      android: "Download from Google Play",
+      ios: "Download from the App Store",
       androidComingSoon: "The app is coming soon to Google Play",
       iosComingSoon: "The app is coming soon to the App Store",
     },

@@ -7,7 +7,7 @@ import { BackgroundArt } from "./BackgroundArt";
 import { BrandingColumn } from "./BrandingColumn";
 import { LoginForm } from "./LoginForm";
 import { BottomBar } from "./BottomBar";
-import { MobileAppsSection } from "./MobileAppsSection";
+import { LanguageSelector } from "./LanguageSelector";
 
 const montserrat = Montserrat({
   subsets: ["latin", "cyrillic"],
@@ -22,9 +22,25 @@ export default function LoginPage() {
     <div className={`${montserrat.className} relative min-h-screen w-full overflow-x-hidden`}>
       <BackgroundArt />
 
+      {/* Переключатель языка — правый верхний угол страницы, НАД карточкой
+          формы (которая вертикально центрирована в своей колонке, так что
+          верх экрана обычно свободен). fixed + свой z-40 (карточка формы —
+          z-30), выпадающее меню теперь раскрывается ВНИЗ (см.
+          LanguageSelector.tsx) — уместно для триггера у верха экрана. */}
+      <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-end px-4 sm:top-6 sm:px-6 lg:top-8 lg:px-16">
+        <div className="pointer-events-auto">
+          <LanguageSelector />
+        </div>
+      </div>
+
       {/* min-h-screen (не h-screen) + без overflow-hidden — на планшете 768
-          карточка логина иногда выше 100vh; overflow-hidden на предке ещё и
-          обрезал fixed-позиционированный BottomBar (переключатель языка). */}
+          карточка логина иногда выше 100vh; фиксированной высотой её обрезало
+          бы. Блок установки приложения (раньше отдельная секция В ПОТОКЕ
+          документа ниже этого грида, добавлявшая высоту сверх 100vh и
+          вызывавшая скролл) переехал в BottomBar — MobileAppsButtons внутри
+          неё, BottomBar как и раньше fixed и не участвует в потоке, так что
+          сам по себе грид снова ровно 100vh на обычных десктопных
+          разрешениях, без лишнего скролла. */}
       <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
         <div className="hidden flex-col justify-center overflow-hidden px-16 py-12 lg:flex">
           <BrandingColumn locale={locale} />
@@ -40,12 +56,6 @@ export default function LoginPage() {
           </Suspense>
         </div>
       </div>
-
-      {/* Отдельный блок «Установить приложение», в обычном потоке документа
-          (не задевает центрирование формы логина в гриде выше). pb-32/lg:pb-40
-          на самом блоке — запас, чтобы контент не оказался под fixed
-          BottomBar (bottom-4), когда пользователь докручивает страницу до конца. */}
-      <MobileAppsSection locale={locale} />
 
       <BottomBar locale={locale} />
     </div>

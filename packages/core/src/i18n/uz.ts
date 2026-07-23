@@ -109,9 +109,8 @@ export const uz: Dictionary = {
       subtitle: "Ma'lumotlaringiz himoyalangan.",
     },
     mobileApps: {
-      label: "Ota-onalar uchun mobil ilova",
-      android: "Android uchun o'rnatish",
-      ios: "iOS uchun o'rnatish",
+      android: "Google Play'dan yuklab olish",
+      ios: "App Store'dan yuklab olish",
       androidComingSoon: "Ilova tez orada Google Play'da paydo bo'ladi",
       iosComingSoon: "Ilova tez orada App Store'da paydo bo'ladi",
     },
