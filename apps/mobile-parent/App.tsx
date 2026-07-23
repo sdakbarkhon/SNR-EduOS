@@ -4,6 +4,15 @@ import * as SplashScreen from "expo-splash-screen";
 import * as Updates from "expo-updates";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  useFonts,
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from "@expo-google-fonts/manrope";
+import { Unbounded_600SemiBold, Unbounded_700Bold } from "@expo-google-fonts/unbounded";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { DemoBanner } from "./src/components/DemoBanner";
@@ -43,6 +52,19 @@ async function checkForUpdateAndReload() {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [initialProfile, setInitialProfile] = useState<ParentProfile | null>(null);
+  // Шрифты редизайна (Manrope + Unbounded). Должны загрузиться ДО первого
+  // рендера экранов новой темы, иначе текст мигнёт системным шрифтом. Старые
+  // (ещё не переверстанные) экраны эти семейства не используют — на них загрузка
+  // не влияет.
+  const [fontsLoaded] = useFonts({
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+    Unbounded_600SemiBold,
+    Unbounded_700Bold,
+  });
   // P2: rootNavRef позволяет DemoBanner дёрнуть переход обратно на Login
   // после signOut. Прокидываем через onDemoLoggedOut в RootNavigator.
   const onDemoLogoutRef = useRef<() => void>(() => {});
@@ -78,7 +100,7 @@ export default function App() {
     })();
   }, []);
 
-  if (!ready) {
+  if (!ready || !fontsLoaded) {
     return (
       <ErrorBoundary>
         <View style={{ flex: 1, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
