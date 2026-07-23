@@ -108,6 +108,13 @@ export const en: Dictionary = {
       title: "Safe. Reliable. Modern.",
       subtitle: "Your data is protected.",
     },
+    mobileApps: {
+      label: "Mobile app for parents",
+      android: "Install on Android",
+      ios: "Install on iOS",
+      androidComingSoon: "The app is coming soon to Google Play",
+      iosComingSoon: "The app is coming soon to the App Store",
+    },
   },
   dashboard: {
     greeting: "Hi, {name}!",

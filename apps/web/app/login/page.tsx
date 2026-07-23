@@ -7,6 +7,7 @@ import { BackgroundArt } from "./BackgroundArt";
 import { BrandingColumn } from "./BrandingColumn";
 import { LoginForm } from "./LoginForm";
 import { BottomBar } from "./BottomBar";
+import { MobileAppsSection } from "./MobileAppsSection";
 
 const montserrat = Montserrat({
   subsets: ["latin", "cyrillic"],
@@ -39,6 +40,12 @@ export default function LoginPage() {
           </Suspense>
         </div>
       </div>
+
+      {/* Отдельный блок «Установить приложение», в обычном потоке документа
+          (не задевает центрирование формы логина в гриде выше). pb-32/lg:pb-40
+          на самом блоке — запас, чтобы контент не оказался под fixed
+          BottomBar (bottom-4), когда пользователь докручивает страницу до конца. */}
+      <MobileAppsSection locale={locale} />
 
       <BottomBar locale={locale} />
     </div>

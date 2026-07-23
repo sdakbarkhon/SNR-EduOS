@@ -108,6 +108,13 @@ export const uz: Dictionary = {
       title: "Xavfsiz. Ishonchli. Zamonaviy.",
       subtitle: "Ma'lumotlaringiz himoyalangan.",
     },
+    mobileApps: {
+      label: "Ota-onalar uchun mobil ilova",
+      android: "Android uchun o'rnatish",
+      ios: "iOS uchun o'rnatish",
+      androidComingSoon: "Ilova tez orada Google Play'da paydo bo'ladi",
+      iosComingSoon: "Ilova tez orada App Store'da paydo bo'ladi",
+    },
   },
   dashboard: {
     greeting: "Salom, {name}!",

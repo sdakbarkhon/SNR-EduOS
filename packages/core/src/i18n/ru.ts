@@ -108,6 +108,13 @@ export const ru: Dictionary = {
       title: "Безопасно. Надёжно. Современное.",
       subtitle: "Ваши данные под защитой.",
     },
+    mobileApps: {
+      label: "Мобильное приложение для родителей",
+      android: "Установить на Android",
+      ios: "Установить на iOS",
+      androidComingSoon: "Приложение скоро появится в Google Play",
+      iosComingSoon: "Приложение скоро появится в App Store",
+    },
   },
   dashboard: {
     greeting: "Привет, {name}!",

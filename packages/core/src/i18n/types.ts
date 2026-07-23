@@ -102,6 +102,15 @@ export interface Dictionary {
       title: string;    // "Безопасно. Надёжно. Современное."
       subtitle: string; // "Ваши данные под защитой."
     };
+    // Блок «Установить приложение» на /login — сторов ещё нет, кнопки активны,
+    // клик показывает notice (см. LoginForm.showNotice паттерн), никаких переходов по ссылкам.
+    mobileApps: {
+      label: string;             // "Мобильное приложение для родителей"
+      android: string;           // "Установить на Android"
+      ios: string;                // "Установить на iOS"
+      androidComingSoon: string; // "Приложение скоро появится в Google Play"
+      iosComingSoon: string;     // "Приложение скоро появится в App Store"
+    };
   };
   dashboard: {
     greeting: string; // "Привет, {name}! 👋"
