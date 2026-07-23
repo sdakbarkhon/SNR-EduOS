@@ -11,7 +11,7 @@ import {
 import {
   getSubjectStyle, formatTime, getDictionary,
   markTheoryStudied, submitStageTask, endLesson,
-  getMaterialDownloadUrl,
+  getMaterialDownloadUrl, setActiveStage,
 } from "@snr/core";
 import type { StudentLessonView, LessonStageWithProgress, LessonStageProgress, LessonMaterial, Locale, QuizConfigForStage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -294,6 +294,12 @@ export function LessonWorkspaceView({
 
   const [stages, setStages] = useState<LessonStageWithProgress[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
+  // Активация этапа учеником (ЗАДАЧА 1) — та же функция setActiveStage(),
+  // что вызывает учитель (packages/core/src/queries/index.ts), тот же
+  // realtime-канал lesson-student-${lesson.id}/lesson-status-${lesson.id}
+  // разносит изменение всей группе, включая учителя. Никакой параллельной
+  // логики активации здесь нет.
+  const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
   const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
@@ -549,6 +555,28 @@ export function LessonWorkspaceView({
       setEndingLesson(false);
     }
   }
+  // Активировать этап урока — ученик получает ту же возможность, что и
+  // учитель (см. handleActivateStage в TeacherLessonDetailView.tsx): тот же
+  // импорт setActiveStage() из @snr/core, тот же UPDATE lessons.active_stage_id,
+  // тот же realtime-разлёт по всей группе. Гейт "только пока урок идёт" —
+  // здесь на клиенте через !isCompleted (компонент и так монтируется только
+  // при status === 'in_progress', см. LessonView.tsx, но realtime может
+  // перевести урок в 'completed' пока панель открыта); настоящая защита —
+  // RLS-политика на lessons (см. отчёт по задаче).
+  async function handleActivateStage(stageId: string) {
+    if (isCompleted || activatingStageId) return;
+    setActivatingStageId(stageId);
+    try {
+      await setActiveStage(db, lesson.id, stageId);
+      setActiveStageId(stageId);
+    } catch (e) {
+      console.error("[LessonWorkspaceView] activate stage failed:", (e as Error)?.message ?? e);
+      showToast(da.activateFailed);
+    } finally {
+      setActivatingStageId(null);
+    }
+  }
+
   // middleStages: visible stages for sidebar stepper (position ≤ active, or all if completed)
   const middleStages = isCompleted
     ? allMiddleStages.filter((s) => (s as any).was_activated === true)
@@ -1070,6 +1098,83 @@ export function LessonWorkspaceView({
           {lesson.description && (
             <div className="rounded-2xl border border-white/60 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
               <p className="text-[15px] leading-relaxed text-slate-600">{lesson.description}</p>
+            </div>
+          )}
+
+          {/* Активация этапов учеником — тот же блок/паттерн, что у учителя
+              в TeacherLessonDetailView.tsx ("Управление этапами"): список
+              middle-этапов, состояние (пройден/активен/впереди), кнопка
+              "Активировать". Действие меняет active_stage_id для ВСЕГО
+              урока (см. handleActivateStage выше) — realtime-канал уже
+              разносит это учителю и остальным ученикам без изменений. */}
+          {!isCompleted && allMiddleStages.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-violet-500" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-violet-700">
+                  {da.manageStages}
+                </h3>
+              </div>
+              <div className="flex flex-col divide-y divide-violet-100 overflow-hidden rounded-xl border border-violet-100 bg-white">
+                {allMiddleStages.map((stage) => {
+                  const isActive = stage.id === activeStageId;
+                  const isPassed = stage.position < activePos && activeStageId !== null;
+                  const isActivating = activatingStageId === stage.id;
+
+                  return (
+                    <div
+                      key={stage.id}
+                      className={`flex items-center gap-3 px-4 py-3 transition-colors ${isActive ? "bg-violet-50" : ""}`}
+                    >
+                      <div
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                          isActive
+                            ? "bg-violet-600 text-white"
+                            : isPassed
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
+                          {stage.title}
+                        </span>
+                        {isActive && (
+                          <p className="mt-0.5 text-[11px] text-violet-500">{da.studentsSeeThis}</p>
+                        )}
+                      </div>
+
+                      {isActive ? (
+                        <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
+                          {da.activeNow}
+                        </span>
+                      ) : isPassed ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-[11px] font-semibold text-emerald-600">{da.passed}</span>
+                          <button
+                            onClick={() => handleActivateStage(stage.id)}
+                            disabled={isActivating}
+                            className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isActivating ? "…" : da.activate}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleActivateStage(stage.id)}
+                          disabled={isActivating}
+                          className="flex shrink-0 items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isActivating ? "…" : `▶ ${da.activate}`}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
