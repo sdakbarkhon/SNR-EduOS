@@ -10,7 +10,12 @@
  * требуется (StubScreen не даст выйти обратно).
  */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { getChildren, getDemoParents, DEFAULT_CHILD_INDEX } from "../data";
+import {
+  getChildren,
+  getChildrenForDemoParent,
+  getDemoParents,
+  DEFAULT_CHILD_INDEX,
+} from "../data";
 import type { DemoParentRow } from "../data/types";
 
 export type AuthPhase = "onboarding" | "phone" | "sms" | "childPicker" | "app";
@@ -103,8 +108,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const enterApp = useCallback((childIndex: number) => {
     setState((s) => {
-      const kids = getChildren();
-      const idx = Math.max(0, Math.min(childIndex, s.kidsCount - 1));
+      // Заход 5: если это демо-родитель, берём его собственный список детей
+      // (Исмаилов → Азизбек, Рахимов → Мадина/Хумоюн, Каримова → Азиз/Малика/
+      //  Фаррух). Phone-flow (demoParentId == null) — прежний behavior:
+      //  берём из общего пула CHILDREN.
+      const kids = s.demoParentId
+        ? getChildrenForDemoParent(s.demoParentId)
+        : getChildren();
+      const bound = Math.max(1, kids.length);
+      const idx = Math.max(0, Math.min(childIndex, bound - 1));
       const childId = kids[idx]?.id ?? kids[0]?.id ?? null;
       return { ...s, phase: "app", currentChildId: childId };
     });

@@ -2602,12 +2602,25 @@ export const ru: Dictionary = {
     },
     sched: {
       today: "Расписание на сегодня",
+      day: "День",
+      week: "Неделя",
+      lesson: "Урок",
+      break: "Перемена",
+      room: "Кабинет",
     },
     files: {
       attached: "Прикреплённые файлы",
     },
     attend: {
       lastDays: "Последние дни",
+      present: "Посещаемость",
+      absent: "Отсутствие",
+      excused: "Уважительные",
+      unexcused: "Неуважительные",
+      legendPresent: "Присутствие",
+      legendExcused: "Уважительная",
+      legendUnexcused: "Неуважительная",
+      legendWeekend: "Выходной",
     },
   },
 };

@@ -2598,12 +2598,25 @@ export const en: Dictionary = {
     },
     sched: {
       today: "Today's schedule",
+      day: "Day",
+      week: "Week",
+      lesson: "Lesson",
+      break: "Break",
+      room: "Room",
     },
     files: {
       attached: "Attached files",
     },
     attend: {
       lastDays: "Recent days",
+      present: "Attendance",
+      absent: "Absent",
+      excused: "Excused",
+      unexcused: "Unexcused",
+      legendPresent: "Present",
+      legendExcused: "Excused",
+      legendUnexcused: "Unexcused",
+      legendWeekend: "Weekend",
     },
   },
 };

@@ -22,7 +22,7 @@ import { useAppLocale } from "../../i18n";
 import { useTheme, fonts, gradPoints, shadowStyle } from "../../theme";
 import { Avatar, GlassCard, GlassCircleButton, PrimaryButton } from "../../ui";
 import { BackArrowIcon, ShieldCheckIcon } from "../../ui/auth/icons";
-import { getChildren } from "../../data";
+import { getChildren, getChildrenForDemoParent } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 
 const SCHOOL_LABEL = "SNR International School";
@@ -33,12 +33,17 @@ export function LoginChildPickerScreen() {
   const t = d.parentApp.auth;
   const { tokens, scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { kidsCount, authSel, pickChildIndex, enterApp, setPhase } = useAuthSession();
+  const { kidsCount, authSel, demoParentId, pickChildIndex, enterApp, setPhase } =
+    useAuthSession();
   const g = gradPoints(tokens.accentGrad.angle);
 
-  // Показываем детей текущего демо-родителя: первые kidsCount из CHILDREN
-  // (макет: KIDS.slice(0, kidsN), строка 4264).
-  const kids = getChildren().slice(0, Math.max(1, kidsCount));
+  // Заход 5: если это демо-родитель — берём его собственный список child_ids
+  // (Исмаилов → Азизбек, Рахимов → Мадина/Хумоюн, Каримова → все Каримовы).
+  // Phone-flow (без демо) — прежний behavior: первые kidsCount из CHILDREN,
+  // это по-прежнему трое Каримовых, т.к. они в начале массива.
+  const kids = demoParentId
+    ? getChildrenForDemoParent(demoParentId)
+    : getChildren().slice(0, Math.max(1, kidsCount));
   const selectedIndex = Math.min(Math.max(0, authSel), kids.length - 1);
 
   const checkOffBg = scheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(23,18,67,0.08)";

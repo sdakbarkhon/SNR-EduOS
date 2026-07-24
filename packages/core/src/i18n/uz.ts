@@ -2599,12 +2599,25 @@ export const uz: Dictionary = {
     },
     sched: {
       today: "Bugungi dars jadvali",
+      day: "Kun",
+      week: "Hafta",
+      lesson: "Dars",
+      break: "Tanaffus",
+      room: "Xona",
     },
     files: {
       attached: "Biriktirilgan fayllar",
     },
     attend: {
       lastDays: "So'nggi kunlar",
+      present: "Davomat",
+      absent: "Kelmagan",
+      excused: "Sababli",
+      unexcused: "Uzrsiz",
+      legendPresent: "Kelgan",
+      legendExcused: "Uzrli",
+      legendUnexcused: "Uzrsiz",
+      legendWeekend: "Dam olish kuni",
     },
   },
 };

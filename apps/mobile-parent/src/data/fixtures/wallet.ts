@@ -11,11 +11,17 @@
 import type { WalletLimits, WalletOpsDayGroup, WalletRow } from "../types";
 import { CHILDREN } from "./family";
 
-/** wallets: [92000, 185000, 240000] — Азиз / Малика / Фаррух. */
+/** wallets: [92000, 185000, 240000] — Азиз / Малика / Фаррух.
+ *  Заход 5: индексы 3–5 — Азизбек Исмаилов / Мадина Рахимова / Хумоюн Рахимов;
+ *  сохраняем инвариант CHILDREN.length === WALLETS.length, чтобы index-based
+ *  lookup getWalletBalance() не падал для новых семей. */
 export const WALLETS: WalletRow[] = [
   { student_id: CHILDREN[0].id, balance: 92000 },
   { student_id: CHILDREN[1].id, balance: 185000 },
   { student_id: CHILDREN[2].id, balance: 240000 },
+  { student_id: CHILDREN[3].id, balance: 65000 },
+  { student_id: CHILDREN[4].id, balance: 145000 },
+  { student_id: CHILDREN[5].id, balance: 210000 },
 ];
 
 /** WOPS — операции по дням: t сегодня, y вчера, d21 — 21 июля. */

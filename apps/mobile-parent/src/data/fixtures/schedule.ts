@@ -32,8 +32,14 @@ export const LESSON_SETS: Record<LessonSetId, SubjectKey[]> = {
   C: ["math", "eng", "prog"],
 };
 
-/** Сеты уроков по детям (SETS_BY_CHILD), индекс = ребёнок. */
+/** Сеты уроков по детям (SETS_BY_CHILD), индекс = ребёнок.
+ *  Заход 5: индексы 3–5 — новые семьи (Азизбек 3-А, Мадина 7-А, Хумоюн 10-А).
+ *  Наборы отражают классы (3-А ~ индекс 0, 7-А ~ 1, 10-А ~ 2), чтобы
+ *  getDaySchedule() по index-based lookup не падал. */
 export const SETS_BY_CHILD: Record<LessonSetId, SubjectKey[]>[] = [
+  { A: ["rus", "math", "eng", "robo"], B: ["math", "prog", "rus"], C: ["eng", "math", "prog"] },
+  { A: ["rus", "eng", "math", "prog", "robo", "rusF"], B: ["math", "rus", "eng", "robo", "prog"], C: ["math", "eng", "prog"] },
+  { A: ["prog", "math", "robo", "eng", "rus"], B: ["robo", "prog", "math", "eng"], C: ["prog", "math", "eng"] },
   { A: ["rus", "math", "eng", "robo"], B: ["math", "prog", "rus"], C: ["eng", "math", "prog"] },
   { A: ["rus", "eng", "math", "prog", "robo", "rusF"], B: ["math", "rus", "eng", "robo", "prog"], C: ["math", "eng", "prog"] },
   { A: ["prog", "math", "robo", "eng", "rus"], B: ["robo", "prog", "math", "eng"], C: ["prog", "math", "eng"] },
