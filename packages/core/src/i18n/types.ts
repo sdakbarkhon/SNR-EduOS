@@ -2496,6 +2496,7 @@ export interface Dictionary {
       rateApp: string;
       shareApp: string;
       myKids: string;
+      switchChild: string;        // «Сменить ребёнка ›» (ChildSwitcherCard compact)
       generalInfo: string;
       schoolContacts: string;
       additional: string;

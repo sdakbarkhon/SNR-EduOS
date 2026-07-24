@@ -1,20 +1,36 @@
 /**
- * Вход 2 — LoginPhoneScreen (макет layerA2, строки 1972–2018 «SNR EduOS v2 Light.dc.html»).
- * Шапка (back + «Нужна помощь?»), заголовок, GlassCard с полем телефона
- * (селектор страны через Popover + input), «или», demo-CTA, Google/Apple
- * строки, legal-текст. Валидация формальная: 9 цифр → активная кнопка.
+ * Вход 2 — LoginPhoneScreen (макет layerA2, «SNR EduOS v2 Light.dc.html» 1972–2018).
+ *
+ * Block-list Захода 4a (строго по порядку сверху вниз):
+ *   1. Шапка: back (GlassCircleButton) + text-link «Нужна помощь?».
+ *   2. Заголовок Unbounded 20/600 «Добро пожаловать\nв SNR EduOS!».
+ *   3. Subtitle 12/600 «Войдите в аккаунт, чтобы продолжить».
+ *   4. GlassCard с caps-label «НОМЕР ТЕЛЕФОНА», country-picker + phone input,
+ *      кнопка «Продолжить» (PrimaryButton, disabled пока цифр < 9).
+ *   5. Разделитель «или» — две hairline-линии.
+ *   6. Демо-CTA («Демо-вход для родителя») — фиолетовая рамка rgba(124,58,237,.5).
+ *   7. CTA «Войти через Google».
+ *   8. CTA «Войти через Apple».
+ *   9. Legal-disclaimer со ссылками goTerms / goPrivacy.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLocale } from "../../i18n";
-import { useTheme, fonts, gradPoints, shadowStyle } from "../../theme";
+import { fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   GlassCard,
   GlassCircleButton,
-  PrimaryButton,
   Popover,
+  PrimaryButton,
 } from "../../ui";
 import { getAuthFixtures } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
@@ -30,7 +46,7 @@ import {
 import { AuthHelpSheet } from "./sheets/AuthHelpSheet";
 import { AuthDemoPickerSheet } from "./sheets/AuthDemoPickerSheet";
 
-/** Формат «90 123 45 67» из макета phoneFmt (строка 4248). */
+/** Формат «90 123 45 67» — соответствует phoneFmt макета. */
 function formatPhone(digits: string): string {
   const m = digits.match(/^(\d{0,2})(\d{0,3})(\d{0,2})(\d{0,2})/);
   if (!m) return digits;
@@ -44,18 +60,25 @@ export function LoginPhoneScreen() {
   const t = d.parentApp.auth;
   const { tokens, scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { country, phone, setCountry, setPhone, submitPhone, setPhase } = useAuthSession();
+  const { country, phone, setCountry, setPhone, submitPhone, setPhase } =
+    useAuthSession();
   const [countryOpen, setCountryOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey>(null);
 
   const { country_codes } = useMemo(() => getAuthFixtures(), []);
   const canSubmit = phone.length === 9;
 
-  const arrowGrad = gradPoints(120);
+  // Цвета «стеклянного» инпута (страна + телефон) — светлая/тёмная пара.
+  const inputBg =
+    scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.55)";
+  const inputBorder =
+    scheme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.85)";
+  // Hairline «или»: макет rgba(23,18,67,.12) — берём ink3 (в токенах ≈ та же плотность).
+  const hairline = tokens.ink3;
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Шапка A2 — back + текст-ссылка «Нужна помощь?» */}
+      {/* 1. Шапка — back слева, «Нужна помощь?» справа (макет 1973–1977). */}
       <View
         style={{
           flexDirection: "row",
@@ -70,7 +93,13 @@ export function LoginPhoneScreen() {
         </GlassCircleButton>
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => setSheet("help")} hitSlop={8}>
-          <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.accent }}>
+          <Text
+            style={{
+              fontFamily: fonts.manrope800,
+              fontSize: 11.5,
+              color: tokens.accent,
+            }}
+          >
             {t.needHelp}
           </Text>
         </Pressable>
@@ -85,16 +114,29 @@ export function LoginPhoneScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Заголовок — 1979 */}
-        <Text style={{ fontFamily: fonts.unbounded600, fontSize: 20, lineHeight: 27, color: tokens.ink1 }}>
+        {/* 2. Заголовок (макет 1979) — welcome в словаре без \n, но макет двухстрочный. */}
+        <Text
+          style={{
+            fontFamily: fonts.unbounded600,
+            fontSize: 20,
+            lineHeight: 27,
+            color: tokens.ink1,
+          }}
+        >
           {t.welcome}
         </Text>
-        {/* Sub — 1980 */}
-        <Text style={{ fontFamily: fonts.manrope600, fontSize: 12, color: tokens.ink2 }}>
+        {/* 3. Subtitle (макет 1980). */}
+        <Text
+          style={{
+            fontFamily: fonts.manrope600,
+            fontSize: 12,
+            color: tokens.ink2,
+          }}
+        >
           {t.signInSub}
         </Text>
 
-        {/* GlassCard с полем телефона (макет 1981) */}
+        {/* 4. GlassCard с полем телефона (макет 1981–2000). */}
         <GlassCard radius={22} contentStyle={{ padding: 14 }}>
           <Text
             style={{
@@ -108,7 +150,7 @@ export function LoginPhoneScreen() {
             {t.phoneHint}
           </Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {/* Селектор страны */}
+            {/* Country picker + Popover */}
             <View>
               <Pressable
                 onPress={() => setCountryOpen((v) => !v)}
@@ -119,19 +161,27 @@ export function LoginPhoneScreen() {
                   paddingVertical: 12,
                   paddingHorizontal: 11,
                   borderRadius: 14,
-                  backgroundColor: scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.55)",
+                  backgroundColor: inputBg,
                   borderWidth: 1,
-                  borderColor: scheme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.85)",
+                  borderColor: inputBorder,
                 }}
               >
                 <UzFlagIcon size={18} />
-                <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>{country}</Text>
+                <Text
+                  style={{
+                    fontFamily: fonts.manrope800,
+                    fontSize: 13,
+                    color: tokens.ink1,
+                  }}
+                >
+                  {country}
+                </Text>
                 <ChevronDownIcon size={11} color={tokens.ink3} />
               </Pressable>
               <Popover visible={countryOpen} width={190} align="left">
-                {country_codes.map(([name, code]) => (
+                {country_codes.map(([n, code], i) => (
                   <Pressable
-                    key={code}
+                    key={`${n}-${i}`}
                     onPress={() => {
                       setCountry(code);
                       setCountryOpen(false);
@@ -144,14 +194,30 @@ export function LoginPhoneScreen() {
                       paddingHorizontal: 12,
                     }}
                   >
-                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 12.5, color: tokens.ink1 }}>{name}</Text>
-                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink2 }}>{code}</Text>
+                    <Text
+                      style={{
+                        fontFamily: fonts.manrope700,
+                        fontSize: 12.5,
+                        color: tokens.ink1,
+                      }}
+                    >
+                      {n}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fonts.manrope800,
+                        fontSize: 12.5,
+                        color: tokens.ink2,
+                      }}
+                    >
+                      {code}
+                    </Text>
                   </Pressable>
                 ))}
               </Popover>
             </View>
 
-            {/* Телефон */}
+            {/* Phone input */}
             <TextInput
               value={formatPhone(phone)}
               onChangeText={setPhone}
@@ -167,14 +233,14 @@ export function LoginPhoneScreen() {
                 fontFamily: fonts.manrope800,
                 fontSize: 14,
                 color: tokens.ink1,
-                backgroundColor: scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.55)",
+                backgroundColor: inputBg,
                 borderWidth: 1,
-                borderColor: scheme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.85)",
+                borderColor: inputBorder,
               }}
               maxLength={12}
             />
           </View>
-          {/* Продолжить — активна при 9 цифрах */}
+          {/* CTA «Продолжить» (phoneBtnStyle: disabled → opacity 0.5) */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButton
               label={t.continue}
@@ -186,77 +252,175 @@ export function LoginPhoneScreen() {
           </View>
         </GlassCard>
 
-        {/* «или» — разделитель (макет 2002) */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 4 }}>
-          <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: tokens.ink3 }} />
-          <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink3 }}>{t.or}</Text>
-          <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: tokens.ink3 }} />
+        {/* 5. Разделитель «или» (макет 2002). */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            paddingVertical: 4,
+          }}
+        >
+          <View
+            style={{
+              flex: 1,
+              height: StyleSheet.hairlineWidth,
+              backgroundColor: hairline,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: fonts.manrope700,
+              fontSize: 10.5,
+              color: tokens.ink3,
+            }}
+          >
+            {t.or}
+          </Text>
+          <View
+            style={{
+              flex: 1,
+              height: StyleSheet.hairlineWidth,
+              backgroundColor: hairline,
+            }}
+          />
         </View>
 
-        {/* Демо-CTA — макет 2005 (ВЫШЕ Google/Apple, как в макете) */}
+        {/* 6. Демо-CTA — фиолетовая рамка rgba(124,58,237,.5) (макет 2003–2007). */}
         <GlassCard
           radius={16}
-          contentStyle={{ padding: 13, flexDirection: "row", alignItems: "center", gap: 12 }}
+          contentStyle={{
+            padding: 13,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+            borderWidth: 1.5,
+            borderColor: "rgba(124,58,237,0.5)",
+          }}
           onPress={() => setSheet("demo")}
         >
-          <View style={[shadowStyle({ x: 0, y: 6, blur: 14, color: "rgba(124,58,237,0.35)" }), { borderRadius: 11 }]}>
+          <View
+            style={[
+              shadowStyle({
+                x: 0,
+                y: 6,
+                blur: 14,
+                color: "rgba(124,58,237,0.35)",
+              }),
+              { borderRadius: 11 },
+            ]}
+          >
             <LinearGradient
               colors={["#7C3AED", "#4F6DF5"]}
-              start={arrowGrad.start}
-              end={arrowGrad.end}
-              style={{ width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" }}
+              {...gradPoints(135)}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 11,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              <SparkleIcon size={18} color="#FFFFFF" />
+              <SparkleIcon size={16} color="#FFFFFF" />
             </LinearGradient>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 12.5,
+                color: tokens.ink1,
+              }}
+            >
               {t.demoCtaTitle}
             </Text>
-            <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink2, marginTop: 2 }}>
+            <Text
+              style={{
+                fontFamily: fonts.manrope600,
+                fontSize: 9.5,
+                color: tokens.ink2,
+                marginTop: 2,
+              }}
+            >
               {t.demoCtaSub}
             </Text>
           </View>
-          <ChevronRightIcon size={16} color={tokens.ink3} />
+          <ChevronRightIcon size={15} color={tokens.ink3} />
         </GlassCard>
 
-        {/* Google/Apple — макет 2010, 2014 */}
-        <GlassCard radius={16} contentStyle={{ padding: 13, flexDirection: "row", alignItems: "center", gap: 12 }}>
+        {/* 7. CTA «Войти через Google» (макет 2008–2011). */}
+        <GlassCard
+          radius={16}
+          contentStyle={{
+            padding: 13,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+          }}
+          onPress={() => setPhase("onboarding")}
+        >
           <View
             style={{
               width: 34,
               height: 34,
               borderRadius: 11,
-              backgroundColor: scheme === "dark" ? "rgba(255,255,255,0.08)" : "#FFFFFF",
+              backgroundColor:
+                scheme === "dark" ? "rgba(255,255,255,0.08)" : "#FFFFFF",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
             <GoogleIcon size={18} />
           </View>
-          <Text style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+          <Text
+            style={{
+              flex: 1,
+              fontFamily: fonts.manrope800,
+              fontSize: 12.5,
+              color: tokens.ink1,
+            }}
+          >
             {t.withGoogle}
           </Text>
         </GlassCard>
-        <GlassCard radius={16} contentStyle={{ padding: 13, flexDirection: "row", alignItems: "center", gap: 12 }}>
+
+        {/* 8. CTA «Войти через Apple» (макет 2012–2015). */}
+        <GlassCard
+          radius={16}
+          contentStyle={{
+            padding: 13,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+          }}
+          onPress={() => setPhase("onboarding")}
+        >
           <View
             style={{
               width: 34,
               height: 34,
               borderRadius: 11,
-              backgroundColor: scheme === "dark" ? "rgba(255,255,255,0.08)" : "#FFFFFF",
+              backgroundColor:
+                scheme === "dark" ? "rgba(255,255,255,0.08)" : "#FFFFFF",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
             <AppleIcon size={18} color={tokens.ink1} />
           </View>
-          <Text style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+          <Text
+            style={{
+              flex: 1,
+              fontFamily: fonts.manrope800,
+              fontSize: 12.5,
+              color: tokens.ink1,
+            }}
+          >
             {t.withApple}
           </Text>
         </GlassCard>
 
-        {/* Legal — макет 2016 */}
+        {/* 9. Legal disclaimer (макет 2016). */}
         <Text
           style={{
             fontFamily: fonts.manrope600,
@@ -269,14 +433,27 @@ export function LoginPhoneScreen() {
           }}
         >
           {t.legalPrefix}
-          <Text style={{ fontFamily: fonts.manrope800, color: tokens.accent }}>{t.legalTerms}</Text>
+          <Text
+            style={{ fontFamily: fonts.manrope800, color: tokens.accent }}
+            onPress={() => setPhase("onboarding")}
+          >
+            {t.legalTerms}
+          </Text>
           {t.legalAnd}
-          <Text style={{ fontFamily: fonts.manrope800, color: tokens.accent }}>{t.legalPrivacy}</Text>
+          <Text
+            style={{ fontFamily: fonts.manrope800, color: tokens.accent }}
+            onPress={() => setPhase("onboarding")}
+          >
+            {t.legalPrivacy}
+          </Text>
         </Text>
       </ScrollView>
 
       <AuthHelpSheet visible={sheet === "help"} onClose={() => setSheet(null)} />
-      <AuthDemoPickerSheet visible={sheet === "demo"} onClose={() => setSheet(null)} />
+      <AuthDemoPickerSheet
+        visible={sheet === "demo"}
+        onClose={() => setSheet(null)}
+      />
     </View>
   );
 }

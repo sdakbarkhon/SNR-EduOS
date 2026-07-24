@@ -239,6 +239,7 @@ export default function ProgressScreen() {
       <RootHeader
         title={d.parentApp.nav.grades}
         titleSize={17}
+        showLogo
         bellCount={bellCount}
         onBellPress={() => navigation.navigate("d8")}
         avatar={{ initials: parentInitials, gradient: parentGradient, variant: "ring" }}
@@ -264,7 +265,7 @@ export default function ProgressScreen() {
           name={child.full_name}
           classLabel={`${child.class_name} ${d.parentApp.grades.class}`}
           status={{ label: child.status_chip, tone: "green" }}
-          switchLabel={`${d.parentApp.prof.myKids} ›`}
+          switchLabel={`${d.parentApp.prof.switchChild} ›`}
           onPress={() => setSheetOpen(true)}
         />
 
@@ -665,32 +666,37 @@ export default function ProgressScreen() {
               linkLabel={`${d.parentApp.common.more} ›`}
               onPress={() => navigation.navigate("d16")}
             />
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {/* Grid 4×1 плитками навыков (макет строки 343–355) — одна строка,
+                iconTile 24×24, шрифт названия 9.5px, % 12px. */}
+            <View style={{ flexDirection: "row", flexWrap: "nowrap", gap: 6 }}>
               {skills.tiles.map((t) => (
                 <View
                   key={t.name}
                   style={{
-                    flexBasis: "47%",
-                    flexGrow: 1,
-                    padding: 12,
-                    borderRadius: 16,
+                    flex: 1,
+                    minWidth: 0,
+                    padding: 10,
+                    borderRadius: 14,
                     borderWidth: 1,
                     borderColor: tokens.glassBorder,
                     backgroundColor: "rgba(255,255,255,0.4)",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <LinearGradient
                       colors={t.gradient}
                       {...gradPoints(135)}
-                      style={{ width: 30, height: 30, borderRadius: 10 }}
+                      style={{ width: 24, height: 24, borderRadius: 8 }}
                     />
-                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: tokens.ink1 }}>
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
                       {t.pct}%
                     </Text>
                   </View>
-                  <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink2 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: tokens.ink2 }}
+                  >
                     {t.name}
                   </Text>
                   <ProgressBar

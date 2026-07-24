@@ -2441,6 +2441,7 @@ export const ru: Dictionary = {
       rateApp: "Оценить приложение",
       shareApp: "Поделиться приложением",
       myKids: "Мои дети",
+      switchChild: "Сменить ребёнка",
       generalInfo: "Общая информация",
       schoolContacts: "Контакты школы",
       additional: "Дополнительно",

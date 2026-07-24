@@ -2437,6 +2437,7 @@ export const en: Dictionary = {
       rateApp: "Rate the app",
       shareApp: "Share the app",
       myKids: "My children",
+      switchChild: "Switch child",
       generalInfo: "General info",
       schoolContacts: "School contacts",
       additional: "Additional",

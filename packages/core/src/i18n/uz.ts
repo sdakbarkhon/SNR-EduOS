@@ -2438,6 +2438,7 @@ export const uz: Dictionary = {
       rateApp: "Ilovani baholash",
       shareApp: "Ilovani ulashish",
       myKids: "Mening farzandlarim",
+      switchChild: "Farzandni almashtirish",
       generalInfo: "Umumiy ma'lumot",
       schoolContacts: "Maktab kontaktlari",
       additional: "Qo'shimcha",
