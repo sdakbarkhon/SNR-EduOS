@@ -23,6 +23,8 @@ import { AppBackground, useTheme, fonts } from "../theme";
 import {
   AccentCard,
   AccentInset,
+  AttendanceHeatmap,
+  AttendanceHeatmapLegend,
   Avatar,
   BottomSheetFrame,
   CenterModalFrame,
@@ -32,23 +34,33 @@ import {
   CountBadge,
   DemoBannerGlass,
   FloatingTabBar,
+  Gauge,
   GlassCard,
   InnerHeader,
   LessonRow,
   ListRow,
   MetricsSplitRow,
+  MiniRing,
   Popover,
   PrimaryButton,
+  ProgressBar,
   QuickActionTile,
   QuickActionsGrid,
+  Radar,
+  Ring,
+  RingSegmented,
   RootHeader,
   SectionHeader,
   SegmentPills,
+  Sparkline,
   StarRating,
   StatusChip,
   SubjectTile,
+  TimelineHorizontal,
+  TimelineVertical,
   Toggle,
 } from "../ui";
+import { getAttendanceMonths, getTransportRoute } from "../data";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const { tokens } = useTheme();
@@ -404,6 +416,384 @@ export function DevGallery({ visible, onClose }: DevGalleryProps) {
             <View style={{ flexDirection: "row", gap: 12 }}>
               <StarRating count={4} color={tokens.accent} mutedColor={tokens.ink3} />
             </View>
+          </Section>
+
+          {/* ═══ ГРАФИКИ (Заход 3) ═══ */}
+          <Section title="Графики">
+            <Caption text="Gauge · 110×70 (96%) / 62×38 мини (68%) / 4.7 на градиенте" />
+            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 14 }}>
+              <Gauge value={96} centerLabel="96%" size={110} />
+              <Gauge
+                value={68}
+                size={62}
+                thickness={12}
+                centerLabel="68%"
+                centerLabelSize={20}
+                centerLabelY={56}
+              />
+            </View>
+            <AccentCard
+              gradient={tokens.subjects.math.grad}
+              shadowRgb="202,138,4"
+              radius={20}
+              contentStyle={{ padding: 14, alignItems: "center", gap: 4 }}
+            >
+              <Gauge
+                value={4.7}
+                max={5}
+                size={128}
+                centerLabel="4.7"
+                centerLabelColor="#FFFFFF"
+                fillColor="#FFFFFF"
+                trackColor="rgba(255,255,255,0.28)"
+              />
+              <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: "#FFFFFF" }}>
+                Средний балл (макс. 5.0)
+              </Text>
+            </AccentCard>
+
+            <Caption text="Radar 200×172 фиолетовый (6 осей, 6 подписей)" />
+            <GlassCard contentStyle={{ padding: 14, alignItems: "center" }}>
+              <Radar
+                values={[4.8, 3.8, 4.7, 4.2, 4.5, 4.3]}
+                labels={["Логика", "Комм.", "Дисциплина", "Креатив", "Самост.", "Команда"]}
+                max={5}
+                size={220}
+              />
+            </GlassCard>
+
+            <Caption text="Ring · 86×86 (2/6 уроков) / 72×72 (70%) / RingSegmented 62×62 (94%) — с r/viewBoxSize по макету" />
+            <GlassCard contentStyle={{ padding: 14, flexDirection: "row", gap: 18, alignItems: "center" }}>
+              {/* #6 «Статус дня»: рендер 86, viewBox 88, r 32, w 10 — 1:1 с макетом. */}
+              <Ring
+                value={2}
+                max={6}
+                size={86}
+                viewBoxSize={88}
+                r={32}
+                thickness={10}
+                color={tokens.accent}
+                centerContent={
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 16, color: tokens.ink1 }}>
+                      2/6
+                    </Text>
+                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 9, color: tokens.ink3 }}>
+                      уроков
+                    </Text>
+                  </View>
+                }
+              />
+              {/* «Освоение тем»: рендер 72, viewBox = size, r 32, w 9 — как в макете строка 1421. */}
+              <Ring
+                value={70}
+                size={72}
+                r={32}
+                thickness={9}
+                color={tokens.subjects.math.base}
+                centerContent={
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: tokens.ink1 }}>
+                    70%
+                  </Text>
+                }
+              />
+              {/* Библиотека §s5: рендер 62, viewBox 88, r 30, w 11 — 3 сегмента 24/2/1. */}
+              <RingSegmented
+                size={62}
+                viewBoxSize={88}
+                r={30}
+                thickness={11}
+                segments={[
+                  { color: `rgb(${tokens.status.green.rgb})`, value: 24 },
+                  { color: `rgb(${tokens.status.orange.rgb})`, value: 2 },
+                  { color: `rgb(${tokens.status.red.rgb})`, value: 1 },
+                ]}
+                max={27}
+                centerContent={
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+                    94%
+                  </Text>
+                }
+              />
+            </GlassCard>
+
+            <Caption text="MiniRing · 42×42 (100% green) / 42×42 (60% orange)" />
+            <View style={{ flexDirection: "row", gap: 14 }}>
+              <MiniRing pct={100} size={42} thickness={4.5} color={`rgb(${tokens.status.green.rgb})`} />
+              <MiniRing
+                pct={60}
+                size={42}
+                thickness={4.5}
+                color={`rgb(${tokens.status.orange.rgb})`}
+                labelColor={tokens.status.orange.text}
+              />
+            </View>
+
+            <Caption text="Sparkline · 320×90 фиолетовый (endDot) / 56×20 белый на градиенте" />
+            <GlassCard contentStyle={{ padding: 12 }}>
+              <Sparkline
+                values={[4.3, 4.4, 4.6, 4.5, 4.6, 4.7]}
+                width={320}
+                height={90}
+                strokeWidth={3}
+                endDot
+              />
+            </GlassCard>
+            <AccentCard
+              gradient={tokens.subjects.prog.grad}
+              shadowRgb="2,132,199"
+              radius={16}
+              contentStyle={{
+                padding: 12,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <View>
+                <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
+                  Средний балл
+                </Text>
+                <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: "rgba(255,255,255,0.75)" }}>
+                  Динамика недели
+                </Text>
+              </View>
+              <Sparkline
+                values={[4.2, 4.3, 4.4, 4.5, 4.6, 4.7]}
+                width={56}
+                height={20}
+                strokeColor="#FFFFFF"
+                strokeWidth={2.2}
+              />
+            </AccentCard>
+
+            <Caption text="ProgressBar · 5.5px «Программирование» 90% (subject-градиент, right-label)" />
+            <ProgressBar
+              pct={0.9}
+              height={5.5}
+              fillGradient={tokens.subjects.prog.grad}
+              showValueLabel="right"
+              valueLabelText="90%"
+            />
+            <Caption text="ProgressBar · 4px «96%» белая на градиентной плитке (inline-label)" />
+            <AccentCard
+              gradient={tokens.accentGrad.colors as [string, string]}
+              shadowRgb="124,58,237"
+              radius={16}
+              contentStyle={{ padding: 14, gap: 8 }}
+            >
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
+                Посещаемость · 96%
+              </Text>
+              <ProgressBar
+                pct={0.96}
+                height={4}
+                fillColor="#FFFFFF"
+                trackColor="rgba(255,255,255,0.3)"
+                showValueLabel="none"
+              />
+            </AccentCard>
+
+            <Caption text="AttendanceHeatmap · Июль 2026 (реальный fixture) + легенда" />
+            <GlassCard contentStyle={{ padding: 12, gap: 10 }}>
+              <AttendanceHeatmap cells={getAttendanceMonths()[1]!.cells} />
+              <AttendanceHeatmapLegend />
+            </GlassCard>
+
+            <Caption text="TimelineHorizontal · 4 узла (done → done → done → current)" />
+            <GlassCard contentStyle={{ padding: 14 }}>
+              <TimelineHorizontal
+                steps={[
+                  { label: "Выдано", date: "22 июля", state: "done" },
+                  { label: "В работе", date: "22 июля", state: "done" },
+                  { label: "Сдано", date: "23 июля", state: "done" },
+                  { label: "Проверка", date: "до 24 июля", state: "current" },
+                ]}
+              />
+            </GlassCard>
+
+            <Caption text="TimelineVertical · TRANSPORT_STOPS (past · now · next)" />
+            <GlassCard contentStyle={{ padding: 14 }}>
+              <TimelineVertical
+                stops={getTransportRoute().stops.map((s) => ({
+                  label: s.name,
+                  time: s.time_label,
+                  state: s.status,
+                  chipLabel: s.is_my_stop ? "Ваша остановка" : undefined,
+                }))}
+              />
+            </GlassCard>
+          </Section>
+
+          {/* ═══ ГРАФИКИ · КРАЙНИЕ ЗНАЧЕНИЯ ═══ */}
+          <Section title="Графики · крайние значения">
+            <Caption text="Gauge · 0% / 100% / max / >max (клампится к 100%)" />
+            <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+              <Gauge value={0} centerLabel="0%" size={92} />
+              <Gauge value={100} centerLabel="100%" size={92} />
+              <Gauge value={5} max={5} centerLabel="5/5" size={92} />
+              <Gauge value={150} centerLabel=">max" size={92} />
+            </View>
+
+            <Caption text="Sparkline · пустой массив / одно значение / плоская линия (min=max) / отрицательная дельта" />
+            <GlassCard contentStyle={{ padding: 12, gap: 10 }}>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <Text style={{ width: 96, fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink2 }}>
+                  values=[]
+                </Text>
+                <Sparkline values={[]} width={200} height={36} />
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <Text style={{ width: 96, fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink2 }}>
+                  values=[4.5]
+                </Text>
+                <Sparkline values={[4.5]} width={200} height={36} />
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <Text style={{ width: 96, fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink2 }}>
+                  плоская линия
+                </Text>
+                <Sparkline values={[3, 3, 3, 3, 3, 3]} width={200} height={36} endDot />
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <Text style={{ width: 96, fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink2 }}>
+                  дельта −0.5
+                </Text>
+                <Sparkline
+                  values={[4.6, 4.5, 4.3, 4.2, 4.15, 4.1]}
+                  width={200}
+                  height={36}
+                  endDot
+                  strokeColor={`rgb(${tokens.status.red.rgb})`}
+                />
+              </View>
+            </GlassCard>
+
+            <Caption text="Ring · 0% / 100% / value=max / value>max (клампится) / max=0 (защита от /0)" />
+            <View style={{ flexDirection: "row", gap: 14, flexWrap: "wrap" }}>
+              <Ring value={0} size={70} thickness={8} color={tokens.accent}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>0%</Text>} />
+              <Ring value={100} size={70} thickness={8} color={tokens.accent}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>100%</Text>} />
+              <Ring value={5} max={5} size={70} thickness={8} color={tokens.accent}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>5/5</Text>} />
+              <Ring value={17} max={10} size={70} thickness={8} color={tokens.accent}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>&gt;max</Text>} />
+              <Ring value={5} max={0} size={70} thickness={8} color={tokens.accent}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: tokens.ink3 }}>max=0</Text>} />
+            </View>
+
+            <Caption text="RingSegmented · один сегмент = 0 / все сегменты равны / всё в одном сегменте" />
+            <View style={{ flexDirection: "row", gap: 14, flexWrap: "wrap" }}>
+              <RingSegmented
+                size={70} thickness={10}
+                segments={[
+                  { color: `rgb(${tokens.status.green.rgb})`, value: 8 },
+                  { color: `rgb(${tokens.status.orange.rgb})`, value: 0 },
+                  { color: `rgb(${tokens.status.red.rgb})`, value: 2 },
+                ]}
+                max={10}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: tokens.ink1 }}>0-сегмент</Text>}
+              />
+              <RingSegmented
+                size={70} thickness={10}
+                segments={[
+                  { color: `rgb(${tokens.status.green.rgb})`, value: 1 },
+                  { color: `rgb(${tokens.status.orange.rgb})`, value: 1 },
+                  { color: `rgb(${tokens.status.red.rgb})`, value: 1 },
+                ]}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: tokens.ink1 }}>1/3 × 3</Text>}
+              />
+              <RingSegmented
+                size={70} thickness={10}
+                segments={[
+                  { color: `rgb(${tokens.status.green.rgb})`, value: 10 },
+                  { color: `rgb(${tokens.status.orange.rgb})`, value: 0 },
+                  { color: `rgb(${tokens.status.red.rgb})`, value: 0 },
+                ]}
+                centerContent={<Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: tokens.ink1 }}>10/0/0</Text>}
+              />
+            </View>
+
+            <Caption text="MiniRing · 0% / 100% / value>max" />
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <MiniRing pct={0} size={52} thickness={5} color={tokens.accent} />
+              <MiniRing pct={100} size={52} thickness={5} color={`rgb(${tokens.status.green.rgb})`} />
+              <MiniRing pct={150} size={52} thickness={5} color={`rgb(${tokens.status.red.rgb})`} />
+            </View>
+
+            <Caption text="ProgressBar · 0% / 100% / >100% / отрицательное значение (клампится к 0)" />
+            <View style={{ gap: 8 }}>
+              <ProgressBar pct={0} height={5.5} fillColor={tokens.accent} showValueLabel="right" valueLabelText="0%" />
+              <ProgressBar pct={1} height={5.5} fillColor={`rgb(${tokens.status.green.rgb})`} showValueLabel="right" valueLabelText="100%" />
+              <ProgressBar pct={1.5} height={5.5} fillColor={`rgb(${tokens.status.orange.rgb})`} showValueLabel="right" valueLabelText="150% (клампится)" />
+              <ProgressBar pct={-0.2} height={5.5} fillColor={`rgb(${tokens.status.red.rgb})`} showValueLabel="right" valueLabelText="−0.2 (клампится)" />
+            </View>
+
+            <Caption text="Radar · длинные подписи UZ / EN — не должны налезать друг на друга и вылетать из viewBox" />
+            <GlassCard contentStyle={{ padding: 14, alignItems: "center" }}>
+              <Radar
+                values={[4.8, 3.8, 4.7, 4.2, 4.5, 4.3]}
+                labels={[
+                  "Mantiqiy fikrlash",
+                  "Muloqot ko‘nikmalari",
+                  "Intizom",
+                  "Kreativlik",
+                  "Mustaqillik",
+                  "Jamoada ishlash",
+                ]}
+                max={5}
+                size={220}
+              />
+            </GlassCard>
+            <GlassCard contentStyle={{ padding: 14, alignItems: "center" }}>
+              <Radar
+                values={[4.8, 3.8, 4.7, 4.2, 4.5, 4.3]}
+                labels={[
+                  "Logical reasoning",
+                  "Communication",
+                  "Discipline",
+                  "Creativity",
+                  "Self-management",
+                  "Teamwork",
+                ]}
+                max={5}
+                size={220}
+              />
+            </GlassCard>
+
+            <Caption text="Radar · все нули (полигон схлопывается в точку) / все max (полигон = внешнему гексагону)" />
+            <View style={{ flexDirection: "row", gap: 14, justifyContent: "center" }}>
+              <Radar values={[0, 0, 0, 0, 0, 0]} max={5} size={140} />
+              <Radar values={[5, 5, 5, 5, 5, 5]} max={5} size={140} />
+            </View>
+
+            <Caption text="TimelineHorizontal · один узел / только upcoming (все не done)" />
+            <GlassCard contentStyle={{ padding: 14, gap: 12 }}>
+              <TimelineHorizontal
+                steps={[{ label: "Единственный шаг", date: "сегодня", state: "current" }]}
+              />
+              <TimelineHorizontal
+                steps={[
+                  { label: "Шаг 1", date: "—", state: "upcoming" },
+                  { label: "Шаг 2", date: "—", state: "upcoming" },
+                  { label: "Шаг 3", date: "—", state: "upcoming" },
+                ]}
+              />
+            </GlassCard>
+
+            <Caption text="AttendanceHeatmap · все прошлые дни присутствовал / все ячейки будущие / все выходные" />
+            <GlassCard contentStyle={{ padding: 12, gap: 12 }}>
+              <AttendanceHeatmap
+                cells={"ppppp pp ppppp pp ppppp pp ppppp pp ppppp pp".replace(/ /g, "").split("") as never}
+              />
+              <AttendanceHeatmap
+                cells={"fffff ff fffff ff fffff ff fffff ff fffff ff".replace(/ /g, "").split("") as never}
+              />
+              <AttendanceHeatmap
+                cells={"wwwww ww wwwww ww wwwww ww wwwww ww wwwww ww".replace(/ /g, "").split("") as never}
+              />
+            </GlassCard>
           </Section>
 
           {/* ═══ ХРОМ (интеграция) ═══ */}

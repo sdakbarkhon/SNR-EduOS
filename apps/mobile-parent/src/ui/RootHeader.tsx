@@ -1,16 +1,17 @@
 /**
  * RootHeader — шапка корневых экранов (табов).
  * Спека: «SNR EduOS v2 Light.dc.html»:
- *  П5 (строки 220–224): row gap 10, padding 46 18 8; лого-знак 32×32
- *   (uploads/snr-logo-mark.png) + название Unbounded 14/600; справа —
- *   круглая стеклянная кнопка колокольчика 38 (160° W72→W46, blur(18),
- *   border W80; глиф bell 17 stroke 1.8) с бейджем CountBadge 17
- *   (top -3 right -3, строка 223) и аватар 38 (градиент 135°, кольцо
- *   0 0 0 2px #fff — Avatar variant ring, инициалы 12/800);
+ *  П5 (строки 220–224): row gap 10, padding 46 18 8; лого-знак 32×32 (только
+ *   знак — три треугольника, assets/logo-mark.png с прозрачным фоном) +
+ *   название «SNR EduOS» ОТДЕЛЬНЫМ Text-ом Unbounded 14/600 в цвете темы
+ *   (tokens.ink1) — намеренно НЕ вшиваем текст в картинку, иначе он не
+ *   переключится между светлой и тёмной темами; справа — круглая стеклянная
+ *   кнопка колокольчика 38 (160° W72→W46, blur(18), border W80; глиф bell 17
+ *   stroke 1.8) с бейджем CountBadge 17 (top -3 right -3, строка 223) и
+ *   аватар 38 (градиент 135°, кольцо 0 0 0 2px #fff — Avatar variant ring,
+ *   инициалы 12/800);
  *  П10/П17 (строки 274–278, 377–380): та же шапка, заголовок Unbounded 17/600,
  *   на П17 без лого.
- * NB: отдельного знака в apps/mobile-parent/assets нет (только logo-full.png
- *  с полным словом) — используем Image logo-full.png высотой 32 (см. отчёт).
  * Тёмные пары: стекло кнопки — glass1/glassBorder тёмных токенов (CSS 28, 56);
  *  глиф #171243 → #fff (CSS 162) — через tokens.ink1.
  * paddingTop — max(safe-area, 46) (в макете 46). Presentational: все данные
@@ -130,11 +131,11 @@ export function RootHeader({
       }}
     >
       {showLogo ? (
-        // В макете — квадратный знак 32×32 (snr-logo-mark.png); в assets есть
-        // только полный логотип — рендерим его высотой 32 (contain).
+        // Квадратный знак 32×32 (три треугольника, прозрачный фон).
+        // Текст «SNR EduOS» — отдельным Text-ом ниже, цвет из tokens.ink1.
         <Image
-          source={require("../../assets/logo-full.png")}
-          style={{ width: 94, height: 32, flexShrink: 0 }}
+          source={require("../../assets/logo-mark.png")}
+          style={{ width: 32, height: 32, flexShrink: 0 }}
           resizeMode="contain"
         />
       ) : null}

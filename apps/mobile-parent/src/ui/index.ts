@@ -61,3 +61,6 @@ export { StarRating, type StarRatingProps } from "./StarRating";
 export { FloatingTabBar, type FloatingTabBarProps, type FloatingTabItem } from "./FloatingTabBar";
 export { RootHeader, GlassCircleButton, type RootHeaderProps } from "./RootHeader";
 export { InnerHeader, type InnerHeaderProps } from "./InnerHeader";
+
+// ─── Графики (Заход 3, react-native-svg) ─────────────────────────────────────
+export * from "./charts";
