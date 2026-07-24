@@ -38,11 +38,10 @@
         }
       ],
       "expo-secure-store",
-      "expo-font",
-      "expo-status-bar"
+      "expo-font"
     ],
     "owner": "snreduos",
-    "runtimeVersion": "exposdk:57.0.0",
+    "runtimeVersion": "exposdk:54.0.0",
     "extra": {
       "eas": {
         "projectId": "b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"
