@@ -110,12 +110,43 @@ export const PARENT_PROFILE: ParentProfileRow = {
   backup_phone: "+998 93 555-21-77",
 };
 
-/** Демо-родители шторки входа (B9). */
+/** Демо-родители шторки входа (B9).
+ *  child_ids ссылаются на CHILDREN.id: макет показывает А/М/Ф в порядке
+ *  CHILDREN (Азиз → Малика → Фаррух); соответственно 1/2/3-детный демо-родитель
+ *  получает первые kids_count элементов этого порядка. */
 export const DEMO_PARENTS: DemoParentRow[] = [
-  { name: "Бахтиёр Исмаилов", phone: "+998 91 234 56 78", kids_count: 1, kids_initials: ["А"] },
-  { name: "Шерзод Рахимов", phone: "+998 93 456 78 90", kids_count: 2, kids_initials: ["А", "М"] },
-  { name: "Дилноза Каримова", phone: "+998 90 123 45 67", kids_count: 3, kids_initials: ["А", "М", "Ф"] },
+  {
+    id: "demo-bakhtiyor",
+    name: "Бахтиёр Исмаилов",
+    phone: "+998 91 234 56 78",
+    kids_count: 1,
+    kids_initials: ["А"],
+    child_ids: ["child-aziz"],
+  },
+  {
+    id: "demo-sherzod",
+    name: "Шерзод Рахимов",
+    phone: "+998 93 456 78 90",
+    kids_count: 2,
+    kids_initials: ["А", "М"],
+    child_ids: ["child-aziz", "child-malika"],
+  },
+  {
+    id: "demo-dilnoza",
+    name: "Дилноза Каримова",
+    phone: "+998 90 123 45 67",
+    kids_count: 3,
+    kids_initials: ["А", "М", "Ф"],
+    child_ids: ["child-aziz", "child-malika", "child-farrukh"],
+  },
 ];
+
+/** Стартовый выделенный ребёнок в списке A4 в зависимости от числа детей у
+ *  демо-родителя (state.authSel макета, строка 4295): 3 → 1 (Малика), иначе 0. */
+export const DEMO_PARENT_DEFAULT_CHILD_INDEX: Record<number, number> = { 1: 0, 2: 0, 3: 1 };
+
+/** Демо-родитель по умолчанию — 3-детный (совпадает с настоящим PARENT). */
+export const DEFAULT_DEMO_PARENT_ID = "demo-dilnoza";
 
 /** Текст демо-шторки — дословно (B9). */
 export const DEMO_SHEET_TEXT =

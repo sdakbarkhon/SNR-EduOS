@@ -33,6 +33,9 @@ export interface SegmentPillsProps {
   onChange: (index: number) => void;
   /** true — скролл-фильтры (hwChip), false — равноширинные табы (gt). */
   scrollable?: boolean;
+  /** Заход 4 (d24 «Сообщения»): индексы пилюль с красной точкой-бейджем 6×6
+   *  в правом верхнем углу лейбла (только у «Сервисы» на макете). */
+  dotIndexes?: number[];
   style?: StyleProp<ViewStyle>;
 }
 
@@ -71,13 +74,31 @@ export function SegmentPills({
   activeIndex,
   onChange,
   scrollable = false,
+  dotIndexes,
   style,
 }: SegmentPillsProps) {
   const { tokens, scheme } = useTheme();
+  const dotSet = new Set(dotIndexes ?? []);
+
+  const renderDot = () => (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 4,
+        right: 6,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: "#ef4444",
+      }}
+    />
+  );
 
   const renderPill = (label: string, index: number) => {
     const active = index === activeIndex;
     const key = `${index}-${label}`;
+    const dot = dotSet.has(index) ? renderDot() : null;
 
     if (active) {
       const shadow =
@@ -105,6 +126,7 @@ export function SegmentPills({
             >
               {label}
             </Text>
+            {dot}
           </LinearGradient>
         </Pressable>
       );
@@ -135,6 +157,7 @@ export function SegmentPills({
             </>
           ) : null}
           <Text style={[styles.labelHw, { color: tokens.ink1 }]}>{label}</Text>
+          {dot}
         </Pressable>
       );
     }
@@ -148,6 +171,7 @@ export function SegmentPills({
           style={[styles.pill, styles.pillGt, { borderWidth: 1, borderColor: g.border }]}
         >
           <Text style={[styles.labelGtInactive, { color: g.text }]}>{label}</Text>
+          {dot}
         </LinearGradient>
       </Pressable>
     );

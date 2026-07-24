@@ -2447,6 +2447,18 @@ export interface Dictionary {
       otherCards: string;
       otherMethods: string;
       lastOps: string;
+      // Заход 4: экран П17 «Оплаты» — дополнительные подписи макета.
+      balanceTotalCap: string;    // «ОБЩИЙ БАЛАНС»
+      balanceDueCap: string;      // «К ОПЛАТЕ»
+      balanceOverpaidCap: string; // «ПЕРЕПЛАТА»
+      balanceAvailable: string;   // «Доступно для расходов»
+      dueNow: string;             // «К оплате сейчас»
+      billsChip: string;          // «{n} счёта»
+      billDueBy: string;          // «до {date}»
+      payAllBtn: string;          // «Оплатить всё — {sum}»
+      billsReceipts: string;      // «Счета и чеки»
+      walletTitle: string;        // «Кошелёк {gen}»
+      walletSub: string;          // «На питание и покупки в школе»
     };
     msg: {
       online: string;
@@ -2456,6 +2468,16 @@ export interface Dictionary {
       announcements: string;
       avgReply: string;
       supportName: string;
+      // Заход 4: экран d24 «Сообщения» — табы и подписи «сторис».
+      tabAll: string;
+      tabChats: string;
+      tabAnn: string;
+      tabSvc: string;
+      storyImportant: string;
+      storyCurator: string;
+      storyMath: string;
+      storyEng: string;
+      storyAdmin: string;
     };
     prof: {
       children: string;
@@ -2479,6 +2501,17 @@ export interface Dictionary {
       additional: string;
       personalInfo: string;
       address: string;
+      // Заход 4: экран «Профиль-хаб» — подписи меню и версии.
+      parentRole: string;         // «Родитель»
+      docsSub: string;            // «Свидетельства, справки, ID»
+      notifSetSub: string;        // «Оценки, задания, оплаты»
+      payMethodsSub: string;      // «Карты и платёжные системы»
+      langSecSub: string;         // «Язык, пароль, биометрия»
+      helpTitle: string;          // «Помощь и поддержка»
+      helpSub: string;            // «Чат с поддержкой школы»
+      aboutSub: string;           // «SNR EduOS для родителей»
+      exit: string;               // «Выйти»
+      versionLabel: string;       // «SNR EduOS · версия {v}»
     };
     about: {
       info: string;
@@ -2530,6 +2563,48 @@ export interface Dictionary {
       demo: string;
       withGoogle: string;
       withApple: string;
+      tagline: string;
+      needHelp: string;
+      moreTitle: string;
+      moreIntro: string;
+      helpTitle: string;
+      helpSub: string;
+      demoSub: string;
+      demoCtaTitle: string;
+      demoCtaSub: string;
+      smsTitle: string;
+      smsSubPrefix: string;
+      smsResendCountdown: string;
+      smsResend: string;
+      smsSecurity: string;
+      a4Sub: string;
+      a4SecurityTitle: string;
+      a4SecuritySub: string;
+      a4School: string;
+      continue: string;
+      legalPrefix: string;
+      legalTerms: string;
+      legalAnd: string;
+      legalPrivacy: string;
+      phoneHint: string;
+      phonePlaceholder: string;
+      kidsOne: string;
+      kidsMany: string;
+      helpPhoneRowTitle: string;
+      helpEmailRowTitle: string;
+      demoBanner: string;
+      featEduTitle: string;
+      featEduSub: string;
+      featHwTitle: string;
+      featHwSub: string;
+      featPayTitle: string;
+      featPaySub: string;
+      featChatTitle: string;
+      featChatSub: string;
+      helpPhoneValue: string;
+      helpEmailValue: string;
+      or: string;
+      close: string;
     };
     status: {
       paid: string;

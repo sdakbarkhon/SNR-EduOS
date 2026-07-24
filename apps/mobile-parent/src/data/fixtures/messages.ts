@@ -3,7 +3,7 @@
  * Гульнорой d25 (C9), чат поддержки d28 (C10), чипы саппорта (B11).
  * Все значения — ДОСЛОВНО из макета (включая эмодзи).
  */
-import type { ChatMessageRow, MessageThreadRow } from "../types";
+import type { ChatMessageRow, MessagesStoryRow, MessageThreadRow } from "../types";
 
 export const MESSAGE_THREADS: MessageThreadRow[] = [
   {
@@ -14,6 +14,9 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "09:00",
     badge: 2,
     go: "d25",
+    avatar_gradient: ["#8b5cf6", "#6366f1"],
+    avatar_initials: "ГЮ",
+    is_online: true,
   },
   {
     category: "ann",
@@ -23,6 +26,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "вчера",
     badge: 3,
     go: "d26",
+    avatar_gradient: ["#a78bfa", "#7c3aed"],
+    avatar_icon_key: "mega",
   },
   {
     category: "chats",
@@ -32,6 +37,9 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "вчера",
     badge: 1,
     go: "d25",
+    avatar_gradient: ["#f472b6", "#8b5cf6"],
+    avatar_initials: "СУ",
+    is_online: true,
   },
   {
     category: "chats",
@@ -41,6 +49,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "19 июля",
     badge: null,
     go: "d27",
+    avatar_gradient: ["#60a5fa", "#2563eb"],
+    avatar_icon_key: "grid",
   },
   {
     category: "svc",
@@ -50,6 +60,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "18 июля",
     badge: null,
     go: "d28",
+    avatar_gradient: ["#34d399", "#059669"],
+    avatar_icon_key: "card",
   },
   {
     category: "svc",
@@ -59,6 +71,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "18 июля",
     badge: null,
     go: "stub:meals",
+    avatar_gradient: ["#f472b6", "#db2777"],
+    avatar_icon_key: "food",
   },
   {
     category: "svc",
@@ -68,6 +82,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "17 июля",
     badge: null,
     go: "stub:transport",
+    avatar_gradient: ["#fbbf24", "#f97316"],
+    avatar_icon_key: "clock",
   },
   {
     category: "svc",
@@ -77,6 +93,55 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     time_label: "17 июля",
     badge: null,
     go: "stub:med",
+    avatar_gradient: ["#fb7185", "#e11d48"],
+    avatar_icon_key: "plus",
+  },
+];
+
+/** Стория раздела «Сообщения» d24: 5 круглых элементов (см. recon-tabs). */
+export const MESSAGES_STORIES: MessagesStoryRow[] = [
+  {
+    id: "important",
+    label_key: "storyImportant",
+    gradient: ["#a78bfa", "#7c3aed"],
+    kind: "icon",
+    icon_key: "mega",
+    go: "d26",
+  },
+  {
+    id: "curator",
+    label_key: "storyCurator",
+    gradient: ["#f472b6", "#8b5cf6"],
+    kind: "chat",
+    initials: "СУ",
+    is_online: true,
+    go: "d25",
+  },
+  {
+    id: "math",
+    label_key: "storyMath",
+    gradient: ["#8b5cf6", "#6366f1"],
+    kind: "chat",
+    initials: "ГЮ",
+    is_online: true,
+    go: "d25",
+  },
+  {
+    id: "eng",
+    label_key: "storyEng",
+    gradient: ["#f472b6", "#db2777"],
+    kind: "chat",
+    initials: "НА",
+    is_online: true,
+    go: "d25",
+  },
+  {
+    id: "admin",
+    label_key: "storyAdmin",
+    gradient: ["#60a5fa", "#2563eb"],
+    kind: "icon",
+    icon_key: "grid",
+    go: "d27",
   },
 ];
 

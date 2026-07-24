@@ -85,10 +85,16 @@ export interface ParentProfileRow {
 
 /** Демо-родители экрана входа (B9). */
 export interface DemoParentRow {
+  /** Стабильный ключ демо-аккаунта (Заход 4) — используется контекстом
+   *  сессии и списком-селектором. */
+  id: string;
   name: string;
   phone: string;
   kids_count: number;         // n
   kids_initials: string[];    // kids
+  /** ID детей CHILDREN, доступные этому демо-родителю (длина = kids_count).
+   *  Порядок совпадает с kids_initials — макет показывает А/М/Ф именно так. */
+  child_ids: string[];
 }
 
 // ─── subjects ────────────────────────────────────────────────────────────────
@@ -452,6 +458,32 @@ export interface MessageThreadRow {
   time_label: string;
   badge: number | null;
   /** Маршрут макета («d25») или stub-ключ («stub:meals»). */
+  go: string;
+  /** Заход 4 (d24 «Сообщения»): визуал аватара треда — градиент + опц. инициалы
+   *  (для чатов учителей) или ключ иконки из ICONS (для объявлений/сервисов). */
+  avatar_gradient?: Gradient;
+  avatar_initials?: string;
+  avatar_icon_key?: string;
+  is_online?: boolean;
+}
+
+/** Стория раздела «Сообщения» d24: 5 круглых элементов сверху экрана. */
+export interface MessagesStoryRow {
+  /** Стабильный ключ; лейбл — из словаря по label_key. */
+  id: string;
+  /** Ключ i18n в parentApp.msg (без секции): «storyImportant» / «storyMath» / … */
+  label_key: string;
+  /** Внутренний градиент круга (после белого зазора). */
+  gradient: Gradient;
+  /** Тип содержимого круга: «icon» — ключ ICONS (мегафон/дом), «chat» — инициалы. */
+  kind: "icon" | "chat";
+  /** Для kind==="icon": ключ ICONS (bell/mega/user/…). */
+  icon_key?: string;
+  /** Для kind==="chat": инициалы (напр. «ГЮ», «СУ», «НА»). */
+  initials?: string;
+  /** Онлайн-точка (для учителей). */
+  is_online?: boolean;
+  /** Куда ведёт тап (ключ маршрута макета). */
   go: string;
 }
 

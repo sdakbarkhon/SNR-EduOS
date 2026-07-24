@@ -124,6 +124,7 @@ import {
 } from "./fixtures/notifications";
 import {
   CHAT_ATTACH_OPTIONS,
+  MESSAGES_STORIES,
   MESSAGE_THREADS,
   SUPPORT_CHAT,
   SUPPORT_CHAT_HEADER,
@@ -514,6 +515,11 @@ export function getUnreadMessageThreadsCount(): number {
 
 export function getTeacherChat() {
   return { header: TEACHER_CHAT_HEADER, messages: TEACHER_CHAT, attach_options: CHAT_ATTACH_OPTIONS };
+}
+
+/** Сториз-ряд экрана d24 «Сообщения» (5 круглых элементов сверху). */
+export function getMessagesStories() {
+  return MESSAGES_STORIES;
 }
 
 export function getSupportChat() {

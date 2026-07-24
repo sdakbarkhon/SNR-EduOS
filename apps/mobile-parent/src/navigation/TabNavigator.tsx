@@ -12,7 +12,11 @@
 import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { CreditCard, Home, MessageCircle, TrendingUp, User } from "lucide-react-native";
 import type { Dictionary } from "@snr/core";
-import StubScreen from "../screens/StubScreen";
+import HomeScreen from "../screens/tabs/HomeScreen";
+import ProgressScreen from "../screens/tabs/ProgressScreen";
+import PaymentsScreen from "../screens/tabs/PaymentsScreen";
+import MessagesScreen from "../screens/tabs/MessagesScreen";
+import ProfileHubScreen from "../screens/tabs/ProfileHubScreen";
 import { getUnreadMessageThreadsCount } from "../data";
 import { useAppLocale } from "../i18n";
 import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
@@ -89,11 +93,11 @@ export default function TabNavigator() {
         sceneStyle: { backgroundColor: "transparent" },
       }}
     >
-      <Tab.Screen name="p5" component={StubScreen} />
-      <Tab.Screen name="p10" component={StubScreen} />
-      <Tab.Screen name="p17" component={StubScreen} />
-      <Tab.Screen name="d24" component={StubScreen} />
-      <Tab.Screen name="dhub" component={StubScreen} />
+      <Tab.Screen name="p5" component={HomeScreen} />
+      <Tab.Screen name="p10" component={ProgressScreen} />
+      <Tab.Screen name="p17" component={PaymentsScreen} />
+      <Tab.Screen name="d24" component={MessagesScreen} />
+      <Tab.Screen name="dhub" component={ProfileHubScreen} />
     </Tab.Navigator>
   );
 }

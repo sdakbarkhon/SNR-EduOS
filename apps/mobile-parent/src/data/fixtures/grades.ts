@@ -118,18 +118,29 @@ export const GRADES_SUMMARY: GradesSummary = {
   dynamics_note: "Рост три месяца подряд — быстрее всего растут программирование и математика",
 };
 
-/** Вкладка «Навыки» П10 (C2) — плитки и чипы. */
+/** Вкладка «Навыки» П10 (C2) — плитки, чипы и радар.
+ *  Расширения Захода 4:
+ *   - `tiles` укомплектован 4 плитками макета (строка 343–348): «Творчество 85» и
+ *     «Коммуникация 90» с градиентами (значения и градиенты из макета);
+ *   - у каждой плитки добавлен градиент 135° (макет строка 343);
+ *   - `radar_values` — 6 значений полигона радара (строка 351: точки
+ *     `60,20 90,38 84,72 60,90 32,68 38,40` при R=44 → проценты вершин к R,
+ *     видимые в макете как ~90/86/68/82/64/68). */
 export const SKILLS_TAB = {
   tiles: [
-    { name: "Знания", pct: 92 },
-    { name: "Мышление", pct: 88 },
+    { name: "Знания", pct: 92, gradient: ["#a78bfa", "#7c3aed"] as [string, string] },
+    { name: "Мышление", pct: 88, gradient: ["#60a5fa", "#2563eb"] as [string, string] },
+    { name: "Творчество", pct: 85, gradient: ["#f472b6", "#db2777"] as [string, string] },
+    { name: "Коммуникация", pct: 90, gradient: ["#34d399", "#059669"] as [string, string] },
   ],
   chips: [
-    { name: "Логика", value_label: "4.8" },
-    { name: "Коммуникация", value_label: "3.8" },
-    { name: "Дисциплина", value_label: "4.7" },
-    { name: "Креативность", value_label: "4.2" },
+    { name: "Логика", value_label: "4.8", tone: "violet" as const },
+    { name: "Коммуникация", value_label: "3.8", tone: "blue" as const },
+    { name: "Дисциплина", value_label: "4.7", tone: "green" as const },
+    { name: "Креативность", value_label: "4.2", tone: "red" as const },
   ],
+  /** 6 значений полигона радара (0..100), извлечены из макета (строка 351). */
+  radar_values: [90, 86, 68, 82, 64, 68] as [number, number, number, number, number, number],
 } as const;
 
 /** Баннеры EduOS Assistant на вкладках П10 (C2). */

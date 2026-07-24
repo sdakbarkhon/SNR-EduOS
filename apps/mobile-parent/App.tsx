@@ -21,6 +21,7 @@ import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { LocaleProvider } from "./src/i18n";
 import { ThemeProvider, useTheme } from "./src/theme";
+import { AuthSessionProvider } from "./src/context/AuthSessionContext";
 import { DevPanel } from "./src/dev/DevPanel";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -50,11 +51,12 @@ function ThemedStatusBar() {
 }
 
 /**
- * ЗАХОД 1 (редизайн v2): дерево живёт на фикстурах и заглушках.
- * DemoSessionProvider / DemoBanner и Supabase-восстановление сессии
- * НЕ монтируются — вход переписывается на этапе auth (Заход 10);
- * файлы (lib/auth.ts, lib/demoApi.ts, context/*) сохранены и вернутся
- * в дерево вместе с экранами входа a1–a4.
+ * ЗАХОД 4 (редизайн v2): auth-flow подключён.
+ * Дерево живёт на фикстурах. AuthSessionProvider держит состояние
+ * входа (phase/phone/sms/childPicker/app + isDemo); RootNavigator
+ * ветвится по phase на AuthNavigator ↔ MainNavigator. Старая
+ * обвязка (lib/auth.ts, lib/demoApi.ts, context/DemoSessionContext)
+ * не монтируется — заменена AuthSessionContext на фикстурах.
  */
 export default function App() {
   // Шрифты редизайна (Manrope + Unbounded) должны загрузиться ДО первого
@@ -93,10 +95,12 @@ export default function App() {
       <LocaleProvider>
         <ThemeProvider>
           <SafeAreaProvider>
-            <ThemedStatusBar />
-            <RootNavigator />
-            {/* ВРЕМЕННАЯ dev-панель (тема/язык) — снести в Заходе 8 */}
-            <DevPanel />
+            <AuthSessionProvider>
+              <ThemedStatusBar />
+              <RootNavigator />
+              {/* ВРЕМЕННАЯ dev-панель (тема/язык) — снести в Заходе 8 */}
+              <DevPanel />
+            </AuthSessionProvider>
           </SafeAreaProvider>
         </ThemeProvider>
       </LocaleProvider>
