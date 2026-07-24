@@ -10,7 +10,7 @@
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.snr.eduos.parent",
       "supportsTablet": true,

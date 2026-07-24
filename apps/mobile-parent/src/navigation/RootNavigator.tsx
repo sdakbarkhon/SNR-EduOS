@@ -1,68 +1,35 @@
-import { useEffect } from "react";
-import { NavigationContainer, useNavigation } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import LoginScreen from "../screens/LoginScreen";
-import MainNavigator from "./MainNavigator";
-import type { ParentProfile } from "../lib/auth";
-
-type RootStackParamList = {
-  Login: undefined;
-  Main: { profile: ParentProfile };
-};
-
-const Stack = createNativeStackNavigator<RootStackParamList>();
-type NavProp = NativeStackNavigationProp<RootStackParamList>;
-
 /**
- * Внутренний компонент — регистрирует в App.tsx колбек «перейти на Login»,
- * чтобы DemoBanner (живёт выше NavigationContainer) мог им воспользоваться
- * после signOut.
+ * Корневой навигатор v2 — Заход 1: сразу Main (стек 64 экранов на заглушках).
+ *
+ * БУДУЩИЙ AUTH-ЭТАП (Заход 10): здесь появится ветка входа a1–a4
+ * (Онбординг → Телефон → SMS-код → Выбор ребёнка) с восстановлением
+ * Supabase-сессии и demo-режимом. Файлы прежнего входа (lib/auth.ts,
+ * lib/demoApi.ts, context/DemoSessionContext.tsx и др.) сохранены,
+ * но в Заходе 1 не монтируются — всё живёт на фикстурах.
  */
-function DemoLogoutRegistrar({ onDemoLogoutRefSet }: { onDemoLogoutRefSet?: (fn: () => void) => void }) {
-  const navigation = useNavigation<NavProp>();
-  useEffect(() => {
-    onDemoLogoutRefSet?.(() => {
-      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-    });
-  }, [navigation, onDemoLogoutRefSet]);
-  return null;
-}
+import { DefaultTheme, NavigationContainer, type Theme } from "@react-navigation/native";
+import MainNavigator from "./MainNavigator";
+import { useTheme } from "../theme";
 
-/** Стек Login → Main. */
-export default function RootNavigator({
-  initialProfile,
-  onDemoLogoutRefSet,
-}: {
-  initialProfile: ParentProfile | null;
-  onDemoLogoutRefSet?: (fn: () => void) => void;
-}) {
+export default function RootNavigator() {
+  const { tokens, scheme } = useTheme();
+
+  // Фон контейнера ~ первый стоп bg-page, чтобы не было белой вспышки
+  // на переходах; сам фон экранов рисует AppBackground.
+  const navTheme: Theme = {
+    ...DefaultTheme,
+    dark: scheme === "dark",
+    colors: {
+      ...DefaultTheme.colors,
+      primary: tokens.accent,
+      background: tokens.bgPage.colors[0],
+      text: tokens.ink1,
+    },
+  };
+
   return (
-    <NavigationContainer>
-      <DemoLogoutRegistrar onDemoLogoutRefSet={onDemoLogoutRefSet} />
-      <Stack.Navigator
-        initialRouteName={initialProfile ? "Main" : "Login"}
-        screenOptions={{ headerShown: false }}
-      >
-        <Stack.Screen name="Login">
-          {({ navigation }) => (
-            <LoginScreen
-              onLoggedIn={(profile) => navigation.replace("Main", { profile })}
-            />
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name="Main"
-          initialParams={initialProfile ? { profile: initialProfile } : undefined}
-        >
-          {({ navigation, route }) => (
-            <MainNavigator
-              profile={route.params.profile}
-              onLoggedOut={() => navigation.replace("Login")}
-            />
-          )}
-        </Stack.Screen>
-      </Stack.Navigator>
+    <NavigationContainer theme={navTheme}>
+      <MainNavigator />
     </NavigationContainer>
   );
 }

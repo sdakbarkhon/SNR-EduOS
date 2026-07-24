@@ -2312,4 +2312,282 @@ export interface Dictionary {
     sectionDirectChats: string;   // "Личные чаты" — секция у учителя (сгруппировано по классу)
     emojiPicker: string;          // title/aria-label кнопки-смайлика у поля ввода
   };
+  // ─── Родительское мобильное приложение v2 (редизайн, Заход 1) ────────────
+  // Словарь макета «SNR EduOS v2 Light.dc.html» (I18N_SRC, строка 3464),
+  // перенесён ДОСЛОВНО: 225 ключей, секции = префикс ключа макета до точки
+  // (common.back → parentApp.common.back). Ключи со звёздочкой макета
+  // («вычитать носителю») перенесены как обычные — их список см. в комментарии
+  // рядом с секцией в ru.ts. Старая секция parentMobile (прежнее приложение)
+  // не трогается и живёт параллельно до завершения редизайна.
+  parentApp: {
+    common: {
+      back: string;
+      viewAll: string;
+      more: string;
+      done: string;
+      cancel: string;
+      cancelAction: string;
+      save: string;
+      apply: string;
+      reset: string;
+      notFound: string;
+      loading: string;
+      showAll: string;
+      close: string;
+      continue: string;
+      next: string;
+      send: string;
+      download: string;
+      open: string;
+      clear: string;
+      gotIt: string;
+    };
+    search: {
+      recent: string;
+      popular: string;
+    };
+    nav: {
+      home: string;
+      grades: string;
+      payments: string;
+      messages: string;
+      profile: string;
+    };
+    scr: {
+      dayStatus: string;
+      homeworks: string;
+      homework: string;
+      attendance: string;
+      schedule: string;
+      skills: string;
+      notifications: string;
+      services: string;
+      announcements: string;
+      adminNews: string;
+      support: string;
+      bills: string;
+      payMethod: string;
+      payHistory: string;
+      receipts: string;
+      childWallet: string;
+      payMethods: string;
+      topup: string;
+      childProfile: string;
+      parentData: string;
+      documents: string;
+      notifSettings: string;
+      langSec: string;
+      allSubjects: string;
+      teacherReviews: string;
+      topics: string;
+      teacherProfile: string;
+      walletOps: string;
+      transfer: string;
+      limits: string;
+      testReview: string;
+      work: string;
+      application: string;
+      about: string;
+      whatsnew: string;
+      search: string;
+      chPass: string;
+      sessions: string;
+    };
+    home: {
+      quickActions: string;
+      nextLesson: string;
+      pay: string;
+      hwShort: string;
+      atSchoolSince: string;
+      lessons: string;
+      attended: string;
+      hw: string;
+      wallet: string;
+      viewProgress: string;
+      msgTeacher: string;
+      today: string;
+      todaySection: string;
+    };
+    grades: {
+      average: string;
+      subjects: string;
+      tabGrades: string;
+      tabSkills: string;
+      tabDyn: string;
+      topic: string;
+      break: string;
+      room: string;
+      class: string;
+      presence: string;
+      absence: string;
+      teacherComment: string;
+      dynAvg: string;
+      lastReviews: string;
+    };
+    skills: {
+      profile: string;
+      progress: string;
+      practice: string;
+    };
+    pay: {
+      autopay: string;
+      on: string;
+      off: string;
+      payNow: string;
+      downloadReceipt: string;
+      balance: string;
+      topupBtn: string;
+      transferBtn: string;
+      all: string;
+      refunds: string;
+      total: string;
+      sum: string;
+      chooseMethod: string;
+      mainCard: string;
+      otherCards: string;
+      otherMethods: string;
+      lastOps: string;
+    };
+    msg: {
+      online: string;
+      typeMessage: string;
+      teachers: string;
+      servicesChip: string;
+      announcements: string;
+      avgReply: string;
+      supportName: string;
+    };
+    prof: {
+      children: string;
+      settings: string;
+      logout: string;
+      appVersion: string;
+      biometric: string;
+      biometricSub: string;
+      sessionsSub: string;
+      autoExit: string;
+      deleteAcc: string;
+      terms: string;
+      privacy: string;
+      licenses: string;
+      writeSupport: string;
+      rateApp: string;
+      shareApp: string;
+      myKids: string;
+      generalInfo: string;
+      schoolContacts: string;
+      additional: string;
+      personalInfo: string;
+      address: string;
+    };
+    about: {
+      info: string;
+      school: string;
+    };
+    set: {
+      security: string;
+      privacySec: string;
+      appearance: string;
+      light: string;
+      dark: string;
+      system: string;
+      lightSub: string;
+      darkSub: string;
+      systemSub: string;
+      appLanguage: string;
+      langSysDefault: string;
+      langUz: string;
+      langEn: string;
+    };
+    wn: {
+      thisVersion: string;
+      prevVersions: string;
+    };
+    svc: {
+      diary: string;
+      tests: string;
+      library: string;
+      portfolio: string;
+      applications: string;
+      medcard: string;
+      transport: string;
+      meals: string;
+      study: string;
+      finance: string;
+      other: string;
+    };
+    auth: {
+      heroTitle: string;
+      heroSub: string;
+      start: string;
+      learnMore: string;
+      welcome: string;
+      signInSub: string;
+      phone: string;
+      smsCode: string;
+      resend: string;
+      chooseChild: string;
+      demo: string;
+      withGoogle: string;
+      withApple: string;
+    };
+    status: {
+      paid: string;
+      due: string;
+      overdue: string;
+      refund: string;
+      atSchool: string;
+      absent: string;
+      liveNow: string;
+      assigned: string;
+      inWork: string;
+      submitted: string;
+      underReview: string;
+      reviewed: string;
+      approved: string;
+      pending: string;
+      rejected: string;
+    };
+    subj: {
+      math: string;
+      eng: string;
+      rus: string;
+      prog: string;
+      robo: string;
+    };
+    date: {
+      mon: string;
+      tue: string;
+      wed: string;
+      thu: string;
+      fri: string;
+      sat: string;
+      sun: string;
+      june: string;
+      july: string;
+      august: string;
+      today: string;
+      yesterday: string;
+      tomorrow: string;
+      minAgo: string;
+      hAgo: string;
+      dAgo: string;
+      in15: string;
+    };
+    ai: {
+      overall: string;
+      recs: string;
+      weekly: string;
+      techBadge: string;
+    };
+    sched: {
+      today: string;
+    };
+    files: {
+      attached: string;
+    };
+    attend: {
+      lastDays: string;
+    };
+  };
 }
