@@ -13,8 +13,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.snr.eduos.parent",
-      "supportsTablet": true,
-      "runtimeVersion": "exposdk:54.0.0"
+      "supportsTablet": true
     },
     "android": {
       "package": "com.snr.eduos.parent",
@@ -39,12 +38,11 @@
         }
       ],
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-status-bar"
     ],
     "owner": "snreduos",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "exposdk:57.0.0",
     "extra": {
       "eas": {
         "projectId": "b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"
