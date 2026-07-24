@@ -2,18 +2,21 @@
  * Таб-навигатор v2 — 5 табов макета: Главная (p5) / Успехи (p10) /
  * Оплаты (p17) / Сообщения (d24) / Профиль (dhub).
  *
- * Заход 1: таб-бар ВРЕМЕННЫЙ простой (стилизован токенами: фон, активный
- * акцент) — фирменный стеклянный (пилюля с градиентом accent-grad,
- * blur 26, sh-float) придёт в Заходе 2. Лейблы — из словаря
- * d.parentApp.nav.* (реагируют на смену языка в dev-панели).
+ * Заход 2: фирменный плавающий стеклянный таб-бар макета (строка 4231) —
+ * компонент src/ui/FloatingTabBar, подключён через tabBar={...}.
+ * Лейблы — из словаря d.parentApp.nav.* (реагируют на смену языка
+ * в dev-панели), иконки — прежние lucide (строки 2648–2652 макета),
+ * бейдж «Сообщений» — из src/data (getUnreadMessageThreadsCount, макет
+ * строка 2651). Данные в презентационный компонент передаёт навигатор.
  */
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { CreditCard, Home, MessageCircle, TrendingUp, User } from "lucide-react-native";
 import type { Dictionary } from "@snr/core";
 import StubScreen from "../screens/StubScreen";
+import { getUnreadMessageThreadsCount } from "../data";
 import { useAppLocale } from "../i18n";
-import { useTheme, fonts } from "../theme";
-import type { TabParamList } from "./routes";
+import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
+import type { TabParamList, TabRouteName } from "./routes";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -36,30 +39,54 @@ const TAB_ICONS = {
   dhub: User,
 } as const;
 
+function renderTabBar(props: BottomTabBarProps, labels: Record<TabRouteName, string>) {
+  const { state, navigation } = props;
+  const unreadMessages = getUnreadMessageThreadsCount();
+
+  const items: FloatingTabItem[] = state.routes.map((route) => {
+    const name = route.name as TabRouteName;
+    const Icon = TAB_ICONS[name];
+    return {
+      key: name,
+      label: labels[name],
+      // Иконка 20 stroke 1.9 — как в макете (строки 2648–2652).
+      icon: (color: string) => <Icon size={20} color={color} strokeWidth={1.9} />,
+      badge: name === "d24" ? unreadMessages : undefined,
+    };
+  });
+
+  return (
+    <FloatingTabBar
+      items={items}
+      activeKey={state.routes[state.index].name}
+      onPress={(key) => {
+        const route = state.routes.find((r) => r.name === key);
+        const isFocused = state.routes[state.index].name === key;
+        if (!route) return;
+        const event = navigation.emit({
+          type: "tabPress",
+          target: route.key,
+          canPreventDefault: true,
+        });
+        if (!isFocused && !event.defaultPrevented) {
+          navigation.navigate(key as TabRouteName);
+        }
+      }}
+    />
+  );
+}
+
 export default function TabNavigator() {
-  const { tokens, scheme } = useTheme();
   const { d } = useAppLocale();
   const labels = tabLabels(d);
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => {
-        const Icon = TAB_ICONS[route.name];
-        return {
-          headerShown: false,
-          tabBarActiveTintColor: tokens.accent,
-          tabBarInactiveTintColor: tokens.ink3,
-          tabBarLabel: labels[route.name],
-          tabBarLabelStyle: { fontFamily: fonts.manrope800, fontSize: 9.5 },
-          tabBarStyle: {
-            backgroundColor:
-              scheme === "dark" ? "rgba(22,16,56,0.96)" : "rgba(255,255,255,0.92)",
-            borderTopColor: tokens.glassBorder,
-          },
-          tabBarIcon: ({ color }) => <Icon size={20} color={color} strokeWidth={1.9} />,
-          // Фон под табами красит сам экран (AppBackground)
-          sceneStyle: { backgroundColor: "transparent" },
-        };
+      tabBar={(props) => renderTabBar(props, labels)}
+      screenOptions={{
+        headerShown: false,
+        // Фон под табами красит сам экран (AppBackground)
+        sceneStyle: { backgroundColor: "transparent" },
       }}
     >
       <Tab.Screen name="p5" component={StubScreen} />

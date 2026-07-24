@@ -503,6 +503,15 @@ export function getMessageThreads(category?: MessageThreadRow["category"]): Mess
   return category ? MESSAGE_THREADS.filter((t) => t.category === category) : MESSAGE_THREADS;
 }
 
+/**
+ * Бейдж таба «Сообщения» — «2» в макете (строка 2651): число непрочитанных
+ * ЧАТОВ (тредов категории chats с badge) = Гульнора + Севара. Считается из
+ * MESSAGE_THREADS, не хардкодится.
+ */
+export function getUnreadMessageThreadsCount(): number {
+  return MESSAGE_THREADS.filter((t) => t.category === "chats" && (t.badge ?? 0) > 0).length;
+}
+
 export function getTeacherChat() {
   return { header: TEACHER_CHAT_HEADER, messages: TEACHER_CHAT, attach_options: CHAT_ATTACH_OPTIONS };
 }

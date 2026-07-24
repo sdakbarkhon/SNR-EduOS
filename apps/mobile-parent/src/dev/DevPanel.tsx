@@ -14,6 +14,7 @@ import type { Locale } from "@snr/core";
 import { locales } from "@snr/core";
 import { useAppLocale } from "../i18n";
 import { useTheme, fonts, type AppearancePref } from "../theme";
+import { DevGallery } from "./DevGallery";
 
 const APPEARANCE_VALUES: AppearancePref[] = ["light", "dark", "system"];
 
@@ -54,6 +55,7 @@ function OptionChip({
 
 export function DevPanel() {
   const [open, setOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const { tokens, scheme, appearance, setAppearance } = useTheme();
   const { d, locale, setLocale } = useAppLocale();
   const insets = useSafeAreaInsets();
@@ -143,6 +145,32 @@ export function DevPanel() {
               ))}
             </View>
 
+            {/* Каталог компонентов UI-кита v2 (временный, Заход 2) */}
+            <Pressable
+              onPress={() => {
+                setOpen(false);
+                setGalleryOpen(true);
+              }}
+              style={{
+                alignItems: "center",
+                paddingVertical: 10,
+                borderRadius: 14,
+                backgroundColor: tokens.chip(tokens.status.violet.rgb).bg,
+                borderWidth: 1,
+                borderColor: tokens.chip(tokens.status.violet.rgb).border,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: fonts.manrope800,
+                  fontSize: 12.5,
+                  color: tokens.status.violet.text,
+                }}
+              >
+                Галерея UI
+              </Text>
+            </Pressable>
+
             <Pressable onPress={() => setOpen(false)} style={{ alignSelf: "flex-end", padding: 6 }}>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.accent }}>
                 {d.parentApp.common.close}
@@ -151,6 +179,9 @@ export function DevPanel() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ВРЕМЕННАЯ галерея UI-кита — снести в Заходе 8 вместе с DevPanel. */}
+      <DevGallery visible={galleryOpen} onClose={() => setGalleryOpen(false)} />
     </>
   );
 }
