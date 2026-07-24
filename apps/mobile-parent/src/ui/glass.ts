@@ -33,6 +33,16 @@ export const glassConfig = {
  * Точного соответствия у платформ нет — эмпирический коэффициент 2.5
  * (blur 22px макета ≈ intensity 55). Ограничение платформы, не менять
  * по экранам — только здесь.
+ *
+ * ЗАХОД 5x · verify (заказчик, правка 2): множитель 2.5 подтверждён по
+ * эталонным blur-значениям макета:
+ *  – §s10 «Токены», строки 2795–2796: glass-1 blur 22, glass-2 blur 20
+ *    (→ intensity 55 / 50 — визуально совпадает с CSS-эталоном);
+ *  – dev-panel-плитки заголовка, строки 194/198/204: blur 18 (→ intensity 45);
+ *  – шторки/поповеры blur 24–26 → intensity 60–65; крышка полей SMS
+ *    (LoginSmsScreen) blur 14 → intensity 35 (HW_BLUR_INTENSITY в SegmentPills).
+ * Меняем коэффициент — только на основании реальной визуальной перепроверки
+ * на iOS/Android, не по «улучшениям» отдельных экранов.
  */
 export function cssBlurToIntensity(px: number): number {
   return Math.min(100, Math.round(px * 2.5));

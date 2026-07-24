@@ -22,7 +22,9 @@ export { AccentCard, AccentInset, type AccentCardProps, type AccentInsetProps } 
 export { Popover, type PopoverProps } from "./Popover";
 export { BottomSheetFrame, type BottomSheetFrameProps } from "./BottomSheetFrame";
 export { CenterModalFrame, type CenterModalFrameProps } from "./CenterModalFrame";
-export { DemoBannerGlass, type DemoBannerGlassProps } from "./DemoBannerGlass";
+// ЗАХОД 5x (правка 3): DemoBannerGlass снят целиком — заменён на one-shot
+// центр-модалку DemoNoticeModal (см. RootNavigator).
+export { DemoNoticeModal, type DemoNoticeModalProps } from "./DemoNoticeModal";
 
 // ─── Контролы (группа B) ─────────────────────────────────────────────────────
 export { StatusChip, type StatusChipProps, type StatusFamily } from "./StatusChip";
@@ -61,6 +63,14 @@ export { StarRating, type StarRatingProps } from "./StarRating";
 export { FloatingTabBar, type FloatingTabBarProps, type FloatingTabItem } from "./FloatingTabBar";
 export { RootHeader, GlassCircleButton, type RootHeaderProps } from "./RootHeader";
 export { InnerHeader, type InnerHeaderProps } from "./InnerHeader";
+// ЗАХОД 5x (правка 4A): единый bottom-inset под FloatingTabBar для всех
+// таб-экранов (замена хардкода paddingBottom: 118 в HomeScreen и др.).
+export {
+  TabScreenScroll,
+  useTabBarBottomInset,
+  FLOATING_TAB_BAR_HEIGHT,
+  type TabScreenScrollProps,
+} from "./TabScreenScroll";
 
 // ─── Графики (Заход 3, react-native-svg) ─────────────────────────────────────
 export * from "./charts";

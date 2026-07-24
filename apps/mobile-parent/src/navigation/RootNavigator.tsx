@@ -1,5 +1,5 @@
 /**
- * Корневой навигатор v2 — Заход 4: развилка auth ⇄ main + демо-баннер.
+ * Корневой навигатор v2 — Заход 4: развилка auth ⇄ main + демо-нотис.
  *
  * Один NavigationContainer, две ветки:
  *   phase === 'app'  → MainNavigator (стек 64 экранов, 5 табов рабочие).
@@ -10,27 +10,28 @@
  * navigation.reset({routes:[{name:'main'|'auth'}]}) без ручного
  * навигационного вызова из экранов.
  *
- * Поверх MainNavigator монтируется DemoBannerGlass (жёлтая полоса макета):
- * viewer видит его пока isDemo=true. Крестик скрыт — по Заходу 4 закрывать
- * его нельзя (при logout баннер уходит вместе с фазой). pointerEvents="box-none"
- * на обёртке — тапы проходят к экрану, тапабельны только сам баннер и его дети.
+ * ЗАХОД 5x (правка 3): жёлтый `DemoBannerGlass` поверх шапки удалён целиком
+ * (и файл, и вьюверы, и i18n `auth.demoBanner` продолжают жить только как
+ * legacy-строка). Вместо него — one-shot центр-модалка `DemoNoticeModal`:
+ * автоматически всплывает один раз сразу после демо-входа (isDemo=true &&
+ * !demoNoticeSeen), при нажатии «Понятно» флаг переключается на true и до
+ * конца сессии больше не показывается. При signOut / pickDemoParent флаг
+ * сбрасывается обратно, поэтому повторный вход в демо снова покажет её.
+ * На phone-flow (isDemo=false) не показывается вообще.
  */
 import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DefaultTheme, NavigationContainer, type Theme } from "@react-navigation/native";
 import MainNavigator from "./MainNavigator";
 import AuthNavigator from "./AuthNavigator";
 import { useAuthSession } from "../context/AuthSessionContext";
-import { DemoBannerGlass } from "../ui";
+import { DemoNoticeModal } from "../ui";
 import { useAppLocale } from "../i18n";
 import { useTheme } from "../theme";
 
 export default function RootNavigator() {
   const { tokens, scheme } = useTheme();
-  const { phase, isDemo } = useAuthSession();
+  const { phase, isDemo, demoNoticeSeen, dismissDemoNotice } = useAuthSession();
   const { d } = useAppLocale();
-  const insets = useSafeAreaInsets();
 
   // Фон контейнера ~ первый стоп bg-page, чтобы не было белой вспышки
   // на переходах; сам фон экранов рисует AppBackground.
@@ -49,31 +50,20 @@ export default function RootNavigator() {
   );
 
   const authenticated = phase === "app";
+  // One-shot центр-модалка «Демо-режим» — только когда мы уже в MainNavigator,
+  // сессия помечена как isDemo и модалка ещё не была закрыта.
+  const showDemoNotice = authenticated && isDemo && !demoNoticeSeen;
 
   return (
     <NavigationContainer theme={navTheme}>
-      <View style={{ flex: 1 }}>
-        {authenticated ? <MainNavigator /> : <AuthNavigator />}
-        {/* Демо-баннер поверх MainNavigator (скрыт на auth-экранах и без демо). */}
-        {authenticated && isDemo ? (
-          <View
-            pointerEvents="box-none"
-            style={[
-              StyleSheet.absoluteFill,
-              // top:40 (макет) + safe-area, чтобы не залезать под вырез iOS
-              { top: Math.max(40, insets.top + 6) },
-            ]}
-          >
-            <View
-              pointerEvents="box-none"
-              style={{ position: "absolute", left: 12, right: 12, top: 0 }}
-            >
-              {/* onClose не передаём — крестик по Заходу 4 недоступен. */}
-              <DemoBannerGlass message={d.parentApp.auth.demoBanner} />
-            </View>
-          </View>
-        ) : null}
-      </View>
+      {authenticated ? <MainNavigator /> : <AuthNavigator />}
+      <DemoNoticeModal
+        visible={showDemoNotice}
+        title={d.parentApp.demo.title}
+        body={d.parentApp.demo.body}
+        cta={d.parentApp.demo.cta}
+        onDismiss={dismissDemoNotice}
+      />
     </NavigationContainer>
   );
 }

@@ -2548,6 +2548,11 @@ export const uz: Dictionary = {
       or: "yoki",
       close: "Yopish",
     },
+    demo: {
+      title: "Demo rejim",
+      body: "Siz demo rejimga kirdingiz. Barcha harakatlar maktabning haqiqiy ma'lumotlariga ta'sir qiladi. Qaytarib bo'lmaydigan operatsiyalarni bajarmang.",
+      cta: "Tushunarli",
+    },
     status: {
       paid: "To'langan",
       due: "To'lov uchun",

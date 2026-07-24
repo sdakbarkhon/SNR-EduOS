@@ -14,7 +14,7 @@
  * под FloatingTabBar (макет: строка 226 — «118 под FloatingTabBar»).
  */
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -34,6 +34,7 @@ import {
   RootHeader,
   SectionHeader,
   StatusChip,
+  TabScreenScroll,
   type ChildPickerItem,
   type MetricCell,
 } from "../../ui";
@@ -269,12 +270,10 @@ export default function HomeScreen() {
         }}
         onAvatarPress={() => navigation.navigate("dhub")}
       />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
+      <TabScreenScroll
         contentContainerStyle={{
           paddingHorizontal: 18,
           paddingTop: 4,
-          paddingBottom: 118,
           gap: 12,
         }}
       >
@@ -517,7 +516,7 @@ export default function HomeScreen() {
             );
           })}
         </GlassCard>
-      </ScrollView>
+      </TabScreenScroll>
 
       {/* Шторка выбора ребёнка. */}
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>

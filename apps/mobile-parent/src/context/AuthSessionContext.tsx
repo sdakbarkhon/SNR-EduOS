@@ -5,9 +5,16 @@
  * DemoSessionContext — это отдельная сессионная сущность Захода 4.
  *
  * Формат — по разведке recon-aux §1.3: pipeline + phone/sms/country/kidsCount +
- * флаги isDemo/bannerClosed + действия submitPhone/verifyCode/pickChild/
- * pickDemoParent/enterApp/signOut. Всё на useState — persist на этом этапе не
- * требуется (StubScreen не даст выйти обратно).
+ * флаги isDemo + действия submitPhone/verifyCode/pickChild/pickDemoParent/
+ * enterApp/signOut. Всё на useState — persist на этом этапе не требуется
+ * (StubScreen не даст выйти обратно).
+ *
+ * ЗАХОД 5x (правка 3): жёлтый DemoBannerGlass поверх шапки заменён на
+ * one-shot центр-модалку `DemoNoticeModal` (см. RootNavigator + src/ui).
+ * Прежние `bannerClosed`/`closeDemoBanner` переименованы в
+ * `demoNoticeSeen`/`dismissDemoNotice`. Флаг session-scoped — сбрасывается
+ * в false при pickDemoParent (новый заход в демо) и в signOut (сброс всей
+ * сессии). При phone-flow (не демо) модалка не показывается никогда.
  */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import {
@@ -42,8 +49,10 @@ export interface AuthSessionState {
   authSel: number;
   /** true после выбора демо-родителя (перед enterApp). */
   isDemo: boolean;
-  /** Крестик демо-баннера. */
-  bannerClosed: boolean;
+  /** ЗАХОД 5x (правка 3): true после того, как one-shot центр-модалка
+   *  «Демо-режим» (DemoNoticeModal) закрыта. Session-scoped: при новом заходе
+   *  в демо (pickDemoParent) и при signOut сбрасывается обратно в false. */
+  demoNoticeSeen: boolean;
   /** id выбранного ребёнка после enterApp (для MainStack). */
   currentChildId: string | null;
 }
@@ -59,7 +68,8 @@ export interface AuthSessionCtx extends AuthSessionState {
   pickDemoParent(p: DemoParentRow): "picker" | "app";
   pickChildIndex(i: number): void;
   enterApp(childIndex: number): void;
-  closeDemoBanner(): void;
+  /** ЗАХОД 5x (правка 3): закрыть one-shot центр-модалку «Демо-режим». */
+  dismissDemoNotice(): void;
   signOut(): void;
 }
 
@@ -74,7 +84,7 @@ const INITIAL_STATE: AuthSessionState = {
   kidsCount: 3,
   authSel: DEFAULT_CHILD_INDEX,
   isDemo: false,
-  bannerClosed: false,
+  demoNoticeSeen: false,
   currentChildId: null,
 };
 
@@ -148,7 +158,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         return {
           ...s,
           isDemo: true,
-          bannerClosed: false,
+          demoNoticeSeen: false,
           demoParentId: p.id,
           kidsCount,
           authSel: 0,
@@ -159,7 +169,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       return {
         ...s,
         isDemo: true,
-        bannerClosed: false,
+        demoNoticeSeen: false,
         demoParentId: p.id,
         kidsCount,
         authSel: DEFAULT_SEL_BY_KIDS[kidsCount] ?? 0,
@@ -173,8 +183,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, authSel: i }));
   }, []);
 
-  const closeDemoBanner = useCallback(() => {
-    setState((s) => ({ ...s, bannerClosed: true }));
+  const dismissDemoNotice = useCallback(() => {
+    setState((s) => ({ ...s, demoNoticeSeen: true }));
   }, []);
 
   const signOut = useCallback(() => {
@@ -194,7 +204,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       pickDemoParent,
       pickChildIndex,
       enterApp,
-      closeDemoBanner,
+      dismissDemoNotice,
       signOut,
     }),
     [
@@ -209,7 +219,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       pickDemoParent,
       pickChildIndex,
       enterApp,
-      closeDemoBanner,
+      dismissDemoNotice,
       signOut,
     ],
   );

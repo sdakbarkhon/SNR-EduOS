@@ -2607,6 +2607,13 @@ export interface Dictionary {
       or: string;
       close: string;
     };
+    /** Заход 5x (правка 3): one-shot центр-модалка после демо-входа
+     *  (заменила жёлтый DemoBannerGlass поверх шапки). */
+    demo: {
+      title: string;
+      body: string;
+      cta: string;
+    };
     status: {
       paid: string;
       due: string;

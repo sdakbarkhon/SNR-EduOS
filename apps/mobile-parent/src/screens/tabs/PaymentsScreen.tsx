@@ -20,7 +20,7 @@
  * ListRow, Toggle, PrimaryButton, QuickActionTile и AccentInset.
  */
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -33,6 +33,7 @@ import {
   QuickActionsGrid,
   QuickActionTile,
   RootHeader,
+  TabScreenScroll,
   Toggle,
 } from "../../ui";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
@@ -121,10 +122,9 @@ export default function PaymentsScreen() {
         onAvatarPress={goD("dhub")}
       />
 
-      <ScrollView
+      <TabScreenScroll
         style={{ flex: 1 }}
-        contentContainerStyle={{ gap: 12, paddingHorizontal: 18, paddingTop: 4, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: 12, paddingHorizontal: 18, paddingTop: 4 }}
       >
         {/* 2. Карточка баланса (три-стоп-градиент, макет 383–386). */}
         <AccentCard
@@ -353,7 +353,7 @@ export default function PaymentsScreen() {
             </Svg>
           </View>
         </AccentCard>
-      </ScrollView>
+      </TabScreenScroll>
     </AppBackground>
   );
 }

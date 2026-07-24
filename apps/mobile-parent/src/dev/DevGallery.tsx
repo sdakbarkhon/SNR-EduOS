@@ -32,7 +32,7 @@ import {
   ChildPickerSheetContent,
   ChildSwitcherCard,
   CountBadge,
-  DemoBannerGlass,
+  DemoNoticeModal,
   FloatingTabBar,
   Gauge,
   GlassCard,
@@ -80,6 +80,45 @@ function Caption({ text }: { text: string }) {
     <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink3 }}>
       {text}
     </Text>
+  );
+}
+
+/** DEV-предпросмотр DemoNoticeModal (кнопка + модалка). Не идёт в прод. */
+function DemoNoticePreview() {
+  const { tokens } = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={{
+          alignSelf: "flex-start",
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 12,
+          backgroundColor: tokens.chip(tokens.status.orange.rgb).bg,
+          borderWidth: 1,
+          borderColor: tokens.chip(tokens.status.orange.rgb).border,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: fonts.manrope800,
+            fontSize: 11.5,
+            color: tokens.status.orange.text,
+          }}
+        >
+          Открыть DemoNoticeModal
+        </Text>
+      </Pressable>
+      <DemoNoticeModal
+        visible={open}
+        title="Демо-режим"
+        body="Вы вошли в демо-режим. Все действия влияют на реальные данные школы. Не совершайте необратимых операций."
+        cta="Понятно"
+        onDismiss={() => setOpen(false)}
+      />
+    </>
   );
 }
 
@@ -171,8 +210,8 @@ export function DevGallery({ visible, onClose }: DevGalleryProps) {
               </AccentInset>
             </AccentCard>
 
-            <Caption text="DemoBannerGlass" />
-            <DemoBannerGlass message="Демо-режим: данные не сохраняются" onClose={() => {}} />
+            <Caption text="DemoNoticeModal (dev-preview)" />
+            <DemoNoticePreview />
 
             <Caption text="Popover (статично)" />
             <View style={{ height: 120 }}>

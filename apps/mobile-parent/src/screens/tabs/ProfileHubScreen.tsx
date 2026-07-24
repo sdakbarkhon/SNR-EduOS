@@ -19,7 +19,7 @@
  * 10. Подпись «SNR EduOS · версия {v}» из app.json (Constants.expoConfig.version).
  */
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,6 +35,7 @@ import {
   PrimaryButton,
   SectionHeader,
   StatusChip,
+  TabScreenScroll,
 } from "../../ui";
 import { AppBackground, fonts, gradPoints, useTheme, type ThemeTokens } from "../../theme";
 import { useAppLocale } from "../../i18n";
@@ -166,10 +167,9 @@ export default function ProfileHubScreen() {
         </GlassCircleButton>
       </View>
 
-      <ScrollView
+      <TabScreenScroll
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 120, gap: 12 }}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 18, gap: 12 }}
       >
         {/* 2. Карточка родителя. */}
         <GlassCard radius={22} onPress={goTo("d30")} contentStyle={{ padding: 14 }}>
@@ -273,7 +273,7 @@ export default function ProfileHubScreen() {
         >
           {fillTemplate(d.parentApp.prof.versionLabel, { v: version })}
         </Text>
-      </ScrollView>
+      </TabScreenScroll>
 
       {/* Подтверждение выхода (CONFIRM_DIALOGS.logout — B8). */}
       <CenterModalFrame

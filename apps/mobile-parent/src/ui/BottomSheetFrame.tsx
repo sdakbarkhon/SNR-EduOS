@@ -13,11 +13,21 @@
  *  тень → 0 -18 40 rgba(3,5,18,.5) (строка 74); блик — токен glassInset;
  *  оверлей → rgba(5,3,20,.62) (строки 123–124); грип → W26 (строка 119).
  * Анимация — Animated из RN (без reanimated). Контент шторки — children.
+ *
+ * ЗАХОД 5x (правка 4B): каркас обёрнут в нативный `<Modal transparent
+ * animationType="none">`, чтобы шторка и `CenterModalFrame` (который её
+ * переиспользует) рендерились ПОВЕРХ `FloatingTabBar` и DEV-кнопки —
+ * оба живут в основном дереве React-Native и не имеют общего zIndex с
+ * потомками экранов. RN Modal открывает отдельное нативное окно поверх
+ * всего RN-контента и одновременно закрывает back-жест на Android. Своя
+ * translateY-анимация продолжает жить внутри Modal (animationType="none",
+ * иначе будет двойной эффект).
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Easing,
+  Modal,
   Pressable,
   StyleSheet,
   View,
@@ -109,7 +119,20 @@ export function BottomSheetFrame({
   });
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <Modal
+      visible={mounted}
+      transparent
+      // animationType="none" — своя translateY-анимация ниже; native fade/slide
+      // при одновременной работе даёт двойной эффект.
+      animationType="none"
+      // Заказчик, правка 4B: тап-в-оверлей закрывает через Pressable ниже;
+      // отдельно ловим Android hardware back → onClose.
+      onRequestClose={onClose}
+      // На Android без этого фон Modal был бы непрозрачным — теряется
+      // весь стеклянный оверлей.
+      statusBarTranslucent
+    >
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* Затемняющий оверлей (blur(4) макета опускаем в пользу нативного
           затемнения: fallback-заливка чуть усилена — единое поведение обеих
           веток через glassConfig). */}
@@ -213,6 +236,7 @@ export function BottomSheetFrame({
           {children}
         </View>
       </Animated.View>
-    </View>
+      </View>
+    </Modal>
   );
 }

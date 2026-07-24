@@ -2547,6 +2547,11 @@ export const en: Dictionary = {
       or: "or",
       close: "Close",
     },
+    demo: {
+      title: "Demo mode",
+      body: "You have entered demo mode. All actions affect the school's real data. Do not perform irreversible operations.",
+      cta: "Got it",
+    },
     status: {
       paid: "Paid",
       due: "Due",

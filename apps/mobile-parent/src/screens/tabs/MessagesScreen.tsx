@@ -16,7 +16,7 @@
  *     Фильтрация по выбранной вкладке.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native"; // ScrollView остаётся для горизонтальных сториз
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,6 +28,7 @@ import {
   GlassCard,
   GlassCircleButton,
   SegmentPills,
+  TabScreenScroll,
 } from "../../ui";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import { useAppLocale } from "../../i18n";
@@ -129,10 +130,9 @@ export default function MessagesScreen() {
         </GlassCircleButton>
       </View>
 
-      <ScrollView
+      <TabScreenScroll
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 118, gap: 11 }}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: 11 }}
       >
         {/* 2. Горизонтальная лента сториз. */}
         <ScrollView
@@ -187,7 +187,7 @@ export default function MessagesScreen() {
             />
           ))}
         </View>
-      </ScrollView>
+      </TabScreenScroll>
     </AppBackground>
   );
 }

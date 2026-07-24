@@ -21,7 +21,7 @@
  * paddingBottom 118 под FloatingTabBar.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -43,6 +43,7 @@ import {
   Sparkline,
   StarRating,
   SubjectTile,
+  TabScreenScroll,
   type ChildPickerItem,
   type SubjectId,
 } from "../../ui";
@@ -245,12 +246,10 @@ export default function ProgressScreen() {
         avatar={{ initials: parentInitials, gradient: parentGradient, variant: "ring" }}
         onAvatarPress={() => navigation.navigate("dhub")}
       />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
+      <TabScreenScroll
         contentContainerStyle={{
           paddingHorizontal: 18,
           paddingTop: 4,
-          paddingBottom: 118,
           gap: 12,
         }}
       >
@@ -900,7 +899,7 @@ export default function ProgressScreen() {
             </Text>
           </>
         )}
-      </ScrollView>
+      </TabScreenScroll>
 
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
         <ChildPickerSheetContent
