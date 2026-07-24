@@ -651,10 +651,10 @@ export interface DashboardFeedItem {
   go: string;
 }
 
-/** Карточка «Следующий урок» Dashboard (C1; кабинет 204 — аномалия №4). */
+/** Карточка «Следующий урок» Dashboard (C1). */
 export interface NextLessonCard {
   subject_name: string;
-  time_room_teacher_label: string; // «10:20–11:05 · Каб. 204 · Гульнора Юсупова»
+  time_room_teacher_label: string; // «10:20–11:05 · Каб. 101 · Гульнора Юсупова»
   tile_label: string;         // «√x»
   gradient: Gradient;
 }

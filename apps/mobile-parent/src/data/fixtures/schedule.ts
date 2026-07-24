@@ -22,7 +22,8 @@ export const SLOT_STARTS = ["08:30", "09:25", "10:20", "11:15", "12:10", "13:05"
 export const SLOT_ENDS = ["09:15", "10:10", "11:05", "12:00", "12:55", "13:50"] as const;
 
 /** Кабинет всех рядов расписания (schedRowsFor и d6) — «Кабинет 101».
- *  На Dashboard «Следующий урок» макет показывает «Каб. 204» (аномалия №4). */
+ *  Единый для всей платформы; «Каб. 204» на Dashboard макета был рудиментом
+ *  и приведён к 101 (см. NEXT_LESSON_CARD в home.ts). */
 export const SCHEDULE_ROOM_LABEL = "Кабинет 101";
 
 export const LESSON_SETS: Record<LessonSetId, SubjectKey[]> = {
