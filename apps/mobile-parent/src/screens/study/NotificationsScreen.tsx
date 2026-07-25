@@ -33,7 +33,8 @@ import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../t
 import { GlassCard, InnerHeader, SegmentPills } from "../../ui";
 import { getNotifications } from "../../data";
 import type { NotificationRow } from "../../data";
-import type { MainStackParamList } from "../../navigation/routes";
+import type { MainStackParamList, StubKey, TabRouteName } from "../../navigation/routes";
+import { TAB_ROUTES } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -257,6 +258,27 @@ export default function NotificationsScreen() {
 
   const activeIndex = FILTERS.findIndex((f) => f.key === filter);
 
+  // ИСПРАВЛЕНИЕ (пост-заход 8): n.go — либо «stub:key» (открыть заглушку
+  // с этим stubKey), либо имя реального маршрута. Реальный маршрут может
+  // быть табом (p5/p10/p17/d24/dhub) — туда нужно идти через вложенную
+  // форму navigate("Tabs", {screen}), голый navigate(tabName) молча
+  // ничего не делает (см. фикс routes.ts Tabs + 10 других мест приложения).
+  const goToNotification = (go: string) => {
+    if (go.startsWith("stub:")) {
+      navigation.navigate("stub", { stubKey: go.slice(5) as StubKey });
+      return;
+    }
+    if ((TAB_ROUTES as readonly string[]).includes(go)) {
+      navigation.navigate("Tabs", { screen: go as TabRouteName });
+      return;
+    }
+    // Имя маршрута динамическое (из фикстуры) — React Navigation не может
+    // сопоставить строку с конкретной перегрузкой navigate(); `as never` —
+    // рекомендуемый в их же TS-гайде обход именно для этого случая (ветки
+    // выше уже отфильтровали stub:/tab-маршруты типобезопасно).
+    navigation.navigate(go as never);
+  };
+
   return (
     <AppBackground>
       {/* 687–690: InnerHeader (glass back + Unbounded 15 title). */}
@@ -291,10 +313,7 @@ export default function NotificationsScreen() {
               <NotificationCard
                 key={`today-${idx}`}
                 row={n}
-                onPress={() => {
-                  if (n.go.indexOf("stub:") === 0) return;
-                  navigation.navigate(n.go as never);
-                }}
+                onPress={() => goToNotification(n.go)}
               />
             ))}
           </>
@@ -308,10 +327,7 @@ export default function NotificationsScreen() {
               <NotificationCard
                 key={`yday-${idx}`}
                 row={n}
-                onPress={() => {
-                  if (n.go.indexOf("stub:") === 0) return;
-                  navigation.navigate(n.go as never);
-                }}
+                onPress={() => goToNotification(n.go)}
               />
             ))}
           </>

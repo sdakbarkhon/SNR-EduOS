@@ -182,7 +182,7 @@ export default function ChildProfileScreen() {
     statusTone: k.status_chip === "В школе" ? "green" : "gray",
   }));
 
-  const goProgress = () => navigation.navigate("p10");
+  const goProgress = () => navigation.navigate("Tabs", { screen: "p10" });
   const goAttend = () => navigation.navigate("d14");
   // Заход 8: Портфолио теперь реальный экран — ведём сразу на вкладку
   // «Достижения», а не на общую заглушку.

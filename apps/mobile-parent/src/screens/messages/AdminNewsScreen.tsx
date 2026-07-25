@@ -111,7 +111,7 @@ export default function AdminNewsScreen() {
 
   const goActions = () => navigation.navigate("stub", { stubKey: "actions" });
   const goFile = () => navigation.navigate("stub", { stubKey: "file" });
-  const goBackToMsgs = () => navigation.navigate("d24");
+  const goBackToMsgs = () => navigation.navigate("Tabs", { screen: "d24" });
 
   // Blue-tinted callout: цвет семьи «blue» из статусных токенов (макет
   // rgba(59,130,246,.1) bg + .3 border ≡ tokens.chip("59,130,246")).

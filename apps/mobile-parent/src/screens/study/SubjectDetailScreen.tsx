@@ -322,7 +322,7 @@ export default function SubjectDetailScreen() {
           </View>
           {/* Кнопка «сообщения» (макет 465). */}
           <Pressable
-            onPress={() => navigation.navigate("d24")}
+            onPress={() => navigation.navigate("Tabs", { screen: "d24" })}
             style={{
               width: 34,
               height: 34,
@@ -349,7 +349,7 @@ export default function SubjectDetailScreen() {
           </Pressable>
           {/* Кнопка «email» (макет 466). */}
           <Pressable
-            onPress={() => navigation.navigate("d24")}
+            onPress={() => navigation.navigate("Tabs", { screen: "d24" })}
             style={{
               width: 34,
               height: 34,

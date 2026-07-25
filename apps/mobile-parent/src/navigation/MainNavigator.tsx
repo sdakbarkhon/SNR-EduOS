@@ -43,6 +43,7 @@ import MealsScreen from "../screens/study/MealsScreen";
 
 // Реальные экраны Захода 8 — родительские сервис-разделы (8 шт.), заменяют
 // StubScreen под dtests/dlib/dport/dapps/dmed/dtrans/dchpass/dsessions.
+import DiaryScreen from "../screens/study/DiaryScreen";
 import TestsScreen from "../screens/study/TestsScreen";
 import LibraryScreen from "../screens/study/LibraryScreen";
 import PortfolioScreen from "../screens/study/PortfolioScreen";
@@ -153,6 +154,7 @@ const PROFILE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
  * остаются генерической заглушкой — они не в объёме этого захода.
  */
 const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  ddiary: DiaryScreen,
   dtests: TestsScreen,
   dlib: LibraryScreen,
   dport: PortfolioScreen,

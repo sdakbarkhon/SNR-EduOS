@@ -19,9 +19,8 @@
  * useAppLocale().d.parentApp.*. Обе темы через useTheme(). iOS safe-area —
  * из InnerHeader.
  *
- * Правило заказчика: плитка t.svcDiary («Дневник») присутствует по макету,
- * но экран Дневник в текущем заходе не реализуется — onPress оставлен пустым
- * (no-op).
+ * ИСПРАВЛЕНИЕ (пост-заход 8): «Дневник» ранее был no-op («экран не
+ * реализуется в этом заходе») — теперь ведёт на реальный DiaryScreen (ddiary).
  */
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -305,7 +304,7 @@ export default function ServicesScreen() {
                   }
                 />
               }
-              onPress={() => navigation.navigate("p10")}
+              onPress={() => navigation.navigate("Tabs", { screen: "p10" })}
             />,
             <ServiceTile
               key="hw"
@@ -378,8 +377,7 @@ export default function ServicesScreen() {
                   }
                 />
               }
-              // Правило заказчика: Дневник в этом заходе не реализуется — no-op.
-              onPress={undefined}
+              onPress={() => navigation.navigate("ddiary")}
             />,
             <ServiceTile
               key="tests"
@@ -447,7 +445,7 @@ export default function ServicesScreen() {
                   }
                 />
               }
-              onPress={() => navigation.navigate("p17")}
+              onPress={() => navigation.navigate("Tabs", { screen: "p17" })}
             />,
             <ServiceTile
               key="history"
@@ -517,7 +515,7 @@ export default function ServicesScreen() {
               gradient={["#22d3ee", "#0891b2"]}
               shadowRgb="8,145,178"
               icon={<TileGlyph paths={<Path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />} />}
-              onPress={() => navigation.navigate("d24")}
+              onPress={() => navigation.navigate("Tabs", { screen: "d24" })}
             />,
             <ServiceTile
               key="docs"
@@ -631,7 +629,7 @@ export default function ServicesScreen() {
                   }
                 />
               }
-              onPress={() => navigation.navigate("dhub")}
+              onPress={() => navigation.navigate("Tabs", { screen: "dhub" })}
             />,
           ]}
         </TileGrid>

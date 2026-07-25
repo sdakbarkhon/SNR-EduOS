@@ -574,7 +574,7 @@ export default function EduosAssistantScreen() {
         {/* Блок 15 — ссылка «Смотреть детальную статистику ›» (макет 1360).
             Уход на таб p10 (Оценки/Успехи). */}
         <Text
-          onPress={() => navigation.navigate("p10")}
+          onPress={() => navigation.navigate("Tabs", { screen: "p10" })}
           style={{
             textAlign: "center",
             fontFamily: fonts.manrope800,

@@ -339,7 +339,7 @@ export default function HomeworkDetailScreen() {
   };
   const goFile = () => navigation.navigate("stub", { stubKey: "file" });
   const goUpload = () => navigation.navigate("stub", { stubKey: "upload" });
-  const goMsgs = () => navigation.navigate("d24" as never);
+  const goMsgs = () => navigation.navigate("Tabs", { screen: "d24" });
 
   // Условные блоки: единственный источник — hw.status_chip. «На проверке» →
   // работа отправлена (SentStateBadge); всё остальное — можно переотправить

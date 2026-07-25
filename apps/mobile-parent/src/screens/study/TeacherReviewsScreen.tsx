@@ -318,7 +318,7 @@ export default function TeacherReviewsScreen() {
   const week = reviews.filter((r) => r.group === "w");
   const earlier = reviews.filter((r) => r.group === "e");
 
-  const goMsgs = () => navigation.navigate("d24");
+  const goMsgs = () => navigation.navigate("Tabs", { screen: "d24" });
 
   const pickerItems: ChildPickerItem[] = children.map((k) => ({
     id: k.id,

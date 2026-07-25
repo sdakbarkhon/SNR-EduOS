@@ -5,6 +5,7 @@
  * ICONS и STUBS перенесены ДОСЛОВНО из макета «SNR EduOS v2 Light.dc.html»
  * (ICONS — строки 3060–3080, STUBS — строки 3081–3157).
  */
+import type { NavigatorScreenParams } from "@react-navigation/native";
 
 /* ===== ICONS (SVG-пути 24×24, дословно из макета) ===== */
 
@@ -238,9 +239,19 @@ export const STACK_ROUTES = [
 
 export type StackRouteName = (typeof STACK_ROUTES)[number];
 
-/** Типизированный ParamList стека: Tabs + 59 маршрутов. */
+/**
+ * Типизированный ParamList стека: Tabs + 59 маршрутов.
+ *
+ * ИСПРАВЛЕНИЕ (пост-заход 8): переходы во вложенный таб-навигатор из
+ * СОСЕДНИХ stack-экранов (d9, d29 и т.п.) должны идти через
+ * `navigation.navigate("Tabs", { screen: "p10" })`, а НЕ голым
+ * `navigate("p10")` — последнее «пузырится» вверх по дереву навигации
+ * и просто ничего не делает (см. https://reactnavigation.org/docs/nesting-navigators/,
+ * официально задокументированное поведение). Тип Tabs ниже даёт эту
+ * вложенную форму TypeScript-безопасной.
+ */
 export type MainStackParamList = {
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<TabParamList> | undefined;
   /** Универсальная заглушка: goStub(k) → navigate('stub', { stubKey: k }). */
   stub: { stubKey?: StubKey } | undefined;
   /** Портфолио — опциональный старт-таб (Заход 8): #29 «Достижения» ведёт

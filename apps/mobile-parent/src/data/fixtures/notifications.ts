@@ -46,7 +46,9 @@ export const NOTIFICATIONS: NotificationRow[] = [
     time_label: "18:05",
     is_unread: false,
     is_important: true,
-    go: "stub:announce",
+    // Заход 8: «Объявления школы» (d26) теперь реальный экран, больше не
+    // stub:announce.
+    go: "d26",
     gradient: ["#a78bfa", "#7c3aed"],
   },
   {
