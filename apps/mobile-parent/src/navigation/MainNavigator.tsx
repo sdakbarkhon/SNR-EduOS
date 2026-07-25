@@ -37,6 +37,20 @@ import ServicesScreen from "../screens/study/ServicesScreen";
 import TeacherProfileScreen from "../screens/study/TeacherProfileScreen";
 import MealsScreen from "../screens/study/MealsScreen";
 
+// Реальные экраны Захода 6 — Оплаты (12 шт., шторки открываются локально).
+import BillsScreen from "../screens/payments/BillsScreen";
+import CheckoutScreen from "../screens/payments/CheckoutScreen";
+import PaymentHistoryScreen from "../screens/payments/PaymentHistoryScreen";
+import ReceiptsScreen from "../screens/payments/ReceiptsScreen";
+import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
+import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
+import TopUpScreen from "../screens/payments/TopUpScreen";
+import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
+import TransferScreen from "../screens/payments/TransferScreen";
+import LimitsScreen from "../screens/payments/LimitsScreen";
+import CardDetailsScreen from "../screens/payments/CardDetailsScreen";
+import AddCardScreen from "../screens/payments/AddCardScreen";
+
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 /**
@@ -62,6 +76,26 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
   dmeals: MealsScreen,
 };
 
+/**
+ * Реестр реальных payment-экранов Захода 6 (12 шт.).
+ * Шторки (TopUpSheet, PayMethodSheet и т.д.) в стек НЕ регистрируются —
+ * открываются как локальные BottomSheet внутри своих parent-экранов.
+ */
+const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d18: BillsScreen,
+  d19: CheckoutScreen,
+  d20: PaymentHistoryScreen,
+  d21: ReceiptsScreen,
+  d22: ChildWalletScreen,
+  d33: PayMethodsScreen,
+  dtop: TopUpScreen,
+  dwops: WalletOpsScreen,
+  dtransfer: TransferScreen,
+  dlimits: LimitsScreen,
+  dcarddet: CardDetailsScreen,
+  daddcard: AddCardScreen,
+};
+
 export default function MainNavigator() {
   return (
     <Stack.Navigator
@@ -73,7 +107,11 @@ export default function MainNavigator() {
     >
       <Stack.Screen name="Tabs" component={TabNavigator} />
       {STACK_ROUTES.map((name) => (
-        <Stack.Screen key={name} name={name} component={STUDY_SCREENS[name] ?? StubScreen} />
+        <Stack.Screen
+          key={name}
+          name={name}
+          component={STUDY_SCREENS[name] ?? PAYMENT_SCREENS[name] ?? StubScreen}
+        />
       ))}
     </Stack.Navigator>
   );

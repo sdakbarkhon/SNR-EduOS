@@ -2459,6 +2459,25 @@ export interface Dictionary {
       billsReceipts: string;      // «Счета и чеки»
       walletTitle: string;        // «Кошелёк {gen}»
       walletSub: string;          // «На питание и покупки в школе»
+      // Заход 6: доп. ключи для ветки «Оплаты» — экраны d17-limits,
+      // d17-transfer, d17-addcard, d17-topup, paySheet-успехи, helpSheet.
+      limits: string;             // «Лимиты расходов» (заголовок секции)
+      limitDay: string;           // «Лимит в день»
+      limitCafeteria: string;     // «Столовая» (категория лимита)
+      transferFrom: string;       // «ОТКУДА»
+      transferTo: string;         // «КУДА»
+      addCardTitle: string;       // «Добавить карту»
+      cardNumber: string;         // «Номер карты»
+      cardExpiry: string;         // «Срок действия»
+      cardCvv: string;            // «CVV»
+      cardHolder: string;         // «Имя держателя»
+      topupInputPlaceholder: string;  // «0» (плейсхолдер суммы)
+      topupChooseAmount: string;      // «Сумма пополнения»
+      howItWorks: string;             // «Как работают оплаты» (заголовок helpSheet)
+      successBillTitle: string;       // paySheet.kind==='bill' → «Платёж проведён»
+      successTopupTitle: string;      // paySheet.kind==='top' → «Баланс пополнен»
+      successTransferTitle: string;   // paySheet.kind==='tr'  → «Перевод выполнен»
+      successCardTitle: string;       // paySheet.kind==='card'→ «Карта добавлена»
     };
     msg: {
       online: string;
