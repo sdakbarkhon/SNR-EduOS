@@ -1,20 +1,29 @@
 /**
- * TabScreenScroll — обёртка над ScrollView для табов, автоматически
- * добавляющая нижний inset, равный высоте плавающего таб-бара +
- * safe-area + запас 12px.
+ * TabScreenScroll — обёртка над ScrollView для 5 корневых таб-экранов.
  *
- * ЗАХОД 5x (правка 4A): 5 tab-screen (HomeScreen / ProgressScreen /
- * PaymentsScreen / MessagesScreen / ProfileHubScreen) раньше хардкодили
- * `paddingBottom: 118` или `120`. На iPhone с большим home-indicator
- * (insets.bottom = 34+) итоговое расстояние получалось слишком плотным,
- * а на Android с insets.bottom=0 — избыточным. Централизуем это в один
- * хук/компонент, чтобы новые табы получали корректный inset автоматически.
+ * ЗАХОД 5x правка 4A — базовый механизм:
+ *   Централизованный расчёт нижнего inset'а под плавающий FloatingTabBar
+ *   (FLOATING_TAB_BAR_HEIGHT + safe-area bottom + запас), чтобы новые
+ *   таб-экраны получали корректный отступ автоматически.
  *
- * Расчёт (см. `useTabBarBottomInset`):
- *   FLOATING_TAB_BAR_HEIGHT (~66px, разбор ниже) +
- *   Math.max(insets.bottom, 14)  (тот же offset, что использует
- *                                   `FloatingTabBar` для позиционирования) +
- *   12                            (визуальный запас над баром)
+ * ЗАХОД 5z — правка отсечения контента под таб-баром:
+ *   Проблема: контент прокручивался ПОД плавающий стеклянный таб-бар и
+ *   просвечивал через его полупрозрачное стекло — строки списка мешались
+ *   с иконками бара.
+ *
+ *   Решение: ScrollView оборачивается в View с `marginBottom = bottomInset`.
+ *   Прокручиваемая ЗОНА (viewport) заканчивается на высоте примерно
+ *   ~12px выше верхней кромки таб-бара — контент, уходящий ниже, обрезается
+ *   `ScrollView.overflow: hidden` (нативное поведение). При этом:
+ *     • AppBackground (родитель по дереву, `flex:1, overflow:hidden` +
+ *       LinearGradient через `StyleSheet.absoluteFill`) продолжает рисовать
+ *       фон-градиент на ВСЮ высоту экрана, включая зону за таб-баром →
+ *       сквозь стекло FloatingTabBar по-прежнему виден именно градиент, как
+ *       задумано Liquid Glass;
+ *     • нижний inset теперь применяется НЕ как `paddingBottom` на content,
+ *       а как `marginBottom` на контейнер — это и есть отсечение;
+ *     • маленький `paddingBottom: 8` в контентном контейнере даёт визуальный
+ *       воздух между последней строкой и нижней кромкой видимой ScrollView.
  *
  * Разбор FLOATING_TAB_BAR_HEIGHT: `FloatingTabBar` (см. src/ui/FloatingTabBar):
  *   – внешний контейнер: padding 7 (7×2 = 14);
@@ -22,12 +31,14 @@
  *   – итого пункт ≈ 8+20+3+13+8 = 52px, плюс 14px внешнего padding = 66px.
  *
  * Используется через два интерфейса:
- *   – `useTabBarBottomInset()` — просто число, если экрану нужна ручная
- *     работа с insets (например, FlatList / SectionList);
- *   – `<TabScreenScroll>` — drop-in замена `<ScrollView>` для табов.
+ *   – `useTabBarBottomInset()` — число, для экранов, использующих
+ *     собственные скролл-контейнеры (FlatList / SectionList) — их автору
+ *     нужно применить это значение к `style.marginBottom` контейнера +
+ *     paddingBottom 8 к content, как здесь;
+ *   – `<TabScreenScroll>` — drop-in замена `<ScrollView>` для 5 табов.
  */
 import { forwardRef } from "react";
-import { ScrollView, type ScrollViewProps } from "react-native";
+import { ScrollView, View, type ScrollViewProps } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
@@ -38,9 +49,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export const FLOATING_TAB_BAR_HEIGHT = 66;
 
 /**
- * Хук: возвращает готовое число `paddingBottom` для скролл-контента внутри
- * таб-экранов. Работает и для 5 текущих корневых табов, и для будущих
- * экранов, которые будут подключены под тот же FloatingTabBar.
+ * Хук: возвращает готовое число нижнего inset'а для tab-экранов.
+ * Значение применяется как `marginBottom` на контейнере скролла (см.
+ * TabScreenScroll) — контент чисто обрезается по верхней кромке таб-бара.
  */
 export function useTabBarBottomInset(): number {
   const insets = useSafeAreaInsets();
@@ -53,31 +64,37 @@ export function useTabBarBottomInset(): number {
 export interface TabScreenScrollProps extends ScrollViewProps {}
 
 /**
- * Drop-in замена `<ScrollView>` для 5 корневых таб-экранов. Автоматически
- * применяет нижний inset. Если вызывающий экран уже передаёт
- * `contentContainerStyle`, наш paddingBottom добавляется первым — экран
- * при желании ещё может его переопределить своим (но по-умолчанию
- * получает корректное значение бесплатно).
+ * Drop-in замена `<ScrollView>` для 5 корневых таб-экранов. ScrollView
+ * обёрнута в `<View marginBottom={bottomInset}>` — прокручиваемая зона
+ * заканчивается над таб-баром, контент за ней обрезается. Фон-градиент
+ * AppBackground продолжается на всю высоту экрана и просвечивает через
+ * стекло таб-бара (по дизайну Liquid Glass).
  */
 export const TabScreenScroll = forwardRef<ScrollView, TabScreenScrollProps>(
   function TabScreenScroll(
-    { contentContainerStyle, showsVerticalScrollIndicator, ...rest },
+    { contentContainerStyle, showsVerticalScrollIndicator, style, ...rest },
     ref,
   ) {
     const bottomInset = useTabBarBottomInset();
     return (
-      <ScrollView
-        ref={ref}
-        // На iOS автоматически корректирует top-inset под safe-area
-        // (у нас шапка сама отступает, но не мешает).
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={showsVerticalScrollIndicator ?? false}
-        contentContainerStyle={[
-          { paddingBottom: bottomInset },
-          contentContainerStyle,
-        ]}
-        {...rest}
-      />
+      <View style={{ flex: 1, marginBottom: bottomInset }}>
+        <ScrollView
+          ref={ref}
+          // На iOS автоматически корректирует top-inset под safe-area
+          // (у нас шапка сама отступает, но не мешает).
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={showsVerticalScrollIndicator ?? false}
+          style={style}
+          contentContainerStyle={[
+            // Небольшой воздух между последней строкой и нижней кромкой
+            // видимой области ScrollView (сама нижняя кромка = верх таб-бара
+            // с зазором ~12px, обеспечивается marginBottom на контейнере).
+            { paddingBottom: 8 },
+            contentContainerStyle,
+          ]}
+          {...rest}
+        />
+      </View>
     );
   },
 );
