@@ -2497,6 +2497,9 @@ export interface Dictionary {
       storyMath: string;
       storyEng: string;
       storyAdmin: string;
+      // Заход 7: меню прикреплений в шторке чата (#25).
+      attachPhoto: string;   // «Фото»
+      attachFile: string;    // «Файл»
     };
     prof: {
       children: string;
@@ -2551,6 +2554,26 @@ export interface Dictionary {
       langSysDefault: string;
       langUz: string;
       langEn: string;
+      // Заход 7: #34 «Язык и безопасность» — доп. ключи.
+      langRu: string;     // «Русский» / «Rus tili» / «Russian»
+      chPass: string;     // «Изменить пароль»
+      sessions: string;   // «Активные сессии»
+      autoExit: string;   // «Автоматический выход» (в set-секции — дубль prof.autoExit)
+    };
+    /** Заход 7: #32 «Настройки уведомлений». Каждый пункт = переключатель
+     *  с заголовком + подпись (subtitle). Опоздания в SNR EduOS НЕТ (см. attend.*),
+     *  подпись notif.attSub ссылается только на присутствие/пропуски. */
+    notif: {
+      master: string;      masterSub: string;
+      grades: string;      gradesSub: string;
+      hw: string;          hwSub: string;
+      sched: string;       schedSub: string;
+      att: string;         attSub: string;
+      ann: string;         annSub: string;
+      events: string;      eventsSub: string;
+      pay: string;         paySub: string;
+      msg: string;         msgSub: string;
+      promo: string;       promoSub: string;
     };
     wn: {
       thisVersion: string;

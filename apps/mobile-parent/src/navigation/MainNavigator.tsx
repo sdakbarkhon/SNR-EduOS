@@ -51,6 +51,19 @@ import LimitsScreen from "../screens/payments/LimitsScreen";
 import CardDetailsScreen from "../screens/payments/CardDetailsScreen";
 import AddCardScreen from "../screens/payments/AddCardScreen";
 
+// Реальные экраны Захода 7 — Messages (4 шт., шторки открываются локально).
+import ChatScreen from "../screens/messages/ChatScreen";
+import AnnouncementsScreen from "../screens/messages/AnnouncementsScreen";
+import AdminNewsScreen from "../screens/messages/AdminNewsScreen";
+import SupportScreen from "../screens/messages/SupportScreen";
+
+// Реальные экраны Захода 7 — Profile (5 шт., шторки открываются локально).
+import ChildProfileScreen from "../screens/profile/ChildProfileScreen";
+import ParentDataScreen from "../screens/profile/ParentDataScreen";
+import DocumentsScreen from "../screens/profile/DocumentsScreen";
+import NotifSettingsScreen from "../screens/profile/NotifSettingsScreen";
+import LangSecurityScreen from "../screens/profile/LangSecurityScreen";
+
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 /**
@@ -96,6 +109,29 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   daddcard: AddCardScreen,
 };
 
+/**
+ * Реестр реальных messages-экранов Захода 7 (4 шт.).
+ * Шторки НЕ в стеке — открываются локально из parent screens.
+ */
+const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d25: ChatScreen,
+  d26: AnnouncementsScreen,
+  d27: AdminNewsScreen,
+  d28: SupportScreen,
+};
+
+/**
+ * Реестр реальных profile-экранов Захода 7 (5 шт.).
+ * Шторки НЕ в стеке — открываются локально из parent screens.
+ */
+const PROFILE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d29: ChildProfileScreen,
+  d30: ParentDataScreen,
+  d31: DocumentsScreen,
+  d32: NotifSettingsScreen,
+  d34: LangSecurityScreen,
+};
+
 export default function MainNavigator() {
   return (
     <Stack.Navigator
@@ -110,7 +146,13 @@ export default function MainNavigator() {
         <Stack.Screen
           key={name}
           name={name}
-          component={STUDY_SCREENS[name] ?? PAYMENT_SCREENS[name] ?? StubScreen}
+          component={
+            STUDY_SCREENS[name] ??
+            PAYMENT_SCREENS[name] ??
+            MESSAGE_SCREENS[name] ??
+            PROFILE_SCREENS[name] ??
+            StubScreen
+          }
         />
       ))}
     </Stack.Navigator>
