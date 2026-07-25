@@ -94,14 +94,14 @@ function FilterChip({
 }) {
   const { tokens, scheme } = useTheme();
   // Активный: accent-градиент + белый текст + тень 0 8 18 rgba(124,58,237,.35).
-  // Неактивный: стекло 160° W60→W40 + бордер W75 + текст (26,19,74,.66);
-  // dark-пара — glass-2 (см. SegmentPills).
+  // Неактивный: стекло 160° W60→W40 + текст (26,19,74,.66); dark-пара — glass-2
+  // (см. SegmentPills). ИСПРАВЛЕНИЕ (пост-заход 8): бордер W75 у неактивной
+  // пилюли снят — та же правка, что и в SegmentPills.tsx, применена здесь,
+  // т.к. этот чип продублирован вручную и не переиспользует SegmentPills.
   const inactiveColors: [string, string] =
     scheme === "dark"
       ? ["rgba(255,255,255,0.11)", "rgba(255,255,255,0.04)"]
       : ["rgba(255,255,255,0.6)", "rgba(255,255,255,0.4)"];
-  const inactiveBorder =
-    scheme === "dark" ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.75)";
   const inactiveText =
     scheme === "dark" ? "rgba(255,255,255,0.68)" : "rgba(26,19,74,0.66)";
 
@@ -141,10 +141,7 @@ function FilterChip({
       <LinearGradient
         colors={inactiveColors}
         {...gradPoints(scheme === "dark" ? 135 : 160)}
-        style={[
-          styles.chipInner,
-          { borderWidth: 1, borderColor: inactiveBorder },
-        ]}
+        style={styles.chipInner}
       >
         <Text
           style={{

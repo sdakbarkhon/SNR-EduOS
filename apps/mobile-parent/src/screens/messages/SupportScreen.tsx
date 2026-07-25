@@ -1,6 +1,13 @@
 /**
  * Экран #28 «Поддержка / Бухгалтерия» — REBUILD (Заход 7, block-by-block из макета).
  *
+ * ИСПРАВЛЕНИЕ (пост-заход 8): заголовок/meta-card/пункт меню «Профиль
+ * службы» вели на generic-заглушку stubKey:"teacherprof", пункт меню
+ * «Уведомления» — на stubKey:"notif", хотя dteach (TeacherProfileScreen,
+ * заход 5) и d8 (NotificationsScreen, заход 5) уже реальные экраны. Теперь
+ * ведут напрямую. «Поиск в чате» (da6) и «Прикрепить файл» (afile) остаются
+ * заглушкой/действием — не в объёме этого фикса.
+ *
  * Композиция 1:1 из «SNR EduOS v2 Light.dc.html», строки 873–907
  * (data-screen-label="Экран 28 Поддержка"):
  *
@@ -141,7 +148,7 @@ export default function SupportScreen() {
         {/* Клик по заголовку/аватару = профиль контакта поддержки
          *  (UI-decision extract, п.2 — общее правило chat #25). */}
         <Pressable
-          onPress={() => openStub("teacherprof")}
+          onPress={() => navigation.navigate("dteach")}
           style={{ flex: 1 }}
           hitSlop={4}
         >
@@ -199,8 +206,8 @@ export default function SupportScreen() {
             </Svg>
           </GlassCircleButton>
           <Popover visible={menuOpen} align="right" width={190} top={44}>
-            <MenuItem label="Профиль службы" onPress={() => openStub("teacherprof")} />
-            <MenuItem label="Уведомления" onPress={() => openStub("notif")} />
+            <MenuItem label="Профиль службы" onPress={() => navigation.navigate("dteach")} />
+            <MenuItem label="Уведомления" onPress={() => navigation.navigate("d8")} />
             <MenuItem label="Поиск в чате" onPress={() => openStub("search")} />
           </Popover>
         </View>
@@ -233,7 +240,7 @@ export default function SupportScreen() {
               paddingVertical: 11,
               paddingHorizontal: 13,
             }}
-            onPress={() => openStub("teacherprof")}
+            onPress={() => navigation.navigate("dteach")}
           >
             <SupportAvatar size={40} iconSize={18} withShadow />
             <View style={{ flex: 1, minWidth: 0 }}>

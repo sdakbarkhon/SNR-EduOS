@@ -13,6 +13,11 @@
  * 57 (border W75 → .14), 44 (bg W60 → .09), 56 (border W80 → .16),
  * 85 (текст .66 → rgba(255,255,255,.68)).
  * Presentational: items только через props, тема — useTheme().
+ *
+ * ИСПРАВЛЕНИЕ (пост-заход 8, осознанное отклонение от макета): бордер
+ * (W75 у gt, W80 у hwChip) у НЕАКТИВНОЙ пилюли снят целиком — по заказчику
+ * неактивная пилюля должна быть просто стеклянной без обводки, как
+ * активная (та изначально без border). Стекло/фон неактивной остаётся.
  */
 import {
   Pressable,
@@ -141,7 +146,10 @@ export function SegmentPills({
           style={[
             styles.pill,
             styles.pillHw,
-            { borderWidth: 1, borderColor: c.border, overflow: "hidden" },
+            // ИСПРАВЛЕНИЕ (пост-заход 8): рамка у неактивной пилюли снята —
+            // должна быть просто стеклянной, без обводки, как активная
+            // (та рисуется вообще без border).
+            { overflow: "hidden" },
             // Fallback без блюра: усиленная альфа заливки (единый конфиг glass.ts).
             !glassConfig.useBlur && { backgroundColor: boostAlpha(c.bg, 0.2) },
           ]}
@@ -168,7 +176,9 @@ export function SegmentPills({
         <LinearGradient
           colors={g.colors}
           {...gradPoints(g.angle)}
-          style={[styles.pill, styles.pillGt, { borderWidth: 1, borderColor: g.border }]}
+          // ИСПРАВЛЕНИЕ (пост-заход 8): рамка у неактивного таба снята —
+          // просто стекло без обводки, как у активного (тот тоже без border).
+          style={[styles.pill, styles.pillGt]}
         >
           <Text style={[styles.labelGtInactive, { color: g.text }]}>{label}</Text>
           {dot}

@@ -70,7 +70,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     preview: "Меню на следующую неделю уже доступно в разделе «Питание»",
     time_label: "18 июля",
     badge: null,
-    go: "stub:meals",
+    // Заход 8: dmeals — реальный экран (MealsScreen), stub:meals устарел.
+    go: "dmeals",
     avatar_gradient: ["#f472b6", "#db2777"],
     avatar_icon_key: "food",
   },
@@ -81,7 +82,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     preview: "Изменение маршрута №3 с 28 июля. Проверьте расписание",
     time_label: "17 июля",
     badge: null,
-    go: "stub:transport",
+    // Заход 8: dtrans — реальный экран (TransportScreen), stub:transport устарел.
+    go: "dtrans",
     avatar_gradient: ["#fbbf24", "#f97316"],
     avatar_icon_key: "clock",
   },
@@ -92,7 +94,8 @@ export const MESSAGE_THREADS: MessageThreadRow[] = [
     preview: "Плановый медосмотр 30 июля. Подробнее в объявлении",
     time_label: "17 июля",
     badge: null,
-    go: "stub:med",
+    // Заход 8: dmed — реальный экран (MedicalCardScreen), stub:med устарел.
+    go: "dmed",
     avatar_gradient: ["#fb7185", "#e11d48"],
     avatar_icon_key: "plus",
   },
