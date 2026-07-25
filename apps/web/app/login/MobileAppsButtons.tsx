@@ -1,64 +1,63 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { Apple, Smartphone } from "lucide-react";
+import Image from "next/image";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 
 /**
- * Компактные кнопки «Скачать приложение» — правая часть футера (BottomBar),
- * на месте, где раньше стоял LanguageSelector (он переехал в правый верхний
- * угол страницы, см. page.tsx). Сторов ещё нет — кнопки активны, клик
- * показывает notice (тот же визуальный паттерн showNotice, что в
- * LoginForm.tsx), никаких переходов по ссылкам. Всегда icon-only (подпись —
- * только в title/aria-label): footer — общая строка с центрированной
- * copyright-пилюлей (BottomBar.tsx), на lg+ ширины ровно двух кнопок с
- * полным текстом уже не хватает без наезда на неё — см. коммит,
- * добавивший эту компоновку.
+ * Бейджи стора — правая часть футера (BottomBar), на месте, где раньше
+ * стоял LanguageSelector (он переехал в правый верхний угол страницы, см.
+ * page.tsx). Собственных листингов в сторах ещё нет — родительское
+ * приложение сейчас раздаётся через Expo Go (OTA-канал preview, см.
+ * apps/mobile-parent/AGENTS.md), поэтому обе ссылки временно ведут на
+ * страницы Expo Go в Google Play / App Store; заменить на прямые ссылки
+ * на приложение, когда появятся собственные листинги. footer — общая строка с
+ * центрированной copyright-пилюлей (BottomBar.tsx), поэтому бейджи всегда
+ * компактные (h-9) — на lg+ ширины ровно двух полноразмерных бейджей уже
+ * не хватает без наезда на неё, см. коммит, добавивший эту компоновку.
  */
+const STORE_LINKS = {
+  android: "https://play.google.com/store/apps/details?id=host.exp.exponent",
+  ios: "https://apps.apple.com/app/expo-go/id982107779",
+} as const;
+
 export function MobileAppsButtons({ locale }: { locale: Locale }) {
   const t = getDictionary(locale).auth.mobileApps;
-  const [notice, setNotice] = useState<string | null>(null);
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
-
-  function showNotice(msg: string) {
-    setNotice(msg);
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = setTimeout(() => setNotice(null), 2500);
-  }
 
   return (
-    <>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => showNotice(t.androidComingSoon)}
-          title={t.android}
-          aria-label={t.android}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/50 shadow-lg backdrop-blur-xl transition hover:bg-white/70"
-        >
-          <Smartphone className="h-4 w-4 text-emerald-600" strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          onClick={() => showNotice(t.iosComingSoon)}
-          title={t.ios}
-          aria-label={t.ios}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/50 shadow-lg backdrop-blur-xl transition hover:bg-white/70"
-        >
-          <Apple className="h-4 w-4 text-slate-800" strokeWidth={2} />
-        </button>
-      </div>
-
-      {notice && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-8 z-50 flex justify-center px-4">
-          <div className="rounded-full bg-slate-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-xl backdrop-blur-sm">
-            {notice}
-          </div>
-        </div>
-      )}
-    </>
+    <div className="flex items-center gap-3">
+      <a
+        href={STORE_LINKS.android}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={t.android}
+        aria-label={t.android}
+        className="shrink-0 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      >
+        <Image
+          src="/google-play-badge.png"
+          alt={t.android}
+          width={827}
+          height={270}
+          className="h-9 w-auto"
+          priority={false}
+        />
+      </a>
+      <a
+        href={STORE_LINKS.ios}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={t.ios}
+        aria-label={t.ios}
+        className="shrink-0 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      >
+        <Image
+          src="/app-store-badge.png"
+          alt={t.ios}
+          width={827}
+          height={271}
+          className="h-9 w-auto"
+          priority={false}
+        />
+      </a>
+    </div>
   );
 }
