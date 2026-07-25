@@ -1434,6 +1434,7 @@ export const ru: Dictionary = {
     showHint: "Подсказка",
     hintComingSoon: "Скоро будет доступно",
     untilStart: "до начала",
+    plannedStart: "Плановое начало",
     autoOpen: "Урок откроется, когда его начнёт учитель",
     planStagesSummary: "{count} этапов · {minutes} мин",
     planStagesSummaryNoDuration: "{count} этапов",

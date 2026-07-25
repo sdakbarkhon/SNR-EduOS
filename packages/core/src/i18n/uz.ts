@@ -1434,6 +1434,7 @@ export const uz: Dictionary = {
     showHint: "Maslahat",
     hintComingSoon: "Tez orada",
     untilStart: "boshlanishiga",
+    plannedStart: "Rejalashtirilgan boshlanish",
     autoOpen: "Dars o'qituvchi boshlaganda ochiladi",
     planStagesSummary: "{count} bosqich · {minutes} daq",
     planStagesSummaryNoDuration: "{count} bosqich",

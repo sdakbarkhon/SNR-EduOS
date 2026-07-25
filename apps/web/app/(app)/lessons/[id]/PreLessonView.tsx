@@ -8,7 +8,7 @@ import {
   Presentation, Code2, ClipboardCheck, Trophy, Puzzle, BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getSubjectStyle, formatTime, formatDate, getDictionary, startLesson } from "@snr/core";
+import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
@@ -18,6 +18,10 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
+
+// Ташкентское смещение (UTC+5, фиксированное — не полагаемся на системный TZ
+// сервера/браузера). Совпадает с TZ_MS в apps/web/app/api/cron/*.
+const TZ_MS = 5 * 60 * 60 * 1000;
 
 function SubjectHeroIcon({ icon, className }: { icon: string | null; className?: string }) {
   const Icon = (icon && LUCIDE_ICONS[icon]) || BookOpen;
@@ -77,11 +81,12 @@ export function PreLessonView({
 
   // Live clock (client-only — null on SSR to avoid hydration mismatch)
   const [nowMs, setNowMs] = useState<number | null>(null);
-  // Ученик тоже может начать урок — та же startLesson(), что и учитель
-  // (packages/core/src/queries/index.ts), полноценный переход lessons.status
-  // -> 'in_progress' для всех, не локальный "вход в просмотр". Требует
-  // RLS-политики "student starts own scheduled lesson" (см. отчёт — SQL для
-  // менеджера, не применена этой правкой).
+  // Ученик стартует урок POST'ом к /api/lessons/[id]/start-with-close-previous —
+  // тот же полноценный переход lessons.status -> 'in_progress' для всех, что
+  // и учитель, ПЛЮС автоматическое закрытие предыдущего урока того же класса
+  // того же дня (если тот ещё не завершён). Требует RLS-политики "student
+  // starts own scheduled lesson" (см. отчёт — SQL для менеджера, не применена
+  // этой правкой).
   const [starting, setStarting] = useState(false);
 
   // Excuse request state
@@ -135,31 +140,57 @@ export function PreLessonView({
     return () => clearInterval(poll);
   }, [router]);
 
-  const startMs = new Date(lesson.starts_at).getTime();
-  const secsUntil = nowMs === null ? null : Math.max(0, Math.floor((startMs - nowMs) / 1000));
-
-  // When countdown reaches zero, refresh once
-  const firedRef = useRef(false);
-  useEffect(() => {
-    if (secsUntil === 0 && !firedRef.current) {
-      firedRef.current = true;
-      router.refresh();
+  // Зациклённый таймер (LOOPED countdown, 45 мин цикл, anchor = сегодня 09:55
+  // Ташкент). Не привязан к starts_at конкретного урока — это визуальный
+  // "пульс" школьного дня, помогающий держать ритм между уроками. До 09:55
+  // Ташкент отсчитывает время до анкора; после 09:55 — отсчитывает от 45:00
+  // до 00:00 и снова к 45:00, бесконечно.
+  const LOOP_MS = 45 * 60 * 1000;
+  function anchor0955TashkentUtcMs(now: number): number {
+    // 09:55 Ташкент = 04:55 UTC. Строим "сегодня 09:55 Ташкент" через ту же
+    // арифметику TZ_MS, что и в close-past-lessons — не полагаемся на
+    // системный часовой пояс сервера/браузера.
+    const tashkentNow = new Date(now + TZ_MS);
+    const tashkentMidnightUtcMs =
+      Date.UTC(tashkentNow.getUTCFullYear(), tashkentNow.getUTCMonth(), tashkentNow.getUTCDate()) - TZ_MS;
+    return tashkentMidnightUtcMs + 9 * 60 * 60 * 1000 + 55 * 60 * 1000;
+  }
+  const secsUntil: number | null = (() => {
+    if (nowMs === null) return null;
+    const anchor = anchor0955TashkentUtcMs(nowMs);
+    const elapsed = nowMs - anchor;
+    if (elapsed < 0) {
+      // Ещё до 09:55 — показываем сколько осталось до анкора.
+      return Math.floor(-elapsed / 1000);
     }
-  }, [secsUntil, router]);
+    // После 09:55 — оставшееся время в текущем 45-минутном цикле.
+    const remainMs = LOOP_MS - (elapsed % LOOP_MS);
+    return Math.floor(remainMs / 1000);
+  })();
+
+  // Раньше здесь был useEffect(refresh() при secsUntil===0) — убран: таймер
+  // теперь зациклённый, "0" наступает каждые 45 минут и не означает "урок
+  // сейчас должен начаться". Realtime + 5-секундный polling выше подхватят
+  // фактический start_at→in_progress без принудительного refresh на нуле.
 
   async function handleStartLesson() {
-    const db = dbRef.current;
-    if (!db || starting) return;
+    if (starting) return;
     setStarting(true);
     try {
-      await startLesson(db, lesson.id);
+      const res = await fetch(`/api/lessons/${lesson.id}/start-with-close-previous`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "unknown" }));
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
       // Не сбрасываем starting=false тут — успешный старт переводит
       // lesson.status в 'in_progress', router.refresh() перерендерит
       // серверный компонент выше (LessonView.tsx), тот сам переключит с
       // PreLessonView на LessonWorkspaceView — этот компонент размонтируется.
       router.refresh();
     } catch (e) {
-      console.error("[PreLessonView] startLesson failed:", (e as Error)?.message ?? e);
+      console.error("[PreLessonView] start-with-close-previous failed:", (e as Error)?.message ?? e);
       showToast(d.common.error);
       setStarting(false);
     }
@@ -202,47 +233,43 @@ export function PreLessonView({
     : formatTime(lesson.starts_at);
   const dateStr = formatDate(lesson.starts_at);
 
-  // Countdown display. Format widens as the remaining time grows so the
-  // digits stay readable, but the string itself must also stay short enough
-  // to fit the ring (see counterSizeClass below) — long labels use a smaller
-  // font instead of overflowing the circle.
-  // secsUntil is clamped to >=0 (Math.max above) — once the scheduled start
-  // time passes without the teacher manually starting the lesson (решение
-  // 21.07, никакого авто-старта больше нет), it sits at exactly 0 forever.
-  // isUrgent must exclude that case (secsUntil > 0 below), or the ring/text
-  // stay in red "hurry up" mode indefinitely instead of settling into a
-  // neutral waiting state once the lesson is simply overdue-but-unstarted.
+  // Countdown display. Формат:
+  //   < 60 сек → "SS" (два больших разряда — визуальный акцент финального
+  //     отсчёта цикла);
+  //   < 60 мин → "MM:SS" (типичный вид, зациклённый 45-минутный отсчёт всё
+  //     время в этом диапазоне);
+  //   >= 60 мин (только когда сейчас ещё до 09:55 Ташкент) → "HHч MMм".
+  // Строка держится короткой, чтобы влезать в кольцо (counterSizeClass ниже).
+  //
+  // isUrgent: последняя минута каждого 45-минутного цикла — визуально
+  // подсвечиваем розовым/pulse. Раньше был кейс "секунды застряли на 0" —
+  // после перехода на LOOPED countdown такого состояния нет.
   const isUrgent = secsUntil !== null && secsUntil > 0 && secsUntil < 60;
-  const showCounter = secsUntil !== null && secsUntil <= 3600;
   const counterText = (() => {
     if (secsUntil === null) return "—:—";
-    if (secsUntil < 60) return `0:${String(secsUntil).padStart(2, "0")}`;
+    if (secsUntil < 60) return String(secsUntil).padStart(2, "0");
     if (secsUntil < 3600) {
       const mm = Math.floor(secsUntil / 60);
       const ss = secsUntil % 60;
-      return `${mm}:${String(ss).padStart(2, "0")}`;
+      return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
     }
-    if (secsUntil < 86400) {
-      const hh = Math.floor(secsUntil / 3600);
-      const mm = Math.floor((secsUntil % 3600) / 60);
-      return `${hh}ч ${String(mm).padStart(2, "0")}м`;
-    }
-    const dd = Math.floor(secsUntil / 86400);
-    const hh = Math.floor((secsUntil % 86400) / 3600);
-    return `${dd}д ${String(hh).padStart(2, "0")}ч`;
+    const hh = Math.floor(secsUntil / 3600);
+    const mm = Math.floor((secsUntil % 3600) / 60);
+    return `${hh}ч ${String(mm).padStart(2, "0")}м`;
   })();
-  // 3 size tiers by string length so longer formats never overflow the ring:
-  // 4 chars ("0:08") → largest; 5 chars ("12:34") → one step down;
-  // 6–7 chars ("2д 03ч", "19ч 31м") → smallest.
+  // 3 size tiers by string length so longer formats never overflow the ring.
   const counterSizeClass =
-    counterText.length <= 4 ? "text-7xl md:text-8xl"
-    : counterText.length === 5 ? "text-6xl md:text-7xl"
+    counterText.length <= 2 ? "text-8xl md:text-9xl"
+    : counterText.length <= 5 ? "text-6xl md:text-7xl"
     : "text-5xl md:text-6xl";
 
-  // SVG ring (r=140 for the larger w-96 circle)
+  // SVG ring (r=140 for the larger w-96 circle). frac визуализирует прогресс
+  // текущего 45-минутного цикла (или отсчёт до 09:55, если ещё раньше).
   const R = 140;
   const C = 2 * Math.PI * R;
-  const frac = secsUntil === null ? 1 : Math.min(1, secsUntil / 3600);
+  const frac = secsUntil === null ? 1 : Math.min(1, secsUntil / (LOOP_MS / 1000));
+
+  const plannedStartLabel = formatTime(lesson.starts_at);
 
   const totalStageMinutes = (stages ?? []).reduce((sum, s) => sum + (s.duration_min ?? 0), 0);
   const planSummary = totalStageMinutes > 0
@@ -388,6 +415,12 @@ export function PreLessonView({
                 style={isUrgent ? undefined : { background: "linear-gradient(180deg,#FFCFB2,#FF7A4D)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}
               >
                 {counterText}
+              </span>
+              {/* Плановое начало этого конкретного урока — не совпадает с
+                  таймером выше (тот — LOOPED, "пульс дня"). Держим рядом,
+                  чтобы визуально не терять привязку урока ко времени. */}
+              <span className="mt-3 text-xs font-semibold tracking-wide text-white/45">
+                {dl.plannedStart}: <span className="text-white/80">{plannedStartLabel}</span>
               </span>
             </div>
           </div>

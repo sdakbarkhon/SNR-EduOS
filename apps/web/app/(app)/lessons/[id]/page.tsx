@@ -3,6 +3,7 @@ import { getStudentLessonView, getLessonMaterialUrl, getHomeworkByLessonId } fro
 import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { safeQuery } from "@/lib/safe-query";
+import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { LessonView } from "./LessonView";
 
 export default async function LessonPage({
@@ -12,6 +13,11 @@ export default async function LessonPage({
 }) {
   const { id } = await params;
   const db = await createClient();
+
+  // Фолбэк утреннего цикла (закрыть 1-й урок дня / стартануть 2-й) — на
+  // случай, если Vercel Cron /api/cron/morning-lesson-cycle не отработал.
+  // Тихо игнорируем ошибки: страница урока не должна падать из-за фолбэка.
+  try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
   // Промт 6: getStudentLessonView(id) раньше глушилось .catch(() => null) —
   // РЕАЛЬНЫЙ сбой запроса (throw) и "урока правда нет" оба вели на

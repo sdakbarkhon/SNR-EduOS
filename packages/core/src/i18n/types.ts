@@ -1470,6 +1470,10 @@ export interface Dictionary {
     hintComingSoon: string;       // "Скоро будет доступно"
     // Iter5 P14 — waiting screen (scheduled lesson)
     untilStart: string;           // "до начала" (countdown label)
+    // Плановое начало этого конкретного урока (starts_at) — показывается
+    // рядом с LOOPED countdown (тот — "пульс дня", а не время конкретного
+    // урока), чтобы не терялась привязка ко времени в расписании.
+    plannedStart: string;         // "Плановое начало"
     autoOpen: string;             // "Урок откроется, когда его начнёт учитель"
     planStagesSummary: string;    // "{count} этапов · {minutes} мин"
     planStagesSummaryNoDuration: string; // "{count} этапов" (no duration_min set)

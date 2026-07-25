@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTeacherLessonsByMonth, getTeacherGroups } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
+import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { TeacherLessonsView } from "./TeacherLessonsView";
 import { redirect } from "next/navigation";
 
@@ -9,6 +10,10 @@ export default async function TeacherLessonsPage() {
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
+
+  // Фолбэк утреннего цикла — учительский аналог "расписания".
+  // См. apps/web/app/(app)/lessons/[id]/page.tsx.
+  try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
   // Куратор (subject_slug=NULL, teacher_karim) — наблюдательная роль: без
   // создания/редактирования уроков (RLS 131 это же enforce'ит на БД).

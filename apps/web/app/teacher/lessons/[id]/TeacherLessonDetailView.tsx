@@ -21,7 +21,7 @@ import {
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
   uploadPresentationFile, isPptxFile,
-  startLesson, endLesson,
+  endLesson,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -916,10 +916,20 @@ export function TeacherLessonDetailView({
     if (startingLesson) return;
     setStartingLesson(true);
     try {
-      await startLesson(db, lesson.id);
+      // Через /api/lessons/[id]/start-with-close-previous — тот же старт
+      // урока, что раньше делал startLesson() из @snr/core, ПЛЮС авто-закрытие
+      // предыдущего урока того же класса того же дня (если он ещё не завершён).
+      // Идемпотентно: повторный клик/гонка с учеником не портит состояние.
+      const res = await fetch(`/api/lessons/${lesson.id}/start-with-close-previous`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "unknown" }));
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
       window.location.reload();
     } catch (e) {
-      console.error("[TeacherLessonDetailView] startLesson failed:", (e as Error)?.message ?? e);
+      console.error("[TeacherLessonDetailView] start-with-close-previous failed:", (e as Error)?.message ?? e);
       showToast(d.common.error);
       setStartingLesson(false);
     }

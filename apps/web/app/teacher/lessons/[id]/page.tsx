@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTeacherLessonView } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { notFound, redirect } from "next/navigation";
+import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { TeacherLessonDetailView } from "./TeacherLessonDetailView";
 
 export default async function TeacherLessonDetailPage({
@@ -11,6 +12,9 @@ export default async function TeacherLessonDetailPage({
 }) {
   const { id } = await params;
   const db = await createClient();
+
+  // Фолбэк утреннего цикла — см. apps/web/app/(app)/lessons/[id]/page.tsx.
+  try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");

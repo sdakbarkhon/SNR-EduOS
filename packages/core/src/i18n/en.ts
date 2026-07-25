@@ -1434,6 +1434,7 @@ export const en: Dictionary = {
     showHint: "Hint",
     hintComingSoon: "Coming soon",
     untilStart: "until start",
+    plannedStart: "Scheduled start",
     autoOpen: "The lesson will open once the teacher starts it",
     planStagesSummary: "{count} stages · {minutes} min",
     planStagesSummaryNoDuration: "{count} stages",

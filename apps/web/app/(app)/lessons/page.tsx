@@ -5,6 +5,7 @@ import {
 } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
+import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { LessonsView } from "./LessonsView";
 
 // ── Tashkent date helpers (UTC+5) ─────────────────────────────────────────────
@@ -26,6 +27,11 @@ function getTashkentWeekMonday(): string {
 
 export default async function LessonsPage() {
   const db = await createClient();
+
+  // Фолбэк утреннего цикла — см. apps/web/app/(app)/lessons/[id]/page.tsx.
+  // /schedule → редирект на /lessons (см. schedule/page.tsx), поэтому одной
+  // точки здесь достаточно для расписания.
+  try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
   const today = getTashkentToday();
   const weekStart = getTashkentWeekMonday();
