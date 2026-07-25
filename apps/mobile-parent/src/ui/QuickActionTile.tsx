@@ -81,18 +81,20 @@ export function QuickActionTile({
       onPress={onPress}
       style={({ pressed }) => [
         shadowStyle(tileShadow),
-        { borderRadius: m.radius },
+        { borderRadius: m.radius, flex: 1 },
         pressed ? { opacity: 0.85 } : null,
         style,
       ]}
     >
       <View
         style={{
+          flex: 1,
           borderRadius: m.radius,
           overflow: "hidden",
           borderWidth: 1,
           borderColor: tokens.glassBorder,
           alignItems: "center",
+          justifyContent: "center",
           gap: m.gap,
           paddingVertical: m.padV,
           paddingHorizontal: m.padH,
@@ -144,6 +146,7 @@ export function QuickActionTile({
           {icon}
         </LinearGradient>
         <Text
+          numberOfLines={2}
           style={{
             fontFamily: fonts.manrope700,
             fontSize: m.label,

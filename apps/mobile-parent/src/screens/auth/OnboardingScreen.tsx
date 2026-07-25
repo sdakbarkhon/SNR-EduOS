@@ -21,15 +21,36 @@
  *   │  не выпихнуть кнопку за нижний край iPhone SE (568h).
  *   └ низ (CTA «Начать» + ссылка «Узнать больше») — фиксированной высоты
  *      с bottom safe-area inset.
+ *
+ * ПРАВКА (3 слайда): рамка (лого/tagline/иллюстрация/CTA/ссылка) — общая,
+ * не меняется. Свайпается только заголовок+subtitle — горизонтальный
+ * ScrollView с pagingEnabled на 3 страницы ровно по ширине центральной
+ * колонки (windowWidth − 44, т.к. паддинг зоны 22 с каждой стороны — тот
+ * же расчёт, что и раньше, просто без onLayout). Дот тоже переключает
+ * страницу (imperative scrollTo). «Начать»/«Узнать больше» живут ВНЕ
+ * свайп-полосы и всегда одинаковы независимо от активного слайда.
  */
-import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLocale } from "../../i18n";
 import { fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { AuthFeaturesSheet } from "./sheets/AuthFeaturesSheet";
+
+const CENTER_PADDING_H = 22;
+const SLIDE_COUNT = 3;
 
 export function OnboardingScreen() {
   const { d } = useAppLocale();
@@ -38,6 +59,35 @@ export function OnboardingScreen() {
   const { setPhase } = useAuthSession();
   const insets = useSafeAreaInsets();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { width: windowWidth } = useWindowDimensions();
+  const pageWidth = Math.max(0, windowWidth - CENTER_PADDING_H * 2);
+  const scrollRef = useRef<ScrollView>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const slides = useMemo(
+    () => [
+      { title: t.heroTitle, sub: t.heroSub },
+      { title: t.heroTitle2, sub: t.heroSub2 },
+      { title: t.heroTitle3, sub: t.heroSub3 },
+    ],
+    [t.heroTitle, t.heroSub, t.heroTitle2, t.heroSub2, t.heroTitle3, t.heroSub3],
+  );
+
+  function goToSlide(index: number) {
+    setActiveIndex(index);
+    scrollRef.current?.scrollTo({ x: index * pageWidth, animated: true });
+  }
+
+  // Индекс считаем из живого onScroll, а не onMomentumScrollEnd — на Android
+  // (и на медленном контролируемом свайпе iOS, оканчивающемся у самой
+  // границы страницы) momentum-end не гарантирован, точки могли отставать
+  // от реально показанного слайда.
+  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (!pageWidth) return;
+    const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+    const clamped = Math.min(SLIDE_COUNT - 1, Math.max(0, index));
+    setActiveIndex((prev) => (prev === clamped ? prev : clamped));
+  }
 
   // Цвета точек-индикаторов: активная — оранжево-розовый акцент CTA,
   // остальные — тон ink3 с прозрачностью .35 (единый плейсхолдер бренда).
@@ -116,40 +166,56 @@ export function OnboardingScreen() {
           />
         </View>
 
-        {/* Hero-заголовок (макет строка 1964) */}
-        <Text
-          numberOfLines={2}
-          adjustsFontSizeToFit
-          style={{
-            textAlign: "center",
-            fontFamily: fonts.unbounded600,
-            fontSize: 19,
-            lineHeight: 26,
-            color: tokens.ink1,
-            paddingHorizontal: 6,
-            marginTop: 12,
-          }}
+        {/* Заголовок + subtitle — свайпаемые (3 слайда), рамка вокруг не меняется. */}
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={pageWidth > 0}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          style={{ marginTop: 12, flexGrow: 0 }}
         >
-          {t.heroTitle}
-        </Text>
+          {slides.map((slide, i) => (
+            <View key={i} style={{ width: pageWidth || windowWidth }}>
+              {/* Hero-заголовок (макет строка 1964) */}
+              <Text
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                style={{
+                  textAlign: "center",
+                  fontFamily: fonts.unbounded600,
+                  fontSize: 19,
+                  lineHeight: 26,
+                  color: tokens.ink1,
+                  paddingHorizontal: 6,
+                }}
+              >
+                {slide.title}
+              </Text>
 
-        {/* Hero-subtitle (макет строка 1965) */}
-        <Text
-          numberOfLines={3}
-          adjustsFontSizeToFit
-          style={{
-            textAlign: "center",
-            fontFamily: fonts.manrope600,
-            fontSize: 11.5,
-            lineHeight: 17,
-            color: tokens.ink2,
-            marginTop: 6,
-          }}
-        >
-          {t.heroSub}
-        </Text>
+              {/* Hero-subtitle (макет строка 1965) */}
+              <Text
+                numberOfLines={3}
+                adjustsFontSizeToFit
+                style={{
+                  textAlign: "center",
+                  fontFamily: fonts.manrope600,
+                  fontSize: 11.5,
+                  lineHeight: 17,
+                  color: tokens.ink2,
+                  marginTop: 6,
+                  paddingHorizontal: 6,
+                }}
+              >
+                {slide.sub}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
 
-        {/* 3 dot-индикатора — статические, декоративные (активна первая). */}
+        {/* 3 dot-индикатора — активный отражает текущий слайд, тап переключает. */}
         <View
           style={{
             flexDirection: "row",
@@ -159,32 +225,19 @@ export function OnboardingScreen() {
             marginTop: 14,
           }}
         >
-          <View
-            style={{
-              width: 22,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: dotActive,
-            }}
-          />
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: dotIdle,
-              opacity: 0.35,
-            }}
-          />
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: dotIdle,
-              opacity: 0.35,
-            }}
-          />
+          {Array.from({ length: SLIDE_COUNT }, (_, i) => (
+            <Pressable key={i} hitSlop={8} onPress={() => goToSlide(i)}>
+              <View
+                style={{
+                  width: i === activeIndex ? 22 : 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: i === activeIndex ? dotActive : dotIdle,
+                  opacity: i === activeIndex ? 1 : 0.35,
+                }}
+              />
+            </Pressable>
+          ))}
         </View>
       </View>
 

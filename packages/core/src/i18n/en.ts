@@ -2538,6 +2538,10 @@ export const en: Dictionary = {
     auth: {
       heroTitle: "Everything for your child's growth in one app",
       heroSub: "Grades, assignments, schedule, payments and school contact",
+      heroTitle2: "Grades and assignments — always at hand",
+      heroSub2: "Track progress and never miss a deadline",
+      heroTitle3: "Always connected with school",
+      heroSub3: "Messages from teachers, payments and notifications — all in one place",
       start: "Get started",
       learnMore: "Learn more",
       welcome: "Welcome to SNR EduOS!",

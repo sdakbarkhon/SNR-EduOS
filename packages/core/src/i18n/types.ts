@@ -2595,6 +2595,12 @@ export interface Dictionary {
     auth: {
       heroTitle: string;
       heroSub: string;
+      // Онбординг-слайды 2 и 3 (свайп) — продолжают тему heroTitle/heroSub:
+      // 2 — успеваемость/задания, 3 — связь со школой/оплаты/уведомления.
+      heroTitle2: string;
+      heroSub2: string;
+      heroTitle3: string;
+      heroSub3: string;
       start: string;
       learnMore: string;
       welcome: string;

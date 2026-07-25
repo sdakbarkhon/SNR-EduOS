@@ -22,7 +22,6 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { LocaleProvider } from "./src/i18n";
 import { ThemeProvider, useTheme } from "./src/theme";
 import { AuthSessionProvider } from "./src/context/AuthSessionContext";
-import { DevPanel } from "./src/dev/DevPanel";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -98,8 +97,6 @@ export default function App() {
             <AuthSessionProvider>
               <ThemedStatusBar />
               <RootNavigator />
-              {/* ВРЕМЕННАЯ dev-панель (тема/язык) — снести в Заходе 8 */}
-              <DevPanel />
             </AuthSessionProvider>
           </SafeAreaProvider>
         </ThemeProvider>

@@ -2539,6 +2539,10 @@ export const uz: Dictionary = {
     auth: {
       heroTitle: "Farzandingiz rivoji uchun barchasi — bitta ilovada",
       heroSub: "O'zlashtirish, vazifalar, dars jadvali, to'lovlar va maktab bilan aloqa",
+      heroTitle2: "Baholar va topshiriqlar doim qo'lingizda",
+      heroSub2: "O'zlashtirishni kuzating va topshirish muddatlarini o'tkazib yubormang",
+      heroTitle3: "Maktab bilan doim aloqada",
+      heroSub3: "O'qituvchilardan xabarlar, to'lovlar va bildirishnomalar — bir joyda",
       start: "Boshlash",
       learnMore: "Batafsil ma'lumot",
       welcome: "SNR EduOS'ga xush kelibsiz!",
