@@ -14,7 +14,7 @@
  * под FloatingTabBar (макет: строка 226 — «118 под FloatingTabBar»).
  */
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type PressableStateCallbackType } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -159,15 +159,38 @@ function FeedIconTile({
   );
 }
 
-/** Иконка «CTA-glass» для акцентной карточки ассистента (chip-стиль). */
+/**
+ * CTA-glass кнопка для акцентной карточки ассистента.
+ * Заказчик просил чтобы две кнопки в ряду делили 50/50. Обёртка
+ * `<View style={{flex:1}}>` вокруг AccentInset не помогала, потому что
+ * AccentInset рендерит `<Pressable>` без flex:1, и Pressable сжимался по
+ * контенту. Здесь Pressable явно `flex:1` + `minHeight:36` (одинаковая
+ * высота обеих кнопок при переносе на 2 строки, что случается на UZ/EN
+ * с более длинными фразами).
+ */
 function AssistantCta({ label, onPress }: { label: string; onPress?: () => void }) {
   return (
-    <AccentInset
-      radius={12}
-      style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+    <Pressable
       onPress={onPress}
+      style={({ pressed }: PressableStateCallbackType) => [
+        {
+          flex: 1,
+          minHeight: 36,
+          borderRadius: 12,
+          overflow: "hidden",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.35)",
+          backgroundColor: "rgba(255,255,255,0.2)",
+          paddingVertical: 8,
+          paddingHorizontal: 10,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        pressed ? { opacity: 0.85 } : null,
+      ]}
     >
       <Text
+        numberOfLines={2}
         style={{
           fontFamily: fonts.manrope800,
           fontSize: 11.5,
@@ -177,7 +200,7 @@ function AssistantCta({ label, onPress }: { label: string; onPress?: () => void 
       >
         {label}
       </Text>
-    </AccentInset>
+    </Pressable>
   );
 }
 
@@ -439,19 +462,15 @@ export default function HomeScreen() {
           >
             {dashboard.assistant_text}
           </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <AssistantCta
-                label={d.parentApp.home.viewProgress}
-                onPress={() => navigation.navigate("p10")}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <AssistantCta
-                label={d.parentApp.home.msgTeacher}
-                onPress={() => navigation.navigate("d24")}
-              />
-            </View>
+          <View style={{ flexDirection: "row", alignItems: "stretch", gap: 8 }}>
+            <AssistantCta
+              label={d.parentApp.home.viewProgress}
+              onPress={() => navigation.navigate("p10")}
+            />
+            <AssistantCta
+              label={d.parentApp.home.msgTeacher}
+              onPress={() => navigation.navigate("d24")}
+            />
           </View>
         </AccentCard>
 
