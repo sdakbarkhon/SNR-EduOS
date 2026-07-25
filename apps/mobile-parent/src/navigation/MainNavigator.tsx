@@ -5,8 +5,12 @@
  *
  * Заход 5 — REGISTER: 15 study-экранов (d6/d7/d8/d9/d11/d12/d13/d14/d15/d16/
  * dallsubj/drev/dtopics/dteach/dmeals) подменяют StubScreen реальными
- * компонентами из src/screens/study. Остальные 44 маршрута продолжают
- * рендерить StubScreen — их закроют следующие заходы.
+ * компонентами из src/screens/study.
+ * Заход 6/7 — Оплаты (12) + Сообщения (4) + Профиль (5).
+ * Заход 8 — родительские сервис-разделы (8): dtests/dlib/dport/dapps/dmed/
+ * dtrans/dchpass/dsessions. Остальные маршруты (da1–da8, ddoc, dchpass-
+ * связанные шторки help/profmenu/call и т.п.) продолжают рендерить
+ * StubScreen — их закроют следующие заходы.
  *
  * Sheets (DatePickerSheet, SubmitWorkSheet) в стек НЕ регистрируются:
  * они открываются как локальные BottomSheet внутри своих parent-экранов
@@ -36,6 +40,17 @@ import NotificationsScreen from "../screens/study/NotificationsScreen";
 import ServicesScreen from "../screens/study/ServicesScreen";
 import TeacherProfileScreen from "../screens/study/TeacherProfileScreen";
 import MealsScreen from "../screens/study/MealsScreen";
+
+// Реальные экраны Захода 8 — родительские сервис-разделы (8 шт.), заменяют
+// StubScreen под dtests/dlib/dport/dapps/dmed/dtrans/dchpass/dsessions.
+import TestsScreen from "../screens/study/TestsScreen";
+import LibraryScreen from "../screens/study/LibraryScreen";
+import PortfolioScreen from "../screens/study/PortfolioScreen";
+import ApplicationsScreen from "../screens/study/ApplicationsScreen";
+import MedicalCardScreen from "../screens/study/MedicalCardScreen";
+import TransportScreen from "../screens/study/TransportScreen";
+import ChangePasswordScreen from "../screens/profile/ChangePasswordScreen";
+import ActiveSessionsScreen from "../screens/profile/ActiveSessionsScreen";
 
 // Реальные экраны Захода 6 — Оплаты (12 шт., шторки открываются локально).
 import BillsScreen from "../screens/payments/BillsScreen";
@@ -132,6 +147,22 @@ const PROFILE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   d34: LangSecurityScreen,
 };
 
+/**
+ * Реестр реальных экранов Захода 8 — родительские сервис-разделы (8 шт.)
+ * и связанные настройки безопасности. Шторки (help/profmenu/call и т.д.)
+ * остаются генерической заглушкой — они не в объёме этого захода.
+ */
+const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  dtests: TestsScreen,
+  dlib: LibraryScreen,
+  dport: PortfolioScreen,
+  dapps: ApplicationsScreen,
+  dmed: MedicalCardScreen,
+  dtrans: TransportScreen,
+  dchpass: ChangePasswordScreen,
+  dsessions: ActiveSessionsScreen,
+};
+
 export default function MainNavigator() {
   return (
     <Stack.Navigator
@@ -151,6 +182,7 @@ export default function MainNavigator() {
             PAYMENT_SCREENS[name] ??
             MESSAGE_SCREENS[name] ??
             PROFILE_SCREENS[name] ??
+            SERVICE_SCREENS[name] ??
             StubScreen
           }
         />

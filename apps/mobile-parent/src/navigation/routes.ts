@@ -243,8 +243,11 @@ export type MainStackParamList = {
   Tabs: undefined;
   /** Универсальная заглушка: goStub(k) → navigate('stub', { stubKey: k }). */
   stub: { stubKey?: StubKey } | undefined;
+  /** Портфолио — опциональный старт-таб (Заход 8): #29 «Достижения» ведёт
+   *  сразу на вкладку ach, а не на Работы по умолчанию. */
+  dport: { initialTab?: "works" | "ach" | "cert" } | undefined;
 } & {
-  [K in Exclude<StackRouteName, "stub">]: undefined;
+  [K in Exclude<StackRouteName, "stub" | "dport">]: undefined;
 };
 
 /** ParamList таб-навигатора. */

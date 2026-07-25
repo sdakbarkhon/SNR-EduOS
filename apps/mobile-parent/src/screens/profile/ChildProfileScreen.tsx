@@ -14,7 +14,8 @@
  *  1180–1185  TabsRow: 4 pill-таба. «Данные» — активный градиент 135°
  *             (#7c3aed→#4f6df5, тень 0 8 18 rgba(124,58,237,.35)), остальные —
  *             glass 160° (W60→W40) + border W75. Клики:
- *             Успехи → таб «p10», Посещаемость → «d14», Достижения → stub «achieve».
+ *             Успехи → таб «p10», Посещаемость → «d14», Достижения → «dport»
+ *             (Заход 8: реальный экран Портфолио, initialTab: "ach").
  *  1186       SectionLabel «Общая информация» (t.prof.generalInfo).
  *  1187–1194  GeneralInfoCard: одна glass r20, 6 label:value строк (padding 9/0,
  *             border-top .07 между строками). Значения — из child + CHILD_INFO.
@@ -183,7 +184,9 @@ export default function ChildProfileScreen() {
 
   const goProgress = () => navigation.navigate("p10");
   const goAttend = () => navigation.navigate("d14");
-  const goAchieve = () => navigation.navigate("stub", { stubKey: "achieve" });
+  // Заход 8: Портфолио теперь реальный экран — ведём сразу на вкладку
+  // «Достижения», а не на общую заглушку.
+  const goAchieve = () => navigation.navigate("dport", { initialTab: "ach" });
   const goProfMenu = () => navigation.navigate("stub", { stubKey: "profmenu" });
   const goMed = () => navigation.navigate("dmed");
 
