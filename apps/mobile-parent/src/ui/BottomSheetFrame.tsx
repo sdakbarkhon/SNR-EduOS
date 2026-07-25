@@ -36,6 +36,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { gradPoints, shadowStyle, useTheme, type GlassToken, type ShadowToken } from "../theme";
 import { GlassBlur, glassConfig, boostAlpha, cssBlurToIntensity, glassSurface } from "./glass";
 
@@ -84,7 +85,16 @@ export function BottomSheetFrame({
 }: BottomSheetFrameProps) {
   const { tokens, scheme } = useTheme();
   const { height: windowH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const dark = scheme === "dark";
+  // ЗАХОД 5y (правка 3): Android system-nav bar перекрывает наше bottom:8
+  // (Modal + statusBarTranslucent → нижняя системная полоса ложится ПОВЕРХ
+  // содержимого шторки). На iOS home-indicator-safe-area требует ≥34pt
+  // clearance. Добавляем padding-bottom к flex-контенту панели: значение
+  // = safe-area inset или минимум 12pt на устройствах без inset. Ни один
+  // потребитель (Auth*Sheet, DatePickerSheet, SubmitWorkSheet, DemoNotice…)
+  // не читает useSafeAreaInsets внутри children — сдвиг не удваивается.
+  const safePaddingBottom = Math.max(insets.bottom, 12);
 
   const anim = useRef(new Animated.Value(0)).current; // 0 — скрыто, 1 — показано
   const [mounted, setMounted] = useState(visible);
@@ -182,6 +192,10 @@ export function BottomSheetFrame({
               flexDirection: "column",
             },
             panelStyle,
+            // Safe-area кладём ПОСЛЕ panelStyle: если потребитель когда-нибудь
+            // передаст свой paddingBottom, наш insets-запас всё равно возьмёт
+            // верх — контент шторки НЕ уйдёт под home-indicator / nav-bar.
+            { paddingBottom: safePaddingBottom },
           ]}
         >
           {surface.mode === "blur" ? (

@@ -10,9 +10,20 @@
  *      radius 18, shadow 0 14 34 rgba(236,72,153,.4), inset hairline W35 (goA2 → phase="phone")
  *   7. Ссылка «Узнать больше» — фиолетовый #6d28d9, 12/800 (openMore → AuthFeaturesSheet)
  * Обе темы (tokens.ink1/ink2/ink3), safe-area верх/низ через useSafeAreaInsets.
+ *
+ * ЗАХОД 5y (правка 2): убран ScrollView — экран строго fit-to-screen без
+ * прокрутки. Раскладка — flex-column из трёх зон:
+ *   ┌ верх (лого + tagline) — фиксированной высоты
+ *   ├ центр (hero-иллюстрация + h1/subtitle + 3 dot-индикатора) — flex:1,
+ *   │  контент центрирован; иллюстрация занимает свободное место через
+ *   │  `flex:1 + resizeMode:contain` — на низких экранах сжимается сама,
+ *   │  тексты имеют `numberOfLines`+`adjustsFontSizeToFit` (iOS) чтобы
+ *   │  не выпихнуть кнопку за нижний край iPhone SE (568h).
+ *   └ низ (CTA «Начать» + ссылка «Узнать больше») — фиксированной высоты
+ *      с bottom safe-area inset.
  */
 import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLocale } from "../../i18n";
@@ -28,51 +39,87 @@ export function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // Цвета точек-индикаторов: активная — оранжево-розовый акцент CTA,
+  // остальные — тон ink3 с прозрачностью .35 (единый плейсхолдер бренда).
+  const dotActive = "#f97316";
+  const dotIdle = tokens.ink3;
+
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
+      {/* ─── ВЕРХ: логотип-хедер + тэглайн (fixed) ────────────────────── */}
+      <View
+        style={{
           paddingTop: Math.max(56, insets.top + 24),
           paddingHorizontal: 22,
-          paddingBottom: Math.max(28, insets.bottom + 20),
-          gap: 10,
+          alignItems: "center",
+          gap: 6,
         }}
-        showsVerticalScrollIndicator={false}
       >
-        {/* 1 + 2 — логотип-хедер и тэглайн-капс (макет строки 1960–1962) */}
-        <View style={{ alignItems: "center", gap: 6 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-            <Image
-              source={require("../../../assets/logo-mark.png")}
-              style={{ width: 38, height: 38 }}
-              resizeMode="contain"
-            />
-            <Text
-              style={{
-                fontFamily: fonts.unbounded700,
-                fontSize: 19,
-                color: tokens.ink1,
-              }}
-            >
-              SNR EduOS
-            </Text>
-          </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+          <Image
+            source={require("../../../assets/logo-mark.png")}
+            style={{ width: 38, height: 38 }}
+            resizeMode="contain"
+          />
           <Text
             style={{
-              fontFamily: fonts.manrope800,
-              fontSize: 9.5,
-              letterSpacing: 1.14,
-              color: tokens.ink3,
-              opacity: 0.9,
+              fontFamily: fonts.unbounded700,
+              fontSize: 19,
+              color: tokens.ink1,
             }}
           >
-            {t.tagline}
+            SNR EduOS
           </Text>
         </View>
-
-        {/* 3 — Hero-заголовок (макет строка 1964) */}
         <Text
+          style={{
+            fontFamily: fonts.manrope800,
+            fontSize: 9.5,
+            letterSpacing: 1.14,
+            color: tokens.ink3,
+            opacity: 0.9,
+          }}
+        >
+          {t.tagline}
+        </Text>
+      </View>
+
+      {/* ─── ЦЕНТР: иллюстрация + заголовок + subtitle + dots (flex:1) ─ */}
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 22,
+          paddingTop: 10,
+          paddingBottom: 10,
+          justifyContent: "center",
+        }}
+      >
+        {/* Hero-иллюстрация — занимает всё свободное вертикальное место,
+            но сжимается на низких экранах через resizeMode:contain. */}
+        <View
+          style={{
+            flex: 1,
+            minHeight: 120,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Image
+            source={require("../../../assets/onboarding-hero.png")}
+            style={{
+              width: "82%",
+              maxWidth: 290,
+              height: "100%",
+              maxHeight: 290,
+            }}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Hero-заголовок (макет строка 1964) */}
+        <Text
+          numberOfLines={2}
+          adjustsFontSizeToFit
           style={{
             textAlign: "center",
             fontFamily: fonts.unbounded600,
@@ -80,38 +127,75 @@ export function OnboardingScreen() {
             lineHeight: 26,
             color: tokens.ink1,
             paddingHorizontal: 6,
+            marginTop: 12,
           }}
         >
           {t.heroTitle}
         </Text>
 
-        {/* 4 — Hero-subtitle (макет строка 1965) */}
+        {/* Hero-subtitle (макет строка 1965) */}
         <Text
+          numberOfLines={3}
+          adjustsFontSizeToFit
           style={{
             textAlign: "center",
             fontFamily: fonts.manrope600,
             fontSize: 11.5,
             lineHeight: 17,
             color: tokens.ink2,
+            marginTop: 6,
           }}
         >
           {t.heroSub}
         </Text>
 
-        {/* 5 — Hero-иллюстрация (макет строка 1966) */}
-        <Image
-          source={require("../../../assets/onboarding-hero.png")}
+        {/* 3 dot-индикатора — статические, декоративные (активна первая). */}
+        <View
           style={{
-            width: "82%",
-            maxWidth: 290,
-            aspectRatio: 1,
-            alignSelf: "center",
-            marginVertical: 2,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginTop: 14,
           }}
-          resizeMode="contain"
-        />
+        >
+          <View
+            style={{
+              width: 22,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: dotActive,
+            }}
+          />
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: dotIdle,
+              opacity: 0.35,
+            }}
+          />
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: dotIdle,
+              opacity: 0.35,
+            }}
+          />
+        </View>
+      </View>
 
-        {/* 6 — CTA «Начать»: оранж-розовый 120° градиент (макет строка 1967) */}
+      {/* ─── НИЗ: CTA «Начать» + ссылка «Узнать больше» (fixed) ────────── */}
+      <View
+        style={{
+          paddingHorizontal: 22,
+          paddingBottom: Math.max(20, insets.bottom + 12),
+          gap: 2,
+        }}
+      >
         <Pressable
           onPress={() => setPhase("phone")}
           style={({ pressed }) => [
@@ -131,11 +215,10 @@ export function OnboardingScreen() {
           </LinearGradient>
         </Pressable>
 
-        {/* 7 — Ссылка «Узнать больше» → шторка Возможности (макет строка 1968) */}
         <Pressable
           onPress={() => setMoreOpen(true)}
           hitSlop={8}
-          style={{ paddingTop: 2, paddingBottom: 6, alignItems: "center" }}
+          style={{ paddingTop: 6, paddingBottom: 2, alignItems: "center" }}
         >
           <Text
             style={{
@@ -148,7 +231,7 @@ export function OnboardingScreen() {
             {t.learnMore}
           </Text>
         </Pressable>
-      </ScrollView>
+      </View>
 
       <AuthFeaturesSheet visible={moreOpen} onClose={() => setMoreOpen(false)} />
     </View>
