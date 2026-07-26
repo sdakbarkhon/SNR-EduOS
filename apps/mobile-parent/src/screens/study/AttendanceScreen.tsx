@@ -18,13 +18,29 @@
  *
  * Экран без FAB и без CTA-кнопок: интерактив — только ChildSwitcherCard
  * (openSheet) и стрелки календаря (prev/next меняют месяц в локальном state).
+ *
+ * Заход 2, шаг 3: для реального входа (isRealFlow) все 3 блока данных
+ * (StatsRow/MonthCalendarCard/LastDaysList) — из public.attendance активного
+ * ребёнка (packages/core getStudentAttendance, throw-on-error, ОДИН запрос,
+ * без month-фильтра — марки уже отсортированы marked_at desc), а не из
+ * data/fixtures/attendance.ts. Идентичность (ChildSwitcherCard) и переклю-
+ * чатель — тот же общий свитчер, что и в Шагах 1–2 (ParentDataContext).
+ * Демо-флоу — вёрстка и фикстурные данные не тронуты ни строкой.
+ * Календарь строится на лету по видимому {year,month} (не фиксированный
+ * 2-месячный фикстурный массив) — см. buildRealMonthCells ниже; вперёд
+ * дальше текущего (ташкентского) месяца не листаем. Сетка по-прежнему
+ * жёстко 5×7=35 ячеек (вёрстку не трогаем) — для редкого месяца, которому
+ * нужен 6-й ряд, самые последние дни в сетке не поместятся (они всё равно
+ * видны в «Последних днях»), это ограничение существовавшей вёрстки, не
+ * новое.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { getStudentAttendance, formatDate, formatTime, APP_TIME_ZONE, type AttendanceStatus } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   BottomSheetFrame,
@@ -41,12 +57,90 @@ import {
   getChildren,
   getSelectedChildContext,
 } from "../../data";
-import type { AttendanceCellCode } from "../../data";
+import type { AttendanceCellCode, AttendanceDayRow, AttendanceStats } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow } from "../../lib/realChild";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { getSupabase } from "../../lib/supabase";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
+
+// ─── Заход 2, шаг 3: Ташкент-корректная работа с датами ───────────────────
+// НЕ toISOString().slice(0,10) — та берёт UTC-дату, что даёт неверный день
+// рядом с полуночью по Ташкенту (UTC+5). См. предупреждение задания про
+// баг UTC→Ташкент, уже словленный в вебе. Intl/timeZone — тот же механизм,
+// что уже использует packages/core/src/utils/date.ts (formatDate/formatTime).
+function tashkentDateKey(iso: string): string {
+  const d = new Date(iso);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value ?? "1970";
+  const m = parts.find((p) => p.type === "month")?.value ?? "01";
+  const day = parts.find((p) => p.type === "day")?.value ?? "01";
+  return `${y}-${m}-${day}`;
+}
+function tashkentToday(): string {
+  return tashkentDateKey(new Date().toISOString());
+}
+
+/** Реальный статус БД → существующая категория UI (календарь/стат/бэйдж) —
+ *  новых категорий не вводим, только маппим на уже нарисованные p/u/n. */
+function statusToCellCode(status: AttendanceStatus): "p" | "u" | "n" {
+  if (status === "present") return "p";
+  if (status === "absent_excused") return "u";
+  return "n";
+}
+const STATUS_META: Record<AttendanceStatus, { tone: "green" | "orange" | "red"; badge: "check" | "doc" | "x"; label: string }> = {
+  present: { tone: "green", badge: "check", label: "Присутствовал" },
+  absent_excused: { tone: "orange", badge: "doc", label: "Уважительная причина" },
+  absent_unexcused: { tone: "red", badge: "x", label: "Отсутствовал без уважительной причины" },
+};
+// При нескольких уроках/записях за один ташкентский день на ячейку календаря
+// побеждает "худший" статус (пропуск без причины важнее уважительного важнее
+// присутствия) — иначе порядок записей в массиве произвольно решал бы, какой
+// статус увидит родитель.
+const STATUS_PRIORITY: Record<AttendanceStatus, number> = {
+  present: 0,
+  absent_excused: 1,
+  absent_unexcused: 2,
+};
+
+/** Сетка 5×7 для видимого {year, month} (1-12) по реальным записям
+ *  (dateKey → status). Дни без записи: будущее → 'f', прошлое/сегодня без
+ *  урока → 'w' (без данных расписания не отличить "выходной" от "урок был,
+ *  не размечен" — это сознательное упрощение, расписание в этом шаге не
+ *  подключаем). Год/месяц — чистая календарная арифметика на Y-M-D, TZ тут
+ *  не участвует (не момент времени, а уже вычисленные целые). */
+function buildRealMonthCells(
+  year: number,
+  month: number,
+  recordsByDate: Map<string, AttendanceStatus>,
+  todayKey: string,
+): { code: AttendanceCellCode; dayNumber: number | null }[] {
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=Вс..6=Сб
+  const leadingPad = (firstWeekday + 6) % 7; // Пн=0
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const cells: { code: AttendanceCellCode; dayNumber: number | null }[] = [];
+  for (let i = 0; i < leadingPad; i += 1) cells.push({ code: "e", dayNumber: null });
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const key = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const status = recordsByDate.get(key);
+    let code: AttendanceCellCode;
+    if (key === todayKey) code = "t";
+    else if (status) code = statusToCellCode(status);
+    else if (key > todayKey) code = "f";
+    else code = "w";
+    cells.push({ code, dayNumber: day });
+  }
+  return cells;
+}
 
 /** Маппинг статуса записи «Последних дней» → цвет подписи + вид бэйджа.
  *  Порядок соответствует ATTENDANCE_LAST_DAYS (макет строки 616–619):
@@ -278,52 +372,170 @@ export default function AttendanceScreen() {
   );
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // Заход 2, шаг 3: тот же общий свитчер, что и в Шагах 1–2 — реальная
+  // идентичность + реальная посещаемость для phone-login/демо-тапа, демо-
+  // флоу (session.demoParentId) не тронут ни строкой.
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const realIndex = isRealFlow
+    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    : -1;
+  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
+  const identityChild = realChildRow ?? child;
 
-  const stats = getAttendanceStats();
-  const months = getAttendanceMonths();
-  const lastDays = getAttendanceLastDays(childId);
+  // ── Реальные данные посещаемости активного ребёнка (ОДИН запрос без
+  // month-фильтра — throw-on-error getStudentAttendance, НЕ .catch(()=>[])).
+  // Перезапрашивается при смене selectedChildId (useAsyncData deps). ──────
+  const attendanceState = useAsyncData(
+    () =>
+      isRealFlow && selectedChildId
+        ? getStudentAttendance(getSupabase(), undefined, selectedChildId)
+        : Promise.resolve(null),
+    [isRealFlow, selectedChildId],
+  );
 
-  // Стартовый месяц — «Июль 2026» (index 1, макет 3906 default). Стрелки
-  // переключают в пределах доступных месяцев (0..months.length-1).
-  const [monthIndex, setMonthIndex] = useState<number>(months.length - 1);
-  const activeMonth = months[monthIndex];
+  const todayKey = useMemo(() => tashkentToday(), []);
+  const yesterdayKey = useMemo(
+    () => tashkentDateKey(new Date(Date.now() - 24 * 3600 * 1000).toISOString()),
+    [],
+  );
 
-  // Дни календаря: код 'e' → пустая ячейка без числа; иначе — счётчик
-  // (макет 3822–3826). Возвращает массив длиной 35.
-  const calendarDays = useMemo(() => {
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, AttendanceStatus>();
+    attendanceState.data?.records.forEach((r) => {
+      const key = tashkentDateKey(r.lesson_date);
+      const existing = map.get(key);
+      if (!existing || STATUS_PRIORITY[r.status] > STATUS_PRIORITY[existing]) {
+        map.set(key, r.status);
+      }
+    });
+    return map;
+  }, [attendanceState.data]);
+
+  // Видимый месяц реального календаря — по умолчанию текущий (ташкентский);
+  // вперёд дальше него не листаем (макет тоже не даёт уйти за границу).
+  const [todayYear, todayMonthNum] = todayKey.split("-").map(Number);
+  const [realVisibleMonth, setRealVisibleMonth] = useState<{ year: number; month: number }>(
+    () => ({ year: todayYear, month: todayMonthNum }),
+  );
+  const realMonthLabel = useMemo(() => {
+    const dt = new Date(Date.UTC(realVisibleMonth.year, realVisibleMonth.month - 1, 1));
+    const label = dt.toLocaleDateString("ru-RU", { month: "long", year: "numeric", timeZone: APP_TIME_ZONE });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }, [realVisibleMonth]);
+  const realCells = useMemo(
+    () => buildRealMonthCells(realVisibleMonth.year, realVisibleMonth.month, recordsByDate, todayKey),
+    [realVisibleMonth, recordsByDate, todayKey],
+  );
+  const goPrevMonthReal = () =>
+    setRealVisibleMonth(({ year, month }) =>
+      month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 },
+    );
+  const goNextMonthReal = () =>
+    setRealVisibleMonth(({ year, month }) => {
+      if (year === todayYear && month === todayMonthNum) return { year, month };
+      return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+    });
+
+  // ── Фикстурная ветка (демо) — байт-в-байт как было ──────────────────────
+  const fixtureStats = getAttendanceStats();
+  const fixtureMonths = getAttendanceMonths();
+  const fixtureLastDays = getAttendanceLastDays(childId);
+  const [monthIndex, setMonthIndex] = useState<number>(fixtureMonths.length - 1);
+  const activeFixtureMonth = fixtureMonths[monthIndex];
+  const fixtureCalendarDays = useMemo(() => {
     let dayCounter = 0;
-    return activeMonth.cells.map((code) => {
+    return activeFixtureMonth.cells.map((code) => {
       if (code === "e") return { code, dayNumber: null as number | null };
       dayCounter += 1;
       return { code, dayNumber: dayCounter };
     });
-  }, [activeMonth]);
+  }, [activeFixtureMonth]);
+  const goPrevMonthFixture = () => setMonthIndex((i) => Math.max(0, i - 1));
+  const goNextMonthFixture = () => setMonthIndex((i) => Math.min(fixtureMonths.length - 1, i + 1));
+
+  // ── Единая точка ветвления real/демо для рендера ────────────────────────
+  const monthLabel = isRealFlow ? realMonthLabel : activeFixtureMonth.label;
+  const calendarDaysFinal = isRealFlow ? realCells : fixtureCalendarDays;
+  const goPrevMonth = isRealFlow ? goPrevMonthReal : goPrevMonthFixture;
+  const goNextMonth = isRealFlow ? goNextMonthReal : goNextMonthFixture;
 
   // Сетка 7×5: режем 35 ячеек на 5 рядов по 7 (гарантия равного flex 1
   // в каждой строке; grid-template-columns:repeat(7,1fr) — макет 603).
   const calendarRows = useMemo(() => {
-    const rows: (typeof calendarDays)[] = [];
-    for (let r = 0; r < 5; r += 1) rows.push(calendarDays.slice(r * 7, r * 7 + 7));
+    const rows: (typeof calendarDaysFinal)[] = [];
+    for (let r = 0; r < 5; r += 1) rows.push(calendarDaysFinal.slice(r * 7, r * 7 + 7));
     return rows;
-  }, [calendarDays]);
+  }, [calendarDaysFinal]);
 
   const weekdayLabels = [t.date.mon, t.date.tue, t.date.wed, t.date.thu, t.date.fri, t.date.sat, t.date.sun];
 
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${t.grades.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
+  // Реальные «последние дни» — из тех же records (уже marked_at desc из
+  // getStudentAttendance без фильтров), первые 4. tone/badge — по РЕАЛЬНОМУ
+  // статусу записи (STATUS_META), не по позиции в массиве, как было у
+  // фикстуры (LAST_DAYS_META[i]) — позиционный маппинг не годится для
+  // реальных данных переменной длины/порядка.
+  const realLastDays: AttendanceDayRow[] = useMemo(() => {
+    if (!attendanceState.data) return [];
+    return attendanceState.data.records.slice(0, 4).map((r) => {
+      const dateKey = tashkentDateKey(r.lesson_date);
+      const plain = formatDate(r.lesson_date);
+      const dateLabel =
+        dateKey === todayKey ? `Сегодня, ${plain}` : dateKey === yesterdayKey ? `Вчера, ${plain}` : plain;
+      return {
+        date_label: dateLabel,
+        status_label: STATUS_META[r.status].label,
+        arrived_label: r.status === "present" && r.marked_at ? formatTime(r.marked_at) : null,
+        left_label: null,
+      };
+    });
+  }, [attendanceState.data, todayKey, yesterdayKey]);
+  const lastDaysFinal = isRealFlow ? realLastDays : fixtureLastDays;
+  // Тот же срез records, параллельно realLastDays — tone/badge по индексу,
+  // как и раньше делала фикстура (LAST_DAYS_META[i]), но по РЕАЛЬНОМУ статусу.
+  const realLastDaysMeta = useMemo(
+    () => attendanceState.data?.records.slice(0, 4).map((r) => STATUS_META[r.status]) ?? [],
+    [attendanceState.data],
+  );
 
-  const goPrevMonth = () => setMonthIndex((i) => Math.max(0, i - 1));
-  const goNextMonth = () => setMonthIndex((i) => Math.min(months.length - 1, i + 1));
+  // Реальная сводка — за ВСЮ историю (не только видимый месяц календаря),
+  // из того же ответа getStudentAttendance.stats.
+  const realStats: AttendanceStats | null = attendanceState.data
+    ? {
+        attendance_pct: attendanceState.data.stats.percentage,
+        excused_count: attendanceState.data.stats.excused,
+        unexcused_count: attendanceState.data.stats.unexcused,
+      }
+    : null;
+  const statsFinal = isRealFlow ? realStats : fixtureStats;
+
+  const pickerItems: ChildPickerItem[] = isRealFlow
+    ? parentData!.children.map((c, i) => {
+        const row = toChildRow(c, i);
+        return {
+          id: row.id,
+          initials: row.first_name.slice(0, 1),
+          gradient: row.avatar_gradient,
+          ringColor: row.avatar_ring,
+          name: row.full_name,
+          classLabel: `${row.class_name} ${t.grades.class}`,
+          statusLabel: "—",
+          statusTone: "gray" as const,
+        };
+      })
+    : children.map((k) => ({
+        id: k.id,
+        initials: k.first_name.slice(0, 1),
+        gradient: k.avatar_gradient,
+        ringColor: k.avatar_ring,
+        name: k.full_name,
+        classLabel: `${k.class_name} ${t.grades.class}`,
+        statusLabel: k.status_chip,
+        statusTone: k.status_chip === "В школе" ? "green" : "gray",
+      }));
 
   return (
     <AppBackground>
@@ -348,161 +560,226 @@ export default function AttendanceScreen() {
         <ChildSwitcherCard
           variant="compact"
           avatar={{
-            initials: child.first_name.slice(0, 1),
-            gradient: child.avatar_gradient,
-            ringColor: child.avatar_ring,
+            initials: identityChild.first_name.slice(0, 1),
+            gradient: identityChild.avatar_gradient,
+            ringColor: identityChild.avatar_ring,
           }}
-          name={child.full_name}
-          classLabel={`${child.class_name} ${t.grades.class}`}
+          name={identityChild.full_name}
+          classLabel={`${identityChild.class_name} ${t.grades.class}`}
           onPress={() => setSheetOpen(true)}
         />
 
-        {/* Блок 3: StatsRow — 3 плитки (Посещаемость / Уважительные / Неуважительные). */}
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <StatTile value={`${stats.attendance_pct}%`} label={t.attend.present} tone="green" />
-          <StatTile value={String(stats.excused_count)} label={t.attend.excused} tone="orange" />
-          <StatTile value={String(stats.unexcused_count)} label={t.attend.unexcused} tone="red" />
-        </View>
-
-        {/* Блок 4: MonthCalendarCard. */}
-        <GlassCard radius={20} contentStyle={{ padding: 13, gap: 10 }}>
-          {/* Заголовок с стрелками. */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <CalNavButton dir="prev" onPress={goPrevMonth} />
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>
-              {activeMonth.label}
-            </Text>
-            <CalNavButton dir="next" onPress={goNextMonth} />
+        {/* Заход 2, шаг 3: loading/error — ТОЛЬКО для реального входа (демо
+            резолвится мгновенно в data:null и никогда не попадает сюда).
+            «Нет записей» (см. Блок 6 ниже) и «ошибка» — визуально разные
+            состояния, не заминаем сбой запроса пустым списком (история
+            тихих RLS-пустот 75/76/77/82/126 — родитель получал 0 строк без
+            ошибки). */}
+        {isRealFlow && attendanceState.loading ? (
+          <View style={{ paddingVertical: 48, alignItems: "center" }}>
+            <ActivityIndicator color={tokens.accent} />
           </View>
-
-          {/* Шапка дней недели + 5 рядов по 7 ячеек. */}
-          <View style={{ gap: 4 }}>
-            <View style={{ flexDirection: "row", gap: 4 }}>
-              {weekdayLabels.map((w) => (
-                <Text
-                  key={w}
-                  style={{
-                    flex: 1,
-                    textAlign: "center",
-                    fontFamily: fonts.manrope800,
-                    fontSize: 8.5,
-                    color: tokens.ink3,
-                  }}
-                >
-                  {w}
-                </Text>
-              ))}
-            </View>
-            {calendarRows.map((row, rowIdx) => (
-              <View key={rowIdx} style={{ flexDirection: "row", gap: 4 }}>
-                {row.map((cell, colIdx) => (
-                  <CalendarCell key={`${rowIdx}-${colIdx}`} code={cell.code} dayNumber={cell.dayNumber} />
-                ))}
-              </View>
-            ))}
-          </View>
-
-          {/* Легенда: 4 маркера (без «опоздания»). */}
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 9,
-              paddingTop: 8,
-              borderTopWidth: 1,
-              borderTopColor: "rgba(23,18,67,0.07)",
+        ) : isRealFlow && attendanceState.error ? (
+          <GlassCard
+            radius={20}
+            contentStyle={{
+              padding: 18,
+              gap: 10,
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: `rgba(${tokens.status.red.rgb},0.35)`,
             }}
           >
-            <LegendMarker color="rgba(16,185,129,0.75)" label={t.attend.legendPresent} />
-            <LegendMarker color="rgba(249,115,22,0.8)" label={t.attend.legendExcused} />
-            <LegendMarker color="rgba(239,68,68,0.8)" label={t.attend.legendUnexcused} />
-            <LegendMarker color="rgba(23,18,67,0.08)" label={t.attend.legendWeekend} />
-          </View>
-        </GlassCard>
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
+              Не удалось загрузить посещаемость
+            </Text>
+            <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
+              {attendanceState.error.message}
+            </Text>
+            <Pressable
+              onPress={() => attendanceState.refresh()}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                backgroundColor: `rgba(${tokens.status.red.rgb},0.14)`,
+                borderWidth: 1,
+                borderColor: `rgba(${tokens.status.red.rgb},0.4)`,
+              }}
+            >
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
+                Повторить
+              </Text>
+            </Pressable>
+          </GlassCard>
+        ) : (
+          <>
+            {/* Блок 3: StatsRow — 3 плитки (Посещаемость / Уважительные / Неуважительные). */}
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <StatTile value={`${statsFinal?.attendance_pct ?? 0}%`} label={t.attend.present} tone="green" />
+              <StatTile value={String(statsFinal?.excused_count ?? 0)} label={t.attend.excused} tone="orange" />
+              <StatTile value={String(statsFinal?.unexcused_count ?? 0)} label={t.attend.unexcused} tone="red" />
+            </View>
 
-        {/* Блок 5: SectionLabel «Последние дни». */}
-        <Text
-          style={{
-            fontFamily: fonts.manrope800,
-            fontSize: 10.5,
-            letterSpacing: 10.5 * 0.08,
-            textTransform: "uppercase",
-            color: tokens.ink3,
-          }}
-        >
-          {t.attend.lastDays}
-        </Text>
+            {/* Блок 4: MonthCalendarCard. */}
+            <GlassCard radius={20} contentStyle={{ padding: 13, gap: 10 }}>
+              {/* Заголовок с стрелками. */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <CalNavButton dir="prev" onPress={goPrevMonth} />
+                <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>
+                  {monthLabel}
+                </Text>
+                <CalNavButton dir="next" onPress={goNextMonth} />
+              </View>
 
-        {/* Блок 6: LastDaysList — одна GlassCard, разделители border-top. */}
-        <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
-          {lastDays.map((row, i) => {
-            const meta = LAST_DAYS_META[i] ?? LAST_DAYS_META[0];
-            const st = tokens.status[meta.tone];
-            const bothNull = row.arrived_label === null && row.left_label === null;
+              {/* Шапка дней недели + 5 рядов по 7 ячеек. */}
+              <View style={{ gap: 4 }}>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  {weekdayLabels.map((w) => (
+                    <Text
+                      key={w}
+                      style={{
+                        flex: 1,
+                        textAlign: "center",
+                        fontFamily: fonts.manrope800,
+                        fontSize: 8.5,
+                        color: tokens.ink3,
+                      }}
+                    >
+                      {w}
+                    </Text>
+                  ))}
+                </View>
+                {calendarRows.map((row, rowIdx) => (
+                  <View key={rowIdx} style={{ flexDirection: "row", gap: 4 }}>
+                    {row.map((cell, colIdx) => (
+                      <CalendarCell key={`${rowIdx}-${colIdx}`} code={cell.code} dayNumber={cell.dayNumber} />
+                    ))}
+                  </View>
+                ))}
+              </View>
 
-            return (
+              {/* Легенда: 4 маркера (без «опоздания»). */}
               <View
-                key={row.date_label}
                 style={{
                   flexDirection: "row",
-                  alignItems: "center",
-                  gap: 11,
-                  paddingVertical: 10,
-                  borderTopWidth: i === 0 ? 0 : 1,
+                  flexWrap: "wrap",
+                  gap: 9,
+                  paddingTop: 8,
+                  borderTopWidth: 1,
                   borderTopColor: "rgba(23,18,67,0.07)",
                 }}
               >
-                <View style={{ flex: 1, flexDirection: "column" }}>
-                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
-                    {row.date_label}
-                  </Text>
-                  <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: st.text }}>
-                    {row.status_label}
-                  </Text>
-                </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  {bothNull ? (
-                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink3 }}>
-                      — · —
-                    </Text>
-                  ) : (
-                    <>
-                      <Text
-                        style={{
-                          fontFamily: fonts.manrope700,
-                          fontSize: 10,
-                          color: row.arrived_label ? tokens.ink2 : tokens.ink3,
-                        }}
-                      >
-                        В школе: {row.arrived_label ?? "—"}
-                      </Text>
-                      <Text
-                        style={{
-                          fontFamily: fonts.manrope700,
-                          fontSize: 10,
-                          color: row.left_label ? tokens.ink2 : tokens.ink3,
-                        }}
-                      >
-                        Уход: {row.left_label ?? "—"}
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <LastDayBadge kind={meta.badge} />
+                <LegendMarker color="rgba(16,185,129,0.75)" label={t.attend.legendPresent} />
+                <LegendMarker color="rgba(249,115,22,0.8)" label={t.attend.legendExcused} />
+                <LegendMarker color="rgba(239,68,68,0.8)" label={t.attend.legendUnexcused} />
+                <LegendMarker color="rgba(23,18,67,0.08)" label={t.attend.legendWeekend} />
               </View>
-            );
-          })}
-        </GlassCard>
+            </GlassCard>
+
+            {/* Блок 5: SectionLabel «Последние дни». */}
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 10.5,
+                letterSpacing: 10.5 * 0.08,
+                textTransform: "uppercase",
+                color: tokens.ink3,
+              }}
+            >
+              {t.attend.lastDays}
+            </Text>
+
+            {/* Блок 6: LastDaysList — одна GlassCard, разделители border-top.
+                Реальный вход с пустой историей (0 записей) — отдельная
+                нейтральная надпись, а не пустая GlassCard (которая выглядела
+                бы неотличимо от сбоя — уже отфильтрован веткой error выше). */}
+            {isRealFlow && lastDaysFinal.length === 0 ? (
+              <GlassCard radius={20} contentStyle={{ padding: 16, alignItems: "center" }}>
+                <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink3, textAlign: "center" }}>
+                  Записей о посещаемости пока нет
+                </Text>
+              </GlassCard>
+            ) : (
+              <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
+                {lastDaysFinal.map((row, i) => {
+                  const meta = isRealFlow
+                    ? (realLastDaysMeta[i] ?? STATUS_META.absent_unexcused)
+                    : (LAST_DAYS_META[i] ?? LAST_DAYS_META[0]);
+                  const st = tokens.status[meta.tone];
+                  const bothNull = row.arrived_label === null && row.left_label === null;
+
+                  return (
+                    <View
+                      key={`${row.date_label}-${i}`}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 11,
+                        paddingVertical: 10,
+                        borderTopWidth: i === 0 ? 0 : 1,
+                        borderTopColor: "rgba(23,18,67,0.07)",
+                      }}
+                    >
+                      <View style={{ flex: 1, flexDirection: "column" }}>
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                          {row.date_label}
+                        </Text>
+                        <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: st.text }}>
+                          {row.status_label}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        {bothNull ? (
+                          <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink3 }}>
+                            — · —
+                          </Text>
+                        ) : (
+                          <>
+                            <Text
+                              style={{
+                                fontFamily: fonts.manrope700,
+                                fontSize: 10,
+                                color: row.arrived_label ? tokens.ink2 : tokens.ink3,
+                              }}
+                            >
+                              В школе: {row.arrived_label ?? "—"}
+                            </Text>
+                            <Text
+                              style={{
+                                fontFamily: fonts.manrope700,
+                                fontSize: 10,
+                                color: row.left_label ? tokens.ink2 : tokens.ink3,
+                              }}
+                            >
+                              Уход: {row.left_label ?? "—"}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                      <LastDayBadge kind={meta.badge} />
+                    </View>
+                  );
+                })}
+              </GlassCard>
+            )}
+          </>
+        )}
       </ScrollView>
 
-      {/* Шторка выбора ребёнка. */}
+      {/* Шторка выбора ребёнка. Реальный вход — реальные дети семьи +
+          selectChild (общий свитчер Шагов 1–2); демо — ровно как было. */}
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
         <ChildPickerSheetContent
           title={t.auth.chooseChild}
           items={pickerItems}
-          selectedId={childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
           onSelect={(id) => {
-            setChildId(id);
+            if (isRealFlow) {
+              selectChild(id);
+            } else {
+              setChildId(id);
+            }
             setSheetOpen(false);
           }}
         />
