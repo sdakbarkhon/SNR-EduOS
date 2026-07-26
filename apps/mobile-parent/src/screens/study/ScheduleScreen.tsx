@@ -25,19 +25,32 @@
  *
  * Внутренний вертикальный ScrollView содержит горизонтальный ScrollView с
  * лентой дней — передаём horizontal + nestedScrollEnabled для Android.
+ *
+ * Заход 2, шаг 4: для реального входа (isRealFlow) неделя/уроки — из
+ * public.lessons группы активного ребёнка (packages/core
+ * getStudentLessonsForWeek — тот же безопасный FK-hint join
+ * teachers!groups_teacher_id_fkey/teachers!subjects_teacher_id_fkey, что
+ * фиксил баг «Выходной везде», d9c6baf), ОДИН запрос на видимую календарную
+ * неделю (Пн-Вс по Ташкенту). Дни недели — все 7, без «только будни». Ряды
+ * урок/перемена для real-флоу строятся в отдельной ветке ("real-lesson")
+ * параллельно фикстурной ("lesson") — общий JSX-компонент LessonRow, разный
+ * источник полей (subject.name/color/room вместо getSubject()-фикстуры).
+ * Демо-флоу — вёрстка и фикстурные данные не тронуты ни строкой.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Rect } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { getStudentLessonsForWeek, formatTime, type LessonWithSubject } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
   GlassBlur,
+  GlassCard,
   GlassCircleButton,
   InnerHeader,
   LessonRow,
@@ -56,8 +69,22 @@ import {
 import type { BaseSubjectKey, ScheduleLessonRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
+import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow } from "../../lib/realChild";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { getSupabase } from "../../lib/supabase";
+import { tashkentDateKey, tashkentToday, mondayOfWeek, weekdayIndex, addDays } from "../../lib/tashkent";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
+
+/** «#ca8a04» → «202,138,4» для tokens.chip()/shadowRgb — тот же локальный
+ *  паттерн, что уже в TeacherProfileScreen.tsx/PortfolioScreen.tsx и др. */
+function hexToRgbCsv(hex: string): string {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
 
 /** Полное имя дня недели по короткому лейблу SCHEDULE_DAYS (для баннера). */
 const WEEKDAY_FULL: Record<string, string> = {
@@ -313,27 +340,89 @@ export default function ScheduleScreen() {
   const { d } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
+  const session = useAuthSession();
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const realIndex = isRealFlow
+    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    : -1;
+  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+
   const children = getChildren();
   const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<number>(DEMO_TODAY.weekday_index);
+  const todayKey = useMemo(() => tashkentToday(), []);
+  const [selectedDay, setSelectedDay] = useState<number>(() =>
+    isRealFlow ? weekdayIndex(todayKey) : DEMO_TODAY.weekday_index,
+  );
 
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
+  const identityChild = realChildRow ?? child;
   const week = getScheduleWeek();
   const lessons = getDaySchedule(selectedDay, childId);
 
+  // ── Заход 2, шаг 4: реальная неделя (Пн-Вс, содержащая «сегодня» по
+  // Ташкенту) — ОДИН запрос getStudentLessonsForWeek на всю неделю, дни
+  // переключаются локально (без рефетча на каждый тап по дню).
+  const weekStartKey = useMemo(() => mondayOfWeek(todayKey), [todayKey]);
+  const realWeekDays = useMemo(() => {
+    const labels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    return labels.map((weekday_label, i) => {
+      const dateKey = addDays(weekStartKey, i);
+      return { weekday_label, day: Number(dateKey.slice(8, 10)), dateKey };
+    });
+  }, [weekStartKey]);
+
+  const scheduleState = useAsyncData(
+    () =>
+      isRealFlow && selectedChildId
+        ? getStudentLessonsForWeek(getSupabase(), weekStartKey, selectedChildId)
+        : Promise.resolve(null),
+    [isRealFlow, selectedChildId, weekStartKey],
+  );
+
+  const realLessonsByDate = useMemo(() => {
+    const map = new Map<string, LessonWithSubject[]>();
+    (scheduleState.data ?? []).forEach((l) => {
+      const key = tashkentDateKey(l.starts_at);
+      const arr = map.get(key) ?? [];
+      arr.push(l);
+      map.set(key, arr);
+    });
+    return map;
+  }, [scheduleState.data]);
+
+  const realDayLessons = useMemo(
+    () => realLessonsByDate.get(realWeekDays[selectedDay]?.dateKey ?? "") ?? [],
+    [realLessonsByDate, realWeekDays, selectedDay],
+  );
+
   // Пункты шторки выбора ребёнка (BottomSheetFrame + ChildPickerSheetContent).
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${d.parentApp.grades.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
+  const pickerItems: ChildPickerItem[] = isRealFlow
+    ? parentData!.children.map((c, i) => {
+        const row = toChildRow(c, i);
+        return {
+          id: row.id,
+          initials: row.first_name.slice(0, 1),
+          gradient: row.avatar_gradient,
+          ringColor: row.avatar_ring,
+          name: row.full_name,
+          classLabel: `${row.class_name} ${d.parentApp.grades.class}`,
+          statusLabel: "—",
+          statusTone: "gray" as const,
+        };
+      })
+    : children.map((k) => ({
+        id: k.id,
+        initials: k.first_name.slice(0, 1),
+        gradient: k.avatar_gradient,
+        ringColor: k.avatar_ring,
+        name: k.full_name,
+        classLabel: `${k.class_name} ${d.parentApp.grades.class}`,
+        statusLabel: k.status_chip,
+        statusTone: k.status_chip === "В школе" ? "green" : "gray",
+      }));
 
   // Баннер даты: если выбран текущий день демо — используем label_full напрямую,
   // иначе собираем «Понедельник, 21 июля» из полного имени дня + числа + «июля».
@@ -345,12 +434,32 @@ export default function ScheduleScreen() {
     return `${full}, ${dayRow.day} июля`;
   }, [selectedDay, week]);
 
+  // Реальный баннер даты: та же форма («Сегодня, 21 июля» / «Вторник, 22
+  // июля»), но дата — из realWeekDays (реальный календарь), не из фикстуры.
+  const realSchedBanner = useMemo(() => {
+    const dayRow = realWeekDays[selectedDay];
+    if (!dayRow) return "";
+    const [y, m, dd] = dayRow.dateKey.split("-").map(Number);
+    const dateLabel = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      timeZone: "UTC",
+    });
+    if (dayRow.dateKey === todayKey) return `Сегодня, ${dateLabel}`;
+    const full = WEEKDAY_FULL[dayRow.weekday_label] ?? dayRow.weekday_label;
+    return `${full}, ${dateLabel}`;
+  }, [selectedDay, realWeekDays, todayKey]);
+
+  const weekFinal = isRealFlow ? realWeekDays : week;
+  const schedBannerFinal = isRealFlow ? realSchedBanner : schedBanner;
+
   // Собираем строки урок/перемена: между двумя последовательными уроками
   // вставляем строку-перемену starts_at=lesson_i.ends_at, ends_at=lesson_{i+1}.starts_at.
   type Row =
     | { kind: "lesson"; l: ScheduleLessonRow }
+    | { kind: "real-lesson"; l: LessonWithSubject }
     | { kind: "break"; start: string; end: string; keyId: string };
-  const rows: Row[] = useMemo(() => {
+  const fixtureRows: Row[] = useMemo(() => {
     const out: Row[] = [];
     for (let i = 0; i < lessons.length; i++) {
       out.push({ kind: "lesson", l: lessons[i] });
@@ -366,6 +475,26 @@ export default function ScheduleScreen() {
     }
     return out;
   }, [lessons]);
+
+  const realRows: Row[] = useMemo(() => {
+    const out: Row[] = [];
+    for (let i = 0; i < realDayLessons.length; i++) {
+      out.push({ kind: "real-lesson", l: realDayLessons[i] });
+      const cur = realDayLessons[i];
+      const next = realDayLessons[i + 1];
+      if (next && cur.ends_at) {
+        out.push({
+          kind: "break",
+          start: formatTime(cur.ends_at),
+          end: formatTime(next.starts_at),
+          keyId: `br-${i}`,
+        });
+      }
+    }
+    return out;
+  }, [realDayLessons]);
+
+  const rows = isRealFlow ? realRows : fixtureRows;
 
   return (
     <AppBackground>
@@ -399,12 +528,12 @@ export default function ScheduleScreen() {
         <ChildSwitcherCard
           variant="compact"
           avatar={{
-            initials: child.first_name.slice(0, 1),
-            gradient: child.avatar_gradient,
-            ringColor: child.avatar_ring,
+            initials: identityChild.first_name.slice(0, 1),
+            gradient: identityChild.avatar_gradient,
+            ringColor: identityChild.avatar_ring,
           }}
-          name={child.full_name}
-          classLabel={`${child.class_name} ${d.parentApp.grades.class}`}
+          name={identityChild.full_name}
+          classLabel={`${identityChild.class_name} ${d.parentApp.grades.class}`}
           onPress={() => setSheetOpen(true)}
         />
 
@@ -417,7 +546,7 @@ export default function ScheduleScreen() {
             contentContainerStyle={{ gap: 7, paddingBottom: 2 }}
             style={{ flex: 1 }}
           >
-            {week.map((dp, i) => (
+            {weekFinal.map((dp, i) => (
               <DayPill
                 key={`${dp.weekday_label}-${dp.day}`}
                 weekday={dp.weekday_label}
@@ -448,60 +577,138 @@ export default function ScheduleScreen() {
         </View>
 
         {/* 5. Schedule banner pill — макет 639. */}
-        {schedBanner ? <SchedBanner text={schedBanner} /> : null}
+        {schedBannerFinal ? <SchedBanner text={schedBannerFinal} /> : null}
 
         {/* 6. Lessons timeline list — макет 640–645 (уроки + перемены отдельными
-             приглушёнными строками через тот же цикл). */}
-        {rows.map((row) => {
-          if (row.kind === "break") {
-            // Перемена — приглушённая строка с заголовком «Перемена».
+             приглушёнными строками через тот же цикл). Заход 2, шаг 4: для
+             real-флоу — loading/error раздельно (useAsyncData, без .catch),
+             «нет уроков в этот день» визуально отличается от ошибки запроса
+             (история тихих RLS-пустот — не заминаем сбой пустым списком). */}
+        {isRealFlow && scheduleState.loading ? (
+          <View style={{ paddingVertical: 48, alignItems: "center" }}>
+            <ActivityIndicator color={tokens.accent} />
+          </View>
+        ) : isRealFlow && scheduleState.error ? (
+          <GlassCard
+            radius={20}
+            contentStyle={{
+              padding: 18,
+              gap: 10,
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: `rgba(${tokens.status.red.rgb},0.35)`,
+            }}
+          >
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
+              Не удалось загрузить расписание
+            </Text>
+            <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
+              {scheduleState.error.message}
+            </Text>
+            <Pressable
+              onPress={() => scheduleState.refresh()}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                backgroundColor: `rgba(${tokens.status.red.rgb},0.14)`,
+                borderWidth: 1,
+                borderColor: `rgba(${tokens.status.red.rgb},0.4)`,
+              }}
+            >
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
+                Повторить
+              </Text>
+            </Pressable>
+          </GlassCard>
+        ) : isRealFlow && rows.length === 0 ? (
+          <GlassCard radius={20} contentStyle={{ padding: 18, alignItems: "center" }}>
+            <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2, textAlign: "center" }}>
+              Уроков в этот день нет
+            </Text>
+          </GlassCard>
+        ) : (
+          rows.map((row) => {
+            if (row.kind === "break") {
+              // Перемена — приглушённая строка с заголовком «Перемена».
+              return (
+                <LessonRow
+                  key={row.keyId}
+                  timeStart={row.start}
+                  timeEnd={row.end}
+                  title={d.parentApp.grades.break}
+                  dimmed
+                />
+              );
+            }
+            if (row.kind === "real-lesson") {
+              // Реальный урок: предмет/цвет/кабинет/тема — из public.lessons
+              // (packages/core getStudentLessonsForWeek), не из фикстуры.
+              // Оценка не показываем (нет реального per-lesson join в этом
+              // шаге — не изобретаем). onPress не задаём: экран деталей
+              // предмета (d11) пока целиком на фикстурах, вести туда с
+              // реального урока значило бы показать чужие (фикстурные)
+              // данные — сознательно не кликабельно, до появления реального
+              // экрана деталей.
+              const l = row.l;
+              const subjColor = l.subject?.color ?? tokens.ink3;
+              const dotHalo = l.subject?.color ? tokens.chip(hexToRgbCsv(l.subject.color)).bg : undefined;
+              const nowLabel = l.status === "in_progress" ? d.parentApp.status.liveNow : undefined;
+              return (
+                <LessonRow
+                  key={`rl-${l.id}`}
+                  timeStart={formatTime(l.starts_at)}
+                  timeEnd={l.ends_at ? formatTime(l.ends_at) : undefined}
+                  active={l.status === "in_progress"}
+                  dotColor={subjColor}
+                  dotHalo={dotHalo}
+                  barGradient={l.subject?.color ? [l.subject.color, l.subject.color] : undefined}
+                  title={l.subject?.name ?? l.title ?? "—"}
+                  subtitle={l.room ? `Кабинет ${l.room}` : "—"}
+                  themeLine={l.topic ? `${d.parentApp.grades.topic} ${l.topic}` : undefined}
+                  nowLabel={nowLabel}
+                  dimmed={l.status === "completed"}
+                />
+              );
+            }
+            const l = row.l;
+            const subject = getSubject(l.subject_id);
+            // Точка-маркер в колонке времени — цвет base предмета; ореол — chip-цвет.
+            const subjTokenKey =
+              l.subject_id === "rusF" ? "rus" : (l.subject_id as BaseSubjectKey);
+            const subjToken = tokens.subjects[subjTokenKey as keyof typeof tokens.subjects];
+            const dotColor = subjToken?.base ?? subject.color;
+            const dotHalo = subject.chip_bg;
+            // Чип оценки — ТОЛЬКО у прошедших с выставленной оценкой.
+            const showGrade = l.status === "done" && l.grade != null;
+            const gradeChip = showGrade
+              ? {
+                  value: String(l.grade),
+                  text: tokens.status.green.text,
+                  rgb: tokens.status.green.rgb,
+                }
+              : undefined;
+            const nowLabel = l.status === "live" ? d.parentApp.status.liveNow : undefined;
             return (
               <LessonRow
-                key={row.keyId}
-                timeStart={row.start}
-                timeEnd={row.end}
-                title={d.parentApp.grades.break}
-                dimmed
+                key={`l-${l.slot_index}`}
+                timeStart={l.starts_at}
+                timeEnd={l.ends_at}
+                active={l.status === "live"}
+                dotColor={dotColor}
+                dotHalo={dotHalo}
+                barGradient={subject.gradient}
+                title={subject.name}
+                subtitle={`${l.room_label}`}
+                themeLine={`${d.parentApp.grades.topic} ${subject.current_topic}`}
+                grade={gradeChip}
+                nowLabel={nowLabel}
+                dimmed={l.status === "done" && !showGrade}
+                onPress={() => navigation.navigate("d11")}
               />
             );
-          }
-          const l = row.l;
-          const subject = getSubject(l.subject_id);
-          // Точка-маркер в колонке времени — цвет base предмета; ореол — chip-цвет.
-          const subjTokenKey =
-            l.subject_id === "rusF" ? "rus" : (l.subject_id as BaseSubjectKey);
-          const subjToken = tokens.subjects[subjTokenKey as keyof typeof tokens.subjects];
-          const dotColor = subjToken?.base ?? subject.color;
-          const dotHalo = subject.chip_bg;
-          // Чип оценки — ТОЛЬКО у прошедших с выставленной оценкой.
-          const showGrade = l.status === "done" && l.grade != null;
-          const gradeChip = showGrade
-            ? {
-                value: String(l.grade),
-                text: tokens.status.green.text,
-                rgb: tokens.status.green.rgb,
-              }
-            : undefined;
-          const nowLabel = l.status === "live" ? d.parentApp.status.liveNow : undefined;
-          return (
-            <LessonRow
-              key={`l-${l.slot_index}`}
-              timeStart={l.starts_at}
-              timeEnd={l.ends_at}
-              active={l.status === "live"}
-              dotColor={dotColor}
-              dotHalo={dotHalo}
-              barGradient={subject.gradient}
-              title={subject.name}
-              subtitle={`${l.room_label}`}
-              themeLine={`${d.parentApp.grades.topic} ${subject.current_topic}`}
-              grade={gradeChip}
-              nowLabel={nowLabel}
-              dimmed={l.status === "done" && !showGrade}
-              onPress={() => navigation.navigate("d11")}
-            />
-          );
-        })}
+          })
+        )}
       </ScrollView>
 
       {/* Шторка выбора ребёнка (BottomSheetFrame + ChildPickerSheetContent). */}
@@ -509,9 +716,13 @@ export default function ScheduleScreen() {
         <ChildPickerSheetContent
           title={d.parentApp.auth.chooseChild}
           items={pickerItems}
-          selectedId={childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
           onSelect={(id) => {
-            setChildId(id);
+            if (isRealFlow) {
+              selectChild(id);
+            } else {
+              setChildId(id);
+            }
             setSheetOpen(false);
           }}
         />

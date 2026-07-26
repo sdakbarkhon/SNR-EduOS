@@ -16,17 +16,23 @@
  * Заход 2, шаг 1: ChildSwitcherCard (228–241, только ИМЯ/КЛАСС/аватар/
  * переключатель, не footer-метрики) для реального (не демо) входа берёт
  * активного ребёнка из ParentDataContext — РЕАЛЬНЫЙ Supabase-student, а не
- * фикстуру. getDashboard/getSelectedChildContext(childId) — по-прежнему
- * фикстурные, продолжают ходить по session.currentChildId как раньше
- * (плитки/метрики/приветствие — «данные-экраны», не идентичность, следующие
- * заходы). Демо-флоу (session.demoParentId != null) не тронут ни строкой.
+ * фикстуру. Демо-флоу (session.demoParentId != null) не тронут ни строкой.
+ *
+ * Заход 2, шаг 4: для реального входа (isRealFlow) 3 плитки метрик
+ * («В школе с» / «Уроков» / «Посещено X/Y») и карточка «Следующий урок»
+ * теперь тоже реальные — getStudentLessonsForWeek (неделя группы, для
+ * подсчёта уроков сегодня и ближайшего предстоящего урока) +
+ * getStudentAttendance (реюз Шага 3, для «сегодня отмечено present» и
+ * времени первой отметки). «ДЗ» и «Кошелёк» — по-прежнему фикстура
+ * (getDashboard), не в скоупе этого шага.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type PressableStateCallbackType } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { getStudentLessonsForWeek, getStudentAttendance, formatTime } from "@snr/core";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
   AccentCard,
@@ -60,6 +66,9 @@ import { formatMoney } from "../../lib/format";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { getSupabase } from "../../lib/supabase";
+import { tashkentDateKey, tashkentToday } from "../../lib/tashkent";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -266,13 +275,92 @@ export default function HomeScreen() {
   const greetingTitle = `${dashboard.greeting.title_prefix}${greetingParentName}!`;
   const greetingSub = dashboard.greeting.subtitle_template.replace("{gen}", greetingChildName);
 
+  // ── Заход 2, шаг 4: реальные «В школе с» / «Уроков» / «Посещено X/Y» +
+  // карточка «Следующий урок» — из недели уроков группы (getStudentLessonsForWeek,
+  // тот же безопасный FK-hint join, что чинил баг «Выходной везде», d9c6baf)
+  // + посещаемости (getStudentAttendance, реюз Шага 3). ОДИН комбинированный
+  // fetch на оба запроса — один loading/error гейт на весь блок.
+  //
+  // Окно — СКОЛЬЗЯЩИЕ 7 дней от «сегодня» (todayKey..+6), НЕ календарная
+  // неделя Пн-Вс (в отличие от ScheduleScreen, которому нужно выравнивание
+  // по Пн-Вс под день-пилюли): адверсариальная проверка поймала, что
+  // календарная неделя даёт ложный «Нет предстоящих уроков» на карточке
+  // Dashboard весь конец недели (с вечера последнего учебного дня недели до
+  // понедельника) — следующий урок физически есть, но лежит в СЛЕДУЮЩЕЙ
+  // календарной неделе, вне загруженного окна. Скользящее окно от today
+  // всегда включает «today + 6 следующих дней», так что этот кейс не
+  // возникает (если только у группы не было бы разрыва в занятиях длиннее
+  // недели — тогда честно «Нет предстоящих уроков», не фейк).
+  const todayKey = useMemo(() => tashkentToday(), []);
+  const homeDataState = useAsyncData(() => {
+    if (!isRealFlow || !selectedChildId) return Promise.resolve(null);
+    const db = getSupabase();
+    return Promise.all([
+      getStudentLessonsForWeek(db, todayKey, selectedChildId),
+      getStudentAttendance(db, undefined, selectedChildId),
+    ]);
+  }, [isRealFlow, selectedChildId, todayKey]);
+
+  const [weekLessons, attendanceResult] = homeDataState.data ?? [null, null];
+
+  const todayLessonsReal = useMemo(
+    () => (weekLessons ?? []).filter((l) => tashkentDateKey(l.starts_at) === todayKey),
+    [weekLessons, todayKey],
+  );
+  // Ближайший урок с starts_at >= сейчас — недельный список уже отсортирован
+  // по starts_at (getStudentLessonsForWeek), поэтому просто find() первого
+  // подходящего. Если его нет во всём 7-дневном скользящем окне — честный
+  // нейтральный placeholder (не фейк), не «эта неделя закончилась».
+  const nextLessonReal = useMemo(
+    () => (weekLessons ?? []).find((l) => l.starts_at >= new Date().toISOString()) ?? null,
+    [weekLessons],
+  );
+  const attendanceTodayReal = useMemo(
+    () => (attendanceResult?.records ?? []).filter((r) => tashkentDateKey(r.lesson_date) === todayKey),
+    [attendanceResult, todayKey],
+  );
+  const presentTodayReal = attendanceTodayReal.filter((r) => r.status === "present");
+  // Самая ранняя отметка present сегодня (не полагаемся на общий порядок
+  // getStudentAttendance — тот marked_at DESC по ВСЕЙ истории, тут явный min
+  // по отфильтрованному сегодняшнему подмножеству).
+  const arrivalTimeReal = presentTodayReal.reduce<string | null>((min, r) => {
+    if (!r.marked_at) return min;
+    return !min || r.marked_at < min ? r.marked_at : min;
+  }, null);
+
   // 5 колонок метрики-сплит (макет 230–240). Валюта коротким — «185 000 сум».
+  // «В школе с» / «Уроков» / «Посещено X/Y» — реальные для isRealFlow (загрузка
+  // → «…», ошибка → «—», не фейк-ноль); «ДЗ» и «Кошелёк» не тронуты (фикстура).
+  const homeLoading = isRealFlow && homeDataState.loading;
+  const homeError = isRealFlow && !!homeDataState.error;
+  const atSchoolSinceValue = isRealFlow
+    ? homeLoading
+      ? "…"
+      : homeError
+        ? "—"
+        : (arrivalTimeReal ? formatTime(arrivalTimeReal) : "—")
+    : dashboard.child_status.at_school_since_label;
+  const lessonsTotalValue = isRealFlow
+    ? homeLoading
+      ? "…"
+      : homeError
+        ? "—"
+        : String(todayLessonsReal.length)
+    : String(dashboard.child_status.lessons_total);
+  const attendedValue = isRealFlow
+    ? homeLoading
+      ? "…"
+      : homeError
+        ? "—"
+        : `${presentTodayReal.length}/${todayLessonsReal.length}`
+    : `${dashboard.child_status.lessons_attended}/${dashboard.child_status.lessons_total}`;
+
   const metricCells: MetricCell[] = [
-    { label: d.parentApp.home.atSchoolSince, value: dashboard.child_status.at_school_since_label },
-    { label: d.parentApp.home.lessons, value: String(dashboard.child_status.lessons_total) },
+    { label: d.parentApp.home.atSchoolSince, value: atSchoolSinceValue },
+    { label: d.parentApp.home.lessons, value: lessonsTotalValue },
     {
       label: d.parentApp.home.attended,
-      value: `${dashboard.child_status.lessons_attended}/${dashboard.child_status.lessons_total}`,
+      value: attendedValue,
       valueColor: tokens.status.green.text,
     },
     {
@@ -286,6 +374,37 @@ export default function HomeScreen() {
       flex: 1.4,
     },
   ];
+
+  // Карточка «Следующий урок» (242–245): реальные предмет/время/кабинет/
+  // учитель (fallback предметник → куратор группы), нейтральный placeholder
+  // при отсутствии предстоящих уроков. Градиент/размер плитки — как в
+  // фикстуре (вёрстку не трогаем, варьируется только текст).
+  const nextLessonTeacherName = nextLessonReal?.subject?.teacher?.full_name ?? nextLessonReal?.group?.teacher?.full_name ?? null;
+  const nextLessonRoomLabel = nextLessonReal?.room ? `Каб. ${nextLessonReal.room}` : null;
+  const nextLessonTimeLabel = nextLessonReal
+    ? `${formatTime(nextLessonReal.starts_at)}${nextLessonReal.ends_at ? `–${formatTime(nextLessonReal.ends_at)}` : ""}`
+    : null;
+  const nextLessonRealLabel = nextLessonReal
+    ? [nextLessonTimeLabel, nextLessonRoomLabel, nextLessonTeacherName].filter(Boolean).join(" · ")
+    : "";
+  const nextLessonRealSubjectName = nextLessonReal?.subject?.name ?? nextLessonReal?.title ?? "—";
+  const nextLessonRealTile = nextLessonRealSubjectName.slice(0, 2);
+
+  const nextLessonView = isRealFlow
+    ? homeLoading
+      ? { subjectName: "Загрузка…", timeRoomTeacherLabel: "", tileLabel: "…" }
+      : homeError
+        ? { subjectName: "Ошибка загрузки", timeRoomTeacherLabel: "Нажмите, чтобы повторить", tileLabel: "!" }
+        : nextLessonReal
+          ? { subjectName: nextLessonRealSubjectName, timeRoomTeacherLabel: nextLessonRealLabel, tileLabel: nextLessonRealTile }
+          : { subjectName: "Нет предстоящих уроков", timeRoomTeacherLabel: "", tileLabel: "–" }
+    : {
+        subjectName: dashboard.next_lesson.subject_name,
+        timeRoomTeacherLabel: dashboard.next_lesson.time_room_teacher_label,
+        tileLabel: dashboard.next_lesson.tile_label,
+      };
+  const nextLessonCardPress =
+    isRealFlow && homeError ? () => homeDataState.refresh() : () => navigation.navigate("d15");
 
   const dueSum = `${formatMoney(dashboard.due_card.amount)} ${d.parentApp.pay.sum}`;
   const dueSubtitle = `${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`;
@@ -373,9 +492,10 @@ export default function HomeScreen() {
         </View>
 
         {/* ChildSwitcherCard large + MetricsSplitRow (228–241). Имя/класс/
-            аватар — identityChild (реальные для phone-flow); footer-метрики
-            (MetricsSplitRow) — по-прежнему фикстурные (dashboard/childId),
-            data-экран, не идентичность. */}
+            аватар — identityChild; footer-метрики (MetricsSplitRow) — заход
+            2, шаг 4: «В школе с»/«Уроков»/«Посещено X/Y» реальные для
+            isRealFlow (metricCells выше), «ДЗ»/«Кошелёк» по-прежнему
+            фикстурные (dashboard/childId), не в скоупе этого шага. */}
         <ChildSwitcherCard
           variant="large"
           avatar={{
@@ -408,7 +528,7 @@ export default function HomeScreen() {
             alignItems: "center",
             gap: 12,
           }}
-          onPress={() => navigation.navigate("d15")}
+          onPress={nextLessonCardPress}
         >
           <View style={{ flex: 1, gap: 4 }}>
             <Text
@@ -423,19 +543,21 @@ export default function HomeScreen() {
               {d.parentApp.home.nextLesson}
             </Text>
             <Text style={{ fontFamily: fonts.manrope800, fontSize: 15.5, color: "#FFFFFF" }}>
-              {dashboard.next_lesson.subject_name}
+              {nextLessonView.subjectName}
             </Text>
-            <Text
-              style={{
-                fontFamily: fonts.manrope700,
-                fontSize: 11.5,
-                color: "rgba(255,255,255,0.9)",
-              }}
-            >
-              {dashboard.next_lesson.time_room_teacher_label}
-            </Text>
+            {nextLessonView.timeRoomTeacherLabel ? (
+              <Text
+                style={{
+                  fontFamily: fonts.manrope700,
+                  fontSize: 11.5,
+                  color: "rgba(255,255,255,0.9)",
+                }}
+              >
+                {nextLessonView.timeRoomTeacherLabel}
+              </Text>
+            ) : null}
           </View>
-          <AccentGlyphTile gradient={dashboard.next_lesson.gradient} glyph={dashboard.next_lesson.tile_label} />
+          <AccentGlyphTile gradient={dashboard.next_lesson.gradient} glyph={nextLessonView.tileLabel} />
         </AccentCard>
 
         {/* Ряд «К оплате / Питание» (246–249). */}
