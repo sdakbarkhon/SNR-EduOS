@@ -63,6 +63,13 @@ import { toChildRow } from "../../lib/realChild";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
+/** Заход 2, шаг 2: реальные ФИО хранятся как "Фамилия Имя" — для обращения
+ *  в приветствии берём последнее слово ("Ismailov Sherzod" → "Sherzod"). */
+function givenName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts[parts.length - 1] || fullName;
+}
+
 /** Иконка-глиф из inline SVG-paths, 17px белым — как quick-action и «Следующий урок». */
 function WhiteGlyph({ paths, size = 17 }: { paths: string[]; size?: number }) {
   return (
@@ -247,9 +254,17 @@ export default function HomeScreen() {
   const identityChild = realChildRow ?? child;
   const bellCount = getUnreadNotificationsCount();
 
-  // Приветствие: «Доброе утро, Дилноза!» + «Вот что происходит у Малики сегодня».
-  const greetingTitle = `${dashboard.greeting.title_prefix}${parent.first_name}!`;
-  const greetingSub = dashboard.greeting.subtitle_template.replace("{gen}", child.first_name_gen);
+  // Приветствие: «Доброе утро, {родитель}!» + «Вот что происходит у {ребёнок}
+  // сегодня». Заход 2, шаг 2: для real-flow — реальные ФИО (родитель из
+  // parentData.parentName, ребёнок из identityChild.full_name), демо — как
+  // раньше genitive-фикстура (child.first_name_gen). Реальные ФИО в базе —
+  // "Фамилия Имя" (см. testAccounts.ts), для обращения берём последнее слово
+  // (даёт "Бахтиёр"/"Шерзод", не "Исмаилов"); шаблон (dashboard.greeting,
+  // локализован ru/uz/en) не меняется, меняется только подставляемое имя.
+  const greetingParentName = isRealFlow ? givenName(parentData!.parentName) : parent.first_name;
+  const greetingChildName = isRealFlow ? givenName(identityChild.full_name) : child.first_name_gen;
+  const greetingTitle = `${dashboard.greeting.title_prefix}${greetingParentName}!`;
+  const greetingSub = dashboard.greeting.subtitle_template.replace("{gen}", greetingChildName);
 
   // 5 колонок метрики-сплит (макет 230–240). Валюта коротким — «185 000 сум».
   const metricCells: MetricCell[] = [

@@ -1,38 +1,50 @@
 /**
- * AuthDemoPickerSheet — шторка «Выберите демо-родителя» (макет authSheet='demo',
- * строки 2070–2092 + фикстура demoParents 4285–4296).
+ * AuthDemoPickerSheet — шторка «Демо-режим» (макет authSheet='demo',
+ * строки 2070–2092 + фикстура demoParents 4285–4296). Вид не менялся.
  *
- * Порядок блоков сверху вниз (заход 4a):
+ * Заход 2, шаг 2: карточки — больше НЕ демо-фикстура (Бахтиёр/Шерзод/
+ * Дилноза с мок-детьми). Тап по карточке = СРАЗУ реальный вход соответ-
+ * ствующим тестовым аккаунтом (lib/testAccounts.ts, та же карта, что
+ * резолвит ввод номера на LoginPhoneScreen) — без экрана кода вообще.
+ * displayName/displayChildren в testAccounts.ts — превью ДО входа (RLS до
+ * авторизации ничего не отдаст); после входа Профиль/шапка берут те же
+ * данные уже через useParentData(), не через эту карту.
+ *
+ * Порядок блоков сверху вниз (не изменён):
  *  1. Оверлей затемнения фона (даёт BottomSheetFrame).
  *  2. Панель шторки — контейнер (даёт BottomSheetFrame).
  *  3. Handle — грипп-полоска сверху (даёт BottomSheetFrame).
  *  4. Заголовок «Выберите демо-родителя».
  *  5. Subtitle шторки.
- *  6. Список демо-родителей (3 строки: аватар + текст + стопка мини-детей).
+ *  6. Список аккаунтов (3 строки: аватар + текст + стопка мини-детей).
  *  7. Нижний спейсер 16px.
- *
- * Тап по строке → pickDemoParent(): 1-детный сразу входит в приложение,
- * многодетный переводит в фазу picker (макет 4295).
  */
 import { Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BottomSheetFrame } from "../../../ui";
 import { useAppLocale } from "../../../i18n";
 import { fonts, gradPoints, useTheme } from "../../../theme";
-import { getChildren, getDemoParents } from "../../../data";
 import { useAuthSession } from "../../../context/AuthSessionContext";
+import { listTestAccounts, type TestAccount } from "../../../lib/testAccounts";
+import { REAL_CHILD_PALETTE } from "../../../lib/realChild";
 
 /** Размер мини-аватарки ребёнка в правой стопке (макет 4294: 24×24). */
 const MINI_SIZE = 24;
 /** Наложение мини-аватарок (макет 4294: marginLeft: -7 у не-первой). */
 const MINI_OVERLAP = -7;
 
-/** Градиенты аватара по id демо-родителя (макет 4286–4288 колонка `g`). */
-const DEMO_AVATAR_GRADS: Record<string, [string, string]> = {
-  "demo-bakhtiyor": ["#34D399", "#0EA5E9"],
-  "demo-sherzod": ["#60A5FA", "#2563EB"],
-  "demo-dilnoza": ["#8B5CF6", "#22D3EE"],
-};
+/** Градиент аватара родителя по индексу карточки — те же 3 цвета, что уже
+ *  используются для реальных детей в остальном приложении (lib/realChild),
+ *  вместо старой демо-палитры по id фикстуры (demo-bakhtiyor/... больше не
+ *  существуют). */
+const PARENT_GRADIENTS: [string, string][] = REAL_CHILD_PALETTE.map(([g]) => g);
+
+/** "+998 XX XXX XX XX" — тот же формат, что LoginPhoneScreen.formatPhone. */
+function formatPhoneDisplay(nationalDigits: string): string {
+  const m = nationalDigits.match(/^(\d{0,2})(\d{0,3})(\d{0,2})(\d{0,2})/);
+  if (!m) return `+998 ${nationalDigits}`;
+  return `+998 ${[m[1], m[2], m[3], m[4]].filter(Boolean).join(" ")}`;
+}
 
 export interface AuthDemoPickerSheetProps {
   visible: boolean;
@@ -44,13 +56,23 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
   const t = d.parentApp.auth;
   const { tokens } = useTheme();
   const gr = gradPoints(135);
-  const { pickDemoParent, enterApp } = useAuthSession();
+  const { loginAsTestAccount, authBusy } = useAuthSession();
 
-  const parents = getDemoParents();
-  const kids = getChildren();
+  const accounts = listTestAccounts();
 
   const kidsCountLabel = (n: number): string =>
     n === 1 ? t.kidsOne : t.kidsMany.replace("{n}", String(n));
+
+  const handlePress = async (account: TestAccount) => {
+    if (authBusy) return;
+    // Заход 2, шаг 2: реальный сетевой логин — успех переключает
+    // AuthSessionContext.phase (app/childPicker) сам, что размонтирует эту
+    // шторку вместе с LoginPhoneScreen через RootNavigator; вызывать onClose()
+    // здесь не нужно и рискованно (setState на уже размонтированном
+    // компоненте). При ошибке (см. authBusy/smsError в контексте) шторка
+    // остаётся открытой — можно попробовать другую карточку.
+    await loginAsTestAccount(account);
+  };
 
   return (
     // Блоки 1–3: BottomSheetFrame даёт оверлей, панель и грипп-полоску.
@@ -83,25 +105,22 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
         {t.demoSub}
       </Text>
 
-      {/* Блок 6: список демо-родителей. */}
+      {/* Блок 6: список аккаунтов. */}
       <View style={{ flexDirection: "column" }}>
-        {parents.map((p, i) => {
-          const pg = DEMO_AVATAR_GRADS[p.id] ?? ["#8B5CF6", "#22D3EE"];
+        {accounts.map(({ phone, account }, i) => {
+          const pg = PARENT_GRADIENTS[i % PARENT_GRADIENTS.length];
           return (
             <Pressable
-              key={p.id}
-              onPress={() => {
-                const next = pickDemoParent(p);
-                onClose();
-                // 1-детный демо-родитель сразу входит в приложение (макет 4295).
-                if (next === "app") enterApp(0);
-              }}
+              key={phone}
+              onPress={() => handlePress(account)}
+              disabled={authBusy}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 11,
                 paddingVertical: 11,
                 paddingHorizontal: 20,
+                opacity: authBusy ? 0.5 : 1,
                 // Разделитель — тонкая линия сверху между строками (кроме первой).
                 borderTopWidth: i === 0 ? 0 : 1,
                 borderTopColor: "rgba(23,18,67,0.06)",
@@ -135,7 +154,7 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
                       color: "#FFFFFF",
                     }}
                   >
-                    {p.name.charAt(0)}
+                    {account.displayName.charAt(0)}
                   </Text>
                 </LinearGradient>
               </View>
@@ -149,7 +168,7 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
                     color: tokens.ink1,
                   }}
                 >
-                  {p.name}
+                  {account.displayName}
                 </Text>
                 <Text
                   style={{
@@ -158,7 +177,7 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
                     color: tokens.ink2,
                   }}
                 >
-                  {p.phone}
+                  {formatPhoneDisplay(phone)}
                 </Text>
                 <Text
                   style={{
@@ -167,18 +186,17 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
                     color: tokens.accent,
                   }}
                 >
-                  {kidsCountLabel(p.kids_count)}
+                  {kidsCountLabel(account.displayChildren.length)}
                 </Text>
               </View>
 
               {/* Стопка мини-аватарок детей (24×24 с наложением -7px и белой рамкой). */}
               <View style={{ flexDirection: "row" }}>
-                {p.child_ids.map((cid, idx) => {
-                  const k = kids.find((c) => c.id === cid);
-                  if (!k) return null;
+                {account.displayChildren.map((child, idx) => {
+                  const [kg] = REAL_CHILD_PALETTE[idx % REAL_CHILD_PALETTE.length];
                   return (
                     <View
-                      key={cid}
+                      key={`${child.name}-${idx}`}
                       style={{
                         width: MINI_SIZE,
                         height: MINI_SIZE,
@@ -190,7 +208,7 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
                       }}
                     >
                       <LinearGradient
-                        colors={k.avatar_gradient}
+                        colors={kg}
                         start={gr.start}
                         end={gr.end}
                         style={{
@@ -206,7 +224,7 @@ export function AuthDemoPickerSheet({ visible, onClose }: AuthDemoPickerSheetPro
                             color: "#FFFFFF",
                           }}
                         >
-                          {k.first_name.charAt(0)}
+                          {child.name.charAt(0)}
                         </Text>
                       </LinearGradient>
                     </View>

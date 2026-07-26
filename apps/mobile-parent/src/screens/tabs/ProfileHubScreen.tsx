@@ -27,6 +27,9 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Constants from "expo-constants";
 import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow, REAL_CHILD_PALETTE } from "../../lib/realChild";
+import { findPhoneForUsername } from "../../lib/testAccounts";
 import {
   Avatar,
   CenterModalFrame,
@@ -45,6 +48,20 @@ import {
   getParent,
 } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
+
+/** "+998 XX XXX XX XX" — тот же формат, что в AuthDemoPickerSheet/LoginPhoneScreen. */
+function formatPhoneDisplay(nationalDigits: string): string {
+  const m = nationalDigits.match(/^(\d{0,2})(\d{0,3})(\d{0,2})(\d{0,2})/);
+  if (!m) return `+998 ${nationalDigits}`;
+  return `+998 ${[m[1], m[2], m[3], m[4]].filter(Boolean).join(" ")}`;
+}
+
+/** ФИО → инициалы (2 буквы, как у фикстурного parent.initials): первая буква
+ *  каждого из первых двух "слов" ФИО. */
+function initialsFromFullName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts.slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join("");
+}
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -69,7 +86,17 @@ export default function ProfileHubScreen() {
   const insets = useSafeAreaInsets();
 
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const { signOut } = useAuthSession();
+  const session = useAuthSession();
+  const { signOut } = session;
+
+  // Заход 2, шаг 2: карточка родителя и «Мои дети» — реальные для
+  // phone-login/демо-тапа (оба теперь real-flow, demoParentId не
+  // выставляется ни при том, ни при другом). parents.phone в базе NULL —
+  // показываем номер, которым реально вошли (по pendingUsername, работает
+  // одинаково для входа по цифрам и по карточке модалки).
+  const { data: parentData } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const loginPhone = isRealFlow && session.pendingUsername ? findPhoneForUsername(session.pendingUsername) : null;
 
   const parent = getParent();
   const children = getChildren();
@@ -171,13 +198,15 @@ export default function ProfileHubScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 18, gap: 12 }}
       >
-        {/* 2. Карточка родителя. */}
+        {/* 2. Карточка родителя. Заход 2, шаг 2: реальные ФИО/инициалы/
+            телефон для phone-login и демо-тапа; аватар-градиент — как и
+            раньше, презентационный (в базе такого поля нет ни у кого). */}
         <GlassCard radius={22} onPress={goTo("d30")} contentStyle={{ padding: 14 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ margin: 4.5 }}>
               <Avatar
                 size={54}
-                initials={parent.initials}
+                initials={isRealFlow ? initialsFromFullName(parentData!.parentName) : parent.initials}
                 gradient={parent.avatar_gradient}
                 variant="ring"
                 ringColor="#8b5cf6"
@@ -186,23 +215,26 @@ export default function ProfileHubScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 14.5, color: tokens.ink1 }}>
-                {parent.full_name}
+                {isRealFlow ? parentData!.parentName : parent.full_name}
               </Text>
               <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.status.violet.text, marginTop: 2 }}>
                 {d.parentApp.prof.parentRole}
               </Text>
               <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, marginTop: 2 }}>
-                {parent.phone}
+                {isRealFlow ? (loginPhone ? formatPhoneDisplay(loginPhone) : "—") : parent.phone}
               </Text>
             </View>
             <ChevronRight tokens={tokens} scheme={scheme} />
           </View>
         </GlassCard>
 
-        {/* 3–4. «Мои дети». */}
+        {/* 3–4. «Мои дети». Заход 2, шаг 2: реальные дети ЭТОГО родителя
+            (1/2/3), не общий фикстурный пул из 6. Статус-пилюля не
+            показывается — посещаемость ещё не подключена (data-экран,
+            следующие заходы), НЕ выдумываем "В школе" для реальных детей. */}
         <SectionHeader title={d.parentApp.prof.myKids} />
         <GlassCard contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
-          {children.map((k, i) => (
+          {(isRealFlow ? parentData!.children.map(toChildRow) : children).map((k, i) => (
             <ChildHubRow
               key={k.id}
               full_name={k.full_name}
@@ -210,7 +242,7 @@ export default function ProfileHubScreen() {
               initials={k.first_name.slice(0, 1)}
               gradient={k.avatar_gradient}
               ringColor={k.avatar_ring}
-              status_chip={k.status_chip}
+              status_chip={isRealFlow ? "" : k.status_chip}
               tone={k.status_chip === "В школе" ? "green" : "gray"}
               divider={i > 0}
               onPress={() => navigation.navigate("d29")}
@@ -370,7 +402,9 @@ function ChildHubRow({
           {classLabel}
         </Text>
       </View>
-      <StatusChip label={status_chip} family={tone} variant={tone === "green" ? "live" : "default"} />
+      {status_chip ? (
+        <StatusChip label={status_chip} family={tone} variant={tone === "green" ? "live" : "default"} />
+      ) : null}
       <ChevronRight tokens={tokens} scheme={scheme} />
     </Pressable>
   );
