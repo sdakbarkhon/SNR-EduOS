@@ -126,7 +126,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   // доп. useEffect ради синхронизации.
   const stateRef = useRef(state);
   stateRef.current = state;
-  const { data: parentData, refresh: refreshParentData } = useParentData();
+  const { data: parentData, refresh: refreshParentData, selectChild: selectParentChild } = useParentData();
   // Тот же приём, что и stateRef — verifyCode() читает это ПОСЛЕ await
   // refreshParentData(), поэтому нужен самый свежий parentData, а не тот,
   // что был захвачен замыканием при последнем создании useCallback.
@@ -292,8 +292,16 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     getSupabase().auth.signOut().catch((e) => {
       console.error("[AuthSessionContext] signOut: supabase signOut failed:", e);
     });
+    // Заход 2, шаг 1: ParentDataProvider смонтирован ВЫШЕ и не размонтируется
+    // вместе с этим сбросом — без явного selectChild(null) selectedChildId
+    // пережил бы signOut и указывал бы на ребёнка ПРЕЖНЕЙ семьи при входе
+    // под другим тестовым номером в той же живой сессии приложения (найдено
+    // адверсариальной проверкой). null — auto-select useEffect в
+    // ParentDataContext сам переизберёт первого ребёнка НОВОЙ семьи, как
+    // только refreshParentData() отработает при следующем логине.
+    selectParentChild(null);
     setState(INITIAL_STATE);
-  }, []);
+  }, [selectParentChild]);
 
   const value = useMemo<AuthSessionCtx>(
     () => ({

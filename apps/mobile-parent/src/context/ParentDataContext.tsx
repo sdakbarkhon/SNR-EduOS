@@ -11,7 +11,12 @@ type Ctx = {
    *  ждёт реальных детей перед переходом на childPicker, а не дёргает вслепую. */
   refresh: () => Promise<void>;
   selectedChildId: string | null;
-  selectChild: (id: string) => void;
+  /** Заход 2, шаг 1: id: null — сброс выбора (см. AuthSessionContext.signOut()).
+   *  Без сброса selectedChildId переживает signOut() (этот провайдер не
+   *  размонтируется вместе с ним) и указывает на ребёнка ПРЕЖНЕЙ семьи после
+   *  повторного входа под другим тестовым номером в той же живой сессии —
+   *  auto-select useEffect ниже сработает заново только если id снова null. */
+  selectChild: (id: string | null) => void;
 };
 
 const ParentDataContext = createContext<Ctx | null>(null);

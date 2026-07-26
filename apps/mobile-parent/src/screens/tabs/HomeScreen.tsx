@@ -12,6 +12,14 @@
  * useAppLocale().d.parentApp.* (RU/UZ/EN). Обе темы через useTheme().
  * iOS safe-area у шапки — из RootHeader; у скролла — paddingBottom 118px
  * под FloatingTabBar (макет: строка 226 — «118 под FloatingTabBar»).
+ *
+ * Заход 2, шаг 1: ChildSwitcherCard (228–241, только ИМЯ/КЛАСС/аватар/
+ * переключатель, не footer-метрики) для реального (не демо) входа берёт
+ * активного ребёнка из ParentDataContext — РЕАЛЬНЫЙ Supabase-student, а не
+ * фикстуру. getDashboard/getSelectedChildContext(childId) — по-прежнему
+ * фикстурные, продолжают ходить по session.currentChildId как раньше
+ * (плитки/метрики/приветствие — «данные-экраны», не идентичность, следующие
+ * заходы). Демо-флоу (session.demoParentId != null) не тронут ни строкой.
  */
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View, type PressableStateCallbackType } from "react-native";
@@ -49,6 +57,9 @@ import {
 import { ICONS, type MainStackParamList, type TabParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
 import { formatMoney } from "../../lib/format";
+import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow } from "../../lib/realChild";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -210,13 +221,30 @@ export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
 
   const children = getChildren();
+  // Демо (session.demoParentId != null) не тронут: childId остаётся
+  // единственным источником и для идентичности, и для фикстурных
+  // data-плиток, ровно как было.
   const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const session = useAuthSession();
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const realIndex = isRealFlow
+    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    : -1;
+  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+
   const parent = getParent();
+  // getDashboard/getSelectedChildContext — фикстурные "данные-экраны"
+  // (метрики, приветствие), НЕ идентичность; продолжают ходить по
+  // session.currentChildId/childId как раньше, в этом шаге не меняются.
   const dashboard = getDashboard(childId);
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
+  // Идентичность в ChildSwitcherCard (имя/класс/аватар/статус) — реальная
+  // для phone-flow, фикстурная (как раньше) для демо.
+  const identityChild = realChildRow ?? child;
   const bellCount = getUnreadNotificationsCount();
 
   // Приветствие: «Доброе утро, Дилноза!» + «Вот что происходит у Малики сегодня».
@@ -248,16 +276,35 @@ export default function HomeScreen() {
   const dueSubtitle = `${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`;
 
   // Пункты шторки выбора ребёнка (BottomSheetFrame + ChildPickerSheetContent).
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${d.parentApp.grades.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
+  // Заход 2, шаг 1: для реального входа — РЕАЛЬНЫЕ дети семьи (не полный
+  // фикстурный пул из 6 детей всех демо-семей). ChildPickerSheetContent
+  // требует statusLabel/statusTone (не опциональны) — для реальных детей
+  // статуса "в школе/дома" ещё нет (это data-экран, следующие заходы),
+  // ставим нейтральный "—", а не выдумываем "В школе".
+  const pickerItems: ChildPickerItem[] = isRealFlow
+    ? parentData!.children.map((c, i) => {
+        const row = toChildRow(c, i);
+        return {
+          id: row.id,
+          initials: row.first_name.slice(0, 1),
+          gradient: row.avatar_gradient,
+          ringColor: row.avatar_ring,
+          name: row.full_name,
+          classLabel: `${row.class_name} ${d.parentApp.grades.class}`,
+          statusLabel: "—",
+          statusTone: "gray" as const,
+        };
+      })
+    : children.map((k) => ({
+        id: k.id,
+        initials: k.first_name.slice(0, 1),
+        gradient: k.avatar_gradient,
+        ringColor: k.avatar_ring,
+        name: k.full_name,
+        classLabel: `${k.class_name} ${d.parentApp.grades.class}`,
+        statusLabel: k.status_chip,
+        statusTone: k.status_chip === "В школе" ? "green" : "gray",
+      }));
 
   // Пункты quick-actions (макет 256–263). Иконки из ICONS + inline paths.
   // «Оплатить» → card; «Дом. задания» → check; «Все сервисы» → grid;
@@ -310,17 +357,24 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* ChildSwitcherCard large + MetricsSplitRow (228–241). */}
+        {/* ChildSwitcherCard large + MetricsSplitRow (228–241). Имя/класс/
+            аватар — identityChild (реальные для phone-flow); footer-метрики
+            (MetricsSplitRow) — по-прежнему фикстурные (dashboard/childId),
+            data-экран, не идентичность. */}
         <ChildSwitcherCard
           variant="large"
           avatar={{
-            initials: child.first_name.slice(0, 1),
-            gradient: child.avatar_gradient,
-            ringColor: child.avatar_ring,
+            initials: identityChild.first_name.slice(0, 1),
+            gradient: identityChild.avatar_gradient,
+            ringColor: identityChild.avatar_ring,
           }}
-          name={child.full_name}
-          classLabel={`${child.class_name} ${d.parentApp.grades.class}`}
-          status={{ label: child.status_chip, tone: "green", withChevron: true }}
+          name={identityChild.full_name}
+          classLabel={`${identityChild.class_name} ${d.parentApp.grades.class}`}
+          status={
+            isRealFlow
+              ? undefined
+              : { label: child.status_chip, tone: "green", withChevron: true }
+          }
           chevron
           onPress={() => setSheetOpen(true)}
           onStatusPress={() => navigation.navigate("d6")}
@@ -537,14 +591,21 @@ export default function HomeScreen() {
         </GlassCard>
       </TabScreenScroll>
 
-      {/* Шторка выбора ребёнка. */}
+      {/* Шторка выбора ребёнка. Реальный phone-flow — переключаем реального
+          активного ребёнка (ParentDataContext.selectChild), не локальный
+          childId (тот продолжает питать фикстурные data-плитки, здесь не
+          трогаем). Демо — ровно как было. */}
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
         <ChildPickerSheetContent
           title={d.parentApp.auth.chooseChild}
           items={pickerItems}
-          selectedId={childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
           onSelect={(id) => {
-            setChildId(id);
+            if (isRealFlow) {
+              selectChild(id);
+            } else {
+              setChildId(id);
+            }
             setSheetOpen(false);
           }}
         />

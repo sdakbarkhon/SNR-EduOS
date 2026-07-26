@@ -34,6 +34,16 @@
  *
  * Правило заказчика: экран информационный, кружков/чатов/2FA/языков нет. Спец-
  * правила чата/объявлений/настроек к d29 не применяются.
+ *
+ * Заход 2, шаг 1: для реального (не демо) входа ChildSwitcherCard + HeroCard +
+ * GeneralInfoCard-строка «Класс» — РЕАЛЬНЫЙ активный ребёнок (ParentDataContext),
+ * не фикстура. Остальные поля GeneralInfoCard/MedicalCard (дата рождения,
+ * классный руководитель, № личного дела, аллергия, мед.особенности) — таких
+ * колонок в Supabase нет (подтверждено разведкой) — остаются на getChildInfo(),
+ * заморожены на фикстурном ребёнке, выбранном при входе (session.currentChildId),
+ * и НЕ меняются при переключении реального активного ребёнка в шторке — это
+ * осознанный компромисс этого шага, не баг: сами данные подключим в
+ * следующих заходах. Демо-флоу не тронут ни строкой.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -57,6 +67,8 @@ import {
   getSelectedChildContext,
 } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow } from "../../lib/realChild";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
@@ -154,8 +166,19 @@ export default function ChildProfileScreen() {
   );
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const realIndex = isRealFlow
+    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    : -1;
+  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+
   const ctx = getSelectedChildContext(childId);
-  const child = ctx.child;
+  // Идентичность (ФИО/класс/аватар) — реальная для phone-flow, иначе как
+  // раньше. info (дата рождения, куратор, № личного дела, аллергия,
+  // мед.особенности) — колонок в Supabase нет, ВСЕГДА фикстура, заморожена
+  // на childId (login-time), не следует за переключением реального ребёнка.
+  const child = realChildRow ?? ctx.child;
   const info = getChildInfo(childId);
 
   // Активный таб — по макету (строка 1181) всегда «data» на входе; остальные
@@ -171,16 +194,34 @@ export default function ChildProfileScreen() {
   // 0 16 36 {g2}55 + inset 0 1.5 0 W35).
   const heroShadowColor = `${heroGradient[1]}55`;
 
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${t.grades.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
+  // Заход 2, шаг 1: для реального входа — РЕАЛЬНЫЕ дети семьи, не полный
+  // фикстурный пул. statusLabel/statusTone у ChildPickerSheetContent не
+  // опциональны — статуса "в школе/дома" для реальных детей ещё нет
+  // (data-экран, следующие заходы), нейтральный "—" вместо выдумки.
+  const pickerItems: ChildPickerItem[] = isRealFlow
+    ? parentData!.children.map((c, i) => {
+        const row = toChildRow(c, i);
+        return {
+          id: row.id,
+          initials: row.first_name.slice(0, 1),
+          gradient: row.avatar_gradient,
+          ringColor: row.avatar_ring,
+          name: row.full_name,
+          classLabel: `${row.class_name} ${t.grades.class}`,
+          statusLabel: "—",
+          statusTone: "gray" as const,
+        };
+      })
+    : children.map((k) => ({
+        id: k.id,
+        initials: k.first_name.slice(0, 1),
+        gradient: k.avatar_gradient,
+        ringColor: k.avatar_ring,
+        name: k.full_name,
+        classLabel: `${k.class_name} ${t.grades.class}`,
+        statusLabel: k.status_chip,
+        statusTone: k.status_chip === "В школе" ? "green" : "gray",
+      }));
 
   const goProgress = () => navigation.navigate("Tabs", { screen: "p10" });
   const goAttend = () => navigation.navigate("d14");
@@ -322,23 +363,28 @@ export default function ChildProfileScreen() {
               <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: "rgba(255,255,255,0.85)" }}>
                 {`${child.class_name} ${t.grades.class}`}
               </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 4,
-                  paddingVertical: 3,
-                  paddingHorizontal: 8,
-                  borderRadius: 999,
-                  backgroundColor: "rgba(255,255,255,0.22)",
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.4)",
-                }}
-              >
-                <Text style={{ fontFamily: fonts.manrope800, fontSize: 8.5, color: "#FFFFFF" }}>
-                  {child.status_chip}
-                </Text>
-              </View>
+              {/* Заход 2, шаг 1: у реальных детей статуса "в школе/дома" ещё
+                  нет (child.status_chip === "" из toChildRow) — скрываем
+                  пилюлю вовсе, не рисуем пустую. */}
+              {child.status_chip ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    paddingVertical: 3,
+                    paddingHorizontal: 8,
+                    borderRadius: 999,
+                    backgroundColor: "rgba(255,255,255,0.22)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255,255,255,0.4)",
+                  }}
+                >
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 8.5, color: "#FFFFFF" }}>
+                    {child.status_chip}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <Text
               numberOfLines={1}
@@ -466,14 +512,21 @@ export default function ChildProfileScreen() {
         </GlassCard>
       </ScrollView>
 
-      {/* Шторка выбора ребёнка. */}
+      {/* Шторка выбора ребёнка. Реальный phone-flow — переключаем реального
+          активного ребёнка (ParentDataContext.selectChild); info (доп.
+          сведения без колонки в БД) намеренно НЕ следует за этим выбором,
+          см. заголовочный комментарий файла. Демо — ровно как было. */}
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
         <ChildPickerSheetContent
           title={t.auth.chooseChild}
           items={pickerItems}
-          selectedId={childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
           onSelect={(id) => {
-            setChildId(id);
+            if (isRealFlow) {
+              selectChild(id);
+            } else {
+              setChildId(id);
+            }
             setSheetOpen(false);
           }}
         />

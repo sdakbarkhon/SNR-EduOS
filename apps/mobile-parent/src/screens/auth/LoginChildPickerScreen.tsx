@@ -26,43 +26,12 @@ import { useTheme, fonts, gradPoints, shadowStyle } from "../../theme";
 import { Avatar, GlassCard, GlassCircleButton, PrimaryButton } from "../../ui";
 import { BackArrowIcon, ShieldCheckIcon } from "../../ui/auth/icons";
 import { getChildren, getChildrenForDemoParent } from "../../data";
-import type { ChildRow, Gradient } from "../../data/types";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
-import type { ParentChildSummary } from "@snr/core";
+import { toChildRow } from "../../lib/realChild";
 
 const SCHOOL_LABEL = "SNR International School";
 const CHECK_ON_SHADOW = { x: 0, y: 4, blur: 10, color: "rgba(124,58,237,0.4)" };
-
-// Заход 1: аватар-палитра для реальных детей — реальных gradient/ring в
-// Supabase нет (презентационные поля, не колонки), крутим по индексу так
-// же, как это уже сделано во множестве других мест приложения.
-const REAL_CHILD_PALETTE: [Gradient, string][] = [
-  [["#22d3ee", "#3b82f6"], "#0891b2"],
-  [["#8b5cf6", "#ec4899"], "#8b5cf6"],
-  [["#34d399", "#0ea5e9"], "#059669"],
-];
-
-/** Реальная строка из getParentContext() → форма ChildRow, которую уже умеет
- *  рисовать эта карточка. first_name_gen/is_female/status_chip — грубые
- *  заглушки (грамматика падежей и статус "в школе/дома" появятся вместе с
- *  реальными data-экранами в следующих заходах, не в этом). */
-function toChildRow(c: ParentChildSummary, index: number): ChildRow {
-  const firstName = c.fullName.split(" ")[0] ?? c.fullName;
-  const [gradient, ring] = REAL_CHILD_PALETTE[index % REAL_CHILD_PALETTE.length];
-  return {
-    id: c.id,
-    full_name: c.fullName,
-    first_name: firstName,
-    first_name_gen: firstName,
-    is_female: false,
-    class_name: c.className ?? "—",
-    group_id: c.groupId ?? "",
-    status_chip: "",
-    avatar_gradient: gradient,
-    avatar_ring: ring,
-  };
-}
 
 export function LoginChildPickerScreen() {
   const { d } = useAppLocale();
@@ -71,7 +40,7 @@ export function LoginChildPickerScreen() {
   const insets = useSafeAreaInsets();
   const { kidsCount, authSel, demoParentId, pickChildIndex, enterApp, setPhase } =
     useAuthSession();
-  const { data: parentData } = useParentData();
+  const { data: parentData, selectChild } = useParentData();
   const g = gradPoints(tokens.accentGrad.angle);
 
   // Заход 5: демо-родитель — свой список child_ids (Исмаилов → Азизбек,
@@ -81,10 +50,11 @@ export function LoginChildPickerScreen() {
   // моменту монтирования этого экрана он уже готов). Пустой/не загруженный
   // (defensive fallback — в норме не должно случаться) — старое поведение
   // на первых kidsCount из CHILDREN.
+  const isRealFlow = !demoParentId && !!parentData && parentData.children.length > 0;
   const kids = demoParentId
     ? getChildrenForDemoParent(demoParentId)
-    : parentData && parentData.children.length > 0
-      ? parentData.children.map(toChildRow)
+    : isRealFlow
+      ? parentData!.children.map(toChildRow)
       : getChildren().slice(0, Math.max(1, kidsCount));
   const selectedIndex = Math.min(Math.max(0, authSel), kids.length - 1);
 
@@ -309,7 +279,17 @@ export function LoginChildPickerScreen() {
         {/* 7. CTA «Продолжить» (accent-gradient, макет строка 2060). */}
         <PrimaryButton
           label={t.continue}
-          onPress={() => enterApp(selectedIndex)}
+          onPress={() => {
+            // Заход 2, шаг 1: реальный phone-login — синхронизируем РЕАЛЬНОГО
+            // активного ребёнка (ParentDataContext) с тем, что пользователь
+            // реально выбрал здесь (selectedIndex), иначе Home/Profile
+            // продолжат показывать авто-выбранного первого ребёнка семьи
+            // независимо от выбора на этом экране. enterApp() ниже — как и
+            // раньше, отдельно маппит на фикстурный набор для data-экранов
+            // (эта часть в этом заходе не меняется).
+            if (isRealFlow) selectChild(kids[selectedIndex].id);
+            enterApp(selectedIndex);
+          }}
         />
       </ScrollView>
     </View>
