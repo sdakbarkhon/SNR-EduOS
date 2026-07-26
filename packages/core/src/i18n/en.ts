@@ -2376,6 +2376,12 @@ export const en: Dictionary = {
       profile: "Skills profile",
       progress: "Skills & progress",
       practice: "Practice recommendations",
+      axisLogic: "Logic",
+      axisCommunication: "Comm.",
+      axisDiscipline: "Disc.",
+      axisCreativity: "Creativ",
+      axisIndependence: "Indep.",
+      axisTeamwork: "Team",
     },
     pay: {
       autopay: "Auto-pay",

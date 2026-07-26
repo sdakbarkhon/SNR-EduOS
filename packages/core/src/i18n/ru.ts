@@ -2380,6 +2380,12 @@ export const ru: Dictionary = {
       profile: "Профиль навыков",
       progress: "Навыки и прогресс",
       practice: "Рекомендации для практики",
+      axisLogic: "Логика",
+      axisCommunication: "Комм.",
+      axisDiscipline: "Дисц.",
+      axisCreativity: "Креатив",
+      axisIndependence: "Самост.",
+      axisTeamwork: "Команда",
     },
     pay: {
       autopay: "Автоплатёж",

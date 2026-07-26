@@ -2437,6 +2437,18 @@ export interface Dictionary {
       profile: string;
       progress: string;
       practice: string;
+      // Редизайн радара «Профиль навыков» (П10 «Успехи»→«Навыки»): 6 коротких
+      // подписей вершин радара (в паре с числом самой вершины на экране,
+      // напр. «Самост. 64%» / «Mustaq. 64%»). Все 6 — через i18n (не смесь
+      // RU-литерала с переводом), длина каждой формы подобрана так, чтобы
+      // «имя + число%» помещалось в тот же бюджет символов, что уже проверен
+      // на #16 (SkillsScreen.tsx, «Самост. 4.5» = 11 символов).
+      axisLogic: string;         // «Логика»
+      axisCommunication: string; // «Комм.»
+      axisDiscipline: string;    // «Дисц.»
+      axisCreativity: string;    // «Креатив»
+      axisIndependence: string;  // «Самост.»
+      axisTeamwork: string;      // «Команда»
     };
     pay: {
       autopay: string;

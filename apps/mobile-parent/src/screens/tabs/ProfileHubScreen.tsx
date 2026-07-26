@@ -40,7 +40,7 @@ import {
   StatusChip,
   TabScreenScroll,
 } from "../../ui";
-import { AppBackground, fonts, gradPoints, useTheme, type ThemeTokens } from "../../theme";
+import { AppBackground, fonts, gradPoints, shadowStyle, useTheme, type ThemeTokens } from "../../theme";
 import { useAppLocale } from "../../i18n";
 import {
   getChildren,
@@ -94,7 +94,7 @@ export default function ProfileHubScreen() {
   // выставляется ни при том, ни при другом). parents.phone в базе NULL —
   // показываем номер, которым реально вошли (по pendingUsername, работает
   // одинаково для входа по цифрам и по карточке модалки).
-  const { data: parentData } = useParentData();
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
   const loginPhone = isRealFlow && session.pendingUsername ? findPhoneForUsername(session.pendingUsername) : null;
 
@@ -237,6 +237,7 @@ export default function ProfileHubScreen() {
           {(isRealFlow ? parentData!.children.map(toChildRow) : children).map((k, i) => (
             <ChildHubRow
               key={k.id}
+              active={isRealFlow && k.id === selectedChildId}
               full_name={k.full_name}
               classLabel={`${k.class_name} ${d.parentApp.grades.class}`}
               initials={k.first_name.slice(0, 1)}
@@ -245,7 +246,16 @@ export default function ProfileHubScreen() {
               status_chip={isRealFlow ? "" : k.status_chip}
               tone={k.status_chip === "В школе" ? "green" : "gray"}
               divider={i > 0}
-              onPress={() => navigation.navigate("d29")}
+              onPress={() => {
+                // Заход 9: тап по ребёнку в «Мои дети» делает его активным
+                // (тот же selectChild, что и рабочий свитчер на Home/d29),
+                // а не только открывает всегда одного и того же — прежде
+                // экран d29 после тапа показывал предыдущего активного, не
+                // тапнутого. Демо-флоу не трогаем — там переключателя
+                // активного ребёнка нет и не было.
+                if (isRealFlow) selectChild(k.id);
+                navigation.navigate("d29");
+              }}
             />
           ))}
         </GlassCard>
@@ -355,7 +365,30 @@ export default function ProfileHubScreen() {
   );
 }
 
-/** Строка ребёнка «Мои дети». */
+/** Галочка активного ребёнка — та же грдиент+тень, что у выбранного элемента
+ *  в ChildPickerSheetContent (шторка свитчера), только компактнее (18px, там
+ *  22px), чтобы поместиться в уже плотную строку рядом с чипом и шевроном. */
+function ActiveCheck({ tokens }: { tokens: ThemeTokens }) {
+  const g = gradPoints(tokens.accentGrad.angle);
+  return (
+    <View style={[{ borderRadius: 9 }, shadowStyle({ x: 0, y: 3, blur: 8, color: "rgba(124,58,237,0.4)" })]}>
+      <LinearGradient
+        colors={[tokens.accentGrad.colors[0], tokens.accentGrad.colors[1]]}
+        start={g.start}
+        end={g.end}
+        style={{ width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" }}
+      >
+        <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+          <Path d="M20 6 9 17l-5-5" stroke="#FFFFFF" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </LinearGradient>
+    </View>
+  );
+}
+
+/** Строка ребёнка «Мои дети». active — активный ребёнок (selectedChildId
+ *  реального входа): подсветка имени акцентным цветом + галочка вместо
+ *  StatusChip-слота (см. ActiveCheck выше). Демо всегда active=false. */
 function ChildHubRow({
   full_name,
   classLabel,
@@ -364,6 +397,7 @@ function ChildHubRow({
   ringColor,
   status_chip,
   tone,
+  active,
   divider,
   onPress,
 }: {
@@ -374,6 +408,7 @@ function ChildHubRow({
   ringColor: string;
   status_chip: string;
   tone: "green" | "gray";
+  active: boolean;
   divider: boolean;
   onPress: () => void;
 }) {
@@ -395,13 +430,14 @@ function ChildHubRow({
         <Avatar size={36} initials={initials} gradient={gradient} ringColor={ringColor} variant="ring" fontSize={12} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: active ? tokens.accent : tokens.ink1 }}>
           {full_name}
         </Text>
         <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink2, marginTop: 2 }}>
           {classLabel}
         </Text>
       </View>
+      {active ? <ActiveCheck tokens={tokens} /> : null}
       {status_chip ? (
         <StatusChip label={status_chip} family={tone} variant={tone === "green" ? "live" : "default"} />
       ) : null}

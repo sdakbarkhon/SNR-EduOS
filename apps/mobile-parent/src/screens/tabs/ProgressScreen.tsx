@@ -195,6 +195,27 @@ export default function ProgressScreen() {
   const summary = getGradesSummary();
   const stats = getSubjectStats();
   const skills = getSkillsTab();
+  // Радар «Профиль навыков» — редизайн: фикстура radar_values даёт 6 осей, а
+  // chips именует только 4 (на другой шкале, /5 — отдельный, несвязанный
+  // набор чисел, здесь не используется во избежание двух разных цифр у
+  // одного и того же навыка). Все 6 названий вершин — через i18n
+  // (d.parentApp.skills.axis*), короткие формы подобраны под бюджет символов
+  // «#16» (SkillsScreen.tsx: «Самост. 4.5» = 11 символов). Число у каждой
+  // подписи — ЕЁ реальный radar_values[i], без изменения фикстуры.
+  const skillsRadarLabels = useMemo((): [string, string, string, string, string, string] => {
+    const s = d.parentApp.skills;
+    const names = [
+      s.axisLogic,
+      s.axisCommunication,
+      s.axisDiscipline,
+      s.axisCreativity,
+      s.axisIndependence,
+      s.axisTeamwork,
+    ];
+    return names.map((name, i) => `${name} ${skills.radar_values[i]}%`) as [
+      string, string, string, string, string, string,
+    ];
+  }, [d.parentApp.skills, skills.radar_values]);
   const notes = getGradesAssistantNotes();
   const reviews = getTeacherReviews();
   const bellCount = getUnreadNotificationsCount();
@@ -727,38 +748,15 @@ export default function ProgressScreen() {
                   skills.radar_values as unknown as [number, number, number, number, number, number]
                 }
                 max={100}
-                size={200}
+                size={224}
                 fillColor={`rgba(${tokens.status.violet.rgb},0.28)`}
                 strokeColor={tokens.accent}
+                labels={skillsRadarLabels}
+                labelFontSize={7.5}
+                gridRings={[0.33, 0.66, 1]}
+                showSpokes
+                showDots
               />
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                {skills.chips.map((c) => {
-                  const st = tokens.status[c.tone];
-                  const chip = tokens.chip(st.rgb);
-                  return (
-                    <View
-                      key={c.name}
-                      style={{
-                        paddingVertical: 5,
-                        paddingHorizontal: 10,
-                        borderRadius: 999,
-                        backgroundColor: chip.bg,
-                        borderWidth: 1,
-                        borderColor: chip.border,
-                        flexDirection: "row",
-                        gap: 6,
-                      }}
-                    >
-                      <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, color: st.text }}>
-                        {c.name}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: st.text }}>
-                        {c.value_label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
             </GlassCard>
 
             <AccentCard

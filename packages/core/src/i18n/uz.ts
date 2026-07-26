@@ -2377,6 +2377,12 @@ export const uz: Dictionary = {
       profile: "Ko'nikmalar profili",
       progress: "Ko'nikma va progress",
       practice: "Amaliyot uchun tavsiyalar",
+      axisLogic: "Mantiq",
+      axisCommunication: "Muloq.",
+      axisDiscipline: "Intiz.",
+      axisCreativity: "Ijodiy",
+      axisIndependence: "Mustaq.",
+      axisTeamwork: "Jamoa",
     },
     pay: {
       autopay: "Avtoto'lov",
