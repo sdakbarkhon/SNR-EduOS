@@ -32,7 +32,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getHomeworkWithSubmissions, type HomeworkWithSubmission } from "@snr/core";
+import { getHomeworkWithSubmissions, format, LOCALE_TAG, type HomeworkWithSubmission, type Dictionary } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCard, GlassCircleButton, InnerHeader, type StatusFamily } from "../../ui";
 import {
@@ -49,7 +49,7 @@ import { useParentData } from "../../context/ParentDataContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSupabase } from "../../lib/supabase";
 import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
-import { realSubmissionStatusKind, realSubmissionStatusLabel, realTestStatusKind, realTestStatusLabel } from "../../lib/homeworkStatus";
+import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -87,6 +87,7 @@ type RealHomeworkRow = {
   subjectName: string;
   subjectColor: string;
   statusLabel: string;
+  statusKind: RealHomeworkStatusKind;
   title: string;
   dueLabel: string;
   progress: number | "hourglass" | null;
@@ -95,24 +96,46 @@ type RealHomeworkRow = {
   submittedAtAll: boolean;
 };
 
-function realDueLabel(dueDate: string | null, todayKey: string, tomorrowKey: string): string {
-  if (!dueDate) return "Без срока";
+/** kind → StatusFamily для РЕАЛЬНЫХ данных — по enum, не по локализованному
+ *  тексту (statusToFamily ниже сравнивает строки и остаётся верным ТОЛЬКО
+ *  для демо-фикстуры, где статус-лейблы всегда фиксированный RU-литерал;
+ *  для реальных данных лейбл теперь переведён и меняется с языком). */
+function realStatusFamily(kind: RealHomeworkStatusKind): StatusFamily {
+  if (kind === "graded") return "green";
+  if (kind === "pending_review") return "violet";
+  return "gray";
+}
+
+function realDueLabel(
+  dueDate: string | null,
+  todayKey: string,
+  tomorrowKey: string,
+  t: Dictionary["parentApp"],
+  localeTag: string,
+): string {
+  if (!dueDate) return t.hw.noDeadline;
   const key = tashkentDateKey(dueDate);
-  const time = new Date(dueDate).toLocaleTimeString("ru-RU", {
+  const time = new Date(dueDate).toLocaleTimeString(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Asia/Tashkent",
   });
-  if (key === todayKey) return `Срок: сегодня, ${time}`;
-  if (key === tomorrowKey) return `Срок: завтра, ${time}`;
-  const dateLabel = new Date(dueDate).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
-  return `Срок: ${dateLabel}`;
+  if (key === todayKey) return format(t.hw.dueToday, { time });
+  if (key === tomorrowKey) return format(t.hw.dueTomorrow, { time });
+  const dateLabel = new Date(dueDate).toLocaleDateString(localeTag, { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
+  return format(t.hw.dueOn, { date: dateLabel });
 }
 
-function toRealHomeworkRow(hw: HomeworkWithSubmission, todayKey: string, tomorrowKey: string): RealHomeworkRow {
+function toRealHomeworkRow(
+  hw: HomeworkWithSubmission,
+  todayKey: string,
+  tomorrowKey: string,
+  t: Dictionary["parentApp"],
+  localeTag: string,
+): RealHomeworkRow {
   const isTest = hw.content_type === "test";
   const kind = isTest ? realTestStatusKind(hw.test_submission) : realSubmissionStatusKind(hw.submission?.status);
-  const statusLabel = isTest ? realTestStatusLabel(hw.test_submission) : realSubmissionStatusLabel(hw.submission?.status);
+  const statusLabel = homeworkStatusLabel(kind, t.status);
   const overdue = kind === "not_submitted" && !!hw.due_date && tashkentDateKey(hw.due_date) < todayKey;
   const dueToday = !!hw.due_date && tashkentDateKey(hw.due_date) === todayKey;
 
@@ -129,11 +152,12 @@ function toRealHomeworkRow(hw: HomeworkWithSubmission, todayKey: string, tomorro
 
   return {
     id: hw.id,
-    subjectName: hw.subjectName ?? hw.group.subject ?? "Предмет",
+    subjectName: hw.subjectName ?? hw.group.subject ?? t.hw.subjectFallback,
     subjectColor: hw.subjectColor ?? "#6366f1",
     statusLabel,
+    statusKind: kind,
     title: hw.title,
-    dueLabel: realDueLabel(hw.due_date, todayKey, tomorrowKey),
+    dueLabel: realDueLabel(hw.due_date, todayKey, tomorrowKey, t, localeTag),
     progress,
     overdue,
     dueToday,
@@ -162,7 +186,7 @@ function RealSubjectTile({ color, glyph }: { color: string; glyph: string }) {
  *  просто источник полей другой (RealHomeworkRow вместо HomeworkCardRow). */
 function RealHomeworkCard({ row, onPress }: { row: RealHomeworkRow; onPress: () => void }) {
   const { tokens, scheme } = useTheme();
-  const family = statusToFamily(row.statusLabel);
+  const family = realStatusFamily(row.statusKind);
   const st = tokens.status[family];
 
   const emphMeta = family === "orange" || family === "red";
@@ -703,7 +727,8 @@ function SummaryStatsBar({
 
 export default function HomeworksScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
+  const t = d.parentApp;
   const navigation = useNavigation<Nav>();
 
   const session = useAuthSession();
@@ -744,18 +769,19 @@ export default function HomeworksScreen() {
   );
   const todayKey = useMemo(() => tashkentToday(), []);
   const tomorrowKey = useMemo(() => addDays(todayKey, 1), [todayKey]);
+  const localeTag = LOCALE_TAG[locale];
   const realList = useMemo(
-    () => (homeworkState.data ?? []).map((hw) => toRealHomeworkRow(hw, todayKey, tomorrowKey)),
-    [homeworkState.data, todayKey, tomorrowKey],
+    () => (homeworkState.data ?? []).map((hw) => toRealHomeworkRow(hw, todayKey, tomorrowKey, t, localeTag)),
+    [homeworkState.data, todayKey, tomorrowKey, t, localeTag],
   );
   const realChips = useMemo(
     () => [
-      { label: "Все", count: realList.length },
-      { label: "Сегодня", count: realList.filter((r) => r.dueToday).length },
-      { label: "Просрочено", count: realList.filter((r) => r.overdue).length },
-      { label: "Выполнено", count: realList.filter((r) => r.submittedAtAll).length },
+      { label: t.hw.filterAll, count: realList.length },
+      { label: t.hw.filterToday, count: realList.filter((r) => r.dueToday).length },
+      { label: t.hw.filterOverdue, count: realList.filter((r) => r.overdue).length },
+      { label: t.hw.filterDone, count: realList.filter((r) => r.submittedAtAll).length },
     ],
-    [realList],
+    [realList, t.hw],
   );
   const realVisible = useMemo(() => {
     switch (activeFilter) {
@@ -772,8 +798,8 @@ export default function HomeworksScreen() {
   const realTotals = useMemo(
     () => ({
       total: realList.length,
-      done: realList.filter((r) => r.statusLabel === "Оценено").length,
-      under_review: realList.filter((r) => r.statusLabel === "На проверке").length,
+      done: realList.filter((r) => r.statusKind === "graded").length,
+      under_review: realList.filter((r) => r.statusKind === "pending_review").length,
       overdue: realList.filter((r) => r.overdue).length,
     }),
     [realList],
@@ -839,7 +865,7 @@ export default function HomeworksScreen() {
             }}
           >
             <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
-              Не удалось загрузить задания
+              {t.hw.loadListError}
             </Text>
             <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
               {homeworkState.error.message}
@@ -856,14 +882,14 @@ export default function HomeworksScreen() {
               }}
             >
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
-                Повторить
+                {t.common.retry}
               </Text>
             </Pressable>
           </GlassCard>
         ) : isRealFlow && realVisible.length === 0 ? (
           <GlassCard radius={20} contentStyle={{ padding: 18, alignItems: "center" }}>
             <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2, textAlign: "center" }}>
-              {realList.length === 0 ? "Заданий пока нет" : "Нет заданий под этот фильтр"}
+              {realList.length === 0 ? t.hw.emptyAll : t.hw.emptyFiltered}
             </Text>
           </GlassCard>
         ) : isRealFlow ? (

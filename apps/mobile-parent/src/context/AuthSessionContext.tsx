@@ -1,6 +1,5 @@
 /**
  * AuthSessionContext — состояние потока входа (A1→A2→A3→A4→Main).
- * Демо-ветка (pickDemoParent) — целиком на фикстурах, как и раньше.
  *
  * ЗАХОД 1 (реальный вход): submitPhone/verifyCode для phone-flow (не демо)
  * больше не чистая фикстура — резолвят один из 3 тестовых номеров
@@ -14,17 +13,17 @@
  * one-shot центр-модалку `DemoNoticeModal` (см. RootNavigator + src/ui).
  * Прежние `bannerClosed`/`closeDemoBanner` переименованы в
  * `demoNoticeSeen`/`dismissDemoNotice`. Флаг session-scoped — сбрасывается
- * в false при pickDemoParent (новый заход в демо) и в signOut (сброс всей
- * сессии). При phone-flow (не демо) модалка не показывается никогда.
+ * в false при демо-тапе (performLogin(isDemoTap=true)) и в signOut (сброс
+ * всей сессии). При phone-flow (не демо) модалка не показывается никогда.
+ *
+ * Долги, проход 1: pickDemoParent()/DEMO_PARENTS/getChildrenForDemoParent
+ * удалены — были мёртвым кодом (не вызывались ни из одного UI-пути с
+ * Захода 2, шаг 2, когда AuthDemoPickerSheet переписали на реальный
+ * loginAsTestAccount()). Поле demoParentId в состоянии осталось — на него
+ * по-прежнему завязан isRealFlow-гейт во всех data-экранах.
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  getChildren,
-  getChildrenForDemoParent,
-  getDemoParents,
-  DEFAULT_CHILD_INDEX,
-} from "../data";
-import type { DemoParentRow } from "../data/types";
+import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
 import { loginAsParent } from "../lib/auth";
 import { getSupabase } from "../lib/supabase";
 import { findTestAccount, TEST_ACCOUNT_PASSWORD, type TestAccount } from "../lib/testAccounts";
@@ -46,7 +45,8 @@ export interface AuthSessionState {
   country: string;
   /** 0..4 цифр. */
   smsCode: string;
-  /** Кто активен: демо-родитель (id из DEMO_PARENTS) или null (phone-flow). */
+  /** id демо-родителя, если активна демо-сессия, или null (phone-flow).
+   *  Устанавливается только через performLogin(isDemoTap=true). */
   demoParentId: string | null;
   /** Сколько детей у активного родителя (1..3). Заход 1: для phone-flow
    *  теперь реальное число из lib/testAccounts.ts (было — хардкод 3). */
@@ -56,8 +56,9 @@ export interface AuthSessionState {
   /** true после выбора демо-родителя (перед enterApp). */
   isDemo: boolean;
   /** ЗАХОД 5x (правка 3): true после того, как one-shot центр-модалка
-   *  «Демо-режим» (DemoNoticeModal) закрыта. Session-scoped: при новом заходе
-   *  в демо (pickDemoParent) и при signOut сбрасывается обратно в false. */
+   *  «Демо-режим» (DemoNoticeModal) закрыта. Session-scoped: при новом
+   *  демо-тапе (performLogin(isDemoTap=true)) и при signOut сбрасывается
+   *  обратно в false. */
   demoNoticeSeen: boolean;
   /** id выбранного ребёнка после enterApp (для MainStack). */
   currentChildId: string | null;
@@ -91,7 +92,6 @@ export interface AuthSessionCtx extends AuthSessionState {
   /** Заход 2, шаг 2: демо-модалка — тап по карточке родителя сразу делает
    *  реальный вход этим аккаунтом (без экрана кода). */
   loginAsTestAccount(account: TestAccount): Promise<"picker" | "app" | "error">;
-  pickDemoParent(p: DemoParentRow): "picker" | "app";
   pickChildIndex(i: number): void;
   enterApp(childIndex: number): void;
   /** ЗАХОД 5x (правка 3): закрыть one-shot центр-модалку «Демо-режим». */
@@ -191,18 +191,16 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const enterApp = useCallback((childIndex: number) => {
     setState((s) => {
-      // Заход 5: демо-родитель — его собственный список детей. Заход 1:
-      // реальный phone-login — фикстурный набор, подобранный по количеству
-      // под этот тестовый аккаунт (lib/testAccounts.ts), НЕ общий пул
-      // getChildren() (иначе индекс из РЕАЛЬНОГО picker'а указывал бы на
-      // случайного ребёнка из всех 6 фикстурных). Ни то ни другое — старый
-      // безусловный fallback на getChildren() (не должно происходить в
-      // норме, оставлен только как защита от несогласованного состояния).
-      const kids = s.demoParentId
-        ? getChildrenForDemoParent(s.demoParentId)
-        : s.pendingFixtureChildIds && s.pendingFixtureChildIds.length > 0
-          ? s.pendingFixtureChildIds.map((id) => getChildren().find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c)
-          : getChildren();
+      // Заход 1: реальный phone-login — фикстурный набор, подобранный по
+      // количеству под этот тестовый аккаунт (lib/testAccounts.ts), НЕ
+      // общий пул getChildren() (иначе индекс из РЕАЛЬНОГО picker'а
+      // указывал бы на случайного ребёнка из всех 6 фикстурных). Пустой
+      // pendingFixtureChildIds — безусловный fallback на getChildren() (не
+      // должно происходить в норме, оставлен только как защита от
+      // несогласованного состояния).
+      const kids = s.pendingFixtureChildIds && s.pendingFixtureChildIds.length > 0
+        ? s.pendingFixtureChildIds.map((id) => getChildren().find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c)
+        : getChildren();
       const bound = Math.max(1, kids.length);
       const idx = Math.max(0, Math.min(childIndex, bound - 1));
       const childId = kids[idx]?.id ?? kids[0]?.id ?? null;
@@ -290,38 +288,6 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [performLogin],
   );
 
-  const pickDemoParent = useCallback((p: DemoParentRow): "picker" | "app" => {
-    let target: "picker" | "app" = "picker";
-    setState((s) => {
-      const kidsCount = p.kids_count;
-      if (kidsCount === 1) {
-        target = "app";
-        const kids = getChildren();
-        const firstId = p.child_ids[0] ?? kids[0]?.id ?? null;
-        return {
-          ...s,
-          isDemo: true,
-          demoNoticeSeen: false,
-          demoParentId: p.id,
-          kidsCount,
-          authSel: 0,
-          phase: "app",
-          currentChildId: firstId,
-        };
-      }
-      return {
-        ...s,
-        isDemo: true,
-        demoNoticeSeen: false,
-        demoParentId: p.id,
-        kidsCount,
-        authSel: DEFAULT_SEL_BY_KIDS[kidsCount] ?? 0,
-        phase: "childPicker",
-      };
-    });
-    return target;
-  }, []);
-
   const pickChildIndex = useCallback((i: number) => {
     setState((s) => ({ ...s, authSel: i }));
   }, []);
@@ -362,7 +328,6 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       submitPhone,
       verifyCode,
       loginAsTestAccount,
-      pickDemoParent,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,
@@ -378,7 +343,6 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       submitPhone,
       verifyCode,
       loginAsTestAccount,
-      pickDemoParent,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,
@@ -393,11 +357,6 @@ export function useAuthSession(): AuthSessionCtx {
   const ctx = useContext(AuthSessionContext);
   if (!ctx) throw new Error("useAuthSession must be used within AuthSessionProvider");
   return ctx;
-}
-
-/** Хелпер для внешних (навигация): доступ ко всему списку родителей. */
-export function getAuthDemoParents(): DemoParentRow[] {
-  return getDemoParents();
 }
 
 /** Индексы фаз (для условной рендер-логики). */

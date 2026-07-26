@@ -9,10 +9,12 @@
  *   5. Security-стрип «Ваши данные защищены» (GlassCard, фиолетовая иконка-щит).
  *   6. Spacer (flex:1) — распорка, прижимающая CTA вниз.
  *   7. CTA «Продолжить» — PrimaryButton (accent gradient) → enterApp.
- * Список детей — демо: собственный child_ids демо-родителя. Заход 1
- * (реальный вход): РЕАЛЬНЫЙ список детей из Supabase (useParentData()) —
- * см. toChildRow() ниже. Иначе (защитный fallback) — первые kidsCount из
- * CHILDREN (макет: KIDS.slice(0, kidsN)).
+ * Список детей — Заход 1 (реальный вход): РЕАЛЬНЫЙ список детей из Supabase
+ * (useParentData()) — см. toChildRow() ниже. Иначе (защитный fallback) —
+ * первые kidsCount из CHILDREN (макет: KIDS.slice(0, kidsN)). Долги, проход
+ * 1: демо-родительская ветка (getChildrenForDemoParent) удалена — была
+ * мёртвым кодом, demoParentId с Захода 2 шаг 2 никогда не становится
+ * non-null (см. AuthSessionContext.tsx).
  * Строки отрисованы кастомно (не через ChildPickerSheetContent), т.к. макет A4
  * показывает «SNR International School» в третьей строке карточки, а
  * ChildPickerSheetContent — status-чип.
@@ -25,7 +27,7 @@ import { useAppLocale } from "../../i18n";
 import { useTheme, fonts, gradPoints, shadowStyle } from "../../theme";
 import { Avatar, GlassCard, GlassCircleButton, PrimaryButton } from "../../ui";
 import { BackArrowIcon, ShieldCheckIcon } from "../../ui/auth/icons";
-import { getChildren, getChildrenForDemoParent } from "../../data";
+import { getChildren } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
@@ -43,19 +45,15 @@ export function LoginChildPickerScreen() {
   const { data: parentData, selectChild } = useParentData();
   const g = gradPoints(tokens.accentGrad.angle);
 
-  // Заход 5: демо-родитель — свой список child_ids (Исмаилов → Азизбек,
-  // Рахимов → Мадина/Хумоюн, Каримова → все Каримовы).
   // Заход 1: реальный phone-login — РЕАЛЬНЫЙ список из ParentDataContext
   // (verifyCode() дожидается его перед переходом на эту фазу, так что к
   // моменту монтирования этого экрана он уже готов). Пустой/не загруженный
   // (defensive fallback — в норме не должно случаться) — старое поведение
   // на первых kidsCount из CHILDREN.
   const isRealFlow = !demoParentId && !!parentData && parentData.children.length > 0;
-  const kids = demoParentId
-    ? getChildrenForDemoParent(demoParentId)
-    : isRealFlow
-      ? parentData!.children.map(toChildRow)
-      : getChildren().slice(0, Math.max(1, kidsCount));
+  const kids = isRealFlow
+    ? parentData!.children.map(toChildRow)
+    : getChildren().slice(0, Math.max(1, kidsCount));
   const selectedIndex = Math.min(Math.max(0, authSel), kids.length - 1);
 
   const checkOffBg = scheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(23,18,67,0.08)";

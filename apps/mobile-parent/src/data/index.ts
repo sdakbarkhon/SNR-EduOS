@@ -50,7 +50,6 @@ import {
   CHILDREN,
   CHILD_INFO,
   DEFAULT_CHILD_INDEX,
-  DEMO_PARENTS,
   DEMO_SHEET_TEXT,
   PARENT,
   PARENT_PROFILE,
@@ -224,27 +223,6 @@ export function getParent() {
 
 export function getParentProfile() {
   return PARENT_PROFILE;
-}
-
-export function getDemoParents() {
-  return DEMO_PARENTS;
-}
-
-/**
- * Заход 5 — дети конкретного демо-родителя в порядке DEMO_PARENTS[i].child_ids.
- * LoginChildPicker и AuthSession используют это, чтобы Исмаилов/Рахимов видели
- * СВОИХ детей, а не всех Каримовых. Возвращает пустой массив, если родителя
- * с таким id нет; неизвестные child_id пропускаются.
- */
-export function getChildrenForDemoParent(demoParentId: string): ChildRow[] {
-  const parent = DEMO_PARENTS.find((p) => p.id === demoParentId);
-  if (!parent) return [];
-  const out: ChildRow[] = [];
-  for (const id of parent.child_ids) {
-    const child = getChildById(id);
-    if (child) out.push(child);
-  }
-  return out;
 }
 
 export function getAuthFixtures() {

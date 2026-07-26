@@ -50,7 +50,7 @@ import Svg, { Path, Rect } from "react-native-svg";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getChildHomeworkDetail, getSubmissionFileUrl, type ChildHomeworkDetail } from "@snr/core";
+import { getChildHomeworkDetail, getSubmissionFileUrl, format, LOCALE_TAG, type ChildHomeworkDetail, type Dictionary } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import type { StatusFamily } from "../../ui";
 import {
@@ -76,7 +76,7 @@ import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSupabase } from "../../lib/supabase";
 import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
-import { realSubmissionStatusLabel, realTestStatusLabel } from "../../lib/homeworkStatus";
+import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
@@ -89,9 +89,11 @@ function hexToRgbCsv(hex: string): string {
   return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
 }
 
-function realStatusFamily(label: string): StatusFamily {
-  if (label === "На проверке") return "violet";
-  if (label === "Оценено") return "green";
+/** kind → StatusFamily по enum, не по локализованному тексту (тот же фикс,
+ *  что в HomeworksScreen.tsx — лейбл теперь переведён и меняется с языком). */
+function realStatusFamily(kind: RealHomeworkStatusKind): StatusFamily {
+  if (kind === "pending_review") return "violet";
+  if (kind === "graded") return "green";
   return "gray"; // «Не сдано»
 }
 
@@ -102,20 +104,20 @@ function fileExtLabel(name: string | null | undefined): string {
   return ext ? ext.toUpperCase().slice(0, 4) : "FILE";
 }
 
-function fileSizeLabel(bytes: number | null | undefined): string {
+function fileSizeLabel(bytes: number | null | undefined, hw: Dictionary["parentApp"]["hw"]): string {
   if (!bytes) return "";
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  if (bytes < 1024 * 1024) return format(hw.sizeKb, { n: Math.round(bytes / 1024) });
+  return format(hw.sizeMb, { n: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
 const HTTP_URL_RE = /^https?:\/\/\S+$/;
 
-async function openSignedFile(storagePath: string) {
+async function openSignedFile(storagePath: string, errorTitle: string) {
   try {
     const url = await getSubmissionFileUrl(getSupabase(), storagePath);
     await Linking.openURL(url);
   } catch (e) {
-    Alert.alert("Не удалось открыть файл", e instanceof Error ? e.message : String(e));
+    Alert.alert(errorTitle, e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -376,7 +378,9 @@ function StepDot({ state }: { state: "done" | "review" }) {
 
 export default function HomeworkDetailScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
+  const t = d.parentApp;
+  const localeTag = LOCALE_TAG[locale];
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProp<MainStackParamList, "d13">>();
   const auth = useAuthSession();
@@ -416,33 +420,34 @@ export default function HomeworkDetailScreen() {
   const tomorrowKey = useMemo(() => addDays(todayKey, 1), [todayKey]);
 
   const isRealTest = realHw?.content_type === "test";
-  const realStatusLabel = realHw
+  const realKind: RealHomeworkStatusKind | null = realHw
     ? isRealTest
-      ? realTestStatusLabel(realHw.test_submission)
-      : realSubmissionStatusLabel(realHw.submission?.status)
-    : "";
-  const realFamily = realStatusFamily(realStatusLabel);
+      ? realTestStatusKind(realHw.test_submission)
+      : realSubmissionStatusKind(realHw.submission?.status)
+    : null;
+  const realStatusLabel = realKind ? homeworkStatusLabel(realKind, t.status) : "";
+  const realFamily = realKind ? realStatusFamily(realKind) : "gray";
   const realSt = tokens.status[realFamily];
   const realChip = tokens.chip(realSt.rgb);
-  const realSubmittedAtAll = realStatusLabel !== "Не сдано" && realStatusLabel !== "";
+  const realSubmittedAtAll = realKind != null && realKind !== "not_submitted";
 
   const realDueLabel = useMemo(() => {
-    if (!realHw?.due_date) return "Без срока";
+    if (!realHw?.due_date) return t.hw.noDeadline;
     const key = tashkentDateKey(realHw.due_date);
-    const time = new Date(realHw.due_date).toLocaleTimeString("ru-RU", {
+    const time = new Date(realHw.due_date).toLocaleTimeString(localeTag, {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: "Asia/Tashkent",
     });
-    if (key === todayKey) return `Срок: сегодня, ${time}`;
-    if (key === tomorrowKey) return `Срок: завтра, ${time}`;
-    const dateLabel = new Date(realHw.due_date).toLocaleDateString("ru-RU", {
+    if (key === todayKey) return format(t.hw.dueToday, { time });
+    if (key === tomorrowKey) return format(t.hw.dueTomorrow, { time });
+    const dateLabel = new Date(realHw.due_date).toLocaleDateString(localeTag, {
       day: "numeric",
       month: "long",
       timeZone: "Asia/Tashkent",
     });
-    return `Срок: ${dateLabel}`;
-  }, [realHw?.due_date, todayKey, tomorrowKey]);
+    return format(t.hw.dueOn, { date: dateLabel });
+  }, [realHw?.due_date, todayKey, tomorrowKey, t.hw, localeTag]);
 
   const realTeacherInitials = useMemo(() => {
     const name = realHw?.teacherName?.trim();
@@ -450,8 +455,6 @@ export default function HomeworkDetailScreen() {
     const parts = name.split(/\s+/).slice(0, 2);
     return parts.map((p) => p.charAt(0).toUpperCase()).join("") || "—";
   }, [realHw?.teacherName]);
-
-  const t = d.parentApp;
 
   const goBack = () => {
     if (navigation.canGoBack()) navigation.goBack();
@@ -556,7 +559,7 @@ export default function HomeworkDetailScreen() {
               }}
             >
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
-                Не удалось загрузить задание
+                {t.hw.loadDetailError}
               </Text>
               <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
                 {detailState.error.message}
@@ -573,14 +576,14 @@ export default function HomeworkDetailScreen() {
                 }}
               >
                 <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
-                  Повторить
+                  {t.common.retry}
                 </Text>
               </Pressable>
             </GlassCard>
           ) : !realHw ? (
             <GlassCard radius={20} contentStyle={{ padding: 18, alignItems: "center" }}>
               <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2, textAlign: "center" }}>
-                Задание не найдено
+                {t.hw.notFound}
               </Text>
             </GlassCard>
           ) : (
@@ -610,7 +613,7 @@ export default function HomeworkDetailScreen() {
                       numberOfLines={1}
                       style={{ fontFamily: fonts.manrope800, fontSize: 10, letterSpacing: 10 * 0.05, color: tokens.ink3 }}
                     >
-                      {(realHw.subjectName ?? "ПРЕДМЕТ").toUpperCase()}
+                      {(realHw.subjectName ?? t.hw.subjectFallbackCaps).toUpperCase()}
                     </Text>
                     <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 13.5, color: tokens.ink1 }}>
                       {realHw.title}
@@ -662,7 +665,7 @@ export default function HomeworkDetailScreen() {
                         color: scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.66)",
                       }}
                     >
-                      {realHw.teacherName ?? "Преподаватель не назначен"}
+                      {realHw.teacherName ?? t.hw.teacherUnassigned}
                     </Text>
                   </View>
                 </View>
@@ -671,7 +674,7 @@ export default function HomeworkDetailScreen() {
               {/* 5-real. TeacherInstructionCard — только если реально есть описание. */}
               {realHw.description ? (
                 <GlassCard radius={20} contentStyle={{ padding: 13, gap: 6 }}>
-                  <CapsLabel>ИНСТРУКЦИЯ ОТ УЧИТЕЛЯ</CapsLabel>
+                  <CapsLabel>{t.hw.instructionLabel}</CapsLabel>
                   <Text
                     style={{
                       fontFamily: fonts.manrope600,
@@ -689,7 +692,7 @@ export default function HomeworkDetailScreen() {
                   только если реально прикреплён. */}
               {realHw.attachment_filename ? (
                 <GlassCard radius={20} contentStyle={{ padding: 13, gap: 9 }}>
-                  <CapsLabel>ПРИКРЕПЛЁННЫЕ МАТЕРИАЛЫ</CapsLabel>
+                  <CapsLabel>{t.hw.attachmentsLabel}</CapsLabel>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                     <AttachmentTypeTile label={fileExtLabel(realHw.attachment_filename)} />
                     <View style={{ flex: 1, minWidth: 0 }}>
@@ -703,11 +706,11 @@ export default function HomeworkDetailScreen() {
                           color: scheme === "dark" ? tokens.ink3 : "rgba(26,19,74,0.55)",
                         }}
                       >
-                        {fileSizeLabel(realHw.attachment_size_bytes)}
+                        {fileSizeLabel(realHw.attachment_size_bytes, t.hw)}
                       </Text>
                     </View>
                     <Pressable
-                      onPress={() => realHw.attachment_storage_path && openSignedFile(realHw.attachment_storage_path)}
+                      onPress={() => realHw.attachment_storage_path && openSignedFile(realHw.attachment_storage_path, t.hw.openFileError)}
                       style={({ pressed }) => [
                         {
                           paddingVertical: 7,
@@ -721,7 +724,7 @@ export default function HomeworkDetailScreen() {
                       ]}
                     >
                       <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: violet.text }}>
-                        Открыть файл
+                        {t.hw.openFile}
                       </Text>
                     </Pressable>
                   </View>
@@ -732,21 +735,21 @@ export default function HomeworkDetailScreen() {
                   задания (код/текст/результат теста/фото+ссылка). Числовая оценка
                   НЕ показывается. */}
               <GlassCard radius={20} contentStyle={{ padding: 13, gap: 9 }}>
-                <CapsLabel>ВАША СДАЧА</CapsLabel>
+                <CapsLabel>{t.hw.submissionLabel}</CapsLabel>
                 {isRealTest ? (
                   realHw.test_submission ? (
                     realHw.test_submission.score != null && realHw.test_submission.max_score != null ? (
                       <Text style={{ fontFamily: fonts.manrope700, fontSize: 12.5, color: tokens.ink1 }}>
-                        Результат: {realHw.test_submission.score} из {realHw.test_submission.max_score}
+                        {format(t.hw.testResult, { score: realHw.test_submission.score, max: realHw.test_submission.max_score })}
                       </Text>
                     ) : (
                       <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink2 }}>
-                        Сдано, ожидает результата
+                        {t.hw.testPendingResult}
                       </Text>
                     )
                   ) : (
                     <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
-                      Тест не пройден
+                      {t.hw.testNotTaken}
                     </Text>
                   )
                 ) : realHw.content_type === "programming" ? (
@@ -766,16 +769,16 @@ export default function HomeworkDetailScreen() {
                     </ScrollView>
                   ) : (
                     <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
-                      Код не отправлен
+                      {t.hw.codeNotSubmitted}
                     </Text>
                   )
                 ) : !realHw.submission ? (
                   <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
-                    Работа не сдана
+                    {t.hw.workNotSubmitted}
                   </Text>
                 ) : !realHw.submission.answer_text && !realHw.submission.file_storage_path ? (
                   <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
-                    Работа не сдана
+                    {t.hw.workNotSubmitted}
                   </Text>
                 ) : (
                   <View style={{ gap: 8 }}>
@@ -797,7 +800,7 @@ export default function HomeworkDetailScreen() {
                           ]}
                         >
                           <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: violet.text }}>
-                            Открыть ссылку
+                            {t.hw.openLink}
                           </Text>
                         </Pressable>
                       ) : (
@@ -818,7 +821,7 @@ export default function HomeworkDetailScreen() {
                         <AttachmentTypeTile label={fileExtLabel(realHw.submission.file_original_name)} />
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
-                            {realHw.submission.file_original_name ?? "Файл"}
+                            {realHw.submission.file_original_name ?? t.hw.fileFallbackName}
                           </Text>
                           <Text
                             style={{
@@ -827,11 +830,11 @@ export default function HomeworkDetailScreen() {
                               color: scheme === "dark" ? tokens.ink3 : "rgba(26,19,74,0.55)",
                             }}
                           >
-                            {fileSizeLabel(realHw.submission.file_size_bytes)}
+                            {fileSizeLabel(realHw.submission.file_size_bytes, t.hw)}
                           </Text>
                         </View>
                         <Pressable
-                          onPress={() => openSignedFile(realHw.submission!.file_storage_path!)}
+                          onPress={() => openSignedFile(realHw.submission!.file_storage_path!, t.hw.openFileError)}
                           style={({ pressed }) => [
                             {
                               paddingVertical: 7,
@@ -845,7 +848,7 @@ export default function HomeworkDetailScreen() {
                           ]}
                         >
                           <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: violet.text }}>
-                            Открыть файл
+                            {t.hw.openFile}
                           </Text>
                         </Pressable>
                       </View>
@@ -860,7 +863,7 @@ export default function HomeworkDetailScreen() {
               {/* 8-real. TeacherCommentCard — только если реально есть комментарий. */}
               {realHw.submission?.teacher_comment ? (
                 <GlassCard radius={20} contentStyle={{ padding: 13, gap: 8 }}>
-                  <CapsLabel>КОММЕНТАРИЙ УЧИТЕЛЯ</CapsLabel>
+                  <CapsLabel>{t.hw.commentLabel}</CapsLabel>
                   <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 9 }}>
                     <TeacherAvatar initials={realTeacherInitials} size={28} />
                     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
@@ -937,7 +940,7 @@ export default function HomeworkDetailScreen() {
                     <Path d="M20 6 9 17l-5-5" />
                   </Svg>
                   <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: realSt.text }}>
-                    Работа отправлена · {realStatusLabel}
+                    {format(t.hw.sentPrefix, { status: realStatusLabel })}
                   </Text>
                 </View>
               ) : null}
@@ -1036,7 +1039,7 @@ export default function HomeworkDetailScreen() {
 
         {/* 5. TeacherInstructionCard */}
         <GlassCard radius={20} contentStyle={{ padding: 13, gap: 6 }}>
-          <CapsLabel>ИНСТРУКЦИЯ ОТ УЧИТЕЛЯ</CapsLabel>
+          <CapsLabel>{t.hw.instructionLabel}</CapsLabel>
           <Text
             style={{
               fontFamily: fonts.manrope600,
@@ -1051,7 +1054,7 @@ export default function HomeworkDetailScreen() {
 
         {/* 6. AttachmentsCard */}
         <GlassCard radius={20} contentStyle={{ padding: 13, gap: 9 }}>
-          <CapsLabel>ПРИКРЕПЛЁННЫЕ МАТЕРИАЛЫ</CapsLabel>
+          <CapsLabel>{t.hw.attachmentsLabel}</CapsLabel>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             <AttachmentTypeTile label={hw.attachment.type_label} />
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -1096,10 +1099,7 @@ export default function HomeworkDetailScreen() {
                   color: violet.text,
                 }}
               >
-                {/* «Открыть файл»: ключа в d.parentApp пока нет (аналогичный
-                 *  hwDetailOpenFileBtn лежит в d.parent — v1 web-словарь).
-                 *  Ставим литерал, добавление ключа — вне scope Захода 5. */}
-                Открыть файл
+                {t.hw.openFile}
               </Text>
             </Pressable>
           </View>
@@ -1168,7 +1168,7 @@ export default function HomeworkDetailScreen() {
 
         {/* 8. TeacherCommentCard */}
         <GlassCard radius={20} contentStyle={{ padding: 13, gap: 8 }}>
-          <CapsLabel>КОММЕНТАРИЙ УЧИТЕЛЯ</CapsLabel>
+          <CapsLabel>{t.hw.commentLabel}</CapsLabel>
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 9 }}>
             <TeacherAvatar initials={hw.teacher_initials} size={28} />
             <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
@@ -1330,11 +1330,7 @@ export default function HomeworkDetailScreen() {
                 color: violet.text,
               }}
             >
-              {/* «Работа отправлена · На проверке» — конкатенация из
-               *  локализованного статусного ярлыка + литерала «Работа
-               *  отправлена» (нет отдельного parentApp-ключа). Так же
-               *  поступает мокап (строка 580). */}
-              Работа отправлена · {t.status.underReview}
+              {format(t.hw.sentPrefix, { status: t.status.underReview })}
             </Text>
           </View>
         ) : null}

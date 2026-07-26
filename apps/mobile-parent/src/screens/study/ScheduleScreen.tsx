@@ -43,7 +43,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Rect } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getStudentLessonsForWeek, formatTime, type LessonWithSubject } from "@snr/core";
+import { getStudentLessonsForWeek, formatTime, LOCALE_TAG, type LessonWithSubject } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   BottomSheetFrame,
@@ -86,16 +86,24 @@ function hexToRgbCsv(hex: string): string {
   return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
 }
 
-/** Полное имя дня недели по короткому лейблу SCHEDULE_DAYS (для баннера). */
-const WEEKDAY_FULL: Record<string, string> = {
-  Пн: "Понедельник",
-  Вт: "Вторник",
-  Ср: "Среда",
-  Чт: "Четверг",
-  Пт: "Пятница",
-  Сб: "Суббота",
-  Вс: "Воскресенье",
-};
+/** Полное имя дня недели по короткому лейблу SCHEDULE_DAYS (для баннера).
+ *  Долги, проход 1: лейблы — из словаря (t.date.*Full), не хардкод; ключи
+ *  ("Пн".."Вс") остаются нейтральными внутренними id из фикстуры/реальных
+ *  данных, не отображаемым текстом. */
+function buildWeekdayFull(date: {
+  monFull: string; tueFull: string; wedFull: string; thuFull: string;
+  friFull: string; satFull: string; sunFull: string;
+}): Record<string, string> {
+  return {
+    Пн: date.monFull,
+    Вт: date.tueFull,
+    Ср: date.wedFull,
+    Чт: date.thuFull,
+    Пт: date.friFull,
+    Сб: date.satFull,
+    Вс: date.sunFull,
+  };
+}
 
 /** Иконка календаря (макет строки 628, 637, 639 — тот же путь, разные stroke). */
 const CAL_PATHS = [
@@ -337,7 +345,8 @@ function SchedBanner({ text }: { text: string }) {
 
 export default function ScheduleScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
+  const WEEKDAY_FULL = useMemo(() => buildWeekdayFull(d.parentApp.date), [d.parentApp.date]);
   const navigation = useNavigation<Nav>();
 
   const session = useAuthSession();
@@ -367,12 +376,14 @@ export default function ScheduleScreen() {
   // переключаются локально (без рефетча на каждый тап по дню).
   const weekStartKey = useMemo(() => mondayOfWeek(todayKey), [todayKey]);
   const realWeekDays = useMemo(() => {
-    const labels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-    return labels.map((weekday_label, i) => {
+    const dateNs = d.parentApp.date;
+    const shortLabels = [dateNs.mon, dateNs.tue, dateNs.wed, dateNs.thu, dateNs.fri, dateNs.sat, dateNs.sun];
+    const fullLabels = [dateNs.monFull, dateNs.tueFull, dateNs.wedFull, dateNs.thuFull, dateNs.friFull, dateNs.satFull, dateNs.sunFull];
+    return shortLabels.map((weekday_label, i) => {
       const dateKey = addDays(weekStartKey, i);
-      return { weekday_label, day: Number(dateKey.slice(8, 10)), dateKey };
+      return { weekday_label, weekday_full: fullLabels[i], day: Number(dateKey.slice(8, 10)), dateKey };
     });
-  }, [weekStartKey]);
+  }, [weekStartKey, d.parentApp.date]);
 
   const scheduleState = useAsyncData(
     () =>
@@ -440,15 +451,14 @@ export default function ScheduleScreen() {
     const dayRow = realWeekDays[selectedDay];
     if (!dayRow) return "";
     const [y, m, dd] = dayRow.dateKey.split("-").map(Number);
-    const dateLabel = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("ru-RU", {
+    const dateLabel = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString(LOCALE_TAG[locale], {
       day: "numeric",
       month: "long",
       timeZone: "UTC",
     });
-    if (dayRow.dateKey === todayKey) return `Сегодня, ${dateLabel}`;
-    const full = WEEKDAY_FULL[dayRow.weekday_label] ?? dayRow.weekday_label;
-    return `${full}, ${dateLabel}`;
-  }, [selectedDay, realWeekDays, todayKey]);
+    if (dayRow.dateKey === todayKey) return `${d.parentApp.date.today}, ${dateLabel}`;
+    return `${dayRow.weekday_full}, ${dateLabel}`;
+  }, [selectedDay, realWeekDays, todayKey, locale, d.parentApp.date]);
 
   const weekFinal = isRealFlow ? realWeekDays : week;
   const schedBannerFinal = isRealFlow ? realSchedBanner : schedBanner;
@@ -485,14 +495,14 @@ export default function ScheduleScreen() {
       if (next && cur.ends_at) {
         out.push({
           kind: "break",
-          start: formatTime(cur.ends_at),
-          end: formatTime(next.starts_at),
+          start: formatTime(cur.ends_at, LOCALE_TAG[locale]),
+          end: formatTime(next.starts_at, LOCALE_TAG[locale]),
           keyId: `br-${i}`,
         });
       }
     }
     return out;
-  }, [realDayLessons]);
+  }, [realDayLessons, locale]);
 
   const rows = isRealFlow ? realRows : fixtureRows;
 
@@ -600,7 +610,7 @@ export default function ScheduleScreen() {
             }}
           >
             <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
-              Не удалось загрузить расписание
+              {d.parentApp.sched.loadError}
             </Text>
             <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
               {scheduleState.error.message}
@@ -617,14 +627,14 @@ export default function ScheduleScreen() {
               }}
             >
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
-                Повторить
+                {d.parentApp.common.retry}
               </Text>
             </Pressable>
           </GlassCard>
         ) : isRealFlow && rows.length === 0 ? (
           <GlassCard radius={20} contentStyle={{ padding: 18, alignItems: "center" }}>
             <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2, textAlign: "center" }}>
-              Уроков в этот день нет
+              {d.parentApp.sched.emptyDay}
             </Text>
           </GlassCard>
         ) : (
@@ -657,14 +667,14 @@ export default function ScheduleScreen() {
               return (
                 <LessonRow
                   key={`rl-${l.id}`}
-                  timeStart={formatTime(l.starts_at)}
-                  timeEnd={l.ends_at ? formatTime(l.ends_at) : undefined}
+                  timeStart={formatTime(l.starts_at, LOCALE_TAG[locale])}
+                  timeEnd={l.ends_at ? formatTime(l.ends_at, LOCALE_TAG[locale]) : undefined}
                   active={l.status === "in_progress"}
                   dotColor={subjColor}
                   dotHalo={dotHalo}
                   barGradient={l.subject?.color ? [l.subject.color, l.subject.color] : undefined}
                   title={l.subject?.name ?? l.title ?? "—"}
-                  subtitle={l.room ? `Кабинет ${l.room}` : "—"}
+                  subtitle={l.room ? `${d.parentApp.sched.room} ${l.room}` : "—"}
                   themeLine={l.topic ? `${d.parentApp.grades.topic} ${l.topic}` : undefined}
                   nowLabel={nowLabel}
                   dimmed={l.status === "completed"}

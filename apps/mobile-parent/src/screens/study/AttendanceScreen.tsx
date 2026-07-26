@@ -40,7 +40,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getStudentAttendance, formatDate, formatTime, APP_TIME_ZONE, type AttendanceStatus } from "@snr/core";
+import { getStudentAttendance, formatDate, formatTime, APP_TIME_ZONE, LOCALE_TAG, type AttendanceStatus } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   BottomSheetFrame,
@@ -97,11 +97,15 @@ function statusToCellCode(status: AttendanceStatus): "p" | "u" | "n" {
   if (status === "absent_excused") return "u";
   return "n";
 }
-const STATUS_META: Record<AttendanceStatus, { tone: "green" | "orange" | "red"; badge: "check" | "doc" | "x"; label: string }> = {
-  present: { tone: "green", badge: "check", label: "Присутствовал" },
-  absent_excused: { tone: "orange", badge: "doc", label: "Уважительная причина" },
-  absent_unexcused: { tone: "red", badge: "x", label: "Отсутствовал без уважительной причины" },
-};
+type StatusMeta = { tone: "green" | "orange" | "red"; badge: "check" | "doc" | "x"; label: string };
+/** Долги, проход 1: лейблы — из словаря (t.attend.day*), не хардкод. */
+function buildStatusMeta(attend: { dayPresent: string; dayExcused: string; dayUnexcused: string }): Record<AttendanceStatus, StatusMeta> {
+  return {
+    present: { tone: "green", badge: "check", label: attend.dayPresent },
+    absent_excused: { tone: "orange", badge: "doc", label: attend.dayExcused },
+    absent_unexcused: { tone: "red", badge: "x", label: attend.dayUnexcused },
+  };
+}
 // При нескольких уроках/записях за один ташкентский день на ячейку календаря
 // побеждает "худший" статус (пропуск без причины важнее уважительного важнее
 // присутствия) — иначе порядок записей в массиве произвольно решал бы, какой
@@ -361,8 +365,9 @@ function LastDayBadge({ kind }: { kind: BadgeKind }) {
 
 export default function AttendanceScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
+  const STATUS_META = useMemo(() => buildStatusMeta(t.attend), [t.attend]);
   const navigation = useNavigation<Nav>();
   const session = useAuthSession();
 
@@ -423,9 +428,9 @@ export default function AttendanceScreen() {
   );
   const realMonthLabel = useMemo(() => {
     const dt = new Date(Date.UTC(realVisibleMonth.year, realVisibleMonth.month - 1, 1));
-    const label = dt.toLocaleDateString("ru-RU", { month: "long", year: "numeric", timeZone: APP_TIME_ZONE });
+    const label = dt.toLocaleDateString(LOCALE_TAG[locale], { month: "long", year: "numeric", timeZone: APP_TIME_ZONE });
     return label.charAt(0).toUpperCase() + label.slice(1);
-  }, [realVisibleMonth]);
+  }, [realVisibleMonth, locale]);
   const realCells = useMemo(
     () => buildRealMonthCells(realVisibleMonth.year, realVisibleMonth.month, recordsByDate, todayKey),
     [realVisibleMonth, recordsByDate, todayKey],
@@ -482,17 +487,17 @@ export default function AttendanceScreen() {
     if (!attendanceState.data) return [];
     return attendanceState.data.records.slice(0, 4).map((r) => {
       const dateKey = tashkentDateKey(r.lesson_date);
-      const plain = formatDate(r.lesson_date);
+      const plain = formatDate(r.lesson_date, LOCALE_TAG[locale]);
       const dateLabel =
-        dateKey === todayKey ? `Сегодня, ${plain}` : dateKey === yesterdayKey ? `Вчера, ${plain}` : plain;
+        dateKey === todayKey ? `${t.date.today}, ${plain}` : dateKey === yesterdayKey ? `${t.date.yesterday}, ${plain}` : plain;
       return {
         date_label: dateLabel,
         status_label: STATUS_META[r.status].label,
-        arrived_label: r.status === "present" && r.marked_at ? formatTime(r.marked_at) : null,
+        arrived_label: r.status === "present" && r.marked_at ? formatTime(r.marked_at, LOCALE_TAG[locale]) : null,
         left_label: null,
       };
     });
-  }, [attendanceState.data, todayKey, yesterdayKey]);
+  }, [attendanceState.data, todayKey, yesterdayKey, locale, t.date.today, t.date.yesterday, STATUS_META]);
   const lastDaysFinal = isRealFlow ? realLastDays : fixtureLastDays;
   // Тот же срез records, параллельно realLastDays — tone/badge по индексу,
   // как и раньше делала фикстура (LAST_DAYS_META[i]), но по РЕАЛЬНОМУ статусу.
@@ -591,7 +596,7 @@ export default function AttendanceScreen() {
             }}
           >
             <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
-              Не удалось загрузить посещаемость
+              {t.attend.loadError}
             </Text>
             <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
               {attendanceState.error.message}
@@ -608,7 +613,7 @@ export default function AttendanceScreen() {
               }}
             >
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
-                Повторить
+                {t.common.retry}
               </Text>
             </Pressable>
           </GlassCard>
@@ -697,7 +702,7 @@ export default function AttendanceScreen() {
             {isRealFlow && lastDaysFinal.length === 0 ? (
               <GlassCard radius={20} contentStyle={{ padding: 16, alignItems: "center" }}>
                 <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink3, textAlign: "center" }}>
-                  Записей о посещаемости пока нет
+                  {t.attend.empty}
                 </Text>
               </GlassCard>
             ) : (
@@ -743,7 +748,7 @@ export default function AttendanceScreen() {
                                 color: row.arrived_label ? tokens.ink2 : tokens.ink3,
                               }}
                             >
-                              В школе: {row.arrived_label ?? "—"}
+                              {t.attend.arrivedPrefix} {row.arrived_label ?? "—"}
                             </Text>
                             <Text
                               style={{
@@ -752,7 +757,7 @@ export default function AttendanceScreen() {
                                 color: row.left_label ? tokens.ink2 : tokens.ink3,
                               }}
                             >
-                              Уход: {row.left_label ?? "—"}
+                              {t.attend.leftPrefix} {row.left_label ?? "—"}
                             </Text>
                           </>
                         )}

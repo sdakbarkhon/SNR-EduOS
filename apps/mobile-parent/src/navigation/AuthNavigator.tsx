@@ -9,8 +9,8 @@
  * рендерим один текущий auth-экран поверх AppBackground.
  *
  * Все auth-экраны — presentational, вызывают setPhase(...) / verifyCode() /
- * enterApp() / pickDemoParent() из useAuthSession(), поэтому этому файлу
- * достаточно просто отрисовать нужный экран для текущей фазы.
+ * enterApp() / loginAsTestAccount() из useAuthSession(), поэтому этому
+ * файлу достаточно просто отрисовать нужный экран для текущей фазы.
  */
 import OnboardingScreen from "../screens/auth/OnboardingScreen";
 import LoginPhoneScreen from "../screens/auth/LoginPhoneScreen";

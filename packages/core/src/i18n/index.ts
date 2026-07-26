@@ -14,6 +14,16 @@ export function getDictionary(locale: Locale): Dictionary {
   return dictionaries[locale] ?? dictionaries[defaultLocale];
 }
 
+/** Locale → BCP-47 тег для Intl/toLocaleDateString (formatDate/formatTime
+ *  и подобных вызовов, которым нужен реальный локаль-тег, не короткий код
+ *  приложения). Долги, проход 1 — до этого экраны mobile-parent хардкодили
+ *  "ru-RU" напрямую вместо текущего языка. */
+export const LOCALE_TAG: Record<Locale, string> = {
+  ru: "ru-RU",
+  uz: "uz-Latn-UZ",
+  en: "en-US",
+};
+
 /** Подстановка {placeholders}: format("Привет, {name}", { name: "Адилбек" }). */
 export function format(
   template: string,

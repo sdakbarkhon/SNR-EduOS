@@ -3,7 +3,7 @@
  * 3282–3286), родитель (разметка C1/C11), демо-родители (B9).
  * Все значения — ДОСЛОВНО из макета.
  */
-import type { ChildInfoRow, ChildRow, DemoParentRow, ParentRow, ParentProfileRow } from "../types";
+import type { ChildInfoRow, ChildRow, ParentRow, ParentProfileRow } from "../types";
 
 /** Дети — KIDS. Активный ребёнок по умолчанию — индекс 1 (Малика). */
 export const CHILDREN: ChildRow[] = [
@@ -178,37 +178,6 @@ export const PARENT_PROFILE: ParentProfileRow = {
   work_phone: "+998 71 233-12-90",
   backup_phone: "+998 93 555-21-77",
 };
-
-/** Демо-родители шторки входа (B9).
- *  child_ids ссылаются на CHILDREN.id: макет показывает А/М/Ф в порядке
- *  CHILDREN (Азиз → Малика → Фаррух); соответственно 1/2/3-детный демо-родитель
- *  получает первые kids_count элементов этого порядка. */
-export const DEMO_PARENTS: DemoParentRow[] = [
-  {
-    id: "demo-bakhtiyor",
-    name: "Бахтиёр Исмаилов",
-    phone: "+998 91 234 56 78",
-    kids_count: 1,
-    kids_initials: ["А"],
-    child_ids: ["child-ismailov-azizbek"],
-  },
-  {
-    id: "demo-sherzod",
-    name: "Шерзод Рахимов",
-    phone: "+998 93 456 78 90",
-    kids_count: 2,
-    kids_initials: ["М", "Х"],
-    child_ids: ["child-rakhimov-madina", "child-rakhimov-humoyun"],
-  },
-  {
-    id: "demo-dilnoza",
-    name: "Дилноза Каримова",
-    phone: "+998 90 123 45 67",
-    kids_count: 3,
-    kids_initials: ["А", "М", "Ф"],
-    child_ids: ["child-aziz", "child-malika", "child-farrukh"],
-  },
-];
 
 /** Стартовый выделенный ребёнок в списке A4 в зависимости от числа детей у
  *  демо-родителя (state.authSel макета, строка 4295): 3 → 1 (Малика), иначе 0. */

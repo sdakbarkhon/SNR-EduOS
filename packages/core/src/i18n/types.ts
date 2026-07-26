@@ -2341,6 +2341,9 @@ export interface Dictionary {
       open: string;
       clear: string;
       gotIt: string;
+      // Долги, проход 1: общая кнопка "повторить" в error-карточках
+      // real-данных (посещаемость/расписание/задания) — один ключ на всех.
+      retry: string;
     };
     search: {
       recent: string;
@@ -2407,6 +2410,12 @@ export interface Dictionary {
       msgTeacher: string;
       today: string;
       todaySection: string;
+      // Долги, проход 1 — карточка «Следующий урок» на реальных данных
+      // (Заход 2, шаг 4): состояния загрузки/ошибки/пусто + шаблон кабинета.
+      nextLessonError: string;      // «Ошибка загрузки»
+      nextLessonRetryHint: string;  // «Нажмите, чтобы повторить»
+      nextLessonEmpty: string;      // «Нет предстоящих уроков»
+      roomLabel: string;            // «Каб. {room}»
     };
     grades: {
       average: string;
@@ -2684,6 +2693,10 @@ export interface Dictionary {
       approved: string;
       pending: string;
       rejected: string;
+      // Долги, проход 1 — реальный статус сдачи ДЗ (lib/homeworkStatus.ts,
+      // 3 состояния; underReview выше уже переиспользуется для «pending_review»).
+      notSubmitted: string; // «Не сдано»
+      graded: string;       // «Оценено»
     };
     subj: {
       math: string;
@@ -2710,6 +2723,15 @@ export interface Dictionary {
       hAgo: string;
       dAgo: string;
       in15: string;
+      // Долги, проход 1 — полные имена дней недели (баннер даты расписания,
+      // Заход 2 шаг 4). mon..sun выше — короткие формы «Пн»..«Вс».
+      monFull: string;
+      tueFull: string;
+      wedFull: string;
+      thuFull: string;
+      friFull: string;
+      satFull: string;
+      sunFull: string;
     };
     ai: {
       overall: string;
@@ -2726,6 +2748,9 @@ export interface Dictionary {
       lesson: string;   // "Урок" — метка ячейки урока
       break: string;    // "Перемена" — приглушённая строка между уроками
       room: string;     // "Кабинет" — короткая метка cab. в карточке урока
+      // Долги, проход 1 — реальное расписание (Заход 2, шаг 4).
+      loadError: string; // «Не удалось загрузить расписание»
+      emptyDay: string;  // «Уроков в этот день нет»
     };
     files: {
       attached: string;
@@ -2748,6 +2773,55 @@ export interface Dictionary {
       legendExcused: string;   // «Уважительная»
       legendUnexcused: string; // «Неуважительная»
       legendWeekend: string;   // «Выходной»
+      // Долги, проход 1 — реальная посещаемость (Заход 2, шаг 3): предложения-
+      // статусы «Последних дней» (отличаются от коротких present/excused/
+      // unexcused выше — те для плиток-метрик, эти — полные фразы в строке дня)
+      // + состояния загрузки.
+      dayPresent: string;    // «Присутствовал»
+      dayExcused: string;    // «Уважительная причина»
+      dayUnexcused: string;  // «Отсутствовал без уважительной причины»
+      loadError: string;     // «Не удалось загрузить посещаемость»
+      empty: string;         // «Записей о посещаемости пока нет»
+      arrivedPrefix: string; // «В школе:» — префикс времени прихода в строке дня
+      leftPrefix: string;    // «Уход:» — префикс времени ухода в строке дня
+    };
+    /** Долги, проход 1 — реальные задания/сдачи (Заход 2, шаг 5). Новый
+     *  namespace: в отличие от grades и sched, для содержимого экрана
+     *  «Домашние задания»/«Детали задания» отдельных ключей раньше не было
+     *  (только заголовки scr.homeworks/scr.homework). */
+    hw: {
+      loadListError: string;     // «Не удалось загрузить задания»
+      loadDetailError: string;   // «Не удалось загрузить задание»
+      emptyAll: string;          // «Заданий пока нет»
+      emptyFiltered: string;     // «Нет заданий под этот фильтр»
+      notFound: string;          // «Задание не найдено»
+      noDeadline: string;        // «Без срока»
+      dueToday: string;          // «Срок: сегодня, {time}»
+      dueTomorrow: string;       // «Срок: завтра, {time}»
+      dueOn: string;             // «Срок: {date}»
+      subjectFallback: string;      // «Предмет»
+      subjectFallbackCaps: string;  // «ПРЕДМЕТ»
+      teacherUnassigned: string; // «Преподаватель не назначен»
+      instructionLabel: string;  // «ИНСТРУКЦИЯ ОТ УЧИТЕЛЯ»
+      attachmentsLabel: string;  // «ПРИКРЕПЛЁННЫЕ МАТЕРИАЛЫ»
+      openFile: string;          // «Открыть файл»
+      openLink: string;          // «Открыть ссылку»
+      openFileError: string;     // «Не удалось открыть файл» (Alert)
+      commentLabel: string;      // «КОММЕНТАРИЙ УЧИТЕЛЯ»
+      submissionLabel: string;   // «ВАША СДАЧА»
+      testResult: string;        // «Результат: {score} из {max}»
+      testPendingResult: string; // «Сдано, ожидает результата»
+      testNotTaken: string;      // «Тест не пройден»
+      codeNotSubmitted: string;  // «Код не отправлен»
+      workNotSubmitted: string;  // «Работа не сдана»
+      fileFallbackName: string;  // «Файл»
+      sentPrefix: string;        // «Работа отправлена · {status}»
+      filterAll: string;         // «Все»
+      filterToday: string;       // «Сегодня»
+      filterOverdue: string;     // «Просрочено»
+      filterDone: string;        // «Выполнено»
+      sizeKb: string;            // «{n} КБ»
+      sizeMb: string;            // «{n} МБ»
     };
   };
 }

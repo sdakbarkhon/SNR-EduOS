@@ -1,4 +1,4 @@
-import { homeworkSubmissionStatusKind, type SubmissionStatus } from "@snr/core";
+import { homeworkSubmissionStatusKind, type Dictionary, type SubmissionStatus } from "@snr/core";
 
 /**
  * Заход 2, шаг 5 — статус сдачи ДЗ для родителя. Переиспользует
@@ -6,21 +6,15 @@ import { homeworkSubmissionStatusKind, type SubmissionStatus } from "@snr/core";
  * паттерн («Не сдано»/«На проверке»/«Оценено»), что уже согласован и
  * отгружен на вебе (задача "Задания"), не изобретаем свой более дробный
  * вариант поверх сырого SubmissionStatus.
+ *
+ * Долги, проход 1: лейблы больше не хардкожены здесь — kind→текст переведён
+ * в homeworkStatusLabel(kind, t.status), т.к. чистая lib-функция не имеет
+ * доступа к useAppLocale(); вызывающий экран передаёт свой d.parentApp.status.
  */
 export type RealHomeworkStatusKind = "not_submitted" | "pending_review" | "graded";
 
-const KIND_LABEL: Record<RealHomeworkStatusKind, string> = {
-  not_submitted: "Не сдано",
-  pending_review: "На проверке",
-  graded: "Оценено",
-};
-
 export function realSubmissionStatusKind(status: SubmissionStatus | null | undefined): RealHomeworkStatusKind {
   return homeworkSubmissionStatusKind(status);
-}
-
-export function realSubmissionStatusLabel(status: SubmissionStatus | null | undefined): string {
-  return KIND_LABEL[realSubmissionStatusKind(status)];
 }
 
 // test_submissions не имеет поля status (только score/max_score/grade) —
@@ -41,8 +35,10 @@ export function realTestStatusKind(
   return testSubmission.score != null && testSubmission.max_score != null ? "graded" : "pending_review";
 }
 
-export function realTestStatusLabel(
-  testSubmission: { score: number | null; max_score: number | null } | null | undefined,
-): string {
-  return KIND_LABEL[realTestStatusKind(testSubmission)];
+/** kind → локализованный лейбл. status — d.parentApp.status (underReview
+ *  переиспользуется как есть — уже существующий ключ для "pending_review"). */
+export function homeworkStatusLabel(kind: RealHomeworkStatusKind, status: Dictionary["parentApp"]["status"]): string {
+  if (kind === "graded") return status.graded;
+  if (kind === "pending_review") return status.underReview;
+  return status.notSubmitted;
 }

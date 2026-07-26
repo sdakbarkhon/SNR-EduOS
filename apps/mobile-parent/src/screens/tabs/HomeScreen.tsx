@@ -39,7 +39,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getStudentLessonsForWeek, getStudentAttendance, getHomeworkWithSubmissions, formatTime } from "@snr/core";
+import { getStudentLessonsForWeek, getStudentAttendance, getHomeworkWithSubmissions, formatTime, format, LOCALE_TAG } from "@snr/core";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
   AccentCard,
@@ -240,7 +240,7 @@ function AssistantCta({ label, onPress }: { label: string; onPress?: () => void 
 
 export default function HomeScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
   const children = getChildren();
@@ -372,7 +372,7 @@ export default function HomeScreen() {
       ? "…"
       : homeError
         ? "—"
-        : (arrivalTimeReal ? formatTime(arrivalTimeReal) : "—")
+        : (arrivalTimeReal ? formatTime(arrivalTimeReal, LOCALE_TAG[locale]) : "—")
     : dashboard.child_status.at_school_since_label;
   const lessonsTotalValue = isRealFlow
     ? homeLoading
@@ -414,9 +414,9 @@ export default function HomeScreen() {
   // при отсутствии предстоящих уроков. Градиент/размер плитки — как в
   // фикстуре (вёрстку не трогаем, варьируется только текст).
   const nextLessonTeacherName = nextLessonReal?.subject?.teacher?.full_name ?? nextLessonReal?.group?.teacher?.full_name ?? null;
-  const nextLessonRoomLabel = nextLessonReal?.room ? `Каб. ${nextLessonReal.room}` : null;
+  const nextLessonRoomLabel = nextLessonReal?.room ? format(d.parentApp.home.roomLabel, { room: nextLessonReal.room }) : null;
   const nextLessonTimeLabel = nextLessonReal
-    ? `${formatTime(nextLessonReal.starts_at)}${nextLessonReal.ends_at ? `–${formatTime(nextLessonReal.ends_at)}` : ""}`
+    ? `${formatTime(nextLessonReal.starts_at, LOCALE_TAG[locale])}${nextLessonReal.ends_at ? `–${formatTime(nextLessonReal.ends_at, LOCALE_TAG[locale])}` : ""}`
     : null;
   const nextLessonRealLabel = nextLessonReal
     ? [nextLessonTimeLabel, nextLessonRoomLabel, nextLessonTeacherName].filter(Boolean).join(" · ")
@@ -426,12 +426,12 @@ export default function HomeScreen() {
 
   const nextLessonView = isRealFlow
     ? homeLoading
-      ? { subjectName: "Загрузка…", timeRoomTeacherLabel: "", tileLabel: "…" }
+      ? { subjectName: d.parentApp.common.loading, timeRoomTeacherLabel: "", tileLabel: "…" }
       : homeError
-        ? { subjectName: "Ошибка загрузки", timeRoomTeacherLabel: "Нажмите, чтобы повторить", tileLabel: "!" }
+        ? { subjectName: d.parentApp.home.nextLessonError, timeRoomTeacherLabel: d.parentApp.home.nextLessonRetryHint, tileLabel: "!" }
         : nextLessonReal
           ? { subjectName: nextLessonRealSubjectName, timeRoomTeacherLabel: nextLessonRealLabel, tileLabel: nextLessonRealTile }
-          : { subjectName: "Нет предстоящих уроков", timeRoomTeacherLabel: "", tileLabel: "–" }
+          : { subjectName: d.parentApp.home.nextLessonEmpty, timeRoomTeacherLabel: "", tileLabel: "–" }
     : {
         subjectName: dashboard.next_lesson.subject_name,
         timeRoomTeacherLabel: dashboard.next_lesson.time_room_teacher_label,

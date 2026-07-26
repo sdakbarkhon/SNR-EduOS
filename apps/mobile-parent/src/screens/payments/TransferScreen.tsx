@@ -37,18 +37,18 @@
  *  - openSheet FROM: выбор источника; при выборе того же id, что и TO,
  *    reassign TO на первого другого ребёнка семьи (иначе перевод самому себе).
  *
- * Данные — фикстуры через accessors: getChildrenForDemoParent (или
- * getChildren в phone-flow) + getWalletBalance (первоначальное состояние
- * baланса). При демо-родителе с 1 ребёнком экран нерабочий по смыслу
- * (нет кому переводить) — CTA всегда disabled, TO пуст. Info-banner уже
- * это объясняет: «переводить можно только между кошельками ваших детей».
+ * Данные — фикстуры через accessors: getChildren + getWalletBalance
+ * (первоначальное состояние баланса). При единственном ребёнке в семье
+ * экран нерабочий по смыслу (нет кому переводить) — CTA всегда disabled,
+ * TO пуст. Info-banner уже это объясняет: «переводить можно только между
+ * кошельками ваших детей».
  *
  * НЕТ на экране: Ring/RingSegmented, фильтров, поиска, tooltip'ов,
  * кружков/категорий (Обучение/Питание/Форма/Экскурсия — это BILLS,
  * не переводы). Литералы «ОТКУДА»/«КУДА»/«СУММА ПЕРЕВОДА» — не через t.*
  * (в макете строки 1770/1777/1784 забиты дословно).
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -72,7 +72,6 @@ import {
 } from "../../ui";
 import {
   getChildren,
-  getChildrenForDemoParent,
   getTransferFixture,
   getWalletBalance,
 } from "../../data";
@@ -300,12 +299,8 @@ export default function TransferScreen() {
   const session = useAuthSession();
   const g = gradPoints(135);
 
-  // Семейный список детей (то же правило, что и в LoginChildPickerScreen).
-  const kids = useMemo<ChildRow[]>(() => {
-    return session.demoParentId
-      ? getChildrenForDemoParent(session.demoParentId)
-      : getChildren();
-  }, [session.demoParentId]);
+  // Семейный список детей.
+  const kids: ChildRow[] = getChildren();
 
   // Локальные балансы (в проде мутация уходит в БД; здесь — session-scoped).
   const [balances, setBalances] = useState<Record<string, number>>(() =>
