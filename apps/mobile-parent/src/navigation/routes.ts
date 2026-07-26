@@ -257,8 +257,11 @@ export type MainStackParamList = {
   /** Портфолио — опциональный старт-таб (Заход 8): #29 «Достижения» ведёт
    *  сразу на вкладку ach, а не на Работы по умолчанию. */
   dport: { initialTab?: "works" | "ach" | "cert" } | undefined;
+  /** Заход 2, шаг 5: список ДЗ передаёт id реального задания для real-флоу
+   *  (демо по-прежнему навигирует без параметров — getHomeworkDetail()). */
+  d13: { homeworkId?: string } | undefined;
 } & {
-  [K in Exclude<StackRouteName, "stub" | "dport">]: undefined;
+  [K in Exclude<StackRouteName, "stub" | "dport" | "d13">]: undefined;
 };
 
 /** ParamList таб-навигатора. */

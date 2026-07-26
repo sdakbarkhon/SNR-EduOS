@@ -30,15 +30,29 @@
  * рендерится SentStateBadge; SecondaryActionResend спрятан.
  *
  * Радар из «Навыков» здесь НЕ используется — этот экран без SVG-радара.
+ *
+ * Заход 2, шаг 5: для реального входа (isRealFlow) экран показывает КОНКРЕТНОЕ
+ * задание (homeworkId из route.params — список передаёт row.id) через
+ * packages/core getChildHomeworkDetail (реюз getHomeworkWithSubmissions,
+ * parent-скоуп на одного ребёнка). Родитель — read-only: «Отправить
+ * обновлённую работу» полностью скрыта для real-флоу (вёрстка не удаляется,
+ * просто не рендерится); TopBar-кнопка «upload» — неактивна (onShare
+ * не задаётся). StatusStepperCard (4-точечный таймлайн) для real-флоу не
+ * рендерится — под него нет реальных данных (не изобретаемfake-даты).
+ * Числовая оценка НЕ показывается — только статус (реюз
+ * lib/homeworkStatus, тот же паттерн, что уже на вебе). Демо-флоу
+ * (HOMEWORK_DETAIL) не тронут ни строкой.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Rect } from "react-native-svg";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getChildHomeworkDetail, getSubmissionFileUrl, type ChildHomeworkDetail } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
+import type { StatusFamily } from "../../ui";
 import {
   Avatar,
   BottomSheetFrame,
@@ -57,9 +71,53 @@ import {
 import type { BaseSubjectKey } from "../../data/types";
 import { useAppLocale } from "../../i18n";
 import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow } from "../../lib/realChild";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { getSupabase } from "../../lib/supabase";
+import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
+import { realSubmissionStatusLabel, realTestStatusLabel } from "../../lib/homeworkStatus";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
+
+/** «#ca8a04» → «202,138,4» — тот же локальный паттерн, что уже в
+ *  ScheduleScreen.tsx/HomeworksScreen.tsx и др. */
+function hexToRgbCsv(hex: string): string {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
+function realStatusFamily(label: string): StatusFamily {
+  if (label === "На проверке") return "violet";
+  if (label === "Оценено") return "green";
+  return "gray"; // «Не сдано»
+}
+
+/** Расширение файла → короткая заглавная метка на плитке (PDF/PNG/DOC…). */
+function fileExtLabel(name: string | null | undefined): string {
+  if (!name) return "FILE";
+  const ext = name.split(".").pop();
+  return ext ? ext.toUpperCase().slice(0, 4) : "FILE";
+}
+
+function fileSizeLabel(bytes: number | null | undefined): string {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+const HTTP_URL_RE = /^https?:\/\/\S+$/;
+
+async function openSignedFile(storagePath: string) {
+  try {
+    const url = await getSubmissionFileUrl(getSupabase(), storagePath);
+    await Linking.openURL(url);
+  } catch (e) {
+    Alert.alert("Не удалось открыть файл", e instanceof Error ? e.message : String(e));
+  }
+}
 
 /**
  * Глиф-символ на плитке предмета (мокап: «√x» для математики). В общем
@@ -320,7 +378,16 @@ export default function HomeworkDetailScreen() {
   const { tokens, scheme } = useTheme();
   const { d } = useAppLocale();
   const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteProp<MainStackParamList, "d13">>();
   const auth = useAuthSession();
+
+  const session = useAuthSession();
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const realIndex = isRealFlow
+    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    : -1;
+  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
 
   const children = getChildren();
   const [childId, setChildId] = useState<string>(() =>
@@ -330,7 +397,59 @@ export default function HomeworkDetailScreen() {
 
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
+  const identityChild = realChildRow ?? child;
   const hw = getHomeworkDetail();
+
+  // ── Заход 2, шаг 5: реальное задание — homeworkId из навигации (список
+  // передаёт row.id), getChildHomeworkDetail уже безопасно скопирован на
+  // ОДНОГО ребёнка (реюз getHomeworkWithSubmissions, без своего select).
+  const homeworkId = route.params?.homeworkId;
+  const detailState = useAsyncData(
+    () =>
+      isRealFlow && selectedChildId && homeworkId
+        ? getChildHomeworkDetail(getSupabase(), selectedChildId, homeworkId)
+        : Promise.resolve(null),
+    [isRealFlow, selectedChildId, homeworkId],
+  );
+  const realHw: ChildHomeworkDetail | null = detailState.data ?? null;
+  const todayKey = useMemo(() => tashkentToday(), []);
+  const tomorrowKey = useMemo(() => addDays(todayKey, 1), [todayKey]);
+
+  const isRealTest = realHw?.content_type === "test";
+  const realStatusLabel = realHw
+    ? isRealTest
+      ? realTestStatusLabel(realHw.test_submission)
+      : realSubmissionStatusLabel(realHw.submission?.status)
+    : "";
+  const realFamily = realStatusFamily(realStatusLabel);
+  const realSt = tokens.status[realFamily];
+  const realChip = tokens.chip(realSt.rgb);
+  const realSubmittedAtAll = realStatusLabel !== "Не сдано" && realStatusLabel !== "";
+
+  const realDueLabel = useMemo(() => {
+    if (!realHw?.due_date) return "Без срока";
+    const key = tashkentDateKey(realHw.due_date);
+    const time = new Date(realHw.due_date).toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Tashkent",
+    });
+    if (key === todayKey) return `Срок: сегодня, ${time}`;
+    if (key === tomorrowKey) return `Срок: завтра, ${time}`;
+    const dateLabel = new Date(realHw.due_date).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      timeZone: "Asia/Tashkent",
+    });
+    return `Срок: ${dateLabel}`;
+  }, [realHw?.due_date, todayKey, tomorrowKey]);
+
+  const realTeacherInitials = useMemo(() => {
+    const name = realHw?.teacherName?.trim();
+    if (!name) return "—";
+    const parts = name.split(/\s+/).slice(0, 2);
+    return parts.map((p) => p.charAt(0).toUpperCase()).join("") || "—";
+  }, [realHw?.teacherName]);
 
   const t = d.parentApp;
 
@@ -364,23 +483,38 @@ export default function HomeworkDetailScreen() {
 
   const pickerItems: ChildPickerItem[] = useMemo(
     () =>
-      children.map((k) => ({
-        id: k.id,
-        initials: k.first_name.slice(0, 1),
-        gradient: k.avatar_gradient,
-        ringColor: k.avatar_ring,
-        name: k.full_name,
-        classLabel: `${k.class_name} ${t.grades.class}`,
-        statusLabel: k.status_chip,
-        statusTone: k.status_chip === "В школе" ? "green" : "gray",
-      })),
-    [children, t.grades.class],
+      isRealFlow
+        ? parentData!.children.map((c, i) => {
+            const row = toChildRow(c, i);
+            return {
+              id: row.id,
+              initials: row.first_name.slice(0, 1),
+              gradient: row.avatar_gradient,
+              ringColor: row.avatar_ring,
+              name: row.full_name,
+              classLabel: `${row.class_name} ${t.grades.class}`,
+              statusLabel: "—",
+              statusTone: "gray" as const,
+            };
+          })
+        : children.map((k) => ({
+            id: k.id,
+            initials: k.first_name.slice(0, 1),
+            gradient: k.avatar_gradient,
+            ringColor: k.avatar_ring,
+            name: k.full_name,
+            classLabel: `${k.class_name} ${t.grades.class}`,
+            statusLabel: k.status_chip,
+            statusTone: k.status_chip === "В школе" ? "green" : "gray",
+          })),
+    [isRealFlow, parentData, children, t.grades.class],
   );
 
   return (
     <AppBackground>
-      {/* 1. TopBar */}
-      <DetailTopBar title={t.scr.homework} onBack={goBack} onShare={goFile} />
+      {/* 1. TopBar — заход 2, шаг 5: upload-иконка неактивна для real-флоу
+          (родитель read-only), вёрстка не убрана. */}
+      <DetailTopBar title={t.scr.homework} onBack={goBack} onShare={isRealFlow ? undefined : goFile} />
 
       {/* 2. ScrollContainer */}
       <ScrollView
@@ -396,15 +530,421 @@ export default function HomeworkDetailScreen() {
         <ChildSwitcherCard
           variant="compact"
           avatar={{
-            initials: child.first_name.slice(0, 1),
-            gradient: child.avatar_gradient,
-            ringColor: child.avatar_ring,
+            initials: identityChild.first_name.slice(0, 1),
+            gradient: identityChild.avatar_gradient,
+            ringColor: identityChild.avatar_ring,
           }}
-          name={child.full_name}
-          classLabel={`${child.class_name} ${t.grades.class}`}
+          name={identityChild.full_name}
+          classLabel={`${identityChild.class_name} ${t.grades.class}`}
           onPress={() => setSheetOpen(true)}
         />
 
+        {isRealFlow ? (
+          detailState.loading ? (
+            <View style={{ paddingVertical: 48, alignItems: "center" }}>
+              <ActivityIndicator color={tokens.accent} />
+            </View>
+          ) : detailState.error ? (
+            <GlassCard
+              radius={20}
+              contentStyle={{
+                padding: 18,
+                gap: 10,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: `rgba(${tokens.status.red.rgb},0.35)`,
+              }}
+            >
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
+                Не удалось загрузить задание
+              </Text>
+              <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
+                {detailState.error.message}
+              </Text>
+              <Pressable
+                onPress={() => detailState.refresh()}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  backgroundColor: `rgba(${tokens.status.red.rgb},0.14)`,
+                  borderWidth: 1,
+                  borderColor: `rgba(${tokens.status.red.rgb},0.4)`,
+                }}
+              >
+                <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
+                  Повторить
+                </Text>
+              </Pressable>
+            </GlassCard>
+          ) : !realHw ? (
+            <GlassCard radius={20} contentStyle={{ padding: 18, alignItems: "center" }}>
+              <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2, textAlign: "center" }}>
+                Задание не найдено
+              </Text>
+            </GlassCard>
+          ) : (
+            <>
+              {/* 4-real. HomeworkHeaderCard — реальный предмет/статус/срок/учитель. */}
+              <GlassCard radius={20} contentStyle={{ padding: 13, gap: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 11 }}>
+                  <View
+                    style={[
+                      {
+                        width: 42,
+                        height: 42,
+                        borderRadius: 14,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: realHw.subjectColor ?? "#6366f1",
+                      },
+                      shadowStyle({ x: 0, y: 6, blur: 14, color: `rgba(${hexToRgbCsv(realHw.subjectColor ?? "#6366f1")},0.30)` }),
+                    ]}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: "#FFFFFF" }}>
+                      {(realHw.subjectName ?? "—").slice(0, 2)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontFamily: fonts.manrope800, fontSize: 10, letterSpacing: 10 * 0.05, color: tokens.ink3 }}
+                    >
+                      {(realHw.subjectName ?? "ПРЕДМЕТ").toUpperCase()}
+                    </Text>
+                    <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 13.5, color: tokens.ink1 }}>
+                      {realHw.title}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      paddingVertical: 3,
+                      paddingHorizontal: 8,
+                      borderRadius: 999,
+                      backgroundColor: realChip.bg,
+                      borderWidth: 1,
+                      borderColor: realChip.border,
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 8.5, color: realSt.text }}>
+                      {realStatusLabel}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    paddingTop: 9,
+                    borderTopWidth: 1,
+                    borderTopColor: scheme === "dark" ? "rgba(255,255,255,0.10)" : "rgba(23,18,67,0.07)",
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <CalendarGlyph color={scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.66)"} />
+                    <Text
+                      style={{
+                        fontFamily: fonts.manrope700,
+                        fontSize: 10.5,
+                        color: scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.66)",
+                      }}
+                    >
+                      {realDueLabel}
+                    </Text>
+                  </View>
+                  <View style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <TeacherAvatar initials={realTeacherInitials} size={24} />
+                    <Text
+                      style={{
+                        fontFamily: fonts.manrope700,
+                        fontSize: 10.5,
+                        color: scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.66)",
+                      }}
+                    >
+                      {realHw.teacherName ?? "Преподаватель не назначен"}
+                    </Text>
+                  </View>
+                </View>
+              </GlassCard>
+
+              {/* 5-real. TeacherInstructionCard — только если реально есть описание. */}
+              {realHw.description ? (
+                <GlassCard radius={20} contentStyle={{ padding: 13, gap: 6 }}>
+                  <CapsLabel>ИНСТРУКЦИЯ ОТ УЧИТЕЛЯ</CapsLabel>
+                  <Text
+                    style={{
+                      fontFamily: fonts.manrope600,
+                      fontSize: 11.5,
+                      lineHeight: 11.5 * 1.6,
+                      color: scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.78)",
+                    }}
+                  >
+                    {realHw.description}
+                  </Text>
+                </GlassCard>
+              ) : null}
+
+              {/* 6-real. AttachmentsCard — прикреплённый УЧИТЕЛЕМ файл (инструкция),
+                  только если реально прикреплён. */}
+              {realHw.attachment_filename ? (
+                <GlassCard radius={20} contentStyle={{ padding: 13, gap: 9 }}>
+                  <CapsLabel>ПРИКРЕПЛЁННЫЕ МАТЕРИАЛЫ</CapsLabel>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <AttachmentTypeTile label={fileExtLabel(realHw.attachment_filename)} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                        {realHw.attachment_filename}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: fonts.manrope600,
+                          fontSize: 9.5,
+                          color: scheme === "dark" ? tokens.ink3 : "rgba(26,19,74,0.55)",
+                        }}
+                      >
+                        {fileSizeLabel(realHw.attachment_size_bytes)}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => realHw.attachment_storage_path && openSignedFile(realHw.attachment_storage_path)}
+                      style={({ pressed }) => [
+                        {
+                          paddingVertical: 7,
+                          paddingHorizontal: 11,
+                          borderRadius: 10,
+                          backgroundColor: chipVi.bg,
+                          borderWidth: 1,
+                          borderColor: chipVi.border,
+                        },
+                        pressed ? { opacity: 0.8 } : null,
+                      ]}
+                    >
+                      <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: violet.text }}>
+                        Открыть файл
+                      </Text>
+                    </Pressable>
+                  </View>
+                </GlassCard>
+              ) : null}
+
+              {/* 7-real. «Ваша сдача» — read-only содержимое сдачи ученика по типу
+                  задания (код/текст/результат теста/фото+ссылка). Числовая оценка
+                  НЕ показывается. */}
+              <GlassCard radius={20} contentStyle={{ padding: 13, gap: 9 }}>
+                <CapsLabel>ВАША СДАЧА</CapsLabel>
+                {isRealTest ? (
+                  realHw.test_submission ? (
+                    realHw.test_submission.score != null && realHw.test_submission.max_score != null ? (
+                      <Text style={{ fontFamily: fonts.manrope700, fontSize: 12.5, color: tokens.ink1 }}>
+                        Результат: {realHw.test_submission.score} из {realHw.test_submission.max_score}
+                      </Text>
+                    ) : (
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink2 }}>
+                        Сдано, ожидает результата
+                      </Text>
+                    )
+                  ) : (
+                    <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
+                      Тест не пройден
+                    </Text>
+                  )
+                ) : realHw.content_type === "programming" ? (
+                  realHw.submission?.code_text ? (
+                    <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled showsVerticalScrollIndicator>
+                      <Text
+                        selectable
+                        style={{
+                          fontFamily: "Courier",
+                          fontSize: 10.5,
+                          lineHeight: 10.5 * 1.5,
+                          color: tokens.ink1,
+                        }}
+                      >
+                        {realHw.submission.code_text}
+                      </Text>
+                    </ScrollView>
+                  ) : (
+                    <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
+                      Код не отправлен
+                    </Text>
+                  )
+                ) : !realHw.submission ? (
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
+                    Работа не сдана
+                  </Text>
+                ) : !realHw.submission.answer_text && !realHw.submission.file_storage_path ? (
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, color: tokens.ink3 }}>
+                    Работа не сдана
+                  </Text>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {realHw.submission.answer_text ? (
+                      HTTP_URL_RE.test(realHw.submission.answer_text) ? (
+                        <Pressable
+                          onPress={() => Linking.openURL(realHw.submission!.answer_text!)}
+                          style={({ pressed }) => [
+                            {
+                              alignSelf: "flex-start",
+                              paddingVertical: 7,
+                              paddingHorizontal: 11,
+                              borderRadius: 10,
+                              backgroundColor: chipVi.bg,
+                              borderWidth: 1,
+                              borderColor: chipVi.border,
+                            },
+                            pressed ? { opacity: 0.8 } : null,
+                          ]}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: violet.text }}>
+                            Открыть ссылку
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Text
+                          style={{
+                            fontFamily: fonts.manrope600,
+                            fontSize: 11.5,
+                            lineHeight: 11.5 * 1.6,
+                            color: scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.78)",
+                          }}
+                        >
+                          {realHw.submission.answer_text}
+                        </Text>
+                      )
+                    ) : null}
+                    {realHw.submission.file_storage_path ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                        <AttachmentTypeTile label={fileExtLabel(realHw.submission.file_original_name)} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                            {realHw.submission.file_original_name ?? "Файл"}
+                          </Text>
+                          <Text
+                            style={{
+                              fontFamily: fonts.manrope600,
+                              fontSize: 9.5,
+                              color: scheme === "dark" ? tokens.ink3 : "rgba(26,19,74,0.55)",
+                            }}
+                          >
+                            {fileSizeLabel(realHw.submission.file_size_bytes)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          onPress={() => openSignedFile(realHw.submission!.file_storage_path!)}
+                          style={({ pressed }) => [
+                            {
+                              paddingVertical: 7,
+                              paddingHorizontal: 11,
+                              borderRadius: 10,
+                              backgroundColor: chipVi.bg,
+                              borderWidth: 1,
+                              borderColor: chipVi.border,
+                            },
+                            pressed ? { opacity: 0.8 } : null,
+                          ]}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: violet.text }}>
+                            Открыть файл
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+              </GlassCard>
+
+              {/* StatusStepperCard пропущен для real-флоу — нет реальных данных
+                  таймлайна (не изобретаем 4 фейковые даты). */}
+
+              {/* 8-real. TeacherCommentCard — только если реально есть комментарий. */}
+              {realHw.submission?.teacher_comment ? (
+                <GlassCard radius={20} contentStyle={{ padding: 13, gap: 8 }}>
+                  <CapsLabel>КОММЕНТАРИЙ УЧИТЕЛЯ</CapsLabel>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 9 }}>
+                    <TeacherAvatar initials={realTeacherInitials} size={28} />
+                    <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                      <Text
+                        style={{
+                          fontFamily: fonts.manrope600,
+                          fontSize: 11.5,
+                          lineHeight: 11.5 * 1.55,
+                          color: scheme === "dark" ? tokens.ink2 : "rgba(26,19,74,0.78)",
+                        }}
+                      >
+                        {realHw.submission.teacher_comment}
+                      </Text>
+                    </View>
+                  </View>
+                </GlassCard>
+              ) : null}
+
+              {/* 9-real. PrimaryActionMessageTeacher — безопасное действие, остаётся активным. */}
+              <Pressable
+                onPress={goMsgs}
+                style={({ pressed }) => [
+                  shadowStyle({ x: 0, y: 14, blur: 32, color: "rgba(124,58,237,0.40)" }),
+                  { borderRadius: 15 },
+                  pressed ? { opacity: 0.9 } : null,
+                ]}
+              >
+                <LinearGradient
+                  colors={["#7c3aed", "#4f6df5"]}
+                  {...gradPoints(135)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: 14,
+                    borderRadius: 15,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                  </Svg>
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: "#FFFFFF" }}>
+                    {t.home.msgTeacher}
+                  </Text>
+                  <View
+                    pointerEvents="none"
+                    style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1.5, backgroundColor: "rgba(255,255,255,0.35)" }}
+                  />
+                </LinearGradient>
+              </Pressable>
+
+              {/* 10-real. Read-only: «Отправить обновлённую работу» полностью
+                  скрыта для родителя (ни при каком статусе), вёрстка не удалена —
+                  просто не рендерится в real-флоу. */}
+
+              {/* 11-real. SentStateBadge — показываем, только если что-то реально сдано. */}
+              {realSubmittedAtAll ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: 13,
+                    borderRadius: 15,
+                    backgroundColor: realChip.bg,
+                    borderWidth: 1,
+                    borderColor: realChip.border,
+                  }}
+                >
+                  <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={realSt.text} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M20 6 9 17l-5-5" />
+                  </Svg>
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: realSt.text }}>
+                    Работа отправлена · {realStatusLabel}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          )
+        ) : (
+          <>
         {/* 4. HomeworkHeaderCard */}
         <GlassCard radius={20} contentStyle={{ padding: 13, gap: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 11 }}>
@@ -798,6 +1338,8 @@ export default function HomeworkDetailScreen() {
             </Text>
           </View>
         ) : null}
+          </>
+        )}
       </ScrollView>
 
       {/* Шторка выбора ребёнка. */}
@@ -805,9 +1347,13 @@ export default function HomeworkDetailScreen() {
         <ChildPickerSheetContent
           title={t.auth.chooseChild}
           items={pickerItems}
-          selectedId={childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
           onSelect={(id) => {
-            setChildId(id);
+            if (isRealFlow) {
+              selectChild(id);
+            } else {
+              setChildId(id);
+            }
             setSheetOpen(false);
           }}
         />

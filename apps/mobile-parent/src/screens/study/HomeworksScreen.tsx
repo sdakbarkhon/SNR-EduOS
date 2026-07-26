@@ -14,15 +14,27 @@
  * getHomeworkTotals, getSubject). Тексты статусов и подписи — из фикстур
  * (HOMEWORK_LIST ru-строки). Header i18n — d.parentApp.scr.homeworks.
  * Обе темы через useTheme(); iOS safe-area — из InnerHeader.
+ *
+ * Заход 2, шаг 5: для реального входа (isRealFlow) список/фильтры/сводка —
+ * из public.homework + сдач активного ребёнка (packages/core
+ * getHomeworkWithSubmissions, throw-on-error, ОДИН запрос). Экран не имел
+ * своего свитчера ребёнка и раньше (фикстура была child-агностична) — под
+ * нового ребёнка список перезапрашивается через общий selectedChildId
+ * (ParentDataContext), без добавления новой вёрстки. Статус сдачи — 3
+ * состояния «Не сдано»/«На проверке»/«Оценено» (реюз packages/core
+ * homeworkSubmissionStatusKind — тот же паттерн, что уже на вебе), числовая
+ * оценка не показывается. Демо-флоу (fixture HOMEWORK_LIST/getHomeworkList)
+ * не тронут ни строкой.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { getHomeworkWithSubmissions, type HomeworkWithSubmission } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
-import { GlassCircleButton, InnerHeader, type StatusFamily } from "../../ui";
+import { GlassCard, GlassCircleButton, InnerHeader, type StatusFamily } from "../../ui";
 import {
   getHomeworkFilterChips,
   getHomeworkList,
@@ -32,6 +44,12 @@ import {
 import type { HomeworkCardRow, SubjectKey } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
+import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { getSupabase } from "../../lib/supabase";
+import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
+import { realSubmissionStatusKind, realSubmissionStatusLabel, realTestStatusKind, realTestStatusLabel } from "../../lib/homeworkStatus";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -40,6 +58,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 function statusToFamily(label: string): StatusFamily {
   switch (label) {
     case "Выполнено":
+    case "Оценено":
       return "green";
     case "В работе":
       return "orange";
@@ -48,8 +67,166 @@ function statusToFamily(label: string): StatusFamily {
     case "Просрочено":
       return "red";
     default:
-      return "gray"; // «Не назначено»
+      return "gray"; // «Не назначено» / «Не сдано»
   }
+}
+
+/** «#ca8a04» → «202,138,4» — тот же локальный паттерн, что уже в
+ *  ScheduleScreen.tsx/TeacherProfileScreen.tsx и др. */
+function hexToRgbCsv(hex: string): string {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
+/** Реальная строка карточки ДЗ — параллельно ScheduleLessonRow/ScheduleScreen's
+ *  real-lesson: настоящий предмет (цвет+имя из resolved subjectName/Color, не
+ *  фикстурный SubjectKey), настоящий статус/срок/индикатор. */
+type RealHomeworkRow = {
+  id: string;
+  subjectName: string;
+  subjectColor: string;
+  statusLabel: string;
+  title: string;
+  dueLabel: string;
+  progress: number | "hourglass" | null;
+  overdue: boolean;
+  dueToday: boolean;
+  submittedAtAll: boolean;
+};
+
+function realDueLabel(dueDate: string | null, todayKey: string, tomorrowKey: string): string {
+  if (!dueDate) return "Без срока";
+  const key = tashkentDateKey(dueDate);
+  const time = new Date(dueDate).toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Tashkent",
+  });
+  if (key === todayKey) return `Срок: сегодня, ${time}`;
+  if (key === tomorrowKey) return `Срок: завтра, ${time}`;
+  const dateLabel = new Date(dueDate).toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
+  return `Срок: ${dateLabel}`;
+}
+
+function toRealHomeworkRow(hw: HomeworkWithSubmission, todayKey: string, tomorrowKey: string): RealHomeworkRow {
+  const isTest = hw.content_type === "test";
+  const kind = isTest ? realTestStatusKind(hw.test_submission) : realSubmissionStatusKind(hw.submission?.status);
+  const statusLabel = isTest ? realTestStatusLabel(hw.test_submission) : realSubmissionStatusLabel(hw.submission?.status);
+  const overdue = kind === "not_submitted" && !!hw.due_date && tashkentDateKey(hw.due_date) < todayKey;
+  const dueToday = !!hw.due_date && tashkentDateKey(hw.due_date) === todayKey;
+
+  let progress: number | "hourglass" | null;
+  if (isTest && hw.test_submission?.score != null && hw.test_submission?.max_score) {
+    progress = Math.round((hw.test_submission.score / hw.test_submission.max_score) * 100);
+  } else if (kind === "not_submitted") {
+    progress = null;
+  } else if (kind === "pending_review") {
+    progress = "hourglass";
+  } else {
+    progress = 100;
+  }
+
+  return {
+    id: hw.id,
+    subjectName: hw.subjectName ?? hw.group.subject ?? "Предмет",
+    subjectColor: hw.subjectColor ?? "#6366f1",
+    statusLabel,
+    title: hw.title,
+    dueLabel: realDueLabel(hw.due_date, todayKey, tomorrowKey),
+    progress,
+    overdue,
+    dueToday,
+    submittedAtAll: kind !== "not_submitted",
+  };
+}
+
+/** Плитка предмета для реальных данных — то же место/тень/форма, что
+ *  SubjectTile, но цвет и глиф (первые буквы названия) — из resolved
+ *  subjectColor/subjectName, а не из фикстурного SUBJECTS-словаря. */
+function RealSubjectTile({ color, glyph }: { color: string; glyph: string }) {
+  const shadow = shadowStyle({ x: 0, y: 6, blur: 14, color: `rgba(${hexToRgbCsv(color)},0.3)` });
+  return (
+    <View style={[styles.subjectTileWrap, shadow]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: color }]} />
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Text style={styles.tileGlyphText}>{glyph}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** Карточка ДЗ на реальных данных — та же композиция/стили, что HomeworkCard,
+ *  просто источник полей другой (RealHomeworkRow вместо HomeworkCardRow). */
+function RealHomeworkCard({ row, onPress }: { row: RealHomeworkRow; onPress: () => void }) {
+  const { tokens, scheme } = useTheme();
+  const family = statusToFamily(row.statusLabel);
+  const st = tokens.status[family];
+
+  const emphMeta = family === "orange" || family === "red";
+  const metaColor = emphMeta ? st.text : scheme === "dark" ? "rgba(255,255,255,0.55)" : "rgba(26,19,74,0.5)";
+  const metaWeight = emphMeta ? fonts.manrope800 : fonts.manrope700;
+  const subtitleColor = scheme === "dark" ? "rgba(255,255,255,0.65)" : "rgba(26,19,74,0.66)";
+
+  let right: React.ReactNode;
+  if (row.progress === "hourglass") {
+    right = <HourglassBadge />;
+  } else if (row.progress === null) {
+    right = <DashBadge />;
+  } else {
+    right = <ProgressRing42 pct={row.progress} family={family} />;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, shadowStyle(tokens.shCard), pressed ? { opacity: 0.9 } : null]}
+    >
+      <LinearGradient
+        colors={
+          scheme === "dark"
+            ? ["rgba(255,255,255,0.13)", "rgba(255,255,255,0.05)"]
+            : ["rgba(255,255,255,0.72)", "rgba(255,255,255,0.46)"]
+        }
+        {...gradPoints(160)}
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: tokens.glassInset.y,
+          backgroundColor: tokens.glassInset.color,
+        }}
+      />
+      <View style={styles.cardContent}>
+        <RealSubjectTile color={row.subjectColor} glyph={row.subjectName.slice(0, 2)} />
+        <View style={styles.cardCenter}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }} numberOfLines={1}>
+              {row.subjectName}
+            </Text>
+            <MiniStatusChip label={row.statusLabel} family={family} />
+          </View>
+          <Text numberOfLines={2} style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: subtitleColor }}>
+            {row.title}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <IconGlyph paths={CLOCK_PATHS} size={10} color={metaColor} stroke={2} />
+            <Text style={{ fontFamily: metaWeight, fontSize: 9.5, color: metaColor }} numberOfLines={1}>
+              {row.dueLabel}
+            </Text>
+          </View>
+        </View>
+        {right}
+      </View>
+    </Pressable>
+  );
 }
 
 /* ─── глифы плиток предметов (макет 510/515/520/525/530). ─────────────────── */
@@ -529,6 +706,10 @@ export default function HomeworksScreen() {
   const { d } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
+  const session = useAuthSession();
+  const { data: parentData, selectedChildId } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+
   const chips = getHomeworkFilterChips(); // [{label, count}] × 4
   const list = getHomeworkList();
   const totals = getHomeworkTotals();
@@ -553,6 +734,54 @@ export default function HomeworksScreen() {
     }
   }, [activeFilter, list]);
 
+  // ── Заход 2, шаг 5: реальный список — ОДИН запрос getHomeworkWithSubmissions
+  // на всю группу активного ребёнка. Экран не имел собственного свитчера
+  // ребёнка (фикстура была child-агностична) — под нового ребёнка список
+  // перезапрашивается через общий selectedChildId, без новой вёрстки.
+  const homeworkState = useAsyncData(
+    () => (isRealFlow && selectedChildId ? getHomeworkWithSubmissions(getSupabase(), selectedChildId) : Promise.resolve(null)),
+    [isRealFlow, selectedChildId],
+  );
+  const todayKey = useMemo(() => tashkentToday(), []);
+  const tomorrowKey = useMemo(() => addDays(todayKey, 1), [todayKey]);
+  const realList = useMemo(
+    () => (homeworkState.data ?? []).map((hw) => toRealHomeworkRow(hw, todayKey, tomorrowKey)),
+    [homeworkState.data, todayKey, tomorrowKey],
+  );
+  const realChips = useMemo(
+    () => [
+      { label: "Все", count: realList.length },
+      { label: "Сегодня", count: realList.filter((r) => r.dueToday).length },
+      { label: "Просрочено", count: realList.filter((r) => r.overdue).length },
+      { label: "Выполнено", count: realList.filter((r) => r.submittedAtAll).length },
+    ],
+    [realList],
+  );
+  const realVisible = useMemo(() => {
+    switch (activeFilter) {
+      case "today":
+        return realList.filter((r) => r.dueToday);
+      case "late":
+        return realList.filter((r) => r.overdue);
+      case "done":
+        return realList.filter((r) => r.submittedAtAll);
+      default:
+        return realList;
+    }
+  }, [activeFilter, realList]);
+  const realTotals = useMemo(
+    () => ({
+      total: realList.length,
+      done: realList.filter((r) => r.statusLabel === "Оценено").length,
+      under_review: realList.filter((r) => r.statusLabel === "На проверке").length,
+      overdue: realList.filter((r) => r.overdue).length,
+    }),
+    [realList],
+  );
+
+  const chipsFinal = isRealFlow ? realChips : chips;
+  const totalsFinal = isRealFlow ? realTotals : totals;
+
   return (
     <AppBackground>
       <InnerHeader
@@ -575,7 +804,7 @@ export default function HomeworksScreen() {
       >
         {/* Ряд фильтр-чипов (макет 503–508). */}
         <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-          {chips.map((c, i) => {
+          {chipsFinal.map((c, i) => {
             const keys: FilterKey[] = ["all", "today", "late", "done"];
             const key = keys[i] ?? "all";
             return (
@@ -590,17 +819,69 @@ export default function HomeworksScreen() {
           })}
         </View>
 
-        {/* Пять карточек ДЗ (макет 509–532). */}
-        {visible.map((row) => (
-          <HomeworkCard key={row.id} row={row} onPress={() => navigation.navigate("d13")} />
-        ))}
+        {/* Список ДЗ (макет 509–532). Заход 2, шаг 5: real-флоу — loading/
+            error раздельно (useAsyncData, без .catch), «нет заданий» под
+            текущий фильтр визуально отличается от ошибки запроса (54
+            задания есть в базе — пустой ответ подозрителен, не заминаем). */}
+        {isRealFlow && homeworkState.loading ? (
+          <View style={{ paddingVertical: 48, alignItems: "center" }}>
+            <ActivityIndicator color={tokens.accent} />
+          </View>
+        ) : isRealFlow && homeworkState.error ? (
+          <GlassCard
+            radius={20}
+            contentStyle={{
+              padding: 18,
+              gap: 10,
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: `rgba(${tokens.status.red.rgb},0.35)`,
+            }}
+          >
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
+              Не удалось загрузить задания
+            </Text>
+            <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
+              {homeworkState.error.message}
+            </Text>
+            <Pressable
+              onPress={() => homeworkState.refresh()}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                backgroundColor: `rgba(${tokens.status.red.rgb},0.14)`,
+                borderWidth: 1,
+                borderColor: `rgba(${tokens.status.red.rgb},0.4)`,
+              }}
+            >
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
+                Повторить
+              </Text>
+            </Pressable>
+          </GlassCard>
+        ) : isRealFlow && realVisible.length === 0 ? (
+          <GlassCard radius={20} contentStyle={{ padding: 18, alignItems: "center" }}>
+            <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2, textAlign: "center" }}>
+              {realList.length === 0 ? "Заданий пока нет" : "Нет заданий под этот фильтр"}
+            </Text>
+          </GlassCard>
+        ) : isRealFlow ? (
+          realVisible.map((row) => (
+            <RealHomeworkCard key={row.id} row={row} onPress={() => navigation.navigate("d13", { homeworkId: row.id })} />
+          ))
+        ) : (
+          visible.map((row) => (
+            <HomeworkCard key={row.id} row={row} onPress={() => navigation.navigate("d13")} />
+          ))
+        )}
 
         {/* Стеклянная строка-сводка (макет 534–542). */}
         <SummaryStatsBar
-          total={totals.total}
-          done={totals.done}
-          underReview={totals.under_review}
-          overdue={totals.overdue}
+          total={totalsFinal.total}
+          done={totalsFinal.done}
+          underReview={totalsFinal.under_review}
+          overdue={totalsFinal.overdue}
         />
       </ScrollView>
     </AppBackground>

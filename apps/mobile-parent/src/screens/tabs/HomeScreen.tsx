@@ -23,8 +23,15 @@
  * теперь тоже реальные — getStudentLessonsForWeek (неделя группы, для
  * подсчёта уроков сегодня и ближайшего предстоящего урока) +
  * getStudentAttendance (реюз Шага 3, для «сегодня отмечено present» и
- * времени первой отметки). «ДЗ» и «Кошелёк» — по-прежнему фикстура
- * (getDashboard), не в скоупе этого шага.
+ * времени первой отметки). «Кошелёк» — по-прежнему фикстура (getDashboard).
+ *
+ * Заход 2, шаг 5: плитка «ДЗ» тоже реальная — getHomeworkWithSubmissions,
+ * критерий «невыполненных» — ТОЧНО тот же, что уже на вебе у родительского
+ * дашборда (apps/web parent dashboard/page.tsx): нет ни homework_submissions,
+ * ни test_submissions, и (срока нет ИЛИ срок сегодня/позже — просроченные
+ * туда сознательно не попадают, это поведение веба, не своя логика).
+ * Отдельный useAsyncData от лессонов/посещаемости — сбой загрузки ДЗ не
+ * должен гасить уже отгруженные «Уроков»/«Посещено»/«В школе с».
  */
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type PressableStateCallbackType } from "react-native";
@@ -32,7 +39,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getStudentLessonsForWeek, getStudentAttendance, formatTime } from "@snr/core";
+import { getStudentLessonsForWeek, getStudentAttendance, getHomeworkWithSubmissions, formatTime } from "@snr/core";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
   AccentCard,
@@ -333,6 +340,33 @@ export default function HomeScreen() {
   // → «…», ошибка → «—», не фейк-ноль); «ДЗ» и «Кошелёк» не тронуты (фикстура).
   const homeLoading = isRealFlow && homeDataState.loading;
   const homeError = isRealFlow && !!homeDataState.error;
+
+  // ── Заход 2, шаг 5: «ДЗ N» — отдельный fetch (не делим loading/error с
+  // уроками/посещаемостью выше — сбой ДЗ не должен гасить уже рабочие
+  // плитки). Критерий «невыполненных» — тот же, что apps/web parent
+  // dashboard/page.tsx: нет ни submission, ни test_submission, и (без
+  // срока ИЛИ срок сегодня/позже).
+  const homeworkTileState = useAsyncData(
+    () => (isRealFlow && selectedChildId ? getHomeworkWithSubmissions(getSupabase(), selectedChildId) : Promise.resolve(null)),
+    [isRealFlow, selectedChildId],
+  );
+  const homeworkLoading = isRealFlow && homeworkTileState.loading;
+  const homeworkError = isRealFlow && !!homeworkTileState.error;
+  const pendingHomeworkCount = useMemo(
+    () =>
+      (homeworkTileState.data ?? []).filter(
+        (hw) => !hw.submission && !hw.test_submission && (!hw.due_date || tashkentDateKey(hw.due_date) >= todayKey),
+      ).length,
+    [homeworkTileState.data, todayKey],
+  );
+  const homeworkCountValue = isRealFlow
+    ? homeworkLoading
+      ? "…"
+      : homeworkError
+        ? "—"
+        : String(pendingHomeworkCount)
+    : String(dashboard.child_status.homework_count);
+
   const atSchoolSinceValue = isRealFlow
     ? homeLoading
       ? "…"
@@ -365,7 +399,7 @@ export default function HomeScreen() {
     },
     {
       label: d.parentApp.home.hw,
-      value: String(dashboard.child_status.homework_count),
+      value: homeworkCountValue,
       valueColor: tokens.status.orange.text,
     },
     {
