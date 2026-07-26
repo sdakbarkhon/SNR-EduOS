@@ -5,7 +5,12 @@ export type AsyncDataState<T> = {
   loading: boolean;
   refreshing: boolean;
   error: Error | null;
-  refresh: () => void;
+  /** Promise resolves once this refresh settles (data ИЛИ error) — awaitable
+   *  для мест, которым нужно знать, когда данные реально готовы (Заход 1:
+   *  verifyCode() ждёт реальный список детей перед переходом на childPicker,
+   *  а не просто дёргает refresh "в фоне"). Существующие вызовы без await
+   *  продолжают работать как раньше. */
+  refresh: () => Promise<void>;
 };
 
 /** Явный fetch-статус для экрана: loading (первая загрузка) / refreshing
@@ -23,12 +28,12 @@ export function useAsyncData<T>(
   const [error, setError] = useState<Error | null>(null);
   const generation = useRef(0);
 
-  const run = useCallback((isRefresh: boolean) => {
+  const run = useCallback((isRefresh: boolean): Promise<void> => {
     const myGen = ++generation.current;
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
-    fetcher()
+    return fetcher()
       .then((result) => {
         if (generation.current !== myGen) return;
         setData(result);

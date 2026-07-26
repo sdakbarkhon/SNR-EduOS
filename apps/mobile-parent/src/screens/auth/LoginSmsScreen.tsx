@@ -10,6 +10,15 @@
  *   7. Numeric keypad 3×4 (padKeys — 12 клавиш).
  *
  * Реальный таймер cooldown (45→0). Автоверификация при 4 цифрах (setTimeout 350ms).
+ *
+ * ЗАХОД 1 (реальный вход): verifyCode() теперь асинхронна (сверяет код
+ * с ожидаемым для найденного номера, затем настоящий signInWithPassword
+ * через loginAsParent) — сама решает переход фазы внутри AuthSessionContext,
+ * этот экран больше не зовёт enterApp() напрямую. Неверный код/сбой сети —
+ * smsError из контекста, отображается под боксами + красная рамка боксов
+ * (существовавшего компонента ошибки в этих экранах не было — минимальный
+ * inline-Text на существующем tokens.status.red, вид остальных блоков
+ * не менялся).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -56,7 +65,8 @@ export function LoginSmsScreen() {
     setSmsCode,
     verifyCode,
     setPhase,
-    enterApp,
+    smsError,
+    authBusy,
   } = useAuthSession();
 
   const [cooldown, setCooldown] = useState<number>(RESEND_COOLDOWN);
@@ -82,28 +92,38 @@ export function LoginSmsScreen() {
     };
   }, [cooldown > 0]);
 
-  // Автоверификация при 4 цифрах (setTimeout 350ms).
+  // Автоверификация при 4 цифрах (setTimeout 350ms). verifyCode() асинхронна
+  // (реальный signInWithPassword внутри) и сама решает переход фазы —
+  // здесь достаточно её вызвать и не дать повторный вызов, пока первая
+  // проверка ещё в полёте (authBusy из контекста).
   useEffect(() => {
-    if (smsCode.length !== SMS_LEN) return;
+    if (smsCode.length !== SMS_LEN || authBusy) return;
     autoSubmitRef.current = setTimeout(() => {
-      const next = verifyCode();
-      if (next === "app") enterApp(0);
+      verifyCode();
     }, AUTO_SUBMIT_DELAY);
     return () => {
       if (autoSubmitRef.current) clearTimeout(autoSubmitRef.current);
     };
-  }, [smsCode, verifyCode, enterApp]);
+  }, [smsCode, authBusy, verifyCode]);
 
-  const goBack = () => setPhase("phone");
+  // Заход 1: во время authBusy verifyCode() уже улетел в сеть (реальный
+  // signInWithPassword + загрузка детей) и САМ переключит фазу по готовности
+  // — если пользователь успеет уйти назад до этого момента, поздний setState
+  // из уже висящего запроса неожиданно перепрыгнет его обратно вперёд.
+  // Блокируем оба выхода из экрана, пока запрос в полёте.
+  const goBack = () => {
+    if (authBusy) return;
+    setPhase("phone");
+  };
 
   const smsResend = () => {
-    if (cooldown > 0) return;
+    if (cooldown > 0 || authBusy) return;
     setSmsCode("");
     setCooldown(RESEND_COOLDOWN);
   };
 
   const pressPad = (k: string) => {
-    if (!k) return;
+    if (!k || authBusy) return;
     if (k === "del") {
       setSmsCode(smsCode.slice(0, -1));
       return;
@@ -121,6 +141,10 @@ export function LoginSmsScreen() {
   const glassBg = scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.55)";
   const glassBorder = scheme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.8)";
   const activeBorder = "rgba(124,58,237,0.65)";
+  // Заход 1: цвет ошибки — существующий семантический токен status.red
+  // (уже используется для просроченных ДЗ и т.п.), новых цветов не вводим.
+  const errorColor = tokens.status.red.text;
+  const smsErrorText = smsError ? t[smsError] : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -189,12 +213,17 @@ export function LoginSmsScreen() {
         </Text>
 
         {/* ── БЛОК 4: 4 бокса ввода кода ────────────────────────────────── */}
+        {/* authBusy — единственная (минимальная, вне block-list) визуальная
+            обратная связь на время реального сетевого логина: без неё экран
+            выглядит зависшим на несколько сотен мс между вводом 4-й цифры
+            и переходом дальше. */}
         <View
           style={{
             flexDirection: "row",
             gap: 10,
             justifyContent: "center",
             paddingVertical: 6,
+            opacity: authBusy ? 0.55 : 1,
           }}
         >
           {Array.from({ length: SMS_LEN }).map((_, i) => {
@@ -211,8 +240,8 @@ export function LoginSmsScreen() {
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: glassBg,
-                    borderWidth: isActive ? 2 : 1,
-                    borderColor: isActive ? activeBorder : glassBorder,
+                    borderWidth: isActive || smsError ? 2 : 1,
+                    borderColor: smsError ? errorColor : isActive ? activeBorder : glassBorder,
                   },
                   shadowStyle(
                     isActive
@@ -234,6 +263,22 @@ export function LoginSmsScreen() {
             );
           })}
         </View>
+
+        {/* Заход 1: ошибка "Неверный код" / сбой сети при логине — вне
+            block-list макета (там неоткуда взяться, фикстурный вход не мог
+            провалиться), минимальный inline-Text на status.red. */}
+        {smsErrorText ? (
+          <Text
+            style={{
+              fontFamily: fonts.manrope700,
+              fontSize: 11,
+              color: errorColor,
+              textAlign: "center",
+            }}
+          >
+            {smsErrorText}
+          </Text>
+        ) : null}
 
         {/* ── БЛОК 5: Security-стрип (щит + текст двумя строками) ───────── */}
         <GlassCard

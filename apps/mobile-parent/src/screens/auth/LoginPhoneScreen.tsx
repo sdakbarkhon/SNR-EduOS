@@ -60,7 +60,7 @@ export function LoginPhoneScreen() {
   const t = d.parentApp.auth;
   const { tokens, scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { country, phone, setCountry, setPhone, submitPhone, setPhase } =
+  const { country, phone, setCountry, setPhone, submitPhone, setPhase, phoneError } =
     useAuthSession();
   const [countryOpen, setCountryOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey>(null);
@@ -75,6 +75,11 @@ export function LoginPhoneScreen() {
     scheme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.85)";
   // Hairline «или»: макет rgba(23,18,67,.12) — берём ink3 (в токенах ≈ та же плотность).
   const hairline = tokens.ink3;
+  // Заход 1: существующего компонента ошибки на этом экране не было
+  // (фикстурный вход не мог провалиться) — переиспользуем семантический
+  // токен status.red, как и на LoginSmsScreen.
+  const errorColor = tokens.status.red.text;
+  const phoneErrorText = phoneError ? t[phoneError] : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -234,12 +239,26 @@ export function LoginPhoneScreen() {
                 fontSize: 14,
                 color: tokens.ink1,
                 backgroundColor: inputBg,
-                borderWidth: 1,
-                borderColor: inputBorder,
+                borderWidth: phoneError ? 2 : 1,
+                borderColor: phoneError ? errorColor : inputBorder,
               }}
               maxLength={12}
             />
           </View>
+          {/* Заход 1: "Номер не найден" — вне block-list макета (фикстурный
+              вход не мог провалиться), минимальный inline-Text на status.red. */}
+          {phoneErrorText ? (
+            <Text
+              style={{
+                fontFamily: fonts.manrope700,
+                fontSize: 10.5,
+                color: errorColor,
+                marginTop: 6,
+              }}
+            >
+              {phoneErrorText}
+            </Text>
+          ) : null}
           {/* CTA «Продолжить» (phoneBtnStyle: disabled → opacity 0.5) */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButton

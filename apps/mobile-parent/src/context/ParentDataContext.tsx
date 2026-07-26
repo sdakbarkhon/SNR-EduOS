@@ -7,7 +7,9 @@ type Ctx = {
   data: ParentContextData | null;
   loading: boolean;
   error: Error | null;
-  refresh: () => void;
+  /** Заход 1: awaitable (useAsyncData.refresh теперь Promise<void>) — auth-flow
+   *  ждёт реальных детей перед переходом на childPicker, а не дёргает вслепую. */
+  refresh: () => Promise<void>;
   selectedChildId: string | null;
   selectChild: (id: string) => void;
 };

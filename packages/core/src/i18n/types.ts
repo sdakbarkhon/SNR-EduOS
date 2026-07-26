@@ -2626,6 +2626,12 @@ export interface Dictionary {
       smsResendCountdown: string;
       smsResend: string;
       smsSecurity: string;
+      // Заход 1 (реальный вход по 3 тестовым номерам) — ошибки на экранах
+      // телефона/кода; существовавших раньше просто не было, т.к. фикстурный
+      // вход никогда не мог провалиться.
+      phoneNotFound: string;
+      wrongCode: string;
+      loginFailed: string;
       a4Sub: string;
       a4SecurityTitle: string;
       a4SecuritySub: string;

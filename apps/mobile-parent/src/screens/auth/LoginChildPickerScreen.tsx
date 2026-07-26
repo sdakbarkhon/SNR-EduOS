@@ -9,7 +9,10 @@
  *   5. Security-стрип «Ваши данные защищены» (GlassCard, фиолетовая иконка-щит).
  *   6. Spacer (flex:1) — распорка, прижимающая CTA вниз.
  *   7. CTA «Продолжить» — PrimaryButton (accent gradient) → enterApp.
- * Список детей — первые kidsCount из CHILDREN (макет: KIDS.slice(0, kidsN)).
+ * Список детей — демо: собственный child_ids демо-родителя. Заход 1
+ * (реальный вход): РЕАЛЬНЫЙ список детей из Supabase (useParentData()) —
+ * см. toChildRow() ниже. Иначе (защитный fallback) — первые kidsCount из
+ * CHILDREN (макет: KIDS.slice(0, kidsN)).
  * Строки отрисованы кастомно (не через ChildPickerSheetContent), т.к. макет A4
  * показывает «SNR International School» в третьей строке карточки, а
  * ChildPickerSheetContent — status-чип.
@@ -23,10 +26,43 @@ import { useTheme, fonts, gradPoints, shadowStyle } from "../../theme";
 import { Avatar, GlassCard, GlassCircleButton, PrimaryButton } from "../../ui";
 import { BackArrowIcon, ShieldCheckIcon } from "../../ui/auth/icons";
 import { getChildren, getChildrenForDemoParent } from "../../data";
+import type { ChildRow, Gradient } from "../../data/types";
 import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import type { ParentChildSummary } from "@snr/core";
 
 const SCHOOL_LABEL = "SNR International School";
 const CHECK_ON_SHADOW = { x: 0, y: 4, blur: 10, color: "rgba(124,58,237,0.4)" };
+
+// Заход 1: аватар-палитра для реальных детей — реальных gradient/ring в
+// Supabase нет (презентационные поля, не колонки), крутим по индексу так
+// же, как это уже сделано во множестве других мест приложения.
+const REAL_CHILD_PALETTE: [Gradient, string][] = [
+  [["#22d3ee", "#3b82f6"], "#0891b2"],
+  [["#8b5cf6", "#ec4899"], "#8b5cf6"],
+  [["#34d399", "#0ea5e9"], "#059669"],
+];
+
+/** Реальная строка из getParentContext() → форма ChildRow, которую уже умеет
+ *  рисовать эта карточка. first_name_gen/is_female/status_chip — грубые
+ *  заглушки (грамматика падежей и статус "в школе/дома" появятся вместе с
+ *  реальными data-экранами в следующих заходах, не в этом). */
+function toChildRow(c: ParentChildSummary, index: number): ChildRow {
+  const firstName = c.fullName.split(" ")[0] ?? c.fullName;
+  const [gradient, ring] = REAL_CHILD_PALETTE[index % REAL_CHILD_PALETTE.length];
+  return {
+    id: c.id,
+    full_name: c.fullName,
+    first_name: firstName,
+    first_name_gen: firstName,
+    is_female: false,
+    class_name: c.className ?? "—",
+    group_id: c.groupId ?? "",
+    status_chip: "",
+    avatar_gradient: gradient,
+    avatar_ring: ring,
+  };
+}
 
 export function LoginChildPickerScreen() {
   const { d } = useAppLocale();
@@ -35,15 +71,21 @@ export function LoginChildPickerScreen() {
   const insets = useSafeAreaInsets();
   const { kidsCount, authSel, demoParentId, pickChildIndex, enterApp, setPhase } =
     useAuthSession();
+  const { data: parentData } = useParentData();
   const g = gradPoints(tokens.accentGrad.angle);
 
-  // Заход 5: если это демо-родитель — берём его собственный список child_ids
-  // (Исмаилов → Азизбек, Рахимов → Мадина/Хумоюн, Каримова → все Каримовы).
-  // Phone-flow (без демо) — прежний behavior: первые kidsCount из CHILDREN,
-  // это по-прежнему трое Каримовых, т.к. они в начале массива.
+  // Заход 5: демо-родитель — свой список child_ids (Исмаилов → Азизбек,
+  // Рахимов → Мадина/Хумоюн, Каримова → все Каримовы).
+  // Заход 1: реальный phone-login — РЕАЛЬНЫЙ список из ParentDataContext
+  // (verifyCode() дожидается его перед переходом на эту фазу, так что к
+  // моменту монтирования этого экрана он уже готов). Пустой/не загруженный
+  // (defensive fallback — в норме не должно случаться) — старое поведение
+  // на первых kidsCount из CHILDREN.
   const kids = demoParentId
     ? getChildrenForDemoParent(demoParentId)
-    : getChildren().slice(0, Math.max(1, kidsCount));
+    : parentData && parentData.children.length > 0
+      ? parentData.children.map(toChildRow)
+      : getChildren().slice(0, Math.max(1, kidsCount));
   const selectedIndex = Math.min(Math.max(0, authSel), kids.length - 1);
 
   const checkOffBg = scheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(23,18,67,0.08)";

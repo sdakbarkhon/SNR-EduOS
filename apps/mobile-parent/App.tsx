@@ -22,6 +22,7 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { LocaleProvider } from "./src/i18n";
 import { ThemeProvider, useTheme } from "./src/theme";
 import { AuthSessionProvider } from "./src/context/AuthSessionContext";
+import { ParentDataProvider } from "./src/context/ParentDataContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -50,12 +51,20 @@ function ThemedStatusBar() {
 }
 
 /**
- * ЗАХОД 4 (редизайн v2): auth-flow подключён.
- * Дерево живёт на фикстурах. AuthSessionProvider держит состояние
- * входа (phase/phone/sms/childPicker/app + isDemo); RootNavigator
- * ветвится по phase на AuthNavigator ↔ MainNavigator. Старая
- * обвязка (lib/auth.ts, lib/demoApi.ts, context/DemoSessionContext)
- * не монтируется — заменена AuthSessionContext на фикстурах.
+ * ЗАХОД 4 (редизайн v2): auth-flow подключён. AuthSessionProvider держит
+ * состояние входа (phase/phone/sms/childPicker/app + isDemo); RootNavigator
+ * ветвится по phase на AuthNavigator ↔ MainNavigator.
+ *
+ * ЗАХОД 1 (реальный вход): ParentDataProvider (lib/auth.ts,
+ * context/ParentDataContext.tsx — "осиротевшая" после Захода 4 обвязка)
+ * возвращена в дерево, ВЫШЕ AuthSessionProvider — та зовёт
+ * useParentData().refresh() после успешного phone-login. Смонтирована
+ * безусловно (не только для реального входа): getParentContext() сама по
+ * себе безопасна без сессии (auth.getUser() → null → data:null, не throw),
+ * так что до входа и во всё время demo-flow это просто одна лишняя тихая
+ * попытка чтения на старте — экраны данных внутри приложения по-прежнему
+ * читают fixtures/, эту context ещё никто не потребляет кроме самого
+ * AuthSessionContext.
  */
 export default function App() {
   // Шрифты редизайна (Manrope + Unbounded) должны загрузиться ДО первого
@@ -94,10 +103,12 @@ export default function App() {
       <LocaleProvider>
         <ThemeProvider>
           <SafeAreaProvider>
-            <AuthSessionProvider>
-              <ThemedStatusBar />
-              <RootNavigator />
-            </AuthSessionProvider>
+            <ParentDataProvider>
+              <AuthSessionProvider>
+                <ThemedStatusBar />
+                <RootNavigator />
+              </AuthSessionProvider>
+            </ParentDataProvider>
           </SafeAreaProvider>
         </ThemeProvider>
       </LocaleProvider>
