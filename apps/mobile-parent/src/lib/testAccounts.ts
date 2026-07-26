@@ -1,7 +1,7 @@
 /**
  * Заход 1 — три тестовых номера входа. Настоящего SMS нет: номер+код
  * резолвятся в реальный parent-username (для signInWithUsername/
- * loginAsParent, пароль везде "password123" — см. auth.ts), а не создают
+ * loginAsParent, пароль везде "parent2026" — см. auth.ts), а не создают
  * никакой сессии сами по себе.
  *
  * fixtureChildIds — НЕ реальные ID детей (у Supabase-детей своя таблица);
@@ -41,7 +41,7 @@ export const TEST_ACCOUNTS: Record<string, TestAccount> = {
 
 /** Пароль всех трёх тестовых аккаунтов — реальный пароль реальных строк
  *  в auth.users, не относится к сгенерированным демо-паролям. */
-export const TEST_ACCOUNT_PASSWORD = "password123";
+export const TEST_ACCOUNT_PASSWORD = "parent2026";
 
 export function findTestAccount(nationalDigits: string): TestAccount | null {
   return TEST_ACCOUNTS[nationalDigits] ?? null;
