@@ -551,6 +551,11 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
           onSelect={(items) => { const first = items[0]; if (first) { setPickedFromKB(first); setAttachFile(null); } }}
           groupIds={groupId ? [groupId] : []}
           multiSelect={false}
+          // 6А, Заход D3 — задание не поддерживает video_*-вложения (нет
+          // attachment_content_type/attachment_external_url на homework,
+          // отдельная будущая миграция) — библиотечные видео-ссылки здесь
+          // намеренно скрыты, чтобы учитель не выбрал то, что не прикрепится.
+          allowVideoLinks={false}
         />
 
         {isExternal && (

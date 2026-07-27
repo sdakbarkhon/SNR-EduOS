@@ -1078,7 +1078,19 @@ export function TeacherLessonDetailView({
     if (uploading || !canSave || !uploadTitle.trim()) return;
     setUploading(true);
     try {
-      const mat = pickedFromKB
+      // 6А, Заход D3 — библиотечная видео-ссылка (source==="teacherLibrary",
+      // contentType video_*) вкладывается тем же путём, что и вручную
+      // вставленная ссылка (parsedVideoUrl ниже) — addLessonMaterialVideo,
+      // без попытки линковать несуществующий storage_path.
+      const pickedIsVideo = pickedFromKB?.contentType === "video_youtube" || pickedFromKB?.contentType === "video_rutube";
+      const mat = pickedFromKB && pickedIsVideo
+        ? await addLessonMaterialVideo(db, {
+            lessonId: lesson.id, teacherId: teacher.id, title: uploadTitle.trim(),
+            platform: pickedFromKB.contentType === "video_youtube" ? "youtube" : "rutube",
+            sourceUrl: pickedFromKB.sourceUrl ?? "", embedUrl: pickedFromKB.externalUrl ?? "",
+            visibility: uploadVisibility,
+          })
+        : pickedFromKB
         ? await linkLessonMaterialFromKnowledgeBase(db, {
             lessonId: lesson.id, teacherId: teacher.id, title: uploadTitle.trim(),
             storagePath: pickedFromKB.storagePath, kbBucket: pickedFromKB.source === "book" ? "books" : "materials",
@@ -1855,6 +1867,10 @@ export function TeacherLessonDetailView({
         groupIds={[lesson.group_id]}
         multiSelect={false}
         acceptedTypes={["application/pdf"]}
+        // 6А, Заход D3 — урок уже умеет video_* материалы (миграция 138,
+        // addLessonMaterialVideo ниже в handleUpload) — библиотечные
+        // видео-ссылки показываем в пикере тем же путём.
+        allowVideoLinks
       />
 
       {/* Read-only stage view (§7.5) — click a stage row to open; "Редактировать этап" switches to the edit modal below */}

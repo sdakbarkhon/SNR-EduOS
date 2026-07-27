@@ -2692,10 +2692,12 @@ export const linkLessonMaterialFromKnowledgeBase = async (
   return data as LessonMaterial;
 };
 
-/** 6А — Библиотека материалов учителей (migration 147): прикрепляет
- *  библиотечный материал к уроку как "базу знаний" — тонкая обёртка над
- *  linkLessonMaterialFromKnowledgeBase выше, ничего не дублирует. Живёт
- *  здесь (а не в queries/library.ts), потому что оборачивает функцию из
+/** 6А — Библиотека материалов учителей (migration 147/148): прикрепляет
+ *  библиотечный материал к уроку как "базу знаний" — тонкая обёртка,
+ *  ничего не дублирует: content_type='file' идёт через
+ *  linkLessonMaterialFromKnowledgeBase, content_type video_* — через
+ *  addLessonMaterialVideo (обе определены выше в этом же файле). Живёт
+ *  здесь (а не в queries/library.ts), потому что оборачивает функции из
  *  этого же файла — library.ts принципиально не импортирует из index.ts
  *  (см. шапку library.ts), чтобы не создавать циклическую зависимость. */
 export const attachLibraryMaterialToLesson = (
@@ -2707,19 +2709,31 @@ export const attachLibraryMaterialToLesson = (
     visibility?: "all" | "teacher_only";
   },
 ): Promise<LessonMaterial> => {
-  // 6А, Заход D (миграция 148) — видео-ссылки библиотеки не имеют
-  // storage_path вовсе; вложение видео-ссылки в урок — отдельный путь
-  // (Заход D3, ещё не реализован), эта функция им пока не занимается.
-  if (input.material.content_type !== "file" || !input.material.storage_path) {
-    throw new Error("attachLibraryMaterialToLesson поддерживает только файлы библиотеки (content_type='file') — видео-ссылки подключаются отдельно (Заход D3)");
+  const { material } = input;
+  if (material.content_type === "video_youtube" || material.content_type === "video_rutube") {
+    if (!material.external_url || !material.source_url) {
+      throw new Error("Видео-ссылка библиотеки без external_url/source_url — повреждённая запись");
+    }
+    return addLessonMaterialVideo(db, {
+      lessonId: input.lessonId,
+      teacherId: input.teacherId,
+      title: material.title,
+      platform: material.content_type === "video_youtube" ? "youtube" : "rutube",
+      sourceUrl: material.source_url,
+      embedUrl: material.external_url,
+      visibility: input.visibility,
+    });
+  }
+  if (!material.storage_path) {
+    throw new Error("Материал библиотеки content_type='file' без storage_path — повреждённая запись");
   }
   return linkLessonMaterialFromKnowledgeBase(db, {
     lessonId: input.lessonId,
     teacherId: input.teacherId,
-    title: input.material.title,
-    storagePath: input.material.storage_path,
+    title: material.title,
+    storagePath: material.storage_path,
     kbBucket: "materials",
-    fileSizeBytes: input.material.file_size_bytes,
+    fileSizeBytes: material.file_size_bytes,
     visibility: input.visibility,
   });
 };

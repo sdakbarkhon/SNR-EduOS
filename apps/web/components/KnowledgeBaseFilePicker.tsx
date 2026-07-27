@@ -15,7 +15,7 @@
 // (`pickedFromKB.source === "book" ? ... : ...`), а "teacherLibrary" !== "book".
 
 import { useEffect, useMemo, useState } from "react";
-import { X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen, Library } from "lucide-react";
+import { X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen } from "lucide-react";
 import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
 import { getDictionary, getLibraryMaterials } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -26,9 +26,17 @@ export type PickedKnowledgeBaseFile = {
   source: "material" | "book" | "teacherLibrary";
   id: string;
   title: string;
+  // Для видео-ссылок библиотеки (contentType video_*, D3) не используется —
+  // пусто, реальные данные в externalUrl/sourceUrl ниже.
   storagePath: string;
   fileType: string | null;
   sizeBytes: number | null;
+  // D3 — только для source==="teacherLibrary" (migration 148): отличает
+  // обычный файл от видео-ссылки. undefined для source "material"/"book"
+  // (у них своя, файловая, форма данных).
+  contentType?: "file" | "video_youtube" | "video_rutube";
+  externalUrl?: string | null;
+  sourceUrl?: string | null;
 };
 
 type Tab = "library" | "materials" | "teacherLibrary";
@@ -50,6 +58,7 @@ export function KnowledgeBaseFilePicker({
   groupIds,
   multiSelect = true,
   acceptedTypes,
+  allowVideoLinks = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -62,6 +71,13 @@ export function KnowledgeBaseFilePicker({
    *  Omit to show everything — the homework-attachment picker relies on
    *  this default to keep accepting all file types. */
   acceptedTypes?: string[];
+  /** D3 — показывать ли видео-ссылки библиотеки (content_type video_*) во
+   *  вкладке "Библиотека учителей". По умолчанию false: вложение
+   *  видео-ссылки поддерживает пока только урок (lesson_materials уже умеет
+   *  video_* с миграции 138) — задание/homework video_*-вложения не имеет
+   *  вовсе (отдельная будущая миграция), поэтому его форма явно передаёт
+   *  false, чтобы учитель не выбрал то, что физически не прикрепится. */
+  allowVideoLinks?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -131,15 +147,12 @@ export function KnowledgeBaseFilePicker({
   const filteredLibraryFiles = useMemo(
     () =>
       libraryFiles.filter(
-        // 6А, Заход D (migration 148) — видео-ссылки библиотеки (content_type
-        // video_*, storage_path=null) сюда пока не показываем: вложение
-        // видео-ссылки в урок/задание — Заход D3, ещё не реализовано, а
-        // PickedKnowledgeBaseFile.storagePath ожидает реальный путь в Storage.
-        // Type predicate заодно сужает storage_path до string ниже по коду.
-        (m): m is LibraryMaterialWithDetails & { storage_path: string } =>
-          m.content_type === "file" && m.storage_path !== null && m.title.toLowerCase().includes(query.toLowerCase()),
+        // 6А, Заход D3 — видео-ссылки (content_type video_*) показываем
+        // только когда вызывающая сторона явно разрешила (allowVideoLinks,
+        // сейчас — только урок; задание video_* пока не прикрепляет).
+        (m) => (m.content_type === "file" || allowVideoLinks) && m.title.toLowerCase().includes(query.toLowerCase()),
       ),
-    [libraryFiles, query],
+    [libraryFiles, query, allowVideoLinks],
   );
 
   function toggle(item: PickedKnowledgeBaseFile) {
@@ -175,8 +188,21 @@ export function KnowledgeBaseFilePicker({
       ? filteredLibraryFiles.map((m) => ({
           key: `teacherLibrary:${m.id}`,
           title: m.title,
-          hasLink: false,
-          picked: { source: "teacherLibrary", id: m.id, title: m.title, storagePath: m.storage_path, fileType: m.file_type, sizeBytes: m.file_size_bytes },
+          // hasLink здесь означает "видео-ссылка" для целей выбора иконки —
+          // тот же LinkIcon, что materials-вкладка уже использует для
+          // link_url-материалов без файла.
+          hasLink: m.content_type !== "file",
+          picked: {
+            source: "teacherLibrary",
+            id: m.id,
+            title: m.title,
+            storagePath: m.storage_path ?? "",
+            fileType: m.file_type,
+            sizeBytes: m.file_size_bytes,
+            contentType: m.content_type,
+            externalUrl: m.external_url,
+            sourceUrl: m.source_url,
+          },
         }))
       : filteredMaterials.map((m) => ({
           key: `material:${m.id}`,
@@ -188,8 +214,17 @@ export function KnowledgeBaseFilePicker({
   // acceptedTypes is opt-in per call site (undefined = show everything, e.g.
   // the homework-attachment picker) — only lesson-materials passes it, to
   // restrict to PDF-only per the customer's requirement for that form.
+  // D3 — video-link items have fileType=null (no MIME — they're not a file
+  // at all) and must NOT be caught by this file-type filter: acceptedTypes
+  // describes an upload-file restriction, a categorically different axis
+  // from "is this a video link". The lesson form already accepts pasted
+  // video URLs alongside PDF-only file uploads (see handleUpload below) —
+  // letting a KB-sourced video link through here is the same content kind,
+  // just picked instead of typed.
+  const isVideoItem = (it: { picked: PickedKnowledgeBaseFile }) =>
+    it.picked.contentType === "video_youtube" || it.picked.contentType === "video_rutube";
   const items = acceptedTypes
-    ? allItems.filter((it) => it.picked.fileType && acceptedTypes.includes(it.picked.fileType))
+    ? allItems.filter((it) => isVideoItem(it) || (it.picked.fileType && acceptedTypes.includes(it.picked.fileType)))
     : allItems;
 
   return (
@@ -258,7 +293,9 @@ export function KnowledgeBaseFilePicker({
               {items.map((it) => {
                 const key = `${it.picked.source}:${it.picked.id}`;
                 const isSelected = selected.has(key);
-                const Icon = tab === "library" ? BookOpen : tab === "teacherLibrary" ? Library : iconFor(it.picked.fileType, it.hasLink);
+                // teacherLibrary: hasLink=true для видео-ссылок (см. allItems выше)
+                // — iconFor уже отдаёт LinkIcon для hasLink, файловую иконку иначе.
+                const Icon = tab === "library" ? BookOpen : iconFor(it.picked.fileType, it.hasLink);
                 return (
                   <button
                     key={it.key}
