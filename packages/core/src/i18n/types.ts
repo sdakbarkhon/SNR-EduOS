@@ -1874,6 +1874,7 @@ export interface Dictionary {
     navGrades: string;
     navMaterials: string;
     navKnowledgeBase: string; // "База знаний" — БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1, replaces navMaterials+navBooks in the sidebar
+    navLibrary: string; // "Библиотека" — 6А, Заход B: библиотека материалов учителей (migration 147), отдельный верхнеуровневый пункт от navKnowledgeBase/navBooks
     navGroups: string;
     navProfile: string;
     kpiGroups: string;
@@ -1985,6 +1986,40 @@ export interface Dictionary {
     materialsLessonOptional: string;
     materialsAllGroups: string;
     materialsAllSubjects: string;
+    // 6А, Заход B — Библиотека материалов учителей (/teacher/library,
+    // migration 147). Отдельная от materials*/books* — свой раздел,
+    // видимый только учителям, куратор смотрит, но не грузит.
+    libraryTitle: string;
+    libraryUploadBtn: string;
+    libraryEmpty: string;
+    libraryEmptyFiltered: string;
+    libraryError: string;
+    librarySearchPlaceholder: string;
+    libraryAllSubjects: string;
+    libraryAllClasses: string;
+    libraryUploadedBy: string;
+    libraryDownload: string;
+    libraryDelete: string;
+    libraryDeleting: string;
+    libraryUploadTitle: string;
+    libraryName: string;
+    libraryNamePlaceholder: string;
+    librarySubjectLabel: string; // "Ваш предмет" — read-only, резолвится из роли
+    libraryClassesLabel: string;
+    libraryFile: string;
+    libraryDragDrop: string;
+    libraryMaxSize: string; // "PDF, PPTX, JPG, PNG, MP4 — макс. 50 МБ"
+    libraryCancel: string;
+    libraryUpload: string;
+    libraryUploading: string;
+    librarySuccess: string;
+    libraryCuratorNotice: string;
+    libraryErrTitleRequired: string;
+    libraryErrFileRequired: string;
+    libraryErrFileTooLarge: string;
+    libraryErrFileType: string;
+    libraryErrUploadFailed: string;
+    libraryErrDeleteFailed: string;
     navLessons: string;
     navCurriculumPlans: string;
     navBooks: string;
