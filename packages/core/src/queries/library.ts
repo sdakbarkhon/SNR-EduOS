@@ -82,32 +82,50 @@ export async function getLibraryMaterials(
       groups: (r.groups ?? [])
         .map((g) => g.group)
         .filter((g): g is LibraryMaterialGroup => g !== null),
-      url: await getLibraryMaterialUrl(db, r.storage_path),
+      // migration 148 — видео-ссылки не имеют Storage-объекта: signed URL
+      // не запрашиваем (нечего подписывать), открывать по external_url.
+      url: r.content_type === "file" && r.storage_path ? await getLibraryMaterialUrl(db, r.storage_path) : null,
     })),
   );
 }
 
-export type CreateLibraryMaterialInput = {
-  title: string;
-  storagePath: string;
-  fileType: string | null;
-  fileSizeBytes: number | null;
-  /** Классы, которым виден материал. Пустой массив = "Все классы" (не
-   *  создаём строк в junction-таблице). */
-  groupIds: string[];
-};
+export type CreateLibraryMaterialInput =
+  | {
+      contentType?: "file";
+      title: string;
+      storagePath: string;
+      fileType: string | null;
+      fileSizeBytes: number | null;
+      /** Классы, которым виден материал. Пустой массив = "Все классы" (не
+       *  создаём строк в junction-таблице). */
+      groupIds: string[];
+    }
+  | {
+      // migration 148 — видео-ссылка (YouTube/RuTube) вместо файла.
+      // externalUrl — уже нормализованный embed-URL (toEmbedUrl() на
+      // стороне apps/web/lib/video-url.ts — парсинг URL сюда не тащим, тем
+      // же принципом, что addLessonMaterialVideo в index.ts). sourceUrl —
+      // то, что вставил учитель, для показа "откуда" видео.
+      contentType: "video_youtube" | "video_rutube";
+      title: string;
+      externalUrl: string;
+      sourceUrl: string;
+      groupIds: string[];
+    };
 
-/** Вставляет строку библиотеки + строки junction по groupIds. school_id НЕ
- *  передаём — берётся из DEFAULT current_school_id() (миграция 147/72),
- *  корректно резолвится для настоящей учительской сессии (auth.uid()
- *  заполнен). subject_slug тоже НЕ принимаем аргументом — резолвим здесь из
- *  роли текущего учителя: и для UX (RLS insert требует точного совпадения
- *  subject_slug с ролью автора — подставлять его на клиенте вручную было бы
- *  дублированием источника истины), и чтобы curator/не-учитель получили
- *  понятную ошибку ДО похода в БД, а не голый 42501 от RLS. Fail closed:
- *  ошибка резолва учителя — throw, не silent-null (тот же принцип, что
+/** Вставляет строку библиотеки (файл ИЛИ видео-ссылка — по contentType) +
+ *  строки junction по groupIds. school_id НЕ передаём — берётся из DEFAULT
+ *  current_school_id() (миграция 147/72), корректно резолвится для
+ *  настоящей учительской сессии (auth.uid() заполнен). subject_slug тоже
+ *  НЕ принимаем аргументом — резолвим здесь из роли текущего учителя: и
+ *  для UX (RLS insert требует точного совпадения subject_slug с ролью
+ *  автора — подставлять его на клиенте вручную было бы дублированием
+ *  источника истины), и чтобы curator/не-учитель получили понятную ошибку
+ *  ДО похода в БД, а не голый 42501 от RLS. Fail closed: ошибка резолва
+ *  учителя — throw, не silent-null (тот же принцип, что
  *  getTeacherSubjectFilter в index.ts). Саму загрузку файла в Storage эта
- *  функция не делает — storagePath уже готов (Заход B). */
+ *  функция не делает — storagePath уже готов (Заход B); видео тоже не
+ *  парсит URL — externalUrl/sourceUrl уже готовы (Заход D). */
 export async function createLibraryMaterial(
   db: Db,
   input: CreateLibraryMaterialInput,
@@ -128,16 +146,29 @@ export async function createLibraryMaterial(
     throw new Error("Куратор (без привязки к предмету) не может загружать материалы в библиотеку");
   }
 
+  const isVideo = "externalUrl" in input;
+  const insertRow = isVideo
+    ? {
+        uploaded_by: teacher.id,
+        subject_slug: teacher.subject_slug,
+        title: input.title,
+        content_type: input.contentType,
+        external_url: input.externalUrl,
+        source_url: input.sourceUrl,
+      }
+    : {
+        uploaded_by: teacher.id,
+        subject_slug: teacher.subject_slug,
+        title: input.title,
+        content_type: "file" as const,
+        storage_path: input.storagePath,
+        file_type: input.fileType,
+        file_size_bytes: input.fileSizeBytes,
+      };
+
   const { data: material, error: insertErr } = await (db as AnyDb)
     .from("teacher_library_materials")
-    .insert({
-      uploaded_by: teacher.id,
-      subject_slug: teacher.subject_slug,
-      title: input.title,
-      storage_path: input.storagePath,
-      file_type: input.fileType,
-      file_size_bytes: input.fileSizeBytes,
-    })
+    .insert(insertRow)
     .select()
     .single();
   if (insertErr) throw insertErr;

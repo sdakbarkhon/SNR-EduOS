@@ -129,7 +129,16 @@ export function KnowledgeBaseFilePicker({
     [books, query],
   );
   const filteredLibraryFiles = useMemo(
-    () => libraryFiles.filter((m) => m.title.toLowerCase().includes(query.toLowerCase())),
+    () =>
+      libraryFiles.filter(
+        // 6А, Заход D (migration 148) — видео-ссылки библиотеки (content_type
+        // video_*, storage_path=null) сюда пока не показываем: вложение
+        // видео-ссылки в урок/задание — Заход D3, ещё не реализовано, а
+        // PickedKnowledgeBaseFile.storagePath ожидает реальный путь в Storage.
+        // Type predicate заодно сужает storage_path до string ниже по коду.
+        (m): m is LibraryMaterialWithDetails & { storage_path: string } =>
+          m.content_type === "file" && m.storage_path !== null && m.title.toLowerCase().includes(query.toLowerCase()),
+      ),
     [libraryFiles, query],
   );
 

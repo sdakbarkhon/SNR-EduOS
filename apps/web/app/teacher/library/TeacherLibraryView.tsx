@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Library, Plus, FileText, Video, FileImage, File as FileIcon,
-  MoreHorizontal, Trash2, X, Upload, Search, AlertTriangle,
+  MoreHorizontal, Trash2, X, Upload, Search, AlertTriangle, Link as LinkIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { createLibraryMaterial, deleteLibraryMaterial, getLibraryMaterialUrl, getSubjectStyle } from "@snr/core";
@@ -13,10 +13,16 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
+import { FileViewerModal } from "@/components/FileViewerModal";
+import { parseVideoUrl } from "@/lib/video-url";
 import { useRouter } from "next/navigation";
 
 // 6А, Заход B — Библиотека материалов учителей (/teacher/library, migration
-// 147). Заход C (прикрепление к уроку) и Заход D (видео-ссылки) — не здесь.
+// 147). Заход C — прикрепление к уроку (через пикер «База знаний»). Заход D
+// (эта правка) — видео-ссылки (YouTube/RuTube), миграция 148: та же
+// content_type/external_url/source_url форма, что lesson_materials
+// (миграция 138) — переиспользуем готовый parseVideoUrl (lib/video-url.ts)
+// и готовый embed-вьюер (FileViewerModal, kind "embed"), ничего не изобретаем.
 
 const ALLOWED_MIME = [
   "application/pdf",
@@ -29,8 +35,9 @@ const MAX_SIZE = 52428800; // 50 МБ — совпадает с лимитом �
 
 type DisplayType = "pdf" | "pptx" | "image" | "video" | "file";
 
-function resolveType(fileType: string | null): DisplayType {
-  const m = fileType ?? "";
+function resolveType(mat: Pick<LibraryMaterialWithDetails, "content_type" | "file_type">): DisplayType {
+  if (mat.content_type === "video_youtube" || mat.content_type === "video_rutube") return "video";
+  const m = mat.file_type ?? "";
   if (m === "application/pdf") return "pdf";
   if (m.includes("presentation")) return "pptx";
   if (m.startsWith("image/")) return "image";
@@ -303,6 +310,193 @@ function UploadModal({
   );
 }
 
+// ── Video link modal ─────────────────────────────────────────────────────
+
+function VideoLinkModal({
+  groups,
+  subjectSlug,
+  d,
+  onClose,
+  onSuccess,
+}: {
+  groups: Array<{ id: string; name: string }>;
+  subjectSlug: string;
+  d: ReturnType<typeof getDictionary>;
+  onClose: () => void;
+  onSuccess: (title: string) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subjectLabel = getSubjectStyle(subjectSlug).label;
+  const allClasses = selectedGroupIds.size === 0;
+  // Клиентский парсинг — тот же parseVideoUrl, что уже используют материалы
+  // урока (Пачка 4); никакого серверного oEmbed-запроса, без CORS.
+  const parsed = useMemo(() => parseVideoUrl(urlInput), [urlInput]);
+
+  function toggleGroup(id: string) {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError(d.teacher.libraryErrTitleRequired); return; }
+    if (!urlInput.trim()) { setError(d.teacher.libraryErrVideoUrlRequired); return; }
+    const p = parseVideoUrl(urlInput.trim());
+    if (!p) { setError(d.teacher.libraryErrVideoUrlInvalid); return; }
+
+    setError(null);
+    setSaving(true);
+    try {
+      await createLibraryMaterial(createClient(), {
+        contentType: p.platform === "youtube" ? "video_youtube" : "video_rutube",
+        title: title.trim(),
+        externalUrl: p.embedUrl,
+        sourceUrl: urlInput.trim(),
+        groupIds: Array.from(selectedGroupIds),
+      });
+      onSuccess(title.trim());
+    } catch (err) {
+      console.error("[library] video link error:", err);
+      setError(err instanceof Error ? err.message : d.teacher.libraryErrUploadFailed);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <h2 className="mb-6 text-xl font-bold text-slate-900">{d.teacher.libraryVideoModalTitle}</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              {d.teacher.libraryName} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={d.teacher.libraryNamePlaceholder}
+              disabled={saving}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{d.teacher.librarySubjectLabel}</label>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+              <SubjectIcon subject={subjectSlug} size={22} />
+              {subjectLabel}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{d.teacher.libraryClassesLabel}</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedGroupIds(new Set())}
+                disabled={saving}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                  allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {d.teacher.libraryAllClasses}
+              </button>
+              {groups.map((g) => {
+                const active = selectedGroupIds.has(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => toggleGroup(g.id)}
+                    disabled={saving}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                      active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              {d.teacher.libraryVideoUrlLabel} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder={d.teacher.libraryVideoUrlPlaceholder}
+                disabled={saving}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
+            {urlInput.trim() && !parsed && (
+              <p className="mt-1.5 text-xs font-medium text-amber-600">{d.teacher.libraryErrVideoUrlInvalid}</p>
+            )}
+          </div>
+
+          {/* Превью — тот же embed-URL, что уйдёт в external_url при сохранении. */}
+          {parsed && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
+              <div className="aspect-video w-full">
+                <iframe
+                  src={parsed.embedUrl}
+                  title={title || "preview"}
+                  className="h-full w-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+            >
+              {d.teacher.libraryCancel}
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !title.trim() || !parsed}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? d.teacher.libraryUploading : d.teacher.libraryUpload}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────
 
 export function TeacherLibraryView({
@@ -325,6 +519,8 @@ export function TeacherLibraryView({
 
   const [materials, setMaterials] = useState(initialMaterials);
   const [showUpload, setShowUpload] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [filterSubject, setFilterSubject] = useState("all");
   const [filterGroup, setFilterGroup] = useState("all");
@@ -373,14 +569,32 @@ export function TeacherLibraryView({
     });
   }, [materials, filterSubject, filterGroup, query]);
 
-  function handleUploadSuccess(title: string) {
-    setShowUpload(false);
+  function notifyAdded(title: string) {
     setToast(`${d.teacher.librarySuccess}: ${title}`);
     router.refresh();
   }
 
+  function handleUploadSuccess(title: string) {
+    setShowUpload(false);
+    notifyAdded(title);
+  }
+
+  function handleVideoSuccess(title: string) {
+    setShowVideoModal(false);
+    notifyAdded(title);
+  }
+
   async function handleOpen(mat: LibraryMaterialWithDetails) {
     setMenuOpenId(null);
+    // Видео-ссылка — нет Storage-объекта, открываем встроенный плеер
+    // напрямую по уже нормализованному external_url (тот же FileViewerModal,
+    // что материалы урока/базы знаний — resolveFileViewerKind распознаёт
+    // embed-URL сам, без доп. классификации здесь).
+    if (mat.content_type !== "file") {
+      if (mat.external_url) setViewer({ url: mat.external_url, title: mat.title });
+      return;
+    }
+    if (!mat.storage_path) return;
     setOpeningId(mat.id);
     try {
       const url = await getLibraryMaterialUrl(createClient(), mat.storage_path);
@@ -411,6 +625,13 @@ export function TeacherLibraryView({
   return (
     <div className="text-slate-800">
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+      {viewer && (
+        <FileViewerModal
+          url={viewer.url}
+          title={viewer.title}
+          onClose={() => setViewer(null)}
+        />
+      )}
       {showUpload && !isCurator && subjectSlug && (
         <UploadModal
           groups={groups}
@@ -421,6 +642,15 @@ export function TeacherLibraryView({
           onSuccess={handleUploadSuccess}
         />
       )}
+      {showVideoModal && !isCurator && subjectSlug && (
+        <VideoLinkModal
+          groups={groups}
+          subjectSlug={subjectSlug}
+          d={d}
+          onClose={() => setShowVideoModal(false)}
+          onSuccess={handleVideoSuccess}
+        />
+      )}
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">{d.teacher.libraryTitle}</h1>
@@ -429,13 +659,22 @@ export function TeacherLibraryView({
             {d.teacher.libraryCuratorNotice}
           </span>
         ) : (
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            {d.teacher.libraryUploadBtn}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+              {d.teacher.libraryUploadBtn}
+            </button>
+            <button
+              onClick={() => setShowVideoModal(true)}
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
+            >
+              <LinkIcon className="h-4 w-4" />
+              {d.teacher.libraryAddVideoBtn}
+            </button>
+          </div>
         )}
       </div>
 
@@ -486,7 +725,8 @@ export function TeacherLibraryView({
       ) : !loadError && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((mat) => {
-            const dtype = resolveType(mat.file_type);
+            const dtype = resolveType(mat);
+            const isVideo = mat.content_type !== "file";
             const Icon = TYPE_ICON[dtype];
             const isDeleting = deleting === mat.id;
             const isOpening = openingId === mat.id;
@@ -523,11 +763,18 @@ export function TeacherLibraryView({
                 )}
 
                 <div className="z-10 flex flex-1 flex-col items-center justify-center">
-                  <div className={`mb-2 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-105 ${TYPE_COLORS[dtype]}`}>
-                    {isOpening ? (
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <Icon className="h-8 w-8" />
+                  <div className="relative mb-2">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-105 ${TYPE_COLORS[dtype]}`}>
+                      {isOpening ? (
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Icon className="h-8 w-8" />
+                      )}
+                    </div>
+                    {isVideo && (
+                      <span className="absolute -bottom-1 -right-1 rounded-full bg-purple-600 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-white shadow">
+                        {d.teacher.libraryVideoBadge}
+                      </span>
                     )}
                   </div>
                   <p className="line-clamp-2 px-2 text-center text-sm font-bold leading-tight text-slate-800">{mat.title}</p>

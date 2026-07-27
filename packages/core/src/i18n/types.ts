@@ -2025,6 +2025,14 @@ export interface Dictionary {
     libraryErrFileType: string;
     libraryErrUploadFailed: string;
     libraryErrDeleteFailed: string;
+    // 6А, Заход D — видео-ссылки (migration 148).
+    libraryAddVideoBtn: string;
+    libraryVideoModalTitle: string;
+    libraryVideoUrlLabel: string;
+    libraryVideoUrlPlaceholder: string;
+    libraryErrVideoUrlRequired: string;
+    libraryErrVideoUrlInvalid: string;
+    libraryVideoBadge: string;
     navLessons: string;
     navCurriculumPlans: string;
     navBooks: string;

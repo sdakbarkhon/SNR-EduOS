@@ -2706,8 +2706,14 @@ export const attachLibraryMaterialToLesson = (
     material: LibraryMaterial;
     visibility?: "all" | "teacher_only";
   },
-): Promise<LessonMaterial> =>
-  linkLessonMaterialFromKnowledgeBase(db, {
+): Promise<LessonMaterial> => {
+  // 6А, Заход D (миграция 148) — видео-ссылки библиотеки не имеют
+  // storage_path вовсе; вложение видео-ссылки в урок — отдельный путь
+  // (Заход D3, ещё не реализован), эта функция им пока не занимается.
+  if (input.material.content_type !== "file" || !input.material.storage_path) {
+    throw new Error("attachLibraryMaterialToLesson поддерживает только файлы библиотеки (content_type='file') — видео-ссылки подключаются отдельно (Заход D3)");
+  }
+  return linkLessonMaterialFromKnowledgeBase(db, {
     lessonId: input.lessonId,
     teacherId: input.teacherId,
     title: input.material.title,
@@ -2716,6 +2722,7 @@ export const attachLibraryMaterialToLesson = (
     fileSizeBytes: input.material.file_size_bytes,
     visibility: input.visibility,
   });
+};
 
 // ─── LESSON STAGES v2 (migration 35) ─────────────────────────────────────────
 
