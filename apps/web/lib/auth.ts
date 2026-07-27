@@ -23,7 +23,7 @@ export async function getCurrentUserRole(
 export function roleToHome(role: UserRole): string {
   if (role === "super_admin") return "/superadmin/dashboard";
   if (role === "admin") return "/admin";
-  if (role === "parent") return "/parent/dashboard";
+  if (role === "parent") return "/parent/home";
   if (role === "teacher") return "/teacher/dashboard";
   return "/dashboard";
 }
