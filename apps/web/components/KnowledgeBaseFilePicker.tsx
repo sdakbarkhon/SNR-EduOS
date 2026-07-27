@@ -1,21 +1,29 @@
 "use client";
 
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.3 — модалка выбора файла в стиле проводника:
-// сетка иконок, мультивыбор кликом, две вкладки (Библиотека / Материалы
-// группы), поиск по названию. Возвращает выбранные файлы БЕЗ их загрузки —
-// вызывающая сторона линкует существующий storage_path (Этап 3.4: без
-// дублирования).
+// сетка иконок, мультивыбор кликом, вкладки (Библиотека / Материалы
+// группы / Библиотека учителей), поиск по названию. Возвращает выбранные
+// файлы БЕЗ их загрузки — вызывающая сторона линкует существующий
+// storage_path (Этап 3.4: без дублирования).
+//
+// 6А, Заход C — третья вкладка "Библиотека учителей" (teacher_library_materials,
+// migration 147). Файлы этой таблицы физически лежат в том же бакете
+// "materials", что и course_materials — поэтому source:"teacherLibrary"
+// НАМЕРЕННО не требует правок в вызывающих компонентах:
+// TeacherLessonDetailView.tsx/CreateHomeworkForm.tsx уже резолвят
+// "любой источник, кроме book" в бакет "materials"
+// (`pickedFromKB.source === "book" ? ... : ...`), а "teacherLibrary" !== "book".
 
 import { useEffect, useMemo, useState } from "react";
-import { X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen } from "lucide-react";
-import type { MaterialWithGroup, Book } from "@snr/core";
-import { getDictionary } from "@snr/core";
+import { X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen, Library } from "lucide-react";
+import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
+import { getDictionary, getLibraryMaterials } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { createClient } from "@/lib/supabase/client";
 
 export type PickedKnowledgeBaseFile = {
-  source: "material" | "book";
+  source: "material" | "book" | "teacherLibrary";
   id: string;
   title: string;
   storagePath: string;
@@ -23,7 +31,7 @@ export type PickedKnowledgeBaseFile = {
   sizeBytes: number | null;
 };
 
-type Tab = "library" | "materials";
+type Tab = "library" | "materials" | "teacherLibrary";
 
 function iconFor(fileType: string | null, hasLink: boolean) {
   if (hasLink) return LinkIcon;
@@ -61,7 +69,11 @@ export function KnowledgeBaseFilePicker({
   const [query, setQuery] = useState("");
   const [materials, setMaterials] = useState<MaterialWithGroup[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [libraryFiles, setLibraryFiles] = useState<LibraryMaterialWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
+  // Промт 6А/C — per-source, не общий: одна вкладка может упасть, пока
+  // остальные две загрузились нормально; не путать реальный сбой с "пусто".
+  const [tabError, setTabError] = useState<Record<Tab, boolean>>({ library: false, materials: false, teacherLibrary: false });
   const [selected, setSelected] = useState<Map<string, PickedKnowledgeBaseFile>>(new Map());
 
   // groupIds приходит как новый массив-литерал на каждый рендер родителя
@@ -77,22 +89,31 @@ export function KnowledgeBaseFilePicker({
     if (!open) return;
     setSelected(new Map());
     setQuery("");
+    setTabError({ library: false, materials: false, teacherLibrary: false });
     let cancelled = false;
     setLoading(true);
     const sb = createClient();
-    Promise.all([
+    Promise.allSettled([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"]),
+      (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"])
+        .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sb as any).from("books").select("*"),
-    ]).then(([m, b]) => {
+      (sb as any).from("books").select("*")
+        .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
+      getLibraryMaterials(sb),
+    ]).then(([m, b, lib]) => {
       if (cancelled) return;
-      setMaterials((m.data ?? []) as MaterialWithGroup[]);
-      setBooks((b.data ?? []) as Book[]);
-      setLoading(false);
-    }).catch((err) => {
-      if (cancelled) return;
-      console.error("[KnowledgeBaseFilePicker] failed to load materials/books:", err);
+      if (m.status === "fulfilled") setMaterials((m.value ?? []) as MaterialWithGroup[]);
+      else console.error("[KnowledgeBaseFilePicker] failed to load course_materials:", m.reason);
+      if (b.status === "fulfilled") setBooks((b.value ?? []) as Book[]);
+      else console.error("[KnowledgeBaseFilePicker] failed to load books:", b.reason);
+      if (lib.status === "fulfilled") setLibraryFiles(lib.value);
+      else console.error("[KnowledgeBaseFilePicker] failed to load teacher library:", lib.reason);
+      setTabError({
+        materials: m.status === "rejected",
+        library: b.status === "rejected",
+        teacherLibrary: lib.status === "rejected",
+      });
       setLoading(false);
     });
     return () => { cancelled = true; };
@@ -106,6 +127,10 @@ export function KnowledgeBaseFilePicker({
   const filteredBooks = useMemo(
     () => books.filter((b) => b.title.toLowerCase().includes(query.toLowerCase())),
     [books, query],
+  );
+  const filteredLibraryFiles = useMemo(
+    () => libraryFiles.filter((m) => m.title.toLowerCase().includes(query.toLowerCase())),
+    [libraryFiles, query],
   );
 
   function toggle(item: PickedKnowledgeBaseFile) {
@@ -136,6 +161,13 @@ export function KnowledgeBaseFilePicker({
           title: b.title,
           hasLink: false,
           picked: { source: "book", id: b.id, title: b.title, storagePath: b.file_storage_path, fileType: "application/pdf", sizeBytes: b.file_size_bytes },
+        }))
+      : tab === "teacherLibrary"
+      ? filteredLibraryFiles.map((m) => ({
+          key: `teacherLibrary:${m.id}`,
+          title: m.title,
+          hasLink: false,
+          picked: { source: "teacherLibrary", id: m.id, title: m.title, storagePath: m.storage_path, fileType: m.file_type, sizeBytes: m.file_size_bytes },
         }))
       : filteredMaterials.map((m) => ({
           key: `material:${m.id}`,
@@ -182,6 +214,12 @@ export function KnowledgeBaseFilePicker({
           >
             {d.tabGroupMaterials}
           </button>
+          <button
+            onClick={() => setTab("teacherLibrary")}
+            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "teacherLibrary" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            {d.tabTeacherLibrary}
+          </button>
         </div>
 
         {/* Search */}
@@ -202,6 +240,8 @@ export function KnowledgeBaseFilePicker({
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">…</div>
+          ) : tabError[tab] ? (
+            <div className="flex h-full items-center justify-center text-sm font-medium text-red-600">{d.loadError}</div>
           ) : items.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">{d.noResults}</div>
           ) : (
@@ -209,7 +249,7 @@ export function KnowledgeBaseFilePicker({
               {items.map((it) => {
                 const key = `${it.picked.source}:${it.picked.id}`;
                 const isSelected = selected.has(key);
-                const Icon = tab === "library" ? BookOpen : iconFor(it.picked.fileType, it.hasLink);
+                const Icon = tab === "library" ? BookOpen : tab === "teacherLibrary" ? Library : iconFor(it.picked.fileType, it.hasLink);
                 return (
                   <button
                     key={it.key}

@@ -49,14 +49,19 @@ export interface Dictionary {
   // lesson/assignment instead of uploading a fresh copy.
   knowledgeBase: {
     title: string;            // "База знаний"
-    tabLibrary: string;       // "Библиотека"
-    tabGroupMaterials: string; // "Материалы группы"
+    tabLibrary: string;       // "Библиотека" (books)
+    tabGroupMaterials: string; // "Материалы группы" (course_materials)
+    // 6А, Заход C — третья вкладка пикера: teacher_library_materials
+    // (migration 147). Отдельная от tabLibrary (та — books), чтобы не
+    // повторять один и тот же ярлык "Библиотека" дважды в одном пикере.
+    tabTeacherLibrary: string; // "Библиотека учителей"
     pickerTitle: string;       // "Выбор файла"
     searchPlaceholder: string; // "Поиск по названию"
     select: string;            // "Выбрать"
     selectCount: string;       // "Выбрать ({n})"
     cancel: string;
     noResults: string;
+    loadError: string;         // "Не удалось загрузить список" — per-tab, не путать с noResults
     browse: string;            // "Выбрать из базы знаний" — button that opens the picker
   };
   // Промт 4 — учебные планы (curriculum_plans, migration 116).
