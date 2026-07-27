@@ -15,7 +15,7 @@ export default async function ChildGradesPage({
   if (!child) return null;
 
   const db = await createClient();
-  const { data: grades } = await safeQuery(getStudentGrades(db, studentId), [], "ChildGradesPage.grades");
+  const { data: grades, failed } = await safeQuery(getStudentGrades(db, studentId), [], "ChildGradesPage.grades");
 
-  return <GradesView child={child} grades={grades} />;
+  return <GradesView child={child} grades={grades} error={failed} />;
 }
