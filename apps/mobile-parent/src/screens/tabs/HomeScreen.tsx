@@ -75,7 +75,8 @@ import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSupabase } from "../../lib/supabase";
-import { tashkentDateKey, tashkentToday } from "../../lib/tashkent";
+import { tashkentDateKey } from "../../lib/tashkent";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -298,7 +299,10 @@ export default function HomeScreen() {
   // всегда включает «today + 6 следующих дней», так что этот кейс не
   // возникает (если только у группы не было бы разрыва в занятиях длиннее
   // недели — тогда честно «Нет предстоящих уроков», не фейк).
-  const todayKey = useMemo(() => tashkentToday(), []);
+  // Долги, проход 2: не useMemo(() => tashkentToday(), []) — та не
+  // пересчитывается, если приложение висит открытым через полночь;
+  // useTashkentToday реагирует на возврат на передний план (AppState).
+  const todayKey = useTashkentToday();
   const homeDataState = useAsyncData(() => {
     if (!isRealFlow || !selectedChildId) return Promise.resolve(null);
     const db = getSupabase();

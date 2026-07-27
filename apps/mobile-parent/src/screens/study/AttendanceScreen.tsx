@@ -6,8 +6,9 @@
  *  591      ChildSwitcherCard compact — триггер шторки выбора ребёнка.
  *  592–596  StatsRow: три плитки (зелёная 96%, оранжевая 2, красная 1).
  *           ВНИМАНИЕ: НЕТ плитки «Опоздания» — правило заказчика соблюдено.
- *  597–613  MonthCalendarCard: prev/next + сетка 7×5 (35 ячеек, стили ST по
- *           коду из макета 3807–3817) + легенда из 4 маркеров.
+ *  597–613  MonthCalendarCard: prev/next + сетка 7×N (N — динамическое число
+ *           недель месяца, см. calendarRows ниже; стили ST по коду из макета
+ *           3807–3817) + легенда из 4 маркеров.
  *  614      SectionLabel uppercase «Последние дни».
  *  615–620  LastDaysList: 4 записи в одной glass-карточке с border-top-
  *           разделителями. Иконки-бэйджи справа: галочка / крестик / документ.
@@ -28,13 +29,16 @@
  * Демо-флоу — вёрстка и фикстурные данные не тронуты ни строкой.
  * Календарь строится на лету по видимому {year,month} (не фиксированный
  * 2-месячный фикстурный массив) — см. buildRealMonthCells ниже; вперёд
- * дальше текущего (ташкентского) месяца не листаем. Сетка по-прежнему
- * жёстко 5×7=35 ячеек (вёрстку не трогаем) — для редкого месяца, которому
- * нужен 6-й ряд, самые последние дни в сетке не поместятся (они всё равно
- * видны в «Последних днях»), это ограничение существовавшей вёрстки, не
- * новое.
+ * дальше текущего (ташкентского) месяца не листаем.
+ *
+ * Долги, проход 2: число рядов сетки — динамическое (calendarRows), не
+ * жёсткие 5×7=35 — иначе месяц с 6-м рядом (напр. 31 день, начинающийся в
+ * воскресенье) терял последние дни. todayKey — через useTashkentToday()
+ * (hooks/), пересчитывается на возврат приложения на передний план, а не
+ * только при монтировании — иначе «сегодня» в календаре/статистике
+ * застывало на вчера, если приложение висело открытым через полночь.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
@@ -62,7 +66,9 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
+import { addDays } from "../../lib/tashkent";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList } from "../../navigation/routes";
 
@@ -85,9 +91,6 @@ function tashkentDateKey(iso: string): string {
   const m = parts.find((p) => p.type === "month")?.value ?? "01";
   const day = parts.find((p) => p.type === "day")?.value ?? "01";
   return `${y}-${m}-${day}`;
-}
-function tashkentToday(): string {
-  return tashkentDateKey(new Date().toISOString());
 }
 
 /** Реальный статус БД → существующая категория UI (календарь/стат/бэйдж) —
@@ -402,11 +405,14 @@ export default function AttendanceScreen() {
     [isRealFlow, selectedChildId],
   );
 
-  const todayKey = useMemo(() => tashkentToday(), []);
-  const yesterdayKey = useMemo(
-    () => tashkentDateKey(new Date(Date.now() - 24 * 3600 * 1000).toISOString()),
-    [],
-  );
+  // Долги, проход 2: не useMemo(() => tashkentToday(), []) — та не
+  // пересчитывается, если приложение висит открытым через полночь;
+  // useTashkentToday реагирует на возврат на передний план (AppState).
+  // yesterdayKey теперь производная ОТ todayKey (addDays(todayKey, -1)),
+  // а не "24 часа назад от момента маунта" — иначе после полуночного
+  // обновления todayKey «вчера» указывало бы на позавчера.
+  const todayKey = useTashkentToday();
+  const yesterdayKey = useMemo(() => addDays(todayKey, -1), [todayKey]);
 
   const recordsByDate = useMemo(() => {
     const map = new Map<string, AttendanceStatus>();
@@ -426,6 +432,25 @@ export default function AttendanceScreen() {
   const [realVisibleMonth, setRealVisibleMonth] = useState<{ year: number; month: number }>(
     () => ({ year: todayYear, month: todayMonthNum }),
   );
+  // Долги, проход 2: если приложение висит открытым через границу месяца
+  // (напр. 31-е поздно вечером → 1-е), todayKey (useTashkentToday) сам
+  // обновится, но realVisibleMonth — обычный useState, сам за ним не
+  // следует. Без этого эффекта пользователь, смотревший "текущий" месяц,
+  // после полуночи видел бы уже вчерашний месяц без подсветки "сегодня" —
+  // пришлось бы вручную листать вперёд. Подтягиваем месяц ТОЛЬКО если
+  // видимый месяц и был тем самым "текущим" (ref хранит todayYear/Month с
+  // прошлого рендера) — если пользователь сам пролистал в прошлое, его
+  // выбор не трогаем.
+  const prevTodayMonthRef = useRef({ year: todayYear, month: todayMonthNum });
+  useEffect(() => {
+    const prevToday = prevTodayMonthRef.current;
+    setRealVisibleMonth((prev) =>
+      prev.year === prevToday.year && prev.month === prevToday.month
+        ? { year: todayYear, month: todayMonthNum }
+        : prev,
+    );
+    prevTodayMonthRef.current = { year: todayYear, month: todayMonthNum };
+  }, [todayYear, todayMonthNum]);
   const realMonthLabel = useMemo(() => {
     const dt = new Date(Date.UTC(realVisibleMonth.year, realVisibleMonth.month - 1, 1));
     const label = dt.toLocaleDateString(LOCALE_TAG[locale], { month: "long", year: "numeric", timeZone: APP_TIME_ZONE });
@@ -468,11 +493,21 @@ export default function AttendanceScreen() {
   const goPrevMonth = isRealFlow ? goPrevMonthReal : goPrevMonthFixture;
   const goNextMonth = isRealFlow ? goNextMonthReal : goNextMonthFixture;
 
-  // Сетка 7×5: режем 35 ячеек на 5 рядов по 7 (гарантия равного flex 1
-  // в каждой строке; grid-template-columns:repeat(7,1fr) — макет 603).
+  // Долги, проход 2: число рядов — динамическое, не жёсткие 5. Демо-фикстура
+  // (cells()) всегда даёт ровно 35 ячеек (5×7) — Math.ceil(35/7)=5, поведение
+  // не меняется. Реальный месяц (leadingPad + daysInMonth) может занимать 4–6
+  // рядов (напр. месяц из 31 дня, начинающийся в воскресенье, — leadingPad=6,
+  // итого 37 ячеек, при жёстких 5×7=35 последние 2 дня месяца пропадали).
+  // Хвостовые пустые ячейки последнего ряда — тем же кодом "e", что и
+  // leadingPad в начале (CalendarCell рендерит "e" прозрачно).
   const calendarRows = useMemo(() => {
+    const weekCount = Math.ceil(calendarDaysFinal.length / 7);
     const rows: (typeof calendarDaysFinal)[] = [];
-    for (let r = 0; r < 5; r += 1) rows.push(calendarDaysFinal.slice(r * 7, r * 7 + 7));
+    for (let r = 0; r < weekCount; r += 1) {
+      const row = calendarDaysFinal.slice(r * 7, r * 7 + 7);
+      while (row.length < 7) row.push({ code: "e", dayNumber: null });
+      rows.push(row);
+    }
     return rows;
   }, [calendarDaysFinal]);
 
@@ -637,7 +672,7 @@ export default function AttendanceScreen() {
                 <CalNavButton dir="next" onPress={goNextMonth} />
               </View>
 
-              {/* Шапка дней недели + 5 рядов по 7 ячеек. */}
+              {/* Шапка дней недели + N рядов по 7 ячеек (N — calendarRows.length). */}
               <View style={{ gap: 4 }}>
                 <View style={{ flexDirection: "row", gap: 4 }}>
                   {weekdayLabels.map((w) => (
