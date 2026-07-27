@@ -342,6 +342,39 @@ export type LessonMaterial = {
   source_url: string | null;
 };
 
+// migration 147 — Библиотека материалов учителей. Раздел видим только
+// учителям (RLS); v1 — все учителя видят все материалы независимо от
+// предмета/класса, subject_slug/группы ниже — фильтры для удобства поиска,
+// не ограничение доступа (см. миграцию 147 и chat-отчёт по 6А).
+export type LibraryMaterial = {
+  id: string;
+  school_id: string;
+  // ON DELETE SET NULL — при удалении учителя материал остаётся, просто
+  // теряет автора (тот же выбор, что LessonMaterial.uploaded_by).
+  uploaded_by: string | null;
+  // Предмет загрузившего (teachers.subject_slug) на момент загрузки:
+  // programming/robotics/math/english/russian. Куратор загружать не может
+  // (RLS insert), поэтому NULL здесь на практике не встречается.
+  subject_slug: string | null;
+  title: string;
+  // Путь в бакете "materials" (переиспользуем существующий бакет):
+  // <teacher_id>/library/<material_id>/<filename>.
+  storage_path: string;
+  file_type: string | null;
+  file_size_bytes: number | null;
+  created_at: string;
+};
+
+export type LibraryMaterialGroup = { id: string; name: string };
+
+export type LibraryMaterialWithDetails = LibraryMaterial & {
+  uploader_name: string | null;
+  // Пустой массив = "видно всем классам" (0 строк в junction-таблице).
+  groups: LibraryMaterialGroup[];
+  /** Signed URL (1 час) на файл в бакете "materials". */
+  url: string;
+};
+
 // migration 116 — Промт 4: учебные планы. teacher_id/group_id/subject_id
 // как в БД; UNIQUE(group_id, subject_id) на стороне БД, не в типе.
 export type CurriculumPlan = {

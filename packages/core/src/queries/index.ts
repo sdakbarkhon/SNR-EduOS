@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
@@ -16,6 +16,7 @@ export * from "./chat";
 export * from "./curriculum";
 export * from "./sandbox";
 export * from "./parent";
+export * from "./library";
 
 // --- Профиль / группы ---
 // Explicit user_id filter + limit(1) prevents PGRST116 if RLS returns >1 row
@@ -2690,6 +2691,31 @@ export const linkLessonMaterialFromKnowledgeBase = async (
   if (error) throw error;
   return data as LessonMaterial;
 };
+
+/** 6А — Библиотека материалов учителей (migration 147): прикрепляет
+ *  библиотечный материал к уроку как "базу знаний" — тонкая обёртка над
+ *  linkLessonMaterialFromKnowledgeBase выше, ничего не дублирует. Живёт
+ *  здесь (а не в queries/library.ts), потому что оборачивает функцию из
+ *  этого же файла — library.ts принципиально не импортирует из index.ts
+ *  (см. шапку library.ts), чтобы не создавать циклическую зависимость. */
+export const attachLibraryMaterialToLesson = (
+  db: Db,
+  input: {
+    lessonId: string;
+    teacherId: string;
+    material: LibraryMaterial;
+    visibility?: "all" | "teacher_only";
+  },
+): Promise<LessonMaterial> =>
+  linkLessonMaterialFromKnowledgeBase(db, {
+    lessonId: input.lessonId,
+    teacherId: input.teacherId,
+    title: input.material.title,
+    storagePath: input.material.storage_path,
+    kbBucket: "materials",
+    fileSizeBytes: input.material.file_size_bytes,
+    visibility: input.visibility,
+  });
 
 // ─── LESSON STAGES v2 (migration 35) ─────────────────────────────────────────
 
