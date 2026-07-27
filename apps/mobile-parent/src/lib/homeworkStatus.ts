@@ -42,3 +42,26 @@ export function homeworkStatusLabel(kind: RealHomeworkStatusKind, status: Dictio
   if (kind === "pending_review") return status.underReview;
   return status.notSubmitted;
 }
+
+/** Заход 2, шаг 6 — числовая оценка для отображения рядом со статусом (была
+ *  намеренно скрыта в Шаге 5). /5-шкала для файла/программирования (тот же
+ *  homework_submissions.grade, что видит getStudentGrades); для теста —
+ *  дискретная auto-grade (migration 31), если есть, иначе raw score/max_score.
+ *  null — оценки ещё нет показать нечего (вызывающий экран решает, показывать
+ *  ли суффикс вовсе). */
+export function realGradeDisplay(
+  contentType: string,
+  submission: { grade: number | null } | null | undefined,
+  testSubmission: { grade: number | null; score: number | null; max_score: number | null } | null | undefined,
+): string | null {
+  if (contentType === "test") {
+    if (!testSubmission) return null;
+    if (testSubmission.grade != null) return `${testSubmission.grade}/5`;
+    if (testSubmission.score != null && testSubmission.max_score != null) {
+      return `${testSubmission.score}/${testSubmission.max_score}`;
+    }
+    return null;
+  }
+  const grade = submission?.grade;
+  return grade != null ? `${grade}/5` : null;
+}

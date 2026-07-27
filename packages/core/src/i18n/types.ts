@@ -2432,6 +2432,13 @@ export interface Dictionary {
       teacherComment: string;
       dynAvg: string;
       lastReviews: string;
+      // Заход 2, шаг 6 — реальные оценки вкладки «Успехи»→«Оценки».
+      loadError: string;          // «Не удалось загрузить оценки»
+      empty: string;              // «Оценок пока нет»
+      noReviews: string;          // «Отзывов учителей пока нет»
+      gradeChipExcellent: string; // «Отлично!» — средний балл ≥4.5
+      gradeChipGood: string;      // «Хорошо!» — средний балл ≥3.5
+      gradeChipNeedsWork: string; // «Есть куда расти» — средний балл <3.5
     };
     skills: {
       profile: string;
@@ -2828,6 +2835,7 @@ export interface Dictionary {
       workNotSubmitted: string;  // «Работа не сдана»
       fileFallbackName: string;  // «Файл»
       sentPrefix: string;        // «Работа отправлена · {status}»
+      gradedWithScore: string;   // «Оценено · {grade}» — Заход 2, шаг 6
       filterAll: string;         // «Все»
       filterToday: string;       // «Сегодня»
       filterOverdue: string;     // «Просрочено»

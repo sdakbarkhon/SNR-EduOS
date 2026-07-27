@@ -76,7 +76,7 @@ import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSupabase } from "../../lib/supabase";
 import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
-import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
+import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, realGradeDisplay, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
@@ -425,7 +425,15 @@ export default function HomeworkDetailScreen() {
       ? realTestStatusKind(realHw.test_submission)
       : realSubmissionStatusKind(realHw.submission?.status)
     : null;
-  const realStatusLabel = realKind ? homeworkStatusLabel(realKind, t.status) : "";
+  // Заход 2, шаг 6 — числовая оценка (была скрыта в Шаге 5): добавляем к
+  // лейблу статуса только для "graded".
+  const realGradeDisplayValue =
+    realKind === "graded" && realHw ? realGradeDisplay(realHw.content_type, realHw.submission, realHw.test_submission) : null;
+  const realStatusLabel = realKind
+    ? realGradeDisplayValue
+      ? format(t.hw.gradedWithScore, { grade: realGradeDisplayValue })
+      : homeworkStatusLabel(realKind, t.status)
+    : "";
   const realFamily = realKind ? realStatusFamily(realKind) : "gray";
   const realSt = tokens.status[realFamily];
   const realChip = tokens.chip(realSt.rgb);
@@ -732,10 +740,17 @@ export default function HomeworkDetailScreen() {
               ) : null}
 
               {/* 7-real. «Ваша сдача» — read-only содержимое сдачи ученика по типу
-                  задания (код/текст/результат теста/фото+ссылка). Числовая оценка
-                  НЕ показывается. */}
+                  задания (код/текст/результат теста/фото+ссылка). Заход 2, шаг 6:
+                  числовая оценка теперь показывается — для теста она уже часть
+                  testResult ниже, для файла/программирования (раньше нигде не
+                  показывалась) — отдельной строкой сразу под заголовком. */}
               <GlassCard radius={20} contentStyle={{ padding: 13, gap: 9 }}>
                 <CapsLabel>{t.hw.submissionLabel}</CapsLabel>
+                {!isRealTest && realGradeDisplayValue ? (
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.status.green.text }}>
+                    {format(t.hw.gradedWithScore, { grade: realGradeDisplayValue })}
+                  </Text>
+                ) : null}
                 {isRealTest ? (
                   realHw.test_submission ? (
                     realHw.test_submission.score != null && realHw.test_submission.max_score != null ? (

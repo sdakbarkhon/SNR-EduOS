@@ -49,7 +49,7 @@ import { useParentData } from "../../context/ParentDataContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSupabase } from "../../lib/supabase";
 import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
-import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
+import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, realGradeDisplay, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -135,7 +135,12 @@ function toRealHomeworkRow(
 ): RealHomeworkRow {
   const isTest = hw.content_type === "test";
   const kind = isTest ? realTestStatusKind(hw.test_submission) : realSubmissionStatusKind(hw.submission?.status);
-  const statusLabel = homeworkStatusLabel(kind, t.status);
+  // Заход 2, шаг 6 — числовая оценка (была скрыта в Шаге 5): добавляем к
+  // лейблу статуса только для "graded", остальные статусы не трогаем.
+  const gradeDisplay = kind === "graded" ? realGradeDisplay(hw.content_type, hw.submission, hw.test_submission) : null;
+  const statusLabel = gradeDisplay
+    ? format(t.hw.gradedWithScore, { grade: gradeDisplay })
+    : homeworkStatusLabel(kind, t.status);
   const overdue = kind === "not_submitted" && !!hw.due_date && tashkentDateKey(hw.due_date) < todayKey;
   const dueToday = !!hw.due_date && tashkentDateKey(hw.due_date) === todayKey;
 
