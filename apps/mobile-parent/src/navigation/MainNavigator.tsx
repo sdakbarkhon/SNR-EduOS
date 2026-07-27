@@ -1,116 +1,194 @@
-import type { Ionicons } from "@expo/vector-icons";
+/**
+ * Главный стек v2: маршрут Tabs (таб-навигатор с p5/p10/p17/d24/dhub) +
+ * все остальные 59 маршрутов прототипа (см. screens-map.md) — итого 64
+ * экрана.
+ *
+ * Заход 5 — REGISTER: 15 study-экранов (d6/d7/d8/d9/d11/d12/d13/d14/d15/d16/
+ * dallsubj/drev/dtopics/dteach/dmeals) подменяют StubScreen реальными
+ * компонентами из src/screens/study.
+ * Заход 6/7 — Оплаты (12) + Сообщения (4) + Профиль (5).
+ * Заход 8 — родительские сервис-разделы (8): dtests/dlib/dport/dapps/dmed/
+ * dtrans/dchpass/dsessions. Остальные маршруты (da1–da8, ddoc, dchpass-
+ * связанные шторки help/profmenu/call и т.п.) продолжают рендерить
+ * StubScreen — их закроют следующие заходы.
+ *
+ * Sheets (DatePickerSheet, SubmitWorkSheet) в стек НЕ регистрируются:
+ * они открываются как локальные BottomSheet внутри своих parent-экранов
+ * (DayStatus/Schedule/Meals — DatePickerSheet, HomeworkDetail — SubmitWorkSheet).
+ *
+ * Переходы — стандартный slide native-stack (соответствует анимациям
+ * v2in/v2back макета: въезд/выезд по X).
+ */
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import StubScreen from "../screens/StubScreen";
 import TabNavigator from "./TabNavigator";
-import ScheduleScreen from "../screens/ScheduleScreen";
-import NotificationsScreen from "../screens/NotificationsScreen";
-import ChildProfileScreen from "../screens/ChildProfileScreen";
-import HomeworkScreen from "../screens/HomeworkScreen";
-import HomeworkDetailScreen from "../screens/HomeworkDetailScreen";
-import SubjectDetailScreen from "../screens/SubjectDetailScreen";
-import SkillsScreen from "../screens/SkillsScreen";
-import AttendanceDetailScreen from "../screens/AttendanceDetailScreen";
-import TeacherReviewsScreen from "../screens/TeacherReviewsScreen";
-import MessageThreadScreen from "../screens/MessageThreadScreen";
-import AnnouncementsScreen from "../screens/AnnouncementsScreen";
-import AnnouncementDetailScreen from "../screens/AnnouncementDetailScreen";
-import SupportScreen from "../screens/SupportScreen";
-import BillsScreen from "../screens/BillsScreen";
-import CheckoutScreen from "../screens/CheckoutScreen";
-import PaymentHistoryScreen from "../screens/PaymentHistoryScreen";
-import ReceiptScreen from "../screens/ReceiptScreen";
-import ChildWalletScreen from "../screens/ChildWalletScreen";
-import DocumentsScreen from "../screens/DocumentsScreen";
-import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
-import PaymentMethodsScreen from "../screens/PaymentMethodsScreen";
-import SecurityScreen from "../screens/SecurityScreen";
-import DailyStatusScreen from "../screens/DailyStatusScreen";
-import InsightScreen from "../screens/InsightScreen";
-import AllServicesScreen from "../screens/AllServicesScreen";
-import ComingSoonScreen from "../screens/ComingSoonScreen";
-import { ParentDataProvider } from "../context/ParentDataContext";
-import type { ParentProfile } from "../lib/auth";
-import type { Bill } from "../lib/mockPaymentsData";
+import { STACK_ROUTES, type MainStackParamList, type StackRouteName } from "./routes";
 
-export type MainStackParamList = {
-  Tabs: undefined;
-  Schedule: undefined;
-  Notifications: undefined;
-  ChildProfile: { childId: string };
-  Homework: undefined;
-  // Промт МОБ-3 — детальные экраны, все требуют явного childId (родитель
-  // мог переключить ребёнка между открытием и просмотром — не полагаемся
-  // на contextual selectedChildId внутри самих детальных экранов).
-  HomeworkDetail: { id: string; childId: string };
-  SubjectDetail: { subjectId: string; childId: string };
-  Skills: { childId: string };
-  AttendanceDetail: { childId: string };
-  TeacherReviews: { childId: string };
-  // Промт МОБ-4 — сообщения/объявления/поддержка.
-  MessageThread: { threadId: string };
-  Announcements: undefined;
-  AnnouncementDetail: { id: string };
-  Support: undefined;
-  Bills: undefined;
-  Checkout: { bill: Bill };
-  PaymentHistory: undefined;
-  Receipt: { recordId: string };
-  ChildWallet: undefined;
-  Documents: undefined;
-  NotificationSettings: undefined;
-  PaymentMethods: undefined;
-  Security: undefined;
-  // Промт МОБ-7 — v7/v8/v10.
-  DailyStatus: undefined;
-  Insight: undefined;
-  AllServices: undefined;
-  ComingSoon: { service: string; icon: keyof typeof Ionicons.glyphMap };
-};
+// Реальные экраны Захода 5 (15 шт.).
+import DayStatusScreen from "../screens/study/DayStatusScreen";
+import SubjectDetailScreen from "../screens/study/SubjectDetailScreen";
+import HomeworksScreen from "../screens/study/HomeworksScreen";
+import HomeworkDetailScreen from "../screens/study/HomeworkDetailScreen";
+import AttendanceScreen from "../screens/study/AttendanceScreen";
+import ScheduleScreen from "../screens/study/ScheduleScreen";
+import SkillsScreen from "../screens/study/SkillsScreen";
+import EduosAssistantScreen from "../screens/study/EduosAssistantScreen";
+import AllSubjectsScreen from "../screens/study/AllSubjectsScreen";
+import TeacherReviewsScreen from "../screens/study/TeacherReviewsScreen";
+import TopicMasteryScreen from "../screens/study/TopicMasteryScreen";
+import NotificationsScreen from "../screens/study/NotificationsScreen";
+import ServicesScreen from "../screens/study/ServicesScreen";
+import TeacherProfileScreen from "../screens/study/TeacherProfileScreen";
+import MealsScreen from "../screens/study/MealsScreen";
+
+// Реальные экраны Захода 8 — родительские сервис-разделы (8 шт.), заменяют
+// StubScreen под dtests/dlib/dport/dapps/dmed/dtrans/dchpass/dsessions.
+import DiaryScreen from "../screens/study/DiaryScreen";
+import TestsScreen from "../screens/study/TestsScreen";
+import LibraryScreen from "../screens/study/LibraryScreen";
+import PortfolioScreen from "../screens/study/PortfolioScreen";
+import ApplicationsScreen from "../screens/study/ApplicationsScreen";
+import MedicalCardScreen from "../screens/study/MedicalCardScreen";
+import TransportScreen from "../screens/study/TransportScreen";
+import ChangePasswordScreen from "../screens/profile/ChangePasswordScreen";
+import ActiveSessionsScreen from "../screens/profile/ActiveSessionsScreen";
+
+// Реальные экраны Захода 6 — Оплаты (12 шт., шторки открываются локально).
+import BillsScreen from "../screens/payments/BillsScreen";
+import CheckoutScreen from "../screens/payments/CheckoutScreen";
+import PaymentHistoryScreen from "../screens/payments/PaymentHistoryScreen";
+import ReceiptsScreen from "../screens/payments/ReceiptsScreen";
+import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
+import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
+import TopUpScreen from "../screens/payments/TopUpScreen";
+import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
+import TransferScreen from "../screens/payments/TransferScreen";
+import LimitsScreen from "../screens/payments/LimitsScreen";
+import CardDetailsScreen from "../screens/payments/CardDetailsScreen";
+import AddCardScreen from "../screens/payments/AddCardScreen";
+
+// Реальные экраны Захода 7 — Messages (4 шт., шторки открываются локально).
+import ChatScreen from "../screens/messages/ChatScreen";
+import AnnouncementsScreen from "../screens/messages/AnnouncementsScreen";
+import AdminNewsScreen from "../screens/messages/AdminNewsScreen";
+import SupportScreen from "../screens/messages/SupportScreen";
+
+// Реальные экраны Захода 7 — Profile (5 шт., шторки открываются локально).
+import ChildProfileScreen from "../screens/profile/ChildProfileScreen";
+import ParentDataScreen from "../screens/profile/ParentDataScreen";
+import DocumentsScreen from "../screens/profile/DocumentsScreen";
+import NotifSettingsScreen from "../screens/profile/NotifSettingsScreen";
+import LangSecurityScreen from "../screens/profile/LangSecurityScreen";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-/** Всё, что доступно после логина. ParentDataProvider оборачивает и табы,
- *  и стек-экраны (Расписание/Уведомления/Профиль ребёнка), чтобы у всех был
- *  один и тот же список детей/выбранный ребёнок без повторных запросов. */
-export default function MainNavigator({
-  profile,
-  onLoggedOut,
-}: {
-  profile: ParentProfile;
-  onLoggedOut: () => void;
-}) {
+/**
+ * Реестр реальных study-экранов Захода 5.
+ * Ключ = route name (совпадает с STACK_ROUTES), значение = компонент.
+ * Для всех остальных маршрутов из STACK_ROUTES остаётся StubScreen.
+ */
+const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d6: DayStatusScreen,
+  d7: EduosAssistantScreen,
+  d8: NotificationsScreen,
+  d9: ServicesScreen,
+  d11: SubjectDetailScreen,
+  d12: HomeworksScreen,
+  d13: HomeworkDetailScreen,
+  d14: AttendanceScreen,
+  d15: ScheduleScreen,
+  d16: SkillsScreen,
+  dallsubj: AllSubjectsScreen,
+  drev: TeacherReviewsScreen,
+  dtopics: TopicMasteryScreen,
+  dteach: TeacherProfileScreen,
+  dmeals: MealsScreen,
+};
+
+/**
+ * Реестр реальных payment-экранов Захода 6 (12 шт.).
+ * Шторки (TopUpSheet, PayMethodSheet и т.д.) в стек НЕ регистрируются —
+ * открываются как локальные BottomSheet внутри своих parent-экранов.
+ */
+const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d18: BillsScreen,
+  d19: CheckoutScreen,
+  d20: PaymentHistoryScreen,
+  d21: ReceiptsScreen,
+  d22: ChildWalletScreen,
+  d33: PayMethodsScreen,
+  dtop: TopUpScreen,
+  dwops: WalletOpsScreen,
+  dtransfer: TransferScreen,
+  dlimits: LimitsScreen,
+  dcarddet: CardDetailsScreen,
+  daddcard: AddCardScreen,
+};
+
+/**
+ * Реестр реальных messages-экранов Захода 7 (4 шт.).
+ * Шторки НЕ в стеке — открываются локально из parent screens.
+ */
+const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d25: ChatScreen,
+  d26: AnnouncementsScreen,
+  d27: AdminNewsScreen,
+  d28: SupportScreen,
+};
+
+/**
+ * Реестр реальных profile-экранов Захода 7 (5 шт.).
+ * Шторки НЕ в стеке — открываются локально из parent screens.
+ */
+const PROFILE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  d29: ChildProfileScreen,
+  d30: ParentDataScreen,
+  d31: DocumentsScreen,
+  d32: NotifSettingsScreen,
+  d34: LangSecurityScreen,
+};
+
+/**
+ * Реестр реальных экранов Захода 8 — родительские сервис-разделы (8 шт.)
+ * и связанные настройки безопасности. Шторки (help/profmenu/call и т.д.)
+ * остаются генерической заглушкой — они не в объёме этого захода.
+ */
+const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
+  ddiary: DiaryScreen,
+  dtests: TestsScreen,
+  dlib: LibraryScreen,
+  dport: PortfolioScreen,
+  dapps: ApplicationsScreen,
+  dmed: MedicalCardScreen,
+  dtrans: TransportScreen,
+  dchpass: ChangePasswordScreen,
+  dsessions: ActiveSessionsScreen,
+};
+
+export default function MainNavigator() {
   return (
-    <ParentDataProvider>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Tabs">
-          {() => <TabNavigator profile={profile} onLoggedOut={onLoggedOut} />}
-        </Stack.Screen>
-        <Stack.Screen name="Schedule" component={ScheduleScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="ChildProfile" component={ChildProfileScreen} />
-        <Stack.Screen name="Homework" component={HomeworkScreen} />
-        <Stack.Screen name="HomeworkDetail" component={HomeworkDetailScreen} />
-        <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
-        <Stack.Screen name="Skills" component={SkillsScreen} />
-        <Stack.Screen name="AttendanceDetail" component={AttendanceDetailScreen} />
-        <Stack.Screen name="TeacherReviews" component={TeacherReviewsScreen} />
-        <Stack.Screen name="MessageThread" component={MessageThreadScreen} />
-        <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
-        <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
-        <Stack.Screen name="Support" component={SupportScreen} />
-        <Stack.Screen name="Bills" component={BillsScreen} />
-        <Stack.Screen name="Checkout" component={CheckoutScreen} />
-        <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
-        <Stack.Screen name="Receipt" component={ReceiptScreen} />
-        <Stack.Screen name="ChildWallet" component={ChildWalletScreen} />
-        <Stack.Screen name="Documents" component={DocumentsScreen} />
-        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-        <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-        <Stack.Screen name="Security" component={SecurityScreen} />
-        <Stack.Screen name="DailyStatus" component={DailyStatusScreen} />
-        <Stack.Screen name="Insight" component={InsightScreen} />
-        <Stack.Screen name="AllServices" component={AllServicesScreen} />
-        <Stack.Screen name="ComingSoon" component={ComingSoonScreen} />
-      </Stack.Navigator>
-    </ParentDataProvider>
+    <Stack.Navigator
+      initialRouteName="Tabs"
+      screenOptions={{
+        headerShown: false,
+        animation: "slide_from_right",
+      }}
+    >
+      <Stack.Screen name="Tabs" component={TabNavigator} />
+      {STACK_ROUTES.map((name) => (
+        <Stack.Screen
+          key={name}
+          name={name}
+          component={
+            STUDY_SCREENS[name] ??
+            PAYMENT_SCREENS[name] ??
+            MESSAGE_SCREENS[name] ??
+            PROFILE_SCREENS[name] ??
+            SERVICE_SCREENS[name] ??
+            StubScreen
+          }
+        />
+      ))}
+    </Stack.Navigator>
   );
 }

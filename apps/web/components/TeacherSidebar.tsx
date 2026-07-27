@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
-  PanelLeftClose, PanelLeftOpen, ClipboardList,
+  PanelLeftClose, PanelLeftOpen, ClipboardList, Library,
 } from "lucide-react";
 import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -35,6 +35,10 @@ export const teacherNavItems = [
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
   { key: "knowledgeBase", href: "/teacher/knowledge-base", icon: GraduationCap, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navKnowledgeBase },
+  // 6А, Заход B — библиотека материалов учителей (миграция 147). Отдельный
+  // верхнеуровневый пункт, не таб внутри "База знаний" — раздел свой,
+  // с собственной загрузкой (только предметники, куратор видит/не грузит).
+  { key: "library",       href: "/teacher/library",       icon: Library,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLibrary },
   // Ночной прогон, ЧАСТЬ 3: убрано из бокового меню — доступ только через
   // колокольчик (NotificationsBell) в шапке, который ведёт на
   // /teacher/notifications (табы «Уведомления»/«Объявления», отдельный

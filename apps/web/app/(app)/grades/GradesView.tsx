@@ -7,6 +7,7 @@ import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
 import { SubjectIcon } from "@/components/SubjectIcon";
+import { ErrorState } from "@/components/ErrorState";
 import { cn } from "@/lib/cn";
 import { GradeFilterDropdown } from "./GradeFilterDropdown";
 import { GradeDistributionDonut } from "./GradeDistributionDonut";
@@ -14,6 +15,7 @@ import { GradeDetailModal } from "./GradeDetailModal";
 
 interface Props {
   grades: StudentGradeItem[];
+  error?: boolean;
 }
 
 type TypeFilter = "all" | StudentGradeItem["kind"];
@@ -132,7 +134,7 @@ function pillClass(active: boolean) {
   );
 }
 
-export function GradesView({ grades }: Props) {
+export function GradesView({ grades, error = false }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.grades;
@@ -143,6 +145,17 @@ export function GradesView({ grades }: Props) {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [sortValue, setSortValue] = useState<SortValue>("date_desc");
   const [selected, setSelected] = useState<StudentGradeItem | null>(null);
+
+  if (error) {
+    return (
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
+          {t.title} <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
+        </h1>
+        <ErrorState>{d.common.error}</ErrorState>
+      </div>
+    );
+  }
 
   if (grades.length === 0) {
     return (

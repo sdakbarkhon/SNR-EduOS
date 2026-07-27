@@ -10,11 +10,10 @@
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.snr.eduos.parent",
-      "supportsTablet": true,
-      "runtimeVersion": "exposdk:54.0.0"
+      "supportsTablet": true
     },
     "android": {
       "package": "com.snr.eduos.parent",
@@ -35,16 +34,14 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#1A1035"
         }
       ],
       "expo-secure-store",
       "expo-font"
     ],
     "owner": "snreduos",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "exposdk:54.0.0",
     "extra": {
       "eas": {
         "projectId": "b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"

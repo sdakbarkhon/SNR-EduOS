@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       admins: {
@@ -135,6 +110,56 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_homework_review_queue: {
+        Row: {
+          attempts: number
+          enqueued_at: string
+          last_error: string | null
+          school_id: string
+          submission_id: string
+        }
+        Insert: {
+          attempts?: number
+          enqueued_at?: string
+          last_error?: string | null
+          school_id: string
+          submission_id: string
+        }
+        Update: {
+          attempts?: number
+          enqueued_at?: string
+          last_error?: string | null
+          school_id?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_homework_review_queue_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "homework_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_log: {
+        Row: {
+          day: string
+          requests_count: number
+          updated_at: string
+        }
+        Insert: {
+          day: string
+          requests_count?: number
+          updated_at?: string
+        }
+        Update: {
+          day?: string
+          requests_count?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       announcement_reads: {
         Row: {
@@ -320,7 +345,6 @@ export type Database = {
       }
       attendance: {
         Row: {
-          is_demo: boolean
           id: string
           is_finalized: boolean
           lesson_id: string
@@ -332,7 +356,6 @@ export type Database = {
           student_id: string
         }
         Insert: {
-          is_demo?: boolean
           id?: string
           is_finalized?: boolean
           lesson_id: string
@@ -344,7 +367,6 @@ export type Database = {
           student_id: string
         }
         Update: {
-          is_demo?: boolean
           id?: string
           is_finalized?: boolean
           lesson_id?: string
@@ -832,7 +854,6 @@ export type Database = {
       }
       classwork_submissions: {
         Row: {
-          is_demo: boolean
           classwork_id: string
           file_original_name: string | null
           file_size_bytes: number | null
@@ -851,7 +872,6 @@ export type Database = {
           text_answer: string | null
         }
         Insert: {
-          is_demo?: boolean
           classwork_id: string
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -870,7 +890,6 @@ export type Database = {
           text_answer?: string | null
         }
         Update: {
-          is_demo?: boolean
           classwork_id?: string
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -919,164 +938,9 @@ export type Database = {
           },
         ]
       }
-      curriculum_plans: {
-        Row: {
-          id: string
-          group_id: string
-          subject_id: string
-          teacher_id: string
-          school_id: string
-          title: string
-          source_file_url: string | null
-          source_file_type: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          group_id: string
-          subject_id: string
-          teacher_id: string
-          school_id?: string
-          title: string
-          source_file_url?: string | null
-          source_file_type?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          group_id?: string
-          subject_id?: string
-          teacher_id?: string
-          school_id?: string
-          title?: string
-          source_file_url?: string | null
-          source_file_type?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "curriculum_plans_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "curriculum_plans_subject_id_fkey"
-            columns: ["subject_id"]
-            isOneToOne: false
-            referencedRelation: "subjects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "curriculum_plans_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teachers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "curriculum_plans_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      curriculum_plan_topics: {
-        Row: {
-          id: string
-          plan_id: string
-          order_index: number
-          title: string
-          description: string | null
-          estimated_lessons: number
-        }
-        Insert: {
-          id?: string
-          plan_id: string
-          order_index: number
-          title: string
-          description?: string | null
-          estimated_lessons?: number
-        }
-        Update: {
-          id?: string
-          plan_id?: string
-          order_index?: number
-          title?: string
-          description?: string | null
-          estimated_lessons?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "curriculum_plan_topics_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "curriculum_plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sandbox_projects: {
-        Row: {
-          id: string
-          student_id: string
-          school_id: string
-          name: string
-          service_id: string
-          code: string | null
-          external_url: string | null
-          is_autosave: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          student_id: string
-          school_id?: string
-          name?: string
-          service_id: string
-          code?: string | null
-          external_url?: string | null
-          is_autosave?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          student_id?: string
-          school_id?: string
-          name?: string
-          service_id?: string
-          code?: string | null
-          external_url?: string | null
-          is_autosave?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sandbox_projects_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sandbox_projects_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       course_materials: {
         Row: {
           bucket: string
-          is_demo: boolean
           created_at: string
           description: string | null
           file_size_bytes: number | null
@@ -1096,7 +960,6 @@ export type Database = {
         }
         Insert: {
           bucket?: string
-          is_demo?: boolean
           created_at?: string
           description?: string | null
           file_size_bytes?: number | null
@@ -1116,7 +979,6 @@ export type Database = {
         }
         Update: {
           bucket?: string
-          is_demo?: boolean
           created_at?: string
           description?: string | null
           file_size_bytes?: number | null
@@ -1172,6 +1034,106 @@ export type Database = {
           },
         ]
       }
+      curriculum_plan_topics: {
+        Row: {
+          description: string | null
+          estimated_lessons: number
+          id: string
+          order_index: number
+          plan_id: string
+          title: string
+        }
+        Insert: {
+          description?: string | null
+          estimated_lessons?: number
+          id?: string
+          order_index: number
+          plan_id: string
+          title: string
+        }
+        Update: {
+          description?: string | null
+          estimated_lessons?: number
+          id?: string
+          order_index?: number
+          plan_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_plan_topics_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      curriculum_plans: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          school_id: string
+          source_file_type: string | null
+          source_file_url: string | null
+          subject_id: string
+          teacher_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          school_id?: string
+          source_file_type?: string | null
+          source_file_url?: string | null
+          subject_id: string
+          teacher_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          school_id?: string
+          source_file_type?: string | null
+          source_file_url?: string | null
+          subject_id?: string
+          teacher_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "curriculum_plans_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_facts: {
         Row: {
           created_at: string
@@ -1204,27 +1166,39 @@ export type Database = {
           },
         ]
       }
-      demo_sessions: {
+      demo_leases: {
         Row: {
-          account_user_id: string
-          claimed_at: string | null
+          claimed_at: string
           id: string
-          last_activity: string | null
-          released: boolean
+          last_activity_at: string
+          released_at: string | null
+          role: string
+          school_id: string
+          session_token: string
+          subject_slug: string | null
+          user_id: string
         }
         Insert: {
-          account_user_id: string
-          claimed_at?: string | null
+          claimed_at?: string
           id?: string
-          last_activity?: string | null
-          released?: boolean
+          last_activity_at?: string
+          released_at?: string | null
+          role: string
+          school_id: string
+          session_token: string
+          subject_slug?: string | null
+          user_id: string
         }
         Update: {
-          account_user_id?: string
-          claimed_at?: string | null
+          claimed_at?: string
           id?: string
-          last_activity?: string | null
-          released?: boolean
+          last_activity_at?: string
+          released_at?: string | null
+          role?: string
+          school_id?: string
+          session_token?: string
+          subject_slug?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1426,7 +1400,6 @@ export type Database = {
       }
       homework: {
         Row: {
-          is_demo: boolean
           attachment_filename: string | null
           attachment_size_bytes: number | null
           attachment_storage_path: string | null
@@ -1457,7 +1430,6 @@ export type Database = {
           title: string
         }
         Insert: {
-          is_demo?: boolean
           attachment_filename?: string | null
           attachment_size_bytes?: number | null
           attachment_storage_path?: string | null
@@ -1488,7 +1460,6 @@ export type Database = {
           title: string
         }
         Update: {
-          is_demo?: boolean
           attachment_filename?: string | null
           attachment_size_bytes?: number | null
           attachment_storage_path?: string | null
@@ -1534,17 +1505,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "homework_subject_id_fkey"
-            columns: ["subject_id"]
-            isOneToOne: false
-            referencedRelation: "subjects"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "homework_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "homework_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
           {
@@ -1558,7 +1529,10 @@ export type Database = {
       }
       homework_submissions: {
         Row: {
-          is_demo: boolean
+          ai_feedback: Json | null
+          ai_grade: number | null
+          ai_review_status: string | null
+          ai_reviewed_at: string | null
           answer_text: string | null
           code_text: string | null
           file_original_name: string | null
@@ -1574,10 +1548,15 @@ export type Database = {
           status: Database["public"]["Enums"]["submission_status"]
           student_id: string
           submitted_at: string
+          teacher_approved_at: string | null
+          teacher_approved_by: string | null
           teacher_comment: string | null
         }
         Insert: {
-          is_demo?: boolean
+          ai_feedback?: Json | null
+          ai_grade?: number | null
+          ai_review_status?: string | null
+          ai_reviewed_at?: string | null
           answer_text?: string | null
           code_text?: string | null
           file_original_name?: string | null
@@ -1593,10 +1572,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["submission_status"]
           student_id: string
           submitted_at?: string
+          teacher_approved_at?: string | null
+          teacher_approved_by?: string | null
           teacher_comment?: string | null
         }
         Update: {
-          is_demo?: boolean
+          ai_feedback?: Json | null
+          ai_grade?: number | null
+          ai_review_status?: string | null
+          ai_reviewed_at?: string | null
           answer_text?: string | null
           code_text?: string | null
           file_original_name?: string | null
@@ -1612,6 +1596,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["submission_status"]
           student_id?: string
           submitted_at?: string
+          teacher_approved_at?: string | null
+          teacher_approved_by?: string | null
           teacher_comment?: string | null
         }
         Relationships: [
@@ -1641,6 +1627,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "homework_submissions_teacher_approved_by_fkey"
+            columns: ["teacher_approved_by"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
         ]
@@ -1904,7 +1897,6 @@ export type Database = {
       }
       lesson_grades: {
         Row: {
-          is_demo: boolean
           comment: string | null
           grade: number
           graded_at: string
@@ -1916,7 +1908,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          is_demo?: boolean
           comment?: string | null
           grade: number
           graded_at?: string
@@ -1928,7 +1919,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          is_demo?: boolean
           comment?: string | null
           grade?: number
           graded_at?: string
@@ -1972,46 +1962,52 @@ export type Database = {
       }
       lesson_materials: {
         Row: {
-          is_demo: boolean
+          content_type: string
           created_at: string
+          external_url: string | null
           file_original_name: string | null
           file_size_bytes: number | null
-          file_storage_path: string
+          file_storage_path: string | null
           from_knowledge_base: boolean
-          kb_bucket: string | null
           id: string
+          kb_bucket: string | null
           lesson_id: string
           school_id: string
+          source_url: string | null
           title: string
           uploaded_by: string | null
           visibility: string
         }
         Insert: {
-          is_demo?: boolean
+          content_type?: string
           created_at?: string
+          external_url?: string | null
           file_original_name?: string | null
           file_size_bytes?: number | null
-          file_storage_path: string
+          file_storage_path?: string | null
           from_knowledge_base?: boolean
-          kb_bucket?: string | null
           id?: string
+          kb_bucket?: string | null
           lesson_id: string
           school_id?: string
+          source_url?: string | null
           title: string
           uploaded_by?: string | null
           visibility?: string
         }
         Update: {
-          is_demo?: boolean
+          content_type?: string
           created_at?: string
+          external_url?: string | null
           file_original_name?: string | null
           file_size_bytes?: number | null
-          file_storage_path?: string
+          file_storage_path?: string | null
           from_knowledge_base?: boolean
-          kb_bucket?: string | null
           id?: string
+          kb_bucket?: string | null
           lesson_id?: string
           school_id?: string
+          source_url?: string | null
           title?: string
           uploaded_by?: string | null
           visibility?: string
@@ -2099,6 +2095,54 @@ export type Database = {
           },
         ]
       }
+      lesson_stage_embeddings: {
+        Row: {
+          chunk_index: number
+          chunk_text: string
+          created_at: string
+          embedding: string
+          id: string
+          lesson_stage_id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          chunk_index?: number
+          chunk_text: string
+          created_at?: string
+          embedding: string
+          id?: string
+          lesson_stage_id: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          chunk_index?: number
+          chunk_text?: string
+          created_at?: string
+          embedding?: string
+          id?: string
+          lesson_stage_id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_stage_embeddings_lesson_stage_id_fkey"
+            columns: ["lesson_stage_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_stage_embeddings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_stage_progress: {
         Row: {
           completed_at: string | null
@@ -2172,7 +2216,6 @@ export type Database = {
       }
       lesson_stages: {
         Row: {
-          is_demo: boolean
           completed_at: string | null
           config: Json
           content_type: string | null
@@ -2199,7 +2242,6 @@ export type Database = {
           was_activated: boolean
         }
         Insert: {
-          is_demo?: boolean
           completed_at?: string | null
           config?: Json
           content_type?: string | null
@@ -2226,7 +2268,6 @@ export type Database = {
           was_activated?: boolean
         }
         Update: {
-          is_demo?: boolean
           completed_at?: string | null
           config?: Json
           content_type?: string | null
@@ -2269,11 +2310,43 @@ export type Database = {
           },
         ]
       }
+      lesson_stages_embedding_queue: {
+        Row: {
+          attempts: number
+          enqueued_at: string
+          last_error: string | null
+          lesson_stage_id: string
+          school_id: string
+        }
+        Insert: {
+          attempts?: number
+          enqueued_at?: string
+          last_error?: string | null
+          lesson_stage_id: string
+          school_id: string
+        }
+        Update: {
+          attempts?: number
+          enqueued_at?: string
+          last_error?: string | null
+          lesson_stage_id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_stages_embedding_queue_lesson_stage_id_fkey"
+            columns: ["lesson_stage_id"]
+            isOneToOne: true
+            referencedRelation: "lesson_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lessons: {
         Row: {
-          is_demo: boolean
           active_stage_id: string | null
           created_at: string
+          curriculum_topic_id: string | null
           demo_current_page: number | null
           demo_material_id: string | null
           demo_video_playing: boolean | null
@@ -2295,12 +2368,11 @@ export type Database = {
           subject_id: string | null
           title: string | null
           topic: string | null
-          curriculum_topic_id: string | null
         }
         Insert: {
-          is_demo?: boolean
           active_stage_id?: string | null
           created_at?: string
+          curriculum_topic_id?: string | null
           demo_current_page?: number | null
           demo_material_id?: string | null
           demo_video_playing?: boolean | null
@@ -2322,12 +2394,11 @@ export type Database = {
           subject_id?: string | null
           title?: string | null
           topic?: string | null
-          curriculum_topic_id?: string | null
         }
         Update: {
-          is_demo?: boolean
           active_stage_id?: string | null
           created_at?: string
+          curriculum_topic_id?: string | null
           demo_current_page?: number | null
           demo_material_id?: string | null
           demo_video_playing?: boolean | null
@@ -2349,21 +2420,20 @@ export type Database = {
           subject_id?: string | null
           title?: string | null
           topic?: string | null
-          curriculum_topic_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "lessons_curriculum_topic_id_fkey"
-            columns: ["curriculum_topic_id"]
-            isOneToOne: false
-            referencedRelation: "curriculum_plan_topics"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "lessons_active_stage_id_fkey"
             columns: ["active_stage_id"]
             isOneToOne: false
             referencedRelation: "lesson_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lessons_curriculum_topic_id_fkey"
+            columns: ["curriculum_topic_id"]
+            isOneToOne: false
+            referencedRelation: "curriculum_plan_topics"
             referencedColumns: ["id"]
           },
           {
@@ -2487,6 +2557,41 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parent_insights: {
+        Row: {
+          child_id: string
+          generated_at: string
+          id: string
+          insight_json: Json
+          locale: string
+          school_id: string
+        }
+        Insert: {
+          child_id: string
+          generated_at?: string
+          id?: string
+          insight_json: Json
+          locale?: string
+          school_id: string
+        }
+        Update: {
+          child_id?: string
+          generated_at?: string
+          id?: string
+          insight_json?: Json
+          locale?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parent_insights_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -3116,6 +3221,60 @@ export type Database = {
           },
         ]
       }
+      sandbox_projects: {
+        Row: {
+          code: string | null
+          created_at: string
+          external_url: string | null
+          id: string
+          is_autosave: boolean
+          name: string
+          school_id: string
+          service_id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          is_autosave?: boolean
+          name?: string
+          school_id?: string
+          service_id: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          is_autosave?: boolean
+          name?: string
+          school_id?: string
+          service_id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sandbox_projects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sandbox_projects_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           code: string | null
@@ -3248,6 +3407,7 @@ export type Database = {
           icon: string
           id: string
           is_active: boolean
+          is_stub: boolean
           name: string
           school_id: string
           teacher_id: string | null
@@ -3260,6 +3420,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          is_stub?: boolean
           name: string
           school_id?: string
           teacher_id?: string | null
@@ -3272,6 +3433,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          is_stub?: boolean
           name?: string
           school_id?: string
           teacher_id?: string | null
@@ -3517,7 +3679,6 @@ export type Database = {
       }
       test_submissions: {
         Row: {
-          is_demo: boolean
           grade: number | null
           graded_at: string | null
           graded_by: string | null
@@ -3531,7 +3692,6 @@ export type Database = {
           submitted_at: string
         }
         Insert: {
-          is_demo?: boolean
           grade?: number | null
           graded_at?: string | null
           graded_by?: string | null
@@ -3545,7 +3705,6 @@ export type Database = {
           submitted_at?: string
         }
         Update: {
-          is_demo?: boolean
           grade?: number | null
           graded_at?: string | null
           graded_by?: string | null
@@ -3592,30 +3751,24 @@ export type Database = {
       user_sessions: {
         Row: {
           created_at: string
-          demo_started_at: string | null
           device_info: string | null
           id: string
-          is_demo: boolean
           last_activity: string
           session_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          demo_started_at?: string | null
           device_info?: string | null
           id?: string
-          is_demo?: boolean
           last_activity?: string
           session_id: string
           user_id: string
         }
         Update: {
           created_at?: string
-          demo_started_at?: string | null
           device_info?: string | null
           id?: string
-          is_demo?: boolean
           last_activity?: string
           session_id?: string
           user_id?: string
@@ -3627,24 +3780,52 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_demo_account: {
-        Args: { p_grade?: string; p_kind: string }
+      can_manage_curriculum_plan: {
+        Args: {
+          p_group_id: string
+          p_school_id: string
+          p_subject_id: string
+          p_teacher_id: string
+        }
+        Returns: boolean
+      }
+      can_view_curriculum_plan: {
+        Args: { p_group_id: string; p_school_id: string }
+        Returns: boolean
+      }
+      check_user_session: { Args: { p_session_id: string }; Returns: string }
+      claim_demo_slot: {
+        Args: {
+          p_grade_level?: number
+          p_role: string
+          p_subject_slug?: string
+        }
         Returns: {
           email: string
+          password: string
+          session_token: string
+          user_id: string
           username: string
         }[]
       }
-      check_user_session: { Args: { p_session_id: string }; Returns: string }
-      get_current_user_role: { Args: never; Returns: string }
+      current_admin_id: { Args: never; Returns: string }
+      current_parent_id: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
-      current_admin_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
       fn_ai_messages_today: { Args: { p_student_id: string }; Returns: number }
       fn_auto_end_lessons: { Args: never; Returns: undefined }
       fn_auto_start_lessons: { Args: never; Returns: undefined }
       fn_cleanup_expired_announcements: { Args: never; Returns: undefined }
+      fn_ensure_direct_chat: {
+        Args: { p_student_id: string; p_teacher_id: string }
+        Returns: undefined
+      }
       fn_is_admin: { Args: { p_user_id?: string }; Returns: boolean }
+      fn_lesson_materials_to_kb: {
+        Args: { p_lesson_id: string }
+        Returns: undefined
+      }
       fn_notify_student_grade: {
         Args: {
           p_grade: number
@@ -3654,14 +3835,39 @@ export type Database = {
         }
         Returns: undefined
       }
-      is_demo_session: { Args: never; Returns: boolean }
+      get_ai_usage_today: { Args: never; Returns: number }
+      get_current_user_role: { Args: never; Returns: string }
+      get_occupied_teacher_subjects: {
+        Args: never
+        Returns: {
+          subject_slug: string
+        }[]
+      }
+      heartbeat_demo_slot: {
+        Args: { p_session_token: string }
+        Returns: boolean
+      }
+      increment_ai_usage: { Args: never; Returns: number }
+      is_curator_teacher: { Args: never; Returns: boolean }
       is_my_child: { Args: { p_student_id: string }; Returns: boolean }
       is_my_child_group: { Args: { p_group_id: string }; Returns: boolean }
       is_my_child_lesson: { Args: { p_lesson_id: string }; Returns: boolean }
       is_my_group: { Args: { p_group_id: string }; Returns: boolean }
       is_my_teacher_group: { Args: { p_group_id: string }; Returns: boolean }
       is_my_thread: { Args: { p_thread_id: string }; Returns: boolean }
+      is_subject_owner: { Args: { p_subject_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      match_lesson_stage_embeddings: {
+        Args: { p_match_count?: number; p_query_embedding: string }
+        Returns: {
+          chunk_text: string
+          lesson_id: string
+          lesson_stage_id: string
+          lesson_topic: string
+          similarity: number
+          starts_at: string
+        }[]
+      }
       notify_user_and_parents: {
         Args: {
           p_body: string
@@ -3673,13 +3879,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      release_demo_slot: { Args: { p_session_token: string }; Returns: boolean }
       reset_demo_data: { Args: never; Returns: undefined }
-      reset_demo_data_for_user: {
-        Args: { p_user_id: string; p_since?: string }
-        Returns: undefined
+      sweep_expired_demo_leases: { Args: never; Returns: undefined }
+      teacher_can_write_lesson: {
+        Args: { p_lesson_id: string }
+        Returns: boolean
       }
-      reset_expired_demo_sessions: { Args: never; Returns: undefined }
-      touch_demo_session: { Args: never; Returns: undefined }
       touch_user_session: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -3819,9 +4025,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       announcement_category: [

@@ -342,6 +342,55 @@ export type LessonMaterial = {
   source_url: string | null;
 };
 
+// migration 147 — Библиотека материалов учителей. Раздел видим только
+// учителям (RLS); v1 — все учителя видят все материалы независимо от
+// предмета/класса, subject_slug/группы ниже — фильтры для удобства поиска,
+// не ограничение доступа (см. миграцию 147 и chat-отчёт по 6А).
+// migration 148 — видео-ссылки (YouTube/RuTube) как альтернатива файлу.
+// Зеркалит lesson_materials.content_type/external_url/source_url
+// (миграция 138) — тот же классификатор (apps/web/lib/material-kind.ts,
+// FileViewerModal.tsx) уже умеет их рендерить без правок.
+export type LibraryMaterialContentType = "file" | "video_youtube" | "video_rutube";
+
+export type LibraryMaterial = {
+  id: string;
+  school_id: string;
+  // ON DELETE SET NULL — при удалении учителя материал остаётся, просто
+  // теряет автора (тот же выбор, что LessonMaterial.uploaded_by).
+  uploaded_by: string | null;
+  // Предмет загрузившего (teachers.subject_slug) на момент загрузки:
+  // programming/robotics/math/english/russian. Куратор загружать не может
+  // (RLS insert), поэтому NULL здесь на практике не встречается.
+  subject_slug: string | null;
+  title: string;
+  content_type: LibraryMaterialContentType;
+  // Путь в бакете "materials" (переиспользуем существующий бакет):
+  // <teacher_id>/library/<material_id>/<filename>. NULL для видео-ссылок
+  // (миграция 148 сняла NOT NULL) — CHECK на БД требует storage_path
+  // только когда content_type='file'.
+  storage_path: string | null;
+  file_type: string | null;
+  file_size_bytes: number | null;
+  // Только для content_type video_* (CHECK на БД): external_url —
+  // нормализованный embed-URL (youtube.com/embed/<id> | rutube.ru/play/embed/<id>),
+  // source_url — то, что вставил учитель. NULL для файлов.
+  external_url: string | null;
+  source_url: string | null;
+  created_at: string;
+};
+
+export type LibraryMaterialGroup = { id: string; name: string };
+
+export type LibraryMaterialWithDetails = LibraryMaterial & {
+  uploader_name: string | null;
+  // Пустой массив = "видно всем классам" (0 строк в junction-таблице).
+  groups: LibraryMaterialGroup[];
+  /** Signed URL (1 час) на файл в бакете "materials" — только для
+   *  content_type='file'. null для видео-ссылок (нет Storage-объекта,
+   *  открывать через external_url напрямую). */
+  url: string | null;
+};
+
 // migration 116 — Промт 4: учебные планы. teacher_id/group_id/subject_id
 // как в БД; UNIQUE(group_id, subject_id) на стороне БД, не в типе.
 export type CurriculumPlan = {

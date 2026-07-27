@@ -1,108 +1,104 @@
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons";
-import { getUnreadThreadCount } from "@snr/core";
-import { useEffect, useState } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import HomeScreen from "../screens/HomeScreen";
-import ProgressScreen from "../screens/ProgressScreen";
-import PaymentsScreen from "../screens/PaymentsScreen";
-import MessagesScreen from "../screens/MessagesScreen";
-import ProfileScreen from "../screens/ProfileScreen";
-import { getSupabase } from "../lib/supabase";
+/**
+ * Таб-навигатор v2 — 5 табов макета: Главная (p5) / Успехи (p10) /
+ * Оплаты (p17) / Сообщения (d24) / Профиль (dhub).
+ *
+ * Заход 2: фирменный плавающий стеклянный таб-бар макета (строка 4231) —
+ * компонент src/ui/FloatingTabBar, подключён через tabBar={...}.
+ * Лейблы — из словаря d.parentApp.nav.* (реагируют на смену языка,
+ * переключатель — экран «Язык и безопасность»), иконки — прежние lucide
+ * (строки 2648–2652 макета),
+ * бейдж «Сообщений» — из src/data (getUnreadMessageThreadsCount, макет
+ * строка 2651). Данные в презентационный компонент передаёт навигатор.
+ */
+import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { CreditCard, Home, MessageCircle, TrendingUp, User } from "lucide-react-native";
+import type { Dictionary } from "@snr/core";
+import HomeScreen from "../screens/tabs/HomeScreen";
+import ProgressScreen from "../screens/tabs/ProgressScreen";
+import PaymentsScreen from "../screens/tabs/PaymentsScreen";
+import MessagesScreen from "../screens/tabs/MessagesScreen";
+import ProfileHubScreen from "../screens/tabs/ProfileHubScreen";
+import { getUnreadMessageThreadsCount } from "../data";
 import { useAppLocale } from "../i18n";
-import { colors } from "../theme";
-import type { ParentProfile } from "../lib/auth";
-
-// Базовая высота содержимого таб-бара (иконка+подпись+внутренние отступы)
-// БЕЗ учёта нижнего safe-area inset — сам inset прибавляется отдельно ниже.
-const TAB_BAR_CONTENT_HEIGHT = 58;
-
-export type TabParamList = {
-  Home: undefined;
-  Progress: undefined;
-  Payments: undefined;
-  Messages: undefined;
-  Profile: undefined;
-};
+import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
+import type { TabParamList, TabRouteName } from "./routes";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-const ICONS: Record<keyof TabParamList, keyof typeof Ionicons.glyphMap> = {
-  Home: "home",
-  Progress: "trophy",
-  Payments: "card",
-  Messages: "chatbubbles",
-  Profile: "person",
-};
+// Лейблы табов из словаря макета: nav.home / nav.grades / nav.payments / nav.messages / nav.profile
+function tabLabels(d: Dictionary): Record<keyof TabParamList, string> {
+  return {
+    p5: d.parentApp.nav.home,
+    p10: d.parentApp.nav.grades,
+    p17: d.parentApp.nav.payments,
+    d24: d.parentApp.nav.messages,
+    dhub: d.parentApp.nav.profile,
+  };
+}
 
-export default function TabNavigator({
-  profile,
-  onLoggedOut,
-}: {
-  profile: ParentProfile;
-  onLoggedOut: () => void;
-}) {
-  const { d } = useAppLocale();
-  const [unread, setUnread] = useState(0);
-  const insets = useSafeAreaInsets();
+const TAB_ICONS = {
+  p5: Home,
+  p10: TrendingUp,
+  p17: CreditCard,
+  d24: MessageCircle,
+  dhub: User,
+} as const;
 
-  // Бейдж непрочитанных на "Сообщения" — из данных (RLS: только мои треды),
-  // не хардкод. Опрос раз в 30с — без realtime-подписки для первого захода.
-  useEffect(() => {
-    let cancelled = false;
-    const db = getSupabase();
-    async function poll() {
-      try {
-        const n = await getUnreadThreadCount(db);
-        if (!cancelled) setUnread(n);
-      } catch {
-        // тихий пропуск опроса бейджа — не критично для функциональности,
-        // но НЕ маскирует ошибки внутри самого экрана Сообщений
-      }
-    }
-    poll();
-    const id = setInterval(poll, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
+function renderTabBar(props: BottomTabBarProps, labels: Record<TabRouteName, string>) {
+  const { state, navigation } = props;
+  const unreadMessages = getUnreadMessageThreadsCount();
+
+  const items: FloatingTabItem[] = state.routes.map((route) => {
+    const name = route.name as TabRouteName;
+    const Icon = TAB_ICONS[name];
+    return {
+      key: name,
+      label: labels[name],
+      // Иконка 20 stroke 1.9 — как в макете (строки 2648–2652).
+      icon: (color: string) => <Icon size={20} color={color} strokeWidth={1.9} />,
+      badge: name === "d24" ? unreadMessages : undefined,
     };
-  }, []);
+  });
+
+  return (
+    <FloatingTabBar
+      items={items}
+      activeKey={state.routes[state.index].name}
+      onPress={(key) => {
+        const route = state.routes.find((r) => r.name === key);
+        const isFocused = state.routes[state.index].name === key;
+        if (!route) return;
+        const event = navigation.emit({
+          type: "tabPress",
+          target: route.key,
+          canPreventDefault: true,
+        });
+        if (!isFocused && !event.defaultPrevented) {
+          navigation.navigate(key as TabRouteName);
+        }
+      }}
+    />
+  );
+}
+
+export default function TabNavigator() {
+  const { d } = useAppLocale();
+  const labels = tabLabels(d);
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      tabBar={(props) => renderTabBar(props, labels)}
+      screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: {
-          borderTopColor: colors.border,
-          height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
-          paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: { fontSize: 10.5, fontWeight: "600" },
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name={ICONS[route.name as keyof TabParamList]} size={size ? size - 3 : 20} color={color} />
-        ),
-      })}
+        // Фон под табами красит сам экран (AppBackground)
+        sceneStyle: { backgroundColor: "transparent" },
+      }}
     >
-      <Tab.Screen name="Home" options={{ title: d.nav.home }}>
-        {() => <HomeScreen profile={profile} />}
-      </Tab.Screen>
-      <Tab.Screen name="Progress" component={ProgressScreen} options={{ title: d.parentMobile.tabProgress }} />
-      <Tab.Screen name="Payments" component={PaymentsScreen} options={{ title: d.nav.payments }} />
-      <Tab.Screen
-        name="Messages"
-        component={MessagesScreen}
-        options={{
-          title: d.nav.messages,
-          tabBarBadge: unread > 0 ? unread : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.danger, fontSize: 9.5 },
-        }}
-      />
-      <Tab.Screen name="Profile" options={{ title: d.nav.profile }}>
-        {() => <ProfileScreen profile={profile} onLoggedOut={onLoggedOut} />}
-      </Tab.Screen>
+      <Tab.Screen name="p5" component={HomeScreen} />
+      <Tab.Screen name="p10" component={ProgressScreen} />
+      <Tab.Screen name="p17" component={PaymentsScreen} />
+      <Tab.Screen name="d24" component={MessagesScreen} />
+      <Tab.Screen name="dhub" component={ProfileHubScreen} />
     </Tab.Navigator>
   );
 }

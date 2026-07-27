@@ -1,0 +1,536 @@
+/**
+ * Экран d29 «Профиль ребёнка» — REBUILD (Заход 7, block-by-block из макета).
+ *
+ * Композиция 1:1 из «SNR EduOS v2 Light.dc.html», строки 1166–1207:
+ *  1166–1171  HeaderBar: back-glass 38 + title «Профиль ребёнка» + kebab-glass 38
+ *             (goProfMenu → stub «profmenu»).
+ *  1173       ChildSwitcherCard compact: аватар 44 + ФИО + «{class} класс ⌄» +
+ *             акцентный лейбл «Сменить ›»; клик открывает шторку выбора детей.
+ *  1174–1179  HeroCard: непрозрачный градиент из child.avatar_gradient (135°),
+ *             overflow hidden, 2 фоновые звёздочки (справа-сверху 16 / opacity .5,
+ *             справа-снизу 10 / opacity .35), 56 аватар (rgba W22 + border W60),
+ *             ФИО 15/800 #fff, «{class} класс» + status-chip (rgba W22 + W40),
+ *             «ID ученика · {student_code}» 9.5/700 W75.
+ *  1180–1185  TabsRow: 4 pill-таба. «Данные» — активный градиент 135°
+ *             (#7c3aed→#4f6df5, тень 0 8 18 rgba(124,58,237,.35)), остальные —
+ *             glass 160° (W60→W40) + border W75. Клики:
+ *             Успехи → таб «p10», Посещаемость → «d14», Достижения → «dport»
+ *             (Заход 8: реальный экран Портфолио, initialTab: "ach").
+ *  1186       SectionLabel «Общая информация» (t.prof.generalInfo).
+ *  1187–1194  GeneralInfoCard: одна glass r20, 6 label:value строк (padding 9/0,
+ *             border-top .07 между строками). Значения — из child + CHILD_INFO.
+ *             «Школа» захардкожен в макете — оставляем «SNR International School».
+ *  1195       SectionLabel «Контакты школы» (t.prof.schoolContacts).
+ *  1196–1200  SchoolContactsCard: одна glass r20, 3 строки — телефон +998 71 200-40-40,
+ *             email info@snr-school.uz, адрес г. Ташкент, ул. Мустакиллик, 45.
+ *             Все три значения захардкожены в макете (правило спец-контекста).
+ *  1201       SectionLabel «Дополнительно» (t.prof.additional).
+ *  1202–1205  MedicalCard: одна glass r20 (клик → «dmed»), 2 label:value — аллергия,
+ *             мед. особенности. Значения — из CHILD_INFO.
+ *
+ * Данные — через getSelectedChildContext + getChildInfo. Тексты — d.parentApp.*.
+ * Обе темы — useTheme(). iOS safe-area — из InnerHeader (реализуем шапку inline,
+ * т.к. правый слот — кнопка меню, не info).
+ *
+ * Правило заказчика: экран информационный, кружков/чатов/2FA/языков нет. Спец-
+ * правила чата/объявлений/настроек к d29 не применяются.
+ *
+ * Заход 2, шаг 1: для реального (не демо) входа ChildSwitcherCard + HeroCard +
+ * GeneralInfoCard-строка «Класс» — РЕАЛЬНЫЙ активный ребёнок (ParentDataContext),
+ * не фикстура. Остальные поля GeneralInfoCard/MedicalCard (дата рождения,
+ * классный руководитель, № личного дела, аллергия, мед.особенности) — таких
+ * колонок в Supabase нет (подтверждено разведкой) — остаются на getChildInfo(),
+ * заморожены на фикстурном ребёнке, выбранном при входе (session.currentChildId),
+ * и НЕ меняются при переключении реального активного ребёнка в шторке — это
+ * осознанный компромисс этого шага, не баг: сами данные подключим в
+ * следующих заходах. Демо-флоу не тронут ни строкой.
+ */
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle, Path } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
+import {
+  BottomSheetFrame,
+  ChildPickerSheetContent,
+  ChildSwitcherCard,
+  GlassCard,
+  GlassCircleButton,
+  type ChildPickerItem,
+} from "../../ui";
+import {
+  getChildInfo,
+  getChildren,
+  getSelectedChildContext,
+} from "../../data";
+import { useAuthSession } from "../../context/AuthSessionContext";
+import { useParentData } from "../../context/ParentDataContext";
+import { toChildRow } from "../../lib/realChild";
+import { useAppLocale } from "../../i18n";
+import type { MainStackParamList, TabParamList } from "../../navigation/routes";
+
+type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
+
+/** Стрелка «назад» 18 stroke 2 — унифицирована с InnerHeader (строка 1168). */
+function BackArrow({ color }: { color: string }) {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M19 12H5" />
+      <Path d="m12 19-7-7 7-7" />
+    </Svg>
+  );
+}
+
+/** Kebab (3 точки по горизонтали) 16 stroke 2.2 — правый слот (строка 1170). */
+function KebabIcon({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round">
+      <Circle cx={5} cy={12} r={1} />
+      <Circle cx={12} cy={12} r={1} />
+      <Circle cx={19} cy={12} r={1} />
+    </Svg>
+  );
+}
+
+/** Звёздочка (spark) 5-конечная — фон hero-карточки (строки 1175, 1176). */
+function SparkStar({ size, opacity }: { size: number; opacity: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="#FFFFFF" opacity={opacity}>
+      <Path d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z" />
+    </Svg>
+  );
+}
+
+/** Одна строка label:value внутри info-карточки (макет 1188–1193, 1197–1199, 1203–1204). */
+function InfoRow({
+  label,
+  value,
+  divider,
+  valueAlignRight,
+}: {
+  label: string;
+  value: string;
+  divider: boolean;
+  valueAlignRight?: boolean;
+}) {
+  const { tokens, scheme } = useTheme();
+  const dividerColor = scheme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(23,18,67,0.07)";
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        paddingVertical: 9,
+        borderTopWidth: divider ? 1 : 0,
+        borderTopColor: dividerColor,
+      }}
+    >
+      <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink2 }}>
+        {label}
+      </Text>
+      <Text
+        numberOfLines={2}
+        style={{
+          flexShrink: 1,
+          fontFamily: fonts.manrope800,
+          fontSize: 11.5,
+          color: tokens.ink1,
+          textAlign: valueAlignRight ? "right" : "right",
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/** Ключи табов d29 (макет 1181–1184, порядок сохраняется). */
+type ProfileTabKey = "data" | "progress" | "attend" | "achieve";
+
+export default function ChildProfileScreen() {
+  const { tokens, scheme } = useTheme();
+  const { d } = useAppLocale();
+  const t = d.parentApp;
+  const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  const session = useAuthSession();
+
+  const children = getChildren();
+  const [childId, setChildId] = useState<string>(
+    () => session.currentChildId ?? children[0].id,
+  );
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  const realIndex = isRealFlow
+    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    : -1;
+  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+
+  const ctx = getSelectedChildContext(childId);
+  // Идентичность (ФИО/класс/аватар) — реальная для phone-flow, иначе как
+  // раньше. info (дата рождения, куратор, № личного дела, аллергия,
+  // мед.особенности) — колонок в Supabase нет, ВСЕГДА фикстура, заморожена
+  // на childId (login-time), не следует за переключением реального ребёнка.
+  const child = realChildRow ?? ctx.child;
+  const info = getChildInfo(childId);
+
+  // Активный таб — по макету (строка 1181) всегда «data» на входе; остальные
+  // три — навигационные ссылки на другие экраны/табы.
+  const [activeTab] = useState<ProfileTabKey>("data");
+
+  // Цвета вспомогательные (обе темы).
+  const sectionCapsColor = scheme === "light" ? "rgba(26,19,74,0.5)" : "rgba(255,255,255,0.55)";
+  const inactiveTabTextColor = scheme === "light" ? "rgba(26,19,74,0.66)" : "rgba(255,255,255,0.7)";
+
+  const heroGradient = child.avatar_gradient;
+  // Тень hero-карточки — в тоне второго стопа градиента (макет: box-shadow
+  // 0 16 36 {g2}55 + inset 0 1.5 0 W35).
+  const heroShadowColor = `${heroGradient[1]}55`;
+
+  // Заход 2, шаг 1: для реального входа — РЕАЛЬНЫЕ дети семьи, не полный
+  // фикстурный пул. statusLabel/statusTone у ChildPickerSheetContent не
+  // опциональны — статуса "в школе/дома" для реальных детей ещё нет
+  // (data-экран, следующие заходы), нейтральный "—" вместо выдумки.
+  const pickerItems: ChildPickerItem[] = isRealFlow
+    ? parentData!.children.map((c, i) => {
+        const row = toChildRow(c, i);
+        return {
+          id: row.id,
+          initials: row.first_name.slice(0, 1),
+          gradient: row.avatar_gradient,
+          ringColor: row.avatar_ring,
+          name: row.full_name,
+          classLabel: `${row.class_name} ${t.grades.class}`,
+          statusLabel: "—",
+          statusTone: "gray" as const,
+        };
+      })
+    : children.map((k) => ({
+        id: k.id,
+        initials: k.first_name.slice(0, 1),
+        gradient: k.avatar_gradient,
+        ringColor: k.avatar_ring,
+        name: k.full_name,
+        classLabel: `${k.class_name} ${t.grades.class}`,
+        statusLabel: k.status_chip,
+        statusTone: k.status_chip === "В школе" ? "green" : "gray",
+      }));
+
+  const goProgress = () => navigation.navigate("Tabs", { screen: "p10" });
+  const goAttend = () => navigation.navigate("d14");
+  // Заход 8: Портфолио теперь реальный экран — ведём сразу на вкладку
+  // «Достижения», а не на общую заглушку.
+  const goAchieve = () => navigation.navigate("dport", { initialTab: "ach" });
+  const goProfMenu = () => navigation.navigate("stub", { stubKey: "profmenu" });
+  const goMed = () => navigation.navigate("dmed");
+
+  // Табы (макет 1181–1184). Клик по «data» — no-op (уже активный).
+  const tabs: { key: ProfileTabKey; label: string; onPress: () => void }[] = [
+    { key: "data", label: "Данные", onPress: () => {} },
+    { key: "progress", label: t.nav.grades, onPress: goProgress },
+    { key: "attend", label: t.scr.attendance, onPress: goAttend },
+    { key: "achieve", label: "Достижения", onPress: goAchieve },
+  ];
+
+  return (
+    <AppBackground>
+      {/* Блок 1: Header (back + title + kebab). */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          paddingTop: Math.max(insets.top, 46),
+          paddingHorizontal: 18,
+          paddingBottom: 8,
+        }}
+      >
+        <GlassCircleButton onPress={() => navigation.goBack()}>
+          <BackArrow color={tokens.ink1} />
+        </GlassCircleButton>
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            fontFamily: fonts.unbounded600,
+            fontSize: 15,
+            color: tokens.ink1,
+          }}
+        >
+          {t.scr.childProfile}
+        </Text>
+        <GlassCircleButton onPress={goProfMenu}>
+          <KebabIcon color={tokens.ink1} />
+        </GlassCircleButton>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 18,
+          paddingTop: 4,
+          paddingBottom: 118,
+          gap: 12,
+        }}
+      >
+        {/* Блок 2: ChildSwitcherCard compact — открывает шторку выбора ребёнка. */}
+        <ChildSwitcherCard
+          variant="compact"
+          avatar={{
+            initials: child.first_name.slice(0, 1),
+            gradient: child.avatar_gradient,
+            ringColor: child.avatar_ring,
+          }}
+          name={child.full_name}
+          classLabel={`${child.class_name} ${t.grades.class}`}
+          switchLabel="Сменить ›"
+          onPress={() => setSheetOpen(true)}
+        />
+
+        {/* Блок 3: HeroCard — большой градиент со звёздочками и ID ученика. */}
+        <View
+          style={[
+            {
+              position: "relative",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              padding: 15,
+              borderRadius: 22,
+              overflow: "hidden",
+              minHeight: 86,
+            },
+            shadowStyle({ x: 0, y: 16, blur: 36, color: heroShadowColor }),
+          ]}
+        >
+          <LinearGradient
+            colors={heroGradient}
+            {...gradPoints(135)}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* inset-блик 0 1.5 0 W35 — верхняя hairline-полоска. */}
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1.5,
+              backgroundColor: "rgba(255,255,255,0.35)",
+            }}
+          />
+          {/* Фоновые звёздочки (макет 1175, 1176). */}
+          <View style={{ position: "absolute", top: 10, right: 14 }}>
+            <SparkStar size={16} opacity={0.5} />
+          </View>
+          <View style={{ position: "absolute", bottom: 14, right: 44 }}>
+            <SparkStar size={10} opacity={0.35} />
+          </View>
+
+          {/* Аватар 56 (rgba W22, border W60 2px). */}
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(255,255,255,0.22)",
+              borderWidth: 2,
+              borderColor: "rgba(255,255,255,0.6)",
+            }}
+          >
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 19, color: "#FFFFFF" }}>
+              {child.first_name.slice(0, 1)}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <Text
+              numberOfLines={1}
+              style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}
+            >
+              {child.full_name}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+              <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: "rgba(255,255,255,0.85)" }}>
+                {`${child.class_name} ${t.grades.class}`}
+              </Text>
+              {/* Заход 2, шаг 1: у реальных детей статуса "в школе/дома" ещё
+                  нет (child.status_chip === "" из toChildRow) — скрываем
+                  пилюлю вовсе, не рисуем пустую. */}
+              {child.status_chip ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    paddingVertical: 3,
+                    paddingHorizontal: 8,
+                    borderRadius: 999,
+                    backgroundColor: "rgba(255,255,255,0.22)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255,255,255,0.4)",
+                  }}
+                >
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 8.5, color: "#FFFFFF" }}>
+                    {child.status_chip}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text
+              numberOfLines={1}
+              style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: "rgba(255,255,255,0.75)" }}
+            >
+              {`ID ученика · ${info.student_code}`}
+            </Text>
+          </View>
+        </View>
+
+        {/* Блок 4: TabsRow — 4 pill-таба. */}
+        <View style={{ flexDirection: "row", gap: 7 }}>
+          {tabs.map((tab) => {
+            const isActive = tab.key === activeTab;
+            if (isActive) {
+              return (
+                <View
+                  key={tab.key}
+                  style={[
+                    { flex: 1, borderRadius: 999, overflow: "hidden" },
+                    shadowStyle({ x: 0, y: 8, blur: 18, color: "rgba(124,58,237,0.35)" }),
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["#7C3AED", "#4F6DF5"]}
+                    {...gradPoints(135)}
+                    style={{ paddingVertical: 9, alignItems: "center" }}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, color: "#FFFFFF" }}>
+                      {tab.label}
+                    </Text>
+                  </LinearGradient>
+                </View>
+              );
+            }
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={tab.onPress}
+                style={{
+                  flex: 1,
+                  borderRadius: 999,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                  backgroundColor: scheme === "light" ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.08)",
+                  borderWidth: 1,
+                  borderColor: scheme === "light" ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.14)",
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: inactiveTabTextColor }}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Блок 5: SectionLabel «Общая информация». */}
+        <Text
+          style={{
+            fontFamily: fonts.manrope800,
+            fontSize: 10.5,
+            letterSpacing: 10.5 * 0.08,
+            textTransform: "uppercase",
+            color: sectionCapsColor,
+          }}
+        >
+          {t.prof.generalInfo}
+        </Text>
+
+        {/* Блок 6: GeneralInfoCard (6 строк). */}
+        <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+          <InfoRow label="Дата рождения" value={info.birth_date_label} divider={false} />
+          <InfoRow label="Возраст" value={info.age_label} divider />
+          <InfoRow label="Школа" value="SNR International School" divider />
+          <InfoRow label="Класс" value={child.class_name} divider />
+          <InfoRow label="Классный руководитель" value={info.curator_name} divider />
+          <InfoRow label="Номер личного дела" value={info.file_no} divider />
+        </GlassCard>
+
+        {/* Блок 7: SectionLabel «Контакты школы». */}
+        <Text
+          style={{
+            fontFamily: fonts.manrope800,
+            fontSize: 10.5,
+            letterSpacing: 10.5 * 0.08,
+            textTransform: "uppercase",
+            color: sectionCapsColor,
+          }}
+        >
+          {t.prof.schoolContacts}
+        </Text>
+
+        {/* Блок 8: SchoolContactsCard (3 строки, значения захардкожены в макете). */}
+        <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+          <InfoRow label="Телефон" value="+998 71 200-40-40" divider={false} />
+          <InfoRow label="Email" value="info@snr-school.uz" divider />
+          <InfoRow label="Адрес" value="г. Ташкент, ул. Мустакиллик, 45" divider valueAlignRight />
+        </GlassCard>
+
+        {/* Блок 9: SectionLabel «Дополнительно». */}
+        <Text
+          style={{
+            fontFamily: fonts.manrope800,
+            fontSize: 10.5,
+            letterSpacing: 10.5 * 0.08,
+            textTransform: "uppercase",
+            color: sectionCapsColor,
+          }}
+        >
+          {t.prof.additional}
+        </Text>
+
+        {/* Блок 10: MedicalCard (2 строки, вся карточка кликабельна → dmed). */}
+        <GlassCard
+          radius={20}
+          onPress={goMed}
+          contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}
+        >
+          <InfoRow label="Аллергия" value={info.allergies_label} divider={false} />
+          <InfoRow label="Медицинские особенности" value={info.med_note_label} divider />
+        </GlassCard>
+      </ScrollView>
+
+      {/* Шторка выбора ребёнка. Реальный phone-flow — переключаем реального
+          активного ребёнка (ParentDataContext.selectChild); info (доп.
+          сведения без колонки в БД) намеренно НЕ следует за этим выбором,
+          см. заголовочный комментарий файла. Демо — ровно как было. */}
+      <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
+        <ChildPickerSheetContent
+          title={t.auth.chooseChild}
+          items={pickerItems}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
+          onSelect={(id) => {
+            if (isRealFlow) {
+              selectChild(id);
+            } else {
+              setChildId(id);
+            }
+            setSheetOpen(false);
+          }}
+        />
+      </BottomSheetFrame>
+    </AppBackground>
+  );
+}

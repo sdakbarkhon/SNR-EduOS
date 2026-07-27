@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import * as Updates from "expo-updates";
@@ -12,24 +12,19 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from "@expo-google-fonts/manrope";
-import { Unbounded_600SemiBold, Unbounded_700Bold } from "@expo-google-fonts/unbounded";
+import {
+  Unbounded_500Medium,
+  Unbounded_600SemiBold,
+  Unbounded_700Bold,
+} from "@expo-google-fonts/unbounded";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
-import { DemoBanner } from "./src/components/DemoBanner";
-import { getSupabase } from "./src/lib/supabase";
-import { fetchParentProfile, type ParentProfile } from "./src/lib/auth";
 import { LocaleProvider } from "./src/i18n";
-import { DemoSessionProvider } from "./src/context/DemoSessionContext";
+import { ThemeProvider, useTheme } from "./src/theme";
+import { AuthSessionProvider } from "./src/context/AuthSessionContext";
+import { ParentDataProvider } from "./src/context/ParentDataContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
-
-const STARTUP_TIMEOUT_MS = 10000;
-
-function timeout(ms: number): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error("startup_timeout")), ms);
-  });
-}
 
 /** По умолчанию expo-updates скачивает новый OTA-бандл в фоне на холодном
  *  старте, но применяет его только на СЛЕДУЮЩЕМ холодном старте — сама
@@ -49,62 +44,55 @@ async function checkForUpdateAndReload() {
   }
 }
 
+/** StatusBar следует теме (внутри ThemeProvider). */
+function ThemedStatusBar() {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === "dark" ? "light" : "dark"} />;
+}
+
+/**
+ * ЗАХОД 4 (редизайн v2): auth-flow подключён. AuthSessionProvider держит
+ * состояние входа (phase/phone/sms/childPicker/app + isDemo); RootNavigator
+ * ветвится по phase на AuthNavigator ↔ MainNavigator.
+ *
+ * ЗАХОД 1 (реальный вход): ParentDataProvider (lib/auth.ts,
+ * context/ParentDataContext.tsx — "осиротевшая" после Захода 4 обвязка)
+ * возвращена в дерево, ВЫШЕ AuthSessionProvider — та зовёт
+ * useParentData().refresh() после успешного phone-login. Смонтирована
+ * безусловно (не только для реального входа): getParentContext() сама по
+ * себе безопасна без сессии (auth.getUser() → null → data:null, не throw),
+ * так что до входа и во всё время demo-flow это просто одна лишняя тихая
+ * попытка чтения на старте — экраны данных внутри приложения по-прежнему
+ * читают fixtures/, эту context ещё никто не потребляет кроме самого
+ * AuthSessionContext.
+ */
 export default function App() {
-  const [ready, setReady] = useState(false);
-  const [initialProfile, setInitialProfile] = useState<ParentProfile | null>(null);
-  // Шрифты редизайна (Manrope + Unbounded). Должны загрузиться ДО первого
-  // рендера экранов новой темы, иначе текст мигнёт системным шрифтом. Старые
-  // (ещё не переверстанные) экраны эти семейства не используют — на них загрузка
-  // не влияет.
+  // Шрифты редизайна (Manrope + Unbounded) должны загрузиться ДО первого
+  // рендера экранов новой темы, иначе текст мигнёт системным шрифтом.
   const [fontsLoaded] = useFonts({
     Manrope_400Regular,
     Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
+    Unbounded_500Medium,
     Unbounded_600SemiBold,
     Unbounded_700Bold,
   });
-  // P2: rootNavRef позволяет DemoBanner дёрнуть переход обратно на Login
-  // после signOut. Прокидываем через onDemoLoggedOut в RootNavigator.
-  const onDemoLogoutRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     checkForUpdateAndReload();
   }, []);
 
   useEffect(() => {
-    (async () => {
-      SplashScreen.hideAsync().catch(() => {});
-      try {
-        await Promise.race([
-          (async () => {
-            const db = getSupabase();
-            const { data } = await db.auth.getSession();
-            if (data.session) {
-              const profile = await fetchParentProfile();
-              if (profile) {
-                setInitialProfile(profile);
-              } else {
-                await db.auth.signOut();
-              }
-            }
-          })(),
-          timeout(STARTUP_TIMEOUT_MS),
-        ]);
-      } catch {
-        // Ошибка на старте не блокирует вход — идём на LoginScreen.
-      } finally {
-        setReady(true);
-      }
-    })();
-  }, []);
+    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded]);
 
-  if (!ready || !fontsLoaded) {
+  if (!fontsLoaded) {
     return (
       <ErrorBoundary>
-        <View style={{ flex: 1, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color="#4f46e5" />
+        <View style={{ flex: 1, backgroundColor: "#DCD2FD", alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#7C3AED" />
         </View>
       </ErrorBoundary>
     );
@@ -113,19 +101,16 @@ export default function App() {
   return (
     <ErrorBoundary>
       <LocaleProvider>
-        <DemoSessionProvider>
+        <ThemeProvider>
           <SafeAreaProvider>
-            <StatusBar style="dark" />
-            {/* P2: баннер над навигатором — виден на всех экранах после
-                демо-логина. Внутри сам определяет isDemo и возвращает null
-                для реальных сессий. */}
-            <DemoBanner onLoggedOut={() => onDemoLogoutRef.current()} />
-            <RootNavigator
-              initialProfile={initialProfile}
-              onDemoLogoutRefSet={(fn) => { onDemoLogoutRef.current = fn; }}
-            />
+            <ParentDataProvider>
+              <AuthSessionProvider>
+                <ThemedStatusBar />
+                <RootNavigator />
+              </AuthSessionProvider>
+            </ParentDataProvider>
           </SafeAreaProvider>
-        </DemoSessionProvider>
+        </ThemeProvider>
       </LocaleProvider>
     </ErrorBoundary>
   );

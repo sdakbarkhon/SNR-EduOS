@@ -3,6 +3,7 @@
 import { getDictionary, getSubjectStyle } from "@snr/core";
 import type { Locale, StudentGradeItem } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { ErrorState } from "@/components/ErrorState";
 import type { ParentChild } from "@/lib/parent-child";
 
 function formatDate(iso: string) {
@@ -15,7 +16,15 @@ function average(items: StudentGradeItem[]): number | null {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-export function GradesView({ child, grades }: { child: ParentChild; grades: StudentGradeItem[] }) {
+export function GradesView({
+  child,
+  grades,
+  error = false,
+}: {
+  child: ParentChild;
+  grades: StudentGradeItem[];
+  error?: boolean;
+}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.parentUi;
@@ -40,7 +49,9 @@ export function GradesView({ child, grades }: { child: ParentChild; grades: Stud
         </p>
       </div>
 
-      {grades.length === 0 ? (
+      {error ? (
+        <ErrorState>{d.common.error}</ErrorState>
+      ) : grades.length === 0 ? (
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
           <p className="text-sm text-gray-400">{t.noGrades}</p>
         </div>

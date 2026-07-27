@@ -49,14 +49,19 @@ export interface Dictionary {
   // lesson/assignment instead of uploading a fresh copy.
   knowledgeBase: {
     title: string;            // "База знаний"
-    tabLibrary: string;       // "Библиотека"
-    tabGroupMaterials: string; // "Материалы группы"
+    tabLibrary: string;       // "Библиотека" (books)
+    tabGroupMaterials: string; // "Материалы группы" (course_materials)
+    // 6А, Заход C — третья вкладка пикера: teacher_library_materials
+    // (migration 147). Отдельная от tabLibrary (та — books), чтобы не
+    // повторять один и тот же ярлык "Библиотека" дважды в одном пикере.
+    tabTeacherLibrary: string; // "Библиотека учителей"
     pickerTitle: string;       // "Выбор файла"
     searchPlaceholder: string; // "Поиск по названию"
     select: string;            // "Выбрать"
     selectCount: string;       // "Выбрать ({n})"
     cancel: string;
     noResults: string;
+    loadError: string;         // "Не удалось загрузить список" — per-tab, не путать с noResults
     browse: string;            // "Выбрать из базы знаний" — button that opens the picker
   };
   // Промт 4 — учебные планы (curriculum_plans, migration 116).
@@ -1878,6 +1883,7 @@ export interface Dictionary {
     navGrades: string;
     navMaterials: string;
     navKnowledgeBase: string; // "База знаний" — БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1, replaces navMaterials+navBooks in the sidebar
+    navLibrary: string; // "Библиотека" — 6А, Заход B: библиотека материалов учителей (migration 147), отдельный верхнеуровневый пункт от navKnowledgeBase/navBooks
     navGroups: string;
     navProfile: string;
     kpiGroups: string;
@@ -1989,6 +1995,48 @@ export interface Dictionary {
     materialsLessonOptional: string;
     materialsAllGroups: string;
     materialsAllSubjects: string;
+    // 6А, Заход B — Библиотека материалов учителей (/teacher/library,
+    // migration 147). Отдельная от materials*/books* — свой раздел,
+    // видимый только учителям, куратор смотрит, но не грузит.
+    libraryTitle: string;
+    libraryUploadBtn: string;
+    libraryEmpty: string;
+    libraryEmptyFiltered: string;
+    libraryError: string;
+    librarySearchPlaceholder: string;
+    libraryAllSubjects: string;
+    libraryAllClasses: string;
+    libraryUploadedBy: string;
+    libraryDownload: string;
+    libraryDelete: string;
+    libraryDeleting: string;
+    libraryUploadTitle: string;
+    libraryName: string;
+    libraryNamePlaceholder: string;
+    librarySubjectLabel: string; // "Ваш предмет" — read-only, резолвится из роли
+    libraryClassesLabel: string;
+    libraryFile: string;
+    libraryDragDrop: string;
+    libraryMaxSize: string; // "PDF, PPTX, JPG, PNG, MP4 — макс. 50 МБ"
+    libraryCancel: string;
+    libraryUpload: string;
+    libraryUploading: string;
+    librarySuccess: string;
+    libraryCuratorNotice: string;
+    libraryErrTitleRequired: string;
+    libraryErrFileRequired: string;
+    libraryErrFileTooLarge: string;
+    libraryErrFileType: string;
+    libraryErrUploadFailed: string;
+    libraryErrDeleteFailed: string;
+    // 6А, Заход D — видео-ссылки (migration 148).
+    libraryAddVideoBtn: string;
+    libraryVideoModalTitle: string;
+    libraryVideoUrlLabel: string;
+    libraryVideoUrlPlaceholder: string;
+    libraryErrVideoUrlRequired: string;
+    libraryErrVideoUrlInvalid: string;
+    libraryVideoBadge: string;
     navLessons: string;
     navCurriculumPlans: string;
     navBooks: string;
@@ -2315,5 +2363,537 @@ export interface Dictionary {
     sectionGroupChats: string;    // "Групповые чаты" — секция у учителя
     sectionDirectChats: string;   // "Личные чаты" — секция у учителя (сгруппировано по классу)
     emojiPicker: string;          // title/aria-label кнопки-смайлика у поля ввода
+  };
+  // ─── Родительское мобильное приложение v2 (редизайн, Заход 1) ────────────
+  // Словарь макета «SNR EduOS v2 Light.dc.html» (I18N_SRC, строка 3464),
+  // перенесён ДОСЛОВНО: 225 ключей, секции = префикс ключа макета до точки
+  // (common.back → parentApp.common.back). Ключи со звёздочкой макета
+  // («вычитать носителю») перенесены как обычные — их список см. в комментарии
+  // рядом с секцией в ru.ts. Старая секция parentMobile (прежнее приложение)
+  // не трогается и живёт параллельно до завершения редизайна.
+  parentApp: {
+    common: {
+      back: string;
+      viewAll: string;
+      more: string;
+      done: string;
+      cancel: string;
+      cancelAction: string;
+      save: string;
+      apply: string;
+      reset: string;
+      notFound: string;
+      loading: string;
+      showAll: string;
+      close: string;
+      continue: string;
+      next: string;
+      send: string;
+      download: string;
+      open: string;
+      clear: string;
+      gotIt: string;
+      // Долги, проход 1: общая кнопка "повторить" в error-карточках
+      // real-данных (посещаемость/расписание/задания) — один ключ на всех.
+      retry: string;
+    };
+    search: {
+      recent: string;
+      popular: string;
+    };
+    nav: {
+      home: string;
+      grades: string;
+      payments: string;
+      messages: string;
+      profile: string;
+    };
+    scr: {
+      dayStatus: string;
+      homeworks: string;
+      homework: string;
+      attendance: string;
+      schedule: string;
+      skills: string;
+      notifications: string;
+      services: string;
+      announcements: string;
+      adminNews: string;
+      support: string;
+      bills: string;
+      payMethod: string;
+      payHistory: string;
+      receipts: string;
+      childWallet: string;
+      payMethods: string;
+      topup: string;
+      childProfile: string;
+      parentData: string;
+      documents: string;
+      notifSettings: string;
+      langSec: string;
+      allSubjects: string;
+      teacherReviews: string;
+      topics: string;
+      teacherProfile: string;
+      walletOps: string;
+      transfer: string;
+      limits: string;
+      testReview: string;
+      work: string;
+      application: string;
+      about: string;
+      whatsnew: string;
+      search: string;
+      chPass: string;
+      sessions: string;
+    };
+    home: {
+      quickActions: string;
+      nextLesson: string;
+      pay: string;
+      hwShort: string;
+      atSchoolSince: string;
+      lessons: string;
+      attended: string;
+      hw: string;
+      wallet: string;
+      viewProgress: string;
+      msgTeacher: string;
+      today: string;
+      todaySection: string;
+      // Долги, проход 1 — карточка «Следующий урок» на реальных данных
+      // (Заход 2, шаг 4): состояния загрузки/ошибки/пусто + шаблон кабинета.
+      nextLessonError: string;      // «Ошибка загрузки»
+      nextLessonRetryHint: string;  // «Нажмите, чтобы повторить»
+      nextLessonEmpty: string;      // «Нет предстоящих уроков»
+      roomLabel: string;            // «Каб. {room}»
+    };
+    grades: {
+      average: string;
+      subjects: string;
+      tabGrades: string;
+      tabSkills: string;
+      tabDyn: string;
+      topic: string;
+      break: string;
+      room: string;
+      class: string;
+      presence: string;
+      absence: string;
+      teacherComment: string;
+      dynAvg: string;
+      lastReviews: string;
+      // Заход 2, шаг 6 — реальные оценки вкладки «Успехи»→«Оценки».
+      loadError: string;          // «Не удалось загрузить оценки»
+      empty: string;              // «Оценок пока нет»
+      noReviews: string;          // «Отзывов учителей пока нет»
+      gradeChipExcellent: string; // «Отлично!» — средний балл ≥4.5
+      gradeChipGood: string;      // «Хорошо!» — средний балл ≥3.5
+      gradeChipNeedsWork: string; // «Есть куда расти» — средний балл <3.5
+    };
+    skills: {
+      profile: string;
+      progress: string;
+      practice: string;
+      // Редизайн радара «Профиль навыков» (П10 «Успехи»→«Навыки»): 6 коротких
+      // подписей вершин радара (в паре с числом самой вершины на экране,
+      // напр. «Самост. 64%» / «Mustaq. 64%»). Все 6 — через i18n (не смесь
+      // RU-литерала с переводом), длина каждой формы подобрана так, чтобы
+      // «имя + число%» помещалось в тот же бюджет символов, что уже проверен
+      // на #16 (SkillsScreen.tsx, «Самост. 4.5» = 11 символов).
+      axisLogic: string;         // «Логика»
+      axisCommunication: string; // «Комм.»
+      axisDiscipline: string;    // «Дисц.»
+      axisCreativity: string;    // «Креатив»
+      axisIndependence: string;  // «Самост.»
+      axisTeamwork: string;      // «Команда»
+    };
+    pay: {
+      autopay: string;
+      on: string;
+      off: string;
+      payNow: string;
+      downloadReceipt: string;
+      balance: string;
+      topupBtn: string;
+      transferBtn: string;
+      all: string;
+      refunds: string;
+      total: string;
+      sum: string;
+      chooseMethod: string;
+      mainCard: string;
+      otherCards: string;
+      otherMethods: string;
+      lastOps: string;
+      // Заход 4: экран П17 «Оплаты» — дополнительные подписи макета.
+      balanceTotalCap: string;    // «ОБЩИЙ БАЛАНС»
+      balanceDueCap: string;      // «К ОПЛАТЕ»
+      balanceOverpaidCap: string; // «ПЕРЕПЛАТА»
+      balanceAvailable: string;   // «Доступно для расходов»
+      dueNow: string;             // «К оплате сейчас»
+      billsChip: string;          // «{n} счёта»
+      billDueBy: string;          // «до {date}»
+      payAllBtn: string;          // «Оплатить всё — {sum}»
+      billsReceipts: string;      // «Счета и чеки»
+      walletTitle: string;        // «Кошелёк {gen}»
+      walletSub: string;          // «На питание и покупки в школе»
+      // Заход 6: доп. ключи для ветки «Оплаты» — экраны d17-limits,
+      // d17-transfer, d17-addcard, d17-topup, paySheet-успехи, helpSheet.
+      limits: string;             // «Лимиты расходов» (заголовок секции)
+      limitDay: string;           // «Лимит в день»
+      limitCafeteria: string;     // «Столовая» (категория лимита)
+      transferFrom: string;       // «ОТКУДА»
+      transferTo: string;         // «КУДА»
+      addCardTitle: string;       // «Добавить карту»
+      cardNumber: string;         // «Номер карты»
+      cardExpiry: string;         // «Срок действия»
+      cardCvv: string;            // «CVV»
+      cardHolder: string;         // «Имя держателя»
+      topupInputPlaceholder: string;  // «0» (плейсхолдер суммы)
+      topupChooseAmount: string;      // «Сумма пополнения»
+      howItWorks: string;             // «Как работают оплаты» (заголовок helpSheet)
+      successBillTitle: string;       // paySheet.kind==='bill' → «Платёж проведён»
+      successTopupTitle: string;      // paySheet.kind==='top' → «Баланс пополнен»
+      successTransferTitle: string;   // paySheet.kind==='tr'  → «Перевод выполнен»
+      successCardTitle: string;       // paySheet.kind==='card'→ «Карта добавлена»
+    };
+    msg: {
+      online: string;
+      typeMessage: string;
+      teachers: string;
+      servicesChip: string;
+      announcements: string;
+      avgReply: string;
+      supportName: string;
+      // Заход 4: экран d24 «Сообщения» — табы и подписи «сторис».
+      tabAll: string;
+      tabChats: string;
+      tabAnn: string;
+      tabSvc: string;
+      storyImportant: string;
+      storyCurator: string;
+      storyMath: string;
+      storyEng: string;
+      storyAdmin: string;
+      // Заход 7: меню прикреплений в шторке чата (#25).
+      attachPhoto: string;   // «Фото»
+      attachFile: string;    // «Файл»
+    };
+    prof: {
+      children: string;
+      settings: string;
+      logout: string;
+      appVersion: string;
+      biometric: string;
+      biometricSub: string;
+      sessionsSub: string;
+      autoExit: string;
+      deleteAcc: string;
+      terms: string;
+      privacy: string;
+      licenses: string;
+      writeSupport: string;
+      rateApp: string;
+      shareApp: string;
+      myKids: string;
+      switchChild: string;        // «Сменить ребёнка ›» (ChildSwitcherCard compact)
+      generalInfo: string;
+      schoolContacts: string;
+      additional: string;
+      personalInfo: string;
+      address: string;
+      // Заход 4: экран «Профиль-хаб» — подписи меню и версии.
+      parentRole: string;         // «Родитель»
+      docsSub: string;            // «Свидетельства, справки, ID»
+      notifSetSub: string;        // «Оценки, задания, оплаты»
+      payMethodsSub: string;      // «Карты и платёжные системы»
+      langSecSub: string;         // «Язык, пароль, биометрия»
+      helpTitle: string;          // «Помощь и поддержка»
+      helpSub: string;            // «Чат с поддержкой школы»
+      aboutSub: string;           // «SNR EduOS для родителей»
+      exit: string;               // «Выйти»
+      versionLabel: string;       // «SNR EduOS · версия {v}»
+    };
+    about: {
+      info: string;
+      school: string;
+    };
+    set: {
+      security: string;
+      privacySec: string;
+      appearance: string;
+      light: string;
+      dark: string;
+      system: string;
+      lightSub: string;
+      darkSub: string;
+      systemSub: string;
+      appLanguage: string;
+      langSysDefault: string;
+      langUz: string;
+      langEn: string;
+      // Заход 7: #34 «Язык и безопасность» — доп. ключи.
+      langRu: string;     // «Русский» / «Rus tili» / «Russian»
+      chPass: string;     // «Изменить пароль»
+      sessions: string;   // «Активные сессии»
+      autoExit: string;   // «Автоматический выход» (в set-секции — дубль prof.autoExit)
+    };
+    /** Заход 7: #32 «Настройки уведомлений». Каждый пункт = переключатель
+     *  с заголовком + подпись (subtitle). Опоздания в SNR EduOS НЕТ (см. attend.*),
+     *  подпись notif.attSub ссылается только на присутствие/пропуски. */
+    notif: {
+      master: string;      masterSub: string;
+      grades: string;      gradesSub: string;
+      hw: string;          hwSub: string;
+      sched: string;       schedSub: string;
+      att: string;         attSub: string;
+      ann: string;         annSub: string;
+      events: string;      eventsSub: string;
+      pay: string;         paySub: string;
+      msg: string;         msgSub: string;
+      promo: string;       promoSub: string;
+    };
+    wn: {
+      thisVersion: string;
+      prevVersions: string;
+    };
+    svc: {
+      diary: string;
+      tests: string;
+      library: string;
+      portfolio: string;
+      applications: string;
+      medcard: string;
+      transport: string;
+      meals: string;
+      study: string;
+      finance: string;
+      other: string;
+    };
+    auth: {
+      heroTitle: string;
+      heroSub: string;
+      // Онбординг-слайды 2 и 3 (свайп) — продолжают тему heroTitle/heroSub:
+      // 2 — успеваемость/задания, 3 — связь со школой/оплаты/уведомления.
+      heroTitle2: string;
+      heroSub2: string;
+      heroTitle3: string;
+      heroSub3: string;
+      start: string;
+      learnMore: string;
+      welcome: string;
+      signInSub: string;
+      phone: string;
+      smsCode: string;
+      resend: string;
+      chooseChild: string;
+      demo: string;
+      withGoogle: string;
+      withApple: string;
+      tagline: string;
+      needHelp: string;
+      moreTitle: string;
+      moreIntro: string;
+      helpTitle: string;
+      helpSub: string;
+      demoSub: string;
+      demoCtaTitle: string;
+      demoCtaSub: string;
+      smsTitle: string;
+      smsSubPrefix: string;
+      smsResendCountdown: string;
+      smsResend: string;
+      smsSecurity: string;
+      // Заход 1 (реальный вход по 3 тестовым номерам) — ошибки на экранах
+      // телефона/кода; существовавших раньше просто не было, т.к. фикстурный
+      // вход никогда не мог провалиться.
+      phoneNotFound: string;
+      wrongCode: string;
+      loginFailed: string;
+      a4Sub: string;
+      a4SecurityTitle: string;
+      a4SecuritySub: string;
+      a4School: string;
+      continue: string;
+      legalPrefix: string;
+      legalTerms: string;
+      legalAnd: string;
+      legalPrivacy: string;
+      phoneHint: string;
+      phonePlaceholder: string;
+      kidsOne: string;
+      kidsMany: string;
+      helpPhoneRowTitle: string;
+      helpEmailRowTitle: string;
+      demoBanner: string;
+      featEduTitle: string;
+      featEduSub: string;
+      featHwTitle: string;
+      featHwSub: string;
+      featPayTitle: string;
+      featPaySub: string;
+      featChatTitle: string;
+      featChatSub: string;
+      helpPhoneValue: string;
+      helpEmailValue: string;
+      or: string;
+      close: string;
+    };
+    /** Заход 5x (правка 3): one-shot центр-модалка после демо-входа
+     *  (заменила жёлтый DemoBannerGlass поверх шапки). */
+    demo: {
+      title: string;
+      body: string;
+      cta: string;
+    };
+    status: {
+      paid: string;
+      due: string;
+      overdue: string;
+      refund: string;
+      atSchool: string;
+      absent: string;
+      liveNow: string;
+      assigned: string;
+      inWork: string;
+      submitted: string;
+      underReview: string;
+      reviewed: string;
+      approved: string;
+      pending: string;
+      rejected: string;
+      // Долги, проход 1 — реальный статус сдачи ДЗ (lib/homeworkStatus.ts,
+      // 3 состояния; underReview выше уже переиспользуется для «pending_review»).
+      notSubmitted: string; // «Не сдано»
+      graded: string;       // «Оценено»
+    };
+    subj: {
+      math: string;
+      eng: string;
+      rus: string;
+      prog: string;
+      robo: string;
+    };
+    date: {
+      mon: string;
+      tue: string;
+      wed: string;
+      thu: string;
+      fri: string;
+      sat: string;
+      sun: string;
+      june: string;
+      july: string;
+      august: string;
+      today: string;
+      yesterday: string;
+      tomorrow: string;
+      minAgo: string;
+      hAgo: string;
+      dAgo: string;
+      in15: string;
+      // Долги, проход 1 — полные имена дней недели (баннер даты расписания,
+      // Заход 2 шаг 4). mon..sun выше — короткие формы «Пн»..«Вс».
+      monFull: string;
+      tueFull: string;
+      wedFull: string;
+      thuFull: string;
+      friFull: string;
+      satFull: string;
+      sunFull: string;
+    };
+    ai: {
+      overall: string;
+      recs: string;
+      weekly: string;
+      techBadge: string;
+    };
+    sched: {
+      today: string;
+      // Заход 5 — базовые ярлыки расписания (17 экранов учебной ветки).
+      // ВАЖНО: «Дневник» ≠ «Расписание» (см. tz — svc.diary отдельно).
+      day: string;      // "День" — заголовок дневного столбца
+      week: string;     // "Неделя" — переключатель диапазона
+      lesson: string;   // "Урок" — метка ячейки урока
+      break: string;    // "Перемена" — приглушённая строка между уроками
+      room: string;     // "Кабинет" — короткая метка cab. в карточке урока
+      // Долги, проход 1 — реальное расписание (Заход 2, шаг 4).
+      loadError: string; // «Не удалось загрузить расписание»
+      emptyDay: string;  // «Уроков в этот день нет»
+    };
+    files: {
+      attached: string;
+    };
+    attend: {
+      lastDays: string;
+      // Заход 5 — три статуса посещаемости в SNR EduOS (опозданий НЕТ):
+      // present  = плитка «Посещаемость» (общая метрика посещаемости, % присутствия)
+      // absent   = «Отсутствовал» (общее)
+      // excused  = «Уважительные» — плитка уважительных пропусков
+      // unexcused = «Неуважительные» — плитка неуважительных пропусков
+      // Ключ 'late' / 'lateArrival' в системе намеренно отсутствует.
+      present: string;
+      absent: string;
+      excused: string;
+      unexcused: string;
+      // Легенда календаря (4 маркера). Формы — краткое существительное/прилагательное,
+      // отличаются от плиток выше (там метрики), поэтому отдельные ключи.
+      legendPresent: string;   // «Присутствие»
+      legendExcused: string;   // «Уважительная»
+      legendUnexcused: string; // «Неуважительная»
+      legendWeekend: string;   // «Выходной»
+      // Долги, проход 1 — реальная посещаемость (Заход 2, шаг 3): предложения-
+      // статусы «Последних дней» (отличаются от коротких present/excused/
+      // unexcused выше — те для плиток-метрик, эти — полные фразы в строке дня)
+      // + состояния загрузки.
+      dayPresent: string;    // «Присутствовал»
+      dayExcused: string;    // «Уважительная причина»
+      dayUnexcused: string;  // «Отсутствовал без уважительной причины»
+      loadError: string;     // «Не удалось загрузить посещаемость»
+      empty: string;         // «Записей о посещаемости пока нет»
+      arrivedPrefix: string; // «В школе:» — префикс времени прихода в строке дня
+      leftPrefix: string;    // «Уход:» — префикс времени ухода в строке дня
+    };
+    /** Долги, проход 1 — реальные задания/сдачи (Заход 2, шаг 5). Новый
+     *  namespace: в отличие от grades и sched, для содержимого экрана
+     *  «Домашние задания»/«Детали задания» отдельных ключей раньше не было
+     *  (только заголовки scr.homeworks/scr.homework). */
+    hw: {
+      loadListError: string;     // «Не удалось загрузить задания»
+      loadDetailError: string;   // «Не удалось загрузить задание»
+      emptyAll: string;          // «Заданий пока нет»
+      emptyFiltered: string;     // «Нет заданий под этот фильтр»
+      notFound: string;          // «Задание не найдено»
+      noDeadline: string;        // «Без срока»
+      dueToday: string;          // «Срок: сегодня, {time}»
+      dueTomorrow: string;       // «Срок: завтра, {time}»
+      dueOn: string;             // «Срок: {date}»
+      subjectFallback: string;      // «Предмет»
+      subjectFallbackCaps: string;  // «ПРЕДМЕТ»
+      teacherUnassigned: string; // «Преподаватель не назначен»
+      instructionLabel: string;  // «ИНСТРУКЦИЯ ОТ УЧИТЕЛЯ»
+      attachmentsLabel: string;  // «ПРИКРЕПЛЁННЫЕ МАТЕРИАЛЫ»
+      openFile: string;          // «Открыть файл»
+      openLink: string;          // «Открыть ссылку»
+      openFileError: string;     // «Не удалось открыть файл» (Alert)
+      commentLabel: string;      // «КОММЕНТАРИЙ УЧИТЕЛЯ»
+      submissionLabel: string;   // «ВАША СДАЧА»
+      testResult: string;        // «Результат: {score} из {max}»
+      testPendingResult: string; // «Сдано, ожидает результата»
+      testNotTaken: string;      // «Тест не пройден»
+      codeNotSubmitted: string;  // «Код не отправлен»
+      workNotSubmitted: string;  // «Работа не сдана»
+      fileFallbackName: string;  // «Файл»
+      sentPrefix: string;        // «Работа отправлена · {status}»
+      gradedWithScore: string;   // «Оценено · {grade}» — Заход 2, шаг 6
+      filterAll: string;         // «Все»
+      filterToday: string;       // «Сегодня»
+      filterOverdue: string;     // «Просрочено»
+      filterDone: string;        // «Выполнено»
+      sizeKb: string;            // «{n} КБ»
+      sizeMb: string;            // «{n} МБ»
+    };
   };
 }

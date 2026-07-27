@@ -1,29 +1,45 @@
 "use client";
 
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.3 — модалка выбора файла в стиле проводника:
-// сетка иконок, мультивыбор кликом, две вкладки (Библиотека / Материалы
-// группы), поиск по названию. Возвращает выбранные файлы БЕЗ их загрузки —
-// вызывающая сторона линкует существующий storage_path (Этап 3.4: без
-// дублирования).
+// сетка иконок, мультивыбор кликом, вкладки (Библиотека / Материалы
+// группы / Библиотека учителей), поиск по названию. Возвращает выбранные
+// файлы БЕЗ их загрузки — вызывающая сторона линкует существующий
+// storage_path (Этап 3.4: без дублирования).
+//
+// 6А, Заход C — третья вкладка "Библиотека учителей" (teacher_library_materials,
+// migration 147). Файлы этой таблицы физически лежат в том же бакете
+// "materials", что и course_materials — поэтому source:"teacherLibrary"
+// НАМЕРЕННО не требует правок в вызывающих компонентах:
+// TeacherLessonDetailView.tsx/CreateHomeworkForm.tsx уже резолвят
+// "любой источник, кроме book" в бакет "materials"
+// (`pickedFromKB.source === "book" ? ... : ...`), а "teacherLibrary" !== "book".
 
 import { useEffect, useMemo, useState } from "react";
 import { X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen } from "lucide-react";
-import type { MaterialWithGroup, Book } from "@snr/core";
-import { getDictionary } from "@snr/core";
+import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
+import { getDictionary, getLibraryMaterials } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { createClient } from "@/lib/supabase/client";
 
 export type PickedKnowledgeBaseFile = {
-  source: "material" | "book";
+  source: "material" | "book" | "teacherLibrary";
   id: string;
   title: string;
+  // Для видео-ссылок библиотеки (contentType video_*, D3) не используется —
+  // пусто, реальные данные в externalUrl/sourceUrl ниже.
   storagePath: string;
   fileType: string | null;
   sizeBytes: number | null;
+  // D3 — только для source==="teacherLibrary" (migration 148): отличает
+  // обычный файл от видео-ссылки. undefined для source "material"/"book"
+  // (у них своя, файловая, форма данных).
+  contentType?: "file" | "video_youtube" | "video_rutube";
+  externalUrl?: string | null;
+  sourceUrl?: string | null;
 };
 
-type Tab = "library" | "materials";
+type Tab = "library" | "materials" | "teacherLibrary";
 
 function iconFor(fileType: string | null, hasLink: boolean) {
   if (hasLink) return LinkIcon;
@@ -42,6 +58,7 @@ export function KnowledgeBaseFilePicker({
   groupIds,
   multiSelect = true,
   acceptedTypes,
+  allowVideoLinks = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -54,6 +71,13 @@ export function KnowledgeBaseFilePicker({
    *  Omit to show everything — the homework-attachment picker relies on
    *  this default to keep accepting all file types. */
   acceptedTypes?: string[];
+  /** D3 — показывать ли видео-ссылки библиотеки (content_type video_*) во
+   *  вкладке "Библиотека учителей". По умолчанию false: вложение
+   *  видео-ссылки поддерживает пока только урок (lesson_materials уже умеет
+   *  video_* с миграции 138) — задание/homework video_*-вложения не имеет
+   *  вовсе (отдельная будущая миграция), поэтому его форма явно передаёт
+   *  false, чтобы учитель не выбрал то, что физически не прикрепится. */
+  allowVideoLinks?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -61,7 +85,11 @@ export function KnowledgeBaseFilePicker({
   const [query, setQuery] = useState("");
   const [materials, setMaterials] = useState<MaterialWithGroup[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [libraryFiles, setLibraryFiles] = useState<LibraryMaterialWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
+  // Промт 6А/C — per-source, не общий: одна вкладка может упасть, пока
+  // остальные две загрузились нормально; не путать реальный сбой с "пусто".
+  const [tabError, setTabError] = useState<Record<Tab, boolean>>({ library: false, materials: false, teacherLibrary: false });
   const [selected, setSelected] = useState<Map<string, PickedKnowledgeBaseFile>>(new Map());
 
   // groupIds приходит как новый массив-литерал на каждый рендер родителя
@@ -77,22 +105,31 @@ export function KnowledgeBaseFilePicker({
     if (!open) return;
     setSelected(new Map());
     setQuery("");
+    setTabError({ library: false, materials: false, teacherLibrary: false });
     let cancelled = false;
     setLoading(true);
     const sb = createClient();
-    Promise.all([
+    Promise.allSettled([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"]),
+      (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"])
+        .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sb as any).from("books").select("*"),
-    ]).then(([m, b]) => {
+      (sb as any).from("books").select("*")
+        .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
+      getLibraryMaterials(sb),
+    ]).then(([m, b, lib]) => {
       if (cancelled) return;
-      setMaterials((m.data ?? []) as MaterialWithGroup[]);
-      setBooks((b.data ?? []) as Book[]);
-      setLoading(false);
-    }).catch((err) => {
-      if (cancelled) return;
-      console.error("[KnowledgeBaseFilePicker] failed to load materials/books:", err);
+      if (m.status === "fulfilled") setMaterials((m.value ?? []) as MaterialWithGroup[]);
+      else console.error("[KnowledgeBaseFilePicker] failed to load course_materials:", m.reason);
+      if (b.status === "fulfilled") setBooks((b.value ?? []) as Book[]);
+      else console.error("[KnowledgeBaseFilePicker] failed to load books:", b.reason);
+      if (lib.status === "fulfilled") setLibraryFiles(lib.value);
+      else console.error("[KnowledgeBaseFilePicker] failed to load teacher library:", lib.reason);
+      setTabError({
+        materials: m.status === "rejected",
+        library: b.status === "rejected",
+        teacherLibrary: lib.status === "rejected",
+      });
       setLoading(false);
     });
     return () => { cancelled = true; };
@@ -106,6 +143,16 @@ export function KnowledgeBaseFilePicker({
   const filteredBooks = useMemo(
     () => books.filter((b) => b.title.toLowerCase().includes(query.toLowerCase())),
     [books, query],
+  );
+  const filteredLibraryFiles = useMemo(
+    () =>
+      libraryFiles.filter(
+        // 6А, Заход D3 — видео-ссылки (content_type video_*) показываем
+        // только когда вызывающая сторона явно разрешила (allowVideoLinks,
+        // сейчас — только урок; задание video_* пока не прикрепляет).
+        (m) => (m.content_type === "file" || allowVideoLinks) && m.title.toLowerCase().includes(query.toLowerCase()),
+      ),
+    [libraryFiles, query, allowVideoLinks],
   );
 
   function toggle(item: PickedKnowledgeBaseFile) {
@@ -137,6 +184,26 @@ export function KnowledgeBaseFilePicker({
           hasLink: false,
           picked: { source: "book", id: b.id, title: b.title, storagePath: b.file_storage_path, fileType: "application/pdf", sizeBytes: b.file_size_bytes },
         }))
+      : tab === "teacherLibrary"
+      ? filteredLibraryFiles.map((m) => ({
+          key: `teacherLibrary:${m.id}`,
+          title: m.title,
+          // hasLink здесь означает "видео-ссылка" для целей выбора иконки —
+          // тот же LinkIcon, что materials-вкладка уже использует для
+          // link_url-материалов без файла.
+          hasLink: m.content_type !== "file",
+          picked: {
+            source: "teacherLibrary",
+            id: m.id,
+            title: m.title,
+            storagePath: m.storage_path ?? "",
+            fileType: m.file_type,
+            sizeBytes: m.file_size_bytes,
+            contentType: m.content_type,
+            externalUrl: m.external_url,
+            sourceUrl: m.source_url,
+          },
+        }))
       : filteredMaterials.map((m) => ({
           key: `material:${m.id}`,
           title: m.title,
@@ -147,8 +214,17 @@ export function KnowledgeBaseFilePicker({
   // acceptedTypes is opt-in per call site (undefined = show everything, e.g.
   // the homework-attachment picker) — only lesson-materials passes it, to
   // restrict to PDF-only per the customer's requirement for that form.
+  // D3 — video-link items have fileType=null (no MIME — they're not a file
+  // at all) and must NOT be caught by this file-type filter: acceptedTypes
+  // describes an upload-file restriction, a categorically different axis
+  // from "is this a video link". The lesson form already accepts pasted
+  // video URLs alongside PDF-only file uploads (see handleUpload below) —
+  // letting a KB-sourced video link through here is the same content kind,
+  // just picked instead of typed.
+  const isVideoItem = (it: { picked: PickedKnowledgeBaseFile }) =>
+    it.picked.contentType === "video_youtube" || it.picked.contentType === "video_rutube";
   const items = acceptedTypes
-    ? allItems.filter((it) => it.picked.fileType && acceptedTypes.includes(it.picked.fileType))
+    ? allItems.filter((it) => isVideoItem(it) || (it.picked.fileType && acceptedTypes.includes(it.picked.fileType)))
     : allItems;
 
   return (
@@ -182,6 +258,12 @@ export function KnowledgeBaseFilePicker({
           >
             {d.tabGroupMaterials}
           </button>
+          <button
+            onClick={() => setTab("teacherLibrary")}
+            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "teacherLibrary" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            {d.tabTeacherLibrary}
+          </button>
         </div>
 
         {/* Search */}
@@ -202,6 +284,8 @@ export function KnowledgeBaseFilePicker({
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">…</div>
+          ) : tabError[tab] ? (
+            <div className="flex h-full items-center justify-center text-sm font-medium text-red-600">{d.loadError}</div>
           ) : items.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">{d.noResults}</div>
           ) : (
@@ -209,6 +293,8 @@ export function KnowledgeBaseFilePicker({
               {items.map((it) => {
                 const key = `${it.picked.source}:${it.picked.id}`;
                 const isSelected = selected.has(key);
+                // teacherLibrary: hasLink=true для видео-ссылок (см. allItems выше)
+                // — iconFor уже отдаёт LinkIcon для hasLink, файловую иконку иначе.
                 const Icon = tab === "library" ? BookOpen : iconFor(it.picked.fileType, it.hasLink);
                 return (
                   <button

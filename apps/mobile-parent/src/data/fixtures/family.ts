@@ -1,0 +1,241 @@
+/**
+ * Семья: дети (KIDS, строки 3055–3059 макета), профили детей (CHILD_INFO,
+ * 3282–3286), родитель (разметка C1/C11), демо-родители (B9).
+ * Все значения — ДОСЛОВНО из макета.
+ */
+import type { ChildInfoRow, ChildRow, ParentRow, ParentProfileRow } from "../types";
+
+/** Дети — KIDS. Активный ребёнок по умолчанию — индекс 1 (Малика). */
+export const CHILDREN: ChildRow[] = [
+  {
+    id: "child-aziz",
+    full_name: "Азиз Каримов",
+    first_name: "Азиз",
+    first_name_gen: "Азиза",
+    is_female: false,
+    class_name: "3-А",
+    group_id: "group-3a",
+    status_chip: "В школе",
+    avatar_gradient: ["#22d3ee", "#3b82f6"],
+    avatar_ring: "#0891b2",
+  },
+  {
+    id: "child-malika",
+    full_name: "Малика Каримова",
+    first_name: "Малика",
+    first_name_gen: "Малики",
+    is_female: true,
+    class_name: "7-А",
+    group_id: "group-7a",
+    status_chip: "В школе",
+    avatar_gradient: ["#8b5cf6", "#ec4899"],
+    avatar_ring: "#8b5cf6",
+  },
+  {
+    id: "child-farrukh",
+    full_name: "Фаррух Каримов",
+    first_name: "Фаррух",
+    first_name_gen: "Фарруха",
+    is_female: false,
+    class_name: "10-А",
+    group_id: "group-10a",
+    status_chip: "Дома",
+    avatar_gradient: ["#34d399", "#0ea5e9"],
+    avatar_ring: "#059669",
+  },
+  // Заход 5 — семья Исмаилов (demo-bakhtiyor): один ребёнок.
+  {
+    id: "child-ismailov-azizbek",
+    full_name: "Азизбек Исмаилов",
+    first_name: "Азизбек",
+    first_name_gen: "Азизбека",
+    is_female: false,
+    class_name: "3-А",
+    group_id: "group-3a",
+    status_chip: "В школе",
+    avatar_gradient: ["#2dd4bf", "#0891b2"],
+    avatar_ring: "#0e7490",
+  },
+  // Заход 5 — семья Рахимов (demo-sherzod): двое детей.
+  {
+    id: "child-rakhimov-madina",
+    full_name: "Мадина Рахимова",
+    first_name: "Мадина",
+    first_name_gen: "Мадины",
+    is_female: true,
+    class_name: "7-А",
+    group_id: "group-7a",
+    status_chip: "В школе",
+    avatar_gradient: ["#f472b6", "#a855f7"],
+    avatar_ring: "#c026d3",
+  },
+  {
+    id: "child-rakhimov-humoyun",
+    full_name: "Хумоюн Рахимов",
+    first_name: "Хумоюн",
+    first_name_gen: "Хумоюна",
+    is_female: false,
+    class_name: "10-А",
+    group_id: "group-10a",
+    status_chip: "Дома",
+    avatar_gradient: ["#4ade80", "#14b8a6"],
+    avatar_ring: "#059669",
+  },
+];
+
+/** Индекс активного ребёнка по умолчанию (initial state: child: 1). */
+export const DEFAULT_CHILD_INDEX = 1;
+
+/** Профили детей d29 — CHILD_INFO (индекс = ребёнок). */
+export const CHILD_INFO: ChildInfoRow[] = [
+  {
+    student_id: "child-aziz",
+    birth_date_label: "14 марта 2017",
+    age_label: "9 лет",
+    curator_name: "Дилдора Касымова",
+    student_code: "SNR-2026-00312",
+    file_no: "№ 03-0312",
+    allergies_label: "Нет данных",
+    med_note_label: "Нет особенностей",
+  },
+  {
+    student_id: "child-malika",
+    birth_date_label: "2 декабря 2012",
+    age_label: "13 лет",
+    curator_name: "Гульнора Юсупова",
+    student_code: "SNR-2026-00847",
+    file_no: "№ 07-0847",
+    allergies_label: "Пыльца (сезонная)",
+    med_note_label: "Очки для чтения",
+  },
+  {
+    student_id: "child-farrukh",
+    birth_date_label: "21 мая 2010",
+    age_label: "16 лет",
+    curator_name: "Александр Петров",
+    student_code: "SNR-2026-00291",
+    file_no: "№ 10-0291",
+    allergies_label: "Нет данных",
+    med_note_label: "Нет особенностей",
+  },
+  // Заход 5 — профили детей семей Исмаилов и Рахимов.
+  {
+    student_id: "child-ismailov-azizbek",
+    birth_date_label: "10 мая 2017",
+    age_label: "9 лет",
+    curator_name: "Дилдора Касымова",
+    student_code: "SNR-2026-00420",
+    file_no: "№ 03-0420",
+    allergies_label: "Нет данных",
+    med_note_label: "Нет особенностей",
+  },
+  {
+    student_id: "child-rakhimov-madina",
+    birth_date_label: "3 сентября 2012",
+    age_label: "13 лет",
+    curator_name: "Гульнора Юсупова",
+    student_code: "SNR-2026-00591",
+    file_no: "№ 07-0591",
+    allergies_label: "Орехи",
+    med_note_label: "Нет особенностей",
+  },
+  {
+    student_id: "child-rakhimov-humoyun",
+    birth_date_label: "17 января 2010",
+    age_label: "16 лет",
+    curator_name: "Александр Петров",
+    student_code: "SNR-2026-00104",
+    file_no: "№ 10-0104",
+    allergies_label: "Нет данных",
+    med_note_label: "Нет особенностей",
+  },
+];
+
+/** Родитель — Дилноза Каримова (шапка Dashboard C1, экран d30 C11). */
+export const PARENT: ParentRow = {
+  id: "parent-dilnoza",
+  full_name: "Дилноза Каримова",
+  first_name: "Дилноза",
+  initials: "ДК",
+  avatar_gradient: ["#8b5cf6", "#22d3ee"],
+  phone: "+998 90 123 45 67",
+  email: "dilnoza.karimova@gmail.com",
+  role_label: "Мать",
+};
+
+/** Данные родителя d30 (C11) — дословно. */
+export const PARENT_PROFILE: ParentProfileRow = {
+  parent_id: "parent-dilnoza",
+  full_name_official: "Каримова Дилноза Рустамовна",
+  birth_date_label: "8 апреля 1988",
+  gender_label: "Женский",
+  marital_status_label: "Замужем",
+  city: "Ташкент",
+  address: "Юнусабад, ул. Амира Темура 12, кв. 34",
+  postal_code: "100084",
+  workplace: "Artel Group",
+  job_title: "Финансовый менеджер",
+  work_phone: "+998 71 233-12-90",
+  backup_phone: "+998 93 555-21-77",
+};
+
+/** Стартовый выделенный ребёнок в списке A4 в зависимости от числа детей у
+ *  демо-родителя (state.authSel макета, строка 4295): 3 → 1 (Малика), иначе 0. */
+export const DEMO_PARENT_DEFAULT_CHILD_INDEX: Record<number, number> = { 1: 0, 2: 0, 3: 1 };
+
+/** Демо-родитель по умолчанию — 3-детный (совпадает с настоящим PARENT). */
+export const DEFAULT_DEMO_PARENT_ID = "demo-dilnoza";
+
+/** Текст демо-шторки B9 — заголовок и подзаголовок (макет строки 4270+). */
+export const DEMO_SHEET_TEXT = {
+  title: "Выберите демо-родителя",
+  subtitle:
+    "Выберите аккаунт родителя. Вы увидите реальные данные школы, все действия влияют на настоящую базу.",
+} as const;
+
+/** Шторка «Помощь» B9 — 2 карточки (телефон + email) + сабтайтл шторки. */
+export const AUTH_HELP = {
+  sheet_subtitle:
+    "Доступ в приложение выдаёт школа. Если у вас нет аккаунта — свяжитесь с администрацией.",
+  items: [
+    { title: "Телефон школы", value: "+998 71 200-40-40", gradient: ["#34d399", "#059669"] as [string, string] },
+    { title: "Email", value: "info@snr-school.uz", gradient: ["#60a5fa", "#2563eb"] as [string, string] },
+  ],
+} as const;
+
+/** Шторка «Возможности приложения» B9 — 4 карточки + сабтайтл шторки. */
+export const AUTH_FEATURES = {
+  sheet_subtitle: "Всё о школьной жизни ребёнка в одном месте.",
+  items: [
+    {
+      title: "Успеваемость и оценки",
+      subtitle: "Баллы, динамика и отзывы учителей",
+      gradient: ["#34d399", "#059669"] as [string, string],
+    },
+    {
+      title: "Домашние задания",
+      subtitle: "Статусы, сроки и материалы",
+      gradient: ["#60a5fa", "#2563eb"] as [string, string],
+    },
+    {
+      title: "Оплаты школы",
+      subtitle: "Счета, чеки и кошелёк ребёнка",
+      gradient: ["#fb923c", "#ef4444"] as [string, string],
+    },
+    {
+      title: "Связь со школой",
+      subtitle: "Чаты с учителями и объявления",
+      gradient: ["#a78bfa", "#7c3aed"] as [string, string],
+    },
+  ],
+} as const;
+
+/** Коды стран телефона (B9). Узбекистан по умолчанию; +7 — Россия;
+ *  +1 — США (добавлено в Заходе 4a); оставлены соседние страны рынка. */
+export const PHONE_COUNTRY_CODES: [string, string][] = [
+  ["Узбекистан", "+998"],
+  ["Россия", "+7"],
+  ["США", "+1"],
+  ["Казахстан", "+7"],
+  ["Кыргызстан", "+996"],
+];

@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
@@ -16,6 +16,7 @@ export * from "./chat";
 export * from "./curriculum";
 export * from "./sandbox";
 export * from "./parent";
+export * from "./library";
 
 // --- Профиль / группы ---
 // Explicit user_id filter + limit(1) prevents PGRST116 if RLS returns >1 row
@@ -975,7 +976,12 @@ type HwJoin = { title: string; content_type: string; group: { name: string } | n
 
 /** Все оценённые работы текущего ученика (RLS отдаёт только свои).
  *  studentId — опционально: parent-контекст сужает до ОДНОГО выбранного
- *  ребёнка (без него RLS для parent отдало бы объединение по всем детям). */
+ *  ребёнка (без него RLS для parent отдало бы объединение по всем детям).
+ *  Каждый из 6 под-запросов разворачивается через unwrap() (helpers.ts) —
+ *  ошибка любого из них бросается наружу, а не глотается в console.error
+ *  с продолжением на data ?? [] (был тот же класс silent-fail, что уже
+ *  чинили в getStudentAttendance/getHomeworkWithSubmissions — иначе сбой
+ *  сети/RLS неотличим от «оценок правда нет»). */
 export const getStudentGrades = async (db: Db, studentId?: string): Promise<StudentGradeItem[]> => {
   // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
   // на hosted. Дата работы = submitted_at (для seed практически совпадает).
@@ -992,11 +998,11 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     testQuery = testQuery.eq("student_id", studentId);
   }
   const [fileRes, testRes] = await Promise.all([fileQuery, testQuery]);
-  if (fileRes.error) console.error("[getStudentGrades] homework_submissions error:", fileRes.error.message);
-  if (testRes.error) console.error("[getStudentGrades] test_submissions error:", testRes.error.message);
+  const fileData = unwrap(fileRes);
+  const testData = unwrap(testRes);
 
   const items: StudentGradeItem[] = [];
-  for (const r of (fileRes.data ?? []) as unknown as Array<{
+  for (const r of fileData as unknown as Array<{
     id: string; grade: number; teacher_comment: string | null; submitted_at: string; homework: HwJoin | null;
   }>) {
     items.push({
@@ -1012,7 +1018,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       comment: r.teacher_comment,
     });
   }
-  for (const r of (testRes.data ?? []) as unknown as Array<{
+  for (const r of testData as unknown as Array<{
     id: string; score: number; max_score: number | null; grade: number | null; submitted_at: string; homework: HwJoin | null;
   }>) {
     const max = r.max_score ?? 0;
@@ -1031,15 +1037,15 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     });
   }
   // Classwork submissions with grades
-  try {
+  {
     const cwSel =
       "id, grade, teacher_comment, submitted_at, classwork:classwork!inner(title, lesson:lessons!inner(subject_id, group:groups!inner(name), subject:subjects(name)))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cwQuery: any = (db as any).from("classwork_submissions").select(cwSel).not("grade", "is", null);
     if (studentId) cwQuery = cwQuery.eq("student_id", studentId);
     const cwRes = await cwQuery;
-    if (cwRes.error) console.error("[getStudentGrades] classwork_submissions error:", cwRes.error.message);
-    for (const r of (cwRes.data ?? []) as unknown as Array<{
+    const cwData = unwrap(cwRes);
+    for (const r of cwData as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string;
       classwork: { title: string; lesson: { group: { name: string } | null; subject: { name: string } | null } | null } | null;
     }>) {
@@ -1055,7 +1061,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.teacher_comment,
       });
     }
-  } catch (e) { console.error("[getStudentGrades] classwork_submissions threw:", (e as Error)?.message); }
+  }
 
   // Project submissions with grades (migration 33). NB: projects.subject —
   // не FK на subjects (нет subject_id у этой таблицы, только текстовый
@@ -1066,15 +1072,15 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
   // корректнее (своя запись, не чужая), но саму ПРИЧИНУ (нет реального
   // subject_id у projects) правкой запроса не убрать — нужна миграция +
   // форма создания проекта с выбором предмета (см. отчёт, вне скоупа здесь).
-  try {
+  {
     const projSel =
       "id, grade, teacher_comment, submitted_at, graded_at, project:projects!inner(title, subject, group:groups!inner(name))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let projQuery: any = (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
     if (studentId) projQuery = projQuery.eq("student_id", studentId);
     const projRes = await projQuery;
-    if (projRes.error) console.error("[getStudentGrades] project_submissions error:", projRes.error.message);
-    for (const r of (projRes.data ?? []) as unknown as Array<{
+    const projData = unwrap(projRes);
+    for (const r of projData as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null; submitted_at: string | null; graded_at: string | null;
       project: { title: string; subject: string; group: { name: string } | null } | null;
     }>) {
@@ -1090,10 +1096,10 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.teacher_comment,
       });
     }
-  } catch (e) { console.error("[getStudentGrades] project_submissions threw:", (e as Error)?.message); }
+  }
 
   // Lesson stage task grades (quiz_qia, quiz_kahoot, code, external — migration 39)
-  try {
+  {
     // lesson:lessons!lesson_id — explicit FK hint. lesson_stages<->lessons has
     // TWO relationships (lesson_stages.lesson_id -> lessons.id, AND the
     // reverse lessons.active_stage_id -> lesson_stages.id from migration 54),
@@ -1106,8 +1112,8 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
     if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
     const stageRes = await stageQuery;
-    if (stageRes.error) console.error("[getStudentGrades] lesson_stage_progress error:", stageRes.error.message);
-    for (const r of (stageRes.data ?? []) as unknown as Array<{
+    const stageData = unwrap(stageRes);
+    for (const r of stageData as unknown as Array<{
       id: string; grade: number; teacher_comment: string | null;
       completed_at: string | null; graded_at: string | null;
       submission_data: { kind?: string } | null;
@@ -1132,18 +1138,18 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.teacher_comment,
       });
     }
-  } catch (e) { console.error("[getStudentGrades] lesson_stage_progress threw:", (e as Error)?.message); }
+  }
 
   // Lesson grades (migration 40)
-  try {
+  {
     const lgSel =
       "id, grade, comment, graded_at, lesson:lessons!inner(title, subject_id, group:groups!inner(name), subject:subjects(name))";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let lgQuery: any = (db as any).from("lesson_grades").select(lgSel);
     if (studentId) lgQuery = lgQuery.eq("student_id", studentId);
     const lgRes = await lgQuery;
-    if (lgRes.error) console.error("[getStudentGrades] lesson_grades error:", lgRes.error.message);
-    for (const r of (lgRes.data ?? []) as unknown as Array<{
+    const lgData = unwrap(lgRes);
+    for (const r of lgData as unknown as Array<{
       id: string; grade: number; comment: string | null; graded_at: string;
       lesson: { title: string | null; group: { name: string } | null; subject: { name: string } | null } | null;
     }>) {
@@ -1159,7 +1165,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         comment: r.comment,
       });
     }
-  } catch (e) { console.error("[getStudentGrades] lesson_grades threw:", (e as Error)?.message); }
+  }
 
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;
@@ -2684,6 +2690,52 @@ export const linkLessonMaterialFromKnowledgeBase = async (
     .single();
   if (error) throw error;
   return data as LessonMaterial;
+};
+
+/** 6А — Библиотека материалов учителей (migration 147/148): прикрепляет
+ *  библиотечный материал к уроку как "базу знаний" — тонкая обёртка,
+ *  ничего не дублирует: content_type='file' идёт через
+ *  linkLessonMaterialFromKnowledgeBase, content_type video_* — через
+ *  addLessonMaterialVideo (обе определены выше в этом же файле). Живёт
+ *  здесь (а не в queries/library.ts), потому что оборачивает функции из
+ *  этого же файла — library.ts принципиально не импортирует из index.ts
+ *  (см. шапку library.ts), чтобы не создавать циклическую зависимость. */
+export const attachLibraryMaterialToLesson = (
+  db: Db,
+  input: {
+    lessonId: string;
+    teacherId: string;
+    material: LibraryMaterial;
+    visibility?: "all" | "teacher_only";
+  },
+): Promise<LessonMaterial> => {
+  const { material } = input;
+  if (material.content_type === "video_youtube" || material.content_type === "video_rutube") {
+    if (!material.external_url || !material.source_url) {
+      throw new Error("Видео-ссылка библиотеки без external_url/source_url — повреждённая запись");
+    }
+    return addLessonMaterialVideo(db, {
+      lessonId: input.lessonId,
+      teacherId: input.teacherId,
+      title: material.title,
+      platform: material.content_type === "video_youtube" ? "youtube" : "rutube",
+      sourceUrl: material.source_url,
+      embedUrl: material.external_url,
+      visibility: input.visibility,
+    });
+  }
+  if (!material.storage_path) {
+    throw new Error("Материал библиотеки content_type='file' без storage_path — повреждённая запись");
+  }
+  return linkLessonMaterialFromKnowledgeBase(db, {
+    lessonId: input.lessonId,
+    teacherId: input.teacherId,
+    title: material.title,
+    storagePath: material.storage_path,
+    kbBucket: "materials",
+    fileSizeBytes: material.file_size_bytes,
+    visibility: input.visibility,
+  });
 };
 
 // ─── LESSON STAGES v2 (migration 35) ─────────────────────────────────────────
