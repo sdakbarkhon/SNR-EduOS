@@ -9,10 +9,20 @@ import type { Locale } from "@snr/core";
  * приложение сейчас раздаётся через Expo Go (OTA-канал preview, см.
  * apps/mobile-parent/AGENTS.md), поэтому обе ссылки временно ведут на
  * страницы Expo Go в Google Play / App Store; заменить на прямые ссылки
- * на приложение, когда появятся собственные листинги. footer — общая строка с
- * центрированной copyright-пилюлей (BottomBar.tsx), поэтому бейджи всегда
- * компактные (h-9) — на lg+ ширины ровно двух полноразмерных бейджей уже
- * не хватает без наезда на неё, см. коммит, добавивший эту компоновку.
+ * на приложение, когда появятся собственные листинги.
+ *
+ * Размер — h-9 (36px) на sm..xl, h-[54px] (×1.5) на xl+ (1280px), НЕ
+ * единый размер. footer — общая строка с центрированной copyright-пилюлей
+ * (BottomBar.tsx, "© 2026 SNR EduOS..."), абсолютно спозиционированной по
+ * центру ВСЕЙ ширины бара — измерено (getBoundingClientRect), при ×1.5
+ * ряд бейджей наезжает на пилюлю на всём диапазоне от sm (одна колонка,
+ * right-aligned) до ~1216px внутри lg+ (двухколоночная раскладка) —
+ * lg (1024px) само по себе НЕ safe-порог, наезд там ещё ~48px. Первая
+ * безопасная стандартная точка — xl (1280px): чистый зазор ~32px. До
+ * xl бейджи остаются в исходном размере (не увеличены) — не наезжают,
+ * т.к. равны текущему прод-состоянию. Полноценное решение (×1.5 на всех
+ * ширинах) требует менять позиционирование пилюли в BottomBar.tsx — вне
+ * скоупа этой правки (только размер бейджей).
  */
 const STORE_LINKS = {
   android: "https://play.google.com/store/apps/details?id=host.exp.exponent",
@@ -37,7 +47,7 @@ export function MobileAppsButtons({ locale }: { locale: Locale }) {
           alt={t.android}
           width={827}
           height={270}
-          className="h-9 w-auto"
+          className="h-9 w-auto xl:h-[54px]"
           priority={false}
         />
       </a>
@@ -54,7 +64,7 @@ export function MobileAppsButtons({ locale }: { locale: Locale }) {
           alt={t.ios}
           width={827}
           height={271}
-          className="h-9 w-auto"
+          className="h-9 w-auto xl:h-[54px]"
           priority={false}
         />
       </a>
