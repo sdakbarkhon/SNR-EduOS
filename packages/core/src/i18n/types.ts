@@ -962,6 +962,10 @@ export interface Dictionary {
     testReview: string;
     testWebOnly: string;
     teacherFile: string;
+    teacherVideo: string;
+    detailWatch: string;
+    videoSourceLabel: string;
+    attachmentUnavailable: string;
     hintPanelTitle: string;     // "Подсказка" — БОЛЬШОЕ ОБНОВЛЕНИЕ §8.2 side panel
     hintPanelCollapse: string;
     hintPanelOpen: string;

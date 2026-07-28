@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, FileText, Link as LinkIcon, Maximize2, Minimize2, Paperclip, Send, X } from "lucide-react";
+import { ArrowLeft, Download, FileText, Link as LinkIcon, Maximize2, Minimize2, Paperclip, Play, Send, Video, X } from "lucide-react";
 import {
   getDictionary,
   getSubjectStyle,
@@ -17,6 +17,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
+import { FileViewerModal } from "@/components/FileViewerModal";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
@@ -52,12 +53,71 @@ function isImagePath(path: string | null | undefined): boolean {
   return /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(path);
 }
 
-/** Card for the teacher's attachment on a homework. */
+/** Card for the teacher's attachment on a homework — file (storage-backed
+ *  download) or video-link (migration 149) — встроенный плеер через
+ *  resolveFileViewerKind/FileViewerModal, 1:1 с уроком/библиотекой
+ *  (TeacherAttachmentCard в TeacherLibraryView.tsx/MaterialsView.tsx —
+ *  клик по карточке открывает тот же полноэкранный вьюер, embed-URL сам
+ *  распознаётся isVideoEmbedUrl, доп. классификация не нужна). */
 function TeacherAttachmentCard({ hw }: { hw: HomeworkWithSubmission }) {
   const sb = createClient();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const [downloading, setDownloading] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
+
+  const isVideo = hw.attachment_content_type === "video_youtube" || hw.attachment_content_type === "video_rutube";
+
+  if (isVideo) {
+    // Защита от битых данных — CHECK homework_attachment_shape_chk (миграция
+    // 149) не должен пропустить video_* без external_url, но не падаем,
+    // если это всё же случилось (например, ручная правка в БД).
+    if (!hw.attachment_external_url) {
+      return (
+        <GlassCard className="mb-4 p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+            {d.homework.teacherVideo}
+          </p>
+          <p className="text-sm text-slate-400">{d.homework.attachmentUnavailable}</p>
+        </GlassCard>
+      );
+    }
+    return (
+      <GlassCard className="mb-4 p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+          {d.homework.teacherVideo}
+        </p>
+        <button
+          type="button"
+          onClick={() => setVideoOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white/80 p-3 text-left transition hover:border-brand-blue/30"
+        >
+          <Video size={16} className="flex-shrink-0 text-brand-blue" />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{hw.title}</span>
+          <span className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-brand-blue">
+            <Play size={12} />
+            {d.homework.detailWatch}
+          </span>
+        </button>
+        {hw.attachment_source_url && (
+          <p className="mt-2 truncate text-xs text-slate-400">
+            {d.homework.videoSourceLabel}:{" "}
+            <a
+              href={hw.attachment_source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand-blue hover:underline"
+            >
+              {hw.attachment_source_url}
+            </a>
+          </p>
+        )}
+        {videoOpen && (
+          <FileViewerModal url={hw.attachment_external_url} title={hw.title} onClose={() => setVideoOpen(false)} />
+        )}
+      </GlassCard>
+    );
+  }
 
   if (!hw.attachment_storage_path) return null;
 
@@ -629,11 +689,17 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
         )}
       </GlassCard>
 
-      {/* Teacher attachment (new storage-backed) */}
-      {hw.attachment_storage_path && <TeacherAttachmentCard hw={hw} />}
+      {/* Teacher attachment — file (storage-backed) or video-link (migration
+          149); TeacherAttachmentCard renders null itself when there's
+          neither (attachment_content_type='file' with no storage_path is
+          the normal "no attachment" state for most homework). */}
+      <TeacherAttachmentCard hw={hw} />
 
-      {/* Legacy jsonb attachments */}
-      {!hw.attachment_storage_path && hw.attachments.length > 0 && (
+      {/* Legacy jsonb attachments — attachment_content_type stays 'file'
+          (DEFAULT) for every row that predates migration 149, so excluding
+          video_* here is defensive, not load-bearing: no row can have both
+          a non-empty legacy array AND a new video attachment. */}
+      {!hw.attachment_storage_path && hw.attachment_content_type === "file" && hw.attachments.length > 0 && (
         <GlassCard className="mb-4 p-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
             {d.homework.detailAttachments}
