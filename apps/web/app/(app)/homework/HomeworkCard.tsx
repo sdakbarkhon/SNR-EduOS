@@ -112,7 +112,12 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
 
       <div className="flex items-center justify-between gap-2">
         {dueLabel ? (
-          <span className={cn("text-[13.5px] font-bold whitespace-nowrap", deadlineColorCls)}>{dueLabel}</span>
+          // min-w-0 обязателен: без него flex-элемент не сжимается ниже
+          // своей контентной ширины (min-width:auto по умолчанию), и на
+          // 1280/1366 (xl:flex-row + xl:grid-cols-3 включаются разом, см.
+          // HomeworkView.tsx) эта строка реально шире доступной колонки —
+          // налезала на бейдж справа вместо переноса в многоточие.
+          <span className={cn("min-w-0 truncate text-[13.5px] font-bold", deadlineColorCls)}>{dueLabel}</span>
         ) : (
           <span />
         )}

@@ -73,7 +73,13 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
   const doneCount = stages.filter((s) => isCompleted || s.is_completed || s.progress?.is_completed).length;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 text-[#1D1D1F]">
+    // Раньше этот экран (status="completed") рендерился в fullscreen-режиме
+    // AppShell (без каркаса, без паддингов) — /^\/lessons\/[^/]+/ матчил все
+    // 3 состояния урока, хотя fullscreen задумывался только под живой урок
+    // (см. fullscreen-lesson-context.tsx). Контент упирался прямо в край
+    // экрана. Теперь — нормальный каркас, как у остальных страниц ученика:
+    // max-w-[1600px] (тот же предел, что даёт сам AppShell) + свой px-паддинг.
+    <div className="mx-auto max-w-[1600px] space-y-6 px-4 sm:px-6 lg:px-8 text-[#1D1D1F]">
       {/* Back */}
       <Link
         href="/schedule"

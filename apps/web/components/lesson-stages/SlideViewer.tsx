@@ -5,9 +5,15 @@ import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { getDictionary, setCurrentSlide } from "@snr/core";
 import type { Locale, LessonSlide } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { SlideBody } from "./SlideBody";
+
+/** Высота панели навигации ниже кадра слайда (px-6 py-4 border-t + кнопка
+ *  px-4 py-2 с иконкой 20px) — используется только чтобы вписать кадр в
+ *  доступную высоту (frameMaxHeight ниже), саму панель не затрагивает. */
+const NAV_BAR_PX = 72;
 
 export function SlideViewer({
   slides,
@@ -17,6 +23,7 @@ export function SlideViewer({
   stageId,
   initialSlide = 0,
   lessonStatus,
+  chromeAbovePx,
 }: {
   slides: LessonSlide[];
   onExportPptx: () => void;
@@ -29,6 +36,15 @@ export function SlideViewer({
   initialSlide?: number;
   /** "in_progress": student gets the same live nav as the teacher, writes sync to everyone via Realtime. "completed": students browse freely for review — same as teacher nav, but never writes current_slide_index (that's live-lesson-only state). */
   lessonStatus?: string;
+  /** Сколько "остального" над этим SlideViewer в текущем макете (шапка
+   *  урока в обычном режиме / почти ничего в фокус-режиме — см.
+   *  LessonWorkspaceView.tsx PRESENTATION_CHROME_ABOVE_PX). Когда задан,
+   *  16:9-кадр слайда вписывается в calc(100vh - chromeAbovePx - navbar),
+   *  сохраняя пропорции (ширина уменьшается, если ограничивает высота) —
+   *  слайд гарантированно виден целиком без скролла даже на 3440. Не
+   *  задан — прежнее поведение (во всю ширину колонки, высота от
+   *  aspect-ratio), для обычных (не во весь экран) мест использования. */
+  chromeAbovePx?: number;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.slides;
@@ -85,11 +101,21 @@ export function SlideViewer({
   const slide = slides[current];
   if (!slide) return null;
 
+  const frameMaxHeight = chromeAbovePx != null ? `calc(100vh - ${chromeAbovePx + NAV_BAR_PX}px)` : undefined;
+
   return (
     <div className="flex w-full flex-col overflow-hidden rounded-2xl shadow-xl">
       {/* Slide body — fixed 16:9 frame, SlideBody scales its content to fit
-          (never scroll — the whole slide should be visible at once). */}
-      <div className="aspect-video w-full overflow-hidden">
+          (never scroll — the whole slide should be visible at once).
+          chromeAbovePx задан: кадр вписывается в доступную высоту (ширина
+          уменьшается пропорционально, если ограничивает высота, а не
+          растягивается на всю колонку — раньше на широких/невысоких
+          вьюпортах кадр от w-full мог быть выше viewport и требовал
+          скролла, см. StudentPresentationViewer.tsx). */}
+      <div
+        className={cn("mx-auto aspect-video overflow-hidden", !frameMaxHeight && "w-full")}
+        style={frameMaxHeight ? { maxHeight: frameMaxHeight, width: `min(100%, calc(${frameMaxHeight} * 16 / 9))` } : undefined}
+      >
         <SlideBody slide={slide} current={current} total={slides.length} />
       </div>
 

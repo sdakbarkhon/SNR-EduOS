@@ -263,7 +263,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   ];
 
   return (
-    <div className="flex max-w-7xl flex-col gap-8 lg:flex-row">
+    <div className="mx-auto flex max-w-7xl flex-col gap-8 lg:flex-row">
       {/* Main */}
       <div className="flex-1">
         <div className="mb-8 flex items-center gap-4">

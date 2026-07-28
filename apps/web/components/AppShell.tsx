@@ -13,6 +13,7 @@ import { ToastProvider } from "./Toast";
 import { navItems } from "./nav-items";
 import { LessonStartBanner } from "./LessonStartBanner";
 import { AiFloatingButton } from "./AiFloatingButton";
+import { useIsFullscreenLesson } from "./fullscreen-lesson-context";
 
 export function AppShell({
   studentName,
@@ -38,8 +39,14 @@ export function AppShell({
   // реально получил высоту от <main>, а не сам скроллился вместе с ним.
   const isMessagesRoute = pathname === "/messages";
 
-  // Fullscreen lesson workspace — hide chrome so the stage content gets full viewport
-  const isFullscreenLesson = /^\/lessons\/[^/]+/.test(pathname);
+  // Fullscreen lesson workspace — hide chrome so the stage content gets full
+  // viewport. Раньше это была pathname-эвристика (/^\/lessons\/[^/]+/),
+  // матчившая ВСЕ 3 состояния урока (scheduled/in_progress/completed), а не
+  // только живой урок — PreLessonView и завершённый LessonView теряли
+  // каркас без причины. Теперь источник — Context, который выставляет
+  // ТОЛЬКО LessonWorkspaceView (status="in_progress"), см.
+  // fullscreen-lesson-context.tsx.
+  const isFullscreenLesson = useIsFullscreenLesson();
   if (isFullscreenLesson) {
     return (
       <ToastProvider>

@@ -33,6 +33,7 @@ import { demoKind } from "@/lib/material-kind";
 import { PdfViewer } from "@/components/PdfViewer";
 import { DemoMaterialContent } from "@/components/DemoMaterialContent";
 import { createClient } from "@/lib/supabase/client";
+import { useRegisterFullscreenLesson } from "@/components/fullscreen-lesson-context";
 
 function initials(name: string): string {
   return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
@@ -283,6 +284,10 @@ export function LessonWorkspaceView({
   materialUrls: Record<string, string>;
   studentId: string | null;
 }) {
+  // Единственное место, где AppShell прячет каркас (сайдбар/топбар/паддинги) —
+  // см. fullscreen-lesson-context.tsx.
+  useRegisterFullscreenLesson();
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const w = d.lesson.workspace;

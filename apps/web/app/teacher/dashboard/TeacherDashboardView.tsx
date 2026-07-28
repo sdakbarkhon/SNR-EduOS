@@ -297,7 +297,7 @@ export function TeacherDashboardView({
   const hours = Array.from({ length: T_END - T_START }, (_, i) => T_START + i);
 
   return (
-    <div className="max-w-6xl space-y-6 pb-6">
+    <div className="mx-auto max-w-6xl space-y-6 pb-6">
 
       {/* Greeting */}
       <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">

@@ -277,7 +277,15 @@ export function PreLessonView({
     : dl.planStagesSummaryNoDuration.replace("{count}", String((stages ?? []).length));
 
   return (
-    <div className="relative min-h-screen w-full bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
+    // Раньше этот экран рендерился в fullscreen-режиме AppShell (без каркаса),
+    // min-h-screen там был к месту. Теперь (fix isFullscreenLesson — только
+    // in_progress, см. fullscreen-lesson-context.tsx) PreLessonView рендерится
+    // ВНУТРИ обычного каркаса (сайдбар/топбар/паддинги), как остальные
+    // страницы ученика — min-h-screen здесь задваивал бы высоту (100vh
+    // экрана поверх уже занятой топбаром) и создавал лишний скролл;
+    // min-h-[600px] + rounded-2xl — карточка нормальной высоты по контенту,
+    // тот же паттерн, что и у остальных карточек в каркасе.
+    <div className="relative min-h-[600px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
       {/* Back link */}
       <Link
         href="/schedule"
@@ -288,7 +296,7 @@ export function PreLessonView({
       </Link>
 
       {/* 2-column grid */}
-      <div className="grid min-h-screen grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
+      <div className="grid min-h-[600px] grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
 
         {/* LEFT: Info */}
         <div className="flex flex-col">

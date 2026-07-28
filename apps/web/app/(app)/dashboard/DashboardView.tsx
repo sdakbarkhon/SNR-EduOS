@@ -520,11 +520,20 @@ export function DashboardView({
             {mySubjects.length > 0 ? (
               <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
                 <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.classSubjectsTitle}</h3>
-                {/* 5 колонок на lg+ → 10 предметов = ровно 2 полных ряда, блок
-                    заполняет всю ширину справа без пустого поля; на узких —
-                    2–4 колонки. Длинные названия переносятся (break-words),
-                    карточки одинаковой высоты (min-h у названия + h-full). */}
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {/* 5 колонок на 2xl → 10 предметов = ровно 2 полных ряда,
+                    блок заполняет всю ширину справа без пустого поля; на
+                    узких — 2–4 колонки. Длинные названия переносятся
+                    (break-words), карточки одинаковой высоты (min-h у
+                    названия + h-full).
+                    xl НАМЕРЕННО откатывается на 3 колонки, а не растёт до
+                    5 сразу после lg=4 — на 1280-1535 (xl) этот блок делит
+                    ширину с правым aside (`xl:w-[340px]`, ниже) и с левой
+                    300px-колонкой «Мой прогресс», из-за чего карточка на
+                    lg:grid-cols-5 падала до ~38-60px (иконка 40px+паддинг
+                    ~64px не помещались, налезали друг на друга). До 2xl,
+                    где aside+прогресс уже не так давят на ширину, карточка
+                    снова безопасно растёт до 5 колонок. */}
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-5">
                   {[...mySubjects].sort((a, b) => Number(b.is_active) - Number(a.is_active)).map((sub) => {
                     const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
                     const card = (
