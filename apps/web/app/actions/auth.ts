@@ -2,11 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { signInWithUsername } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DEMO_SESSION_COOKIE, sessionIdFromAccessToken } from "@/lib/single-session";
+import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
+import { registerSession } from "@/lib/register-session";
 
 // P2 (пачка 2) — переработка демо-режима. Демо-логика теперь живёт в
 // endpoints apps/web/app/api/demo/*, но demoLogin остаётся как «серверный
@@ -27,46 +28,6 @@ interface ClaimSlotRow {
   user_id: string;
 }
 
-/**
- * Регистрирует новую single-session-строку в user_sessions (одна активная
- * сессия на аккаунт, все роли — миграция 110). В P2 больше НЕ пишет is_demo
- * и demo_started_at (эти колонки убраны миграцией 132) и НЕ вызывает
- * reset_demo_data_for_user (функция удалена миграцией 132) — демо-данные
- * больше не отделяются от реальных.
- *
- * Демо-cookie snr-demo-session ставится/чистится в endpoints /api/demo/*
- * (для новой lease-логики) или в signOut() (при выходе).
- */
-async function registerSession(opts: {
-  userId: string;
-  accessToken: string;
-}): Promise<void> {
-  const sessionId = sessionIdFromAccessToken(opts.accessToken);
-  if (!sessionId) {
-    throw new Error("single-session: access token has no session_id claim");
-  }
-
-  const admin = createAdminClient();
-
-  const { error: deleteError } = await admin
-    .from("user_sessions")
-    .delete()
-    .eq("user_id", opts.userId);
-  if (deleteError) {
-    throw new Error(`single-session: evict failed: ${deleteError.message}`);
-  }
-
-  const ua = (await headers()).get("user-agent");
-  const { error: insertError } = await admin.from("user_sessions").insert({
-    user_id: opts.userId,
-    session_id: sessionId,
-    device_info: ua ? ua.slice(0, 512) : null,
-  });
-  if (insertError) {
-    throw new Error(`single-session: register failed: ${insertError.message}`);
-  }
-}
-
 /** Приоритет как в middleware: super_admin > admin > parent > teacher > student. */
 async function resolveDest(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -80,7 +41,7 @@ async function resolveDest(
   ]);
   if (superAdminRes.data) return "/superadmin/dashboard";
   if (adminRes.data) return "/admin";
-  if (parentRes.data) return "/parent/dashboard";
+  if (parentRes.data) return "/parent/home";
   if (teacherRes.data) return "/teacher/dashboard";
   return "/dashboard";
 }
@@ -172,7 +133,7 @@ export async function demoLogin(
 
   const dest =
     role === "teacher" ? "/teacher/dashboard" :
-    role === "parent"  ? "/parent/dashboard"  :
+    role === "parent"  ? "/parent/home"       :
                          "/dashboard";
   return { ok: true, dest, isDemo: true };
 }

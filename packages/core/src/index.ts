@@ -3,6 +3,7 @@ export * from "./types";
 export type { Database, Json } from "./database.types";
 export * from "./supabase/factory";
 export * from "./auth/username";
+export * from "./auth/phone";
 export * from "./schemas";
 export * from "./queries";
 export * from "./presenters";

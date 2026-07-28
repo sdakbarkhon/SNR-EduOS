@@ -43,7 +43,7 @@ function redirectFor(role: Role): string {
   switch (role) {
     case "student": return "/dashboard";
     case "teacher": return "/teacher/dashboard";
-    case "parent":  return "/parent/dashboard";
+    case "parent":  return "/parent/home";
   }
 }
 

@@ -1,15 +1,16 @@
 import Image from "next/image";
+import Link from "next/link";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 
 /**
  * Бейджи стора — правая часть футера (BottomBar), на месте, где раньше
  * стоял LanguageSelector (он переехал в правый верхний угол страницы, см.
- * page.tsx). Собственных листингов в сторах ещё нет — родительское
- * приложение сейчас раздаётся через Expo Go (OTA-канал preview, см.
- * apps/mobile-parent/AGENTS.md), поэтому обе ссылки временно ведут на
- * страницы Expo Go в Google Play / App Store; заменить на прямые ссылки
- * на приложение, когда появятся собственные листинги.
+ * page.tsx). Заход 1 (веб-родитель): обе ссылки больше не ведут на Expo
+ * Go в сторах — родитель теперь может пройти вход прямо в браузере на
+ * /parent (узкая мобильная вёрстка, вход по номеру телефона), это и есть
+ * целевой сценарий для этих кнопок, пока нет собственных листингов в
+ * Google Play / App Store.
  *
  * Размер — h-9 (36px) на sm..xl, h-[54px] (×1.5) на xl+ (1280px), НЕ
  * единый размер. footer — общая строка с центрированной copyright-пилюлей
@@ -24,20 +25,15 @@ import type { Locale } from "@snr/core";
  * ширинах) требует менять позиционирование пилюли в BottomBar.tsx — вне
  * скоупа этой правки (только размер бейджей).
  */
-const STORE_LINKS = {
-  android: "https://play.google.com/store/apps/details?id=host.exp.exponent",
-  ios: "https://apps.apple.com/app/expo-go/id982107779",
-} as const;
+const PARENT_WEB_HREF = "/parent";
 
 export function MobileAppsButtons({ locale }: { locale: Locale }) {
   const t = getDictionary(locale).auth.mobileApps;
 
   return (
     <div className="flex items-center gap-3">
-      <a
-        href={STORE_LINKS.android}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        href={PARENT_WEB_HREF}
         title={t.android}
         aria-label={t.android}
         className="shrink-0 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
@@ -50,11 +46,9 @@ export function MobileAppsButtons({ locale }: { locale: Locale }) {
           className="h-9 w-auto xl:h-[54px]"
           priority={false}
         />
-      </a>
-      <a
-        href={STORE_LINKS.ios}
-        target="_blank"
-        rel="noopener noreferrer"
+      </Link>
+      <Link
+        href={PARENT_WEB_HREF}
         title={t.ios}
         aria-label={t.ios}
         className="shrink-0 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
@@ -67,7 +61,7 @@ export function MobileAppsButtons({ locale }: { locale: Locale }) {
           className="h-9 w-auto xl:h-[54px]"
           priority={false}
         />
-      </a>
+      </Link>
     </div>
   );
 }

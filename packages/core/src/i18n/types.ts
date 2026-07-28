@@ -2408,6 +2408,11 @@ export interface Dictionary {
       messages: string;
       profile: string;
     };
+    /** Заглушка «Скоро» на ещё не подключённых экранах (веб-родитель). */
+    stub: {
+      title: string;
+      subtitle: string;
+    };
     scr: {
       dayStatus: string;
       homeworks: string;

@@ -40,14 +40,18 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname.startsWith("/login");
-  const isParentJoinRoute = pathname.startsWith("/parent/join");
+  // Заход 1 (веб-родитель, вход по номеру): корень /parent — публичный
+  // экран телефон-входа (заменяет старый /parent/join). Сама страница
+  // (app/parent/page.tsx) редиректит уже залогиненного родителя на
+  // /parent/home — здесь просто не гейтим, как раньше не гейтили join.
+  const isParentLoginRoute = pathname === "/parent";
   const isTeacherRoute = pathname.startsWith("/teacher");
   const isAdminRoute = pathname.startsWith("/admin");
   const isSuperadminRoute = pathname.startsWith("/superadmin");
-  const isParentRoute = pathname.startsWith("/parent") && !isParentJoinRoute;
+  const isParentRoute = pathname.startsWith("/parent") && !isParentLoginRoute;
 
-  // Public, unauthenticated invite-registration flow — no guard at all.
-  if (isParentJoinRoute) {
+  // Публичный экран телефон-входа — без гейта.
+  if (isParentLoginRoute) {
     return response;
   }
 
@@ -134,10 +138,13 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(target);
     }
 
-    // Parent on any other route → /parent/dashboard
+    // Parent on any other route → /parent/home. Note: this never fires for
+    // the /parent login screen itself — isParentLoginRoute returns early
+    // above before role is even known; that page's own server component
+    // handles "already authenticated → redirect to /parent/home".
     if (isParent && !isParentRoute && !isAuthPage) {
       const target = request.nextUrl.clone();
-      target.pathname = "/parent/dashboard";
+      target.pathname = "/parent/home";
       return NextResponse.redirect(target);
     }
 

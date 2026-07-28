@@ -2339,6 +2339,10 @@ export const en: Dictionary = {
       messages: "Messages",
       profile: "Profile",
     },
+    stub: {
+      title: "Coming soon",
+      subtitle: "This section will be available in one of the upcoming updates",
+    },
     scr: {
       dayStatus: "Day status",
       homeworks: "Homework",
