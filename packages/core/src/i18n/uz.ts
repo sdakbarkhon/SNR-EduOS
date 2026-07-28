@@ -2402,6 +2402,10 @@ export const uz: Dictionary = {
       nextLessonRetryHint: "Qayta urinish uchun bosing",
       nextLessonEmpty: "Kutilayotgan darslar yo'q",
       roomLabel: "Xona {room}",
+      greetingTitle: "Xayrli tong, {name}!",
+      greetingSub: "Bugun {name}da nima bo'layotganini ko'ring",
+      assistantText: "Bu hafta davomat barqaror va topshiriqlar o'z vaqtida topshirilmoqda — yaxshi dinamika.",
+      noDataYet: "Hozircha ma'lumot yo'q",
     },
     grades: {
       average: "O'rtacha ball",

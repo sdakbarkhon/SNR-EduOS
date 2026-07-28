@@ -2405,6 +2405,10 @@ export const ru: Dictionary = {
       nextLessonRetryHint: "Нажмите, чтобы повторить",
       nextLessonEmpty: "Нет предстоящих уроков",
       roomLabel: "Каб. {room}",
+      greetingTitle: "Доброе утро, {name}!",
+      greetingSub: "Вот что происходит у {name} сегодня",
+      assistantText: "На этой неделе стабильная посещаемость и вовремя сданные задания — хорошая динамика.",
+      noDataYet: "Пока нет данных",
     },
     grades: {
       average: "Средний балл",

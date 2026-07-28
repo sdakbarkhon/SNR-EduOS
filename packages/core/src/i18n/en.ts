@@ -2401,6 +2401,10 @@ export const en: Dictionary = {
       nextLessonRetryHint: "Tap to retry",
       nextLessonEmpty: "No upcoming lessons",
       roomLabel: "Room {room}",
+      greetingTitle: "Good morning, {name}!",
+      greetingSub: "Here's what's happening with {name} today",
+      assistantText: "Steady attendance and on-time homework this week — good progress overall.",
+      noDataYet: "No data yet",
     },
     grades: {
       average: "Average score",

@@ -2473,6 +2473,13 @@ export interface Dictionary {
       nextLessonRetryHint: string;  // «Нажмите, чтобы повторить»
       nextLessonEmpty: string;      // «Нет предстоящих уроков»
       roomLabel: string;            // «Каб. {room}»
+      // Веб-родитель, экран «Главная» (реальные данные) — приветствие
+      // (шаблон с {name}), мок-текст ассистента, мок-плейсхолдер значения
+      // для карточек «К оплате»/«Питание» (данные пока не подключены).
+      greetingTitle: string;  // «Доброе утро, {name}!»
+      greetingSub: string;    // «Вот что происходит у {name} сегодня»
+      assistantText: string;
+      noDataYet: string;
     };
     grades: {
       average: string;
