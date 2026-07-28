@@ -2501,6 +2501,10 @@ export const ru: Dictionary = {
       successTransferTitle: "Перевод выполнен",
       successCardTitle: "Карта добавлена",
     },
+    paymentsWeb: {
+      tuition: "Обучение",
+      walletTitleGeneric: "Кошелёк ребёнка",
+    },
     msg: {
       online: "В сети",
       typeMessage: "Напишите сообщение…",

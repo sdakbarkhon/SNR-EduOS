@@ -2497,6 +2497,10 @@ export const en: Dictionary = {
       successTransferTitle: "Transfer completed",
       successCardTitle: "Card added",
     },
+    paymentsWeb: {
+      tuition: "Tuition",
+      walletTitleGeneric: "Child's wallet",
+    },
     msg: {
       online: "Online",
       typeMessage: "Type a message…",

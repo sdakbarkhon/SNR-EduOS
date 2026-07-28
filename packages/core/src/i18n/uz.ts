@@ -2498,6 +2498,10 @@ export const uz: Dictionary = {
       successTransferTitle: "O'tkazma bajarildi",
       successCardTitle: "Karta qo'shildi",
     },
+    paymentsWeb: {
+      tuition: "Ta'lim",
+      walletTitleGeneric: "Bola hamyoni",
+    },
     msg: {
       online: "Onlayn",
       typeMessage: "Xabar yozing…",

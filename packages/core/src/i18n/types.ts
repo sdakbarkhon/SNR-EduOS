@@ -2587,6 +2587,15 @@ export interface Dictionary {
       successTransferTitle: string;   // paySheet.kind==='tr'  → «Перевод выполнен»
       successCardTitle: string;       // paySheet.kind==='card'→ «Карта добавлена»
     };
+    /** Веб-родитель, экран «Оплаты» — мок, не подключён к БД. Пара новых
+     *  строк, которых не хватало среди уже существующих pay.* ключей:
+     *  общее название первого счёта-заглушки и generic-заголовок карточки
+     *  кошелька (без склонения имени ребёнка — на вебе нет genitive-хелпера
+     *  мобилки, first_name_gen). */
+    paymentsWeb: {
+      tuition: string;              // «Обучение» — заголовок 1-го счёта-заглушки
+      walletTitleGeneric: string;   // «Кошелёк ребёнка»
+    };
     msg: {
       online: string;
       typeMessage: string;
