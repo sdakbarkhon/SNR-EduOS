@@ -39,14 +39,15 @@
 //     chat_read_state не каскадируют от chat_messages (last_read_message_id
 //     — SET NULL), трогать не нужно.
 //   - course_materials — ДВЕ разные FK на lessons: stage_id (CASCADE, для
-//     авто-опубликованных AI-презентаций) и lesson_id (SET NULL, для
-//     вручную загруженных материалов группы). Этот скрипт удаляет только
-//     ветку через stage_id (она и так каскадно уйдёт вместе со stage) —
-//     строки с только lesson_id (без stage_id) сознательно НЕ удаляются:
-//     это материалы уровня группы, не привязанные к конкретной дате урока
-//     жёстче, чем к его существованию; после удаления урока lesson_id у них
-//     просто станет NULL (примерно 100 строк по живому счёту на момент
-//     разведки — см. отчёт).
+//     авто-опубликованных AI-презентаций) и lesson_id (обычно SET NULL, для
+//     вручную загруженных материалов группы). ПОДТВЕРЖДЕНО пользователем:
+//     удалять ЖЁСТКО через ОБЕ ветки (stage_id И lesson_id) — файлы в
+//     бакете не важны, ничего не должно остаться привязанным к диапазону.
+//     Живой счёт на момент разведки: 100 строк всего с lesson_id в
+//     диапазоне, из них 98 уже покрыты веткой stage_id (не двойной счёт —
+//     второй DELETE на них просто не находит строк), 2 — настоящие
+//     "SET NULL survivors" без stage_id, ловятся только явным DELETE по
+//     lesson_id.
 //
 // РЕЖИМ: dry-run по умолчанию — ничего не пишет, только считает и печатает.
 // --confirm — реальное удаление. Идемпотентно: каждый шаг заново вычисляет
@@ -116,29 +117,57 @@ function chunk(arr, n) {
   return out;
 }
 async function selectIds(table, filterFn, selectCol = "id") {
-  const { data, error } = await filterFn(db.from(table).select(selectCol));
-  if (error) throw new Error(`${table} select failed: ${error.message}`);
-  return (data ?? []).map((r) => r[selectCol]);
+  let out = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await filterFn(db.from(table).select(selectCol).range(from, from + 999));
+    if (error) throw new Error(`${table} select failed: ${error.message}`);
+    out = out.concat((data ?? []).map((r) => r[selectCol]));
+    if (!data || data.length < 1000) break;
+    from += 1000;
+  }
+  return out;
 }
+// ВАЖНО (найдено эмпирически в этой сессии): PostgREST по умолчанию режет
+// ЛЮБОЙ .select(), возвращающий данные, на 1000 строк (db-max-rows), даже
+// если .in()-фильтр применён к маленькому чанку id — при плотности >3.3
+// дочерних строк на 1 id из чанка в 300 это легко превышается (проверено
+// живьём: lesson_stages — 1178 строк на 251 урок, один чанк уже отдавал
+// ровно 1000 и молча резал остальное). .select(..., {count:"exact",
+// head:true}) НЕ подвержен этому (Prefer:count=exact — агрегат, не выдача
+// строк) — но selectIdsIn ЗДЕСЬ реально читает id-шники, поэтому обязан
+// пагинироваться через .range(), иначе построенные из него filter-id-сеты
+// (stageIds/questionIds/...) сами оказываются урезаны, и все счётчики,
+// которые от них зависят дальше по цепочке, окажутся занижены.
 async function selectIdsIn(table, col, ids, selectCol = "id") {
   if (ids.length === 0) return [];
   let out = [];
   for (const c of chunk(ids, 300)) {
-    const { data, error } = await db.from(table).select(selectCol).in(col, c);
-    if (error) throw new Error(`${table}.${col} select failed: ${error.message}`);
-    out = out.concat((data ?? []).map((r) => r[selectCol]));
+    let from = 0;
+    for (;;) {
+      const { data, error } = await db.from(table).select(selectCol).in(col, c).range(from, from + 999);
+      if (error) throw new Error(`${table}.${col} select failed: ${error.message}`);
+      out = out.concat((data ?? []).map((r) => r[selectCol]));
+      if (!data || data.length < 1000) break;
+      from += 1000;
+    }
   }
   return out;
 }
 
 let stepNo = 0;
 const totals = {};
-/** Удаляет строки table, где col IN ids (чанками). Возвращает удалённое кол-во.
- *  dry-run: только считает (не пишет). Идемпотентно — повторный вызов на уже
- *  пустом множестве просто вернёт 0. */
-async function deleteWhereIn(table, col, ids, totalSteps) {
+/** Удаляет строки table, где col IN ids (чанками по 300 — безопасный размер
+ *  IN-списка для PostgREST). Возвращает удалённое кол-во.
+ *  dry-run: считает через {count:"exact",head:true} (агрегат, НЕ подвержен
+ *  лимиту в 1000 строк — безопасно даже для больших совпадений).
+ *  confirm: удаляет через .delete({count:"exact"}) БЕЗ .select() — тот же
+ *  Prefer:count=exact-агрегат для точного числа, не выдача самих строк
+ *  (которая была бы урезана тем же лимитом при >1000 удалений в чанке).
+ *  Идемпотентно — повторный вызов на уже пустом множестве вернёт 0. */
+async function deleteWhereIn(table, col, ids, totalSteps, extraFilter) {
   stepNo++;
-  const label = `[${stepNo}/${totalSteps}] ${DRY_RUN ? "Would delete" : "Deleting"} ${table} where ${col} in (...)`;
+  const label = `[${stepNo}/${totalSteps}] ${DRY_RUN ? "Would delete" : "Deleting"} ${table} where ${col} in (...)${extraFilter ? " (доп. фильтр)" : ""}`;
   if (ids.length === 0) {
     console.log(`${label} — 0 кандидатов, пропуск.`);
     totals[table] = (totals[table] ?? 0) + 0;
@@ -147,13 +176,17 @@ async function deleteWhereIn(table, col, ids, totalSteps) {
   let deleted = 0;
   for (const c of chunk(ids, 300)) {
     if (DRY_RUN) {
-      const { count, error } = await db.from(table).select("*", { count: "exact", head: true }).in(col, c);
+      let q = db.from(table).select("*", { count: "exact", head: true }).in(col, c);
+      if (extraFilter) q = extraFilter(q);
+      const { count, error } = await q;
       if (error) throw new Error(`${table} dry-count failed: ${error.message}`);
       deleted += count ?? 0;
     } else {
-      const { data, error } = await db.from(table).delete().in(col, c).select("*");
+      let q = db.from(table).delete({ count: "exact" }).in(col, c);
+      if (extraFilter) q = extraFilter(q);
+      const { count, error } = await q;
       if (error) throw new Error(`${table} delete failed: ${error.message}`);
-      deleted += data?.length ?? 0;
+      deleted += count ?? 0;
     }
   }
   console.log(`${label} — ${deleted} строк.`);
@@ -170,26 +203,29 @@ async function deleteWhereRange(table, col, totalSteps) {
     totals[table] = (totals[table] ?? 0) + (count ?? 0);
     return count ?? 0;
   }
-  const { data, error } = await db.from(table).delete().gte(col, START_ISO).lt(col, END_EXCL_ISO).select("*");
+  const { count, error } = await db.from(table).delete({ count: "exact" }).gte(col, START_ISO).lt(col, END_EXCL_ISO);
   if (error) throw new Error(`${table} delete failed: ${error.message}`);
-  console.log(`${label} — ${data?.length ?? 0} строк.`);
-  totals[table] = (totals[table] ?? 0) + (data?.length ?? 0);
-  return data?.length ?? 0;
+  console.log(`${label} — ${count ?? 0} строк.`);
+  totals[table] = (totals[table] ?? 0) + (count ?? 0);
+  return count ?? 0;
 }
 
 async function main() {
-  const TOTAL_STEPS = 32; // 1 chat_messages + 10 дерево homework + 21 дерево lessons
+  const TOTAL_STEPS = 33; // 1 chat_messages + 10 дерево homework + 22 дерево lessons
 
   // ── Резолв id ДО удаления (чтобы дочерние DELETE знали, что удалять) ────
   const lessonIds = await selectIds("lessons", (q) => q.gte("starts_at", START_ISO).lt("starts_at", END_EXCL_ISO));
   console.log(`\nУроков в диапазоне: ${lessonIds.length}`);
 
-  const { data: hwRows, error: hwErr } = await db
-    .from("homework")
-    .select("id")
-    .or(`and(due_date.gte.${START_ISO},due_date.lt.${END_EXCL_ISO}),and(created_at.gte.${START_ISO},created_at.lt.${END_EXCL_ISO})`);
-  if (hwErr) throw new Error(`homework select failed: ${hwErr.message}`);
-  const homeworkIds = (hwRows ?? []).map((r) => r.id);
+  // Через selectIds (пагинировано .range()) — найдено адверсариальной
+  // проверкой этой сессии: раньше это был сырой .select() в обход
+  // хелперов, единственное непагинированное чтение id в файле. Live-объём
+  // (50 ДЗ) сейчас не задевает лимит 1000, но было структурно
+  // несогласованным с остальным файлом и опасным при более широком
+  // --start-date/--end-date.
+  const homeworkIds = await selectIds("homework", (q) =>
+    q.or(`and(due_date.gte.${START_ISO},due_date.lt.${END_EXCL_ISO}),and(created_at.gte.${START_ISO},created_at.lt.${END_EXCL_ISO})`)
+  );
   console.log(`ДЗ в диапазоне (due_date ИЛИ created_at): ${homeworkIds.length}`);
 
   const stageIds = await selectIdsIn("lesson_stages", "lesson_id", lessonIds);
@@ -227,7 +263,20 @@ async function main() {
   await deleteWhereIn("lesson_stage_progress", "stage_id", stageIds, TOTAL_STEPS);
   await deleteWhereIn("lesson_stage_embeddings", "lesson_stage_id", stageIds, TOTAL_STEPS);
   await deleteWhereIn("lesson_stages_embedding_queue", "lesson_stage_id", stageIds, TOTAL_STEPS);
+  // course_materials — ДВЕ FK на lessons: stage_id (CASCADE) и lesson_id
+  // (ON DELETE SET NULL). Раньше здесь чистилась только ветка stage_id, а
+  // строки с lesson_id-без-stage_id ("вручную загруженные материалы
+  // группы") переживали удаление с обнулённым lesson_id. Пользователь
+  // подтвердил: для диапазона 7-26 июля удалять ЖЁСТКО, файлы в бакете не
+  // важны. Оставляем оба вызова (idempotent — второй просто добьёт то, что
+  // первый не поймал через stage_id, порядок между ними не важен).
   await deleteWhereIn("course_materials", "stage_id", stageIds, TOTAL_STEPS);
+  // .is("stage_id", null) делает эту ветку взаимоисключающей с предыдущей —
+  // без него dry-run-отчёт задвоил бы 73 строки, уже посчитанные выше
+  // (реальный --confirm запуск был бы корректен и без этого — второй DELETE
+  // просто не нашёл бы уже удалённые строки, — но dry-run считает оба шага
+  // независимо, поэтому фильтр нужен для точного числа в отчёте).
+  await deleteWhereIn("course_materials", "lesson_id", lessonIds, TOTAL_STEPS, (q) => q.is("stage_id", null));
   await deleteWhereIn("classwork_submissions", "classwork_id", classworkIds, TOTAL_STEPS);
   await deleteWhereIn("classwork_questions", "classwork_id", classworkIds, TOTAL_STEPS);
   await deleteWhereIn("classwork", "lesson_id", lessonIds, TOTAL_STEPS);
