@@ -664,6 +664,13 @@ export type TestAnswer = {
   is_correct: boolean | null;
 };
 
+// migration 149 — вложение УЧИТЕЛЯ к заданию: файл или видео-ссылка,
+// ось НЕЗАВИСИМАЯ от ContentType (тот — тип самого задания, миграция 95,
+// использует свои content_type/external_url на homework). Имена нарочно
+// с префиксом attachment_, чтобы не столкнуться с уже занятыми
+// content_type/external_url.
+export type HomeworkAttachmentContentType = 'file' | 'video_youtube' | 'video_rutube';
+
 export type HomeworkWithSubmission = {
   id: string;
   group_id: string;
@@ -679,6 +686,9 @@ export type HomeworkWithSubmission = {
   attachment_storage_path: string | null;
   attachment_size_bytes: number | null;
   attachment_filename: string | null;
+  attachment_content_type: HomeworkAttachmentContentType; // migration 149
+  attachment_external_url: string | null; // migration 149 — embed-URL, только для attachment_content_type video_*
+  attachment_source_url: string | null;   // migration 149 — ссылка, которую вставил учитель
   external_url: string | null; // migration 95 (external-service homework types)
   test_duration_seconds: number | null; // migration 31 (test type)
   test_auto_grade: boolean;             // migration 31 (test type)

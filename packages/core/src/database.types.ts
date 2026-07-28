@@ -1400,8 +1400,11 @@ export type Database = {
       }
       homework: {
         Row: {
+          attachment_content_type: string
+          attachment_external_url: string | null
           attachment_filename: string | null
           attachment_size_bytes: number | null
+          attachment_source_url: string | null
           attachment_storage_path: string | null
           attachments: Json
           content_type: string
@@ -1430,8 +1433,11 @@ export type Database = {
           title: string
         }
         Insert: {
+          attachment_content_type?: string
+          attachment_external_url?: string | null
           attachment_filename?: string | null
           attachment_size_bytes?: number | null
+          attachment_source_url?: string | null
           attachment_storage_path?: string | null
           attachments?: Json
           content_type?: string
@@ -1460,8 +1466,11 @@ export type Database = {
           title: string
         }
         Update: {
+          attachment_content_type?: string
+          attachment_external_url?: string | null
           attachment_filename?: string | null
           attachment_size_bytes?: number | null
+          attachment_source_url?: string | null
           attachment_storage_path?: string | null
           attachments?: Json
           content_type?: string

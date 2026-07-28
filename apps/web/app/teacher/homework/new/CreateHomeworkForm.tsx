@@ -9,6 +9,7 @@ import {
   createHomeworkSubtasks,
   uploadHomeworkAttachment,
   setHomeworkAttachment,
+  setHomeworkAttachmentVideo,
   uploadHomeworkTestsFile,
   uploadHomeworkHint,
   setHomeworkHint,
@@ -19,8 +20,9 @@ import {
 import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage, SubjectWithGroup } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch, Link2 } from "lucide-react";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
+import { parseVideoUrl } from "@/lib/video-url";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
 import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { CodeEditor } from "@/components/CodeEditor";
@@ -77,6 +79,13 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   // instead of uploading a fresh copy. Mutually exclusive with attachFile.
   const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
   const [showKBPicker, setShowKBPicker] = useState(false);
+  // Заход 2 (миграция 149) — третий взаимоисключающий вариант вложения:
+  // своя ссылка на YouTube/RuTube вместо файла. Валидность — производное
+  // значение (parseVideoUrl), не отдельный кусок state, тот же паттерн,
+  // что в TeacherLessonDetailView.tsx (uploadVideoUrl/parsedVideoUrl).
+  const [attachVideoUrl, setAttachVideoUrl] = useState("");
+  const parsedVideoUrl = attachVideoUrl.trim() ? parseVideoUrl(attachVideoUrl.trim()) : null;
+  const videoUrlInvalid = attachVideoUrl.trim().length > 0 && !parsedVideoUrl;
   const fileRef = useRef<HTMLInputElement>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [saving, setSaving] = useState(false);
@@ -109,6 +118,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     if (f && f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); e.target.value = ""; return; }
     setError(null);
     setAttachFile(f);
+    setAttachVideoUrl("");
   }
 
   function handleFileDrop(e: React.DragEvent) {
@@ -118,6 +128,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     if (f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); return; }
     setError(null);
     setAttachFile(f);
+    setAttachVideoUrl("");
   }
 
   const HINT_MIME_TYPES = ["image/png", "image/jpeg", "application/pdf"];
@@ -201,6 +212,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     if (format === "programming" && !description.trim()) { setError("Введите условие задачи"); return; }
     if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
     if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
+    if (format === "file" && videoUrlInvalid) { setError(d.lesson.materialInvalidVideoUrl); return; }
     // БОЛЬШОЕ ОБНОВЛЕНИЕ §9.1 — ссылка необязательна: пустая строка → на
     // просмотре у ученика подставится DEFAULT_EXTERNAL_URLS, как на уроках
     // (см. TeacherLessonDetailView.tsx's `externalReady` — тот же паттерн).
@@ -248,13 +260,29 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         })));
       }
       if (format === "file" && pickedFromKB) {
-        // Linked, not copied — see linkedMaterialAttachmentPath/linkedBookAttachmentPath.
-        const linkedPath = pickedFromKB.source === "book"
-          ? linkedBookAttachmentPath(pickedFromKB.storagePath)
-          : linkedMaterialAttachmentPath(pickedFromKB.storagePath);
-        await setHomeworkAttachment(supabase, hw.id, {
-          path: linkedPath, sizeByte: pickedFromKB.sizeBytes ?? 0, fileName: pickedFromKB.title,
-        });
+        if (pickedFromKB.contentType === "video_youtube" || pickedFromKB.contentType === "video_rutube") {
+          // Заход 2 (миграция 149) — видео-ссылка из Материалов кафедры:
+          // storagePath пуст для видео-элементов (см. PickedKnowledgeBaseFile),
+          // линковать как файл (linkedMaterialAttachmentPath) было бы тихой
+          // порчей данных — video-путь пишет отдельные attachment_external_url/
+          // attachment_source_url колонки, а не attachment_storage_path.
+          if (!pickedFromKB.externalUrl || !pickedFromKB.sourceUrl) {
+            throw new Error("Видео-ссылка библиотеки без external_url/source_url — повреждённая запись");
+          }
+          await setHomeworkAttachmentVideo(supabase, hw.id, {
+            contentType: pickedFromKB.contentType,
+            externalUrl: pickedFromKB.externalUrl,
+            sourceUrl: pickedFromKB.sourceUrl,
+          });
+        } else {
+          // Linked, not copied — see linkedMaterialAttachmentPath/linkedBookAttachmentPath.
+          const linkedPath = pickedFromKB.source === "book"
+            ? linkedBookAttachmentPath(pickedFromKB.storagePath)
+            : linkedMaterialAttachmentPath(pickedFromKB.storagePath);
+          await setHomeworkAttachment(supabase, hw.id, {
+            path: linkedPath, sizeByte: pickedFromKB.sizeBytes ?? 0, fileName: pickedFromKB.title,
+          });
+        }
       } else if (format === "file" && attachFile) {
         const { path, sizeByte } = await uploadHomeworkAttachment(supabase, {
           teacherId: resolvedTeacherId,
@@ -263,6 +291,13 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
           blob: attachFile,
         });
         await setHomeworkAttachment(supabase, hw.id, { path, sizeByte, fileName: attachFile.name });
+      } else if (format === "file" && parsedVideoUrl) {
+        // Заход 2 — своя ссылка, вставленная вручную (не из библиотеки).
+        await setHomeworkAttachmentVideo(supabase, hw.id, {
+          contentType: parsedVideoUrl.platform === "youtube" ? "video_youtube" : "video_rutube",
+          externalUrl: parsedVideoUrl.embedUrl,
+          sourceUrl: attachVideoUrl.trim(),
+        });
       }
       if (format === "programming" && testsFile) {
         const { path, sizeByte } = await uploadHomeworkTestsFile(supabase, {
@@ -497,10 +532,18 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
             />
             {pickedFromKB ? (
               <div className="flex items-center gap-3 rounded-[14px] border border-brand-blue/40 bg-blue-50/60 px-4 py-3">
-                <FolderSearch size={15} className="shrink-0 text-brand-blue" />
+                {pickedFromKB.contentType === "video_youtube" || pickedFromKB.contentType === "video_rutube" ? (
+                  <Link2 size={15} className="shrink-0 text-brand-blue" />
+                ) : (
+                  <FolderSearch size={15} className="shrink-0 text-brand-blue" />
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium text-brand-blue">{pickedFromKB.title}</p>
-                  <p className="text-[11px] text-slate-500">{d.knowledgeBase.title}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {pickedFromKB.contentType === "video_youtube" || pickedFromKB.contentType === "video_rutube"
+                      ? d.lesson.materialVideoTag
+                      : d.knowledgeBase.title}
+                  </p>
                 </div>
                 <button type="button" onClick={() => setPickedFromKB(null)} className="shrink-0 text-slate-400 hover:text-red-500">
                   <X size={14} />
@@ -521,6 +564,17 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
                   <X size={14} />
                 </button>
               </div>
+            ) : parsedVideoUrl ? (
+              <div className="flex items-center gap-3 rounded-[14px] border border-brand-blue/40 bg-blue-50/60 px-4 py-3">
+                <Link2 size={15} className="shrink-0 text-brand-blue" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-brand-blue">{attachVideoUrl.trim()}</p>
+                  <p className="text-[11px] text-slate-500">{d.lesson.materialVideoTag}</p>
+                </div>
+                <button type="button" onClick={() => setAttachVideoUrl("")} className="shrink-0 text-slate-400 hover:text-red-500">
+                  <X size={14} />
+                </button>
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 <label
@@ -532,6 +586,25 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
                   <Paperclip size={20} className="text-slate-400" />
                   <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.hwAttachBtn}</span>
                   <span className="text-[11px] text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ</span>
+                </label>
+                {/* Заход 2 (миграция 149) — своя видео-ссылка вместо файла;
+                    те же ключи и та же логика (parseVideoUrl), что и на
+                    форме "Прикрепить материал" урока. */}
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12px] font-medium text-brand-ink-muted">{d.lesson.materialVideoUrlLabel}</span>
+                  <input
+                    type="text"
+                    value={attachVideoUrl}
+                    onChange={(e) => { setAttachVideoUrl(e.target.value); setAttachFile(null); setPickedFromKB(null); }}
+                    placeholder="https://..."
+                    className={cn(
+                      "rounded-[10px] border bg-white/80 px-3 py-2.5 text-[13px] text-brand-ink focus:outline-none focus:ring-2",
+                      videoUrlInvalid
+                        ? "border-red-300 focus:border-red-500 focus:ring-red-100"
+                        : "border-slate-200 focus:border-brand-blue/50 focus:ring-brand-blue/20",
+                    )}
+                  />
+                  {videoUrlInvalid && <span className="text-[11px] text-red-500">{d.lesson.materialInvalidVideoUrl}</span>}
                 </label>
                 <button
                   type="button"
@@ -548,14 +621,15 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         <KnowledgeBaseFilePicker
           open={showKBPicker}
           onClose={() => setShowKBPicker(false)}
-          onSelect={(items) => { const first = items[0]; if (first) { setPickedFromKB(first); setAttachFile(null); } }}
+          onSelect={(items) => { const first = items[0]; if (first) { setPickedFromKB(first); setAttachFile(null); setAttachVideoUrl(""); } }}
           groupIds={groupId ? [groupId] : []}
           multiSelect={false}
-          // 6А, Заход D3 — задание не поддерживает video_*-вложения (нет
-          // attachment_content_type/attachment_external_url на homework,
-          // отдельная будущая миграция) — библиотечные видео-ссылки здесь
-          // намеренно скрыты, чтобы учитель не выбрал то, что не прикрепится.
-          allowVideoLinks={false}
+          // Заход 2 (миграция 149) — задание теперь поддерживает video_*
+          // вложения (attachment_content_type/attachment_external_url/
+          // attachment_source_url на homework) — библиотечные видео-ссылки
+          // больше не нужно скрывать (см. save() выше: pickedFromKB.contentType
+          // video_* → setHomeworkAttachmentVideo, не линковка storagePath).
+          allowVideoLinks
         />
 
         {isExternal && (

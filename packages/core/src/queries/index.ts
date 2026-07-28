@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
@@ -231,6 +231,9 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         attachment_storage_path: string | null;
         attachment_size_bytes: number | null;
         attachment_filename: string | null;
+        attachment_content_type: HomeworkAttachmentContentType;
+        attachment_external_url: string | null;
+        attachment_source_url: string | null;
         test_duration_seconds: number | null;
         test_auto_grade: boolean;
         programming_language: ProgrammingLanguage | null;
@@ -282,6 +285,9 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     attachment_storage_path: string | null;
     attachment_size_bytes: number | null;
     attachment_filename: string | null;
+    attachment_content_type: HomeworkAttachmentContentType;
+    attachment_external_url: string | null;
+    attachment_source_url: string | null;
     test_duration_seconds: number | null;
     test_auto_grade: boolean;
     programming_language: ProgrammingLanguage | null;
@@ -3798,7 +3804,12 @@ export const uploadHomeworkAttachment = async (
   return { path, sizeByte: blob.size };
 };
 
-/** Update homework's attachment columns after uploading (or null to clear). */
+/** Update homework's attachment columns after uploading (or null to clear).
+ *  Файловая ветка вложения (migration 149) — всегда явно возвращает
+ *  attachment_content_type в 'file' и зануляет video-поля, даже если
+ *  вложение раньше было video_* (иначе CHECK homework_attachment_shape_chk
+ *  упадёт: 'file' требует attachment_external_url/attachment_source_url
+ *  = NULL). */
 export const setHomeworkAttachment = async (
   db: Db,
   homeworkId: string,
@@ -3807,9 +3818,36 @@ export const setHomeworkAttachment = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db.from("homework") as any)
     .update({
+      attachment_content_type: "file",
       attachment_storage_path: attachment?.path ?? null,
       attachment_size_bytes: attachment?.sizeByte ?? null,
       attachment_filename: attachment?.fileName ?? null,
+      attachment_external_url: null,
+      attachment_source_url: null,
+    })
+    .eq("id", homeworkId);
+  if (error) throw error;
+};
+
+/** Видео-ветка вложения задания (migration 149) — зеркалит
+ *  addLessonMaterialVideo/createLibraryMaterial (тот же content_type/
+ *  external_url/source_url паттерн, здесь — с префиксом attachment_,
+ *  т.к. голые имена заняты осью типа задания, см. types.ts). Явно
+ *  зануляет файловые поля — CHECK требует их NULL для video_*. */
+export const setHomeworkAttachmentVideo = async (
+  db: Db,
+  homeworkId: string,
+  video: { contentType: "video_youtube" | "video_rutube"; externalUrl: string; sourceUrl: string },
+) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db.from("homework") as any)
+    .update({
+      attachment_content_type: video.contentType,
+      attachment_external_url: video.externalUrl,
+      attachment_source_url: video.sourceUrl,
+      attachment_storage_path: null,
+      attachment_size_bytes: null,
+      attachment_filename: null,
     })
     .eq("id", homeworkId);
   if (error) throw error;
@@ -3855,21 +3893,33 @@ export const getHomeworkAttachmentUrl = async (
   return data!.signedUrl;
 };
 
-/** Delete teacher attachment from Storage + clear homework columns.
- *  A Knowledge Base-linked file (Этап 3.4) is shared with its Materials/
- *  Library entry — only the link is removed, the underlying file survives. */
+/** Delete teacher attachment (file OR video, migration 149) from Storage
+ *  (file only — video has no Storage object, storagePath is null then) +
+ *  clear ALL SIX homework attachment columns, returning
+ *  attachment_content_type to its 'file' default. A Knowledge Base-linked
+ *  file (Этап 3.4) is shared with its Materials/Library entry — only the
+ *  link is removed, the underlying file survives. */
 export const deleteHomeworkAttachment = async (
   db: Db,
   homeworkId: string,
-  storagePath: string,
+  storagePath: string | null,
 ) => {
-  const { bucket, path, isLinked } = resolveAttachmentBucket(storagePath);
-  if (!isLinked) {
-    await db.storage.from(bucket).remove([path]);
+  if (storagePath) {
+    const { bucket, path, isLinked } = resolveAttachmentBucket(storagePath);
+    if (!isLinked) {
+      await db.storage.from(bucket).remove([path]);
+    }
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db.from("homework") as any)
-    .update({ attachment_storage_path: null, attachment_size_bytes: null, attachment_filename: null })
+    .update({
+      attachment_content_type: "file",
+      attachment_storage_path: null,
+      attachment_size_bytes: null,
+      attachment_filename: null,
+      attachment_external_url: null,
+      attachment_source_url: null,
+    })
     .eq("id", homeworkId);
   if (error) throw error;
 };
