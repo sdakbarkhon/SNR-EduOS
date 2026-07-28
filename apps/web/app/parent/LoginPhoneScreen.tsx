@@ -19,6 +19,7 @@ import {
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
 import { AuthDemoSheet } from "./AuthDemoSheet";
+import { LangThemeButtons } from "./LangThemeButtons";
 
 type SheetKey = null | "help" | "demo";
 
@@ -67,12 +68,13 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Шапка: назад + «Нужна помощь?» */}
-      <div className="flex items-center gap-3 px-4 pb-2 pt-6">
+      {/* Шапка: назад + Язык/Тема + «Нужна помощь?» */}
+      <div className="flex items-center gap-2.5 px-4 pb-2 pt-6">
         <GlassCircleButton onClick={onBack} ariaLabel={dict.parentApp.common.back}>
           <BackArrowIcon color={ink1} />
         </GlassCircleButton>
         <div className="flex-1" />
+        <LangThemeButtons />
         <button type="button" onClick={() => setSheet("help")} className="text-[12px] font-extrabold" style={{ color: accent }}>
           {t.needHelp}
         </button>

@@ -56,6 +56,63 @@ export function AppleIcon({ size = 18, color = "#171243" }: IconProps) {
   );
 }
 
+/** Глобус — кнопка выбора языка на онбординге/экране входа. */
+export function GlobeIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+      <path d="M3 12h18" />
+      <path d="M12 3a13 13 0 0 1 0 18" />
+      <path d="M12 3a13 13 0 0 0 0 18" />
+    </svg>
+  );
+}
+
+/** Солнце — 1:1 с apps/mobile-parent LangSecurityScreen.tsx SunIcon. */
+export function SunIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx={12} cy={12} r={4} />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.9 4.9 1.4 1.4" />
+      <path d="m17.7 17.7 1.4 1.4" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.3 17.7-1.4 1.4" />
+      <path d="m19.1 4.9-1.4 1.4" />
+    </svg>
+  );
+}
+
+/** Луна — 1:1 с apps/mobile-parent LangSecurityScreen.tsx MoonIcon. */
+export function MoonIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+    </svg>
+  );
+}
+
+/** Монитор — 1:1 с apps/mobile-parent LangSecurityScreen.tsx DeviceIcon («Системная»). */
+export function MonitorIcon({ size = 17, color = "#FFFFFF", strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <rect x={6} y={2} width={12} height={20} rx={3} />
+      <path d="M12 18h.01" />
+    </svg>
+  );
+}
+
+/** Галочка — индикатор выбранного пункта в шторках языка/темы. */
+export function CheckIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 export function UzFlagIcon({ size = 18 }: { size?: number }) {
   const h = Math.round((size / 18) * 13);
   return (
