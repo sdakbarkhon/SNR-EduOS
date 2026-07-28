@@ -2343,6 +2343,10 @@ export const en: Dictionary = {
       title: "Coming soon",
       subtitle: "This section will be available in one of the upcoming updates",
     },
+    qrGate: {
+      title: "Open on your phone",
+      subtitle: "Scan the QR code with your phone's camera to open the parent panel",
+    },
     scr: {
       dayStatus: "Day status",
       homeworks: "Homework",
@@ -2427,6 +2431,13 @@ export const en: Dictionary = {
       gradeChipExcellent: "Excellent!",
       gradeChipGood: "Good!",
       gradeChipNeedsWork: "Room to grow",
+    },
+    progressWeb: {
+      weekProgressLabel: "Progress this week",
+      weekProgressNote: "Steady trend",
+      dynamicsNote: "Average grade trend by month — a preliminary estimate.",
+      assistantGradesNote: "Performance is steady, no subjects falling behind.",
+      assistantSkillsNote: "Strengths — logic and independence.",
     },
     skills: {
       profile: "Skills profile",

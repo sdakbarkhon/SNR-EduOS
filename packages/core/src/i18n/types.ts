@@ -2413,6 +2413,12 @@ export interface Dictionary {
       title: string;
       subtitle: string;
     };
+    /** QR-гейт /parent на широких экранах (веб-родитель — узкая мобильная
+     *  вёрстка, десктоп/планшет получает QR вместо интерфейса). */
+    qrGate: {
+      title: string;
+      subtitle: string;
+    };
     scr: {
       dayStatus: string;
       homeworks: string;
@@ -2503,6 +2509,16 @@ export interface Dictionary {
       gradeChipExcellent: string; // «Отлично!» — средний балл ≥4.5
       gradeChipGood: string;      // «Хорошо!» — средний балл ≥3.5
       gradeChipNeedsWork: string; // «Есть куда расти» — средний балл <3.5
+    };
+    /** Веб-родитель, экран «Успехи» — статичный мок-текст под карточкой
+     *  «Средний балл» и вкладками «Навыки»/«Динамика» (те же вкладки в
+     *  мобилке остаются фикстурой — сюда просто перенесены их подписи). */
+    progressWeb: {
+      weekProgressLabel: string; // «Прогресс за неделю»
+      weekProgressNote: string;
+      dynamicsNote: string;
+      assistantGradesNote: string;
+      assistantSkillsNote: string;
     };
     skills: {
       profile: string;

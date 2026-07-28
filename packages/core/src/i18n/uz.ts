@@ -2344,6 +2344,10 @@ export const uz: Dictionary = {
       title: "Tez orada",
       subtitle: "Bu bo'lim yaqin yangilanishlardan birida qo'shiladi",
     },
+    qrGate: {
+      title: "Telefoningizda oching",
+      subtitle: "Ota-ona panelini ochish uchun QR-kodni telefon kamerasi bilan skanerlang",
+    },
     scr: {
       dayStatus: "Kun holati",
       homeworks: "Uy vazifalari",
@@ -2428,6 +2432,13 @@ export const uz: Dictionary = {
       gradeChipExcellent: "A'lo!",
       gradeChipGood: "Yaxshi!",
       gradeChipNeedsWork: "Rivojlanish kerak",
+    },
+    progressWeb: {
+      weekProgressLabel: "Haftalik progress",
+      weekProgressNote: "Barqaror dinamika",
+      dynamicsNote: "Oylar bo'yicha o'rtacha ball dinamikasi — dastlabki baho.",
+      assistantGradesNote: "O'zlashtirish barqaror, fanlar bo'yicha orqada qolish aniqlanmadi.",
+      assistantSkillsNote: "Kuchli tomonlari — mantiq va mustaqillik.",
     },
     skills: {
       profile: "Ko'nikmalar profili",

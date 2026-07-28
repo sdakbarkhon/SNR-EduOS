@@ -2347,6 +2347,10 @@ export const ru: Dictionary = {
       title: "Скоро",
       subtitle: "Этот раздел появится в одном из ближайших обновлений",
     },
+    qrGate: {
+      title: "Откройте на телефоне",
+      subtitle: "Отсканируйте QR-код камерой телефона, чтобы открыть родительскую панель",
+    },
     scr: {
       dayStatus: "Статус дня",
       homeworks: "Домашние задания",
@@ -2431,6 +2435,13 @@ export const ru: Dictionary = {
       gradeChipExcellent: "Отлично!",
       gradeChipGood: "Хорошо!",
       gradeChipNeedsWork: "Есть куда расти",
+    },
+    progressWeb: {
+      weekProgressLabel: "Прогресс за неделю",
+      weekProgressNote: "Стабильная динамика",
+      dynamicsNote: "Динамика среднего балла по месяцам — предварительная оценка.",
+      assistantGradesNote: "Успеваемость стабильна, отставаний по предметам не выявлено.",
+      assistantSkillsNote: "Сильные стороны — логика и самостоятельность.",
     },
     skills: {
       profile: "Профиль навыков",
