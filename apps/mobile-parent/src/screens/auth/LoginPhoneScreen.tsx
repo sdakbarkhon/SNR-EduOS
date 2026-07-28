@@ -45,6 +45,7 @@ import {
 } from "../../ui/auth/icons";
 import { AuthHelpSheet } from "./sheets/AuthHelpSheet";
 import { AuthDemoPickerSheet } from "./sheets/AuthDemoPickerSheet";
+import { LangThemeButtons } from "./LangThemeButtons";
 
 /** Формат «90 123 45 67» — соответствует phoneFmt макета. */
 function formatPhone(digits: string): string {
@@ -83,11 +84,12 @@ export function LoginPhoneScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* 1. Шапка — back слева, «Нужна помощь?» справа (макет 1973–1977). */}
+      {/* 1. Шапка — back слева, Язык/Тема + «Нужна помощь?» справа (макет 1973–1977). */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
+          gap: 10,
           paddingTop: Math.max(50, insets.top + 10),
           paddingHorizontal: 18,
           paddingBottom: 8,
@@ -97,6 +99,7 @@ export function LoginPhoneScreen() {
           <BackArrowIcon color={tokens.ink1} />
         </GlassCircleButton>
         <View style={{ flex: 1 }} />
+        <LangThemeButtons />
         <Pressable onPress={() => setSheet("help")} hitSlop={8}>
           <Text
             style={{

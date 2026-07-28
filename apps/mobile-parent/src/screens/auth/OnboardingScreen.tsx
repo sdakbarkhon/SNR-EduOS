@@ -48,6 +48,7 @@ import { useAppLocale } from "../../i18n";
 import { fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { AuthFeaturesSheet } from "./sheets/AuthFeaturesSheet";
+import { LangThemeButtons } from "./LangThemeButtons";
 
 const CENTER_PADDING_H = 22;
 const SLIDE_COUNT = 3;
@@ -97,41 +98,47 @@ export function OnboardingScreen() {
   return (
     <View style={{ flex: 1 }}>
       {/* ─── ВЕРХ: логотип-хедер + тэглайн (fixed) ────────────────────── */}
-      <View
-        style={{
-          paddingTop: Math.max(56, insets.top + 24),
-          paddingHorizontal: 22,
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-          <Image
-            source={require("../../../assets/logo-mark.png")}
-            style={{ width: 38, height: 38 }}
-            resizeMode="contain"
-          />
-          <Text
-            style={{
-              fontFamily: fonts.unbounded700,
-              fontSize: 19,
-              color: tokens.ink1,
-            }}
-          >
-            SNR EduOS
-          </Text>
+      <View style={{ position: "relative" }}>
+        {/* Язык/Тема — в правом верхнем углу, не задевают центрированный лого-блок. */}
+        <View style={{ position: "absolute", top: Math.max(50, insets.top + 10), right: 18, zIndex: 10 }}>
+          <LangThemeButtons />
         </View>
-        <Text
+        <View
           style={{
-            fontFamily: fonts.manrope800,
-            fontSize: 9.5,
-            letterSpacing: 1.14,
-            color: tokens.ink3,
-            opacity: 0.9,
+            paddingTop: Math.max(56, insets.top + 24),
+            paddingHorizontal: 22,
+            alignItems: "center",
+            gap: 6,
           }}
         >
-          {t.tagline}
-        </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+            <Image
+              source={require("../../../assets/logo-mark.png")}
+              style={{ width: 38, height: 38 }}
+              resizeMode="contain"
+            />
+            <Text
+              style={{
+                fontFamily: fonts.unbounded700,
+                fontSize: 19,
+                color: tokens.ink1,
+              }}
+            >
+              SNR EduOS
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontFamily: fonts.manrope800,
+              fontSize: 9.5,
+              letterSpacing: 1.14,
+              color: tokens.ink3,
+              opacity: 0.9,
+            }}
+          >
+            {t.tagline}
+          </Text>
+        </View>
       </View>
 
       {/* ─── ЦЕНТР: иллюстрация + заголовок + subtitle + dots (flex:1) ─ */}

@@ -3,7 +3,7 @@
  * Экраны не импортируют react-native-svg напрямую (правило Захода 4).
  * Все пути — 1:1 из макета «SNR EduOS v2 Light.dc.html».
  */
-import Svg, { G, Path, Rect } from "react-native-svg";
+import Svg, { Circle, G, Path, Rect } from "react-native-svg";
 
 export interface AuthIconProps {
   size?: number;
@@ -91,6 +91,54 @@ export function CheckIcon({ size = 12, color = "#FFFFFF", strokeWidth = 3 }: Aut
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M20 6 9 17l-5-5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** Глобус — кнопка выбора языка на онбординге/экране входа. */
+export function GlobeIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: AuthIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+      <Path d="M3 12h18" />
+      <Path d="M12 3a13 13 0 0 1 0 18" />
+      <Path d="M12 3a13 13 0 0 0 0 18" />
+    </Svg>
+  );
+}
+
+/** Солнце — 1:1 с LangSecurityScreen.tsx SunIcon (кнопка темы + строка «Светлая»). */
+export function SunIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: AuthIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx={12} cy={12} r={4} />
+      <Path d="M12 2v2" />
+      <Path d="M12 20v2" />
+      <Path d="m4.9 4.9 1.4 1.4" />
+      <Path d="m17.7 17.7 1.4 1.4" />
+      <Path d="M2 12h2" />
+      <Path d="M20 12h2" />
+      <Path d="m6.3 17.7-1.4 1.4" />
+      <Path d="m19.1 4.9-1.4 1.4" />
+    </Svg>
+  );
+}
+
+/** Луна — 1:1 с LangSecurityScreen.tsx MoonIcon (кнопка темы + строка «Тёмная»). */
+export function MoonIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: AuthIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+    </Svg>
+  );
+}
+
+/** Устройство — 1:1 с LangSecurityScreen.tsx DeviceIcon (строка «Системная»). */
+export function DeviceIcon({ size = 17, color = "#FFFFFF", strokeWidth = 1.8 }: AuthIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x={6} y={2} width={12} height={20} rx={3} />
+      <Path d="M12 18h.01" />
     </Svg>
   );
 }
