@@ -8,6 +8,7 @@ import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
+import { PageContainer } from "@/components/PageContainer";
 import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
@@ -263,7 +264,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   ];
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-8 lg:flex-row">
+    <PageContainer className="flex flex-col gap-8 lg:flex-row">
       {/* Main */}
       <div className="flex-1">
         <div className="mb-8 flex items-center gap-4">
@@ -408,6 +409,6 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

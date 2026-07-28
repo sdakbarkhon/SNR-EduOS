@@ -193,8 +193,10 @@ export function TeacherGradesView({ groups, stats }: Props) {
 
   return (
     <div className="space-y-5">
-      {/* KPI */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* KPI — max-w здесь, а не на всей странице: у экрана и так нет своего
+          cap (уже во всю ширину каркаса), но 3 карточки без ограничения
+          растягивались до огромных на 1920+ (Адаптив, заход 2). */}
+      <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-[20px] border border-white/80 bg-white/70 p-5 backdrop-blur-xl"
             style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>

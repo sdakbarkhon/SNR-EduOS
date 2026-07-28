@@ -17,6 +17,7 @@ import { TeacherProgrammingSubmissions } from "./TeacherProgrammingSubmissions";
 import { TeacherBundleSubmissions } from "./TeacherBundleSubmissions";
 import type { Locale, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { PageContainer } from "@/components/PageContainer";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
@@ -335,7 +336,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5">
+    <PageContainer className="space-y-5">
       <div className="flex items-center gap-3">
         <Link href="/teacher/homework" className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />
@@ -586,6 +587,6 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

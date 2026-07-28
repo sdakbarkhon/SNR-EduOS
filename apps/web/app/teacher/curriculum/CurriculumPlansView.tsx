@@ -10,6 +10,7 @@ import {
 import type { CurriculumPlanWithTopics, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { PageContainer } from "@/components/PageContainer";
 
 type GroupItem = { id: string; name: string };
 type SubjectItem = { id: string; name: string; group_id: string };
@@ -52,7 +53,7 @@ export function CurriculumPlansView({
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageContainer className="space-y-6">
       <div className="flex items-center gap-4">
         <div className="group relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-blue-600" />
@@ -77,7 +78,7 @@ export function CurriculumPlansView({
           {plans.length === 0 ? "Пока нет ни одного плана. Загрузите первый — AI разложит его на темы." : "Ничего не найдено"}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredPlans.map((p) => (
             <Link
               key={p.id}
@@ -104,7 +105,7 @@ export function CurriculumPlansView({
           onSaved={(saved) => { handleSaved(saved); setUploadModal(false); }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

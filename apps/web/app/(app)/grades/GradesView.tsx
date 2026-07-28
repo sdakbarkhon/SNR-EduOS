@@ -8,6 +8,7 @@ import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
+import { PageContainer } from "@/components/PageContainer";
 import { cn } from "@/lib/cn";
 import { GradeFilterDropdown } from "./GradeFilterDropdown";
 import { GradeDistributionDonut } from "./GradeDistributionDonut";
@@ -227,7 +228,7 @@ export function GradesView({ grades, error = false }: Props) {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <PageContainer className="flex flex-col gap-6">
       <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
         {t.title} <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
       </h1>
@@ -446,6 +447,6 @@ export function GradesView({ grades, error = false }: Props) {
           onClose={() => setSelected(null)}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

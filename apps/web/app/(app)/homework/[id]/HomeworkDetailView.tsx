@@ -650,7 +650,11 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
   }
 
   return (
-    <div className="py-6">
+    // Единственный экран ученика в заходе 2 наоборот получает более узкий
+    // предел, а не PageContainer: тут длинные абзацы (описание задания,
+    // текстовое поле сдачи) — на всю каркасную ширину до 1600px строка
+    // текста была избыточно длинной для чтения (Адаптив, заход 2).
+    <div className="mx-auto max-w-4xl py-6">
       {hintPanel}
       <button
         type="button"

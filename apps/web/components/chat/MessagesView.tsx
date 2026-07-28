@@ -320,10 +320,14 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   return (
     <div className="flex h-full overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
       {/* Промт 6.2: на md-lg (планшет, 768-1024) 320px фиксированной ширины
-          списка чатов зажимало область сообщений — сужена до 230px, на lg+
-          (десктоп) ширина как была. */}
+          списка чатов зажимало область сообщений — сужена до 230px, на xl+
+          ширина как была (320px). Порог второго прыжка — xl=1280, а не
+          lg=1024: у учителя TeacherSidebar.tsx (window.innerWidth<1024)
+          разворачивается ровно на 1024, и раньше оба события совпадали на
+          одном пикселе — панель диалога резко проседала (Адаптив, заход 2 —
+          разведка). На xl сайдбар уже стабильно развёрнут, коллизии нет. */}
       <div
-        className={`w-full shrink-0 flex-col border-r border-gray-100 md:flex md:w-[230px] lg:w-[320px] ${activeThreadId ? "hidden md:flex" : "flex"}`}
+        className={`w-full shrink-0 flex-col border-r border-gray-100 md:flex md:w-[230px] xl:w-[320px] ${activeThreadId ? "hidden md:flex" : "flex"}`}
       >
         <div className="shrink-0 border-b border-gray-100 px-4 py-4">
           <h1 className="text-lg font-bold text-gray-800">{d.chat.title}</h1>
@@ -455,7 +459,12 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
                       </div>
                     )}
                     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${mine ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-800"}`}>
+                      {/* max-w — min(75%, 520px): на узких панелях (768-1366)
+                          75% по-прежнему работает как раньше; на 1920+ (где
+                          панель диалога растягивается вместе с 1600px-каркасом)
+                          пузырь больше не растягивается на ~900px — читаемая
+                          ширина строки ограничена px-потолком (Адаптив, заход 2). */}
+                      <div className={`max-w-[min(75%,520px)] rounded-2xl px-3 py-2 ${mine ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-800"}`}>
                         {!mine && senderName && (
                           <p className="mb-0.5 text-[11px] font-semibold text-indigo-500">{senderName}</p>
                         )}
@@ -477,7 +486,10 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
 
             <div className="shrink-0 border-t border-gray-100 p-3">
               {sendError && <p className="mb-1.5 text-xs font-medium text-red-500">{d.chat.sendError}</p>}
-              <div className="flex items-end gap-2">
+              {/* mx-auto max-w-[720px] — на 1920+ однострочное поле ввода
+                  раньше растягивалось на всю ширину панели (~1200px+) вместо
+                  разумного композера (Адаптив, заход 2). */}
+              <div className="mx-auto flex w-full max-w-[720px] items-end gap-2">
                 <EmojiPicker onSelect={insertEmoji} />
                 <textarea
                   ref={textareaRef}

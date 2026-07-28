@@ -34,6 +34,7 @@ import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { PageContainer } from "@/components/PageContainer";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -1198,14 +1199,14 @@ export function TeacherLessonDetailView({
 
   if (!mounted) {
     return (
-      <div className="mx-auto max-w-5xl flex justify-center py-24">
+      <PageContainer className="flex justify-center py-24">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageContainer className="space-y-6">
       {/* Back */}
       <Link
         href="/teacher/lessons"
@@ -1319,7 +1320,7 @@ export function TeacherLessonDetailView({
         {materials.length === 0 ? (
           <p className="text-sm text-gray-400">{dl.materialsEmpty}</p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {materials.map((mat) => {
               const matEditBlocked = isDemoSession && !mat.is_demo;
               const isVideo = mat.content_type !== "file";
@@ -2104,6 +2105,6 @@ export function TeacherLessonDetailView({
         confirmText="Удалить"
         cancelText={d.common.cancel}
       />
-    </div>
+    </PageContainer>
   );
 }

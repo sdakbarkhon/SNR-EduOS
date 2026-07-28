@@ -22,6 +22,7 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
+import { PageContainer } from "@/components/PageContainer";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 
 type ViewMode = "today" | "week";
@@ -259,7 +260,7 @@ export function LessonsView({
   const weekLessons = weekCache[weekStart] ?? [];
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col overflow-hidden">
+    <PageContainer className="flex h-full flex-col overflow-hidden">
       {/* Приветствие + иллюстрация + переключатель */}
       <div className="flex shrink-0 items-start justify-between gap-4">
         <div>
@@ -410,7 +411,7 @@ export function LessonsView({
           onOpen={(id) => router.push(`/lessons/${id}`)}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -558,8 +559,14 @@ function WeekGrid({
         </div>
       </div>
 
-      {/* Сетка/список — на <1024 (моб.+планшет) список по дням, на >=1024
-          (десктоп) прежняя горизонтальная сетка без изменений. */}
+      {/* Сетка/список — на <1280 список по дням, на >=1280 горизонтальная
+          сетка. Раньше порог был lg=1024 — ровно там же, где StudentSidebar
+          переключается overlay→push (см. StudentSidebar.tsx, "lg:static"),
+          из-за чего оба события совпадали на одном пикселе: сайдбар
+          раздвигался ДО push-ширины и сетка недели включалась ОДНОВРЕМЕННО,
+          съедая колонку дня до ~83px (Адаптив, заход 2 — разведка). На xl
+          сайдбар уже какое-то время как push-192/256px, а самой сетке
+          физически больше места. */}
       <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
         {loading && (
           <div className="absolute inset-0 z-20 flex items-center justify-center rounded-3xl bg-white/70">
@@ -567,11 +574,11 @@ function WeekGrid({
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl border border-slate-100 bg-white p-3 shadow-sm lg:hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl border border-slate-100 bg-white p-3 shadow-sm xl:hidden">
           <WeekDayList days={days} byDay={byDay} todayIdx={todayIdx} locale={locale} s={s} onOpen={onOpen} />
         </div>
 
-      <div className="hidden min-h-0 flex-1 flex-col rounded-3xl border border-slate-100 bg-white p-4 shadow-sm lg:flex">
+      <div className="hidden min-h-0 flex-1 flex-col rounded-3xl border border-slate-100 bg-white p-4 shadow-sm xl:flex">
         {/* Шапка дней */}
         <div className="grid shrink-0 gap-x-2" style={gridTemplate}>
           <div />

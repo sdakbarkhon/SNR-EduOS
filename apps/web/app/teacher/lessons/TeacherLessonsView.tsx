@@ -17,6 +17,7 @@ import type { SubjectWithGroup, Locale, CurriculumTopicWithUsage } from "@snr/co
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
+import { PageContainer } from "@/components/PageContainer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
@@ -702,7 +703,7 @@ export function TeacherLessonsView({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <PageContainer className="space-y-6">
       {loadError && <ErrorState>{dc.error}</ErrorState>}
       {/* Two-column layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -877,6 +878,6 @@ export function TeacherLessonsView({
           onConfirm={handleDelete}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

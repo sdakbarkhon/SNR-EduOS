@@ -12,6 +12,7 @@ import {
 } from "@snr/core";
 import type { CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { PageContainer } from "@/components/PageContainer";
 
 function topicWord(n: number): string {
   const mod10 = n % 10, mod100 = n % 100;
@@ -174,7 +175,7 @@ export function CurriculumPlanDetailView({
   const inputCls = "rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <PageContainer className="space-y-6">
       <div>
         <Link href="/teacher/curriculum" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600">
           <ArrowLeft className="h-3.5 w-3.5" /> Учебные планы
@@ -365,6 +366,6 @@ export function CurriculumPlanDetailView({
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

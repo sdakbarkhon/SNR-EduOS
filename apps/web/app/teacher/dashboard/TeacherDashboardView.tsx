@@ -11,6 +11,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { Avatar } from "@/components/Avatar";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
+import { PageContainer } from "@/components/PageContainer";
 import { cn } from "@/lib/cn";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -297,7 +298,7 @@ export function TeacherDashboardView({
   const hours = Array.from({ length: T_END - T_START }, (_, i) => T_START + i);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-6">
+    <PageContainer className="space-y-6 pb-6">
 
       {/* Greeting */}
       <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">
@@ -503,6 +504,6 @@ export function TeacherDashboardView({
 
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

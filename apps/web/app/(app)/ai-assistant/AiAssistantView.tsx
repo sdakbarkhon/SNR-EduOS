@@ -6,6 +6,7 @@ import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { callAiChat } from "@/app/actions/ai";
 import { EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
+import { PageContainer } from "@/components/PageContainer";
 
 const SUGGESTION_ICONS = [Calculator, Languages, Bug, BookOpen];
 
@@ -91,7 +92,7 @@ export function AiAssistantView() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <PageContainer className="flex flex-col gap-6">
       <div>
         <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
           {t.title} <Bot className="h-7 w-7 text-violet-500" />
@@ -225,6 +226,6 @@ export function AiAssistantView() {
       </div>
 
       <p className="text-center text-xs text-slate-400">{t.disclaimer}</p>
-    </div>
+    </PageContainer>
   );
 }
