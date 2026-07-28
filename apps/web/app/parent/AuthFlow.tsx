@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
@@ -10,16 +9,14 @@ import { GlassButton } from "@/components/parent/glass/GlassButton";
 import { GlassInput } from "@/components/parent/glass/GlassInput";
 import { loginParentByPhone } from "@/app/actions/parentPhoneAuth";
 import { ink1, ink2, ink3 } from "@/lib/parent/glass-tokens";
+import { OnboardingCarousel } from "./OnboardingCarousel";
 
 type Step = "onboarding" | "phone" | "code";
 
 /**
- * Неавторизованный вход родителя: онбординг → номер телефона → код.
- * Композиция онбординга — 1:1 с apps/mobile-parent/src/screens/auth/
- * OnboardingScreen.tsx (лого+тэглайн сверху, hero-иллюстрация+заголовок/
- * subtitle в центре, CTA снизу), но без свайп-карусели на 3 слайда, точек
- * и шторки «Узнать больше» — веб-раунд ограничен одним статичным экраном
- * приветствия (первый слайд мобильной версии), остальное не входит в задачу.
+ * Неавторизованный вход родителя: онбординг (карусель 3 слайдов) → номер
+ * телефона → код. Онбординг — 1:1 с apps/mobile-parent/src/screens/auth/
+ * OnboardingScreen.tsx, см. OnboardingCarousel.tsx.
  */
 export function AuthFlow() {
   const { locale } = useLocale();
@@ -67,38 +64,7 @@ export function AuthFlow() {
   }
 
   if (step === "onboarding") {
-    return (
-      <div className="flex flex-1 flex-col px-6 pb-8 pt-12">
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="flex items-center gap-2">
-            <Image src="/parent/logo-mark.png" alt="" width={38} height={38} priority />
-            <span className="text-[19px] font-bold" style={{ color: ink1 }}>
-              SNR EduOS
-            </span>
-          </div>
-          <span
-            className="text-[9.5px] font-extrabold uppercase tracking-[0.11em]"
-            style={{ color: ink3, opacity: 0.9 }}
-          >
-            {d.tagline}
-          </span>
-        </div>
-
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-4">
-          <div className="relative h-[240px] w-[240px] max-w-[82%]">
-            <Image src="/parent/onboarding-hero.png" alt="" fill className="object-contain" priority />
-          </div>
-          <h1 className="mt-2 text-center text-[19px] font-bold leading-tight" style={{ color: ink1 }}>
-            {d.heroTitle}
-          </h1>
-          <p className="text-center text-[11.5px] font-semibold leading-snug" style={{ color: ink2 }}>
-            {d.heroSub}
-          </p>
-        </div>
-
-        <GlassButton onClick={() => setStep("phone")}>{d.start}</GlassButton>
-      </div>
-    );
+    return <OnboardingCarousel onStart={() => setStep("phone")} />;
   }
 
   return (
