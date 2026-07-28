@@ -13,3 +13,4 @@ export * from "./utils/date";
 export * from "./utils/money";
 export * from "./utils/homework";
 export * from "./utils/plural";
+export * from "./mocks/payments";

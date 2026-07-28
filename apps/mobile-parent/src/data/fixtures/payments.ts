@@ -9,58 +9,12 @@
  * Итоги «Истории оплат» (10 250 000 / 10 100 000 / 150 000) — тоже считаются
  * из PAYMENT_HISTORY.
  */
-import type { BillRow, PaymentHistoryRow, PaymentsFaqItem, PaymentsOverview, PayMethodRow, ReceiptRow } from "../types";
+import type { PaymentHistoryRow, PaymentsFaqItem, PayMethodRow, ReceiptRow } from "../types";
 
-/** BILLS. Стартовое состояние: edu/food — основной список, отмечены;
- *  form/exc — блок «другие», не отмечены. */
-export const BILLS: BillRow[] = [
-  {
-    id: "edu",
-    title: "Обучение · август",
-    note: "Малика · 7-А · ежемесячный платёж",
-    amount: 4500000,
-    due_date_label: "5 августа 2026",
-    gradient: ["#7c3aed", "#4f6df5"],
-    icon_paths: ["M22 10 12 5 2 10l10 5 10-5Z", "M6 12.5V17c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5"],
-    in_main_list: true,
-    checked_by_default: true,
-  },
-  {
-    id: "food",
-    title: "Питание · август",
-    note: "Малика · 7-А · обеды в столовой",
-    amount: 450000,
-    due_date_label: "5 августа 2026",
-    gradient: ["#34d399", "#059669"],
-    icon_paths: ["M4 2v7a3 3 0 0 0 6 0V2", "M7 12v10", "M20 2a4 4 0 0 0-4 4v7h4", "M20 13v9"],
-    in_main_list: true,
-    checked_by_default: true,
-  },
-  {
-    id: "form",
-    title: "Школьная форма",
-    note: "Азиз · 3-А · комплект на осень",
-    amount: 350000,
-    due_date_label: "10 августа 2026",
-    gradient: ["#60a5fa", "#2563eb"],
-    icon_paths: [
-      "M20.4 3.5 16 2a4 4 0 0 1-8 0L3.6 3.5a2 2 0 0 0-1.3 2.2l.6 3.5a1 1 0 0 0 1 .8H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.1a1 1 0 0 0 1-.8l.6-3.5a2 2 0 0 0-1.3-2.2Z",
-    ],
-    in_main_list: false,
-    checked_by_default: false,
-  },
-  {
-    id: "exc",
-    title: "Экскурсия в музей",
-    note: "Фаррух · 10-А · выезд класса",
-    amount: 150000,
-    due_date_label: "15 августа 2026",
-    gradient: ["#f472b6", "#db2777"],
-    icon_paths: ["M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z", "M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
-    in_main_list: false,
-    checked_by_default: false,
-  },
-];
+/** BILLS + PAYMENTS_OVERVIEW подняты в @snr/core (единый мок для web+mobile,
+ *  см. packages/core/src/mocks/payments.ts) — здесь только реэкспорт, чтобы
+ *  ../index.ts и экраны продолжали импортировать из этого же пути. */
+export { BILLS, PAYMENTS_OVERVIEW } from "@snr/core";
 
 /** PAY_OPTS — способы оплаты checkout; выбран по умолчанию payme. */
 export const PAY_METHODS: PayMethodRow[] = [
@@ -183,14 +137,6 @@ export const PAYMENTS_FAQ: PaymentsFaqItem[] = [
       "В выбранную дату система списывает сумму всех выставленных счетов с привязанной карты. Перед списанием придёт уведомление — автоплатёж можно пропустить или выключить в любой момент.",
   },
 ];
-
-/** Карточка баланса П17 (C3) + автоплатёж (initial state: autopay true). */
-export const PAYMENTS_OVERVIEW: PaymentsOverview = {
-  total_balance: 1250000,
-  overpayment: 120000,
-  autopay_enabled: true,
-  autopay_note: "1-го числа · Uzcard ····8341",
-};
 
 /** Карты (B6): основная UZCARD ···· 4242; BIN-определение бренда. */
 export const MAIN_CARD_LABEL = "UZCARD ···· 4242";

@@ -1,27 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { getDictionary, format, type Locale } from "@snr/core";
+import { useRef, useState } from "react";
+import { BILLS, PAYMENTS_OVERVIEW, getDictionary, format, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { ink1, ink2, ink3, glassBorder } from "@/lib/parent/glass-tokens";
 
 type Props = {
   childName: string | null;
+  /** WALLETS[индекс активного ребёнка] — считается в page.tsx (см. комментарий там). */
+  walletBalance: number;
 };
 
 /**
- * Экран «Оплаты» — состав 1:1 с apps/mobile-parent PaymentsScreen.tsx, но
- * ПОЛНОСТЬЮ мок: все суммы — d.parentApp.home.noDataYet ("Пока нет данных"),
- * как было решено для мок-карточек на Главной. Ничего не подключено к
+ * Экран «Оплаты» — состав и вёрстка 1:1 с apps/mobile-parent PaymentsScreen.tsx.
+ * Значения — из общего мок-слоя packages/core/src/mocks/payments.ts (BILLS/
+ * PAYMENTS_OVERVIEW), того же источника, что читает мобилка — числа/тексты не
+ * пересчитываются и не изобретаются заново на вебе. Ничего не подключено к
  * payments/charges (старый веб-портал с реальными запросами уже снесён и
- * сознательно не переиспользуется). Все внутренние кнопки/ссылки — заглушки
- * без onClick/href на реальные роуты.
+ * сознательно не переиспользуется).
  *
- * Не перенесены (сознательно, чтобы не изобретать несуществующие данные):
- * счётчик "{n} счёта" на секции "К оплате сейчас" и подпись "до {date}" под
- * суммой счёта — оба требуют конкретных чисел/дат, которые выглядели бы как
- * настоящие обязательства.
+ * Экраны-назначения (пополнение/история/счета и чеки/способы оплаты) на вебе
+ * ещё не существуют — 4 плитки QuickActionsGrid показывают toast «Скоро»
+ * (тот же локальный механизм, что и на ProfileView.tsx/LoginPhoneScreen.tsx).
+ *
+ * Заголовок кошелька — «Кошелёк {имя}» на плоском (не родительном, как в
+ * мобилке «Кошелёк Малики») падеже: реальные дети Supabase не хранят
+ * родительную форму имени (это чисто фикстурное поле мобилки), придумывать
+ * склонение не стали.
  */
 function WalletIcon() {
   return (
@@ -143,18 +149,42 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   );
 }
 
-export function PaymentsView({ childName }: Props) {
+const NBSP = " ";
+
+/** Дословно apps/mobile-parent/src/utils/format.ts — чтобы суммы совпадали
+ *  с мобилкой посимвольно (core's formatMoney форматирует иначе, через
+ *  Intl currency, поэтому здесь локальная копия именно этого алгоритма). */
+function formatMoney(n: number, opts: { withCurrency?: boolean; currency?: string } = {}): string {
+  const abs = Math.abs(Math.round(n));
+  const grouped = abs.toString().replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  const signed = n < 0 ? "-" + grouped : grouped;
+  return opts.withCurrency ? signed + NBSP + (opts.currency ?? "сум") : signed;
+}
+
+const BILL_ICONS: Record<string, React.ReactNode> = {
+  edu: <BillIcon />,
+  food: <MealIcon />,
+};
+
+export function PaymentsView({ childName, walletBalance }: Props) {
   const { locale } = useLocale();
   const loc = locale as Locale;
   const d = getDictionary(loc).parentApp;
-  const [autopay, setAutopay] = useState(true);
+  const [autopay, setAutopay] = useState(PAYMENTS_OVERVIEW.autopay_enabled);
 
-  const noData = d.home.noDataYet;
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<number | null>(null);
 
-  const bills: { title: string; icon: React.ReactNode; gradient: string }[] = [
-    { title: d.paymentsWeb.tuition, icon: <BillIcon />, gradient: "linear-gradient(135deg, #f97316, #ea580c)" },
-    { title: d.svc.meals, icon: <MealIcon />, gradient: "linear-gradient(135deg, #34d399, #059669)" },
-  ];
+  function showComingSoon() {
+    setNotice(d.stub.subtitle);
+    if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 2200) as unknown as number;
+  }
+
+  const dueBills = BILLS.filter((b) => b.in_main_list);
+  const checkedDueBills = BILLS.filter((b) => b.in_main_list && b.checked_by_default);
+  const dueTotal = checkedDueBills.reduce((s, b) => s + b.amount, 0);
+  const dueCount = checkedDueBills.length;
 
   const quickActions: { label: string; icon: React.ReactNode; gradient: string }[] = [
     { label: d.pay.topupBtn, icon: <PlusIcon />, gradient: "linear-gradient(135deg, #34d399, #059669)" },
@@ -164,6 +194,7 @@ export function PaymentsView({ childName }: Props) {
   ];
 
   const childInitial = childName?.trim().split(/\s+/).pop()?.slice(0, 1) ?? "?";
+  const childFirstName = childName?.trim().split(/\s+/)[0] ?? "";
 
   return (
     <div className="flex flex-1 flex-col gap-3 py-4">
@@ -175,7 +206,9 @@ export function PaymentsView({ childName }: Props) {
         <div className="flex items-start justify-between">
           <div>
             <div className="text-[9px] font-extrabold uppercase tracking-wide text-white/80">{d.pay.balanceTotalCap}</div>
-            <div className="mt-1 text-[22px] font-extrabold text-white">{noData}</div>
+            <div className="mt-1 text-[22px] font-extrabold text-white">
+              {formatMoney(PAYMENTS_OVERVIEW.total_balance)} {d.pay.sum}
+            </div>
             <div className="mt-0.5 text-[11px] font-semibold text-white/85">{d.pay.balanceAvailable}</div>
           </div>
           <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px] border border-white/35 bg-white/15">
@@ -185,40 +218,59 @@ export function PaymentsView({ childName }: Props) {
         <div className="mt-3 flex gap-2.5">
           <div className="flex-1 rounded-[14px] border border-white/25 bg-white/12 px-3 py-2">
             <div className="text-[8.5px] font-extrabold uppercase tracking-wide text-white/75">{d.pay.balanceDueCap}</div>
-            <div className="mt-0.5 text-[13px] font-extrabold text-white">{noData}</div>
+            <div className="mt-0.5 text-[13px] font-extrabold text-white">
+              {formatMoney(dueTotal, { withCurrency: true, currency: d.pay.sum })}
+            </div>
           </div>
           <div className="flex-1 rounded-[14px] border border-white/25 bg-white/12 px-3 py-2">
             <div className="text-[8.5px] font-extrabold uppercase tracking-wide text-white/75">{d.pay.balanceOverpaidCap}</div>
-            <div className="mt-0.5 text-[13px] font-extrabold text-white">{noData}</div>
+            <div className="mt-0.5 text-[13px] font-extrabold text-white">
+              {formatMoney(PAYMENTS_OVERVIEW.overpayment, { withCurrency: true, currency: d.pay.sum })}
+            </div>
           </div>
         </div>
       </div>
 
       {/* К оплате сейчас */}
       <div className="flex items-center justify-between px-0.5">
-        <span className="text-[13px] font-extrabold" style={{ color: ink1 }}>
-          {d.pay.dueNow}
-        </span>
+        <div className="flex flex-1 items-center gap-2">
+          <span className="text-[13px] font-extrabold" style={{ color: ink1 }}>
+            {d.pay.dueNow}
+          </span>
+          <span
+            className="rounded-full px-2 py-[3px] text-[9.5px] font-extrabold"
+            style={{ background: "rgba(249,115,22,0.13)", border: "1px solid rgba(249,115,22,0.33)", color: "#C2410C" }}
+          >
+            {format(d.pay.billsChip, { n: dueCount })}
+          </span>
+        </div>
         <button type="button" className="text-[11.5px] font-bold" style={{ color: ink2 }}>
           {d.common.viewAll} ›
         </button>
       </div>
 
       <GlassCard className="divide-y" style={{ borderColor: glassBorder }}>
-        {bills.map((bill, i) => (
-          <div key={i} className="flex items-center gap-3 p-3" style={i > 0 ? { borderTop: `1px solid ${glassBorder}` } : undefined}>
-            <IconTile gradient={bill.gradient}>{bill.icon}</IconTile>
+        {dueBills.map((bill, i) => (
+          <div key={bill.id} className="flex items-center gap-3 p-3" style={i > 0 ? { borderTop: `1px solid ${glassBorder}` } : undefined}>
+            <IconTile gradient={`linear-gradient(135deg, ${bill.gradient[0]}, ${bill.gradient[1]})`}>
+              {BILL_ICONS[bill.id] ?? <BillIcon />}
+            </IconTile>
             <div className="flex-1">
               <div className="text-[13.5px] font-bold" style={{ color: ink1 }}>
                 {bill.title}
               </div>
               <div className="text-[11px]" style={{ color: ink3 }}>
-                {d.stub.subtitle}
+                {bill.note}
               </div>
             </div>
-            <span className="text-[13.5px] font-extrabold" style={{ color: ink1 }}>
-              {noData}
-            </span>
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-[13.5px] font-extrabold" style={{ color: ink1 }}>
+                {formatMoney(bill.amount)}
+              </span>
+              <span className="text-[9.5px] font-extrabold" style={{ color: "#C2410C" }}>
+                {format(d.pay.billDueBy, { date: bill.due_date_label })}
+              </span>
+            </div>
           </div>
         ))}
       </GlassCard>
@@ -233,26 +285,26 @@ export function PaymentsView({ childName }: Props) {
             {d.pay.autopay}
           </div>
           <div className="text-[11px]" style={{ color: ink3 }}>
-            {d.stub.subtitle}
+            {PAYMENTS_OVERVIEW.autopay_note}
           </div>
         </div>
         <Toggle value={autopay} onChange={setAutopay} />
       </GlassCard>
 
-      {/* Оплатить всё — заглушка */}
+      {/* Оплатить всё */}
       <button
         type="button"
         className="flex items-center justify-center gap-2 rounded-[16px] py-3.5 text-[14px] font-extrabold text-white"
         style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)", boxShadow: "0 10px 22px rgba(79,70,229,0.28)" }}
       >
         <PayAllIcon />
-        {format(d.pay.payAllBtn, { sum: noData })}
+        {format(d.pay.payAllBtn, { sum: formatMoney(dueTotal, { withCurrency: true, currency: d.pay.sum }) })}
       </button>
 
-      {/* Быстрые действия — 4 плитки, все заглушки */}
+      {/* Быстрые действия — 4 плитки; экранов-назначений на вебе ещё нет → toast «Скоро» */}
       <div className="grid grid-cols-4 gap-2.5">
         {quickActions.map((qa, i) => (
-          <button key={i} type="button" className="flex flex-col items-center gap-1.5 rounded-[16px] p-2.5" style={{ ...glassTileStyle }}>
+          <button key={i} type="button" onClick={showComingSoon} className="flex flex-col items-center gap-1.5 rounded-[16px] p-2.5" style={{ ...glassTileStyle }}>
             <div
               className="flex h-9 w-9 items-center justify-center rounded-[12px]"
               style={{ background: qa.gradient }}
@@ -276,12 +328,22 @@ export function PaymentsView({ childName }: Props) {
           {childInitial}
         </div>
         <div className="flex-1">
-          <div className="text-[13.5px] font-extrabold text-white">{d.paymentsWeb.walletTitleGeneric}</div>
+          <div className="text-[13.5px] font-extrabold text-white">{format(d.pay.walletTitle, { gen: childFirstName })}</div>
           <div className="text-[11px] font-semibold text-white/85">{d.pay.walletSub}</div>
         </div>
-        <span className="text-[14px] font-extrabold text-white">{noData}</span>
+        <span className="text-[14px] font-extrabold text-white">
+          {formatMoney(walletBalance, { withCurrency: true, currency: d.pay.sum })}
+        </span>
         <ChevronIcon color="#FFFFFF" />
       </button>
+
+      {notice && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-6">
+          <div className="rounded-full px-4 py-2.5 text-[12.5px] font-semibold text-white shadow-lg" style={{ background: "rgba(23,18,67,0.92)" }}>
+            {notice}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

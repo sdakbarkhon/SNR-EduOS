@@ -328,19 +328,9 @@ export interface UploadFileFixture {
 
 // ─── payments ────────────────────────────────────────────────────────────────
 
-/** Счёт к оплате (BILLS) — виртуальная таблица bills/invoices. */
-export interface BillRow {
-  id: string;                 // 'edu' | 'food' | 'form' | 'exc'
-  title: string;              // name
-  note: string;               // «Малика · 7-А · ежемесячный платёж»
-  amount: number;             // sum
-  due_date_label: string;     // «5 августа 2026»
-  gradient: Gradient;
-  icon_paths: string[];
-  /** Стартовое состояние макета: в основном списке / отмечен чекбокс. */
-  in_main_list: boolean;
-  checked_by_default: boolean;
-}
+/** Счёт к оплате (BILLS) — тип и фикстура подняты в @snr/core (единый мок
+ *  для web+mobile, см. packages/core/src/mocks/payments.ts). */
+export type { BillRow } from "@snr/core";
 
 /** Способ оплаты checkout (PAY_OPTS). */
 export interface PayMethodRow {
@@ -379,21 +369,15 @@ export interface PaymentsFaqItem {
   answer: string;
 }
 
-/** Карточка баланса П17 + автоплатёж (C3). */
-export interface PaymentsOverview {
-  total_balance: number;      // 1 250 000
-  overpayment: number;        // 120 000
-  autopay_enabled: boolean;
-  autopay_note: string;       // «1-го числа · Uzcard ····8341»
-}
+/** Карточка баланса П17 + автоплатёж (C3) — тип и фикстура подняты в
+ *  @snr/core. */
+export type { PaymentsOverview } from "@snr/core";
 
 // ─── wallet ──────────────────────────────────────────────────────────────────
 
-/** Кошелёк ребёнка (виртуальная таблица wallets). */
-export interface WalletRow {
-  student_id: string;
-  balance: number;            // wallets[i]
-}
+/** Кошелёк ребёнка (виртуальная таблица wallets) — тип и фикстура подняты в
+ *  @snr/core. */
+export type { WalletRow } from "@snr/core";
 
 /** Операция кошелька (WOPS). */
 export interface WalletOpRow {

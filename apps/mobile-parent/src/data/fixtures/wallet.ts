@@ -8,21 +8,14 @@
  * питания» d6 читают его через getWalletBalance() (см. ../index.ts).
  * walletBal: 185000 из initial state макета — легаси (аномалия №9).
  */
-import type { WalletLimits, WalletOpsDayGroup, WalletRow } from "../types";
-import { CHILDREN } from "./family";
+import type { WalletLimits, WalletOpsDayGroup } from "../types";
 
-/** wallets: [92000, 185000, 240000] — Азиз / Малика / Фаррух.
- *  Заход 5: индексы 3–5 — Азизбек Исмаилов / Мадина Рахимова / Хумоюн Рахимов;
- *  сохраняем инвариант CHILDREN.length === WALLETS.length, чтобы index-based
- *  lookup getWalletBalance() не падал для новых семей. */
-export const WALLETS: WalletRow[] = [
-  { student_id: CHILDREN[0].id, balance: 92000 },
-  { student_id: CHILDREN[1].id, balance: 185000 },
-  { student_id: CHILDREN[2].id, balance: 240000 },
-  { student_id: CHILDREN[3].id, balance: 65000 },
-  { student_id: CHILDREN[4].id, balance: 145000 },
-  { student_id: CHILDREN[5].id, balance: 210000 },
-];
+/** WALLETS подняты в @snr/core (единый мок для web+mobile, см.
+ *  packages/core/src/mocks/payments.ts) — здесь только реэкспорт. Порядок
+ *  ([92000, 185000, 240000, 65000, 145000, 210000]) и student_id-литералы
+ *  там совпадают с CHILDREN этого файла (инвариант CHILDREN.length ===
+ *  WALLETS.length для index-based lookup getWalletBalance() сохранён). */
+export { WALLETS } from "@snr/core";
 
 /** WOPS — операции по дням: t сегодня, y вчера, d21 — 21 июля. */
 export const WALLET_OPS: WalletOpsDayGroup[] = [
