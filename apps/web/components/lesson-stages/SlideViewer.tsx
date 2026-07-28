@@ -21,33 +21,48 @@ export function SlideViewer({
   slides: LessonSlide[];
   onExportPptx: () => void;
   canExport: boolean;
-  /** Teacher: navigation controls active + writes current_slide_index. Student: read-only, follows via Realtime — UNLESS lessonStatus="completed" (post-lesson review, see canNavigate below). */
+  /** Teacher: navigation controls active + writes current_slide_index, any lessonStatus (unchanged). Student: same live controls + write, but ONLY while lessonStatus="in_progress" (synchronous slide nav, migration 150) — OR read-only free browsing once lessonStatus="completed" (post-lesson review, see canNavigate below), which never writes. */
   isTeacher?: boolean;
-  /** Required when isTeacher — the stage whose current_slide_index is updated on nav. */
+  /** Required when isTeacher or a live (in_progress) student — the stage whose current_slide_index is updated on nav. */
   stageId?: string;
-  /** Starting slide (teacher's current_slide_index at mount, e.g. rejoining a lesson). */
+  /** Starting slide (current_slide_index at mount, e.g. rejoining a lesson). */
   initialSlide?: number;
-  /** Once the lesson is completed, students browse freely for review — same as teacher nav, but never writes current_slide_index (that's live-lesson-only state). */
+  /** "in_progress": student gets the same live nav as the teacher, writes sync to everyone via Realtime. "completed": students browse freely for review — same as teacher nav, but never writes current_slide_index (that's live-lesson-only state). */
   lessonStatus?: string;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.slides;
   const [current, setCurrent] = useState(Math.min(initialSlide, Math.max(0, slides.length - 1)));
-  const canNavigate = isTeacher || lessonStatus === "completed";
+  // Migration 150 — student gets the same live nav as the teacher while the
+  // lesson is actually ongoing (RLS scopes the write to the student's own
+  // group + the lesson's currently-active stage); "completed" review mode
+  // is unchanged (navigate locally, never write).
+  const canNavigate = isTeacher || lessonStatus === "completed" || lessonStatus === "in_progress";
+  // Writes to the shared current_slide_index: teacher always (unchanged —
+  // e.g. prepping a not-yet-started lesson), student only while the lesson
+  // is actually live. Completed-review browsing for a student stays purely
+  // local, exactly as before.
+  const syncsWrite = isTeacher || lessonStatus === "in_progress";
+  // Solo (unsynced) review is the ONLY case where nobody else can move this
+  // slide — everyone else (teacher during any status, or a student during a
+  // live lesson) must stay subscribed so they see every participant's clicks,
+  // not just their own.
+  const soloReview = !isTeacher && lessonStatus === "completed";
 
   const goTo = useCallback((idx: number) => {
     const clamped = Math.max(0, Math.min(slides.length - 1, idx));
     setCurrent(clamped);
-    if (isTeacher && stageId) {
+    if (syncsWrite && stageId) {
       setCurrentSlide(createClient() as never, stageId, clamped).catch(() => null);
     }
-  }, [slides.length, isTeacher, stageId]);
+  }, [slides.length, syncsWrite, stageId]);
 
-  // Live student (not teacher, lesson not completed): follow the teacher's
-  // current_slide_index via Realtime. Once completed, canNavigate students
-  // browse independently — no point staying subscribed.
+  // Everyone but a solo-reviewing student follows current_slide_index via
+  // Realtime — including the teacher now that a student's click can also
+  // move the slide (migration 150: single shared "who moved it last" state,
+  // not "teacher broadcasts, others just listen").
   useRealtimeChannel(
-    !canNavigate && stageId ? `stage-slide-${stageId}` : null,
+    stageId && !soloReview ? `stage-slide-${stageId}` : null,
     "lesson_stages",
     stageId ? `id=eq.${stageId}` : undefined,
     (payload) => {
