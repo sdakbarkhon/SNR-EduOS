@@ -2343,6 +2343,10 @@ export const ru: Dictionary = {
       messages: "Сообщения",
       profile: "Профиль",
     },
+    stub: {
+      title: "Скоро",
+      subtitle: "Этот раздел появится в одном из ближайших обновлений",
+    },
     scr: {
       dayStatus: "Статус дня",
       homeworks: "Домашние задания",

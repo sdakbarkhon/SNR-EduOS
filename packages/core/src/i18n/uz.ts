@@ -2340,6 +2340,10 @@ export const uz: Dictionary = {
       messages: "Xabarlar",
       profile: "Profil",
     },
+    stub: {
+      title: "Tez orada",
+      subtitle: "Bu bo'lim yaqin yangilanishlardan birida qo'shiladi",
+    },
     scr: {
       dayStatus: "Kun holati",
       homeworks: "Uy vazifalari",
