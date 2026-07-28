@@ -1817,7 +1817,6 @@ export const ru: Dictionary = {
     navGrades: "Оценки",
     navMaterials: "Материалы",
     navKnowledgeBase: "База знаний",
-    navLibrary: "Материалы кафедры",
     navGroups: "Мои классы",
     navProfile: "Профиль",
     kpiGroups: "Мои группы",

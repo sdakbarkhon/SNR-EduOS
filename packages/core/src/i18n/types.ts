@@ -1883,7 +1883,6 @@ export interface Dictionary {
     navGrades: string;
     navMaterials: string;
     navKnowledgeBase: string; // "База знаний" — БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.1, replaces navMaterials+navBooks in the sidebar
-    navLibrary: string; // "Библиотека" — 6А, Заход B: библиотека материалов учителей (migration 147), отдельный верхнеуровневый пункт от navKnowledgeBase/navBooks
     navGroups: string;
     navProfile: string;
     kpiGroups: string;

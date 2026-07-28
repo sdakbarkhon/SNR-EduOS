@@ -1817,7 +1817,6 @@ export const en: Dictionary = {
     navGrades: "Grades",
     navMaterials: "Materials",
     navKnowledgeBase: "Knowledge Base",
-    navLibrary: "Department Materials",
     navGroups: "My classes",
     navProfile: "Profile",
     kpiGroups: "My groups",

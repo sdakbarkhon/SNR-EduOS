@@ -1,26 +1,50 @@
 "use client";
 
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.3 — модалка выбора файла в стиле проводника:
-// сетка иконок, мультивыбор кликом, вкладки (Библиотека / Материалы
-// группы / Библиотека учителей), поиск по названию. Возвращает выбранные
-// файлы БЕЗ их загрузки — вызывающая сторона линкует существующий
-// storage_path (Этап 3.4: без дублирования).
+// сетка иконок, мультивыбор кликом, вкладки (Материалы группы / Библиотека /
+// Библиотека учителей). Возвращает выбранные файлы БЕЗ их загрузки —
+// вызывающая сторона линкует существующий storage_path (Этап 3.4: без
+// дублирования).
 //
-// 6А, Заход C — третья вкладка "Библиотека учителей" (teacher_library_materials,
+// 6А, Заход C — вкладка "Библиотека учителей" (teacher_library_materials,
 // migration 147). Файлы этой таблицы физически лежат в том же бакете
 // "materials", что и course_materials — поэтому source:"teacherLibrary"
 // НАМЕРЕННО не требует правок в вызывающих компонентах:
 // TeacherLessonDetailView.tsx/CreateHomeworkForm.tsx уже резолвят
 // "любой источник, кроме book" в бакет "materials"
 // (`pickedFromKB.source === "book" ? ... : ...`), а "teacherLibrary" !== "book".
+//
+// Уборка (после Захода 2) — отдельная страница /teacher/library снесена:
+// загрузка файла / добавление видео-ссылки / удаление своего материала
+// перенесены СЮДА, внутрь вкладки "Библиотека учителей", один вход в базу
+// знаний вместо двух. Формы 1:1 из снесённой TeacherLibraryView.tsx —
+// тот же parseVideoUrl, те же MIME-типы/лимит 50 МБ, тот же
+// classes+"Все классы" селектор (полный список групп учителя, НЕ groupIds
+// пикера — тот сужен до групп текущего урока/задания, библиотечный материал
+// таргетируется независимо). teacherId/subjectSlug резолвятся здесь же
+// через getMyTeacher() — новые обязательные пропсы не нужны, оба вызывающих
+// места (CreateHomeworkForm.tsx, TeacherLessonDetailView.tsx) не тронуты.
 
-import { useEffect, useMemo, useState } from "react";
-import { X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  X, Search, FileText, FileImage, Video, File as FileIcon, Link as LinkIcon, BookOpen,
+  Plus, Upload, Trash2,
+} from "lucide-react";
 import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
-import { getDictionary, getLibraryMaterials } from "@snr/core";
+import {
+  getDictionary,
+  getLibraryMaterials,
+  createLibraryMaterial,
+  deleteLibraryMaterial,
+  getMyTeacher,
+  getMyGroups,
+  getSubjectStyle,
+} from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { createClient } from "@/lib/supabase/client";
+import { SubjectIcon } from "@/components/SubjectIcon";
+import { parseVideoUrl } from "@/lib/video-url";
 
 export type PickedKnowledgeBaseFile = {
   source: "material" | "book" | "teacherLibrary";
@@ -39,7 +63,7 @@ export type PickedKnowledgeBaseFile = {
   sourceUrl?: string | null;
 };
 
-type Tab = "library" | "materials" | "teacherLibrary";
+type Tab = "materials" | "library" | "teacherLibrary";
 
 function iconFor(fileType: string | null, hasLink: boolean) {
   if (hasLink) return LinkIcon;
@@ -49,6 +73,432 @@ function iconFor(fileType: string | null, hasLink: boolean) {
   if (t.startsWith("image/")) return FileImage;
   if (t.includes("presentation") || t.includes("powerpoint")) return FileImage;
   return FileIcon;
+}
+
+// ── Библиотека учителей: загрузка/видео-ссылка/удаление (порт из снесённой
+// apps/web/app/teacher/library/TeacherLibraryView.tsx, 1:1) ────────────────
+
+const LIB_ALLOWED_MIME = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/jpeg",
+  "image/png",
+  "video/mp4",
+];
+const LIB_MAX_SIZE = 52428800; // 50 МБ — совпадает с лимитом бакета "materials"
+
+function formatLibSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function LibraryUploadModal({
+  groups,
+  teacherId,
+  subjectSlug,
+  dt,
+  onClose,
+  onSuccess,
+}: {
+  groups: Array<{ id: string; name: string }>;
+  teacherId: string;
+  subjectSlug: string;
+  dt: ReturnType<typeof getDictionary>["teacher"];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  const subjectLabel = getSubjectStyle(subjectSlug).label;
+  const allClasses = selectedGroupIds.size === 0;
+
+  function toggleGroup(id: string) {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError(dt.libraryErrTitleRequired); return; }
+    if (!file) { setError(dt.libraryErrFileRequired); return; }
+    if (!LIB_ALLOWED_MIME.includes(file.type)) { setError(dt.libraryErrFileType); return; }
+    if (file.size > LIB_MAX_SIZE) { setError(dt.libraryErrFileTooLarge); return; }
+
+    setError(null);
+    setUploading(true);
+    setProgress(10);
+
+    try {
+      const sb = createClient();
+      const materialId = crypto.randomUUID();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = `${teacherId}/library/${materialId}/${safeName}`;
+
+      const ramp = setInterval(() => setProgress((p) => Math.min(p + 5, 90)), 300);
+      const { error: uploadErr } = await sb.storage
+        .from("materials")
+        .upload(storagePath, file, { contentType: file.type || undefined, upsert: false });
+      clearInterval(ramp);
+
+      if (uploadErr) throw uploadErr;
+      setProgress(95);
+
+      await createLibraryMaterial(sb, {
+        title: title.trim(),
+        storagePath,
+        fileType: file.type || null,
+        fileSizeBytes: file.size,
+        groupIds: Array.from(selectedGroupIds),
+      });
+
+      setProgress(100);
+      onSuccess();
+    } catch (err) {
+      console.error("[library] upload error:", err);
+      setError(err instanceof Error ? err.message : dt.libraryErrUploadFailed);
+      setUploading(false);
+      setProgress(0);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" style={{ zIndex: 10010 }}>
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <h2 className="mb-6 text-xl font-bold text-slate-900">{dt.libraryUploadTitle}</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              {dt.libraryName} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={dt.libraryNamePlaceholder}
+              disabled={uploading}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            />
+          </div>
+
+          {/* Предмет — read-only, из роли учителя, не из формы. */}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+              <SubjectIcon subject={subjectSlug} size={22} />
+              {subjectLabel}
+            </div>
+          </div>
+
+          {/* Классы — мультиселект + "Все классы" (пусто = все, ничего в junction не создаём). */}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.libraryClassesLabel}</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedGroupIds(new Set())}
+                disabled={uploading}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                  allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {dt.libraryAllClasses}
+              </button>
+              {groups.map((g) => {
+                const active = selectedGroupIds.has(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => toggleGroup(g.id)}
+                    disabled={uploading}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                      active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* File drop zone */}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              {dt.libraryFile} <span className="text-red-500">*</span>
+            </label>
+            <div
+              ref={dropRef}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleFileDrop}
+              onClick={() => !uploading && fileRef.current?.click()}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+                file ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40"
+              } ${uploading ? "pointer-events-none opacity-60" : ""}`}
+            >
+              <Upload className="h-6 w-6 text-slate-400" />
+              {file ? (
+                <p className="text-sm font-semibold text-blue-700">{file.name} ({formatLibSize(file.size)})</p>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600">{dt.libraryDragDrop}</p>
+                  <p className="text-xs text-slate-400">{dt.libraryMaxSize}</p>
+                </>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.pptx,.jpg,.jpeg,.png,.mp4"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+
+          {uploading && (
+            <div>
+              <div className="mb-1 flex justify-between text-xs font-medium text-slate-500">
+                <span>{dt.libraryUploading}</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={uploading}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+            >
+              {dt.libraryCancel}
+            </button>
+            <button
+              type="submit"
+              disabled={uploading || !title.trim() || !file}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+            >
+              {uploading ? dt.libraryUploading : dt.libraryUpload}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function LibraryVideoLinkModal({
+  groups,
+  subjectSlug,
+  dt,
+  onClose,
+  onSuccess,
+}: {
+  groups: Array<{ id: string; name: string }>;
+  subjectSlug: string;
+  dt: ReturnType<typeof getDictionary>["teacher"];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subjectLabel = getSubjectStyle(subjectSlug).label;
+  const allClasses = selectedGroupIds.size === 0;
+  // Клиентский парсинг — тот же parseVideoUrl, что уже используют материалы
+  // урока (Пачка 4); никакого серверного oEmbed-запроса, без CORS.
+  const parsed = useMemo(() => parseVideoUrl(urlInput), [urlInput]);
+
+  function toggleGroup(id: string) {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError(dt.libraryErrTitleRequired); return; }
+    if (!urlInput.trim()) { setError(dt.libraryErrVideoUrlRequired); return; }
+    const p = parseVideoUrl(urlInput.trim());
+    if (!p) { setError(dt.libraryErrVideoUrlInvalid); return; }
+
+    setError(null);
+    setSaving(true);
+    try {
+      await createLibraryMaterial(createClient(), {
+        contentType: p.platform === "youtube" ? "video_youtube" : "video_rutube",
+        title: title.trim(),
+        externalUrl: p.embedUrl,
+        sourceUrl: urlInput.trim(),
+        groupIds: Array.from(selectedGroupIds),
+      });
+      onSuccess();
+    } catch (err) {
+      console.error("[library] video link error:", err);
+      setError(err instanceof Error ? err.message : dt.libraryErrUploadFailed);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" style={{ zIndex: 10010 }}>
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <h2 className="mb-6 text-xl font-bold text-slate-900">{dt.libraryVideoModalTitle}</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              {dt.libraryName} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={dt.libraryNamePlaceholder}
+              disabled={saving}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+              <SubjectIcon subject={subjectSlug} size={22} />
+              {subjectLabel}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.libraryClassesLabel}</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedGroupIds(new Set())}
+                disabled={saving}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                  allClasses ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {dt.libraryAllClasses}
+              </button>
+              {groups.map((g) => {
+                const active = selectedGroupIds.has(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => toggleGroup(g.id)}
+                    disabled={saving}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                      active ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              {dt.libraryVideoUrlLabel} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder={dt.libraryVideoUrlPlaceholder}
+                disabled={saving}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+            </div>
+            {urlInput.trim() && !parsed && (
+              <p className="mt-1.5 text-xs font-medium text-amber-600">{dt.libraryErrVideoUrlInvalid}</p>
+            )}
+          </div>
+
+          {/* Превью — тот же embed-URL, что уйдёт в external_url при сохранении. */}
+          {parsed && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
+              <div className="aspect-video w-full">
+                <iframe
+                  src={parsed.embedUrl}
+                  title={title || "preview"}
+                  className="h-full w-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+            >
+              {dt.libraryCancel}
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !title.trim() || !parsed}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? dt.libraryUploading : dt.libraryUpload}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 export function KnowledgeBaseFilePicker({
@@ -80,8 +530,10 @@ export function KnowledgeBaseFilePicker({
   allowVideoLinks?: boolean;
 }) {
   const { locale } = useLocale();
-  const d = getDictionary(locale as Locale).knowledgeBase;
-  const [tab, setTab] = useState<Tab>("library");
+  const dict = getDictionary(locale as Locale);
+  const d = dict.knowledgeBase;
+  const dt = dict.teacher;
+  const [tab, setTab] = useState<Tab>("materials");
   const [query, setQuery] = useState("");
   const [materials, setMaterials] = useState<MaterialWithGroup[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
@@ -92,6 +544,20 @@ export function KnowledgeBaseFilePicker({
   const [tabError, setTabError] = useState<Record<Tab, boolean>>({ library: false, materials: false, teacherLibrary: false });
   const [selected, setSelected] = useState<Map<string, PickedKnowledgeBaseFile>>(new Map());
 
+  // Уборка (после Захода 2) — учитель+его группы резолвятся здесь же
+  // (getMyTeacher/getMyGroups), а не пропсами: единственные два вызывающих
+  // места (форма задания, урок) передают groupIds ТЕКУЩЕГО контекста
+  // (сужены до одной группы/группы урока), а библиотечный материал
+  // таргетируется на ЛЮБОЙ поднабор ВСЕХ групп учителя — та же семантика,
+  // что была на снесённой странице /teacher/library.
+  const [myTeacher, setMyTeacher] = useState<{ id: string; subject_slug: string | null } | null>(null);
+  const [myGroups, setMyGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const isCurator = !myTeacher?.subject_slug;
+  const [showLibUpload, setShowLibUpload] = useState(false);
+  const [showLibVideo, setShowLibVideo] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // groupIds приходит как новый массив-литерал на каждый рендер родителя
   // (см. TeacherLessonDetailView.tsx/CreateHomeworkForm.tsx) — использовать
   // сам массив как dependency сбрасывал бы query/selected и перезапускал
@@ -101,11 +567,16 @@ export function KnowledgeBaseFilePicker({
   // меняется состав групп.
   const groupIdsKey = groupIds.join(",");
 
+  function loadLibraryFiles(sb: ReturnType<typeof createClient>) {
+    return getLibraryMaterials(sb);
+  }
+
   useEffect(() => {
     if (!open) return;
     setSelected(new Map());
     setQuery("");
     setTabError({ library: false, materials: false, teacherLibrary: false });
+    setDeleteError(null);
     let cancelled = false;
     setLoading(true);
     const sb = createClient();
@@ -116,8 +587,10 @@ export function KnowledgeBaseFilePicker({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sb as any).from("books").select("*")
         .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
-      getLibraryMaterials(sb),
-    ]).then(([m, b, lib]) => {
+      loadLibraryFiles(sb),
+      getMyTeacher(sb),
+      getMyGroups(sb),
+    ]).then(([m, b, lib, teacherRes, groupsRes]) => {
       if (cancelled) return;
       if (m.status === "fulfilled") setMaterials((m.value ?? []) as MaterialWithGroup[]);
       else console.error("[KnowledgeBaseFilePicker] failed to load course_materials:", m.reason);
@@ -125,6 +598,14 @@ export function KnowledgeBaseFilePicker({
       else console.error("[KnowledgeBaseFilePicker] failed to load books:", b.reason);
       if (lib.status === "fulfilled") setLibraryFiles(lib.value);
       else console.error("[KnowledgeBaseFilePicker] failed to load teacher library:", lib.reason);
+      if (teacherRes.status === "fulfilled") {
+        const t = teacherRes.value as unknown as { id: string; subject_slug: string | null };
+        setMyTeacher({ id: t.id, subject_slug: t.subject_slug });
+      } else {
+        console.error("[KnowledgeBaseFilePicker] failed to resolve current teacher:", teacherRes.reason);
+      }
+      if (groupsRes.status === "fulfilled") setMyGroups(groupsRes.value as unknown as Array<{ id: string; name: string }>);
+      else console.error("[KnowledgeBaseFilePicker] failed to load teacher groups:", groupsRes.reason);
       setTabError({
         materials: m.status === "rejected",
         library: b.status === "rejected",
@@ -135,6 +616,36 @@ export function KnowledgeBaseFilePicker({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, groupIdsKey]);
+
+  async function refetchLibrary() {
+    try {
+      const lib = await getLibraryMaterials(createClient());
+      setLibraryFiles(lib);
+    } catch (err) {
+      console.error("[KnowledgeBaseFilePicker] refetch library failed:", err);
+    }
+  }
+
+  async function handleDeleteMaterial(materialId: string) {
+    setDeleteError(null);
+    setDeletingId(materialId);
+    try {
+      await deleteLibraryMaterial(createClient(), materialId);
+      setLibraryFiles((prev) => prev.filter((m) => m.id !== materialId));
+      setSelected((prev) => {
+        const key = `teacherLibrary:${materialId}`;
+        if (!prev.has(key)) return prev;
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+    } catch (err) {
+      console.error("[KnowledgeBaseFilePicker] delete material failed:", err);
+      setDeleteError(dt.libraryErrDeleteFailed);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const filteredMaterials = useMemo(
     () => materials.filter((m) => m.title.toLowerCase().includes(query.toLowerCase())),
@@ -176,7 +687,7 @@ export function KnowledgeBaseFilePicker({
 
   if (!open) return null;
 
-  const allItems: { key: string; title: string; picked: PickedKnowledgeBaseFile; hasLink: boolean }[] =
+  const allItems: { key: string; title: string; picked: PickedKnowledgeBaseFile; hasLink: boolean; isMine?: boolean }[] =
     tab === "library"
       ? filteredBooks.map((b) => ({
           key: `book:${b.id}`,
@@ -192,6 +703,7 @@ export function KnowledgeBaseFilePicker({
           // тот же LinkIcon, что materials-вкладка уже использует для
           // link_url-материалов без файла.
           hasLink: m.content_type !== "file",
+          isMine: !!myTeacher && m.uploaded_by === myTeacher.id,
           picked: {
             source: "teacherLibrary",
             id: m.id,
@@ -227,6 +739,8 @@ export function KnowledgeBaseFilePicker({
     ? allItems.filter((it) => isVideoItem(it) || (it.picked.fileType && acceptedTypes.includes(it.picked.fileType)))
     : allItems;
 
+  const canManageLibrary = tab === "teacherLibrary" && !!myTeacher && !isCurator;
+
   return (
     // z-index above 9999 — the app's other full-screen modals (e.g. "Прикрепить
     // материал" in TeacherLessonDetailView) use style={{ zIndex: 9999 }}, and this
@@ -244,19 +758,19 @@ export function KnowledgeBaseFilePicker({
           </button>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — порядок: Материалы группы → Библиотека → Библиотека учителей */}
         <div className="flex gap-2 border-b border-slate-100 px-6 pt-3">
-          <button
-            onClick={() => setTab("library")}
-            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "library" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            {d.tabLibrary}
-          </button>
           <button
             onClick={() => setTab("materials")}
             className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "materials" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
           >
             {d.tabGroupMaterials}
+          </button>
+          <button
+            onClick={() => setTab("library")}
+            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "library" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            {d.tabLibrary}
           </button>
           <button
             onClick={() => setTab("teacherLibrary")}
@@ -280,6 +794,41 @@ export function KnowledgeBaseFilePicker({
           </div>
         </div>
 
+        {/* Уборка — загрузка/видео-ссылка теперь живут прямо во вкладке
+            "Библиотека учителей" (была отдельная страница /teacher/library).
+            Куратор (subject_slug NULL) видит вкладку, но не эти кнопки —
+            RLS insert на teacher_library_materials требует subject_slug,
+            createLibraryMaterial() тоже фейлится для куратора с понятной
+            ошибкой, но проще не показывать то, что всё равно не сработает. */}
+        {tab === "teacherLibrary" && canManageLibrary && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+            <button
+              type="button"
+              onClick={() => setShowLibUpload(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-[#185AF7] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {dt.libraryUploadBtn}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLibVideo(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+            >
+              <LinkIcon className="h-3.5 w-3.5" />
+              {dt.libraryAddVideoBtn}
+            </button>
+            {deleteError && <span className="text-xs font-medium text-red-600">{deleteError}</span>}
+          </div>
+        )}
+        {tab === "teacherLibrary" && isCurator && myTeacher && (
+          <div className="border-b border-slate-100 px-6 py-3">
+            <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
+              {dt.libraryCuratorNotice}
+            </span>
+          </div>
+        )}
+
         {/* Grid */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
@@ -296,20 +845,34 @@ export function KnowledgeBaseFilePicker({
                 // teacherLibrary: hasLink=true для видео-ссылок (см. allItems выше)
                 // — iconFor уже отдаёт LinkIcon для hasLink, файловую иконку иначе.
                 const Icon = tab === "library" ? BookOpen : iconFor(it.picked.fileType, it.hasLink);
+                const canDelete = tab === "teacherLibrary" && it.isMine;
+                const isDeleting = deletingId === it.picked.id;
                 return (
-                  <button
-                    key={it.key}
-                    type="button"
-                    onClick={() => toggle(it.picked)}
-                    className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center transition ${
-                      isSelected ? "border-blue-500 bg-blue-50" : "border-transparent hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
-                      <Icon className={`h-6 w-6 ${isSelected ? "text-blue-600" : "text-slate-500"}`} />
-                    </div>
-                    <p className="line-clamp-2 w-full break-words text-[11px] font-semibold leading-tight text-slate-700">{it.title}</p>
-                  </button>
+                  <div key={it.key} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggle(it.picked)}
+                      className={`flex w-full flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center transition ${
+                        isSelected ? "border-blue-500 bg-blue-50" : "border-transparent hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
+                        <Icon className={`h-6 w-6 ${isSelected ? "text-blue-600" : "text-slate-500"}`} />
+                      </div>
+                      <p className="line-clamp-2 w-full break-words text-[11px] font-semibold leading-tight text-slate-700">{it.title}</p>
+                    </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(it.picked.id); }}
+                        disabled={isDeleting}
+                        title={dt.libraryDelete}
+                        className="absolute right-1 top-1 z-10 rounded-full bg-white/95 p-1 text-slate-400 shadow transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-60"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -330,6 +893,26 @@ export function KnowledgeBaseFilePicker({
           </button>
         </div>
       </div>
+
+      {showLibUpload && myTeacher && !isCurator && (
+        <LibraryUploadModal
+          groups={myGroups}
+          teacherId={myTeacher.id}
+          subjectSlug={myTeacher.subject_slug ?? ""}
+          dt={dt}
+          onClose={() => setShowLibUpload(false)}
+          onSuccess={() => { setShowLibUpload(false); refetchLibrary(); }}
+        />
+      )}
+      {showLibVideo && myTeacher && !isCurator && (
+        <LibraryVideoLinkModal
+          groups={myGroups}
+          subjectSlug={myTeacher.subject_slug ?? ""}
+          dt={dt}
+          onClose={() => setShowLibVideo(false)}
+          onSuccess={() => { setShowLibVideo(false); refetchLibrary(); }}
+        />
+      )}
     </div>
   );
 }

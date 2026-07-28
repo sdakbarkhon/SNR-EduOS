@@ -1817,7 +1817,6 @@ export const uz: Dictionary = {
     navGrades: "Baholar",
     navMaterials: "Materiallar",
     navKnowledgeBase: "Bilimlar bazasi",
-    navLibrary: "Kafedra materiallari",
     navGroups: "Mening sinflarim",
     navProfile: "Profil",
     kpiGroups: "Guruhlarim",

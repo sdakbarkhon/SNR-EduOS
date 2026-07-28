@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
-  PanelLeftClose, PanelLeftOpen, ClipboardList, Library,
+  PanelLeftClose, PanelLeftOpen, ClipboardList,
 } from "lucide-react";
 import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -35,10 +35,10 @@ export const teacherNavItems = [
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
   { key: "knowledgeBase", href: "/teacher/knowledge-base", icon: GraduationCap, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navKnowledgeBase },
-  // 6А, Заход B — библиотека материалов учителей (миграция 147). Отдельный
-  // верхнеуровневый пункт, не таб внутри "База знаний" — раздел свой,
-  // с собственной загрузкой (только предметники, куратор видит/не грузит).
-  { key: "library",       href: "/teacher/library",       icon: Library,       label: (d: ReturnType<typeof getDictionary>) => d.teacher.navLibrary },
+  // Уборка (после Захода 2) — отдельный пункт "Материалы кафедры"
+  // (/teacher/library, миграция 147) убран: загрузка/видео-ссылка/удаление
+  // перенесены внутрь вкладки "Библиотека учителей" пикера «База знаний»
+  // (KnowledgeBaseFilePicker.tsx) — один вход в базу знаний вместо двух.
   // Ночной прогон, ЧАСТЬ 3: убрано из бокового меню — доступ только через
   // колокольчик (NotificationsBell) в шапке, который ведёт на
   // /teacher/notifications (табы «Уведомления»/«Объявления», отдельный
