@@ -3,8 +3,8 @@
  * Здесь сведены три группы:
  *   • Кривые и полигоны — Gauge / Radar / Sparkline / ProgressBar.
  *   • Кольца и donuts — Ring / RingSegmented / MiniRing.
- *   • Календарь и таймлайны — AttendanceHeatmap (+легенда) / TimelineHorizontal /
- *     TimelineVertical.
+ *   • Календарь и таймлайны — TimelineHorizontal / TimelineVertical.
+ * (AttendanceHeatmap удалён — 0 импортов нигде в приложении, мёртвый код.)
  * Экраны импортируют графики ТОЛЬКО отсюда — либо через ре-экспорт из
  * `../ui` (см. `src/ui/index.ts`, секция «Графики»). Данные передаются
  * через props (presentational), тема — только через `useTheme()`.
@@ -26,14 +26,6 @@ export {
 export { MiniRing, type MiniRingProps } from "./MiniRing";
 
 // ─── Календарь и таймлайны ───────────────────────────────────────────────────
-export {
-  AttendanceHeatmap,
-  AttendanceHeatmapLegend,
-  ATTENDANCE_LEGEND_FAMILIES,
-  type AttendanceHeatmapProps,
-  type AttendanceHeatmapLegendProps,
-  type AttendanceLegendFamily,
-} from "./AttendanceHeatmap";
 export {
   TimelineHorizontal,
   type TimelineHorizontalProps,

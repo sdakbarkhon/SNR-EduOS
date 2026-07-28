@@ -26,7 +26,7 @@
  * оценка не показывается. Демо-флоу (fixture HOMEWORK_LIST/getHomeworkList)
  * не тронут ни строкой.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
@@ -47,8 +47,9 @@ import { useAppLocale } from "../../i18n";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
-import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
+import { tashkentDateKey, addDays } from "../../lib/tashkent";
 import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, realGradeDisplay, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -772,8 +773,22 @@ export default function HomeworksScreen() {
     () => (isRealFlow && selectedChildId ? getHomeworkWithSubmissions(getSupabase(), selectedChildId) : Promise.resolve(null)),
     [isRealFlow, selectedChildId],
   );
-  const todayKey = useMemo(() => tashkentToday(), []);
+  // Долги, проход 3 — "сегодня" больше не застывает на дате монтирования
+  // (useTashkentToday пересчитывает на возврат в foreground И на границе
+  // суток по Ташкенту). Список ДЗ не скоупится датой в самом запросе (в
+  // отличие от расписания, где недельный weekStartKey сам меняется и тянет
+  // рефетч) — "просрочено"/"сегодня"/"завтра" здесь чисто derived поля от
+  // уже загруженных данных, поэтому дополнительно явно перезапрашиваем
+  // список на смене дня, а не только пересчитываем лейблы локально.
+  const todayKey = useTashkentToday();
   const tomorrowKey = useMemo(() => addDays(todayKey, 1), [todayKey]);
+  const mountedTodayKeyRef = useRef(todayKey);
+  useEffect(() => {
+    if (mountedTodayKeyRef.current === todayKey) return;
+    mountedTodayKeyRef.current = todayKey;
+    homeworkState.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayKey]);
   const localeTag = LOCALE_TAG[locale];
   const realList = useMemo(
     () => (homeworkState.data ?? []).map((hw) => toRealHomeworkRow(hw, todayKey, tomorrowKey, t, localeTag)),

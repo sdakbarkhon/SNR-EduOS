@@ -74,8 +74,9 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
-import { tashkentDateKey, tashkentToday, addDays } from "../../lib/tashkent";
+import { tashkentDateKey, addDays } from "../../lib/tashkent";
 import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, realGradeDisplay, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
@@ -416,7 +417,11 @@ export default function HomeworkDetailScreen() {
     [isRealFlow, selectedChildId, homeworkId],
   );
   const realHw: ChildHomeworkDetail | null = detailState.data ?? null;
-  const todayKey = useMemo(() => tashkentToday(), []);
+  // Долги, проход 3 — единственный элемент уже загружен, "сегодня/завтра"
+  // в дедлайне — derived-лейбл; useTashkentToday сам пересчитывает его на
+  // границе суток, отдельный refresh() не нужен (нечего перезапрашивать
+  // заново — это не список).
+  const todayKey = useTashkentToday();
   const tomorrowKey = useMemo(() => addDays(todayKey, 1), [todayKey]);
 
   const isRealTest = realHw?.content_type === "test";

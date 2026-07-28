@@ -73,8 +73,9 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
-import { tashkentDateKey, tashkentToday, mondayOfWeek, weekdayIndex, addDays } from "../../lib/tashkent";
+import { tashkentDateKey, mondayOfWeek, weekdayIndex, addDays } from "../../lib/tashkent";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -360,7 +361,14 @@ export default function ScheduleScreen() {
   const children = getChildren();
   const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const todayKey = useMemo(() => tashkentToday(), []);
+  // Долги, проход 3 — "сегодня" больше не застывает на дате монтирования
+  // (useTashkentToday пересчитывает на возврат в foreground И на границе
+  // суток по Ташкенту). weekStartKey/realWeekDays/realSchedBanner уже
+  // реактивно зависят от todayKey, поэтому переход на новую неделю в
+  // полночь (Вс→Пн) сам по себе перезапросит scheduleState — доп. вызов
+  // .refresh() не нужен; в пределах той же недели меняется только
+  // подсветка/баннер "сегодня", данные уже загружены.
+  const todayKey = useTashkentToday();
   const [selectedDay, setSelectedDay] = useState<number>(() =>
     isRealFlow ? weekdayIndex(todayKey) : DEMO_TODAY.weekday_index,
   );

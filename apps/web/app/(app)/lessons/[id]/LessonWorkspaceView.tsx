@@ -1252,11 +1252,14 @@ export function LessonWorkspaceView({
                   )}
 
                   {/* Theory: full presentation (slides) when generated, else plain text.
-                      Students never drive navigation — they follow the teacher's
-                      current_slide_index via Realtime inside SlideViewer (untouched —
-                      both branches below render the exact same SlideViewer instance/
-                      props, just a different, larger wrapper while the presentation is
-                      the active stage). */}
+                      While in_progress, student AND teacher both drive navigation —
+                      any click moves the active slide for everyone via Supabase
+                      Realtime (channel stage-slide-*, migration 150 lets the student
+                      UPDATE lesson_stages.current_slide_index on the lesson's active
+                      stage). Once completed, sync is off — each student browses their
+                      own copy locally for review. Both branches below render the
+                      exact same SlideViewer instance/props, just a different, larger
+                      wrapper while the presentation is the active stage. */}
                   {!isCodeOrExternal && (
                     isPresentationActive && stage.slides && stage.slides.length > 0 ? (
                       <StudentPresentationViewer
