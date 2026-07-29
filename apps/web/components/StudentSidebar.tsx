@@ -235,8 +235,12 @@ export function StudentSidebar({ isDemo }: { isDemo?: boolean } = {}) {
         </button>
       </div>
 
-      {/* Пункты меню */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
+      {/* Пункты меню — flex-1 убран (раньше растягивал nav на всю высоту
+          сайдбара на высоких мониторах, из-за чего пункты визуально
+          "разъезжались" — на самом деле сами пункты просто оставались
+          сверху, а под ними образовывалась одна большая пустая зона).
+          Теперь список занимает ровно свою естественную высоту. */}
+      <nav className="flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = !item.isStub && pathname.startsWith(item.href);
           const Icon = item.icon as LucideIcon;

@@ -161,8 +161,14 @@ export function TeacherSidebar() {
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
+      {/* Navigation — "Выйти" геометрически такой же пункт списка, как и
+          остальные (тот же space-y-1 контейнер, тот же px-3 py-3
+          rounded-2xl) — раньше жила в отдельном div ниже с border-t/pt-4
+          и nav имела flex-1, из-за чего на высоких мониторах (2160+)
+          между "Настройками" и "Выйти" образовывался огромный пустой
+          растянутый промежуток, а сама кнопка прибивалась к низу
+          экрана. */}
+      <nav className="space-y-1 px-2">
         {teacherNavItems.filter((item) => !item.hideFromSidebar).map((item) => {
           const active = pendingHref ? pendingHref === item.href : pathname.startsWith(item.href);
           const Icon = item.icon;
@@ -196,23 +202,19 @@ export function TeacherSidebar() {
             </Link>
           );
         })}
-      </nav>
-
-      {/* Logout */}
-      <div className="shrink-0 border-t border-white/20 pt-4 px-2">
         <button
           type="button"
           onClick={logout}
           title="Выйти"
           className={cn(
-            "flex w-full items-center gap-3 rounded-2xl p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white",
+            "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium text-white/80 transition-all duration-200 hover:bg-white/10 hover:text-white",
             isCollapsed && "justify-center",
           )}
         >
-          <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
-          {!isCollapsed && <span className="font-medium">Выйти</span>}
+          <LogOut size={20} strokeWidth={2} className="shrink-0" />
+          {!isCollapsed && <span className="whitespace-nowrap">Выйти</span>}
         </button>
-      </div>
+      </nav>
       {loggingOut && <LogoutOverlay />}
     </aside>
   );
