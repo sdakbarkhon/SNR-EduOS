@@ -365,6 +365,31 @@ export interface Dictionary {
     tableStudentCount: string;
     tableTeacher: string;
     loading: string;
+    // П.3 Заход 2 — добавлено при i18n-переводе students/teachers/groups/dashboard
+    noResults: string;
+    selectGroupPlaceholder: string;
+    noGroupOption: string;
+    resetPasswordHint: string;
+    teachersSearchPlaceholder: string;
+    groupsSearchPlaceholder: string;
+    selectSubjectPlaceholder: string;
+    selectTeacherPlaceholder: string;
+    groupCreatedMsg: string;   // "Группа «{name}» создана"
+    groupUpdatedMsg: string;
+    groupDeletedMsg: string;
+    teacherUpdatedMsg: string;
+    teacherDeletedMsg: string;
+    studentUpdatedMsg: string;
+    dashboardTitle: string;
+    dashboardSubtitle: string;
+    recentStudentsTitle: string;
+    creating: string;
+    saving: string;
+    resetting: string;
+    deleting: string;
+    subjectsEnterName: string;
+    subjectsDeleteTitle: string;
+    subjectsIconSelected: string;  // "Выбрано: {icon}"
   };
   superadmin: {
     title: string;
@@ -391,7 +416,7 @@ export interface Dictionary {
     generatePassword: string;
     createBtn: string;
     cancelBtn: string;
-    createdMsg: string;
+    createdMsg: string;   // "Админ создан. Username: {username}, Пароль: {password}"
     tableFullName: string;
     tableUsername: string;
     tableSchool: string;
@@ -401,6 +426,36 @@ export interface Dictionary {
     fieldNewPassword: string;
     saveBtn: string;
     passwordChangedMsg: string;
+    // П.3 Заход 2 — добавлено при i18n-переводе dashboard/schools/admins/settings
+    dashboardTitle: string;
+    dashboardSubtitle: string;
+    quickActionsTitle: string;
+    addSchoolAdminQuick: string;
+    schoolsSubtitle: string;
+    createSchoolBtn: string;
+    fieldSchoolName: string;
+    fieldSchoolCode: string;
+    autostartLabel: string;
+    autostartEnabled: string;
+    autostartDisabled: string;
+    noSchools: string;
+    schoolCreatedMsg: string;         // "Школа «{name}» создана."
+    searchPlaceholder: string;
+    noResults: string;
+    editAdminTitle: string;
+    deleteAdminTitle: string;
+    deleteAdminConfirm: string;       // "{name}"
+    resetAdminPasswordConfirm: string; // "{name}"
+    adminUpdatedMsg: string;
+    adminDeletedMsg: string;
+    newPasswordFlash: string;         // "{name}" "{password}"
+    noAccountError: string;
+    settingsSubtitle: string;
+    saving: string;
+    creating: string;
+    deleting: string;
+    resetPasswordBtn: string;
+    resetting: string;
   };
   parent: {
     title: string;
@@ -479,6 +534,18 @@ export interface Dictionary {
     resetPasswordConfirm: string;
     resetPasswordNotRegistered: string;
     newPasswordFlash: string;
+  };
+  /** П.3 Заход 2 — человеческие сообщения об ошибках для админ-форм
+   *  (apps/web/lib/admin-error-messages.ts), заменяют сырой Postgres-текст. */
+  adminErrors: {
+    usernameTaken: string;
+    phoneTaken: string;
+    schoolCodeTaken: string;
+    foreignKeyBlocked: string;
+    requiredField: string;   // "Обязательное поле: {field}"
+    invalidCredentials: string;
+    rateLimited: string;
+    genericPrefix: string;   // "Ошибка: "
   };
   parentUi: {
     todayTitle: string;
@@ -2177,6 +2244,12 @@ export interface Dictionary {
       categoryLabel: string;
       isTickerLabel: string;
       validUntilLabel: string;
+      // П.3 Заход 2 — добавлено при i18n-переводе AdminAnnouncementsView
+      errorRequiredFields: string;
+      errorSelectGroup: string;
+      scopeGroupFallback: string;
+      scopeStudentFallback: string;
+      scopeAllGroups: string;
     };
   };
   classwork: {

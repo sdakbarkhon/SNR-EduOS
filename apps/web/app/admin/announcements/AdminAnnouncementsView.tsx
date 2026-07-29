@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { cn } from "@/lib/cn";
 import { X } from "lucide-react";
 
@@ -51,8 +52,8 @@ function CreateModal({
   const [error, setError] = useState("");
 
   async function save() {
-    if (!title.trim() || !body.trim()) { setError("Заполните заголовок и текст"); return; }
-    if (scope === "group" && !groupId) { setError("Выберите группу"); return; }
+    if (!title.trim() || !body.trim()) { setError(t.errorRequiredFields); return; }
+    if (scope === "group" && !groupId) { setError(t.errorSelectGroup); return; }
     setSaving(true); setError("");
     try {
       await createAnnouncement(db, {
@@ -70,7 +71,7 @@ function CreateModal({
       onClose();
       router.refresh();
     } catch (e) {
-      setError((e as Error).message ?? d.common.error);
+      setError(humanizeAdminError(e, locale as Locale));
     } finally {
       setSaving(false);
     }
@@ -209,7 +210,7 @@ export function AdminAnnouncementsView({
             const catLabel = (d.announcements as Record<string, string>)[`category${(a.category ?? "general").charAt(0).toUpperCase()}${(a.category ?? "general").slice(1)}`];
             const date = new Date(a.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" });
             const validDate = a.valid_until ? new Date(a.valid_until).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Tashkent" }) : null;
-            const scopeLabel = a.scope === "group" ? (a.groupName ?? "Группа") : a.scope === "student" ? (a.targetStudentName ?? "Ученик") : "Все группы";
+            const scopeLabel = a.scope === "group" ? (a.groupName ?? d.teacher.announcements.scopeGroupFallback) : a.scope === "student" ? (a.targetStudentName ?? d.teacher.announcements.scopeStudentFallback) : d.teacher.announcements.scopeAllGroups;
             return (
               <div key={a.id} className={cn("rounded-2xl border p-5 shadow-sm backdrop-blur-xl",
                 a.is_pinned ? "border-l-4 border-amber-300 bg-amber-50/50" : "border-white/70 bg-white/70")}>
@@ -236,7 +237,7 @@ export function AdminAnnouncementsView({
                   <div className="flex shrink-0 gap-1">
                     <button onClick={() => togglePin(a)}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-500"
-                      title={a.is_pinned ? "Открепить" : "Закрепить"}>
+                      title={a.is_pinned ? d.teacher.announcements.unpin : d.teacher.announcements.pin}>
                       <Pin size={15} className={a.is_pinned ? "text-amber-500" : ""} />
                     </button>
                     <button onClick={() => setDeleteId(a.id)}

@@ -7,6 +7,7 @@ import { ArrowLeft, Copy, Check } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { actionCreateParent } from "../actions";
 
 type Student = { id: string; full_name: string; username: string };
@@ -50,7 +51,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
         const res = await actionCreateParent(fd);
         setResult(res);
       } catch (err) {
-        setError((err as Error).message);
+        setError(humanizeAdminError(err, locale as Locale));
       }
     });
   }

@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Plus, X, RefreshCw, Pencil, Trash2, KeyRound } from "lucide-react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import {
   actionCreateSchoolAdmin, actionUpdateSchoolAdmin,
   actionDeleteSchoolAdmin, actionResetSchoolAdminPassword,
@@ -84,6 +87,10 @@ export function AdminsView({
   emails: Record<string, string>;
   defaultOpenAdd?: boolean;
 }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const t = d.superadmin;
+
   const [modal, setModal] = useState<Modal>(defaultOpenAdd ? { kind: "add" } : { kind: "none" });
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
@@ -105,13 +112,13 @@ export function AdminsView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Администраторы школ</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t.adminsTitle}</h1>
         <button
           onClick={() => setModal({ kind: "add" })}
           className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900"
         >
           <Plus className="h-4 w-4" />
-          Добавить админа
+          {t.addAdmin}
         </button>
       </div>
 
@@ -126,7 +133,7 @@ export function AdminsView({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по имени или логину…"
+            placeholder={t.searchPlaceholder}
             className="w-full rounded-xl bg-gray-50 px-4 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-slate-400"
           />
         </div>
@@ -134,17 +141,17 @@ export function AdminsView({
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-4 py-3">ФИО</th>
-                <th className="px-4 py-3">Логин</th>
-                <th className="px-4 py-3">Школа</th>
-                <th className="px-4 py-3">Создан</th>
+                <th className="px-4 py-3">{t.tableFullName}</th>
+                <th className="px-4 py-3">{t.tableUsername}</th>
+                <th className="px-4 py-3">{t.tableSchool}</th>
+                <th className="px-4 py-3">{t.tableCreated}</th>
                 <th className="px-4 py-3 text-right">&nbsp;</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">Ничего не найдено</td>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{t.noResults}</td>
                 </tr>
               ) : (
                 filtered.map((a) => (
@@ -159,21 +166,21 @@ export function AdminsView({
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setModal({ kind: "edit", admin: a })}
-                          title="Редактировать"
+                          title={t.editAdminTitle}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-slate-50 hover:text-slate-700"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setModal({ kind: "reset", admin: a })}
-                          title="Сбросить пароль"
+                          title={t.resetPasswordBtn}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600"
                         >
                           <KeyRound className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setModal({ kind: "delete", admin: a })}
-                          title="Удалить"
+                          title={t.deleteAdminTitle}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -190,7 +197,7 @@ export function AdminsView({
 
       {modal.kind === "add" && (
         <Backdrop onClose={() => setModal({ kind: "none" })}>
-          <ModalCard title="Добавить администратора школы" onClose={() => setModal({ kind: "none" })}>
+          <ModalCard title={t.addAdminTitle} onClose={() => setModal({ kind: "none" })}>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -198,19 +205,23 @@ export function AdminsView({
                 startTransition(async () => {
                   try {
                     await actionCreateSchoolAdmin(fd);
-                    flash(`Админ создан. Username: ${fd.get("username")}, Пароль: ${fd.get("password")}`);
+                    flash(
+                      t.createdMsg
+                        .replace("{username}", String(fd.get("username")))
+                        .replace("{password}", String(fd.get("password"))),
+                    );
                     setModal({ kind: "none" });
                     setPwd(generatePassword());
                   } catch (err) {
-                    flash("Ошибка: " + (err as Error).message);
+                    flash(humanizeAdminError(err, locale as Locale));
                   }
                 });
               }}
               className="space-y-4"
             >
-              <Field label="ФИО"><Input name="full_name" required placeholder="Иван Петров" /></Field>
-              <Field label="Username"><Input name="username" required placeholder="admin_maktab2" autoCapitalize="none" /></Field>
-              <Field label="Пароль">
+              <Field label={t.fieldFullName}><Input name="full_name" required placeholder="Иван Петров" /></Field>
+              <Field label={t.fieldUsername}><Input name="username" required placeholder="admin_maktab2" autoCapitalize="none" /></Field>
+              <Field label={t.fieldPassword}>
                 <div className="flex gap-2">
                   <input
                     name="password"
@@ -225,11 +236,11 @@ export function AdminsView({
                     className="flex items-center gap-1 rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
-                    Генерировать
+                    {t.generatePassword}
                   </button>
                 </div>
               </Field>
-              <Field label="Школа">
+              <Field label={t.fieldSchool}>
                 <select
                   name="school_id"
                   required
@@ -242,9 +253,9 @@ export function AdminsView({
                 </select>
               </Field>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
+                <button type="button" onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">
-                  {isPending ? "Создание…" : "Создать"}
+                  {isPending ? t.creating : t.createBtn}
                 </button>
               </div>
             </form>
@@ -254,7 +265,7 @@ export function AdminsView({
 
       {modal.kind === "edit" && (
         <Backdrop onClose={() => setModal({ kind: "none" })}>
-          <ModalCard title="Редактировать администратора" onClose={() => setModal({ kind: "none" })}>
+          <ModalCard title={t.editAdminTitle} onClose={() => setModal({ kind: "none" })}>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -262,18 +273,18 @@ export function AdminsView({
                 startTransition(async () => {
                   try {
                     await actionUpdateSchoolAdmin(fd);
-                    flash("Изменения сохранены.");
+                    flash(t.adminUpdatedMsg);
                     setModal({ kind: "none" });
                   } catch (err) {
-                    flash("Ошибка: " + (err as Error).message);
+                    flash(humanizeAdminError(err, locale as Locale));
                   }
                 });
               }}
               className="space-y-4"
             >
               <input type="hidden" name="admin_id" value={modal.admin.id} />
-              <Field label="ФИО"><Input name="full_name" required defaultValue={modal.admin.full_name} /></Field>
-              <Field label="Школа">
+              <Field label={t.fieldFullName}><Input name="full_name" required defaultValue={modal.admin.full_name} /></Field>
+              <Field label={t.fieldSchool}>
                 <select
                   name="school_id"
                   required
@@ -286,9 +297,9 @@ export function AdminsView({
                 </select>
               </Field>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
+                <button type="button" onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">
-                  {isPending ? "Сохранение…" : "Сохранить"}
+                  {isPending ? t.saving : t.saveBtn}
                 </button>
               </div>
             </form>
@@ -298,32 +309,32 @@ export function AdminsView({
 
       {modal.kind === "reset" && (
         <Backdrop onClose={() => setModal({ kind: "none" })}>
-          <ModalCard title="Сбросить пароль" onClose={() => setModal({ kind: "none" })}>
+          <ModalCard title={t.resetPasswordBtn} onClose={() => setModal({ kind: "none" })}>
             <p className="mb-6 text-sm text-gray-600">
-              Сбросить пароль администратора «{modal.admin.full_name}»? Новый пароль будет показан один раз.
+              {t.resetAdminPasswordConfirm.replace("{name}", modal.admin.full_name)}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
-                Отмена
+                {t.cancelBtn}
               </button>
               <button
                 onClick={() => {
                   const userId = modal.admin.user_id;
-                  if (!userId) { flash("Ошибка: у администратора нет учётной записи"); setModal({ kind: "none" }); return; }
+                  if (!userId) { flash(t.noAccountError); setModal({ kind: "none" }); return; }
                   startTransition(async () => {
                     try {
                       const newPassword = await actionResetSchoolAdminPassword(userId);
-                      flash(`Новый пароль для ${modal.admin.full_name}: ${newPassword}`);
+                      flash(t.newPasswordFlash.replace("{name}", modal.admin.full_name).replace("{password}", newPassword));
                       setModal({ kind: "none" });
                     } catch (err) {
-                      flash("Ошибка: " + (err as Error).message);
+                      flash(humanizeAdminError(err, locale as Locale));
                     }
                   });
                 }}
                 disabled={isPending}
                 className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60"
               >
-                {isPending ? "…" : "Сбросить"}
+                {isPending ? t.resetting : t.resetPasswordBtn}
               </button>
             </div>
           </ModalCard>
@@ -332,32 +343,32 @@ export function AdminsView({
 
       {modal.kind === "delete" && (
         <Backdrop onClose={() => setModal({ kind: "none" })}>
-          <ModalCard title="Удалить администратора" onClose={() => setModal({ kind: "none" })}>
+          <ModalCard title={t.deleteAdminTitle} onClose={() => setModal({ kind: "none" })}>
             <p className="mb-6 text-sm text-gray-600">
-              Удалить администратора «{modal.admin.full_name}»? Это действие необратимо — учётная запись входа будет удалена.
+              {t.deleteAdminConfirm.replace("{name}", modal.admin.full_name)}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
-                Отмена
+                {t.cancelBtn}
               </button>
               <button
                 onClick={() => {
                   const userId = modal.admin.user_id;
-                  if (!userId) { flash("Ошибка: у администратора нет учётной записи"); setModal({ kind: "none" }); return; }
+                  if (!userId) { flash(t.noAccountError); setModal({ kind: "none" }); return; }
                   startTransition(async () => {
                     try {
                       await actionDeleteSchoolAdmin(userId);
-                      flash("Администратор удалён.");
+                      flash(t.adminDeletedMsg);
                       setModal({ kind: "none" });
                     } catch (err) {
-                      flash("Ошибка: " + (err as Error).message);
+                      flash(humanizeAdminError(err, locale as Locale));
                     }
                   });
                 }}
                 disabled={isPending}
                 className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
               >
-                {isPending ? "Удаление…" : "Удалить"}
+                {isPending ? t.deleting : d.admin.deleteBtn}
               </button>
             </div>
           </ModalCard>

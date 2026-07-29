@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { actionChangeOwnPassword } from "../actions";
 
 export function SettingsView() {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const t = d.superadmin;
+
   const [isPending, startTransition] = useTransition();
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
 
@@ -15,8 +22,8 @@ export function SettingsView() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Настройки</h1>
-        <p className="mt-1 text-sm text-gray-500">Учётные данные супер-администратора</p>
+        <h1 className="text-2xl font-bold text-gray-800">{t.settingsTitle}</h1>
+        <p className="mt-1 text-sm text-gray-500">{t.settingsSubtitle}</p>
       </div>
 
       {flashMsg && (
@@ -26,7 +33,7 @@ export function SettingsView() {
       )}
 
       <div className="max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-        <h2 className="mb-4 text-base font-semibold text-gray-700">Смена пароля</h2>
+        <h2 className="mb-4 text-base font-semibold text-gray-700">{t.changePassword}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -34,17 +41,17 @@ export function SettingsView() {
             startTransition(async () => {
               try {
                 await actionChangeOwnPassword(fd);
-                flash("Пароль изменён");
+                flash(t.passwordChangedMsg);
                 (e.target as HTMLFormElement).reset();
               } catch (err) {
-                flash("Ошибка: " + (err as Error).message);
+                flash(humanizeAdminError(err, locale as Locale));
               }
             });
           }}
           className="space-y-4"
         >
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Новый пароль</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldNewPassword}</label>
             <input
               name="new_password"
               type="text"
@@ -58,7 +65,7 @@ export function SettingsView() {
             disabled={isPending}
             className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60"
           >
-            {isPending ? "Сохранение…" : "Сохранить"}
+            {isPending ? t.saving : t.saveBtn}
           </button>
         </form>
       </div>

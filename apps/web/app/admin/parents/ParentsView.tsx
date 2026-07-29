@@ -7,6 +7,7 @@ import { Plus, Copy, RefreshCw, Trash2, Pencil, KeyRound } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { actionRegenerateInviteCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
 
 type ParentRow = {
@@ -50,6 +51,7 @@ function EditParentModal({
   onSaved,
   onError,
   t,
+  locale,
 }: {
   parent: ParentRow;
   allStudents: Student[];
@@ -57,6 +59,7 @@ function EditParentModal({
   onSaved: () => void;
   onError: (msg: string) => void;
   t: ReturnType<typeof getDictionary>["adminParents"];
+  locale: Locale;
 }) {
   const [fullName, setFullName] = useState(parent.full_name);
   const [phone, setPhone] = useState(parent.phone ?? "");
@@ -85,7 +88,7 @@ function EditParentModal({
         await actionUpdateParent(fd);
         onSaved();
       } catch (err) {
-        onError((err as Error).message);
+        onError(humanizeAdminError(err, locale));
       }
     });
   }
@@ -258,7 +261,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                                 await actionRegenerateInviteCode(p.id);
                                 flash(t.regenerateCodeBtn + " ✓");
                               } catch (err) {
-                                flash("Ошибка: " + (err as Error).message);
+                                flash(humanizeAdminError(err, locale as Locale));
                               }
                             })}
                             disabled={isPending}
@@ -323,7 +326,8 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
           allStudents={allStudents}
           onClose={() => setModal({ kind: "none" })}
           onSaved={() => { flash(t.saveBtn + " ✓"); setModal({ kind: "none" }); }}
-          onError={(msg) => flash("Ошибка: " + msg)}
+          onError={(msg) => flash(msg)}
+          locale={locale as Locale}
           t={t}
         />
       )}
@@ -349,7 +353,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                       flash(t.newPasswordFlash.replace("{name}", modal.parent.full_name).replace("{password}", newPassword));
                       setModal({ kind: "none" });
                     } catch (err) {
-                      flash("Ошибка: " + (err as Error).message);
+                      flash(humanizeAdminError(err, locale as Locale));
                     }
                   });
                 }}
@@ -381,7 +385,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                     flash(t.deleteBtn + " ✓");
                     setModal({ kind: "none" });
                   } catch (err) {
-                    flash("Ошибка: " + (err as Error).message);
+                    flash(humanizeAdminError(err, locale as Locale));
                   }
                 })}
                 disabled={isPending}

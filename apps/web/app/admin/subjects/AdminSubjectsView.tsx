@@ -7,6 +7,7 @@ import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 
 type Group    = { id: string; name: string; subject: string };
 type Teacher  = { id: string; full_name: string };
@@ -87,8 +88,8 @@ export function AdminSubjectsView({
   }
 
   function handleSave() {
-    if (!formName.trim()) { setFormError("Введите название"); return; }
-    if (!selectedGroupId) { setFormError("Выберите группу"); return; }
+    if (!formName.trim()) { setFormError(d.subjectsEnterName); return; }
+    if (!selectedGroupId) { setFormError(d.selectGroupPlaceholder); return; }
     setFormError("");
     startTransition(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,7 +102,7 @@ export function AdminSubjectsView({
           icon: formIcon,
           color: formColor,
         });
-        if (error) { setFormError(error.message); return; }
+        if (error) { setFormError(humanizeAdminError(error, locale as Locale)); return; }
       } else if (modal.mode === "edit") {
         const { error } = await db2.from("subjects").update({
           name: formName.trim(),
@@ -109,7 +110,7 @@ export function AdminSubjectsView({
           icon: formIcon,
           color: formColor,
         }).eq("id", modal.subject.id);
-        if (error) { setFormError(error.message); return; }
+        if (error) { setFormError(humanizeAdminError(error, locale as Locale)); return; }
       }
       setModal({ mode: "none" });
       // Refresh
@@ -129,7 +130,7 @@ export function AdminSubjectsView({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db2 = db as any;
       const { error } = await db2.from("subjects").delete().eq("id", id);
-      if (error) { alert(error.message); return; }
+      if (error) { alert(humanizeAdminError(error, locale as Locale)); return; }
       setModal({ mode: "none" });
       setSubjects((prev) => prev.filter((s) => s.id !== id));
     });
@@ -159,7 +160,7 @@ export function AdminSubjectsView({
 
       {/* Group selector */}
       <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <label className="mb-2 block text-sm font-medium text-zinc-600">Группа</label>
+        <label className="mb-2 block text-sm font-medium text-zinc-600">{d.fieldGroup}</label>
         <select
           value={selectedGroupId}
           onChange={(e) => setSelectedGroupId(e.target.value)}
@@ -207,14 +208,14 @@ export function AdminSubjectsView({
                     <button
                       onClick={() => openEdit(s)}
                       className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
-                      title="Редактировать"
+                      title={d.editBtn}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setModal({ mode: "delete", subject: s })}
                       className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                      title="Удалить"
+                      title={d.deleteBtn}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -281,7 +282,7 @@ export function AdminSubjectsView({
                     </button>
                   ))}
                 </div>
-                <p className="mt-1 text-xs text-zinc-500">Выбрано: {formIcon}</p>
+                <p className="mt-1 text-xs text-zinc-500">{d.subjectsIconSelected.replace("{icon}", formIcon)}</p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700">{d.subjectsColor}</label>
@@ -306,7 +307,7 @@ export function AdminSubjectsView({
                 onClick={() => setModal({ mode: "none" })}
                 className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 transition-colors"
               >
-                Отмена
+                {d.cancelBtn}
               </button>
               <button
                 onClick={handleSave}
@@ -314,7 +315,7 @@ export function AdminSubjectsView({
                 className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors"
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                Сохранить
+                {d.saveBtn}
               </button>
             </div>
           </div>
@@ -325,7 +326,7 @@ export function AdminSubjectsView({
       {modal.mode === "delete" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="mb-2 text-lg font-semibold text-zinc-900">Удалить предмет?</h2>
+            <h2 className="mb-2 text-lg font-semibold text-zinc-900">{d.subjectsDeleteTitle}</h2>
             <p className="mb-1 text-sm text-zinc-600">
               {d.subjectsDeleteConfirm
                 .replace("{name}", modal.subject.name)
@@ -337,7 +338,7 @@ export function AdminSubjectsView({
                 onClick={() => setModal({ mode: "none" })}
                 className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"
               >
-                Отмена
+                {d.cancelBtn}
               </button>
               <button
                 onClick={handleDelete}
@@ -345,7 +346,7 @@ export function AdminSubjectsView({
                 className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Удалить
+                {d.deleteBtn}
               </button>
             </div>
           </div>

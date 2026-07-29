@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { actionCreateSchool } from "../actions";
 
 type School = { id: string; name: string; code: string | null; autostart_enabled: boolean; created_at: string };
@@ -51,6 +54,10 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export function SchoolsView({ schools }: { schools: School[] }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const t = d.superadmin;
+
   const [showAdd, setShowAdd] = useState(false);
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -64,15 +71,15 @@ export function SchoolsView({ schools }: { schools: School[] }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Школы</h1>
-          <p className="mt-1 text-sm text-gray-500">Все школы, использующие SNR EduOS</p>
+          <h1 className="text-2xl font-bold text-gray-800">{t.schoolsTitle}</h1>
+          <p className="mt-1 text-sm text-gray-500">{t.schoolsSubtitle}</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900"
         >
           <Plus className="h-4 w-4" />
-          Создать школу
+          {t.createSchoolBtn}
         </button>
       </div>
 
@@ -87,16 +94,16 @@ export function SchoolsView({ schools }: { schools: School[] }) {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-4 py-3">Название</th>
-                <th className="px-4 py-3">Код</th>
-                <th className="px-4 py-3">Автостарт уроков</th>
-                <th className="px-4 py-3">Создана</th>
+                <th className="px-4 py-3">{t.schoolsTableName}</th>
+                <th className="px-4 py-3">{t.schoolsTableCode}</th>
+                <th className="px-4 py-3">{t.autostartLabel}</th>
+                <th className="px-4 py-3">{t.schoolsTableCreated}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {schools.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">Школ пока нет</td>
+                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">{t.noSchools}</td>
                 </tr>
               ) : (
                 schools.map((s) => (
@@ -105,9 +112,9 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                     <td className="px-4 py-3 text-gray-500">{s.code ?? "—"}</td>
                     <td className="px-4 py-3">
                       {s.autostart_enabled ? (
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">Включён</span>
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">{t.autostartEnabled}</span>
                       ) : (
-                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200">Выключен</span>
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200">{t.autostartDisabled}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
@@ -123,7 +130,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
 
       {showAdd && (
         <Backdrop onClose={() => setShowAdd(false)}>
-          <ModalCard title="Создать школу" onClose={() => setShowAdd(false)}>
+          <ModalCard title={t.createSchoolBtn} onClose={() => setShowAdd(false)}>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -131,17 +138,17 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 startTransition(async () => {
                   try {
                     await actionCreateSchool(fd);
-                    flash(`Школа «${fd.get("name")}» создана.`);
+                    flash(t.schoolCreatedMsg.replace("{name}", String(fd.get("name"))));
                     setShowAdd(false);
                   } catch (err) {
-                    flash("Ошибка: " + (err as Error).message);
+                    flash(humanizeAdminError(err, locale as Locale));
                   }
                 });
               }}
               className="space-y-4"
             >
-              <Field label="Название"><Input name="name" required placeholder="SNR International School" /></Field>
-              <Field label="Код"><Input name="code" required placeholder="SNR-REAL" autoCapitalize="none" /></Field>
+              <Field label={t.fieldSchoolName}><Input name="name" required placeholder="SNR International School" /></Field>
+              <Field label={t.fieldSchoolCode}><Input name="code" required placeholder="SNR-REAL" autoCapitalize="none" /></Field>
               <label className="flex items-center gap-2.5 pt-1 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -149,12 +156,12 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                   defaultChecked
                   className="h-4 w-4 rounded border-gray-300 text-slate-700 focus:ring-slate-400"
                 />
-                Автостарт/автозавершение уроков по расписанию
+                {t.autostartLabel}
               </label>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowAdd(false)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
+                <button type="button" onClick={() => setShowAdd(false)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">
-                  {isPending ? "Создание…" : "Создать"}
+                  {isPending ? t.creating : t.createBtn}
                 </button>
               </div>
             </form>

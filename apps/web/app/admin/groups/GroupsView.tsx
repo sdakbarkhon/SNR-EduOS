@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2, Plus, X } from "lucide-react";
+import { getDictionary, type Locale, subjects } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
-import { subjects } from "@snr/core";
 
 type Teacher = { id: string; full_name: string };
 type Group = {
@@ -73,10 +75,13 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
+type AdminDict = ReturnType<typeof getDictionary>["admin"];
+
 function GroupForm({
   defaultValues,
   teachers,
   isPending,
+  t,
   onClose,
   onSubmit,
   submitLabel,
@@ -84,6 +89,7 @@ function GroupForm({
   defaultValues?: Partial<Group>;
   teachers: Teacher[];
   isPending: boolean;
+  t: AdminDict;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
   submitLabel: string;
@@ -95,27 +101,27 @@ function GroupForm({
       onSubmit={(e) => { e.preventDefault(); onSubmit(new FormData(e.currentTarget)); }}
       className="space-y-4"
     >
-      <Field label="Название группы">
+      <Field label={t.fieldGroupName}>
         <Input name="name" required placeholder="Математика 7А" defaultValue={defaultValues?.name} />
       </Field>
-      <Field label="Предмет">
+      <Field label={t.fieldSubject}>
         <Select name="subject" required defaultValue={defaultValues?.subject ?? ""}>
-          <option value="" disabled>Выберите предмет</option>
+          <option value="" disabled>{t.selectSubjectPlaceholder}</option>
           {subjectEntries.map(([key, cfg]) => (
             <option key={key} value={key}>{cfg.label}</option>
           ))}
         </Select>
       </Field>
-      <Field label="Учитель">
+      <Field label={t.fieldTeacher}>
         <Select name="teacher_id" required defaultValue={defaultValues?.teacher_id ?? undefined}>
-          <option value="" disabled>Выберите учителя</option>
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>{t.full_name}</option>
+          <option value="" disabled>{t.selectTeacherPlaceholder}</option>
+          {teachers.map((tc) => (
+            <option key={tc.id} value={tc.id}>{tc.full_name}</option>
           ))}
         </Select>
       </Field>
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
+        <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
         <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60">
           {isPending ? "…" : submitLabel}
         </button>
@@ -133,6 +139,10 @@ export function GroupsView({
   teachers: Teacher[];
   defaultOpenAdd?: boolean;
 }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const t = d.admin;
+
   const [modal, setModal] = useState<Modal | null>(defaultOpenAdd ? { kind: "add" } : null);
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
@@ -155,13 +165,13 @@ export function GroupsView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Группы</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t.groupsTitle}</h1>
         <button
           onClick={() => setModal({ kind: "add" })}
           className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
         >
           <Plus className="h-4 w-4" />
-          Создать группу
+          {t.addGroupTitle}
         </button>
       </div>
 
@@ -176,7 +186,7 @@ export function GroupsView({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию или учителю…"
+            placeholder={t.groupsSearchPlaceholder}
             className="w-full rounded-xl bg-gray-50 px-4 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-amber-400"
           />
         </div>
@@ -184,17 +194,17 @@ export function GroupsView({
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-4 py-3">Название</th>
-                <th className="px-4 py-3">Предмет</th>
-                <th className="px-4 py-3">Учитель</th>
-                <th className="px-4 py-3">Учеников</th>
-                <th className="px-4 py-3 text-right">Действия</th>
+                <th className="px-4 py-3">{t.fieldGroupName}</th>
+                <th className="px-4 py-3">{t.fieldSubject}</th>
+                <th className="px-4 py-3">{t.tableTeacher}</th>
+                <th className="px-4 py-3">{t.tableStudentCount}</th>
+                <th className="px-4 py-3 text-right">{t.tableActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">Ничего не найдено</td>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{t.noResults}</td>
                 </tr>
               ) : (
                 filtered.map((g) => {
@@ -207,10 +217,10 @@ export function GroupsView({
                       <td className="px-4 py-3 text-gray-500">{g.student_groups.length}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setModal({ kind: "edit", group: g })} className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600" title="Редактировать">
+                          <button onClick={() => setModal({ kind: "edit", group: g })} className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600" title={t.editBtn}>
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button onClick={() => setModal({ kind: "delete", group: g })} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title="Удалить">
+                          <button onClick={() => setModal({ kind: "delete", group: g })} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title={t.deleteBtn}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -226,21 +236,22 @@ export function GroupsView({
 
       {modal?.kind === "add" && (
         <Backdrop onClose={() => setModal(null)}>
-          <ModalCard title="Создать группу" onClose={() => setModal(null)}>
+          <ModalCard title={t.addGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
               teachers={teachers}
               isPending={isPending}
+              t={t}
               onClose={() => setModal(null)}
               onSubmit={(fd) => startTransition(async () => {
                 try {
                   await actionCreateGroup(fd);
-                  flash(`Группа «${fd.get("name")}» создана`);
+                  flash(t.groupCreatedMsg.replace("{name}", String(fd.get("name"))));
                   setModal(null);
                 } catch (e) {
-                  flash("Ошибка: " + (e as Error).message);
+                  flash(humanizeAdminError(e, locale as Locale));
                 }
               })}
-              submitLabel="Создать"
+              submitLabel={t.createBtn}
             />
           </ModalCard>
         </Backdrop>
@@ -248,25 +259,26 @@ export function GroupsView({
 
       {modal?.kind === "edit" && (
         <Backdrop onClose={() => setModal(null)}>
-          <ModalCard title="Редактировать группу" onClose={() => setModal(null)}>
+          <ModalCard title={t.editGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
               defaultValues={modal.group}
               teachers={teachers}
               isPending={isPending}
+              t={t}
               onClose={() => setModal(null)}
               onSubmit={(fd) => {
                 fd.append("group_id", modal.group.id);
                 startTransition(async () => {
                   try {
                     await actionUpdateGroup(fd);
-                    flash("Группа обновлена");
+                    flash(t.groupUpdatedMsg);
                     setModal(null);
                   } catch (e) {
-                    flash("Ошибка: " + (e as Error).message);
+                    flash(humanizeAdminError(e, locale as Locale));
                   }
                 });
               }}
-              submitLabel="Сохранить"
+              submitLabel={t.saveBtn}
             />
           </ModalCard>
         </Backdrop>
@@ -274,27 +286,27 @@ export function GroupsView({
 
       {modal?.kind === "delete" && (
         <Backdrop onClose={() => setModal(null)}>
-          <ModalCard title="Удалить группу" onClose={() => setModal(null)}>
+          <ModalCard title={t.deleteGroupTitle} onClose={() => setModal(null)}>
             <p className="mb-2 text-sm text-gray-600">
-              Удалить группу <strong>{modal.group.name}</strong>? Все уроки и оценки в ней будут удалены.
+              {t.deleteGroupConfirm.replace("{name}", modal.group.name)}
             </p>
-            <p className="mb-6 text-xs font-semibold text-red-600">Это действие необратимо!</p>
+            <p className="mb-6 text-xs font-semibold text-red-600">{t.deleteWarning}</p>
             <div className="flex gap-3">
-              <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
+              <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
               <button
                 onClick={() => startTransition(async () => {
                   try {
                     await actionDeleteGroup(modal.group.id);
-                    flash("Группа удалена");
+                    flash(t.groupDeletedMsg);
                     setModal(null);
                   } catch (e) {
-                    flash("Ошибка: " + (e as Error).message);
+                    flash(humanizeAdminError(e, locale as Locale));
                   }
                 })}
                 disabled={isPending}
                 className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
               >
-                {isPending ? "Удаление…" : "Удалить навсегда"}
+                {isPending ? t.deleting : t.confirmDeleteBtn}
               </button>
             </div>
           </ModalCard>

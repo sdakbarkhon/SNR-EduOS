@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { humanizeAdminError } from "@/lib/admin-error-messages";
 import {
   actionCreateStudent,
   actionUpdateStudent,
@@ -53,6 +56,10 @@ export function StudentsView({
   groups: Group[];
   defaultOpenAdd?: boolean;
 }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const t = d.admin;
+
   const [modal, setModal] = useState<Modal | null>(defaultOpenAdd ? { kind: "add" } : null);
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
@@ -76,13 +83,13 @@ export function StudentsView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Ученики</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t.studentsTitle}</h1>
         <button
           onClick={() => setModal({ kind: "add" })}
           className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
         >
           <Plus className="h-4 w-4" />
-          Добавить ученика
+          {t.addStudentTitle}
         </button>
       </div>
 
@@ -97,7 +104,7 @@ export function StudentsView({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по имени или группе…"
+            placeholder={t.searchPlaceholder}
             className="w-full rounded-xl bg-gray-50 px-4 py-2.5 text-sm outline-none ring-1 ring-gray-200 focus:ring-violet-400"
           />
         </div>
@@ -105,18 +112,18 @@ export function StudentsView({
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-4 py-3">ФИО</th>
-                <th className="px-4 py-3">Логин</th>
-                <th className="px-4 py-3">Группа</th>
-                <th className="px-4 py-3">Создан</th>
-                <th className="px-4 py-3 text-right">Действия</th>
+                <th className="px-4 py-3">{t.tableFullName}</th>
+                <th className="px-4 py-3">{t.tableUsername}</th>
+                <th className="px-4 py-3">{t.tableGroup}</th>
+                <th className="px-4 py-3">{t.tableCreated}</th>
+                <th className="px-4 py-3 text-right">{t.tableActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                    Ничего не найдено
+                    {t.noResults}
                   </td>
                 </tr>
               ) : (
@@ -135,21 +142,21 @@ export function StudentsView({
                           <button
                             onClick={() => setModal({ kind: "edit", student: s })}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600"
-                            title="Редактировать"
+                            title={t.editBtn}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setModal({ kind: "reset", student: s })}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600"
-                            title="Сбросить пароль"
+                            title={t.resetPasswordBtn}
                           >
                             <KeyRound className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setModal({ kind: "delete", student: s })}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                            title="Удалить"
+                            title={t.deleteBtn}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -170,15 +177,20 @@ export function StudentsView({
           <AddStudentModal
             groups={groups}
             isPending={isPending}
+            t={t}
             onClose={() => setModal(null)}
             onSubmit={async (fd) => {
               startTransition(async () => {
                 try {
-                  const res = await actionCreateStudent(fd);
-                  flash(`Ученик создан. Username: ${fd.get("username")}, Пароль: ${fd.get("password")}`);
+                  await actionCreateStudent(fd);
+                  flash(
+                    t.createdMsg
+                      .replace("{username}", String(fd.get("username")))
+                      .replace("{password}", String(fd.get("password"))),
+                  );
                   setModal(null);
                 } catch (e) {
-                  flash("Ошибка: " + (e as Error).message);
+                  flash(humanizeAdminError(e, locale as Locale));
                 }
               });
             }}
@@ -193,15 +205,16 @@ export function StudentsView({
             student={modal.student}
             groups={groups}
             isPending={isPending}
+            t={t}
             onClose={() => setModal(null)}
             onSubmit={async (fd) => {
               startTransition(async () => {
                 try {
                   await actionUpdateStudent(fd);
-                  flash("Данные ученика обновлены");
+                  flash(t.studentUpdatedMsg);
                   setModal(null);
                 } catch (e) {
-                  flash("Ошибка: " + (e as Error).message);
+                  flash(humanizeAdminError(e, locale as Locale));
                 }
               });
             }}
@@ -215,15 +228,16 @@ export function StudentsView({
           <ResetPasswordModal
             student={modal.student}
             isPending={isPending}
+            t={t}
             onClose={() => setModal(null)}
             onConfirm={() => {
               startTransition(async () => {
                 try {
                   const newPwd = await actionResetStudentPassword(modal.student.user_id);
-                  flash(`Новый пароль для ${modal.student.full_name}: ${newPwd}`);
+                  flash(t.passwordResetMsg.replace("{name}", modal.student.full_name).replace("{password}", newPwd));
                   setModal(null);
                 } catch (e) {
-                  flash("Ошибка: " + (e as Error).message);
+                  flash(humanizeAdminError(e, locale as Locale));
                 }
               });
             }}
@@ -237,15 +251,16 @@ export function StudentsView({
           <DeleteStudentModal
             student={modal.student}
             isPending={isPending}
+            t={t}
             onClose={() => setModal(null)}
             onConfirm={() => {
               startTransition(async () => {
                 try {
                   await actionDeleteStudent(modal.student.user_id);
-                  flash("Ученик удалён");
+                  flash(t.deletedMsg);
                   setModal(null);
                 } catch (e) {
-                  flash("Ошибка: " + (e as Error).message);
+                  flash(humanizeAdminError(e, locale as Locale));
                 }
               });
             }}
@@ -257,6 +272,8 @@ export function StudentsView({
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+type AdminDict = ReturnType<typeof getDictionary>["admin"];
 
 function ModalCard({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -302,18 +319,20 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 function AddStudentModal({
   groups,
   isPending,
+  t,
   onClose,
   onSubmit,
 }: {
   groups: Group[];
   isPending: boolean;
+  t: AdminDict;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
 }) {
   const [pwd, setPwd] = useState(() => generatePassword());
 
   return (
-    <ModalCard title="Добавить ученика" onClose={onClose}>
+    <ModalCard title={t.addStudentTitle} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -321,13 +340,13 @@ function AddStudentModal({
         }}
         className="space-y-4"
       >
-        <Field label="ФИО">
+        <Field label={t.fieldFullName}>
           <Input name="full_name" required placeholder="Алишер Назаров" />
         </Field>
-        <Field label="Username">
+        <Field label={t.fieldUsername}>
           <Input name="username" required placeholder="alisher_07" autoCapitalize="none" />
         </Field>
-        <Field label="Пароль">
+        <Field label={t.fieldPassword}>
           <div className="flex gap-2">
             <Input
               name="password"
@@ -342,13 +361,13 @@ function AddStudentModal({
               className="flex items-center gap-1 rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Генерировать
+              {t.generatePassword}
             </button>
           </div>
         </Field>
-        <Field label="Группа">
+        <Field label={t.fieldGroup}>
           <Select name="group_id" required defaultValue="">
-            <option value="" disabled>Выберите группу</option>
+            <option value="" disabled>{t.selectGroupPlaceholder}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
@@ -356,14 +375,14 @@ function AddStudentModal({
         </Field>
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
-            Отмена
+            {t.cancelBtn}
           </button>
           <button
             type="submit"
             disabled={isPending}
             className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
           >
-            {isPending ? "Создание…" : "Создать"}
+            {isPending ? t.creating : t.createBtn}
           </button>
         </div>
       </form>
@@ -375,19 +394,21 @@ function EditStudentModal({
   student,
   groups,
   isPending,
+  t,
   onClose,
   onSubmit,
 }: {
   student: Student;
   groups: Group[];
   isPending: boolean;
+  t: AdminDict;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
 }) {
   const currentGroupId = student.student_groups[0]?.groups?.id ?? "";
 
   return (
-    <ModalCard title="Редактировать ученика" onClose={onClose}>
+    <ModalCard title={t.editStudentTitle} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -399,15 +420,15 @@ function EditStudentModal({
         }}
         className="space-y-4"
       >
-        <Field label="ФИО">
+        <Field label={t.fieldFullName}>
           <Input name="full_name" required defaultValue={student.full_name} />
         </Field>
-        <Field label="Username">
+        <Field label={t.fieldUsername}>
           <Input name="username" required defaultValue={student.username} autoCapitalize="none" />
         </Field>
-        <Field label="Группа">
+        <Field label={t.fieldGroup}>
           <Select name="group_id" defaultValue={currentGroupId}>
-            <option value="">— без группы —</option>
+            <option value="">{t.noGroupOption}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
@@ -415,14 +436,14 @@ function EditStudentModal({
         </Field>
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
-            Отмена
+            {t.cancelBtn}
           </button>
           <button
             type="submit"
             disabled={isPending}
             className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
           >
-            {isPending ? "Сохранение…" : "Сохранить"}
+            {isPending ? t.saving : t.saveBtn}
           </button>
         </div>
       </form>
@@ -433,29 +454,31 @@ function EditStudentModal({
 function ResetPasswordModal({
   student,
   isPending,
+  t,
   onClose,
   onConfirm,
 }: {
   student: Student;
   isPending: boolean;
+  t: AdminDict;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <ModalCard title="Сбросить пароль" onClose={onClose}>
+    <ModalCard title={t.resetPasswordTitle} onClose={onClose}>
       <p className="mb-6 text-sm text-gray-600">
-        Сбросить пароль для <strong>{student.full_name}</strong>? Будет сгенерирован новый случайный пароль.
+        {t.resetPasswordConfirm.replace("{name}", student.full_name)} {t.resetPasswordHint}
       </p>
       <div className="flex gap-3">
         <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
-          Отмена
+          {t.cancelBtn}
         </button>
         <button
           onClick={onConfirm}
           disabled={isPending}
           className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60"
         >
-          {isPending ? "Сброс…" : "Сбросить"}
+          {isPending ? t.resetting : t.resetBtn}
         </button>
       </div>
     </ModalCard>
@@ -465,30 +488,32 @@ function ResetPasswordModal({
 function DeleteStudentModal({
   student,
   isPending,
+  t,
   onClose,
   onConfirm,
 }: {
   student: Student;
   isPending: boolean;
+  t: AdminDict;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <ModalCard title="Удалить ученика" onClose={onClose}>
+    <ModalCard title={t.deleteStudentTitle} onClose={onClose}>
       <p className="mb-2 text-sm text-gray-600">
-        Удалить ученика <strong>{student.full_name}</strong>? Все его оценки, домашки, история — будут безвозвратно удалены.
+        {t.deleteStudentConfirm.replace("{name}", student.full_name)}
       </p>
-      <p className="mb-6 text-xs font-semibold text-red-600">Это действие необратимо!</p>
+      <p className="mb-6 text-xs font-semibold text-red-600">{t.deleteWarning}</p>
       <div className="flex gap-3">
         <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
-          Отмена
+          {t.cancelBtn}
         </button>
         <button
           onClick={onConfirm}
           disabled={isPending}
           className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
         >
-          {isPending ? "Удаление…" : "Удалить навсегда"}
+          {isPending ? t.deleting : t.confirmDeleteBtn}
         </button>
       </div>
     </ModalCard>
