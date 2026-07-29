@@ -3300,4 +3300,47 @@ typecheck (`packages/core` + `apps/web`) и `next build` чистые.
 
 typecheck (`packages/core` + `apps/web` + `apps/mobile-parent`) и `next build` чистые.
 
-typecheck (`packages/core` + `apps/web` + `apps/mobile-parent`) и `next build` чистые.
+## Регенерация 29.07, этап 1: скрипт полной зачистки учебных данных демо-школы
+
+Перед регенерацией недели 27.07-02.08 нужно полностью зачистить учебные данные демо-школы (`school_id=a0a0a0a0-...`) без фильтра по датам — костяк (пользователи, школы, группы, предметы, БЗ-книги, чат-треды) остаётся.
+
+**`apps/web/scripts/clean-all-lesson-data.mjs`** (новый, dry-run по умолчанию, `--confirm` — реальное удаление; НЕ запускался с `--confirm` в этой сессии, только dry-run на живой БД). Разведка по `supabase/migrations/*.sql` показала: все 25 таблиц из списка имеют СОБСТВЕННУЮ колонку `school_id` — резолв id родителя через join (как в `cleanup-jul7-jul26.mjs`) не нужен, каждая таблица чистится отдельным `DELETE ... WHERE school_id=...`. Единственное жёсткое ограничение порядка во всём списке: `test_answers.selected_option_id → test_question_options` — `NO ACTION`, не `CASCADE`, поэтому `test_answers` удаляется раньше `test_question_options` (все остальные связи в списке — `CASCADE`/`SET NULL` от `lessons`/`homework`/`quiz_attempts`/`quiz_questions`, порядок между ними не критичен). Отдельная информационная секция в dry-run выводом (без удаления) показывает побочные эффекты каскада — таблицы НЕ из списка 25, которые исчезнут автоматически вместе с родителем: `classwork`-дерево (от `lessons`), `homework_subtasks`-дерево (от `homework`), `quiz_answers` (от `quiz_questions`/`quiz_attempts`), `ai_chat_messages`/`leave_requests`/`lesson_excuse_requests` (от `lessons`), `project_stage_progress`/`project_attachments` (от `project_submissions`), `curriculum_plan_topics` (от `curriculum_plans`), `announcement_reads`/`announcement_user_reads` (от `announcements`).
+
+**Полный dry-run на живой БД** (24 990 строк по основным 25 таблицам):
+
+| Таблица | Строк |
+|---|---|
+| quiz_attempts | 3 |
+| test_answers | 0 |
+| ai_homework_review_queue | 0 |
+| lesson_stages_embedding_queue | 316 |
+| lesson_stage_embeddings | 0 |
+| lesson_stage_progress | 6 |
+| kahoot_sessions | 0 |
+| quiz_questions | 503 |
+| test_question_options | 0 |
+| test_questions | 0 |
+| test_submissions | 0 |
+| homework_submissions | 10 |
+| course_materials | 4 |
+| lesson_grades | 215 |
+| lesson_raised_hands | 1 |
+| attendance | 390 |
+| lesson_materials | 273 |
+| lesson_stages | 946 |
+| homework | 16 |
+| lessons | 315 |
+| curriculum_plans | 1 |
+| announcements | 19 |
+| chat_messages | 90 |
+| notifications | 21 820 |
+| project_submissions | 62 |
+| **ВСЕГО** | **24 990** |
+
+`notifications` (21 820) — на порядок больше остального, но это ожидаемо: без фильтра по датам счёт идёт за ВСЁ время работы демо-школы, а не за последнюю неделю (в отличие от предыдущих `cleanup-*`-скриптов, которые всегда были ограничены диапазоном дат).
+
+Побочные эффекты каскада (не удаляются отдельно, посчитаны где есть свой `school_id`): `project_stage_progress` — 253, `announcement_user_reads` — 9, `announcement_reads` — 6, остальные (`classwork`, `homework_subtasks`, `quiz_answers`, `ai_chat_messages`, `leave_requests`, `lesson_excuse_requests`, `project_attachments`) — 0 на текущий момент.
+
+Реальное удаление (`--confirm`) не запускалось — ждём подтверждения пользователя.
+
+typecheck (`packages/core` + `apps/web`) чистый (скрипт — самостоятельный `.mjs`, не часть сборки `next build`).
