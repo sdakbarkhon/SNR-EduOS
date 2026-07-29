@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { AppShell } from "@/components/AppShell";
 import { FullscreenLessonProvider } from "@/components/fullscreen-lesson-context";
+import { ScaleWrapper } from "@/components/ScaleWrapper";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
@@ -36,10 +37,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <FullscreenLessonProvider>
-      <DemoWelcomeModal />
-      <DemoBanner isDemo={isDemo} />
-      <DemoHeartbeat isDemo={isDemo} />
-      <AppShell studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} isDemo={isDemo}>{children}</AppShell>
+      <ScaleWrapper>
+        <DemoWelcomeModal />
+        <DemoBanner isDemo={isDemo} />
+        <DemoHeartbeat isDemo={isDemo} />
+        <AppShell studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} isDemo={isDemo}>{children}</AppShell>
+      </ScaleWrapper>
     </FullscreenLessonProvider>
   );
 }

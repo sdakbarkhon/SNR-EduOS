@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { TeacherShell } from "@/components/TeacherShell";
 import { TeacherHeaderInfo, TeacherHeaderSkeleton } from "@/components/TeacherHeaderInfo";
+import { ScaleWrapper } from "@/components/ScaleWrapper";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
@@ -29,7 +30,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   const isDemo = (await cookies()).has(DEMO_SESSION_COOKIE);
 
   return (
-    <>
+    <ScaleWrapper>
       <DemoWelcomeModal />
       <DemoBanner isDemo={isDemo} />
       <DemoHeartbeat isDemo={isDemo} />
@@ -42,6 +43,6 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
       >
         {children}
       </TeacherShell>
-    </>
+    </ScaleWrapper>
   );
 }

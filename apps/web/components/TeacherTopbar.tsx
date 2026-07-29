@@ -25,9 +25,9 @@ export function TeacherTopbar({
   const pageTitle = navItem?.label(d) ?? "";
 
   return (
-    // Ширина больше не капается здесь — TeacherShell.tsx оборачивает весь
-    // каркас в фиксированные 1920px на viewport>=1920, топбар как обычный
-    // w-full-потомок автоматически наследует эту ширину без своего max-w.
+    // Ширина больше не капается здесь — ScaleWrapper.tsx оборачивает весь
+    // каркас в логический холст 1920px, топбар как обычный w-full-потомок
+    // автоматически наследует эту ширину без своего max-w.
     <header className="sticky top-0 z-30 flex h-20 w-full shrink-0 items-center justify-between gap-4 bg-white/20 px-4 backdrop-blur-sm md:px-8">
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-[20px] font-black tracking-tight text-gray-800 md:text-[24px]">

@@ -19,8 +19,8 @@ export function Topbar({
   classLabel?: string;
 }) {
   return (
-    // Ширина больше не капается здесь — AppShell.tsx оборачивает весь каркас
-    // в фиксированные 1920px на viewport>=1920, карточка-шапка как обычный
+    // Ширина больше не капается здесь — ScaleWrapper.tsx оборачивает весь
+    // каркас в логический холст 1920px, карточка-шапка как обычный
     // w-full-потомок автоматически наследует эту ширину без своего max-w.
     <header className="flex w-full shrink-0 items-center justify-between gap-4 rounded-[20px] bg-white py-3 pl-6 pr-4 shadow-[0_8px_22px_rgba(93,80,150,0.05)]">
       {/* Промт 6.2.1: длинные заголовки ("Посещаемость", "База знаний")
