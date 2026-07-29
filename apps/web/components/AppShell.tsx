@@ -73,7 +73,11 @@ export function AppShell({
         <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]">
           <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
           <main className={cn("flex-1 pb-20 md:pb-1", isMessagesRoute ? "overflow-hidden" : "overflow-y-auto")}>
-            <div className={cn("mx-auto w-full min-[1440px]:max-w-[1600px]", isMessagesRoute && "h-full")}>
+            {/* max-w-[1600px] без брейкпоинт-варианта — тот же безусловный
+                паттерн, что PageContainer.tsx (Заход 2) и TeacherShell.tsx
+                (см. там комментарий) — снят min-[1440px]:-гейт, подозреваемый
+                корень бага "контент прижат к сайдбару на широких мониторах". */}
+            <div className={cn("mx-auto w-full max-w-[1600px]", isMessagesRoute && "h-full")}>
               {children}
             </div>
           </main>

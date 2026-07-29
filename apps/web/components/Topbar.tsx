@@ -19,7 +19,11 @@ export function Topbar({
   classLabel?: string;
 }) {
   return (
-    <header className="flex shrink-0 items-center justify-between gap-4 rounded-[20px] bg-white py-3 pl-6 pr-4 shadow-[0_8px_22px_rgba(93,80,150,0.05)]">
+    // mx-auto max-w-[1600px] — карточка-шапка выравнивается по той же
+    // ширине/центру, что и <main> ниже в AppShell.tsx (иначе на широких
+    // мониторах шапка растянута во весь доступный столбец, а тело страницы
+    // под ней — уже и по центру, визуально разъезжаясь).
+    <header className="mx-auto flex w-full max-w-[1600px] shrink-0 items-center justify-between gap-4 rounded-[20px] bg-white py-3 pl-6 pr-4 shadow-[0_8px_22px_rgba(93,80,150,0.05)]">
       {/* Промт 6.2.1: длинные заголовки ("Посещаемость", "База знаний")
           толкали правую часть шапки за край на планшете — обёртка теперь
           min-w-0 flex-1 (может сжиматься), h1 truncate + title-tooltip. */}
