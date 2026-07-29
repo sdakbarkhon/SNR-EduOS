@@ -40,10 +40,15 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (fullscreen) return;
-    const prevOverflowX = document.body.style.overflowX;
+    // overflow-x на ОБОИХ html и body — Safari в части версий игнорирует
+    // overflow-x:hidden на body одном, если не задать его и на html тоже.
+    const prevBodyOverflowX = document.body.style.overflowX;
+    const prevHtmlOverflowX = document.documentElement.style.overflowX;
     document.body.style.overflowX = "hidden";
+    document.documentElement.style.overflowX = "hidden";
     return () => {
-      document.body.style.overflowX = prevOverflowX;
+      document.body.style.overflowX = prevBodyOverflowX;
+      document.documentElement.style.overflowX = prevHtmlOverflowX;
     };
   }, [fullscreen]);
 
@@ -55,6 +60,7 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
       style={{
         width: `${BASE_WIDTH}px`,
         height: `calc(100vh / ${scale})`,
+        margin: 0,
         transform: `scale(${scale})`,
         transformOrigin: "top left",
       }}
