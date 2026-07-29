@@ -619,15 +619,13 @@ export function DashboardView({
               {todayLessons.map((lesson) => {
                 const sub = lesson.subject_id ? subjectById.get(lesson.subject_id) : undefined;
                 const SubIcon = sub ? (LUCIDE_ICONS[sub.icon] ?? BookOpen) : BookOpen;
-                const start = new Date(lesson.starts_at);
                 const end = lesson.ends_at ? new Date(lesson.ends_at) : null;
                 const isNow = currentLessonIdToday === lesson.id;
-                // "Далее"-бейдж по-прежнему подсвечивается только когда урок
-                // скоро (в пределах 15 мин) — презентационный выбор поверх
-                // того, КАКОЙ урок технически следующий (nextLessonToday).
-                const isNext = !isNow && nextLessonToday?.id === lesson.id
-                  && now !== null && start.getTime() - now.getTime() > 0
-                  && start.getTime() - now.getTime() < 15 * 60 * 1000;
+                // Безусловно — как на /lessons (LessonsView.tsx): раньше тут
+                // был доп. 15-минутный порог, из-за которого "Далее" почти
+                // никогда не появлялось (баг: на /lessons метка видна, на
+                // дашборде — нет для того же урока в тот же момент).
+                const isNext = !isNow && nextLessonToday?.id === lesson.id;
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
                   <Link
