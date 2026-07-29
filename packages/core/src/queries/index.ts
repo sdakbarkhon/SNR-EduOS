@@ -2256,14 +2256,14 @@ export const getStudentLessonView = async (
 ): Promise<StudentLessonView | null> => {
   const { data: lessonRaw, error: lessonErr } = await (db as never as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown; error: unknown }> } } } })
     .from("lessons")
-    .select("id, group_id, subject_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
+    .select("id, group_id, subject_id, school_id, lesson_no, topic, title, description, starts_at, ends_at, started_at, ended_at, status, room, active_stage_id, demo_material_id, group:groups!inner(id, name, subject, teacher_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (lessonErr) throw lessonErr;
   if (!lessonRaw) return null;
 
   const lesson = lessonRaw as unknown as {
-    id: string; group_id: string; subject_id: string | null; lesson_no: number | null; topic: string | null;
+    id: string; group_id: string; subject_id: string | null; school_id: string; lesson_no: number | null; topic: string | null;
     title: string | null; description: string | null;
     starts_at: string; ends_at: string | null;
     started_at: string | null; ended_at: string | null; status: string;
@@ -2283,7 +2283,11 @@ export const getStudentLessonView = async (
   const subjectQuery = lesson.subject_id
     ? db3.from("subjects").select(SUBJECT_WITH_TEACHER).eq("id", lesson.subject_id).maybeSingle()
     : db3.from("subjects").select(SUBJECT_WITH_TEACHER).eq("group_id", lesson.group_id).limit(1).maybeSingle();
-  const [curatorRes, materialsRes, stagesRaw, subjectRes] = await Promise.all([
+  // П.2: schools.autostart_enabled школы этого урока — гейтит рендер кнопок
+  // "Начать урок"/"Закончить урок" (см. StudentLessonView.schoolAutostartEnabled).
+  const schoolQuery = db3.from("schools").select("autostart_enabled").eq("id", lesson.school_id).maybeSingle();
+
+  const [curatorRes, materialsRes, stagesRaw, subjectRes, schoolRes] = await Promise.all([
     curatorId
       ? db.from("teachers").select("id, full_name").eq("id", curatorId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -2298,11 +2302,14 @@ export const getStudentLessonView = async (
     db3.from("lesson_materials").select("*").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
     db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
+    schoolQuery,
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;
   const materialsTyped = materialsRes as { data: unknown[] | null; error: { message: string } | null };
   const stagesTyped = stagesRaw as { data: unknown[] | null; error: { message: string } | null };
+  const schoolTyped = schoolRes as { data: { autostart_enabled: boolean } | null; error: { message: string } | null };
+  if (schoolTyped.error) console.error("[getStudentLessonView] schools query failed:", schoolTyped.error.message);
   const subjectTyped = subjectRes as {
     data: { name: string; icon: string | null; color: string | null; teacher: { id: string; full_name: string } | null } | null;
     error: { message: string } | null;
@@ -2339,6 +2346,7 @@ export const getStudentLessonView = async (
     teacher: subjectTyped.data?.teacher ?? curatorTyped.data,
     materials: (materialsTyped.data ?? []) as LessonMaterial[],
     stages: stagesWithProgress as LessonStageWithProgress[],
+    schoolAutostartEnabled: schoolTyped.data?.autostart_enabled ?? false,
   };
 };
 

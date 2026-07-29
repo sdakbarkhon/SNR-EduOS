@@ -57,12 +57,27 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   const admin = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson, error: lessonErr } = await (admin as any).from("lessons")
-    .select("id, group_id, starts_at, status").eq("id", lessonId).maybeSingle();
+    .select("id, group_id, school_id, starts_at, status").eq("id", lessonId).maybeSingle();
   if (lessonErr) {
     return NextResponse.json({ error: lessonErr.message }, { status: 500 });
   }
   if (!lesson) {
     return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
+  }
+
+  // П.2: школа с schools.autostart_enabled=true управляет стартом уроков
+  // исключительно кроном (fn_auto_start_lessons) — ни ученик, ни учитель
+  // этой школы не запускают урок вручную ("автостарт значит полностью
+  // авто"). Единая проверка на обоих вызывающих: PreLessonView (студент) и
+  // TeacherLessonDetailView.handleStartLesson (учитель) бьют в этот же роут.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: school, error: schoolErr } = await (admin as any).from("schools")
+    .select("autostart_enabled").eq("id", lesson.school_id).maybeSingle();
+  if (schoolErr) {
+    return NextResponse.json({ error: schoolErr.message }, { status: 500 });
+  }
+  if (school?.autostart_enabled) {
+    return NextResponse.json({ error: "Автостарт включён для этой школы — ручной запуск недоступен" }, { status: 403 });
   }
 
   // 3) Уже запущен — no-op.

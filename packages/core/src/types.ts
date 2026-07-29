@@ -491,6 +491,12 @@ export type StudentLessonView = {
   teacher: { id: string; full_name: string } | null;
   materials: LessonMaterial[];
   stages: LessonStageWithProgress[];
+  /** П.2: schools.autostart_enabled школы этого урока — true для реальной
+   *  школы (уроки стартуют/завершаются по расписанию кроном), false для
+   *  демо (управление только вручную, кнопками). Гейтит рендер кнопок
+   *  "Начать урок"/"Закончить урок" в PreLessonView/LessonWorkspaceView —
+   *  сама RLS (миграция 151) отдельно и независимо блокирует запись. */
+  schoolAutostartEnabled: boolean;
 };
 
 export type Attendance = {

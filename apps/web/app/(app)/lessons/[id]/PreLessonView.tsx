@@ -439,15 +439,21 @@ export function PreLessonView({
               полноценный status -> 'in_progress' для всех, не локальный
               вход). Realtime/polling выше по-прежнему подхватывают старт,
               если урок первым начнёт учитель — кнопка не единственный путь,
-              просто ещё один. */}
-          <button
-            onClick={handleStartLesson}
-            disabled={starting}
-            className="inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-8 py-3 text-base font-bold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-60 disabled:hover:translate-y-0"
-          >
-            <Play className="h-5 w-5" fill="currentColor" />
-            {starting ? "…" : dl.startLessonBtn}
-          </button>
+              просто ещё один.
+              П.2: в школе с автостартом (schoolAutostartEnabled) уроки
+              стартуют кроном по расписанию — ручной кнопки у ученика там
+              быть не должно (API-роут start-with-close-previous всё равно
+              отдаст 403, это просто убирает мёртвую кнопку из UI). */}
+          {!lesson.schoolAutostartEnabled && (
+            <button
+              onClick={handleStartLesson}
+              disabled={starting}
+              className="inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-8 py-3 text-base font-bold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-60 disabled:hover:translate-y-0"
+            >
+              <Play className="h-5 w-5" fill="currentColor" />
+              {starting ? "…" : dl.startLessonBtn}
+            </button>
+          )}
 
           {/* Excuse button (replaces the old "Перейти сейчас") */}
           {studentId && excuse !== undefined && !excuse && (

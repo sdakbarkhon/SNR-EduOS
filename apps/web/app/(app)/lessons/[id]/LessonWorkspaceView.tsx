@@ -945,7 +945,7 @@ export function LessonWorkspaceView({
                 {dl.leaveLessonBtn}
               </button>
             )}
-            {!isCompleted && (
+            {!isCompleted && !lesson.schoolAutostartEnabled && (
               <button
                 onClick={handleFinishLesson}
                 disabled={endingLesson}
@@ -1037,7 +1037,7 @@ export function LessonWorkspaceView({
               <LogOut className="h-4 w-4" />
             </button>
           )}
-          {!isCompleted && (
+          {!isCompleted && !lesson.schoolAutostartEnabled && (
             <button
               onClick={handleFinishLesson}
               disabled={endingLesson}
