@@ -944,11 +944,14 @@ async function phaseG_announcements() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ФАЗА H — чаты. Если за неделю СОВСЕМ 0 сообщений — добавить 1-2 в 10-15
-// случайных direct-тредов учитель↔ученик. ВАЖНО: живой запрос этой сессии
-// показал 1 (не 0) сообщение за неделю — гейт буквально "0" НЕ сработает.
-// Оставлено буквально по формулировке задачи (не самовольно снижен порог)
-// — dry-run это явно печатает, решение за пользователем (см. отчёт).
+// ФАЗА H — чаты. Гейт поднят с буквального "==0" (прошлый заход — живое
+// число было 1, не 0, гейт не срабатывал) до "< 10" по прямому указанию
+// пользователя. Довеска — по ОДНОМУ сообщению на случайный direct-тред
+// (не полный 2-реплик­овый диалог, как раньше), чтобы прицельно попасть в
+// целевой диапазон 10-15 сообщений ЗА НЕДЕЛЮ, а не перелить его 2-кратным
+// дублированием. target = случайное число 10-15, need = target - текущее
+// число (не меньше 0, не больше числа доступных тредов). Даты сообщений —
+// равномерно между 27 июля 00:00 и текущим моментом.
 // ═══════════════════════════════════════════════════════════════════════
 const CHAT_DIALOGS = [
   [{ s: "student", t: "Здравствуйте, как проходит подготовка к контрольной?" }, { s: "teacher", t: "Идёт хорошо, на следующем уроке разберём последние вопросы" }],
@@ -972,20 +975,20 @@ async function phaseH_chatMessages() {
   const { count, error } = await db.from("chat_messages").select("*", { count: "exact", head: true }).gte("created_at", weekStartIso).lt("created_at", weekEndExclIso);
   if (error) throw new Error(`chat_messages count: ${error.message}`);
   console.log(`  chat_messages за неделю сейчас: ${count ?? 0}.`);
-  if (count !== 0) {
-    console.log(`  ГЕЙТ ПО ЗАДАЧЕ БУКВАЛЬНО "0 сообщений" НЕ СРАБОТАЛ (сейчас ${count}, не 0) — фаза пропущена без записи.`);
-    console.log(`  Если цель — "не выглядит пустым" (а не буквально ==0), нужно явное решение пользователя поднять порог.`);
+  if ((count ?? 0) >= 10) {
+    console.log(`  Уже ≥10 (порог по задаче) — пропуск, ничего не добавляем.`);
     return;
   }
 
   const { data: directThreads, error: dtErr } = await db.from("chat_threads").select("id, group_id, school_id").eq("kind", "direct");
   if (dtErr) throw new Error(`chat_threads: ${dtErr.message}`);
-  const nThreads = Math.min(10 + Math.floor(Math.random() * 6), directThreads.length); // 10-15
-  const chosenThreads = [...directThreads].sort(() => Math.random() - 0.5).slice(0, nThreads);
-  console.log(`  План: сообщения в ${chosenThreads.length} из ${directThreads.length} direct-тредов.`);
+  const target = 10 + Math.floor(Math.random() * 6); // 10-15 итоговых сообщений за неделю
+  const need = Math.min(Math.max(0, target - (count ?? 0)), directThreads.length);
+  const chosenThreads = [...directThreads].sort(() => Math.random() - 0.5).slice(0, need);
+  console.log(`  Цель за неделю: ${target}. Недостаёт: ${need}. План: по 1 сообщению в ${chosenThreads.length} из ${directThreads.length} direct-тредов.`);
   if (DRY_RUN) { console.log("  [DRY-RUN] вставка не выполнена."); return; }
 
-  const todayEnd = new Date();
+  const nowIso = new Date().toISOString();
   let inserted = 0;
   for (const t of chosenThreads) {
     const { data: participants, error: pErr } = await db.from("chat_participants").select("user_id, role_in_thread").eq("thread_id", t.id);
@@ -994,17 +997,16 @@ async function phaseH_chatMessages() {
     const studentP = (participants ?? []).find((p) => p.role_in_thread === "student");
     if (!teacherP || !studentP) continue; // не teacher-student direct — пропуск
 
-    const dialog = pick(CHAT_DIALOGS);
-    const stamps = [...Array(dialog.length)].map(() => randomTimeBetween(weekStartIso, todayEnd.toISOString())).sort();
-    const rows = dialog.map((m, i) => ({
-      thread_id: t.id, sender_id: m.s === "teacher" ? teacherP.user_id : studentP.user_id,
-      body: m.t, created_at: stamps[i], school_id: t.school_id ?? SCHOOL_ID,
-    }));
-    const { error: insErr } = await db.from("chat_messages").insert(rows);
+    const line = pick(pick(CHAT_DIALOGS)); // одно сообщение (не полный 2-реплик­овый диалог)
+    const row = {
+      thread_id: t.id, sender_id: line.s === "teacher" ? teacherP.user_id : studentP.user_id,
+      body: line.t, created_at: randomTimeBetween(weekStartIso, nowIso), school_id: t.school_id ?? SCHOOL_ID,
+    };
+    const { error: insErr } = await db.from("chat_messages").insert(row);
     if (insErr) { console.error(`  !! chat_messages insert failed for ${t.id}: ${insErr.message}`); continue; }
-    inserted += rows.length;
+    inserted += 1;
   }
-  console.log(`  Итог Фазы H: chat_messages +${inserted}.`);
+  console.log(`  Итог Фазы H: chat_messages +${inserted} (цель была ${target}, было ${count ?? 0}).`);
 }
 
 // ── main ────────────────────────────────────────────────────────────────
