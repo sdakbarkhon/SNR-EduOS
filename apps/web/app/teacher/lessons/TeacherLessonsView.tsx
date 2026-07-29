@@ -757,7 +757,27 @@ export function TeacherLessonsView({
                 if (isToday && !isSelected) cellCls += "ring-2 ring-blue-400 ring-offset-1 ";
 
                 return (
-                  <button key={i} onClick={() => setSelectedDayKey(key)} className={cellCls}>
+                  <button
+                    key={i}
+                    onClick={() => {
+                      // Сетка — всегда 42 ячейки (6 недель), поэтому у месяцев,
+                      // начинающихся не с понедельника, хвост неизбежно
+                      // захватывает дни СЛЕДУЮЩЕГО месяца (напр. июль 2026
+                      // начинается в четверг — хвост сетки доходит до 8
+                      // августа). Раньше клик по такой "серой" ячейке менял
+                      // только selectedDayKey — viewYear/viewMonth оставались
+                      // прежними, monthLessons (и, соответственно, точки/
+                      // список уроков) для этого дня никогда не подгружались.
+                      // Баг проявлялся как "нет уроков" на 1-2 августа при
+                      // просмотре июля.
+                      if (!isCurrentMonth) {
+                        setViewYear(day.getFullYear());
+                        setViewMonth(day.getMonth() + 1);
+                      }
+                      setSelectedDayKey(key);
+                    }}
+                    className={cellCls}
+                  >
                     <span className={`mt-1 text-sm font-semibold leading-none ${
                       isSelected ? "text-white"
                       : isCurrentMonth ? "text-[#1D1D1F]"
