@@ -50,18 +50,37 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (fullscreen || !active) return;
-    // overflow-x на ОБОИХ html и body — Safari в части версий игнорирует
-    // overflow-x:hidden на body одном, если не задать его и на html тоже.
-    // Ставится только пока active=true — на <=1920 горизонтальный скролл
-    // и так не возникает (нет фиксированной 1920px обёртки), незачем
-    // трогать overflow вообще.
+    // html/body получают явную height:100vh + overflow-y:hidden, ПОКА
+    // active=true. Это отдельная, независимая гарантия от высоты самой
+    // обёртки ниже: transform НЕ меняет layout-размер элемента (только
+    // то, как он рисуется) — обёртка занимает в потоке документа ровно
+    // calc(100vh/scale) логических пикселей, даже когда после transform
+    // визуально растягивается обратно до 100vh. Если бы html/body не
+    // получали свою собственную высоту явно, их auto-высота считалась бы
+    // от ЭТОГО layout-размера (короче реального viewport), и фон
+    // страницы под настоящим низом экрана не был бы прокрашен — именно
+    // это выглядело как пустое поле снизу на широких мониторах.
+    // Заодно overflow-y:hidden — никакого вертикального скролла: обёртка
+    // и так после transform ровно 100vh, скроллить нечего.
+    const prevBodyHeight = document.body.style.height;
+    const prevHtmlHeight = document.documentElement.style.height;
     const prevBodyOverflowX = document.body.style.overflowX;
     const prevHtmlOverflowX = document.documentElement.style.overflowX;
+    const prevBodyOverflowY = document.body.style.overflowY;
+    const prevHtmlOverflowY = document.documentElement.style.overflowY;
+    document.body.style.height = "100vh";
+    document.documentElement.style.height = "100vh";
     document.body.style.overflowX = "hidden";
     document.documentElement.style.overflowX = "hidden";
+    document.body.style.overflowY = "hidden";
+    document.documentElement.style.overflowY = "hidden";
     return () => {
+      document.body.style.height = prevBodyHeight;
+      document.documentElement.style.height = prevHtmlHeight;
       document.body.style.overflowX = prevBodyOverflowX;
       document.documentElement.style.overflowX = prevHtmlOverflowX;
+      document.body.style.overflowY = prevBodyOverflowY;
+      document.documentElement.style.overflowY = prevHtmlOverflowY;
     };
   }, [fullscreen, active]);
 
@@ -72,6 +91,11 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
       className="flex flex-col"
       style={{
         width: `${BASE_WIDTH}px`,
+        // Обязательно /scale (не просто 100vh) — transform:scale() масштабирует
+        // ОБЕ оси одинаково. Если бы высота была полным 100vh (без деления),
+        // после того же transform она стала бы 100vh*scale — заметно больше
+        // реального экрана (обрезка/скролл снизу). Деление на scale — то, что
+        // делает пост-transform высоту снова ровно равной 100vh.
         height: `calc(100vh / ${scale})`,
         margin: 0,
         transform: `scale(${scale})`,
