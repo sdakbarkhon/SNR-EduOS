@@ -26,8 +26,36 @@ const BASE_WIDTH = 1920;
  *
  * Fullscreen-урок (LessonWorkspaceView, см. fullscreen-lesson-context.tsx) —
  * исключение независимо от ширины: пока он смонтирован, всегда no-op.
+ *
+ * fitHeight (default true) — режим высоты обёртки:
+ *   true  (каркасы /(app), /teacher): обёртка получает фиксированную
+ *         height:calc(100vh/scale), html/body получают явную height:100vh +
+ *         overflow-y:hidden. Рассчитано на каркасы с sticky/h-screen
+ *         сайдбарами и фиксированной раскладкой "ровно один экран".
+ *   false (/login): высота обёртки НЕ задаётся — растёт по контенту
+ *         (auto), html/body/overflow-y не трогаются вовсе (родная
+ *         прокрутка страницы работает как обычно). Нужен для вёрсток с
+ *         абсолютным/fixed позиционированием (footer, языковой переключатель
+ *         на /login) — принудительная height:100vh на body/html там уже
+ *         один раз ломала раскладку (форма съезжала, футер наезжал), потому
+ *         что дочерние min-h-screen считают 100vh от РЕАЛЬНОГО вьюпорта
+ *         (единицы vh не масштабируются transform-ом предка), и при
+ *         фиксированной высоте обёртки этот раздутый блок обрезался. Без
+ *         фикс-высоты обёртка просто позволяет контенту (и его собственному
+ *         min-h-screen) занять столько места, сколько ему нужно, с обычным
+ *         вертикальным скроллом при необходимости — только ширина
+ *         масштабируется.
+ *   В обоих режимах overflow-x:hidden на html/body ставится всегда, пока
+ *   active — иначе после scale() возможен горизонтальный скролл на пиксель-два
+ *   из-за округления.
  */
-export function ScaleWrapper({ children }: { children: ReactNode }) {
+export function ScaleWrapper({
+  children,
+  fitHeight = true,
+}: {
+  children: ReactNode;
+  fitHeight?: boolean;
+}) {
   const fullscreen = useIsFullscreenLesson();
   const [scale, setScale] = useState(1);
   const [active, setActive] = useState(false);
@@ -50,30 +78,26 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (fullscreen || !active) return;
-    // html/body получают явную height:100vh + overflow-y:hidden, ПОКА
-    // active=true. Это отдельная, независимая гарантия от высоты самой
-    // обёртки ниже: transform НЕ меняет layout-размер элемента (только
-    // то, как он рисуется) — обёртка занимает в потоке документа ровно
-    // calc(100vh/scale) логических пикселей, даже когда после transform
-    // визуально растягивается обратно до 100vh. Если бы html/body не
-    // получали свою собственную высоту явно, их auto-высота считалась бы
-    // от ЭТОГО layout-размера (короче реального viewport), и фон
-    // страницы под настоящим низом экрана не был бы прокрашен — именно
-    // это выглядело как пустое поле снизу на широких мониторах.
-    // Заодно overflow-y:hidden — никакого вертикального скролла: обёртка
-    // и так после transform ровно 100vh, скроллить нечего.
     const prevBodyHeight = document.body.style.height;
     const prevHtmlHeight = document.documentElement.style.height;
     const prevBodyOverflowX = document.body.style.overflowX;
     const prevHtmlOverflowX = document.documentElement.style.overflowX;
     const prevBodyOverflowY = document.body.style.overflowY;
     const prevHtmlOverflowY = document.documentElement.style.overflowY;
-    document.body.style.height = "100vh";
-    document.documentElement.style.height = "100vh";
+
     document.body.style.overflowX = "hidden";
     document.documentElement.style.overflowX = "hidden";
-    document.body.style.overflowY = "hidden";
-    document.documentElement.style.overflowY = "hidden";
+
+    // Явная height:100vh + overflow-y:hidden — только в fitHeight-режиме
+    // (см. комментарий выше класса). В fitHeight=false html/body остаются
+    // нетронутыми — страница скроллится как обычная, немасштабированная.
+    if (fitHeight) {
+      document.body.style.height = "100vh";
+      document.documentElement.style.height = "100vh";
+      document.body.style.overflowY = "hidden";
+      document.documentElement.style.overflowY = "hidden";
+    }
+
     return () => {
       document.body.style.height = prevBodyHeight;
       document.documentElement.style.height = prevHtmlHeight;
@@ -82,7 +106,7 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
       document.body.style.overflowY = prevBodyOverflowY;
       document.documentElement.style.overflowY = prevHtmlOverflowY;
     };
-  }, [fullscreen, active]);
+  }, [fullscreen, active, fitHeight]);
 
   if (fullscreen || !active) return <>{children}</>;
 
@@ -91,12 +115,12 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
       className="flex flex-col"
       style={{
         width: `${BASE_WIDTH}px`,
-        // Обязательно /scale (не просто 100vh) — transform:scale() масштабирует
-        // ОБЕ оси одинаково. Если бы высота была полным 100vh (без деления),
-        // после того же transform она стала бы 100vh*scale — заметно больше
-        // реального экрана (обрезка/скролл снизу). Деление на scale — то, что
-        // делает пост-transform высоту снова ровно равной 100vh.
-        height: `calc(100vh / ${scale})`,
+        // fitHeight=true: обязательно /scale (не просто 100vh) —
+        // transform:scale() масштабирует ОБЕ оси одинаково; деление на
+        // scale — то, что делает пост-transform высоту снова ровно равной
+        // 100vh. fitHeight=false: height вообще не задаётся — auto,
+        // растёт по контенту (см. комментарий класса).
+        ...(fitHeight ? { height: `calc(100vh / ${scale})` } : {}),
         margin: 0,
         transform: `scale(${scale})`,
         transformOrigin: "top left",
