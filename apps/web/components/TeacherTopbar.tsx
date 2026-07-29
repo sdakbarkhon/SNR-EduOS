@@ -8,6 +8,7 @@ import { useLocale } from "./LocaleProvider";
 import { teacherNavItems } from "./TeacherSidebar";
 import { NotificationsBell } from "./NotificationsBell";
 import { AnnouncementTicker } from "./AnnouncementTicker";
+import { LogoutButton } from "./LogoutButton";
 
 export function TeacherTopbar({
   headerInfo,
@@ -40,6 +41,10 @@ export function TeacherTopbar({
         <NotificationsBell />
 
         {headerInfo}
+        {/* Выйти — рядом с блоком имени учителя, симметрично студенческому
+            Topbar.tsx. Раньше жила в TeacherSidebar.tsx (убрана оттуда —
+            на высоких мониторах разъезжалась/прибивалась не туда). */}
+        <LogoutButton />
       </div>
     </header>
   );

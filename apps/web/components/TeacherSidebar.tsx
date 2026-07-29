@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
-  Megaphone, Users, Settings, LogOut, Bell, MessageCircle,
+  Megaphone, Users, Settings, Bell, MessageCircle,
   PanelLeftClose, PanelLeftOpen, ClipboardList,
 } from "lucide-react";
 import { getDictionary, getUnreadThreadCount } from "@snr/core";
@@ -14,7 +14,6 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "./LocaleProvider";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
-import { useLogout, LogoutOverlay } from "./LogoutOverlay";
 import { Logo } from "./Logo";
 
 const STORAGE_KEY = "teacher_sidebar_collapsed";
@@ -62,7 +61,6 @@ export function TeacherSidebar() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const { loggingOut, logout } = useLogout();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -161,13 +159,10 @@ export function TeacherSidebar() {
         </button>
       </div>
 
-      {/* Navigation — "Выйти" геометрически такой же пункт списка, как и
-          остальные (тот же space-y-1 контейнер, тот же px-3 py-3
-          rounded-2xl) — раньше жила в отдельном div ниже с border-t/pt-4
-          и nav имела flex-1, из-за чего на высоких мониторах (2160+)
-          между "Настройками" и "Выйти" образовывался огромный пустой
-          растянутый промежуток, а сама кнопка прибивалась к низу
-          экрана. */}
+      {/* Navigation. "Выйти" здесь больше не живёт — перенесена в
+          TeacherTopbar.tsx рядом с аватаром/именем учителя, симметрично
+          студенческому Topbar.tsx (LogoutButton). Список заканчивается
+          на "Настройки". */}
       <nav className="space-y-1 px-2">
         {teacherNavItems.filter((item) => !item.hideFromSidebar).map((item) => {
           const active = pendingHref ? pendingHref === item.href : pathname.startsWith(item.href);
@@ -202,20 +197,7 @@ export function TeacherSidebar() {
             </Link>
           );
         })}
-        <button
-          type="button"
-          onClick={logout}
-          title="Выйти"
-          className={cn(
-            "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-[15px] font-medium text-white/80 transition-all duration-200 hover:bg-white/10 hover:text-white",
-            isCollapsed && "justify-center",
-          )}
-        >
-          <LogOut size={20} strokeWidth={2} className="shrink-0" />
-          {!isCollapsed && <span className="whitespace-nowrap">Выйти</span>}
-        </button>
       </nav>
-      {loggingOut && <LogoutOverlay />}
     </aside>
   );
 }
