@@ -556,7 +556,7 @@ function SubmitForm({
   );
 }
 
-/** External-service homework (wokwi/codesandbox/geogebra/.../h5p): teacher's
+/** External-service homework (wokwi/codesandbox/geogebra/...): teacher's
  *  project link embedded as an iframe, with a fullscreen toggle (УЧ.10 Part 5).
  *  Submission itself still goes through the generic SubmitForm/SubmissionBlock
  *  below (text/file "mark done"), same as the plain "file" homework type. */

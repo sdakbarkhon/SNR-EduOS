@@ -177,16 +177,25 @@ export function ProjectDetailView({
                     </button>
                   </div>
 
-                  {/* Notes */}
-                  <textarea
-                    value={notes[stage.id] ?? ""}
-                    onChange={(e) => setNotes((n) => ({ ...n, [stage.id]: e.target.value }))}
-                    onBlur={() => saveNotes(stage.id)}
-                    disabled={readOnly}
-                    placeholder={t.notesPlaceholder}
-                    rows={2}
-                    className="mt-3 w-full resize-none rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[13px] text-slate-700 focus:border-blue-400 focus:outline-none disabled:bg-slate-50"
-                  />
+                  {/* Notes — для этапа "Написать код" это и есть код ученика, поэтому
+                      моноширинный шрифт + больше строк, чем у обычной заметки. */}
+                  {(() => {
+                    const isCodeStage = stage.title === "Написать код";
+                    return (
+                      <textarea
+                        value={notes[stage.id] ?? ""}
+                        onChange={(e) => setNotes((n) => ({ ...n, [stage.id]: e.target.value }))}
+                        onBlur={() => saveNotes(stage.id)}
+                        disabled={readOnly}
+                        placeholder={t.notesPlaceholder}
+                        rows={isCodeStage ? 8 : 2}
+                        className={cn(
+                          "mt-3 w-full resize-none rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[13px] text-slate-700 focus:border-blue-400 focus:outline-none disabled:bg-slate-50",
+                          isCodeStage && "font-mono whitespace-pre",
+                        )}
+                      />
+                    );
+                  })()}
 
                   {/* Files */}
                   <div className="mt-2 space-y-1.5">

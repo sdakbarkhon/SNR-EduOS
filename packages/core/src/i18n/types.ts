@@ -165,6 +165,8 @@ export interface Dictionary {
     // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 2.4 — full per-class subject catalog section
     classSubjectsTitle: string; // "Предметы класса"
     subjectComingSoon: string;  // "Скоро появится" (toast on stub subject click)
+    subjectModalTeacher: string; // "Учитель" (SubjectDetailModal field label)
+    subjectModalClass: string;   // "Класс" (SubjectDetailModal field label)
   };
   schedule: {
     title: string;
@@ -1175,6 +1177,7 @@ export interface Dictionary {
     typeWeb: string;
     typeGeogebra: string;
     typePhet: string;
+    externalProjectsSection: string; // "Внешние инструменты" — раздел проектов на внешних сервисах (всегда 0%)
   };
   sandbox: {
     title: string;          // "Проекты (песочница)"
@@ -1198,7 +1201,6 @@ export interface Dictionary {
       excalidraw: { name: string; description: string };
       learningapps: { name: string; description: string };
       sqlonline: { name: string; description: string };
-      h5p: { name: string; description: string };
       typerun: { name: string; description: string };
     };
     // migration 118 — Промт 5Б: автосохранение + именованные проекты
@@ -1637,7 +1639,6 @@ export interface Dictionary {
     stageContentExcalidraw: string;    // "Excalidraw"
     stageContentLearningapps: string;  // "Learning Apps"
     stageContentSqlonline: string;     // "SQL Online"
-    stageContentH5p: string;           // "H5P Interactive"
     stageContentTyperun: string;       // "TypeRun"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"

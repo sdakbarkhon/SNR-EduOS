@@ -1,51 +1,63 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowRight, Calculator, Code2, Cpu, FlaskConical, Globe, FlaskRound, type LucideIcon } from "lucide-react";
-import { getDictionary, type Locale } from "@snr/core";
+import { getDictionary, type Locale, type StudentProjectListItem } from "@snr/core";
 import { useLocale } from "@/components";
 import { cn } from "@/lib/cn";
 import { SandboxView } from "./SandboxView";
 import type { SandboxToolId } from "@/lib/sandbox-tools";
 
 type Mode = "projects" | "sandbox";
-type ProjectType = "python" | "arduino" | "web" | "geogebra" | "phet";
-type ProjectStatus = "not_started" | "in_progress" | "completed";
+type ExternalTool = "wokwi" | "geogebra" | "phet";
+type ExternalProject = { title: string; description: string; tool: ExternalTool };
 
-type DemoProject = {
-  id: number;
-  title: string;
-  type: ProjectType;
-  description: string;
-  status: ProjectStatus;
-  progress: number;
+// "Внешние" проекты не имеют БД-бэкинга вообще (содержимое живёт на стороннем
+// сервисе, не у нас) — всегда 0%/"Не начат", клик открывает песочницу с
+// предвыбранным инструментом. Список зависит от класса ученика.
+const EXTERNAL_PROJECTS_BY_CLASS: Record<string, ExternalProject[]> = {
+  "3-А класс": [
+    { title: "Мигающий светодиод", description: "Управление светодиодом через Wokwi симулятор", tool: "wokwi" },
+    { title: "График функции y=x", description: "Построение графика функции в GeoGebra", tool: "geogebra" },
+    { title: "Опыт с шариком", description: "Простая симуляция в PhET", tool: "phet" },
+  ],
+  "7-А класс": [
+    { title: "Умный дом на Arduino", description: "Датчики температуры и света через Wokwi", tool: "wokwi" },
+    { title: "Парабола в GeoGebra", description: "Построение параболы и её свойств", tool: "geogebra" },
+    { title: "Опыт с маятником", description: "Симуляция физического маятника в PhET", tool: "phet" },
+  ],
+  "10-А класс": [
+    { title: "Робот с датчиками", description: "Симуляция робота с датчиками через Wokwi", tool: "wokwi" },
+    { title: "3D модель в GeoGebra", description: "Построение 3D-фигур в GeoGebra", tool: "geogebra" },
+    { title: "Симуляция физики", description: "Эксперимент по механике в PhET", tool: "phet" },
+  ],
+};
+const DEFAULT_EXTERNAL_PROJECTS: ExternalProject[] = EXTERNAL_PROJECTS_BY_CLASS["3-А класс"] ?? [];
+
+const TOOL_STYLE: Record<ExternalTool, { sandboxTool: SandboxToolId; gradient: string; Icon: LucideIcon }> = {
+  wokwi: { sandboxTool: "wokwi", gradient: "from-sky-400 to-blue-500", Icon: Cpu },
+  geogebra: { sandboxTool: "geogebra", gradient: "from-green-500 to-emerald-600", Icon: Calculator },
+  phet: { sandboxTool: "phet", gradient: "from-blue-500 to-indigo-600", Icon: FlaskConical },
 };
 
-// Заглушки — реальной таблицы "портфолио проектов" нет, только оцениваемые
-// проекты (см. getStudentProjects/[id]) и песочница. Карточки ведут в
-// песочницу с предвыбранным инструментом (Iter5 P10, вариант А). Иконка
-// берётся из TYPE_STYLE[type].Icon — отдельного поля на проект не нужно.
-const DEMO_PROJECTS: DemoProject[] = [
-  { id: 1, title: "Игра змейка на Python", type: "python", description: "Классическая игра Змейка с использованием Pygame", status: "in_progress", progress: 60 },
-  { id: 2, title: "Мигающий светодиод Arduino", type: "arduino", description: "Управление светодиодом через Wokwi симулятор", status: "completed", progress: 100 },
-  { id: 3, title: "Мой первый сайт", type: "web", description: "HTML + CSS страница про хобби", status: "in_progress", progress: 40 },
-  { id: 4, title: "График параболы", type: "geogebra", description: "Построение графиков функций в GeoGebra", status: "completed", progress: 100 },
-  { id: 5, title: "Калькулятор", type: "python", description: "Простой калькулятор на Python", status: "not_started", progress: 0 },
-  { id: 6, title: "Умный дом на Arduino", type: "arduino", description: "Датчики температуры и света через Wokwi", status: "in_progress", progress: 30 },
-  { id: 7, title: "Опыт с маятником", type: "phet", description: "Симуляция физического маятника в PhET", status: "not_started", progress: 0 },
-];
+// Иконка "своего" проекта — по ключевым словам в заголовке (нет отдельного
+// поля "тип" на строке БД, см. отчёт по схеме — не заводим лишнюю колонку
+// ради одной иконки).
+function internalProjectIcon(title: string): LucideIcon {
+  const t = title.toLowerCase();
+  if (t.includes("c++") || t.includes("arduino")) return Cpu;
+  if (t.includes("веб") || t.includes("сайт") || t.includes("javascript") || t.includes("html")) return Globe;
+  return Code2;
+}
 
-// Соответствует градиентам инструментов в SANDBOX_TOOLS — карточка ведёт
-// именно в этот инструмент, поэтому цвета совпадают.
-const TYPE_STYLE: Record<ProjectType, { tool: SandboxToolId; gradient: string; badgeBg: string; badgeText: string; Icon: LucideIcon }> = {
-  python: { tool: "code", gradient: "from-emerald-500 to-teal-600", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700", Icon: Code2 },
-  arduino: { tool: "wokwi", gradient: "from-sky-400 to-blue-500", badgeBg: "bg-sky-50", badgeText: "text-sky-700", Icon: Cpu },
-  web: { tool: "codesandbox", gradient: "from-slate-600 to-slate-800", badgeBg: "bg-slate-100", badgeText: "text-slate-700", Icon: Globe },
-  geogebra: { tool: "geogebra", gradient: "from-green-500 to-emerald-600", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700", Icon: Calculator },
-  phet: { tool: "phet", gradient: "from-blue-500 to-indigo-600", badgeBg: "bg-blue-50", badgeText: "text-blue-700", Icon: FlaskConical },
-};
-
-export function ProjectsView() {
+export function ProjectsView({
+  projects,
+  className,
+}: {
+  projects: StudentProjectListItem[];
+  className: string;
+}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.projects;
@@ -57,18 +69,12 @@ export function ProjectsView() {
     setMode("sandbox");
   }
 
-  const typeLabels: Record<ProjectType, string> = {
-    python: t.typePython,
-    arduino: t.typeArduino,
-    web: t.typeWeb,
-    geogebra: t.typeGeogebra,
-    phet: t.typePhet,
-  };
+  const externalProjects = EXTERNAL_PROJECTS_BY_CLASS[className] ?? DEFAULT_EXTERNAL_PROJECTS;
 
-  function statusBadge(p: DemoProject) {
-    if (p.status === "completed") return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{t.statusCompleted}</span>;
-    if (p.status === "in_progress") return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-700">{t.statusInProgress}</span>;
-    return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>;
+  function internalStatusBadge(p: StudentProjectListItem) {
+    if (!p.submission) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>;
+    if (p.submission.is_submitted) return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{t.statusAwaiting}</span>;
+    return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-700">{t.statusInProgress}</span>;
   }
 
   return (
@@ -76,7 +82,7 @@ export function ProjectsView() {
       <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{d.nav.projects}</h1>
       <p className="mt-1.5 text-sm text-slate-500">{t.pageSubtitle}</p>
 
-      {/* Mode switch: демо-проекты | песочница */}
+      {/* Mode switch: проекты | песочница */}
       <div className="mt-5 inline-flex rounded-full border border-white/60 bg-white/60 p-1 backdrop-blur-xl">
         {([
           { key: "projects" as Mode, label: d.sandbox.modeProjects },
@@ -114,40 +120,69 @@ export function ProjectsView() {
           </button>
 
           <h2 className="mt-8 text-lg font-bold text-slate-900">{t.myProjectsSection}</h2>
-          <div className="mt-4 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
-            {DEMO_PROJECTS.map((p) => {
-              const style = TYPE_STYLE[p.type];
+          <div className="mt-4 grid grid-cols-1 gap-6 pb-4 md:grid-cols-2 lg:grid-cols-3">
+            {projects.map((p) => {
+              const Icon = internalProjectIcon(p.title);
+              const percent = p.stageCount > 0 ? Math.round((p.completedCount / p.stageCount) * 100) : 0;
               return (
-                <button
+                <Link
                   key={p.id}
-                  type="button"
-                  onClick={() => openSandbox(style.tool)}
+                  href={`/projects/${p.id}`}
                   className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 text-left shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3">
-                      <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm", style.gradient)}>
-                        <style.Icon className="h-5 w-5" />
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
+                        <Icon className="h-5 w-5" />
                       </div>
                       <h3 className="font-bold text-slate-900">{p.title}</h3>
                     </div>
                   </div>
-                  <span className={cn("mt-3 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold", style.badgeBg, style.badgeText)}>
-                    <style.Icon className="h-3 w-3" /> {typeLabels[p.type]}
-                  </span>
+                  {p.teacherName && <p className="mt-2 text-[12px] font-semibold text-slate-400">{t.teacher}: {p.teacherName}</p>}
                   <p className="mt-3 line-clamp-2 flex-1 text-[13px] text-slate-500">{p.description}</p>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <div className="flex flex-1 items-center gap-3">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className={cn("h-full rounded-full bg-gradient-to-r", style.gradient)}
-                          style={{ width: `${p.progress}%` }}
-                        />
+                        <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600" style={{ width: `${percent}%` }} />
                       </div>
-                      <span className="text-[11px] font-bold tabular-nums text-slate-400">{p.progress}%</span>
+                      <span className="text-[11px] font-bold tabular-nums text-slate-400">{percent}%</span>
                     </div>
                   </div>
-                  <div className="mt-3">{statusBadge(p)}</div>
+                  <div className="mt-3">{internalStatusBadge(p)}</div>
+                </Link>
+              );
+            })}
+          </div>
+
+          <h2 className="mt-8 text-lg font-bold text-slate-900">{t.externalProjectsSection}</h2>
+          <div className="mt-4 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
+            {externalProjects.map((p) => {
+              const style = TOOL_STYLE[p.tool];
+              return (
+                <button
+                  key={p.title}
+                  type="button"
+                  onClick={() => openSandbox(style.sandboxTool)}
+                  className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 text-left shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm", style.gradient)}>
+                      <style.Icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="font-bold text-slate-900">{p.title}</h3>
+                  </div>
+                  <p className="mt-3 line-clamp-2 flex-1 text-[13px] text-slate-500">{p.description}</p>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="flex flex-1 items-center gap-3">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-slate-200" style={{ width: "0%" }} />
+                      </div>
+                      <span className="text-[11px] font-bold tabular-nums text-slate-400">0%</span>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>
+                  </div>
                 </button>
               );
             })}

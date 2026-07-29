@@ -122,7 +122,7 @@ function SubtaskAnswer({
     );
   }
 
-  // external service subtask (wokwi/codesandbox/geogebra/.../h5p)
+  // external service subtask (wokwi/codesandbox/geogebra/...)
   const ack = (answer.content as { acknowledged?: boolean }).acknowledged === true;
   return (
     <p className={cn("flex items-center gap-1 text-[13px] font-medium", ack ? "text-emerald-600" : "text-brand-ink-muted")}>

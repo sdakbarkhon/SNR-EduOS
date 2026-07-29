@@ -5,13 +5,13 @@
 
 import {
   CircuitBoard, Code2, Terminal, Ruler, FlaskConical, LineChart, Puzzle,
-  Shuffle, Palette, PenTool, Brain, Database, Grid3x3, Keyboard, type LucideIcon,
+  Shuffle, Palette, PenTool, Brain, Database, Keyboard, type LucideIcon,
 } from "lucide-react";
 
 export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
-  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "h5p" | "typerun";
+  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "typerun";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -100,13 +100,6 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://sqlime.org/",
     Icon: Database,
     gradient: "from-cyan-600 to-blue-700",
-  },
-  {
-    id: "h5p",
-    kind: "iframe",
-    embedUrl: "https://h5p.eduos.snruz.uz/library",
-    Icon: Grid3x3,
-    gradient: "from-fuchsia-500 to-purple-600",
   },
   {
     id: "code",

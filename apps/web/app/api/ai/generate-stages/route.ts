@@ -15,12 +15,10 @@ const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
   "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
-  "h5p",
 ];
 const EXTERNAL = [
   "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
-  "h5p",
 ];
 
 type AttachedMaterial = { title: string; text: string };

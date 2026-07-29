@@ -12,12 +12,14 @@ import {
   findNextLesson,
   formatTime,
   getDictionary,
+  getSubjects,
   type Lesson,
   type Group,
   type Homework,
   type HomeworkSubmission,
   type TestSubmission,
   type AttendanceStatus,
+  type SubjectWithGroup,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -26,6 +28,7 @@ import { useToast } from "@/components/Toast";
 import { getClassLabel } from "@/lib/student-class-label";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { Modal } from "@/components/Modal";
+import { SubjectDetailModal } from "./SubjectDetailModal";
 import type { Database } from "@snr/core";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
@@ -171,6 +174,16 @@ export function DashboardView({
   const activeHomeworkCount = homework.filter((h) => !submittedIds.has(h.id)).length;
   const firstName = student.full_name.split(" ")[0] ?? student.full_name;
   const [progressModalOpen, setProgressModalOpen] = useState(false);
+  // Модалка предмета (ЧАСТЬ 1в) — грузится по клику, а не заранее вместе с
+  // mySubjects: mySubjects — узкий select (без teacher/group join, см.
+  // stableLoadSubjects выше), а getSubjects() возвращает уже готовый join
+  // (teacher.full_name, group.name) — переиспользуем существующий query,
+  // не заводим новый.
+  const [subjectDetail, setSubjectDetail] = useState<SubjectWithGroup | null>(null);
+  async function openSubjectDetail(sub: SubjectRow) {
+    const list = await getSubjects(db, { groupId: sub.group_id });
+    setSubjectDetail(list.find((s) => s.id === sub.id) ?? null);
+  }
   const classLabel = getClassLabel(groups);
   const greeting = t.greetings[dayOfYear(now ?? new Date()) % t.greetings.length];
   const factEmoji = factEmojiFor(aiFactText);
@@ -186,7 +199,6 @@ export function DashboardView({
   // чего после последнего урока дня виджет считал день "пустым" и показывал
   // "Нет уроков" вместо реального расписания. "Нет уроков" теперь — это
   // ТОЛЬКО пустой todayLessonsAll (см. проверку ниже), не "все прошли".
-  const MAX_TODAY_WIDGET = 3;
   const lastLessonOfDay = todayLessonsAll.length > 0 ? todayLessonsAll[todayLessonsAll.length - 1] : null;
   const dayIsOver = now !== null && !!lastLessonOfDay?.ends_at && now > new Date(lastLessonOfDay.ends_at);
   // Сейчас/Далее: единственный источник истины — status='in_progress'
@@ -204,10 +216,12 @@ export function DashboardView({
   // дня могли оба получить isNow=true одновременно — адверсариальная
   // проверка).
   const currentLessonIdToday = currentLessonToday?.id ?? (dayIsOver ? lastLessonOfDay?.id ?? null : null);
-  const todayLessons = dayIsOver
-    ? todayLessonsAll.slice(-MAX_TODAY_WIDGET)
-    : todayLessonsAll.slice(0, MAX_TODAY_WIDGET);
-  const hasMoreToday = todayLessonsAll.length > MAX_TODAY_WIDGET;
+  // Показываем ВЕСЬ день целиком (Промт: "Дашборд+Проекты" П.1б) — раньше
+  // здесь резался хвост списка (MAX_TODAY_WIDGET=3), из-за чего на дне с
+  // 4+ уроками поздние уроки (включая реально идущий/следующий) могли не
+  // попасть в видимую панель. Прошедшие уроки помечаются приглушённо (см.
+  // isCompleted ниже в рендере), а не скрываются.
+  const todayLessons = todayLessonsAll;
   const subjectById = new Map(mySubjects.map((s) => [s.id, s]));
 
   // "Мой прогресс" (расчёт из ed9b0f8 — НЕ меняется) — доля СДАННЫХ заданий от
@@ -469,7 +483,7 @@ export function DashboardView({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <QuickAction icon={<FileText />} bg="#FFF3DE" iconBg="#FFB020" iconColor="#fff" label={t.qaHomework} badge={activeHomeworkCount} href="/homework" />
               <QuickAction icon={<Folder />} bg="#E9F1FF" iconBg="#4E86F7" iconColor="#fff" label={t.qaFiles} href="/knowledge-base" />
-              <QuickAction icon={<UserPlus />} bg="#FCE9F2" iconBg="#F368A8" iconColor="#fff" label={t.qaTeacher} onClick={() => showToast(d.auth.comingSoon)} />
+              <QuickAction icon={<UserPlus />} bg="#FCE9F2" iconBg="#F368A8" iconColor="#fff" label={t.qaTeacher} href="/messages" />
             </div>
           </div>
 
@@ -573,7 +587,9 @@ export function DashboardView({
                       </div>
                     );
                     return sub.is_active ? (
-                      <Link key={sub.id} href="/lessons">{card}</Link>
+                      <button key={sub.id} type="button" onClick={() => openSubjectDetail(sub)} className="text-left">
+                        {card}
+                      </button>
                     ) : (
                       <button key={sub.id} type="button" onClick={() => showToast(t.subjectComingSoon)} className="text-left">
                         {card}
@@ -626,13 +642,14 @@ export function DashboardView({
                 // никогда не появлялось (баг: на /lessons метка видна, на
                 // дашборде — нет для того же урока в тот же момент).
                 const isNext = !isNow && nextLessonToday?.id === lesson.id;
+                const isCompleted = lesson.status === "completed";
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
                   <Link
                     key={lesson.id}
                     href={`/lessons/${lesson.id}`}
                     className="flex items-center gap-2.5 rounded-2xl p-2.5 transition hover:bg-[#F7F5FF]"
-                    style={{ background: isNow ? "#F4F0FF" : undefined }}
+                    style={{ background: isNow ? "#F4F0FF" : undefined, opacity: isCompleted ? 0.6 : 1 }}
                   >
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tileColor }} />
                     <div
@@ -668,15 +685,6 @@ export function DashboardView({
                 <p className="py-8 text-center text-sm text-[#9A9AB5]">{t.noLessonsToday}</p>
               )}
             </div>
-
-            {hasMoreToday && (
-              <Link
-                href="/lessons"
-                className="mt-3 flex items-center justify-center gap-1.5 rounded-2xl bg-[#F1EDFF] py-3 text-sm font-extrabold text-[#7C5CFF] transition hover:bg-[#E6DDFF]"
-              >
-                {t.fullSchedule} <ArrowRight className="h-4 w-4" />
-              </Link>
-            )}
           </div>
 
           {/* Мои достижения — заглушка, реальной таблицы нет */}
@@ -749,6 +757,10 @@ export function DashboardView({
           </div>
         </div>
       </Modal>
+
+      {subjectDetail && (
+        <SubjectDetailModal subject={subjectDetail} locale={locale as Locale} onClose={() => setSubjectDetail(null)} />
+      )}
     </div>
   );
 }

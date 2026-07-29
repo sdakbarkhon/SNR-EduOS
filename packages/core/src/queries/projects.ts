@@ -98,8 +98,17 @@ export const gradeProjectSubmission = async (
 
 // ── Student ──
 export const getStudentProjects = async (db: Db, studentId: string): Promise<StudentProjectListItem[]> => {
+  // Раньше запрос не фильтровался по группе ученика вообще — студент видел
+  // ВСЕ проекты школы, включая чужих классов. group_id резолвится через
+  // student_groups (та же связь, что используют scripts/*.mjs).
+  const { data: sg, error: sgErr } = await (db as any).from("student_groups").select("group_id").eq("student_id", studentId);
+  if (sgErr) throw sgErr;
+  const groupIds = ((sg ?? []) as any[]).map((r) => r.group_id);
+  if (groupIds.length === 0) return [];
+
   const { data, error } = await (db as any).from("projects")
     .select("*, teacher:teachers(full_name), stages:project_stages(count), submissions:project_submissions(id, is_submitted, grade, student_id)")
+    .in("group_id", groupIds)
     .order("created_at", { ascending: false });
   if (error) throw error;
   const projects = (data ?? []) as any[];

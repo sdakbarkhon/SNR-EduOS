@@ -266,7 +266,6 @@ ${input.kbMaterials && input.kbMaterials.length > 0
     "geogebra", "геогебра", "phet", "симуляц", "desmos", "калькулятор граф",
     "blockly", "visualgo", "сортировк", "p5.js", "p5js", "excalidraw", "доска",
     "learningapps", "learning apps", "sqlonline", "sql",
-    "h5p", "memory game", "мемори", "интерактивная картинка", "drag-n-drop", "перетаскивание",
   ];
   const mentionsPython = PYTHON_TOPIC_HINTS.some((kw) => topicLower.includes(kw));
   const mentionsOtherTool = OTHER_TOOL_HINTS.some((kw) => topicLower.includes(kw));
@@ -315,7 +314,6 @@ ${programmingSection}
 - "excalidraw" — виртуальная доска для схем и диаграмм, любые классы
 - "learningapps" — интерактивные упражнения и мини-игры, классы 1–9
 - "sqlonline" — SQL-запросы в браузере, классы 9–11
-- "h5p" — H5P Interactive: интерактивные задания (memory games, drag-n-drop, интерактивные картинки, квизы). Универсально для любых предметов
 
 ВАЖНО: название предмета ("Информатика", "Робототехника", "Программирование") само по себе
 НЕ означает что все этапы должны быть "code" — эти предметы охватывают ВСЕ инструменты выше
@@ -331,7 +329,6 @@ ${programmingSection}
 - "Excalidraw", "схема", "диаграмма", "доска" → content_type="excalidraw"
 - "LearningApps", "интерактивное упражнение", "мини-игра" → content_type="learningapps"
 - "SQL", "база данных", "запросы" (старшие классы) → content_type="sqlonline"
-- "H5P", "memory game", "мемори", "интерактивная картинка", "drag-n-drop", "перетаскивание" → content_type="h5p"
 - "Arduino", "светодиод", "датчик", "схема", "робот", "микроконтроллер" → content_type="wokwi"
 - "HTML", "CSS", "JavaScript", "веб", "сайт", "страница" → content_type="codesandbox"
 - "Python", "циклы", "функции", "алгоритмы", "переменные" → content_type="code"
@@ -389,7 +386,7 @@ ${programmingSection}
 - Вопросы проверяют ПОНИМАНИЕ концепции темы урока, а не запоминание синтаксиса.
 - Для content_type='quiz_kahoot' поле "quiz" НЕ заполняй — учитель добавит вопросы вручную позже.
 
-ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='geogebra'|'phet'|'desmos'|'blockly_games'|'visualgo'|'p5js'|'excalidraw'|'learningapps'|'sqlonline'|'wokwi'|'codesandbox'|'h5p'):
+ДЛЯ ВНЕШНИХ СЕРВИСОВ (content_type='geogebra'|'phet'|'desmos'|'blockly_games'|'visualgo'|'p5js'|'excalidraw'|'learningapps'|'sqlonline'|'wokwi'|'codesandbox'):
 - Ссылку (URL) НЕ указывай — система сама подставит редактор по умолчанию.
 - Обязательно заполни description (что именно должен сделать ученик в редакторе) и teacher_notes
   (на что учителю обратить внимание при демонстрации/проверке), например:
@@ -399,7 +396,7 @@ ${programmingSection}
 
 ФОРМАТ КАЖДОГО ЭТАПА:
 {
-  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"wokwi"|"codesandbox"|"geogebra"|"phet"|"desmos"|"blockly_games"|"visualgo"|"p5js"|"excalidraw"|"learningapps"|"sqlonline"|"h5p",
+  "content_type": "presentation"|"code"|"quiz_qia"|"quiz_kahoot"|"wokwi"|"codesandbox"|"geogebra"|"phet"|"desmos"|"blockly_games"|"visualgo"|"p5js"|"excalidraw"|"learningapps"|"sqlonline",
   "stage_type": "theory"|"task",
   "title": "Короткое название",
   "description": "Что конкретно будет делать УЧЕНИК на этом этапе (1–3 предложения)",

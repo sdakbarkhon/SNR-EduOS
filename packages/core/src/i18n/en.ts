@@ -173,6 +173,8 @@ export const en: Dictionary = {
     viewGoals: "View goals",
     classSubjectsTitle: "Class subjects",
     subjectComingSoon: "Coming soon",
+    subjectModalTeacher: "Teacher",
+    subjectModalClass: "Class",
   },
   schedule: {
     title: "Schedule",
@@ -1155,6 +1157,7 @@ export const en: Dictionary = {
     typeWeb: "Web",
     typeGeogebra: "GeoGebra",
     typePhet: "PhET Simulations",
+    externalProjectsSection: "External Tools",
   },
   sandbox: {
     title: "Projects (sandbox)",
@@ -1177,7 +1180,6 @@ export const en: Dictionary = {
       excalidraw: { name: "Excalidraw", description: "Virtual whiteboard for diagrams and sketches" },
       learningapps: { name: "Learning Apps", description: "Interactive exercises and mini-games for lessons" },
       sqlonline: { name: "SQL Online", description: "SQL queries in the browser (SQLite) — for older students" },
-      h5p: { name: "H5P Interactive", description: "Interactive tasks: memory games, quizzes, drag-n-drop. Works for any subject" },
       typerun: { name: "Typing Trainer", description: "Improve your typing speed and accuracy" },
     },
     projects: {
@@ -1588,7 +1590,6 @@ export const en: Dictionary = {
     stageContentExcalidraw: "Excalidraw",
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
-    stageContentH5p: "H5P Interactive",
     stageContentTyperun: "TypeRun",
     stageContentQuizQia: "Quiz (QIA)",
     stageContentQuizKahoot: "Quiz game (Kahoot)",

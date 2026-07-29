@@ -26,7 +26,7 @@ const GRADE_COLORS: Record<number, string> = {
 
 /**
  * External-service (wokwi/codesandbox/geogebra/phet/desmos/
- * blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline/h5p) embedded
+ * blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline) embedded
  * directly in the stage card. Owns its full header (title/description/
  * actions on one row), no "Open" gate, no fullscreen modal, no "open in new
  * tab" fallback — all twelve services embed via iframe.

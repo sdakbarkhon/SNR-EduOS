@@ -173,6 +173,8 @@ export const uz: Dictionary = {
     viewGoals: "Maqsadlarni ko'rish",
     classSubjectsTitle: "Sinf fanlari",
     subjectComingSoon: "Tez orada",
+    subjectModalTeacher: "O'qituvchi",
+    subjectModalClass: "Sinf",
   },
   schedule: {
     title: "Dars jadvali",
@@ -1155,6 +1157,7 @@ export const uz: Dictionary = {
     typeWeb: "Web",
     typeGeogebra: "GeoGebra",
     typePhet: "PhET Simulations",
+    externalProjectsSection: "Tashqi vositalar",
   },
   sandbox: {
     title: "Loyihalar (mashq maydoni)",
@@ -1177,7 +1180,6 @@ export const uz: Dictionary = {
       excalidraw: { name: "Excalidraw", description: "Sxema va diagrammalar uchun virtual doska" },
       learningapps: { name: "Learning Apps", description: "Darslar uchun interaktiv mashqlar va mini-o'yinlar" },
       sqlonline: { name: "SQL Online", description: "Brauzerda SQL so'rovlari (SQLite) — yuqori sinflar uchun" },
-      h5p: { name: "H5P Interactive", description: "Interaktiv topshiriqlar: memory games, viktorinalar, drag-n-drop. Har qanday fan uchun" },
       typerun: { name: "Klaviatura trenajyori", description: "Yozish tezligi va aniqligini oshiring" },
     },
     projects: {
@@ -1588,7 +1590,6 @@ export const uz: Dictionary = {
     stageContentExcalidraw: "Excalidraw",
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
-    stageContentH5p: "H5P Interactive",
     stageContentTyperun: "TypeRun",
     stageContentQuizQia: "Test (QIA)",
     stageContentQuizKahoot: "Kviz o'yini (Kahoot)",

@@ -173,6 +173,8 @@ export const ru: Dictionary = {
     viewGoals: "Смотреть цели",
     classSubjectsTitle: "Предметы класса",
     subjectComingSoon: "Скоро появится",
+    subjectModalTeacher: "Учитель",
+    subjectModalClass: "Класс",
   },
   schedule: {
     title: "Расписание",
@@ -1155,6 +1157,7 @@ export const ru: Dictionary = {
     typeWeb: "Web",
     typeGeogebra: "GeoGebra",
     typePhet: "PhET Simulations",
+    externalProjectsSection: "Внешние инструменты",
   },
   sandbox: {
     title: "Проекты (песочница)",
@@ -1177,7 +1180,6 @@ export const ru: Dictionary = {
       excalidraw: { name: "Excalidraw", description: "Виртуальная доска для схем и диаграмм" },
       learningapps: { name: "Learning Apps", description: "Интерактивные упражнения и мини-игры для уроков" },
       sqlonline: { name: "SQL Online", description: "SQL-запросы в браузере (SQLite) — для старших классов" },
-      h5p: { name: "H5P Interactive", description: "Интерактивные задания: memory games, квизы, drag-n-drop. Универсально для любых предметов" },
       typerun: { name: "Тренажёр печати", description: "Улучшай скорость и точность печати" },
     },
     projects: {
@@ -1588,7 +1590,6 @@ export const ru: Dictionary = {
     stageContentExcalidraw: "Excalidraw",
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
-    stageContentH5p: "H5P Interactive",
     stageContentTyperun: "TypeRun",
     stageContentQuizQia: "Тест (QIA)",
     stageContentQuizKahoot: "Квиз-игра (Kahoot)",
