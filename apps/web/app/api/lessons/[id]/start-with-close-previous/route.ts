@@ -1,34 +1,29 @@
 // POST /api/lessons/[id]/start-with-close-previous
 //
-// Ученик/учитель нажимает "Начать урок" на N-м уроке дня. Помимо перевода
-// самого урока в 'in_progress' (как обычный startLesson()), эндпоинт
-// закрывает ПРЕДЫДУЩИЙ урок того же класса того же дня, если тот ещё не
-// 'completed' — completeLessons() полноценно проставит статус + upsert
-// посещаемость и оценки. Идемпотентно (guard в completeLessons/UPDATE):
-//   - если этот урок уже in_progress/completed → { ok:true, no_op:true };
-//   - если предыдущий уже completed → просто не трогаем;
-//   - повторный клик по кнопке ничего не портит.
+// Ученик/учитель нажимает "Начать урок" на N-м уроке дня. Переводит урок в
+// 'in_progress' — закрытие ДРУГИХ in_progress уроков той же группы теперь
+// делает SQL-триггер trg_close_other_in_progress_lessons (миграция 152),
+// атомарно в той же транзакции, что и сам UPDATE ниже. Раньше это делалось
+// здесь вручную по ВРЕМЕННОЙ близости (искали "предыдущий урок того же
+// дня" по starts_at) — если учитель пропускал уроки, закрывался
+// хронологически ближайший, а не реально идущий (см. resheniya_2.md,
+// "Сейчас/Далее"). Название роута оставлено (на него уже завязаны
+// PreLessonView и TeacherLessonDetailView) — внутри только сам старт.
+//
+// Идемпотентно: если урок уже in_progress/completed → { ok:true, no_op:true };
+// повторный клик по кнопке ничего не портит (guard eq("status","scheduled")
+// на UPDATE защищает от гонки).
 //
 // Проверка прав: юзер должен иметь право читать этот урок через свой
 // user-scoped клиент — если RLS даёт SELECT (student.startLesson RLS-полиси,
 // учитель группы, ...), значит имеет право и стартовать. Дальше уже
-// работаем admin-клиентом (для operations над attendance/grades/чужими
-// уроками — которые под RLS ученик не пропустил бы).
+// работаем admin-клиентом (тот же клиент, что и раньше выполнял сам UPDATE —
+// триггер выполняется в той же транзакции и не зависит от того, каким
+// клиентом вызван UPDATE).
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { completeLessons } from "@/app/api/cron/_lib/complete-lessons";
-
-const TZ_MS = 5 * 60 * 60 * 1000;
-
-function tashkentTodayWindowForInstant(instant: Date): { start: string; end: string } {
-  const tashkentInstant = new Date(instant.getTime() + TZ_MS);
-  const startMs =
-    Date.UTC(tashkentInstant.getUTCFullYear(), tashkentInstant.getUTCMonth(), tashkentInstant.getUTCDate()) - TZ_MS;
-  const endMs = startMs + 24 * 60 * 60 * 1000;
-  return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
-}
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id: lessonId } = await ctx.params;
@@ -52,12 +47,12 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // 2) Дальше admin — нужен и для чтения соседних уроков, и для UPDATE'ов
-  //    (attendance/grades через RLS ученик не проставит).
+  // 2) Дальше admin — нужен для UPDATE (attendance/grades через RLS ученик
+  //    не проставит).
   const admin = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson, error: lessonErr } = await (admin as any).from("lessons")
-    .select("id, group_id, school_id, starts_at, status").eq("id", lessonId).maybeSingle();
+    .select("id, school_id, status").eq("id", lessonId).maybeSingle();
   if (lessonErr) {
     return NextResponse.json({ error: lessonErr.message }, { status: 500 });
   }
@@ -85,37 +80,11 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ ok: true, no_op: true, current_status: lesson.status });
   }
 
-  // 4) Найти предыдущий урок того же класса того же ДНЯ Ташкент.
-  const window = tashkentTodayWindowForInstant(new Date(lesson.starts_at));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: prevRow, error: prevErr } = await (admin as any).from("lessons")
-    .select("id, status, starts_at")
-    .eq("group_id", lesson.group_id)
-    .lt("starts_at", lesson.starts_at)
-    .gte("starts_at", window.start)
-    .lt("starts_at", window.end)
-    .order("starts_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (prevErr) {
-    return NextResponse.json({ error: prevErr.message }, { status: 500 });
-  }
-
-  let closedPrevious: string | null = null;
-  if (prevRow && prevRow.status !== "completed") {
-    try {
-      const res = await completeLessons(admin, [prevRow.id]);
-      if (res.closed > 0) closedPrevious = prevRow.id;
-    } catch (e) {
-      // Не блокируем старт — но лог оставляем. Если предыдущий не закрылся,
-      // пусть закроется ночным кроном (close-past-lessons).
-      console.error("[start-with-close-previous] closePrevious failed:", (e as Error)?.message ?? e);
-    }
-  }
-
-  // 5) Старт этого урока — guard on status='scheduled' для идемпотентности
+  // 4) Старт этого урока — guard on status='scheduled' для идемпотентности
   //    (защита от гонки: другой клиент мог уже стартануть между шагом 3 и
-  //    сюда — тогда UPDATE вернёт 0 строк, и это не ошибка).
+  //    сюда — тогда UPDATE вернёт 0 строк, и это не ошибка). Триггер
+  //    trg_close_other_in_progress_lessons закрывает другие in_progress
+  //    уроки той же группы атомарно внутри этого же UPDATE.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: started, error: startErr } = await (admin as any).from("lessons")
     .update({ status: "in_progress", started_at: new Date().toISOString() })
@@ -130,6 +99,5 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   return NextResponse.json({
     ok: true,
     no_op: !flipped,
-    closed_previous: closedPrevious,
   });
 }

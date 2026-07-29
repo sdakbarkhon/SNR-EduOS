@@ -5,8 +5,8 @@ import Link from "next/link";
 import {
   BookOpen, Calendar, CheckCircle2, Clock, FileText, Megaphone, Users,
 } from "lucide-react";
-import { getDictionary, getSubjectConfig, formatTime } from "@snr/core";
-import type { Locale } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime } from "@snr/core";
+import type { Locale, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { Avatar } from "@/components/Avatar";
 import { SubjectIcon } from "@/components/SubjectIcon";
@@ -20,7 +20,7 @@ type TodayLesson = {
   id: string;
   starts_at: string;
   ends_at: string;
-  status: string;
+  status: LessonStatus;
   room: string | null;
   topic: string | null;
   group: { id: string; name: string; subject: string };
@@ -136,23 +136,21 @@ function findHeroLesson(
   lessons: TodayLesson[],
   now: Date,
 ): { lesson: TodayLesson; mode: Exclude<HeroMode, "none"> } | null {
-  const active = lessons.find((l) => l.status === "in_progress");
+  // Единый общий хелпер (единообразно с ученическими/родительскими
+  // экранами): "Сейчас" — status='in_progress', "Далее" — первый
+  // scheduled по времени, включая просроченные-но-не-начатые (учитель
+  // ещё не нажал "Начать" вручную — решение 21.07, авто-старта по
+  // времени больше нет). Раньше здесь была локальная копия этой же
+  // "поймать просроченный урок" логики (findNextLesson изначально не
+  // умел её — исправлено после адверсариальной проверки, поэтому теперь
+  // безопасно унифицировано). "soon" vs "next" — чисто презентационный
+  // порог (в пределах часа), не отдельный источник истины.
+  const active = findCurrentLesson(lessons);
   if (active) return { lesson: active, mode: "in_progress" };
-  // "soon" ловит и уроки, чьё время уже прошло, но которые учитель ещё не
-  // начал вручную (решение 21.07 — авто-старта по времени больше нет, эта
-  // "дыра" раньше почти не встречалась, pg_cron закрывал её за ~1-5 мин).
-  // Без нижней границы diff>0 такой урок раньше вообще не находился ни
-  // одним из трёх .find() — HeroBlock показывал неверное "Уроки на сегодня
-  // завершены" при живом незапущенном уроке.
-  const soon = lessons.find((l) => {
-    if (l.status !== "scheduled") return false;
-    const diff = new Date(l.starts_at).getTime() - now.getTime();
-    return diff <= 3_600_000;
-  });
-  if (soon) return { lesson: soon, mode: "soon" };
-  const next = lessons.find((l) => l.status === "scheduled" && new Date(l.starts_at) > now);
-  if (next) return { lesson: next, mode: "next" };
-  return null;
+  const next = findNextLesson(lessons);
+  if (!next) return null;
+  const diff = new Date(next.starts_at).getTime() - now.getTime();
+  return { lesson: next, mode: diff <= 3_600_000 ? "soon" : "next" };
 }
 
 function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null }) {

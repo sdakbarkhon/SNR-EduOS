@@ -15,7 +15,7 @@ import {
   Smile,
   Star,
 } from "lucide-react";
-import { getDictionary, getStudentLessonsForWeek } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek } from "@snr/core";
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -222,26 +222,27 @@ export function LessonsView({
   const firstName = studentName.split(" ")[0] ?? studentName;
   const nowMs = now?.getTime() ?? null;
 
-  // Сейчас / Прошедший / Далее — строго по текущему времени (не по
-  // lesson.status, который может отставать от реальности: cron-автостарт/
-  // финиш урока крутится по расписанию, а не мгновенно). Пересчитывается
-  // каждые 30 сек через setInterval выше.
+  // Сейчас: единственный источник истины — status='in_progress'
+  // (findCurrentLesson из @snr/core). Раньше считалось по времени
+  // (start<=now<=end) — из-за этого несколько уроков одновременно могли
+  // получить метку "Сейчас", если реальный статус ещё не подтянулся
+  // (cron-автостарт крутится раз в минуту, а не мгновенно). "Далее" —
+  // findNextLesson: первый после текущего in_progress, иначе первый
+  // scheduled в будущем. nowMs !== null гейтит вычисление до маунта
+  // (SSR/клиент считают "сейчас" по-разному до гидрации).
   //
-  // Замирание: когда время дошло до последнего урока дня и он побыл
-  // "Сейчас", эта метка ОСТАЁТСЯ на нём после его окончания (до полуночи
-  // Ташкента, когда день реально закроет крон) — иначе после последнего
-  // урока никто не "Сейчас", и день выглядит незаконченным/повисшим.
+  // Замирание на последнем уроке дня — презентационный fallback, НЕ
+  // источник истины для "текущего": когда крон уже закрыл последний урок
+  // дня (status='completed'), findCurrentLesson вернёт null — без этого
+  // фолбэка после последнего урока никто не "Сейчас", и день выглядит
+  // незаконченным/повисшим.
   const lastTodayLesson = todayLessons.length > 0
     ? ([...todayLessons].sort((a, b) => lessonStartMs(b) - lessonStartMs(a))[0] ?? null)
     : null;
   const dayIsOver = nowMs !== null && lastTodayLesson !== null && nowMs > lessonEndMs(lastTodayLesson);
-  const currentId = nowMs !== null
-    ? (todayLessons.find((l) => nowMs >= lessonStartMs(l) && nowMs <= lessonEndMs(l))?.id
-        ?? (dayIsOver ? lastTodayLesson!.id : null))
-    : null;
-  const nextLesson = nowMs !== null
-    ? todayLessons.find((l) => lessonStartMs(l) > nowMs) ?? null
-    : null;
+  const currentLesson = nowMs !== null ? findCurrentLesson(todayLessons) : null;
+  const currentId = currentLesson?.id ?? (dayIsOver ? lastTodayLesson!.id : null);
+  const nextLesson = nowMs !== null ? findNextLesson(todayLessons) : null;
 
   // Баннер (режим "Сегодня")
   let todayBanner = s.planLearnAchieve;

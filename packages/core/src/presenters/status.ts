@@ -46,10 +46,14 @@ export function lessonStatus(
 ): StatusBadge {
   if (lesson.status === "completed") return { variant: "neutral", key: "passed" };
   if (lesson.status === "in_progress") return { variant: "success", key: "now" };
+  // status === "scheduled" отсюда и ниже — "Сейчас" больше НЕ выводится
+  // по времени (start<=now<=end), только из status='in_progress' выше.
+  // Иначе крон-отставание (fn_auto_start_lessons проверяет раз в минуту)
+  // могло дать "Сейчас" сразу нескольким урокам, чей статус ещё не
+  // догнал реальность.
   const start = new Date(lesson.starts_at).getTime();
   const end = lesson.ends_at ? new Date(lesson.ends_at).getTime() : start + DEFAULT_LESSON_MS;
   if (end < now) return { variant: "neutral", key: "passed" };
-  if (now >= start && now <= end) return { variant: "success", key: "now" };
   if (start - now <= SOON_WINDOW_MS) return { variant: "warning", key: "soon" };
   return { variant: "info", key: "scheduled" };
 }

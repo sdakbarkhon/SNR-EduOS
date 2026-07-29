@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getStudentAttendance, getStudentLessonsForWeek, getHomeworkWithSubmissions } from "@snr/core";
+import { findNextLesson, getStudentAttendance, getStudentLessonsForWeek, getHomeworkWithSubmissions } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
 import { tashkentDateKey, tashkentToday } from "./tashkent";
@@ -48,8 +48,12 @@ export default async function ParentHomePage() {
   ]);
 
   const todayLessons = weekLessons.filter((l) => tashkentDateKey(l.starts_at) === todayKey);
-  const nowIso = new Date().toISOString();
-  const nextLessonRaw = weekLessons.find((l) => l.starts_at >= nowIso) ?? null;
+  // "Следующий урок": единственный источник истины — status='in_progress'
+  // → первый после него, иначе первый scheduled в будущем
+  // (findNextLesson из @snr/core) — не сырое сравнение starts_at с "сейчас",
+  // которое могло пропустить реально идущий урок, если его старт уже в
+  // прошлом.
+  const nextLessonRaw = findNextLesson(weekLessons);
 
   const attendanceToday = attendanceResult.records.filter((r) => tashkentDateKey(r.lesson_date) === todayKey);
   const presentToday = attendanceToday.filter((r) => r.status === "present");

@@ -8,6 +8,8 @@ import {
   Check, Award, Trophy, Target, type LucideIcon,
 } from "lucide-react";
 import {
+  findCurrentLesson,
+  findNextLesson,
   formatTime,
   getDictionary,
   type Lesson,
@@ -187,6 +189,21 @@ export function DashboardView({
   const MAX_TODAY_WIDGET = 3;
   const lastLessonOfDay = todayLessonsAll.length > 0 ? todayLessonsAll[todayLessonsAll.length - 1] : null;
   const dayIsOver = now !== null && !!lastLessonOfDay?.ends_at && now > new Date(lastLessonOfDay.ends_at);
+  // Сейчас/Далее: единственный источник истины — status='in_progress'
+  // (findCurrentLesson/findNextLesson из @snr/core), не время. Раньше
+  // isNow/isNext сравнивали starts_at/ends_at с часами — из-за этого
+  // могло "гореть" сразу несколько уроков как текущие, если статус ещё
+  // не подтянулся за реальностью (cron-автостарт раз в минуту).
+  // dayIsOver-фриз ниже — презентационный fallback поверх этого, не
+  // источник истины.
+  const currentLessonToday = now ? findCurrentLesson(todayLessonsAll) : null;
+  const nextLessonToday = now ? findNextLesson(todayLessonsAll) : null;
+  // Единственный "текущий" id — реальный in_progress побеждает фриз
+  // последнего урока дня, а не независимое OR двух условий (то давало
+  // критический баг: реально идущий урок И "замороженный" последний урок
+  // дня могли оба получить isNow=true одновременно — адверсариальная
+  // проверка).
+  const currentLessonIdToday = currentLessonToday?.id ?? (dayIsOver ? lastLessonOfDay?.id ?? null : null);
   const todayLessons = dayIsOver
     ? todayLessonsAll.slice(-MAX_TODAY_WIDGET)
     : todayLessonsAll.slice(0, MAX_TODAY_WIDGET);
@@ -604,9 +621,12 @@ export function DashboardView({
                 const SubIcon = sub ? (LUCIDE_ICONS[sub.icon] ?? BookOpen) : BookOpen;
                 const start = new Date(lesson.starts_at);
                 const end = lesson.ends_at ? new Date(lesson.ends_at) : null;
-                const isFrozenLast = dayIsOver && lastLessonOfDay?.id === lesson.id;
-                const isNow = isFrozenLast || (now !== null && now >= start && (!end || now <= end));
-                const isNext = !isNow && now !== null && start.getTime() - now.getTime() > 0
+                const isNow = currentLessonIdToday === lesson.id;
+                // "Далее"-бейдж по-прежнему подсвечивается только когда урок
+                // скоро (в пределах 15 мин) — презентационный выбор поверх
+                // того, КАКОЙ урок технически следующий (nextLessonToday).
+                const isNext = !isNow && nextLessonToday?.id === lesson.id
+                  && now !== null && start.getTime() - now.getTime() > 0
                   && start.getTime() - now.getTime() < 15 * 60 * 1000;
                 const tileColor = sub?.color ?? "#94A3B8";
                 return (
