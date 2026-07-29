@@ -23,7 +23,16 @@ export function DemoBanner({ isDemo }: { isDemo: boolean }) {
           below doesn't cover the first row of page content. */}
       <div className="h-10" />
 
-      <div className="fixed inset-x-0 top-0 z-[100] flex items-center justify-between gap-3 border-b border-yellow-500 bg-yellow-400 px-4 py-2 shadow-md">
+      {/* Баннер рендерится СНАРУЖИ TeacherShell/AppShell (соседом в layout.tsx),
+          так что просто "вложить его внутрь" 1920-контейнера каркаса не
+          подействовало бы: position:fixed позиционируется относительно
+          реального вьюпорта независимо от DOM-вложенности — только
+          transform/filter/contain на предке создают для него новый
+          containing block, а такого предка здесь нет. Поэтому капается сам:
+          left-1/2 + -translate-x-1/2 центрируют бокс независимо от ширины;
+          на <1920 width=100% вьюпорта — как раньше (inset-x-0), на >=1920
+          — фиксированные 1920px, центрировано так же, как каркас ниже. */}
+      <div className="fixed left-1/2 top-0 z-[100] w-full min-[1920px]:w-[1920px] -translate-x-1/2 flex items-center justify-between gap-3 border-b border-yellow-500 bg-yellow-400 px-4 py-2 shadow-md">
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0 text-yellow-900" />
           <span className="text-sm font-medium text-yellow-900">{d.bannerText}</span>

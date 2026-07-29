@@ -65,31 +65,37 @@ export function AppShell({
   // высота явно уменьшается на те же 40px, когда баннер показан.
   return (
     <ToastProvider>
-      <div className={cn("flex overflow-hidden bg-[#F2F1FA]", isDemo ? "h-[calc(100vh-2.5rem)]" : "h-screen")}>
-        <LessonStartBanner />
-        <StudentSidebar isDemo={isDemo} />
+      {/* Фиксированная ширина 1920px на viewport>=1920 (не max-width) — ниже
+          1920 просто w-full (как раньше). Выше — весь каркас не растёт шире
+          1920px и центрируется (по решению пользователя — фиксация 1:1 с
+          обычным 1920×1080, не адаптивное растягивание). Дочерние max-w/
+          mx-auto в Topbar.tsx/PageContainer.tsx сняты — ширину теперь целиком
+          задаёт этот внешний контейнер. Fullscreen-lesson ветка (return выше)
+          сознательно НЕ обёрнута — рабочей области урока нужен весь физический
+          экран, не 1920-заморозка. */}
+      <div className="w-full min-[1920px]:w-[1920px] min-[1920px]:mx-auto">
+        <div className={cn("flex overflow-hidden bg-[#F2F1FA]", isDemo ? "h-[calc(100vh-2.5rem)]" : "h-screen")}>
+          <LessonStartBanner />
+          <StudentSidebar isDemo={isDemo} />
 
-        {/* Правая колонка */}
-        <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]">
-          <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
-          <main className={cn("flex-1 pb-20 md:pb-1", isMessagesRoute ? "overflow-hidden" : "overflow-y-auto")}>
-            {/* max-w-[1920px] без брейкпоинт-варианта — согласовано с
-                PageContainer.tsx и TeacherShell.tsx (финальная целевая
-                ширина по решению пользователя, было 1600). На 1920 и уже —
-                контент как раньше, выше — центрируется без растяжения. */}
-            <div className={cn("mx-auto w-full max-w-[1920px]", isMessagesRoute && "h-full")}>
-              {children}
-            </div>
-          </main>
-          <BottomNav />
+          {/* Правая колонка */}
+          <div className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]">
+            <Topbar title={title} studentName={studentName} avatarUrl={avatarUrl} classLabel={classLabel} />
+            <main className={cn("flex-1 pb-20 md:pb-1", isMessagesRoute ? "overflow-hidden" : "overflow-y-auto")}>
+              <div className={cn("w-full", isMessagesRoute && "h-full")}>
+                {children}
+              </div>
+            </main>
+            <BottomNav />
+          </div>
+
+          {/* Reachable from every student page except the fullscreen-lesson
+              branch above (workspace/pre-lesson/presentations) — that branch
+              returns early and never reaches this JSX. Also hidden on
+              /messages: the floating button overlapped the chat composer's
+              send button (see isMessagesRoute above). */}
+          {!isMessagesRoute && <AiFloatingButton />}
         </div>
-
-        {/* Reachable from every student page except the fullscreen-lesson
-            branch above (workspace/pre-lesson/presentations) — that branch
-            returns early and never reaches this JSX. Also hidden on
-            /messages: the floating button overlapped the chat composer's
-            send button (see isMessagesRoute above). */}
-        {!isMessagesRoute && <AiFloatingButton />}
       </div>
     </ToastProvider>
   );
