@@ -31,7 +31,7 @@ export function TeacherTopbar({
     // а тело страницы под ним — по центру в узкой колонке, разъезжаясь
     // визуально; см. TeacherShell.tsx).
     <header className="sticky top-0 z-30 h-20 w-full shrink-0 bg-white/20 px-4 backdrop-blur-sm md:px-8">
-      <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-4">
+      <div className="mx-auto flex h-full w-full max-w-[1920px] items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[20px] font-black tracking-tight text-gray-800 md:text-[24px]">
             {pageTitle}

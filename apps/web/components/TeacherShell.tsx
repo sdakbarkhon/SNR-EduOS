@@ -47,14 +47,13 @@ export function TeacherShell({
 
         <TeacherTopbar headerInfo={headerInfo} />
         <main className={cn("flex-1 px-4 pb-20 pt-1 md:px-8 md:pb-8", isMessagesRoute ? "overflow-hidden" : "overflow-y-auto")}>
-          {/* max-w-[1600px] без брейкпоинт-варианта — та же безусловная форма,
-              что уже проверенно работает в PageContainer.tsx (Заход 2):
-              w-full+max-w уже сам по себе не даёт эффекта ниже 1600px, лишний
-              min-[1440px]:-гейт был избыточен и является подозреваемым корнем
-              бага "контент прижат к сайдбару на 3440" (пользователь подтвердил
-              скриншотом) — снят, чтобы не зависеть от кастомного arbitrary-
-              брейкпоинта. */}
-          <div className={cn("mx-auto w-full max-w-[1600px]", isMessagesRoute && "h-full")}>
+          {/* max-w-[1920px] без брейкпоинт-варианта — безусловная форма,
+              согласованная с PageContainer.tsx: w-full+max-w уже сам по себе
+              не даёт эффекта ниже 1920px. Финальная целевая ширина —
+              на 1920 и уже контент как раньше, выше 1920 — центрируется,
+              ничего не растягивается (заменено с 1600 по решению
+              пользователя). */}
+          <div className={cn("mx-auto w-full max-w-[1920px]", isMessagesRoute && "h-full")}>
             {children}
           </div>
         </main>
