@@ -6,32 +6,42 @@ import { useIsFullscreenLesson } from "./fullscreen-lesson-context";
 const BASE_WIDTH = 1920;
 
 /**
- * Приложение всегда рендерится в логическом холсте 1920×N (N = 100vh/scale) —
- * Tailwind-брейкпоинты внутри не переключаются на бОльших мониторах (кроме
- * тех немногих, что уже сейчас триггерятся выше 1920px реального viewport —
- * их в шелле не осталось). На физическом viewport >= 1920 холст визуально
- * растягивается transform: scale() до полной ширины монитора; ниже 1920 —
- * scale=1, поведение не отличается от простого w-full.
+ * ScaleWrapper активен ТОЛЬКО когда реальный viewport ШИРЕ 1920px — тогда
+ * логический холст 1920px растягивается transform: scale() под физический
+ * монитор (2560/3440/3840...). На <=1920 (включая ровно 1920×1080/1920×1200
+ * и любые ноутбучные 1366/1440/1536) компонент — полный no-op: рендерит
+ * children напрямую, без обёртки, без width/transform — так, будто
+ * ScaleWrapper вообще не существует.
  *
- * transform на этом контейнере заодно делает его containing block для
- * потомков с position:fixed (по спеке CSS — transform у предка "ловит"
- * fixed-позиционирование так же, как relative ловит absolute) — поэтому
- * DemoBanner/BottomNav/AiFloatingButton не нуждаются в отдельных 1920-хаках:
- * они естественно позиционируются относительно этого же холста, а не
- * реального окна.
+ * Раньше "выключенное" состояние всё равно рисовало literal
+ * width:1920px div (scale прижимался к 1 через Math.max) — этот div мог
+ * быть шире реально доступного пространства (скроллбар, оконный хром) и
+ * обрезался. Теперь на <=1920 такой обёртки просто нет физически — это
+ * устраняет саму возможность подобной обрезки, а не маскирует её.
+ *
+ * transform на обёртке заодно делает её containing block для потомков с
+ * position:fixed (по спеке CSS) — но это работает только пока active=true;
+ * на <=1920 DemoBanner/BottomNav/AiFloatingButton позиционируются
+ * относительно реального окна как обычно (естественная часть no-op).
  *
  * Fullscreen-урок (LessonWorkspaceView, см. fullscreen-lesson-context.tsx) —
- * единственное исключение: пока он смонтирован, useIsFullscreenLesson()
- * истинно и обёртка становится прозрачным no-op — урок получает весь
- * физический экран без масштаба, как и раньше.
+ * исключение независимо от ширины: пока он смонтирован, всегда no-op.
  */
 export function ScaleWrapper({ children }: { children: ReactNode }) {
   const fullscreen = useIsFullscreenLesson();
   const [scale, setScale] = useState(1);
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
     function recompute() {
-      setScale(Math.max(1, window.innerWidth / BASE_WIDTH));
+      const w = window.innerWidth;
+      if (w > BASE_WIDTH) {
+        setScale(w / BASE_WIDTH);
+        setActive(true);
+      } else {
+        setScale(1);
+        setActive(false);
+      }
     }
     recompute();
     window.addEventListener("resize", recompute);
@@ -39,9 +49,12 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (fullscreen) return;
+    if (fullscreen || !active) return;
     // overflow-x на ОБОИХ html и body — Safari в части версий игнорирует
     // overflow-x:hidden на body одном, если не задать его и на html тоже.
+    // Ставится только пока active=true — на <=1920 горизонтальный скролл
+    // и так не возникает (нет фиксированной 1920px обёртки), незачем
+    // трогать overflow вообще.
     const prevBodyOverflowX = document.body.style.overflowX;
     const prevHtmlOverflowX = document.documentElement.style.overflowX;
     document.body.style.overflowX = "hidden";
@@ -50,9 +63,9 @@ export function ScaleWrapper({ children }: { children: ReactNode }) {
       document.body.style.overflowX = prevBodyOverflowX;
       document.documentElement.style.overflowX = prevHtmlOverflowX;
     };
-  }, [fullscreen]);
+  }, [fullscreen, active]);
 
-  if (fullscreen) return <>{children}</>;
+  if (fullscreen || !active) return <>{children}</>;
 
   return (
     <div
