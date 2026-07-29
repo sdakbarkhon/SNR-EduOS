@@ -471,6 +471,14 @@ export interface Dictionary {
     deleteConfirm: string;
     searchPlaceholder: string;
     noParents: string;
+    editBtn: string;
+    editParentTitle: string;
+    saveBtn: string;
+    saving: string;
+    resetPasswordBtn: string;
+    resetPasswordConfirm: string;
+    resetPasswordNotRegistered: string;
+    newPasswordFlash: string;
   };
   parentUi: {
     todayTitle: string;

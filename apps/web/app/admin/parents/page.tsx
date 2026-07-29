@@ -35,10 +35,15 @@ export default async function AdminParentsPage() {
   const studentMap = new Map(studentRows.map((s) => [s.id, s.full_name]));
 
   const childrenByParent = new Map<string, string[]>();
+  const childIdsByParent = new Map<string, string[]>();
   for (const l of linkRows) {
     const arr = childrenByParent.get(l.parent_id) ?? [];
     arr.push(studentMap.get(l.student_id) ?? "?");
     childrenByParent.set(l.parent_id, arr);
+
+    const idArr = childIdsByParent.get(l.parent_id) ?? [];
+    idArr.push(l.student_id);
+    childIdsByParent.set(l.parent_id, idArr);
   }
 
   // inviteRows is already ordered by created_at desc, so the first match per
@@ -52,11 +57,13 @@ export default async function AdminParentsPage() {
     const invite = latestInviteByParent.get(p.id);
     return {
       id: p.id,
+      user_id: p.user_id,
       full_name: p.full_name,
       phone: p.phone,
       isRegistered: !!p.user_id,
       created_at: p.created_at,
       children: childrenByParent.get(p.id) ?? [],
+      childIds: childIdsByParent.get(p.id) ?? [],
       inviteCode: invite?.code ?? null,
       inviteExpired: invite ? new Date(invite.expires_at).getTime() < Date.now() : true,
     };
