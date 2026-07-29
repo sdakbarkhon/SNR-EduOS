@@ -3344,3 +3344,15 @@ typecheck (`packages/core` + `apps/web` + `apps/mobile-parent`) и `next build` 
 Реальное удаление (`--confirm`) не запускалось — ждём подтверждения пользователя.
 
 typecheck (`packages/core` + `apps/web`) чистый (скрипт — самостоятельный `.mjs`, не часть сборки `next build`).
+
+## Регенерация 29.07, этап 2: 15 учебных планов на неделю 27.07-02.08
+
+Создано 15 учебных планов (5 предметов × 3 группы) на неделю 27.07-02.08, по 7 тем в каждом (105 тем всего). Темы дифференцированы по уровню класса (3-А — базовый, 7-А — средний, 10-А — продвинутый), логически связаны в последовательность урок-за-уроком. Готовы для Этапа 3 (расписание).
+
+**Схема** (`supabase/migrations/116_curriculum_plans.sql`, RLS-доп. в `120_curriculum_plan_subject_owner.sql` — колонки не менялись): `curriculum_plans` (group_id, subject_id, teacher_id, school_id, title, source_file_url/source_file_type — оба NULL, планы не загружены из файла) — `UNIQUE(group_id, subject_id)`, ровно один план на пару. Темы — в ОТДЕЛЬНОЙ таблице `curriculum_plan_topics` (plan_id CASCADE, order_index, title, description, estimated_lessons), не jsonb-поле. `teacher_id` каждого плана — из `subjects.teacher_id` (модель "1 предмет = 1 учитель": teacher_prog/robot/math/english/russian), не `groups.teacher_id` (тот жёстко указывает на учителя-куратора для всех предметов группы — было бы неверно).
+
+**`apps/web/scripts/create-curriculum-plans-week.mjs`** (новый, без `--confirm` — по инструкции, INSERT в пустую после Этапа 1 таблицу). Идемпотентность — через `UNIQUE(group_id, subject_id)`: если план уже есть, обновляется `title` + темы полностью заменяются (delete+insert), а не дублируются. Прогнан вживую: создано 15 планов, записано 105 тем. Независимая read-only проверка после запуска подтвердила: 15 планов, 105 тем, корректный `order_index` (1-7) и содержимое по каждому из 5×3.
+
+Живая проверка в UI (`/teacher/curriculum` как `teacher_prog`) не удалась — тот же сессионный сбой headless-браузера этой сессии (`session_replaced` сразу после успешного `/api/demo/claim`), не связан с этим скриптом. Данные подтверждены прямым read-only запросом к БД вместо скриншота.
+
+typecheck (`packages/core` + `apps/web`) чистый.
