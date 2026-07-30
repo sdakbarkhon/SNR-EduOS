@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, Layers, Globe, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Code2, FileText, ClipboardCheck, Layers, Globe, Puzzle, type LucideIcon } from "lucide-react";
 import {
   getDictionary,
   getSubjectStyle,
@@ -16,15 +16,30 @@ import { useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { EXTERNAL_SERVICE_ORDER, SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
 
-const TYPE_STYLE: Record<ContentType, { bg: string; text: string; Icon: LucideIcon }> = {
+type TypeStyle = { bg: string; text: string; Icon: LucideIcon };
+
+// ВАЖНО: ключ ОБЯЗАН быть на каждый ContentType. Пропущенный ключ роняет
+// всю страницу /homework ("Cannot read properties of undefined (reading
+// 'bg')") — так и случилось с 'code_completion' (Блок 6.5, коммит 7e67a14):
+// тип добавили в ContentType и в диспетчеризацию учителя, но этот Record
+// не дополнили, а финальный "as Record<...>" глушил именно ту ошибку
+// компилятора, которая поймала бы пропуск. Ошибка вылезла только когда в
+// БД появились первые реальные code_completion-ДЗ.
+const TYPE_STYLE: Record<ContentType, TypeStyle> = {
   file: { bg: "bg-blue-50", text: "text-blue-600", Icon: FileText },
   test: { bg: "bg-violet-50", text: "text-violet-600", Icon: ClipboardCheck },
   programming: { bg: "bg-orange-50", text: "text-orange-600", Icon: Code2 },
   bundle: { bg: "bg-purple-50", text: "text-purple-600", Icon: Layers },
-  ...Object.fromEntries(
+  code_completion: { bg: "bg-violet-50", text: "text-violet-600", Icon: Puzzle },
+  ...(Object.fromEntries(
     EXTERNAL_SERVICE_ORDER.map((key) => [key, { bg: "bg-sky-50", text: "text-sky-600", Icon: Globe }]),
-  ),
-} as Record<ContentType, { bg: string; text: string; Icon: LucideIcon }>;
+  ) as Record<(typeof EXTERNAL_SERVICE_ORDER)[number], TypeStyle>),
+};
+
+// Страховка от повторения того же класса бага: даже если в ContentType
+// когда-нибудь добавят значение и снова забудут этот файл, карточка
+// отрендерится нейтральным стилем вместо падения всей страницы.
+const FALLBACK_TYPE_STYLE: TypeStyle = { bg: "bg-slate-50", text: "text-slate-600", Icon: FileText };
 
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
 
@@ -41,7 +56,7 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
   const cat = homeworkCategory(hw, hw.submission);
   const urgency = deadlineUrgency(hw.due_date);
 
-  const typeStyle = TYPE_STYLE[hw.content_type];
+  const typeStyle = TYPE_STYLE[hw.content_type] ?? FALLBACK_TYPE_STYLE;
   const typeLabel =
     hw.content_type === "test"
       ? d.homework.typeTest
@@ -49,9 +64,11 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
         ? d.homework.typeProgrammingShort
         : hw.content_type === "bundle"
           ? d.homework.typeBundle
-          : isExternalService(hw.content_type)
-            ? SERVICE_CONFIG[hw.content_type].name
-            : d.homework.typeFile;
+          : hw.content_type === "code_completion"
+            ? d.homework.typeCodeCompletion
+            : isExternalService(hw.content_type)
+              ? SERVICE_CONFIG[hw.content_type].name
+              : d.homework.typeFile;
 
   const dueLabel = hw.due_date
     ? d.homework.dueUntil.replace(
