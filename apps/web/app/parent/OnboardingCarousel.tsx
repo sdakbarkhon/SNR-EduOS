@@ -5,7 +5,7 @@ import Image from "next/image";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { FeaturesSheet } from "./FeaturesSheet";
-import { LangThemeButtons } from "./LangThemeButtons";
+import { LangButton } from "./LangButton";
 import { ink1, ink2, ink3 } from "@/lib/parent/glass-tokens";
 
 const SLIDE_COUNT = 3;
@@ -54,7 +54,7 @@ export function OnboardingCarousel({ onStart }: { onStart: () => void }) {
     <div className="relative flex flex-1 flex-col px-6 pb-8 pt-12">
       {/* Язык/Тема — правый верхний угол, поверх центрированного лого-блока. */}
       <div className="absolute right-5 top-5 z-10">
-        <LangThemeButtons />
+        <LangButton />
       </div>
       <div className="flex flex-col items-center gap-1.5">
         <div className="flex items-center gap-2">

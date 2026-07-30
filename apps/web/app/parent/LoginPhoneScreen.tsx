@@ -20,7 +20,7 @@ import {
   UzFlagIcon,
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
-import { LangThemeButtons } from "./LangThemeButtons";
+import { LangButton } from "./LangButton";
 
 /** Единственный демо-родитель: Исмаилов Бахтиёр (ребёнок — Шерзод, 10-А).
  *  Тот же номер, что в packages/core PARENT_PHONE_ACCOUNTS. */
@@ -105,7 +105,7 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           <BackArrowIcon color={ink1} />
         </GlassCircleButton>
         <div className="flex-1" />
-        <LangThemeButtons />
+        <LangButton />
         <button type="button" onClick={() => setSheet("help")} className="text-[12px] font-extrabold" style={{ color: accent }}>
           {t.needHelp}
         </button>
