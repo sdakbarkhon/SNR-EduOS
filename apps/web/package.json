@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && eslint \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\" --rule \"{\\\"react-hooks/exhaustive-deps\\\":\\\"off\\\"}\" --no-warn-ignored",
     "type-check": "tsc --noEmit",
     "seed:demo-iter4": "tsx scripts/seed-demo-iteration4.ts"
   },
