@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useIsFullscreenLesson } from "./fullscreen-lesson-context";
 
 const BASE_WIDTH = 1920;
@@ -108,12 +108,24 @@ export function ScaleWrapper({
     };
   }, [fullscreen, active, fitHeight]);
 
-  if (fullscreen || !active) return <>{children}</>;
-
-  return (
-    <div
-      className="flex flex-col"
-      style={{
+  // Большой фикс — "React #310 ещё живёт на /schedule", раунд 2: живой
+  // прод-репорт (eduos.snruz.uz/schedule, Yandex Browser) показал React
+  // #418 (hydration mismatch) ПЕРЕД #310 — #310 там вторичный, каскадный
+  // симптом провалившейся гидратации, а не самостоятельный баг порядка
+  // хуков (полная статическая проверка кодовой базы дважды не нашла ни
+  // одного нарушения Rules of Hooks). Раньше здесь было "if (fullscreen ||
+  // !active) return <>{children}</>" — на сервере (нет window) active
+  // ВСЕГДА false при первом рендере, значит структурно это должно совпадать
+  // с первым клиентским рендером (эффект ещё не выполнился) — но ЛЮБОЕ
+  // структурное ветвление Fragment↔div в компоненте, обёртывающем ВЕСЬ
+  // remaining tree, — риск, которого не должно быть в принципе: теперь
+  // ВСЕГДА рендерится один и тот же <div> (структура идентична между
+  // сервером/клиентом при любом active), меняются только его style-значения
+  // после эффекта — что является безопасным пост-гидратационным обновлением
+  // стилей, а не структурным изменением DOM.
+  const wrapperStyle: CSSProperties = fullscreen || !active
+    ? { margin: 0 }
+    : {
         width: `${BASE_WIDTH}px`,
         // fitHeight=true: обязательно /scale (не просто 100vh) —
         // transform:scale() масштабирует ОБЕ оси одинаково; деление на
@@ -124,8 +136,10 @@ export function ScaleWrapper({
         margin: 0,
         transform: `scale(${scale})`,
         transformOrigin: "top left",
-      }}
-    >
+      };
+
+  return (
+    <div className="flex flex-col" style={wrapperStyle}>
       {children}
     </div>
   );

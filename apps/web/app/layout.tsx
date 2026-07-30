@@ -26,7 +26,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           } catch(e) {}
         `}} />
       </head>
-      <body>
+      {/* suppressHydrationWarning — браузерные расширения (Yandex/Алиса,
+          переводчики, менеджеры паролей и т.д.) нередко модифицируют DOM
+          <body> ДО гидратации (добавляют атрибуты/дочерние узлы) — без
+          этого такая правка сторонним расширением превращается в React
+          error #418 (hydration mismatch), из-за которого падает вся
+          гидратация приложения (см. React #310 на /schedule, разведка
+          нашла live-репорт именно с Yandex Browser). suppressHydrationWarning
+          не скрывает НАШИ баги (те по-прежнему всплывают предупреждением в
+          консоли) — оно только останавливает React от паники на разметке
+          <body>, добавленной ПОСЛЕ первого рендера кем-то другим. */}
+      <body suppressHydrationWarning>
         <ThemeProvider>
           <LocaleProvider>
             {children}
