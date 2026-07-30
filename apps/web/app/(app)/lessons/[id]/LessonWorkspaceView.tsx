@@ -26,6 +26,7 @@ import { StudentPresentationViewer } from "@/components/lesson-stages/StudentPre
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
 import { ExternalStageModal } from "./ExternalStageModal";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { QiaQuizModal } from "./QiaQuizModal";
 import { KahootStudentModal } from "./KahootStudentModal";
 import { isExternalService } from "@/lib/external-services";
@@ -177,7 +178,9 @@ function TaskStubModal({
         </div>
 
         {stage.description && (
-          <p className="mb-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
+          <div className="mb-4">
+            <MarkdownContent text={stage.description} className="text-sm text-slate-600 dark:text-slate-300" />
+          </div>
         )}
 
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
@@ -1093,7 +1096,7 @@ export function LessonWorkspaceView({
         <section className="flex-1 min-w-0 space-y-4">
           {lesson.description && (
             <div className="rounded-2xl border border-white/60 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
-              <p className="text-[15px] leading-relaxed text-slate-600">{lesson.description}</p>
+              <MarkdownContent text={lesson.description} className="text-[15px] text-slate-600" />
             </div>
           )}
 
@@ -1284,7 +1287,9 @@ export function LessonWorkspaceView({
                         filename={(stage.config as { presentation_file: { storagePath: string; filename: string } }).presentation_file.filename}
                       />
                     ) : stage.description ? (
-                      <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{stage.description}</p>
+                      <div className="mb-3">
+                        <MarkdownContent text={stage.description} className="text-sm text-slate-600 dark:text-slate-300" />
+                      </div>
                     ) : null
                   )}
 
@@ -1378,7 +1383,7 @@ export function LessonWorkspaceView({
                   <h3 className="text-[15px] font-bold text-slate-800">{summaryStage.title}</h3>
                 </div>
                 {summaryStage.description && (
-                  <p className="text-sm leading-relaxed text-slate-600">{summaryStage.description}</p>
+                  <MarkdownContent text={summaryStage.description} className="text-sm text-slate-600" />
                 )}
               </div>
             </div>

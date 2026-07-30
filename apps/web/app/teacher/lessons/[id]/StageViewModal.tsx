@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { useIsDemoSession } from "@/lib/useIsDemoSession";
+import { MarkdownContent } from "@/components/MarkdownContent";
 
 const LIVE_SCORES_POLL_MS = 12000;
 
@@ -130,9 +131,7 @@ export function StageViewModal({
 
         {/* Body */}
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
-          {stage.description && (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{stage.description}</p>
-          )}
+          {stage.description && <MarkdownContent text={stage.description} className="text-sm text-slate-700" />}
 
           {stage.slides && stage.slides.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-slate-100">

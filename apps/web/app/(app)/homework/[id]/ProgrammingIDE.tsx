@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { CODE_LANGUAGE_LABELS, CODE_LANGUAGE_DEFAULT_SNIPPETS, isHtmlLanguage } from "@/lib/code-languages";
 import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
@@ -122,8 +123,11 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
         <ArrowLeft size={16} /> {d.common.back}
       </button>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        {/* LEFT: condition */}
+      {/* Раньше 50/50 grid gap-5 lg:grid-cols-2 — условие и IDE делили ширину
+          пополам и оба были слишком узкими, чтобы удобно читать/писать код.
+          Теперь описание сверху во всю ширину, IDE снизу во всю ширину. */}
+      <div className="flex flex-col gap-5">
+        {/* TOP: condition */}
         <div className="space-y-4">
           <GlassCard className="p-5">
             <div className="flex items-start gap-4">
@@ -146,9 +150,9 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
               </div>
             </div>
             {hw.description && (
-              <p className="mt-4 whitespace-pre-wrap border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-700">
-                {hw.description}
-              </p>
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <MarkdownContent text={hw.description} className="text-sm text-slate-700" />
+              </div>
             )}
           </GlassCard>
 
@@ -218,7 +222,7 @@ export function ProgrammingIDE({ hw }: { hw: HomeworkWithSubmission }) {
           )}
         </div>
 
-        {/* RIGHT: pseudo-IDE */}
+        {/* BOTTOM: pseudo-IDE */}
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">

@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon, useLocale } from "@/components";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { cn } from "@/lib/cn";
 
 type Student = { id: string; full_name: string; avatar_url: string | null };
@@ -103,7 +104,11 @@ export function TeacherProjectDetailView({
             <Trash2 size={17} />
           </button>
         </div>
-        {project.description && <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-700">{project.description}</p>}
+        {project.description && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <MarkdownContent text={project.description} className="text-sm text-slate-700" />
+          </div>
+        )}
       </section>
 
       {/* Stages (read-only) */}

@@ -14,6 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon, useLocale } from "@/components";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { cn } from "@/lib/cn";
 
 export function ProjectDetailView({
@@ -138,7 +139,11 @@ export function ProjectDetailView({
             {due && <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><CalendarDays size={13} /> {t.deadline}: {due}</p>}
           </div>
         </div>
-        {project.description && <p className="mt-4 whitespace-pre-wrap border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-700">{project.description}</p>}
+        {project.description && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <MarkdownContent text={project.description} className="text-sm text-slate-700" />
+          </div>
+        )}
       </div>
 
       {/* Not started → big start button */}
@@ -214,24 +219,6 @@ export function ProjectDetailView({
                 </div>
               );
             })}
-          </div>
-
-          {/* General files */}
-          <div className="rounded-2xl border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
-            <h2 className="mb-2 text-sm font-bold uppercase tracking-widest text-gray-500">{t.generalFiles}</h2>
-            <div className="space-y-1.5">
-              {attachments.filter((a) => !a.stage_id).map((f) => <FileRow key={f.id} att={f} />)}
-              {!readOnly && (
-                <>
-                  <input ref={(el) => { fileRefs.current.__general = el; }} type="file" className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(null, f); e.target.value = ""; }} />
-                  <button onClick={() => fileRefs.current.__general?.click()} disabled={busy}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 py-2 text-[12px] font-medium text-slate-500 hover:border-blue-300 hover:text-blue-600 disabled:opacity-50">
-                    <Upload size={13} /> {t.attachGeneral}
-                  </button>
-                </>
-              )}
-            </div>
           </div>
 
           {/* Footer state */}

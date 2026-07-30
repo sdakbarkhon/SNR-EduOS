@@ -23,6 +23,7 @@ import {
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, Modal, useLocale } from "@/components";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { useToast } from "@/components/Toast";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
@@ -306,7 +307,9 @@ function SubtaskRow({
       {expanded && (
         <div className="border-t border-white/60 p-4">
           {subtask.description && (
-            <p className="mb-3 whitespace-pre-wrap text-sm text-brand-ink-muted">{subtask.description}</p>
+            <div className="mb-3">
+              <MarkdownContent text={subtask.description} className="text-sm text-brand-ink-muted" />
+            </div>
           )}
           {subtask.type === "file" && (
             <FileSubtaskEditor content={sub?.content} onSave={onSave} readOnly={readOnly} placeholder={d.homework.answerPlaceholder} />
@@ -502,9 +505,9 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
           </div>
         </div>
         {hw.description && (
-          <p className="mt-4 whitespace-pre-wrap border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-700">
-            {hw.description}
-          </p>
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <MarkdownContent text={hw.description} className="text-sm text-slate-700" />
+          </div>
         )}
         {alreadySubmitted && (
           <div className="mt-4 border-t border-slate-100 pt-4">

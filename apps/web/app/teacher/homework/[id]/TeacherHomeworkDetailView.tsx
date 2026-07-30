@@ -18,6 +18,7 @@ import { TeacherBundleSubmissions } from "./TeacherBundleSubmissions";
 import type { Locale, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
@@ -396,7 +397,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
       {/* Description */}
       {hw.description && (
         <div className="rounded-[16px] bg-white/70 border border-white/80 p-4 text-[14px] text-brand-ink">
-          {hw.description}
+          <MarkdownContent text={hw.description} />
         </div>
       )}
 

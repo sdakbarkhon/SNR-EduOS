@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
@@ -687,9 +688,9 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
         </div>
 
         {hw.description && (
-          <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-700">
-            {hw.description}
-          </p>
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <MarkdownContent text={hw.description} className="text-sm text-slate-700" />
+          </div>
         )}
       </GlassCard>
 
