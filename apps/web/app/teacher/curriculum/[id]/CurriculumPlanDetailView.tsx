@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, ChevronUp, ChevronDown, Pencil, Trash2, Check,
-  Sparkles, ListPlus, LayoutTemplate, AlertTriangle, CalendarPlus,
+  Sparkles, ListPlus, LayoutTemplate, AlertTriangle, CalendarPlus, Loader2,
 } from "lucide-react";
 import {
   getCurriculumTopicsWithUsage, updateCurriculumPlanTopic,
   reorderCurriculumPlanTopics, deleteCurriculumPlanTopic, createLesson,
 } from "@snr/core";
-import type { CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "@snr/core";
+import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { PageContainer } from "@/components/PageContainer";
+import { useRealtimeChannel } from "@/lib/realtime";
 
 function topicWord(n: number): string {
   const mod10 = n % 10, mod100 = n % 100;
@@ -39,19 +40,62 @@ export function CurriculumPlanDetailView({
   const db = createClient();
   const isOwner = plan.teacher_id === teacherId;
 
+  // Большой фикс, Блок 6, ЗАДАЧА 1 — фоновый парсинг: пока status='processing'
+  // тем ещё нет (background-parse дописывает их асинхронно), поэтому текущий
+  // статус/прогресс/ошибка живут локально и обновляются через Realtime, а не
+  // через plan-проп (тот приходит один раз с сервера при первой загрузке
+  // страницы).
+  const [planStatus, setPlanStatus] = useState<CurriculumPlanStatus>(plan.status);
+  const [progressPercent, setProgressPercent] = useState(plan.progress_percent);
+  const [errorMessage, setErrorMessage] = useState(plan.error_message);
+  const [retrying, setRetrying] = useState(false);
+
+  useRealtimeChannel(
+    planStatus === "ready" ? null : `curriculum-plan-${plan.id}`,
+    "curriculum_plans",
+    `id=eq.${plan.id}`,
+    (payload) => {
+      const row = payload.new as { status?: string; progress_percent?: number; error_message?: string | null };
+      if (typeof row.progress_percent === "number") setProgressPercent(row.progress_percent);
+      if (row.status === "processing" || row.status === "ready" || row.status === "error") setPlanStatus(row.status);
+      if ("error_message" in row) setErrorMessage(row.error_message ?? null);
+    },
+  );
+
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/curriculum-plans/${plan.id}/retry-parse`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) { setErrorMessage(json.error || "Не удалось перезапустить"); return; }
+      setPlanStatus("processing");
+      setProgressPercent(10);
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage("Ошибка сети");
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   const [topics, setTopics] = useState<CurriculumTopicWithUsage[]>(
     plan.topics.map((t) => ({ ...t, used_in_lessons: 0 })),
   );
   const [usageLoaded, setUsageLoaded] = useState(false);
 
   useEffect(() => {
+    if (planStatus !== "ready") return;
     let cancelled = false;
     getCurriculumTopicsWithUsage(db, plan.id)
       .then((withUsage) => { if (!cancelled) { setTopics(withUsage); setUsageLoaded(true); } })
       .catch(() => { if (!cancelled) setUsageLoaded(true); });
     return () => { cancelled = true; };
+    // planStatus добавлен в deps намеренно — как только фоновый парсинг
+    // переводит план в 'ready' (Realtime выше), темы ещё не в исходном
+    // серверном plan-пропе (он был загружен, пока план был 'processing'),
+    // поэтому нужен свежий фетч именно в этот момент, а не только при mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan.id]);
+  }, [plan.id, planStatus]);
 
   // ── Rename (inline) ──────────────────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -184,11 +228,47 @@ export function CurriculumPlanDetailView({
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{plan.subject_name}</p>
             <h1 className="mt-0.5 text-xl font-bold text-slate-900">{plan.group_name}</h1>
-            <p className="mt-1 text-sm text-slate-500">{topics.length} {topicWord(topics.length)}</p>
+            {planStatus === "ready" && (
+              <p className="mt-1 text-sm text-slate-500">{topics.length} {topicWord(topics.length)}</p>
+            )}
           </div>
         </div>
       </div>
 
+      {planStatus === "processing" && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-8 text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-500" />
+          <p className="text-sm font-semibold text-slate-700">План готовится — AI разбирает файл на темы…</p>
+          <p className="mt-1 text-xs text-slate-400">Можно закрыть эту вкладку — мы покажем уведомление, когда план будет готов.</p>
+          <div className="mx-auto mt-5 h-2 w-full max-w-sm overflow-hidden rounded-full bg-blue-100">
+            <div
+              className="h-full rounded-full bg-blue-600 transition-all duration-700 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-blue-600">{progressPercent}%</p>
+        </div>
+      )}
+
+      {planStatus === "error" && (
+        <div className="rounded-2xl border border-red-100 bg-red-50/60 p-8 text-center">
+          <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
+          <p className="text-sm font-bold text-red-700">Ошибка</p>
+          {errorMessage && <p className="mx-auto mt-1 max-w-md text-xs text-red-500">{errorMessage}</p>}
+          {isOwner && (
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="mt-4 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {retrying ? "Пробуем снова…" : "Попробовать снова"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {planStatus === "ready" && (
+      <>
       {!isOwner && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -344,6 +424,8 @@ export function CurriculumPlanDetailView({
             </div>
           )}
         </div>
+      )}
+      </>
       )}
 
       {confirmDelete && (

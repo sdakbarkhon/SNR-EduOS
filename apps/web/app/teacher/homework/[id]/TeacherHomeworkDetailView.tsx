@@ -22,7 +22,8 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
-import { ReviewModal, TestReviewModal } from "@/components/teacher/ReviewModals";
+import { ReviewModal, TestReviewModal, AiReviewModal } from "@/components/teacher/ReviewModals";
+import type { TeacherAiPendingReview } from "@snr/core";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
 import { CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
@@ -41,6 +42,12 @@ type Submission = {
   grade: number | null; teacher_comment: string | null;
   file_storage_path: string | null; file_original_name: string | null;
   student: { id: string; full_name: string; avatar_url: string | null };
+  // Большой фикс, Блок 6, Задача 3 — уже приходят с сервера (getHomeworkSubmissions
+  // селектит "*"), просто не были типизированы/отрендерены на этом экране.
+  ai_grade: number | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ai_feedback: any;
+  ai_review_status: string | null;
 };
 type TestSub = {
   id: string; student_id: string;
@@ -286,6 +293,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
 
   const [hw, setHw] = useState(initialHw);
   const [reviewSub, setReviewSub] = useState<Submission | null>(null);
+  const [reviewingAi, setReviewingAi] = useState<Submission | null>(null);
   const [reviewTestSub, setReviewTestSub] = useState<TestSub | null>(null);
   const [localSubs, setLocalSubs] = useState(submissions);
   const [localTestSubs, setLocalTestSubs] = useState(testSubs);
@@ -491,10 +499,21 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           <p className="text-[14px] text-brand-ink-muted">{d.teacher.noActivity}</p>
         ) : (
           <div className="space-y-2">
-            {localSubs.map((sub) => (
+            {localSubs.map((sub) => {
+              // Большой фикс, Блок 6, Задача 3 — AI-проверка (миграция 140,
+              // уже живая: trg_enqueue_homework_ai_review ставит в очередь
+              // при submit, cron раз в сутки — apps/web/lib/ai/process-
+              // homework-review-queue.ts — заполняет ai_grade/ai_feedback).
+              // Здесь только рендер уже существующих полей + уже
+              // существующая AiReviewModal (ReviewModals.tsx), которая
+              // раньше открывалась только с отдельной кросс-ДЗ страницы
+              // /teacher/homework/ai-review.
+              const aiPending = sub.ai_review_status === "pending_ai";
+              const aiReadyForTeacher = sub.ai_review_status === "ai_reviewed_pending_teacher";
+              return (
               <div key={sub.id}
                 className="flex cursor-pointer items-center gap-3 rounded-[14px] bg-white/60 p-3 transition-colors hover:bg-white/90"
-                onClick={() => setReviewSub(sub)}>
+                onClick={() => (aiReadyForTeacher ? setReviewingAi(sub) : setReviewSub(sub))}>
                 <Avatar name={sub.student.full_name} url={sub.student.avatar_url} />
                 <div className="min-w-0 flex-1">
                   <div className="text-[14px] font-semibold text-brand-ink">{sub.student.full_name}</div>
@@ -503,24 +522,40 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
                     {sub.grade != null && (
                       <span className="text-[12px] font-bold text-emerald-600">{sub.grade}/5</span>
                     )}
+                    {aiPending && (
+                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-600">
+                        {d.teacher.aiReviewPendingBadge}
+                      </span>
+                    )}
+                    {aiReadyForTeacher && sub.ai_grade != null && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                        {d.teacher.aiGrade}: {sub.ai_grade}/5
+                      </span>
+                    )}
                   </div>
                 </div>
-                {sub.status === "submitted" && (
+                {aiReadyForTeacher ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setReviewingAi(sub); }}
+                    className="shrink-0 rounded-[10px] bg-violet-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-violet-700">
+                    {d.teacher.aiReviewOpenBtn}
+                  </button>
+                ) : sub.status === "submitted" ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); setReviewSub(sub); }}
                     className="shrink-0 rounded-[10px] bg-brand-blue/10 px-3 py-1.5 text-[12px] font-semibold text-brand-blue hover:bg-brand-blue/20">
                     {d.teacher.reviewBtn}
                   </button>
-                )}
-                {sub.status === "graded" && (
+                ) : sub.status === "graded" ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); setReviewSub(sub); }}
                     className="shrink-0 rounded-[10px] border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-brand-ink-muted hover:bg-slate-50">
                     Открыть
                   </button>
-                )}
+                ) : null}
               </div>
-            ))}
+              );
+            })}
 
             {localTestSubs.map((sub) => {
               const isGraded = !hasOpenQuestions || sub.max_score === questions.length;
@@ -572,6 +607,27 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
               s.id === reviewSub.id ? { ...s, status: "graded", grade, teacher_comment: comment } : s
             ));
             setReviewSub(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {reviewingAi && (
+        <AiReviewModal
+          review={{
+            id: reviewingAi.id,
+            homework_id: hw.id,
+            answer_text: reviewingAi.answer_text,
+            code_text: reviewingAi.code_text,
+            submitted_at: reviewingAi.submitted_at ?? new Date().toISOString(),
+            ai_grade: reviewingAi.ai_grade,
+            ai_feedback: reviewingAi.ai_feedback,
+            student: reviewingAi.student,
+            homework: { id: hw.id, title: hw.title, content_type: hw.content_type, group: hw.group },
+          } as TeacherAiPendingReview}
+          onClose={() => setReviewingAi(null)}
+          onResolved={() => {
+            setReviewingAi(null);
             router.refresh();
           }}
         />

@@ -1978,6 +1978,8 @@ export const uz: Dictionary = {
     aiReviewConfirmBtn: "Tasdiqlash",
     aiReviewEditConfirmBtn: "O'zgartirib tasdiqlash",
     aiReviewManualBtn: "AI-siz qo'lda tekshirish",
+    aiReviewPendingBadge: "AI tekshirmoqda…",
+    aiReviewOpenBtn: "AI bahosini tekshirish",
     groupsTitle: "Guruhlarim",
     groupStudents: "o'quvchi",
     groupAttendance: "Davomat",

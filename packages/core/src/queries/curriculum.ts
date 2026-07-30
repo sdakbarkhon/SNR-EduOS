@@ -199,3 +199,110 @@ export async function deleteCurriculumPlan(db: Db, planId: string): Promise<void
   const { error } = await (db as AnyDb).from("curriculum_plans").delete().eq("id", planId);
   if (error) throw error;
 }
+
+// ── Большой фикс, Блок 6, ЗАДАЧА 1 — фоновый парсинг (migration 160) ────────
+// Загрузка больше не блокирует страницу на 10-30с: план создаётся СРАЗУ со
+// status='processing', БЕЗ тем, учитель мгновенно попадает на его страницу.
+// Реальный парсинг делает apps/web/app/api/curriculum-plans/[id]/
+// background-parse/route.ts (отдельный serverless-вызов, fire-and-forget) —
+// он и вызывает updateCurriculumPlanProgress/markCurriculumPlanReady/
+// markCurriculumPlanError ниже.
+
+/** Создаёт план БЕЗ тем, сразу в status='processing' — темы дописывает
+ *  background-parse через markCurriculumPlanReady. Как и createCurriculumPlan,
+ *  бросает при конфликте UNIQUE(group_id, subject_id) — caller должен явно
+ *  вызвать replaceCurriculumPlanProcessing для замены. */
+export async function createCurriculumPlanProcessing(
+  db: Db,
+  input: {
+    groupId: string;
+    subjectId: string;
+    teacherId: string;
+    title: string;
+    sourceFileUrl: string;
+    sourceFileType: "pdf" | "docx";
+  },
+): Promise<CurriculumPlan> {
+  const plan = await (db as AnyDb)
+    .from("curriculum_plans")
+    .insert({
+      group_id: input.groupId,
+      subject_id: input.subjectId,
+      teacher_id: input.teacherId,
+      title: input.title,
+      source_file_url: input.sourceFileUrl,
+      source_file_type: input.sourceFileType,
+      status: "processing",
+      progress_percent: 10,
+    })
+    .select("*")
+    .single()
+    .then(unwrap);
+  return plan as CurriculumPlan;
+}
+
+/** "Заменить?" под фоновый флоу — тот же delete-then-insert, что
+ *  replaceCurriculumPlan, но создаёт processing-план без тем. */
+export async function replaceCurriculumPlanProcessing(
+  db: Db,
+  existingPlanId: string,
+  input: Parameters<typeof createCurriculumPlanProcessing>[1],
+): Promise<CurriculumPlan> {
+  const { error: delErr } = await (db as AnyDb).from("curriculum_plans").delete().eq("id", existingPlanId);
+  if (delErr) throw delErr;
+  return createCurriculumPlanProcessing(db, input);
+}
+
+/** Симулированный прогресс (10→30→60→90→100), пишется background-parse на
+ *  каждой стадии — клиент подхватывает через Realtime (см. useRealtimeChannel
+ *  в CurriculumPlanDetailView.tsx). */
+export async function updateCurriculumPlanProgress(db: Db, planId: string, percent: number): Promise<void> {
+  const { error } = await (db as AnyDb).from("curriculum_plans").update({ progress_percent: percent }).eq("id", planId);
+  if (error) throw error;
+}
+
+/** Финальный шаг парсинга — дописывает темы и переводит план в status='ready'. */
+export async function markCurriculumPlanReady(
+  db: Db,
+  planId: string,
+  topics: Array<{ title: string; description: string | null; estimatedLessons: number }>,
+): Promise<void> {
+  if (topics.length > 0) {
+    const { error: topicsErr } = await (db as AnyDb).from("curriculum_plan_topics").insert(
+      topics.map((t, i) => ({
+        plan_id: planId,
+        order_index: i,
+        title: t.title,
+        description: t.description,
+        estimated_lessons: t.estimatedLessons,
+      })),
+    );
+    if (topicsErr) throw topicsErr;
+  }
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .update({ status: "ready", progress_percent: 100 })
+    .eq("id", planId);
+  if (error) throw error;
+}
+
+export async function markCurriculumPlanError(db: Db, planId: string, message: string): Promise<void> {
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .update({ status: "error", error_message: message.slice(0, 2000) })
+    .eq("id", planId);
+  if (error) throw error;
+}
+
+/** "Попробовать снова" — сбрасывает план в status='processing' (без старых
+ *  тем, если такие остались от предыдущей частично-успешной попытки не
+ *  трогаем: markCurriculumPlanReady — единственное место, что пишет topics,
+ *  а до него мы сюда не доходим при ошибке). Caller (retry-parse route)
+ *  после этого заново триггерит background-parse. */
+export async function resetCurriculumPlanForRetry(db: Db, planId: string): Promise<void> {
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .update({ status: "processing", progress_percent: 10, error_message: null })
+    .eq("id", planId);
+  if (error) throw error;
+}

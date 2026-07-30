@@ -2048,6 +2048,8 @@ export interface Dictionary {
     aiReviewConfirmBtn: string;
     aiReviewEditConfirmBtn: string;
     aiReviewManualBtn: string;
+    aiReviewPendingBadge: string;
+    aiReviewOpenBtn: string;
     groupsTitle: string;
     groupStudents: string;
     groupAttendance: string;

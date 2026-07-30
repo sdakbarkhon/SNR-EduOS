@@ -1,10 +1,11 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Quote as QuoteIcon } from "lucide-react";
+import { HelpCircle, Image as ImageIcon, Quote as QuoteIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { LessonSlide } from "@snr/core";
+import type { LessonSlide, LessonSlideMiniQuiz } from "@snr/core";
+import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { markdownCodeComponents } from "./markdownCode";
 import { SyntaxHighlighter, oneDark } from "./highlighter";
 
@@ -107,13 +108,59 @@ function SlideContent({ slide, current, total }: { slide: LessonSlide; current: 
   }
 
   // default
+  const Icon = slide.icon ? LUCIDE_ICONS[slide.icon] : undefined;
   return (
     <div className="w-full p-8 md:p-12">
-      <h2 className="mb-6 inline-block border-b-4 border-violet-500 pb-3 text-2xl font-bold text-slate-900 dark:text-slate-100 md:text-4xl">
-        {slide.title}
-      </h2>
+      <div className="mb-6 flex items-center gap-3">
+        {Icon && <Icon className="h-8 w-8 shrink-0 text-violet-500 md:h-10 md:w-10" />}
+        <h2
+          className={`inline-block border-b-4 border-violet-500 pb-3 text-2xl font-bold text-slate-900 dark:text-slate-100 md:text-4xl ${
+            slide.title_font === "fancy" ? "font-serif" : ""
+          }`}
+        >
+          {slide.title}
+        </h2>
+      </div>
       <div className="prose prose-slate max-w-none text-base leading-relaxed dark:prose-invert md:text-lg">
         <Md>{slide.content}</Md>
+      </div>
+      {slide.mini_quiz && <MiniQuiz quiz={slide.mini_quiz} />}
+    </div>
+  );
+}
+
+function MiniQuiz({ quiz }: { quiz: LessonSlideMiniQuiz }) {
+  const [selected, setSelected] = useState<number | null>(null);
+
+  return (
+    <div className="mt-8 rounded-2xl border border-violet-200 bg-violet-50/60 p-6 dark:border-violet-500/30 dark:bg-violet-500/10">
+      <p className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100 md:text-lg">
+        <HelpCircle className="h-5 w-5 shrink-0 text-violet-500" />
+        {quiz.question}
+      </p>
+      <div className="flex flex-col gap-2">
+        {quiz.options.map((option, i) => {
+          const showState = selected !== null;
+          const isCorrect = i === quiz.correct;
+          const isSelected = selected === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setSelected(i)}
+              disabled={showState}
+              className={`rounded-xl border px-4 py-2.5 text-left text-sm transition md:text-base ${
+                showState && isCorrect
+                  ? "border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  : showState && isSelected
+                    ? "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -165,6 +212,7 @@ export function SlideBody({ slide, current, total }: { slide: LessonSlide; curre
     <div
       ref={outerRef}
       className={`relative flex h-full w-full items-center justify-center overflow-hidden ${LAYOUT_BG[layout]}`}
+      style={slide.background_color ? { backgroundColor: slide.background_color } : undefined}
     >
       <div ref={innerRef} style={{ transform: `scale(${scale})`, transformOrigin: "center" }} className="w-full">
         <SlideContent slide={slide} current={current} total={total} />

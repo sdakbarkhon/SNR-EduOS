@@ -1978,6 +1978,8 @@ export const ru: Dictionary = {
     aiReviewConfirmBtn: "Подтвердить",
     aiReviewEditConfirmBtn: "Изменить и подтвердить",
     aiReviewManualBtn: "Проверить вручную без ИИ",
+    aiReviewPendingBadge: "ИИ проверяет…",
+    aiReviewOpenBtn: "Проверить ИИ-оценку",
     groupsTitle: "Мои группы",
     groupStudents: "учеников",
     groupAttendance: "Посещаемость",

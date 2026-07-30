@@ -193,6 +193,16 @@ export type LessonSlideQuote = {
   author?: string;
 };
 
+// Большой фикс, Блок 6, Задача 2 — визуальное обогащение слайдов (без
+// картинок — Pollinations.ai нестабилен). Все поля опциональны и
+// добавляются ПОВЕРХ существующих (merge, не replace) — старые слайды без
+// этих полей рендерятся как раньше.
+export type LessonSlideMiniQuiz = {
+  question: string;
+  options: string[];
+  correct: number; // 0-based индекс в options
+};
+
 /** Слайд презентации (этап теории). Хранится в lesson_stages.slides (jsonb). */
 export type LessonSlide = {
   layout?: LessonSlideLayout;
@@ -202,6 +212,10 @@ export type LessonSlide = {
   image_prompt?: string;
   code?: LessonSlideCode;
   quote?: LessonSlideQuote;
+  background_color?: string;
+  title_font?: "fancy" | "regular";
+  icon?: string; // имя иконки lucide-react, напр. "BookOpen"
+  mini_quiz?: LessonSlideMiniQuiz;
 };
 
 export type LessonStageProgress = {
@@ -427,6 +441,13 @@ export type LibraryMaterialWithDetails = LibraryMaterial & {
 
 // migration 116 — Промт 4: учебные планы. teacher_id/group_id/subject_id
 // как в БД; UNIQUE(group_id, subject_id) на стороне БД, не в типе.
+//
+// migration 160, Большой фикс Блок 6 Задача 1 — status/progress_percent/
+// error_message для фонового парсинга: план создаётся сразу со
+// status='processing' (пустой, без topics), background-parse route
+// дописывает topics и переводит в 'ready' (или 'error' + error_message).
+export type CurriculumPlanStatus = 'processing' | 'ready' | 'error';
+
 export type CurriculumPlan = {
   id: string;
   group_id: string;
@@ -437,6 +458,9 @@ export type CurriculumPlan = {
   source_file_url: string | null;
   source_file_type: 'pdf' | 'docx' | null;
   created_at: string;
+  status: CurriculumPlanStatus;
+  progress_percent: number;
+  error_message: string | null;
 };
 
 export type CurriculumPlanTopic = {

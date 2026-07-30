@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Upload, X, Plus, Trash2, GripVertical, FileText, AlertTriangle, Search, ChevronRight } from "lucide-react";
-import {
-  createCurriculumPlan, replaceCurriculumPlan, uploadCurriculumPlanFile,
-  getCurriculumPlanForGroupSubject, getDictionary,
-} from "@snr/core";
+import { useRouter } from "next/navigation";
+import { Upload, X, FileText, AlertTriangle, Search, ChevronRight } from "lucide-react";
+import { uploadCurriculumPlanFile, getCurriculumPlanForGroupSubject, getDictionary } from "@snr/core";
 import type { CurriculumPlanWithTopics, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -14,7 +12,6 @@ import { PageContainer } from "@/components/PageContainer";
 
 type GroupItem = { id: string; name: string };
 type SubjectItem = { id: string; name: string; group_id: string };
-type TopicDraft = { key: string; title: string; description: string; estimatedLessons: number };
 
 export function CurriculumPlansView({
   plans: initialPlans,
@@ -29,7 +26,10 @@ export function CurriculumPlansView({
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).curriculum;
-  const [plans, setPlans] = useState(initialPlans);
+  // Больше не оптимистично обновляется onSaved — загрузка теперь редиректит
+  // на страницу плана сразу после создания (Большой фикс, Блок 6, ЗАДАЧА 1),
+  // список этой страницы просто не участвует в том флоу.
+  const plans = initialPlans;
   const [uploadModal, setUploadModal] = useState(false);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -47,10 +47,6 @@ export function CurriculumPlansView({
       (p.subject_name ?? "").toLowerCase().includes(q),
     );
   }, [plans, query]);
-
-  function handleSaved(saved: CurriculumPlanWithTopics) {
-    setPlans((prev) => [saved, ...prev.filter((p) => !(p.group_id === saved.group_id && p.subject_id === saved.subject_id))]);
-  }
 
   return (
     <PageContainer className="space-y-6">
@@ -102,7 +98,6 @@ export function CurriculumPlansView({
           subjects={subjects}
           teacherId={teacherId}
           onClose={() => setUploadModal(false)}
-          onSaved={(saved) => { handleSaved(saved); setUploadModal(false); }}
         />
       )}
     </PageContainer>
@@ -116,130 +111,90 @@ function topicWord(n: number): string {
   return "тем";
 }
 
-// ── Upload modal (2 шага: форма+парсинг → редактор тем) ─────────────────────
+// ── Upload modal ──────────────────────────────────────────────────────────
+// Большой фикс, Блок 6, ЗАДАЧА 1 — раньше здесь было 2 шага (форма+блокирующий
+// AI-парсинг → редактор тем → сохранить), парсинг занимал 10-30с прямо в
+// модалке. Теперь один шаг: файл загружается в Storage → план создаётся сразу
+// в status='processing' → редирект на страницу плана, где идёт фоновый
+// парсинг с прогресс-баром (см. CurriculumPlanDetailView.tsx). Разбор/правка
+// тем происходит ПОСЛЕ, на странице плана (там уже есть полный редактор тем).
+
+function isPdfOrDocxFile(f: File): "pdf" | "docx" | null {
+  const name = f.name.toLowerCase();
+  if (f.type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+  if (f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) return "docx";
+  return null;
+}
 
 function UploadPlanModal({
-  groups, subjects, teacherId, onClose, onSaved,
+  groups, subjects, teacherId, onClose,
 }: {
   groups: GroupItem[];
   subjects: SubjectItem[];
   teacherId: string;
   onClose: () => void;
-  onSaved: (plan: CurriculumPlanWithTopics) => void;
 }) {
+  const router = useRouter();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).curriculum;
   const db = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<"form" | "topics">("form");
   const [groupId, setGroupId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState("");
-  const [parsing, setParsing] = useState(false);
-  const [parseError, setParseError] = useState("");
-  const [topics, setTopics] = useState<TopicDraft[]>([]);
   const [sourceFileType, setSourceFileType] = useState<"pdf" | "docx" | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [confirmReplace, setConfirmReplace] = useState<CurriculumPlanWithTopics | null>(null);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const groupSubjects = subjects.filter((s) => s.group_id === groupId);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
-    if (!f) { setFile(null); setFileError(""); return; }
-    const isPdfOrDocx = f.type === "application/pdf"
-      || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      || f.name.toLowerCase().endsWith(".pdf") || f.name.toLowerCase().endsWith(".docx");
-    if (!isPdfOrDocx) { setFileError(d.errorPdfDocxOnly); setFile(null); e.target.value = ""; return; }
-    if (f.size > 20 * 1024 * 1024) { setFileError(d.errorFileTooLarge); setFile(null); e.target.value = ""; return; }
+    if (!f) { setFile(null); setSourceFileType(null); setFileError(""); return; }
+    const kind = isPdfOrDocxFile(f);
+    if (!kind) { setFileError(d.errorPdfDocxOnly); setFile(null); setSourceFileType(null); e.target.value = ""; return; }
+    if (f.size > 20 * 1024 * 1024) { setFileError(d.errorFileTooLarge); setFile(null); setSourceFileType(null); e.target.value = ""; return; }
     setFileError("");
     setFile(f);
+    setSourceFileType(kind);
   }
 
-  async function handleParse() {
-    if (!file || !groupId || !subjectId) return;
-    setParsing(true); setParseError("");
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("group_id", groupId);
-      fd.append("subject_id", subjectId);
-      const res = await fetch("/api/curriculum-plans/parse", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) { setParseError(json.error || d.errorParseFailed); return; }
-      setTopics((json.topics as Array<{ title: string; description: string | null; estimated_lessons: number }>)
-        .map((t) => ({ key: crypto.randomUUID(), title: t.title, description: t.description ?? "", estimatedLessons: t.estimated_lessons })));
-      setSourceFileType(json.sourceFileType);
-      setStep("topics");
-    } catch {
-      setParseError("Ошибка сети");
-    } finally {
-      setParsing(false);
-    }
-  }
-
-  function updateTopic(key: string, patch: Partial<TopicDraft>) {
-    setTopics((prev) => prev.map((t) => (t.key === key ? { ...t, ...patch } : t)));
-  }
-  function removeTopic(key: string) {
-    setTopics((prev) => prev.filter((t) => t.key !== key));
-  }
-  function addTopic() {
-    setTopics((prev) => [...prev, { key: crypto.randomUUID(), title: "", description: "", estimatedLessons: 1 }]);
-  }
-  function moveTopic(from: number, to: number) {
-    setTopics((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      if (!moved) return prev;
-      next.splice(to, 0, moved);
-      return next;
-    });
-  }
-
-  async function doSave(replaceExisting: CurriculumPlanWithTopics | null) {
-    setSaving(true); setSaveError("");
+  async function startUpload(replaceExisting: CurriculumPlanWithTopics | null) {
+    if (!file || !sourceFileType || !groupId || !subjectId) return;
+    setUploading(true); setUploadError("");
     try {
       const group = groups.find((g) => g.id === groupId);
       const subject = subjects.find((s) => s.id === subjectId);
-      const { storagePath } = await uploadCurriculumPlanFile(db, { teacherId, file: file! });
-      const planInput = {
-        groupId, subjectId, teacherId,
-        title: `${subject?.name ?? "Предмет"} — ${group?.name ?? "Группа"}`,
-        sourceFileUrl: storagePath,
-        sourceFileType,
-        topics: topics.map((t) => ({ title: t.title.trim() || "Без названия", description: t.description.trim() || null, estimatedLessons: t.estimatedLessons })),
-      };
-      const saved = replaceExisting
-        ? await replaceCurriculumPlan(db, replaceExisting.id, planInput)
-        : await createCurriculumPlan(db, planInput);
-      onSaved({
-        ...saved,
-        group_name: group?.name,
-        subject_name: subject?.name,
-        topics: topics.map((t, i) => ({
-          id: `local-${i}`, plan_id: saved.id, order_index: i,
-          title: t.title.trim() || "Без названия", description: t.description.trim() || null, estimated_lessons: t.estimatedLessons,
-        })),
+      const { storagePath } = await uploadCurriculumPlanFile(db, { teacherId, file });
+      const res = await fetch("/api/curriculum-plans/create-processing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupId, subjectId, storagePath, sourceFileType,
+          title: `${subject?.name ?? "Предмет"} — ${group?.name ?? "Группа"}`,
+          replaceExistingId: replaceExisting?.id ?? null,
+        }),
       });
+      const json = await res.json();
+      if (!res.ok) { setUploadError(json.error || "Ошибка сохранения"); return; }
+      onClose();
+      router.push(`/teacher/curriculum/${json.id}`);
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Ошибка сохранения");
+      setUploadError(e instanceof Error ? e.message : "Ошибка сохранения");
     } finally {
-      setSaving(false);
+      setUploading(false);
       setConfirmReplace(null);
     }
   }
 
-  async function handleSaveClick() {
-    if (topics.length === 0) { setSaveError("Добавьте хотя бы одну тему"); return; }
-    setSaveError("");
+  async function handleUploadClick() {
+    setUploadError("");
     const existing = await getCurriculumPlanForGroupSubject(db, groupId, subjectId).catch(() => null);
     if (existing) { setConfirmReplace(existing); return; }
-    await doSave(null);
+    await startUpload(null);
   }
 
   const inputCls = "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -254,99 +209,46 @@ function UploadPlanModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {step === "form" ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <div>
+              <label className={labelCls}>Группа *</label>
+              <select value={groupId} onChange={(e) => { setGroupId(e.target.value); setSubjectId(""); }} className={inputCls}>
+                <option value="">Выберите группу</option>
+                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            {groupId && (
               <div>
-                <label className={labelCls}>Группа *</label>
-                <select value={groupId} onChange={(e) => { setGroupId(e.target.value); setSubjectId(""); }} className={inputCls}>
-                  <option value="">Выберите группу</option>
-                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                <label className={labelCls}>Предмет *</label>
+                <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
+                  <option value="">— выберите предмет —</option>
+                  {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-              {groupId && (
-                <div>
-                  <label className={labelCls}>Предмет *</label>
-                  <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
-                    <option value="">— выберите предмет —</option>
-                    {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className={labelCls}>Файл плана (PDF/DOCX, макс. 20 МБ) *</label>
-                <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
-                <button onClick={() => fileRef.current?.click()}
-                  className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
-                  <FileText className="h-5 w-5" />
-                  {file ? file.name : "Выбрать PDF или DOCX файл"}
-                </button>
-                {fileError && <p className="mt-1.5 text-[12px] text-red-500">{fileError}</p>}
-              </div>
-              {parseError && <p className="text-sm text-red-500">{parseError}</p>}
-              <button
-                onClick={handleParse}
-                disabled={parsing || !groupId || !subjectId || !file}
-                className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {parsing ? "Распознаём план…" : d.parseWithAi}
+            )}
+            <div>
+              <label className={labelCls}>Файл плана (PDF/DOCX, макс. 20 МБ) *</label>
+              <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
+              <button onClick={() => fileRef.current?.click()}
+                className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
+                <FileText className="h-5 w-5" />
+                {file ? file.name : "Выбрать PDF или DOCX файл"}
               </button>
+              {fileError && <p className="mt-1.5 text-[12px] text-red-500">{fileError}</p>}
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {topics.length} {topicWord(topics.length)} — отредактируйте перед сохранением
-              </p>
-              {topics.map((t, i) => (
-                <div
-                  key={t.key}
-                  draggable
-                  onDragStart={() => setDragIndex(i)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => { if (dragIndex !== null && dragIndex !== i) moveTopic(dragIndex, i); setDragIndex(null); }}
-                  className="flex gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3"
-                >
-                  <div className="flex shrink-0 cursor-grab items-center text-slate-300 active:cursor-grabbing">
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <input
-                      type="text" value={t.title} onChange={(e) => updateTopic(t.key, { title: e.target.value })}
-                      placeholder="Название темы" className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold outline-none focus:border-blue-400"
-                    />
-                    <textarea
-                      rows={1} value={t.description} onChange={(e) => updateTopic(t.key, { description: e.target.value })}
-                      placeholder="Описание (опционально)" className="w-full resize-none rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-slate-600 outline-none focus:border-blue-400"
-                    />
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-medium text-slate-500">Уроков на тему:</label>
-                      <input
-                        type="number" min={1} max={20} value={t.estimatedLessons}
-                        onChange={(e) => updateTopic(t.key, { estimatedLessons: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                        className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-blue-400"
-                      />
-                    </div>
-                  </div>
-                  <button onClick={() => removeTopic(t.key)} className="shrink-0 text-slate-300 hover:text-red-500">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button onClick={addTopic} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-2.5 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
-                <Plus className="h-4 w-4" /> Добавить тему
-              </button>
-              {saveError && <p className="text-sm text-red-500">{saveError}</p>}
-            </div>
-          )}
-        </div>
-
-        {step === "topics" && (
-          <div className="flex shrink-0 gap-3 border-t border-slate-100 px-6 py-4">
-            <button onClick={() => setStep("form")} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Назад</button>
-            <button onClick={handleSaveClick} disabled={saving} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-              {saving ? "Сохраняем…" : "Сохранить план"}
+            {uploadError && <p className="text-sm text-red-500">{uploadError}</p>}
+            <button
+              onClick={handleUploadClick}
+              disabled={uploading || !groupId || !subjectId || !file}
+              className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {uploading ? "Загружаем…" : d.uploadPlan}
             </button>
+            <p className="text-center text-[11px] text-slate-400">
+              AI разберёт план на темы в фоне — можно закрыть вкладку, мы уведомим, когда план будет готов.
+            </p>
           </div>
-        )}
+        </div>
       </div>
 
       {confirmReplace && (
@@ -362,8 +264,8 @@ function UploadPlanModal({
             </p>
             <div className="mt-4 flex gap-3">
               <button onClick={() => setConfirmReplace(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Отмена</button>
-              <button onClick={() => doSave(confirmReplace)} disabled={saving} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {saving ? "Заменяем…" : "Заменить"}
+              <button onClick={() => startUpload(confirmReplace)} disabled={uploading} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                {uploading ? "Заменяем…" : "Заменить"}
               </button>
             </div>
           </div>

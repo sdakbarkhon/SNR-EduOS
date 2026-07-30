@@ -9,6 +9,7 @@ import { ScaleWrapper } from "@/components/ScaleWrapper";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DemoHeartbeat } from "@/components/DemoHeartbeat";
 import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
+import { CurriculumReadyModal } from "@/components/CurriculumReadyModal";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 
@@ -34,6 +35,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
     <FullscreenLessonProvider>
       <ScaleWrapper>
         <DemoWelcomeModal />
+        <CurriculumReadyModal teacherId={teacher.id} />
         <DemoBanner isDemo={isDemo} />
         <DemoHeartbeat isDemo={isDemo} />
         <TeacherShell

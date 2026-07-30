@@ -1978,6 +1978,8 @@ export const en: Dictionary = {
     aiReviewConfirmBtn: "Confirm",
     aiReviewEditConfirmBtn: "Edit and confirm",
     aiReviewManualBtn: "Review manually without AI",
+    aiReviewPendingBadge: "AI is reviewing…",
+    aiReviewOpenBtn: "Check AI grade",
     groupsTitle: "My groups",
     groupStudents: "students",
     groupAttendance: "Attendance",
