@@ -3481,3 +3481,17 @@ typecheck (`packages/core` + `apps/web`) и `next build` чистые.
 **Счётчики до/после**: вставлено 43 новых строк (ровно все прежние пропуски), обновлено 57 (заниженные оценки/опоздания), уже были хорошими — 330 (не тронуты). Итог: `homework_submissions` — 310 (31 ДЗ × 10, было 279), `test_submissions` — 120 (12 ДЗ × 10, было 108), суммарно 430 — ровно 43×10, без единого пропуска. Средняя оценка (обе таблицы вместе) — **4.82** (в целевом диапазоне 4.7-4.9). Оценок ниже 4 — 0. Сдач с опозданием — 0. Все `homework_submissions` — `status='graded'`.
 
 typecheck (`packages/core` + `apps/web`) и `next build` чистые.
+
+## Регенерация 29.07, этап 8: посещаемость 27-29 июля
+
+Посещаемость создана для всех 54 уроков со статусом `completed` (27-29 июля, 3 группы × 3 дня × 6 уроков) — 540 записей `attendance`, все 10 учеников каждой группы на каждом уроке.
+
+**Расхождение со схемой**: промт предполагал статусы `present/absent/late/sick`. Реальный CHECK-констрейнт (миграция `20260619000027_attendance.sql` конвертировала ENUM→text+CHECK, миграция `20260623000043_remove_late_status.sql` — финальная версия) допускает РОВНО три значения: `present`, `absent_excused`, `absent_unexcused`. `late` был добавлен и окончательно убран ещё раньше (миграции 42/43); `sick` как отдельное значение не существовало никогда. `AttendanceView.tsx` (`apps/web/app/(app)/attendance/`) подтверждает: ровно эти 3 статуса, разный цвет (present — зелёный, absent_excused — жёлтый, absent_unexcused — красный). Для "5% пропустил" выбран `absent_excused` (жёлтый, не тревожный) — эквивалент "пропустил по уважительной причине", смотрится презентабельнее для демо, чем `absent_unexcused`.
+
+Также найден уже существующий `apps/web/scripts/backfill-attendance.mjs`, но он вставляет колонку `is_demo`, которой в `attendance` больше нет (удалена миграцией `132_remove_demo_infra_convert_demo_to_real.sql` — тот же паттерн, что и `is_demo` на `homework_submissions`, см. Этап 7) — при запуске сейчас он бы упал на insert. Использована актуальная схема (`school_id`, `status`, `marked_at`, `marked_by`, `is_finalized` — `recorded_at` не задаётся, есть DB default). Идемпотентность — `upsert(onConflict: "student_id,lesson_id", ignoreDuplicates: true)` прямо на UNIQUE-констрейнт таблицы, тот же приём, что уже использован в `backfill-attendance.mjs`.
+
+**`apps/web/scripts/create-attendance-week.mjs`** (новый). Статус выбирается seeded-рандомом (`xmur3`+`mulberry32`, seed = `studentId|lessonId`, воспроизводимо при повторном запуске — как и просил промт). `is_finalized=true` — по прецеденту самой миграции 27 ("seed rows are historical, mark as finalized"), это не текущая перекличка, а уже прошедшие уроки. `marked_by` — учитель предмета урока.
+
+**Счётчики**: 540 записей вставлено (540 кандидатов, 0 уже существовало). По статусам: 518 `present` (95.9%), 22 `absent_excused` (4.1%) — близко к целевым 95/5%, естественная вариация от seeded-рандома. Независимая проверка: все 54 completed-урока имеют РОВНО 10 записей, 0 отклонений.
+
+typecheck (`packages/core` + `apps/web`) и `next build` чистые.
