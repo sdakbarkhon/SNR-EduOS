@@ -1,5 +1,8 @@
 import { parentNotifications, parentToday } from "@/lib/parent-queries";
-import { GlassCircleButton, Glyph, ICON, InnerHeader, ScreenScroll } from "../_ui/screen-kit";
+import { GlassCircleButton, Glyph, InnerHeader, ScreenScroll } from "../_ui/screen-kit";
+// Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
+// а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
+import { ICON } from "../_ui/screen-tokens";
 import { previousDay, relativeStamp, tashkentDay } from "../_ui/format";
 import { ink1 } from "../v2/tokens";
 import { NotificationsView, type NotificationItem } from "./NotificationsView";

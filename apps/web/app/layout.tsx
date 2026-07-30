@@ -14,11 +14,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
-        {/* Apply saved theme before hydration to prevent flash */}
+        {/* Apply saved theme before hydration to prevent flash.
+            /parent — светлая тема принудительно и без вариантов: переключателя
+            там нет, а сохранённое 'dark'/'system' иначе красило бы родителя в
+            тёмное ещё до гидратации (класс вешается здесь, до первой
+            отрисовки — один React-эффект этот флеш убрать не успевает).
+            Ветка ученика/учителя не меняется ни на байт. */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
             var t = localStorage.getItem('snr-theme') || 'light';
-            if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            var parent = location.pathname === '/parent' || location.pathname.indexOf('/parent/') === 0;
+            if (!parent && (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))) {
               document.documentElement.classList.add('dark');
             } else {
               document.documentElement.classList.remove('dark');

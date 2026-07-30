@@ -27,6 +27,7 @@ import {
   fontDisplay,
   glass1,
   glassBorder,
+  grad135,
   ink1,
   ink2,
   ink3,
@@ -35,28 +36,41 @@ import {
   type StatusKey,
 } from "../v2/tokens";
 
-/* ── Производные цвета (в мобилке — внутри соответствующих ui-компонентов) ── */
+/* ── Чистые значения ──────────────────────────────────────────────────────
+ * Производные цвета и ICON переехали в `./screen-tokens` (модуль БЕЗ
+ * "use client"), а `grad135` — в `../v2/tokens`. Причина подробно расписана
+ * в шапке screen-tokens.ts: за границей "use client" не-компонентный экспорт
+ * подменяется клиентской ссылкой, из-за чего в серверных компонентах
+ * `ICON.doc` был undefined, а `${DIVIDER}` подставлял текст функции.
+ *
+ * Реэкспорт ниже — для КЛИЕНТСКИХ экранов: они как импортировали эти имена
+ * из screen-kit, так и импортируют. Серверные компоненты обязаны брать их
+ * напрямую из `./screen-tokens`.
+ */
+import {
+  CHEVRON,
+  DIVIDER,
+  ICON,
+  ONLINE_GREEN,
+  PILL_ACTIVE_SHADOW,
+  PILL_INACTIVE_BG,
+  PILL_INACTIVE_TEXT,
+  SECTION_CAP,
+  WHITE,
+} from "./screen-tokens";
 
-/** Разделитель строк внутри карточки-списка. */
-export const DIVIDER = "rgba(23,18,67,0.07)";
-/** Цвет SectionHeader — rgba(26,19,74,.5). */
-export const SECTION_CAP = "rgba(26,19,74,0.5)";
-/** Шеврон строки. */
-export const CHEVRON = "rgba(26,19,74,0.4)";
-/** Неактивная пилюля SegmentPills: 160° W60→W40, текст .66. */
-export const PILL_INACTIVE_BG =
-  "linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4))";
-export const PILL_INACTIVE_TEXT = "rgba(26,19,74,0.66)";
-/** Тень активной пилюли: 0 8 18 rgba(124,58,237,.35). */
-export const PILL_ACTIVE_SHADOW = "0 8px 18px rgba(124,58,237,0.35)";
-/** Онлайн-точка макета: #22C55E + белая обводка 2px. */
-export const ONLINE_GREEN = "#22C55E";
-export const WHITE = "#FFFFFF";
-
-/** Градиент 135° из пары стопов — форма макета для всех плиток/аватаров. */
-export function grad135(g: readonly [string, string]): string {
-  return `linear-gradient(135deg, ${g[0]}, ${g[1]})`;
-}
+export {
+  CHEVRON,
+  DIVIDER,
+  ICON,
+  ONLINE_GREEN,
+  PILL_ACTIVE_SHADOW,
+  PILL_INACTIVE_BG,
+  PILL_INACTIVE_TEXT,
+  SECTION_CAP,
+  WHITE,
+  grad135,
+};
 
 /* ── Глиф: SVG-пути 24×24, как ICONS макета ─────────────────────────────── */
 
@@ -86,58 +100,17 @@ export function Glyph({
       className="shrink-0"
       aria-hidden
     >
-      {paths.map((p, i) => (
+      {/* `paths ?? []` — страховка: если иконка приедет undefined (например,
+          серверный компонент прочитает ICON через клиентскую границу), экран
+          останется без глифа, но не упадёт с «Cannot read … of undefined». */}
+      {(paths ?? []).map((p, i) => (
         <path key={i} d={p} />
       ))}
     </svg>
   );
 }
 
-/** Часто используемые глифы (те же пути, что в RN-экранах мобилки). */
-export const ICON = {
-  back: ["M19 12H5", "m12 19-7-7 7-7"],
-  chevron: ["m9 18 6-6-6-6"],
-  kebab: ["M5 12h.01", "M12 12h.01", "M19 12h.01"],
-  bell: ["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"],
-  mega: ["m3 11 18-7v16L3 13v-2Z", "M11.6 16.8a3 3 0 1 1-5.8-1.6"],
-  chat: ["M7.9 20A9 9 0 1 0 4 16.1L2 22Z"],
-  doc: [
-    "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z",
-    "M14 3v5h5",
-    "M9 13h6",
-    "M9 17h4",
-  ],
-  shield: [
-    "M20 13c0 5-3.5 7.5-7.7 9a.6.6 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1Z",
-    "m9 12 2 2 4-4",
-  ],
-  check: ["M20 6 9 17l-5-5"],
-  checkSquare: [
-    "M3 8a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5Z",
-    "m8.5 12 2.5 2.5 5-5",
-  ],
-  clock: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"],
-  wallet: [
-    "M20 12V8H6a2 2 0 0 1 0-4h12v4",
-    "M4 6v12a2 2 0 0 0 2 2h14v-6",
-    "M18 12a2 2 0 0 0 0 4h4v-4Z",
-  ],
-  card: ["M2 8a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z", "M2 10h20"],
-  lock: ["M4 11h16v10H4Z", "M8 11V7a4 4 0 0 1 8 0v4"],
-  globe: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M3 12h18", "M12 3a13 13 0 0 1 0 18", "M12 3a13 13 0 0 0 0 18"],
-  help: [
-    "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z",
-    "M9 10a3 3 0 1 1 4 2.8c-.6.3-1 .9-1 1.7",
-    "M12 17h.01",
-  ],
-  info: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 8h.01", "M11 12h1v4h1"],
-  user: ["M20 21a8 8 0 1 0-16 0", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"],
-  logout: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"],
-  send: ["m22 2-7 20-4-9-9-4Z", "M22 2 11 13"],
-  eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"],
-  pin: ["M12 17v5", "M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z"],
-  inbox: ["M3 12h5l2 3h4l2-3h5", "M5 5h14l2 7v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Z"],
-} as const;
+/* ICON переехал в ./screen-tokens (см. шапку того файла) и реэкспортируется выше. */
 
 /* ── Круглая стеклянная кнопка 38 (RootHeader.GlassCircleButton) ─────────── */
 

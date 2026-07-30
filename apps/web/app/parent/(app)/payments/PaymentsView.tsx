@@ -7,7 +7,7 @@
  * утверждённого макета «SNR EduOS v2 Light.dc.html» (строки 376–411).
  *
  * Композиция сверху вниз (как в RN):
- *  1. RootHeader без лого — заголовок «Оплаты», bell (badge 3), аватар «ДК».
+ *  1. RootHeader без лого — заголовок «Оплаты», bell (badge 3), аватар.
  *  2. AccentCard баланса — трёхстопный градиент ec4899→f97316→4f86f6; левая
  *     колонка (ОБЩИЙ БАЛАНС, число, «Доступно для расходов»), справа
  *     wallet-иконка 42×42 на glass-квадрате; внизу два AccentInset sub-tile:
@@ -33,12 +33,22 @@
  *  * иконки — инлайновый <svg> с ДОСЛОВНЫМИ path'ами ICONS макета
  *    (navigation/routes.ts), а не lucide: пути известны точно, замена
  *    ближайшей иконкой ухудшила бы совпадение;
- *  * навигация (d8/d18/d19/d20/d21/d22/d33/dtop/dhub) в вебе отсутствует —
- *    экраны-назначения не портированы, поэтому кнопки без обработчиков;
+ *  * навигация: четыре плитки быстрых действий и «Смотреть все» ведут на
+ *    подроуты /parent/payments/{top-up,history,invoices,methods} — веб-порты
+ *    RN-экранов dtop/d20/d21/d33. Кликабельным здесь обязано быть ВСЁ, что
+ *    выглядит кликабельным: bell → /parent/notifications, аватар →
+ *    /parent/profile, строки счетов (у них шеврон) → /parent/payments/invoices,
+ *    карточка кошелька (тоже с шевроном) → /parent/payments/top-up. Экраны
+ *    деталей счёта и кошелька (d19/d22) в веб не портированы, поэтому шеврон
+ *    ведёт на ближайший реальный экран той же сущности, а не в никуда;
+ *  * «Оплатить всё» — единственное действие без назначения: оно упирается в
+ *    отсутствующего платёжного провайдера. Кнопка не молчит, а раскрывает
+ *    SoonNote с объяснением — тот же приём, что в TopUpView/PayMethodsView;
  *  * только светлая тема (токены ../v2/tokens.ts).
  */
 
 import { useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
 import { GlassCard } from "../v2/GlassCard";
 import {
   accentGrad,
@@ -61,6 +71,15 @@ import {
   getSelectedChildContext,
   getUnreadNotificationsCount,
 } from "../v2/data";
+import {
+  BILL_NOTE_TAIL,
+  SOON_PAYMENTS,
+  givenNameOf,
+  rowNote,
+  walletTitleOf,
+  whoLabel,
+} from "./mock-data";
+import { SoonNote } from "./parts";
 
 /* ===== Тексты (ru, дословно из словаря мобилки packages/core/src/i18n/ru.ts,
  *       ветка feat/mobile-parent-redesign: parentApp.nav / .pay / .scr / .common) ===== */
@@ -82,7 +101,9 @@ const T = {
   payHistory: "История оплат",
   billsReceipts: "Счета и чеки",
   payMethods: "Способы оплаты",
-  walletTitle: "Кошелёк {gen}",
+  // walletTitle («Кошелёк {gen}») здесь больше нет: заголовок кошелька строит
+  // общий walletTitleOf() из mock-data — им же пользуется /parent/payments/top-up,
+  // иначе два экрана называли бы один кошелёк по-разному.
   walletSub: "На питание и покупки в школе",
 } as const;
 
@@ -216,12 +237,16 @@ function AccentInset({
   );
 }
 
-/** ListRow: строка 52–60px — title 12.5/800 ink1, sub 10.5/600 ink2, шеврон 14. */
+/** ListRow: строка 52–60px — title 12.5/800 ink1, sub 10.5/600 ink2, шеврон 14.
+ *
+ *  `href` превращает строку в ссылку. Шеврон без href рисовать нельзя: он
+ *  обещает переход, и строка-заглушка с ним читается как сломанная кнопка. */
 function ListRow({
   left,
   title,
   subtitle,
   right,
+  href,
   chevron = false,
   divider = false,
   verticalPadding = 10,
@@ -231,21 +256,20 @@ function ListRow({
   title: string;
   subtitle?: string;
   right?: ReactNode;
+  href?: string;
   chevron?: boolean;
   divider?: boolean;
   verticalPadding?: number;
   gap?: number;
 }) {
-  return (
-    <div
-      className="flex items-center"
-      style={{
-        gap,
-        paddingTop: verticalPadding,
-        paddingBottom: verticalPadding,
-        borderTop: divider ? "1px solid rgba(23,18,67,0.07)" : undefined,
-      }}
-    >
+  const style: CSSProperties = {
+    gap,
+    paddingTop: verticalPadding,
+    paddingBottom: verticalPadding,
+    borderTop: divider ? "1px solid rgba(23,18,67,0.07)" : undefined,
+  };
+  const inner = (
+    <>
       {left}
       <div className="min-w-0 flex-1">
         <p className="truncate" style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>
@@ -259,6 +283,19 @@ function ListRow({
       </div>
       {right}
       {chevron ? <Chevron color="rgba(26,19,74,0.4)" /> : null}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="flex items-center" style={style}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className="flex items-center" style={style}>
+      {inner}
     </div>
   );
 }
@@ -311,10 +348,19 @@ function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (next
 }
 
 /** PrimaryButton: accent-градиент, r16, padding 15, gap 8, текст 14/800, тень 0 14 32. */
-function PrimaryButton({ label, icon }: { label: string; icon?: ReactNode }) {
+function PrimaryButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon?: ReactNode;
+  onClick?: () => void;
+}) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="relative flex w-full items-center justify-center overflow-hidden transition-transform active:scale-[0.99]"
       style={{
         gap: 8,
@@ -336,21 +382,29 @@ function PrimaryButton({ label, icon }: { label: string; icon?: ReactNode }) {
   );
 }
 
-/** QuickActionTile size="sm" (грид 4 колонки, П17): r16, pad 10×4, gap 5, плитка 34 r11, подпись 9/700. */
+/** QuickActionTile size="sm" (грид 4 колонки, П17): r16, pad 10×4, gap 5, плитка 34 r11, подпись 9/700.
+ *
+ *  В мобилке плитка — Pressable с navigate(dtop/d20/d21/d33). В вебе это
+ *  обычная ссылка на соответствующий подроут /parent/payments/*: экран может
+ *  быть открыт по прямому URL, и Link даёт и предзагрузку, и рабочее
+ *  «открыть в новой вкладке». Раньше здесь был <button> без обработчика —
+ *  четыре кнопки не вели никуда. */
 function QuickActionTile({
   label,
+  href,
   icon,
   gradient,
   shadowRgb,
 }: {
   label: string;
+  href: string;
   icon: ReactNode;
   gradient: [string, string];
   shadowRgb?: string;
 }) {
   return (
-    <button
-      type="button"
+    <Link
+      href={href}
       className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden transition-transform active:scale-[0.97]"
       style={{
         gap: 5,
@@ -381,7 +435,7 @@ function QuickActionTile({
       <span style={{ fontSize: 9, fontWeight: 700, color: ink1, textAlign: "center", lineHeight: 1.25 }}>
         {label}
       </span>
-    </button>
+    </Link>
   );
 }
 
@@ -427,15 +481,23 @@ function BillIconTile({
   );
 }
 
-/** Шапка корневого экрана (RootHeader без лого): заголовок 17 Unbounded, bell 38 + badge, аватар 38. */
+/** Шапка корневого экрана (RootHeader без лого): заголовок 17 Unbounded, bell 38 + badge, аватар 38.
+ *
+ *  bell и аватар — ССЫЛКИ, а не декорации: на /parent/home и /parent/progress
+ *  та же шапка ведёт на уведомления и профиль, и молчащая копия здесь читалась
+ *  бы как поломка. */
 function RootHeader({
   title,
   bellCount,
+  bellHref,
   avatar,
+  avatarHref,
 }: {
   title: string;
   bellCount?: number;
+  bellHref: string;
   avatar: { initials: string; gradient: [string, string] };
+  avatarHref: string;
 }) {
   return (
     <header
@@ -446,8 +508,8 @@ function RootHeader({
       <div className="flex-1" />
       <div className="relative">
         {/* Круглая стеклянная кнопка 38 (glass-1 160°, blur 18, border W78). */}
-        <button
-          type="button"
+        <Link
+          href={bellHref}
           aria-label="Уведомления"
           className="flex items-center justify-center"
           style={{
@@ -475,11 +537,13 @@ function RootHeader({
               <path key={i} d={d} />
             ))}
           </svg>
-        </button>
+        </Link>
         {bellCount ? (
           // CountBadge preset 'alert': 17 r9, top −3 right −3 (макет строка 223).
+          // pointer-events-none: бейдж лежит поверх ссылки-колокольчика и не
+          // должен съедать клик по её углу.
           <span
-            className="absolute flex items-center justify-center"
+            className="pointer-events-none absolute flex items-center justify-center"
             style={{
               top: -3,
               right: -3,
@@ -499,7 +563,9 @@ function RootHeader({
         ) : null}
       </div>
       {/* Avatar 38, variant ring (белое кольцо 2px), инициалы 12/800. */}
-      <span
+      <Link
+        href={avatarHref}
+        aria-label="Профиль"
         className="flex shrink-0 items-center justify-center"
         style={{
           width: 38,
@@ -513,7 +579,7 @@ function RootHeader({
         }}
       >
         {avatar.initials}
-      </span>
+      </Link>
     </header>
   );
 }
@@ -541,13 +607,14 @@ export function PaymentsView({
   // ИМЯ ребёнка берём настоящее: раньше здесь стоял DEFAULT_CHILD_INDEX
   // фикстур и экран показывал чужую семью.
   const { wallet_balance } = getSelectedChildContext();
-  // «Шерзод» → родительный «Шерзода» для шаблона «Кошелёк {gen}».
-  const givenName = (childName ?? "").trim().split(/\s+/).slice(-1)[0] ?? "";
-  const child = {
-    first_name: givenName || "—",
-    first_name_gen: givenName ? `${givenName}а` : "—",
-    class_name: childClassName ?? "",
-  };
+  // Имя и заголовок кошелька — через общие хелперы mock-data: их же зовут
+  // /parent/payments/top-up и /parent/payments/history. Раньше здесь имя
+  // резалось «последним словом», а там — «вторым», и на ФИО из трёх слов
+  // соседние экраны называли ребёнка по-разному.
+  const givenName = givenNameOf(childName);
+  const walletTitle = walletTitleOf(childName);
+  // «Шерзод · 10-А» — префикс подписей строк счетов.
+  const who = whoLabel(childName, childClassName);
   const parent = getParent();
   const overview = getPaymentsOverview();
   const dueBills = getDueBills();
@@ -556,6 +623,9 @@ export function PaymentsView({
   const unread = getUnreadNotificationsCount();
 
   const [autopay, setAutopay] = useState<boolean>(overview.autopay_enabled);
+  // «Оплатить всё» упирается в отсутствующего провайдера — объясняем это прямо
+  // под кнопкой (тот же приём, что в TopUpView и PayMethodsView).
+  const [paySoon, setPaySoon] = useState(false);
 
   const orangeChip = chip(status.orange.rgb);
 
@@ -564,7 +634,9 @@ export function PaymentsView({
       <RootHeader
         title={T.navPayments}
         bellCount={unread}
+        bellHref="/parent/notifications"
         avatar={{ initials: parent.initials, gradient: parent.avatar_gradient }}
+        avatarHref="/parent/profile"
       />
 
       <div
@@ -659,13 +731,15 @@ export function PaymentsView({
               {fillTemplate(T.billsChip, { n: String(dueCount) })}
             </span>
           </div>
-          <button
-            type="button"
+          {/* «Смотреть все» — тот же экран, что и плитка «Счета и чеки»
+              (в мобилке это был d21). Раньше кнопка тоже вела в никуда. */}
+          <Link
+            href="/parent/payments/invoices"
             className="shrink-0"
             style={{ fontSize: 11.5, fontWeight: 800, color: status.violet.text }}
           >
             {T.viewAll} ›
-          </button>
+          </Link>
         </div>
 
         {/* 4. Счета «К оплате сейчас». */}
@@ -675,7 +749,10 @@ export function PaymentsView({
               key={bill.id}
               left={<BillIconTile gradient={bill.gradient} paths={bill.icon_paths} />}
               title={bill.title}
-              subtitle={bill.note}
+              // НЕ bill.note: в фикстуре там подпись мобильного макета с чужим
+              // ребёнком и чужим классом. Собираем из настоящего ребёнка и
+              // «хвоста» счёта (см. BILL_NOTE_TAIL в mock-data).
+              subtitle={rowNote(who, BILL_NOTE_TAIL[bill.id] ?? "")}
               right={
                 <div className="flex flex-col items-end" style={{ gap: 2 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>
@@ -686,6 +763,11 @@ export function PaymentsView({
                   </span>
                 </div>
               }
+              // Шеврон обещает переход — значит переход должен быть. Экран
+              // деталей счёта (d19) в веб не портирован, ближайший реальный —
+              // «Счета и чеки», где этот же счёт лежит в группе
+              // «К оплате сейчас».
+              href="/parent/payments/invoices"
               chevron
               divider={i > 0}
               gap={11}
@@ -709,12 +791,16 @@ export function PaymentsView({
         </GlassCard>
 
         {/* 6. Главная CTA. */}
-        <PrimaryButton
-          label={fillTemplate(T.payAllBtn, {
-            sum: formatMoney(dueTotal, { withCurrency: true, currency: T.sum }),
-          })}
-          icon={<WhiteGlyph paths={ICON.card} size={16} />}
-        />
+        <div>
+          <PrimaryButton
+            label={fillTemplate(T.payAllBtn, {
+              sum: formatMoney(dueTotal, { withCurrency: true, currency: T.sum }),
+            })}
+            icon={<WhiteGlyph paths={ICON.card} size={16} />}
+            onClick={() => setPaySoon((v) => !v)}
+          />
+          {paySoon ? <SoonNote text={SOON_PAYMENTS} /> : null}
+        </div>
 
         {/* 7. Быстрые действия — 4 колонки (gap 8). */}
         <div
@@ -723,31 +809,37 @@ export function PaymentsView({
         >
           <QuickActionTile
             label={T.topupBtn}
+            href="/parent/payments/top-up"
             gradient={["#34d399", "#059669"]}
             shadowRgb="52,211,153"
             icon={<WhiteGlyph paths={ICON.plus} size={15} />}
           />
           <QuickActionTile
             label={T.payHistory}
+            href="/parent/payments/history"
             gradient={["#60a5fa", "#2563eb"]}
             shadowRgb="96,165,250"
             icon={<WhiteGlyph paths={ICON.clock} size={15} />}
           />
           <QuickActionTile
             label={T.billsReceipts}
+            href="/parent/payments/invoices"
             gradient={["#fbbf24", "#f97316"]}
             shadowRgb="251,191,36"
             icon={<WhiteGlyph paths={ICON.doc} size={15} />}
           />
           <QuickActionTile
             label={T.payMethods}
+            href="/parent/payments/methods"
             gradient={["#a78bfa", "#7c3aed"]}
             shadowRgb="167,139,250"
             icon={<WhiteGlyph paths={ICON.card} size={15} />}
           />
         </div>
 
-        {/* 8. Кошелёк ребёнка. */}
+        {/* 8. Кошелёк ребёнка. Шеврон ведёт на «Пополнение баланса» — тот же
+            кошелёк, тот же баланс (общий аксессор getSelectedChildContext).
+            Экран деталей кошелька (d22) в веб не портирован. */}
         <AccentCard
           gradient={["#7c3aed", "#a855f7"]}
           angle={135}
@@ -755,7 +847,7 @@ export function PaymentsView({
           radius={20}
           contentStyle={{ padding: 14 }}
         >
-          <div className="flex items-center" style={{ gap: 12 }}>
+          <Link href="/parent/payments/top-up" className="flex items-center" style={{ gap: 12 }}>
             <span
               className="flex shrink-0 items-center justify-center"
               style={{
@@ -768,11 +860,11 @@ export function PaymentsView({
                 color: "#7c3aed",
               }}
             >
-              {child.first_name.slice(0, 1)}
+              {(givenName[0] ?? "—").toUpperCase()}
             </span>
             <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 2 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>
-                {fillTemplate(T.walletTitle, { gen: child.first_name_gen })}
+              <span className="truncate" style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>
+                {walletTitle}
               </span>
               <span style={{ fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
                 {T.walletSub}
@@ -782,7 +874,7 @@ export function PaymentsView({
               {formatMoney(wallet_balance, { withCurrency: true, currency: T.sum })}
             </span>
             <Chevron color="rgba(255,255,255,0.85)" width={2.4} />
-          </div>
+          </Link>
         </AccentCard>
       </div>
     </div>

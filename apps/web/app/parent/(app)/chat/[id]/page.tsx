@@ -1,13 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { GlassCard } from "../../v2/GlassCard";
-import {
-  EmptyState,
-  Glyph,
-  GlassCircleButton,
-  ICON,
-  InnerHeader,
-  ScreenScroll,
-} from "../../_ui/screen-kit";
+import { EmptyState, Glyph, GlassCircleButton, InnerHeader, ScreenScroll } from "../../_ui/screen-kit";
+// Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
+// а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
+import { ICON } from "../../_ui/screen-tokens";
 import { ink1 } from "../../v2/tokens";
 import { parentThreadMessages, parentToday } from "@/lib/parent-queries";
 import { dayDivider, formatTime, previousDay, tashkentDay } from "../../_ui/format";

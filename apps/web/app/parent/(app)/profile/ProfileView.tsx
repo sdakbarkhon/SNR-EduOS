@@ -78,7 +78,7 @@ const SETTINGS_ITEMS: HubMenuItem[] = [
     key: "payMeth",
     title: "Способы оплаты",
     subtitle: "Карты и платёжные системы",
-    href: "/parent/payments",
+    href: "/parent/payments/methods",
     gradient: ["#a78bfa", "#7c3aed"],
     paths: ICON.card,
   },

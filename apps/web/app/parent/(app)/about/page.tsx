@@ -1,18 +1,9 @@
 import Link from "next/link";
 import { GlassCard } from "../v2/GlassCard";
-import {
-  CardRow,
-  ChevronRight,
-  DIVIDER,
-  Glyph,
-  ICON,
-  IconTile,
-  InnerHeader,
-  RowText,
-  ScreenScroll,
-  SectionCap,
-  WHITE,
-} from "../_ui/screen-kit";
+import { CardRow, ChevronRight, Glyph, IconTile, InnerHeader, RowText, ScreenScroll, SectionCap } from "../_ui/screen-kit";
+// Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
+// а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
+import { DIVIDER, ICON, WHITE } from "../_ui/screen-tokens";
 import { accentGrad, fontDisplay, ink1, ink2, ink3 } from "../v2/tokens";
 
 /**

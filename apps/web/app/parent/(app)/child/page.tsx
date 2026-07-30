@@ -1,92 +1,115 @@
-import Link from "next/link";
-import { childProfile, childSubjectTeachers, getSelectedChild } from "@/lib/parent-queries";
+import { getParentContext } from "@/lib/parent-context";
+import { getSelectedChild } from "@/lib/parent-queries";
 import { GlassCard } from "../v2/GlassCard";
-import {
-  Avatar,
-  ChevronRight,
-  DIVIDER,
-  EmptyState,
-  Glyph,
-  GlassCircleButton,
-  ICON,
-  InnerHeader,
-  ScreenScroll,
-  SectionCap,
-  StatusChip,
-  grad135,
-  WHITE,
-} from "../_ui/screen-kit";
-import { avatarGradient, formatDateLong, givenNameLetter } from "../_ui/format";
-import { ink1, ink2, ink3 } from "../v2/tokens";
+import { Avatar, EmptyState, Glyph, IconTile, InnerHeader, ScreenScroll, SectionCap, StatusChip } from "../_ui/screen-kit";
+// Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
+// а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
+import { DIVIDER, ICON, WHITE } from "../_ui/screen-tokens";
+import { avatarGradient, givenNameLetter, initialsOf } from "../_ui/format";
+// grad135 — строго из tokens, а не из screen-kit: страница серверная, а
+// screen-kit помечен "use client", и вызов его функции роняет пререндер.
+import { grad135, ink1, ink2, ink3, subjects } from "../v2/tokens";
 
 /**
- * Экран d29 «Профиль ребёнка» — веб-порт
- * apps/mobile-parent/src/screens/profile/ChildProfileScreen.tsx (макет
- * «SNR EduOS v2 Light.dc.html», строки 1166–1207), на реальных данных
- * `students` (+ куратор и группы через getStudentById).
+ * Экран «Профиль ребёнка» — ПЕРЕПИСАН по прямому требованию заказчика на
+ * простой экран, который физически не может упасть.
  *
- * Осталось от макета: hero-карточка с градиентом и звёздочками, ряд табов-
- * ссылок, секции «Общая информация» / «Предметы и учителя».
+ * Было: childProfile() + childSubjectTeachers(), обе через getStudentById() из
+ * packages/core, а он делает `.single()` и бросает на ЛЮБОЙ ошибке — в том
+ * числе на PGRST116 «0 строк», который под RLS родителя штатен. Исключение из
+ * серверного компонента роняло весь рендер экрана.
  *
- * Убрано и почему:
- *  • ChildSwitcherCard «Сменить ›» — переключать не на кого, ребёнок один;
- *  • «ID ученика · {student_code}», «Номер личного дела», «Аллергия»,
- *    «Медицинские особенности» — таких колонок в БД нет, в мобилке это была
- *    фикстура; выдумывать их на реальном экране нельзя;
- *  • контакты школы (телефон/почта/адрес) были захардкожены в макете и
- *    относятся к школе, а не к ребёнку — перенесены в /parent/about.
- * Вместо них добавлена реальная секция «Предметы и учителя»
- * (getGroupSubjectTeachers по группе ребёнка).
+ * Стало: источники данных — только getSelectedChild() и getParentContext().
+ * Ни один из них не бросает (см. lib/parent-context.ts: все ошибки
+ * логируются, наружу идёт null), а второй к тому же уже вызван внутри
+ * первого — см. комментарий в теле компонента. Пути к throw у страницы нет.
+ *
+ * ВСЁ ОСТАЛЬНОЕ НА ЭКРАНЕ — МОКИ (см. константы ниже, каждая помечена).
+ * Реальных колонок под нагрузку/достижения/медкарту в БД нет; когда они
+ * появятся, менять нужно только эти константы, а не разметку.
  */
+
+/* ── МОК: учебная нагрузка. В БД нет ни часов, ни учебного плана. ────────── */
+const WORKLOAD_MOCK: readonly { name: string; hours: number; key: keyof typeof subjects }[] = [
+  { name: "Математика", hours: 8, key: "math" },
+  { name: "Программирование", hours: 6, key: "prog" },
+  { name: "Английский язык", hours: 6, key: "eng" },
+  { name: "Робототехника", hours: 6, key: "robo" },
+  { name: "Русский язык", hours: 4, key: "rus" },
+];
+
+const WORKLOAD_TOTAL_MOCK = WORKLOAD_MOCK.reduce((sum, s) => sum + s.hours, 0);
+
+/* ── МОК: достижения. Таблицы бейджей/наград в БД пока нет. ──────────────── */
+const ACHIEVEMENTS_MOCK: readonly {
+  title: string;
+  subtitle: string;
+  gradient: readonly [string, string];
+  paths: readonly string[];
+}[] = [
+  {
+    title: "Отличник четверти",
+    subtitle: "За стабильно высокие результаты",
+    gradient: ["#FACC15", "#CA8A04"],
+    paths: ICON.check,
+  },
+  {
+    title: "Без пропусков",
+    subtitle: "Полная посещаемость месяца",
+    gradient: ["#34D399", "#059669"],
+    paths: ICON.checkSquare,
+  },
+  {
+    title: "Победитель олимпиады",
+    subtitle: "Математика, школьный этап",
+    gradient: ["#A78BFA", "#7C3AED"],
+    paths: ICON.shield,
+  },
+];
+
+/* ── МОК: куратор. Взять его из БД дёшево и безопасно нельзя — единственный
+      путь идёт через бросающий getStudentById().
+
+      ФИО дословно как в БД (migration 97_full_reset_new_accounts.sql:
+      teachers.full_name = 'Karim Alisher Botirov'). Раньше здесь стояло
+      усечённое «Karim Alisher», и один и тот же человек выглядел как два
+      разных: в чатах и объявлениях родитель видит полное имя. ────────────── */
+const CURATOR_NAME_MOCK = "Karim Alisher Botirov";
+
+/* ── Фолбэки, если контекст не приехал. Порядок слов — как в БД
+      («Фамилия Имя», см. initialsOf/givenNameLetter в _ui/format.ts). ────── */
+const PARENT_NAME_FALLBACK = "Ismailov Bakhtiyor";
+const CHILD_NAME_FALLBACK = "Ismailov Sherzod";
+const CHILD_CLASS_FALLBACK = "10-А класс";
+
 export default async function ParentChildPage() {
   const child = await getSelectedChild();
+  // ПОЧЕМУ ЭТО НЕ ЛОМАЕТ ГАРАНТИЮ «страница не может упасть».
+  // getParentContext() — та же самая cache()-функция, которую getSelectedChild()
+  // уже дождался ВНУТРИ себя первой строкой (lib/parent-queries.ts:104). Раз мы
+  // дошли сюда, её промис уже успешно зарезолвился, а cache() отдаёт ровно его
+  // же — новых сетевых запросов и новых путей к throw не появляется. Сама
+  // функция тоже не бросает: все три запроса читают { data, error } и при
+  // ошибке отдают null/[] (lib/parent-context.ts).
+  // Поэтому — строго ПОСЛЕ await getSelectedChild(), не в Promise.all.
+  const ctx = await getParentContext();
 
-  if (!child) {
-    return (
-      <div className="mx-auto w-full max-w-[430px]">
-        <InnerHeader title="Профиль ребёнка" backHref="/parent/profile" />
-        <ScreenScroll>
-          <GlassCard>
-            <EmptyState
-              title="Ребёнок не выбран"
-              text="К вашему аккаунту пока не привязан ученик. Обратитесь к администрации школы."
-              paths={ICON.user}
-            />
-          </GlassCard>
-        </ScreenScroll>
-      </div>
-    );
-  }
+  const childName = child?.full_name ?? CHILD_NAME_FALLBACK;
+  const classLabel = child?.className ?? CHILD_CLASS_FALLBACK;
+  const gradient = avatarGradient(child?.id ?? childName);
 
-  const [profile, subjectTeachers] = await Promise.all([childProfile(), childSubjectTeachers()]);
-
-  const gradient = avatarGradient(child.id);
-  const classLabel = child.className ?? "Класс не указан";
-  const curator = profile?.curator ?? null;
-
-  const infoRows: { label: string; value: string }[] = [
-    { label: "Класс", value: classLabel },
-    ...(profile?.birth_date
-      ? [{ label: "Дата рождения", value: formatDateLong(profile.birth_date) }]
-      : []),
-    { label: "Классный руководитель", value: curator?.full_name ?? "Не назначен" },
-    { label: "Школа", value: "SNR International School" },
-  ];
+  // Имя родителя — из БД, а не из константы: на соседнем /parent/profile
+  // (откуда сюда и приходят) оно берётся из того же ctx.parentName.
+  const parentName = ctx?.parentName?.trim() || PARENT_NAME_FALLBACK;
+  // Сид аватара — тот же, что в profile/page.tsx, чтобы цвет совпадал.
+  const parentGradient = avatarGradient(ctx?.parentId ?? parentName);
 
   return (
-    <div className="mx-auto w-full max-w-[430px]">
-      <InnerHeader
-        title="Профиль ребёнка"
-        backHref="/parent/profile"
-        right={
-          <GlassCircleButton href="/parent/documents" ariaLabel="Документы">
-            <Glyph paths={ICON.doc} size={16} color={ink1} strokeWidth={1.9} />
-          </GlassCircleButton>
-        }
-      />
+    <>
+      <InnerHeader title="Профиль ребёнка" backHref="/parent/profile" />
 
       <ScreenScroll>
-        {/* Hero — градиент со звёздочками (макет 1174–1179). */}
+        {/* Hero — градиент со звёздочками (макет «SNR EduOS v2 Light», 1174–1179). */}
         <div
           className="relative flex items-center overflow-hidden"
           style={{
@@ -122,143 +145,137 @@ export default async function ParentChildPage() {
               color: WHITE,
             }}
           >
-            {givenNameLetter(child.full_name)}
+            {givenNameLetter(childName)}
           </span>
 
-          <div className="min-w-0 flex-1" style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span className="flex min-w-0 flex-1 flex-col" style={{ gap: 3 }}>
             <span className="truncate" style={{ fontSize: 15, fontWeight: 800, color: WHITE }}>
-              {child.full_name}
+              {childName}
             </span>
             <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
               {classLabel}
             </span>
-            {profile?.status ? (
-              <span
-                className="self-start rounded-full"
-                style={{
-                  padding: "3px 8px",
-                  background: "rgba(255,255,255,0.22)",
-                  border: "1px solid rgba(255,255,255,0.4)",
-                  fontSize: 8.5,
-                  fontWeight: 800,
-                  color: WHITE,
-                }}
-              >
-                {profile.status === "active" ? "Учится" : profile.status}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Ряд быстрых переходов (в макете — 4 pill-таба). */}
-        <div className="flex gap-[7px]">
-          <TabLink href="/parent/progress" label="Успехи" />
-          <TabLink href="/parent/home" label="День" />
-          <TabLink href="/parent/documents" label="Документы" />
-        </div>
-
-        {/* Общая информация. */}
-        <SectionCap label="Общая информация" />
-        <GlassCard radius={20} className="px-[14px] py-1">
-          {infoRows.map((r, i) => (
-            <div
-              key={r.label}
-              className="flex items-center justify-between gap-3"
-              style={{ paddingBlock: 9, borderTop: i > 0 ? `1px solid ${DIVIDER}` : undefined }}
+            <span
+              className="self-start rounded-full"
+              style={{
+                padding: "3px 8px",
+                background: "rgba(255,255,255,0.22)",
+                border: "1px solid rgba(255,255,255,0.4)",
+                fontSize: 8.5,
+                fontWeight: 800,
+                color: WHITE,
+              }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, color: ink2 }}>{r.label}</span>
-              <span className="shrink text-right" style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>
-                {r.value}
+              Учится
+            </span>
+          </span>
+        </div>
+
+        {/* Учебная нагрузка (мок). */}
+        <SectionCap label="Учебная нагрузка" />
+        <GlassCard radius={20} className="px-[14px] py-1">
+          {WORKLOAD_MOCK.map((s, i) => (
+            <div
+              key={s.name}
+              className="flex items-center"
+              style={{ gap: 11, paddingBlock: 10, borderTop: i > 0 ? `1px solid ${DIVIDER}` : undefined }}
+            >
+              <Avatar
+                size={32}
+                initials={s.name.slice(0, 1)}
+                gradient={subjects[s.key].grad}
+                fontSize={12}
+              />
+              <span className="min-w-0 flex-1 truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+                {s.name}
+              </span>
+              <span className="shrink-0" style={{ fontSize: 11, fontWeight: 800, color: ink2 }}>
+                {s.hours} ч/нед
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between" style={{ paddingBlock: 10, borderTop: `1px solid ${DIVIDER}` }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: ink2 }}>Всего в неделю</span>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>{WORKLOAD_TOTAL_MOCK} часов</span>
+          </div>
+        </GlassCard>
+
+        {/* Достижения (мок). */}
+        <SectionCap label="Достижения" />
+        <GlassCard radius={20} className="px-[14px] py-1">
+          {ACHIEVEMENTS_MOCK.map((a, i) => (
+            <div
+              key={a.title}
+              className="flex items-center"
+              style={{ gap: 11, paddingBlock: 10, borderTop: i > 0 ? `1px solid ${DIVIDER}` : undefined }}
+            >
+              <IconTile gradient={a.gradient} paths={a.paths} size={34} glyphSize={15} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+                  {a.title}
+                </span>
+                <span className="block truncate" style={{ fontSize: 9.5, fontWeight: 600, color: ink2, marginTop: 2 }}>
+                  {a.subtitle}
+                </span>
               </span>
             </div>
           ))}
         </GlassCard>
 
-        {/* Предметы и учителя — реальные группы ребёнка. */}
-        <SectionCap label="Предметы и учителя" />
+        {/* Куратор и родитель (мок). */}
+        <SectionCap label="Контакты" />
         <GlassCard radius={20} className="px-[14px] py-1">
-          {subjectTeachers.length === 0 ? (
-            <EmptyState
-              title="Предметы не назначены"
-              text="Как только класс получит расписание, здесь появятся предметы и учителя."
-              paths={ICON.doc}
+          <div className="flex items-center" style={{ gap: 11, paddingBlock: 10 }}>
+            <Avatar
+              size={34}
+              initials={initialsOf(CURATOR_NAME_MOCK)}
+              gradient={avatarGradient(CURATOR_NAME_MOCK)}
+              fontSize={12}
             />
-          ) : (
-            subjectTeachers.map((st, i) => (
-              <div
-                key={`${st.subjectId}-${st.subjectName}`}
-                className="flex items-center gap-[11px]"
-                style={{ paddingBlock: 10, borderTop: i > 0 ? `1px solid ${DIVIDER}` : undefined }}
-              >
-                <Avatar
-                  size={34}
-                  initials={(st.teacherName ?? st.subjectName).slice(0, 1).toUpperCase()}
-                  gradient={avatarGradient(st.subjectId)}
-                  fontSize={12}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-                    {st.subjectName}
-                  </span>
-                  <span className="block truncate" style={{ fontSize: 9.5, fontWeight: 600, color: ink2, marginTop: 2 }}>
-                    {st.teacherName ?? "Учитель не назначен"}
-                  </span>
-                </span>
-              </div>
-            ))
-          )}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+                {CURATOR_NAME_MOCK}
+              </span>
+              <span className="block" style={{ fontSize: 9.5, fontWeight: 600, color: ink2, marginTop: 2 }}>
+                Классный руководитель
+              </span>
+            </span>
+            <StatusChip label="Куратор" family="violet" fontSize={8.5} />
+          </div>
+
+          <div className="flex items-center" style={{ gap: 11, paddingBlock: 10, borderTop: `1px solid ${DIVIDER}` }}>
+            <Avatar
+              size={34}
+              initials={initialsOf(parentName)}
+              gradient={parentGradient}
+              fontSize={12}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+                {parentName}
+              </span>
+              <span className="block" style={{ fontSize: 9.5, fontWeight: 600, color: ink2, marginTop: 2 }}>
+                Родитель
+              </span>
+            </span>
+            <StatusChip label="Вы" family="blue" fontSize={8.5} />
+          </div>
         </GlassCard>
 
-        {curator ? (
-          <>
-            <SectionCap label="Связь" />
-            <GlassCard radius={20} className="px-[14px] py-1">
-              <div className="flex items-center gap-[11px]" style={{ paddingBlock: 10 }}>
-                <Avatar
-                  size={34}
-                  initials={curator.full_name.slice(0, 1).toUpperCase()}
-                  gradient={avatarGradient(curator.id)}
-                  fontSize={12}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-                    {curator.full_name}
-                  </span>
-                  <span className="block" style={{ fontSize: 9.5, fontWeight: 600, color: ink2, marginTop: 2 }}>
-                    Классный руководитель
-                  </span>
-                </span>
-                <StatusChip label="Куратор" family="violet" fontSize={8.5} />
-              </div>
-            </GlassCard>
-          </>
-        ) : null}
+        {/* Медицинская информация — раздела в БД нет, честная заглушка. */}
+        <SectionCap label="Медицинская информация" />
+        <GlassCard radius={20}>
+          <EmptyState
+            title="Функция появится скоро"
+            text="Здесь будут медицинские особенности и аллергии ученика, когда школа начнёт вести эти данные."
+            paths={ICON.shield}
+          />
+        </GlassCard>
 
         <span style={{ fontSize: 9, fontWeight: 600, color: ink3, textAlign: "center" }}>
           Данные ученика ведёт администрация школы
         </span>
       </ScreenScroll>
-    </div>
-  );
-}
-
-/** Пилюля-ссылка ряда быстрых переходов (неактивный стиль SegmentPills). */
-function TabLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex flex-1 items-center justify-center rounded-full py-[9px] text-[10.5px]"
-      style={{
-        background: "linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4))",
-        border: "1px solid rgba(255,255,255,0.75)",
-        color: "rgba(26,19,74,0.66)",
-        fontWeight: 700,
-      }}
-    >
-      {label}
-      <span className="ml-1 inline-flex">
-        <ChevronRight />
-      </span>
-    </Link>
+    </>
   );
 }

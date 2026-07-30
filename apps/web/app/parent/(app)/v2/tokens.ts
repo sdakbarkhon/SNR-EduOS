@@ -104,6 +104,24 @@ export const subjects: Record<SubjectKey, { base: string; accent: string; grad: 
 export const subjectGrad = (k: SubjectKey) =>
   `linear-gradient(135deg, ${subjects[k].grad[0]}, ${subjects[k].grad[1]})`;
 
+/**
+ * Градиент 135° из произвольной пары стопов — та же форма макета, но для
+ * плиток вне списка предметов (сервисы, быстрые действия, аватары).
+ *
+ * Живёт ЗДЕСЬ, а не в `_ui/screen-kit.tsx`, хотя раньше был там: screen-kit
+ * помечен "use client", и любой его экспорт для серверного компонента
+ * превращается в клиентскую ссылку. Компоненты через такую границу проходят
+ * (их рендерят на клиенте), константы — тоже (читается только свойство), а
+ * вот ВЫЗОВ функции падает на пререндере:
+ *     Attempted to call grad135() from the server but grad135 is on the client
+ * Ровно так сборка и легла на /parent/services. tokens.ts клиентским не
+ * помечен, поэтому функция доступна обеим сторонам. screen-kit её реэкспортит
+ * — прежние клиентские импорты не трогаем.
+ */
+export function grad135(g: readonly [string, string]): string {
+  return `linear-gradient(135deg, ${g[0]}, ${g[1]})`;
+}
+
 /* ===== Статусы (§s10) ===== */
 
 export type StatusKey = "green" | "red" | "violet" | "orange" | "blue" | "gray";
