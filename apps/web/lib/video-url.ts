@@ -22,7 +22,7 @@ export function parseVideoUrl(raw: string): ParsedVideoUrl | null {
   }
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
 
-  if (host === "youtube.com" || host === "m.youtube.com") {
+  if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
     if (url.pathname === "/watch") {
       const id = url.searchParams.get("v");
       if (id && YOUTUBE_ID_RE.test(id)) return { platform: "youtube", id, embedUrl: toEmbedUrl("youtube", id) };
@@ -55,8 +55,12 @@ export function parseVideoUrl(raw: string): ParsedVideoUrl | null {
 }
 
 export function toEmbedUrl(platform: VideoPlatform, id: string): string {
+  // YouTube "ошибка 153" ("Ошибка настройки видеопроигрывателя") —
+  // youtube-nocookie.com — тот же embed-плеер без cookie-домена Google Ads,
+  // который часто ломается блокировщиками рекламы на клиенте. rel=0 — без
+  // чужих "похожих видео" в конце, modestbranding=1 — минимальный брендинг.
   return platform === "youtube"
-    ? `https://www.youtube.com/embed/${id}`
+    ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=0&modestbranding=1&rel=0`
     : `https://rutube.ru/play/embed/${id}`;
 }
 
@@ -68,7 +72,10 @@ export function isVideoEmbedUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
     const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-    return host === "youtube.com" || host === "youtu.be" || host === "rutube.ru";
+    // youtube-nocookie.com — новый embed-домен (фикс ошибки 153, toEmbedUrl
+    // выше); youtube.com остаётся для СТАРЫХ уже сохранённых embed-URL,
+    // сгенерированных до этого фикса.
+    return host === "youtube.com" || host === "youtube-nocookie.com" || host === "youtu.be" || host === "rutube.ru";
   } catch {
     return false;
   }
