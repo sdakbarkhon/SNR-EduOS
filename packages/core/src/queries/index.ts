@@ -661,6 +661,24 @@ export const getMaterials = (db: Db) =>
     .then(unwrap)
     .then((rows) => rows as unknown as import("../types").MaterialWithGroup[]);
 
+/** Материалы ОДНОГО ребёнка — те же строки, что getMaterials, но суженные
+ *  группами конкретного ученика. getMaterials параметра не имеет и полагается
+ *  только на RLS: у родителя RLS пропускает материалы групп ВСЕХ его детей, и
+ *  экран материалов второго ребёнка молча показал бы объединение. */
+export const getChildMaterials = async (
+  db: Db,
+  studentId: string,
+): Promise<import("../types").MaterialWithGroup[]> => {
+  const groupIds = await getStudentGroupIds(db, studentId);
+  const { data, error } = await db
+    .from("course_materials")
+    .select("*, group:groups!inner(name, subject)")
+    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as import("../types").MaterialWithGroup[];
+};
+
 /** Signed URL на 1 час. Без downloadAs открывается инлайн (просмотр в
  *  браузере); передайте downloadAs только если действительно нужно
  *  принудительное скачивание (Content-Disposition: attachment).
@@ -2153,9 +2171,10 @@ export function homeworkSubmissionStatusKind(status: SubmissionStatus | null | u
 
 // ─── LESSON DETAIL ───────────────────────────────────────────────────────────
 
-/** Один урок со всеми связанными данными для страницы /lessons/[id].
- *  Возвращает null, если урок недоступен текущему пользователю (RLS). */
-export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDetail | null> => {
+/** Общая реализация детали урока. studentId задан только в parent-контексте:
+ *  посещаемость и сдача ДЗ там сужаются до конкретного ребёнка (см.
+ *  getChildLessonDetail). */
+const loadLessonDetail = async (db: Db, lessonId: string, studentId?: string): Promise<LessonDetail | null> => {
   const { data: lessonRaw, error: lessonErr } = await db
     .from("lessons")
     .select("id, group_id, lesson_no, topic, starts_at, ends_at, room, group:groups!inner(id, name, subject, teacher_id)")
@@ -2171,17 +2190,24 @@ export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDet
   };
 
   const teacherId = lesson.group.teacher_id;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let hwQuery: any = db.from("homework")
+    .select("id, title, description, due_date, content_type, submissions:homework_submissions(status, grade)")
+    .eq("lesson_id", lessonId);
+  if (studentId) hwQuery = hwQuery.eq("submissions.student_id", studentId);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let attQuery: any = db.from("attendance").select("status").eq("lesson_id", lessonId);
+  if (studentId) attQuery = attQuery.eq("student_id", studentId);
+
   const [teacherRes, materialsRes, hwRes, attRes] = await Promise.all([
     teacherId
       ? db.from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db.from("course_materials").select("*").eq("lesson_id", lessonId).order("created_at"),
-    db.from("homework")
-      .select("id, title, description, due_date, content_type, submissions:homework_submissions(status, grade)")
-      .eq("lesson_id", lessonId)
-      .order("created_at", { ascending: false })
-      .limit(1),
-    db.from("attendance").select("status").eq("lesson_id", lessonId).maybeSingle(),
+    hwQuery.order("created_at", { ascending: false }).limit(1),
+    attQuery.maybeSingle(),
   ]);
 
   if (materialsRes.error) throw materialsRes.error;
@@ -2212,6 +2238,21 @@ export const getLessonById = async (db: Db, lessonId: string): Promise<LessonDet
     attendance: attRes.data ? { status: (attRes.data as { status: string }).status as AttendanceStatus } : null,
   };
 };
+
+/** Один урок со всеми связанными данными для страницы /lessons/[id].
+ *  Возвращает null, если урок недоступен текущему пользователю (RLS). */
+export const getLessonById = (db: Db, lessonId: string): Promise<LessonDetail | null> =>
+  loadLessonDetail(db, lessonId);
+
+/** То же, что getLessonById, но для parent-контекста: attendance и сдача ДЗ
+ *  берутся ИМЕННО этого ребёнка. У getLessonById оба подзапроса без фильтра по
+ *  student_id — под родительским RLS это чужая строка (или PGRST116 на
+ *  attendance.maybeSingle(), когда детей в группе больше одного). */
+export const getChildLessonDetail = (
+  db: Db,
+  studentId: string,
+  lessonId: string,
+): Promise<LessonDetail | null> => loadLessonDetail(db, lessonId, studentId);
 
 /** Уроки группы для дропдауна в форме создания ДЗ (учитель). */
 export const getTeacherLessonsForGroup = async (
@@ -4630,18 +4671,28 @@ export async function getStudentLessonsForWeek(
 }
 
 /** Дата (YYYY-MM-DD в Asia/Tashkent) ближайшего будущего урока ученика.
- *  Возвращает null, если будущих уроков нет. */
+ *  Возвращает null, если будущих уроков нет.
+ *  studentId — опционально (как у getStudentLessonsForDate/ForWeek): в
+ *  parent-контексте RLS отдаёт уроки ВСЕХ детей родителя, и без сужения по
+ *  группам выбранного ребёнка «следующий учебный день» брался бы от чужого
+ *  расписания. */
 export async function getNextStudentLessonDate(
   db: Db,
   afterDate: string,
+  studentId?: string,
 ): Promise<string | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
+  let query = (db as any)
     .from("lessons")
     .select("starts_at")
-    .gt("starts_at", `${afterDate}T23:59:59+05:00`)
-    .order("starts_at")
-    .limit(1);
+    .gt("starts_at", `${afterDate}T23:59:59+05:00`);
+  if (studentId) {
+    const groupIds = await getStudentGroupIds(db, studentId);
+    query = query.in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
+  // .order()/.limit() строго после .in() — PostgrestTransformBuilder,
+  // возвращаемый limit(), уже не даёт навешивать фильтры.
+  const { data, error } = await query.order("starts_at").limit(1);
   if (error) throw error;
   if (!data || data.length === 0) return null;
   const first = (data as Array<{ starts_at: string }>)[0];

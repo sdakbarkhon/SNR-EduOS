@@ -3,50 +3,42 @@
 /**
  * П10 «Успехи» — ВЕБ-порт экрана родительского приложения.
  *
- * Источник 1:1 — apps/mobile-parent/src/screens/tabs/ProgressScreen.tsx с ветки
+ * Вёрстка 1:1 — apps/mobile-parent/src/screens/tabs/ProgressScreen.tsx с ветки
  * `feat/mobile-parent-redesign` (то, что реально крутится в Expo Go), который
  * сам перенесён дословно из макета «SNR EduOS v2 Light.dc.html», строки 273–374:
  *   274–279  шапка RootHeader (заголовок 17/600, лого, колокольчик, аватар);
- *   281      ChildSwitcherCard compact + «Сменить ребёнка ›»;
+ *   281      ChildSwitcherCard compact;
  *   282–289  AccentCard «Средний балл» + 2 AccentInset («Прогресс за неделю»
  *            со Sparkline 56×20 и «Посещаемость» с полосой 4px);
- *   290      SegmentPills 3 таба «Оценки / Навыки / Динамика»;
+ *   290      SegmentPills («Оценки / Динамика» — см. ниже про «Навыки»);
  *   294–304  период-popover (170px) + дельта «Выше на 0.2, чем в июне ↗»;
  *   305–312  grid плиток предметов 3×2 (SubjectTile 34 r11 + оценка + звезда);
  *   313–319  GlassCard со строками ProgressBar по предметам;
  *   320–325  «Сильные стороны / Зоны роста» с chip-ами;
  *   326–331  SectionHeader «Последние отзывы» + карточка отзыва учителя;
  *   332–336  AccentCard EduOS Assistant;
- *   342–348  вкладка «Навыки»: SectionHeader + 4 плитки навыков (24×24 + %
- *            + ProgressBar 3.5px);
- *   349–353  GlassCard «Профиль навыков» с Radar 224 (6 осей с подписями);
- *   354      AccentCard EduOS Assistant (текст вкладки «Навыки»);
- *   360–364  вкладка «Динамика»: Sparkline 320×90 с endDot + 6 месяцев;
- *   365–369  GlassCard из 3 строк «месяц / средний балл / дельта»;
- *   370      итоговая заметка по центру;
- *   + шторка выбора ребёнка (2632–2644).
+ *   360–370  вкладка «Динамика»: Sparkline + помесячные строки + заметка.
  *
- * Данные — ТОЛЬКО через аксессоры ../v2/data (точная копия data-слоя мобилки):
- * getGradesSummary, getSubjectStats, getSkillsTab, getGradePeriods,
- * getGradesAssistantNotes, getTeacherReviews, getAssistantTexts, getSubject,
- * getChildren, getSelectedChildContext, getParent, getUnreadNotificationsCount.
- * Ничего не пересчитывается и не выдумывается.
+ * ДАННЫЕ: экран больше НЕ читает фикстуры ../v2/data (там был чужой ребёнок и
+ * выдуманные числа). Он чистая презентация — весь view-model собирает
+ * серверный page.tsx из lib/parent-queries (Supabase, всегда со studentId
+ * выбранного ребёнка). Фильтр по периоду и производные средние считаются здесь
+ * из переданного списка реальных оценок, чтобы переключение периода не гоняло
+ * сервер.
  *
- * Ветка isRealFlow мобилки (Supabase: getStudentGrades / getChildTeacherReviews)
- * на вебе НЕ переносится — ровно как на «Главной» (см. home/page.tsx): БД к
- * экранам v2 подключается отдельным шагом, после приёмки переноса вёрстки.
- * Поэтому здесь живёт демо-ветка мобилки, байт-в-байт.
+ * ВКЛАДКА «НАВЫКИ» УДАЛЕНА: под неё нет ни таблицы, ни core-запроса (см.
+ * комментарий в packages/core/src/queries/index.ts — «Навыки (#16) — целиком
+ * mock в самом экране»), а радар из фикстуры — ровно то, что просили убрать.
+ * Вернуть вкладку = сначала завести схему оценки навыков.
  *
- * UI-компоненты мобилки (AccentCard/AccentInset, ChildSwitcherCard compact,
- * SegmentPills, SectionHeader, StarRating, SubjectTile, Popover, ProgressBar,
- * Radar, Sparkline, Avatar, BottomSheetFrame + ChildPickerSheetContent)
- * перенесены сюда локально с их точными радиусами/паддингами/цветами; общее
- * стекло и токены берутся из ../v2/GlassCard и ../v2/tokens — вторых копий
- * не заводим.
+ * НАВИГАЦИЯ: плитки/строки предметов, «Все предметы», «Отзывы», посещаемость
+ * и профиль ребёнка — кликабельные (next/link, prefetch по умолчанию).
  *
  * Только светлая тема.
  */
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { GlassCard } from "../v2/GlassCard";
 import { RootHeader } from "../v2/RootHeader";
 import {
@@ -55,7 +47,6 @@ import {
   chip,
   fontDisplay,
   glassBorder,
-  glassInset,
   ink1,
   ink2,
   ink3,
@@ -64,23 +55,90 @@ import {
   subjectGrad,
   subjects,
   type StatusKey,
+  type SubjectKey,
 } from "../v2/tokens";
-import {
-  DEFAULT_CHILD_INDEX,
-  getAssistantTexts,
-  getChildren,
-  getGradePeriods,
-  getGradesAssistantNotes,
-  getGradesSummary,
-  getParent,
-  getSelectedChildContext,
-  getSkillsTab,
-  getSubject,
-  getSubjectStats,
-  getTeacherReviews,
-  getUnreadNotificationsCount,
-} from "../v2/data";
-import type { BaseSubjectKey, SubjectStatRow } from "../v2/data";
+
+/* ─── Контракт данных (заполняется серверным page.tsx) ────────────────────── */
+
+export type Gradient = [string, string];
+
+export interface ProgressSubject {
+  /** UUID предмета для /parent/subject/[id]; null — предмет не нашёлся в справочнике. */
+  id: string | null;
+  name: string;
+  key: SubjectKey;
+  glyph: string;
+}
+
+export interface ProgressGrade {
+  /** Название предмета — связь с ProgressSubject.name. */
+  subject: string;
+  /** Оценка, нормированная к пятибалльной (StudentGradeItem.grade5). */
+  grade5: number;
+  /** Месяц выставления, YYYY-MM по Ташкенту. */
+  month: string;
+}
+
+export interface ProgressPeriod {
+  /** "all" либо YYYY-MM. */
+  id: string;
+  /** Именительный падеж для кнопки/попапа: «Июль 2026». */
+  label: string;
+  /** Предложный падеж для фразы «…чем в июне»: «июне». */
+  prepLabel: string;
+}
+
+export interface ProgressReview {
+  id: string;
+  teacherName: string;
+  teacherInitials: string;
+  teacherGradient: Gradient;
+  subjectName: string;
+  subjectId: string | null;
+  timeLabel: string;
+  comment: string;
+}
+
+export interface ProgressMonthPoint {
+  monthKey: string;
+  label: string;
+  avg: number;
+}
+
+export interface ProgressViewData {
+  parent: { initials: string };
+  bellCount: number;
+  /** null — у родителя нет привязанного ребёнка (пустое состояние). */
+  child: {
+    fullName: string;
+    initial: string;
+    className: string;
+    gradient: Gradient;
+    statusLabel: string | null;
+  } | null;
+  subjects: ProgressSubject[];
+  grades: ProgressGrade[];
+  periods: ProgressPeriod[];
+  defaultPeriod: string;
+  attendance: { pct: number; present: number; total: number };
+  weekActivity: { thisWeek: number; lastWeek: number; deltaPct: number | null };
+  reviews: ProgressReview[];
+  dynamics: ProgressMonthPoint[];
+}
+
+/* ─── Маршруты ────────────────────────────────────────────────────────────── */
+
+const R = {
+  notifications: "/parent/notifications",
+  profile: "/parent/profile",
+  child: "/parent/child",
+  day: "/parent/day",
+  attendance: "/parent/attendance",
+  subjects: "/parent/subjects",
+  reviews: "/parent/reviews",
+} as const;
+
+const subjectHref = (id: string | null) => (id ? `/parent/subject/${id}` : R.subjects);
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Локальные константы, которых нет в v2/tokens.ts: в мобилке это приватные
@@ -89,7 +147,7 @@ import type { BaseSubjectKey, SubjectStatRow } from "../v2/data";
 
 /** SectionHeader: заголовок 10.5/800 rgba(26,19,74,.5) (макет строка 2772). */
 const SECTION_TITLE = "rgba(26,19,74,0.5)";
-/** ChildSwitcherCard: «Сменить ребёнка ›» #6d28d9 (макет строка 281). */
+/** ChildSwitcherCard: правая ссылка #6d28d9 (макет строка 281). */
 const LINK = "#6D28D9";
 /** AccentCard: внутренний блик inset 0 1.5 0 W35 (макет строка 242). */
 const ACCENT_INSET_SHADOW = "inset 0 1.5px 0 rgba(255,255,255,0.35)";
@@ -102,7 +160,7 @@ const ROW_DIVIDER = "rgba(23,18,67,0.07)";
 const CARD_DIVIDER = "rgba(23,18,67,0.08)";
 /** ProgressBar: трек светлой темы. */
 const TRACK = "rgba(23,18,67,0.09)";
-/** Плитки предметов/навыков: полупрозрачная заливка (макет строки 306, 343). */
+/** Плитки предметов: полупрозрачная заливка (макет строка 306). */
 const TILE_BG = "rgba(255,255,255,0.4)";
 /** Кнопка периода (макет строка 294). */
 const PERIOD_BG = "rgba(255,255,255,0.6)";
@@ -115,22 +173,10 @@ const POPOVER_SHADOW = "0 18px 40px rgba(64,54,150,0.28)";
 const PILL_INACTIVE_BG = "linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4))";
 const PILL_INACTIVE_TEXT = "rgba(26,19,74,0.66)";
 const PILL_ACTIVE_SHADOW = "0 8px 18px rgba(124,58,237,0.35)";
-/** Radar: сетка/спицы светлой темы (charts/Radar.tsx). */
-const RADAR_OUTER_GRID = "rgba(23,18,67,0.14)";
-const RADAR_INNER_GRID = "rgba(23,18,67,0.09)";
-const RADAR_SPOKE = "rgba(23,18,67,0.08)";
 /** Онлайн-точка на аватаре учителя (макет строка 327). */
 const ONLINE_DOT = "#22C55E";
 /** Звезда рядом с оценкой предмета (макет строка 306). */
 const STAR_AMBER = "#F59E0B";
-/** Шторка (BottomSheetFrame, макет 4227–4228). */
-const SHEET_OVERLAY = "rgba(23,18,67,0.35)";
-const SHEET_BG = "linear-gradient(160deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76))";
-const SHEET_BORDER = "rgba(255,255,255,0.9)";
-const SHEET_SHADOW = "0 -16px 50px rgba(64,54,150,0.3)";
-const SHEET_GRIP = "rgba(23,18,67,0.2)";
-/** ChildPickerSheetContent: фон невыбранной галочки (макет строка 4381). */
-const CHECK_OFF_BG = "rgba(23,18,67,0.08)";
 
 /**
  * Тексты — ru, дословно из packages/core/src/i18n/ru.ts (parentApp.*), теми же
@@ -139,41 +185,35 @@ const CHECK_OFF_BG = "rgba(23,18,67,0.08)";
 const T = {
   navGrades: "Успехи", // nav.grades
   class: "класс", // grades.class
-  switchChild: "Сменить ребёнка", // prof.switchChild
   average: "Средний балл", // grades.average
   attendance: "Посещаемость", // scr.attendance
   tabGrades: "Оценки", // grades.tabGrades
-  tabSkills: "Навыки", // grades.tabSkills
   tabDyn: "Динамика", // grades.tabDyn
   subjectsSection: "Предметы", // grades.subjects
   allSubjects: "Все предметы", // scr.allSubjects
   lastReviews: "Последние отзывы", // grades.lastReviews
   viewAll: "Смотреть все", // common.viewAll
-  more: "Подробнее", // common.more
-  skillsProgress: "Навыки и прогресс", // skills.progress
-  skillsProfile: "Профиль навыков", // skills.profile
   dynAvg: "Динамика среднего балла", // grades.dynAvg
-  chooseChild: "Выберите ребёнка", // auth.chooseChild
-  axisLogic: "Логика", // skills.axisLogic
-  axisCommunication: "Комм.", // skills.axisCommunication
-  axisDiscipline: "Дисц.", // skills.axisDiscipline
-  axisCreativity: "Креатив", // skills.axisCreativity
-  axisIndependence: "Самост.", // skills.axisIndependence
-  axisTeamwork: "Команда", // skills.axisTeamwork
+  childProfile: "Профиль ребёнка", // scr.childProfile
   /** Не из словаря: в RN-экране эти строки — литералы (строки 610, 650, 876, 894). */
   weekProgress: "Прогресс за неделю",
   attendanceRatioPrefix: "присутствий",
   strengths: "Сильные стороны",
   growthAreas: "Зоны роста",
-  /** Подписи месяцев вкладки «Динамика» (литерал RN, строка 1255). */
-  dynMonths: ["фев", "мар", "апр", "май", "июн", "июл"],
+  periodAll: "Всё время",
+  /** Пустые состояния. */
+  noChild: "К аккаунту не привязан ни один ребёнок",
+  noChildHint: "Обратитесь в администрацию школы — она свяжет профиль ученика с вашим аккаунтом.",
+  noGrades: "Оценок пока нет",
+  noGradesHint: "Как только учитель выставит первую оценку, она появится здесь",
+  noGradesPeriod: "За выбранный период оценок нет",
+  noReviews: "Отзывов учителей пока нет",
+  noReviewsHint: "Здесь появятся комментарии, которые учителя оставляют к оценкам",
+  noDynamics: "Для графика нужно минимум два месяца с оценками",
 } as const;
 
-/**
- * Глиф предмета (макет: prog «< >», math «√x», eng «Aa», rus «Aa», robo — SVG) —
- * дословно SUBJECT_GLYPH из ProgressScreen.tsx.
- */
-const SUBJECT_GLYPH: Record<BaseSubjectKey, string> = {
+/** Глиф предмета — дословно SUBJECT_GLYPH из ProgressScreen.tsx. */
+const SUBJECT_GLYPH: Record<SubjectKey, string> = {
   prog: "</>",
   robo: "⚙",
   math: "√x",
@@ -192,6 +232,9 @@ const CLAMP_3: CSSProperties = {
   overflow: "hidden",
 };
 
+/** «4.9» — как в макете (точка, один знак). */
+const gradeLabel = (v: number) => v.toFixed(1);
+
 /* ─── Иконки: inline-пути 24×24, дословно из RN (НЕ lucide) ──────────────── */
 
 /** Путь звезды из макета (строки 284, 306) — StarRating / StarGlyph. */
@@ -209,7 +252,15 @@ function StarGlyph({ size = 12, color = STAR_AMBER }: { size?: number; color?: s
   );
 }
 
-function ChevronRight({ size = 9, color = "#FFFFFF", strokeWidth = 2.6 }: { size?: number; color?: string; strokeWidth?: number }) {
+function ChevronRight({
+  size = 9,
+  color = "#FFFFFF",
+  strokeWidth = 2.6,
+}: {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
       <path d="m9 18 6-6-6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
@@ -221,15 +272,6 @@ function ChevronDown({ size, color, strokeWidth }: { size: number; color: string
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
       <path d="m6 9 6 6 6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Галочка 12px stroke 3 белым (шторка выбора ребёнка, макет строка 4381). */
-function CheckGlyph() {
-  return (
-    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-      <path d="M20 6 9 17l-5-5" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -256,19 +298,9 @@ function SparkGlyph({ size = 18 }: { size?: number }) {
 
 /**
  * Avatar — инициалы на градиенте 135° + кольца (av(), макет строка 3832):
- * box-shadow 0 0 0 2px #fff + 0 0 0 4.5px ring.
+ * box-shadow 0 0 0 2px #fff.
  */
-function Avatar({
-  initials,
-  gradient,
-  ringColor,
-  size,
-}: {
-  initials: string;
-  gradient: readonly [string, string];
-  ringColor?: string;
-  size: number;
-}) {
+function Avatar({ initials, gradient, size }: { initials: string; gradient: Gradient; size: number }) {
   return (
     <span
       className="flex shrink-0 items-center justify-center rounded-full text-white"
@@ -278,7 +310,7 @@ function Avatar({
         fontSize: Math.round(size * 0.3),
         fontWeight: 800,
         background: lg(135, gradient[0], gradient[1]),
-        boxShadow: ringColor ? `0 0 0 2px #FFFFFF, 0 0 0 4.5px ${ringColor}` : "0 0 0 2px #FFFFFF",
+        boxShadow: "0 0 0 2px #FFFFFF",
       }}
     >
       {initials}
@@ -296,58 +328,50 @@ function AccentCard({
   angle = 135,
   shadowRgb,
   radius: r = 18,
-  pressable = false,
   className = "",
   style,
   contentStyle,
   children,
 }: {
-  gradient: readonly [string, string];
+  gradient: Gradient;
   angle?: number;
   shadowRgb?: string;
   radius?: number;
-  pressable?: boolean;
   className?: string;
   style?: CSSProperties;
   contentStyle?: CSSProperties;
   children?: ReactNode;
 }) {
-  const surface: CSSProperties = {
-    borderRadius: r,
-    overflow: "hidden",
-    background: lg(angle, gradient[0], gradient[1]),
-    boxShadow: shadowRgb ? `${shColor(shadowRgb)}, ${ACCENT_INSET_SHADOW}` : ACCENT_INSET_SHADOW,
-    ...style,
-  };
-  const inner = <div style={contentStyle}>{children}</div>;
-
-  if (pressable) {
-    return (
-      <button type="button" className={`block w-full text-left ${className}`} style={surface}>
-        {inner}
-      </button>
-    );
-  }
   return (
-    <div className={className} style={surface}>
-      {inner}
+    <div
+      className={className}
+      style={{
+        borderRadius: r,
+        overflow: "hidden",
+        background: lg(angle, gradient[0], gradient[1]),
+        boxShadow: shadowRgb ? `${shColor(shadowRgb)}, ${ACCENT_INSET_SHADOW}` : ACCENT_INSET_SHADOW,
+        ...style,
+      }}
+    >
+      <div style={contentStyle}>{children}</div>
     </div>
   );
 }
 
 /**
  * AccentInset — «стеклянная вставка» внутри градиентной карточки (макет
- * строка 2741): rgba(255,255,255,.2) + blur(8) + border W35.
+ * строка 2741): rgba(255,255,255,.2) + blur(8) + border W35. `href`
+ * превращает её в next/link (в мобилке это был Pressable).
  */
 function AccentInset({
   radius: r = 12,
-  pressable = false,
+  href,
   className = "",
   style,
   children,
 }: {
   radius?: number;
-  pressable?: boolean;
+  href?: string;
   className?: string;
   style?: CSSProperties;
   children?: ReactNode;
@@ -360,11 +384,11 @@ function AccentInset({
     WebkitBackdropFilter: "blur(8px)",
     ...style,
   };
-  if (pressable) {
+  if (href) {
     return (
-      <button type="button" className={`block text-left ${className}`} style={surface}>
+      <Link href={href} className={`text-left ${className}`} style={surface}>
         {children}
-      </button>
+      </Link>
     );
   }
   return (
@@ -409,7 +433,7 @@ function CapsLabel({ children, color }: { children: string; color: string }) {
 }
 
 /** SectionHeader (макет строка 2772): caps 10.5/800 + правая ссылка 11.5/800. */
-function SectionHeader({ title, linkLabel }: { title: string; linkLabel?: string }) {
+function SectionHeader({ title, linkLabel, linkHref }: { title: string; linkLabel?: string; linkHref?: string }) {
   return (
     <div className="flex items-center justify-between">
       <span
@@ -423,10 +447,10 @@ function SectionHeader({ title, linkLabel }: { title: string; linkLabel?: string
       >
         {title}
       </span>
-      {linkLabel ? (
-        <button type="button" style={{ fontSize: 11.5, fontWeight: 800, color: status.violet.text }}>
+      {linkLabel && linkHref ? (
+        <Link href={linkHref} style={{ fontSize: 11.5, fontWeight: 800, color: status.violet.text }}>
           {linkLabel}
-        </button>
+        </Link>
       ) : null}
     </div>
   );
@@ -464,17 +488,17 @@ function StarRating({
  * sh-color по тёмному стопу градиента (макет §s1, строки 2677–2687).
  */
 function SubjectTile({
-  subjectId,
+  subjectKey,
   size = 40,
   radius: r = 13,
   glyph,
 }: {
-  subjectId: BaseSubjectKey;
+  subjectKey: SubjectKey;
   size?: number;
   radius?: number;
   glyph?: string;
 }) {
-  const dark = subjects[subjectId].grad[1];
+  const dark = subjects[subjectKey].grad[1];
   const rgb = `${parseInt(dark.slice(1, 3), 16)},${parseInt(dark.slice(3, 5), 16)},${parseInt(dark.slice(5, 7), 16)}`;
   return (
     <span
@@ -483,7 +507,7 @@ function SubjectTile({
         width: size,
         height: size,
         borderRadius: r,
-        background: subjectGrad(subjectId),
+        background: subjectGrad(subjectKey),
         boxShadow: shColor(rgb),
         fontSize: 14,
         fontWeight: 800,
@@ -506,24 +530,17 @@ function ProgressBar({
 }: {
   pct: number;
   height?: number;
-  fillGradient: readonly [string, string];
+  fillGradient: Gradient;
   trackColor?: string;
 }) {
   const ratio = Math.max(0, Math.min(1, pct));
   const r = height / 2;
   return (
     <span className="flex items-center" style={{ gap: 7 }}>
-      <span
-        className="relative block flex-1 overflow-hidden"
-        style={{ height, borderRadius: r, background: trackColor }}
-      >
+      <span className="relative block flex-1 overflow-hidden" style={{ height, borderRadius: r, background: trackColor }}>
         <span
           className="absolute bottom-0 left-0 top-0 block"
-          style={{
-            width: `${ratio * 100}%`,
-            borderRadius: r,
-            background: lg(90, fillGradient[0], fillGradient[1]),
-          }}
+          style={{ width: `${ratio * 100}%`, borderRadius: r, background: lg(90, fillGradient[0], fillGradient[1]) }}
         />
       </span>
     </span>
@@ -605,126 +622,6 @@ function Sparkline({
   );
 }
 
-/**
- * Radar — шестиугольный радар на 6 осях (charts/Radar.tsx): центр (60,54),
- * R = 44, оси по часовой от «верха» с шагом 60°; с подписями viewBox
- * «-14 0 148 108» (иначе текст обрезается), высота = size·108/148.
- */
-const RADAR_CX = 60;
-const RADAR_CY = 54;
-const RADAR_R = 44;
-/** Позиции подписей вокруг гексагона — как на #16 (макет строка 663). */
-const RADAR_LABEL_POS: { x: number; y: number; anchor: "start" | "middle" | "end" }[] = [
-  { x: 60, y: 7, anchor: "middle" },
-  { x: 102, y: 30, anchor: "start" },
-  { x: 102, y: 82, anchor: "start" },
-  { x: 60, y: 106, anchor: "middle" },
-  { x: 18, y: 82, anchor: "end" },
-  { x: 18, y: 30, anchor: "end" },
-];
-
-function radarAxisAngle(i: number): number {
-  return -Math.PI / 2 + i * (Math.PI / 3);
-}
-
-function radarHexPoints(radius: number): string {
-  const pts: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const a = radarAxisAngle(i);
-    pts.push(`${(RADAR_CX + radius * Math.cos(a)).toFixed(2)},${(RADAR_CY + radius * Math.sin(a)).toFixed(2)}`);
-  }
-  return pts.join(" ");
-}
-
-function Radar({
-  values,
-  max = 5,
-  size = 200,
-  fillColor,
-  strokeColor,
-  strokeWidth = 2,
-  labels,
-  labelFontSize = 7.5,
-  gridRings = [1],
-  showSpokes = false,
-  showDots = false,
-  dotRadius = 3,
-}: {
-  values: readonly number[];
-  max?: number;
-  size?: number;
-  fillColor: string;
-  strokeColor: string;
-  strokeWidth?: number;
-  labels?: string[];
-  labelFontSize?: number;
-  gridRings?: number[];
-  showSpokes?: boolean;
-  showDots?: boolean;
-  dotRadius?: number;
-}) {
-  const ringRatios = gridRings.slice().sort((a, b) => a - b);
-  const outerRatio = ringRatios[ringRatios.length - 1] ?? 1;
-
-  const outerVertices = Array.from({ length: 6 }, (_, i) => {
-    const a = radarAxisAngle(i);
-    return {
-      x: RADAR_CX + RADAR_R * outerRatio * Math.cos(a),
-      y: RADAR_CY + RADAR_R * outerRatio * Math.sin(a),
-    };
-  });
-  const dataVertices = Array.from({ length: 6 }, (_, i) => {
-    const raw = values[i] ?? 0;
-    const ratio = Math.max(0, Math.min(1, max > 0 ? raw / max : 0));
-    const a = radarAxisAngle(i);
-    return { x: RADAR_CX + RADAR_R * ratio * Math.cos(a), y: RADAR_CY + RADAR_R * ratio * Math.sin(a) };
-  });
-  const dataPoints = dataVertices.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
-
-  const hasLabels = Array.isArray(labels) && labels.length >= 6;
-  const vbW = hasLabels ? 148 : 120;
-  const viewBox = hasLabels ? "-14 0 148 108" : "0 0 120 108";
-  const height = size * (108 / vbW);
-
-  return (
-    <svg width={size} height={height} viewBox={viewBox} aria-hidden>
-      {ringRatios.map((ratio) => (
-        <polygon
-          key={ratio}
-          points={radarHexPoints(RADAR_R * ratio)}
-          fill="none"
-          stroke={ratio === outerRatio ? RADAR_OUTER_GRID : RADAR_INNER_GRID}
-          strokeWidth={ratio === outerRatio ? 1.5 : 1}
-        />
-      ))}
-      {showSpokes
-        ? outerVertices.map((v, i) => (
-            <line key={i} x1={RADAR_CX} y1={RADAR_CY} x2={v.x} y2={v.y} stroke={RADAR_SPOKE} strokeWidth={1} />
-          ))
-        : null}
-      <polygon points={dataPoints} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
-      {showDots
-        ? dataVertices.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={dotRadius} fill={strokeColor} />)
-        : null}
-      {hasLabels
-        ? RADAR_LABEL_POS.map((pos, i) => (
-            <text
-              key={i}
-              x={pos.x}
-              y={pos.y}
-              textAnchor={pos.anchor}
-              fontSize={labelFontSize}
-              fontWeight={700}
-              fill={ink2}
-            >
-              {labels![i]}
-            </text>
-          ))
-        : null}
-    </svg>
-  );
-}
-
 /** Chip-«pill»: маленький бордерный chip с текстом (сильные / зоны роста). */
 function ToneChip({ label, tone }: { label: string; tone: StatusKey }) {
   const st = status[tone];
@@ -790,47 +687,23 @@ function SegmentPills({
   );
 }
 
-/**
- * SubjectGridTile — плитка предмета в grid 3×2 (макет 306–312):
- * flexBasis 31%, паддинг 12×6, r16, border glass, bg W40.
- */
-function SubjectGridTile({ stat, subjectName }: { stat: SubjectStatRow; subjectName: string }) {
+/** Пустое состояние внутри стеклянной карточки. */
+function EmptyBlock({ title, hint }: { title: string; hint?: string }) {
   return (
-    <button
-      type="button"
-      className="flex flex-col items-center"
-      style={{
-        flex: "1 1 31%",
-        gap: 6,
-        padding: "12px 6px",
-        borderRadius: 16,
-        border: `1px solid ${glassBorder}`,
-        background: TILE_BG,
-      }}
-    >
-      <SubjectTile subjectId={stat.subject_id} size={34} radius={11} glyph={SUBJECT_GLYPH[stat.subject_id]} />
-      <span className="flex items-center" style={{ gap: 3 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: ink1 }}>{stat.grade_label}</span>
-        <StarGlyph size={11} />
-      </span>
-      <span
-        className="w-full truncate text-center"
-        style={{ fontSize: 8.5, fontWeight: 700, color: ink2 }}
-      >
-        {subjectName}
-      </span>
-    </button>
+    <div className="flex flex-col items-center text-center" style={{ gap: 4, padding: "22px 16px" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>{title}</span>
+      {hint ? <span style={{ fontSize: 11, fontWeight: 600, color: ink2 }}>{hint}</span> : null}
+    </div>
   );
 }
 
-/** Карточка «EduOS Assistant» (макет строки 332–336 / 354). */
+/** Карточка «EduOS Assistant» (макет строки 332–336). */
 function AssistantCard({ note }: { note: string }) {
   return (
     <AccentCard
       gradient={["#8b5cf6", "#6366f1"]}
       shadowRgb="139,92,246"
       radius={20}
-      pressable
       contentStyle={{ padding: 14, display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}
     >
       <span
@@ -849,736 +722,673 @@ function AssistantCard({ note }: { note: string }) {
         <span style={{ fontSize: 12, fontWeight: 800, color: "#FFFFFF" }}>EduOS Assistant</span>
         <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{note}</span>
       </span>
-      <ChevronRight />
     </AccentCard>
   );
 }
 
-/* ─── Шторка выбора ребёнка ───────────────────────────────────────────────── */
+/* ─── Производные (считаются из реальных оценок) ──────────────────────────── */
 
-interface ChildPickerItem {
-  id: string;
-  initials: string;
-  gradient: readonly [string, string];
-  ringColor?: string;
-  name: string;
-  classLabel: string;
-  statusLabel: string;
-  statusTone: StatusKey;
+interface SubjectStat {
+  subject: ProgressSubject;
+  avg: number;
+  count: number;
+  /** Разница со средним предыдущего месяца; null — сравнивать не с чем. */
+  delta: number | null;
 }
 
-/**
- * BottomSheetFrame + ChildPickerSheetContent (макет 2462–2645 / 2632–2644):
- * оверлей rgba(23,18,67,.35)+blur(4) с opacity .28s; панель left/right/bottom 8,
- * r30, 160° W92→W76, blur(26), border W90, тень 0 -16 50 + inset-блик,
- * translateY(115%) → 0 за .32s cubic-bezier(.2,.7,.3,1); грип 44×5 r3.
- */
-function ChildPickerSheet({
-  open,
-  onClose,
-  title,
-  items,
-  selectedId,
-  onSelect,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  items: ChildPickerItem[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  const [mounted, setMounted] = useState(open);
-  const [shown, setShown] = useState(open);
+function averageOf(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
 
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const raf = window.requestAnimationFrame(() => setShown(true));
-      return () => window.cancelAnimationFrame(raf);
-    }
-    setShown(false);
-    const timer = window.setTimeout(() => setMounted(false), 280);
-    return () => window.clearTimeout(timer);
-  }, [open]);
-
-  if (!mounted) return null;
-
-  return (
-    <div className="fixed inset-0" style={{ zIndex: 60 }}>
-      <button
-        type="button"
-        aria-label="Закрыть"
-        onClick={onClose}
-        className="absolute inset-0 block h-full w-full"
-        style={{
-          background: SHEET_OVERLAY,
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
-          opacity: shown ? 1 : 0,
-          transition: "opacity .28s cubic-bezier(.2,.7,.3,1)",
-        }}
-      />
-      <div
-        className="absolute mx-auto"
-        style={{
-          left: 8,
-          right: 8,
-          bottom: 8,
-          maxWidth: 414,
-          borderRadius: 30,
-          border: `1px solid ${SHEET_BORDER}`,
-          background: SHEET_BG,
-          backdropFilter: "blur(26px)",
-          WebkitBackdropFilter: "blur(26px)",
-          boxShadow: `${SHEET_SHADOW}, ${glassInset}`,
-          paddingBottom: 12,
-          transform: shown ? "translateY(0)" : "translateY(115%)",
-          transition: "transform .32s cubic-bezier(.2,.7,.3,1)",
-        }}
-      >
-        {/* Полоска-грип 44×5 (макет строка 2464). */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Закрыть"
-          className="flex w-full justify-center"
-          style={{ paddingTop: 10, paddingBottom: 4 }}
-        >
-          <span style={{ width: 44, height: 5, borderRadius: 3, background: SHEET_GRIP }} />
-        </button>
-
-        <p
-          style={{
-            fontSize: 14,
-            fontWeight: 800,
-            color: ink1,
-            paddingTop: 2,
-            paddingLeft: 20,
-            paddingRight: 20,
-            paddingBottom: 10,
-          }}
-        >
-          {title}
-        </p>
-
-        {items.map((item) => {
-          const selected = item.id === selectedId;
-          const st = status[item.statusTone];
-          const c = chip(st.rgb);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className="flex w-full items-center text-left"
-              style={{ gap: 12, padding: "11px 20px" }}
-            >
-              {/* Кольца аватара выступают наружу — компенсируем зазором, как в мобилке. */}
-              <span className="block shrink-0" style={{ margin: item.ringColor ? 4.5 : 2 }}>
-                <Avatar initials={item.initials} gradient={item.gradient} ringColor={item.ringColor} size={44} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, color: ink1 }}>
-                  {item.name}
-                </span>
-                <span className="block truncate" style={{ fontSize: 11, fontWeight: 700, color: ink2 }}>
-                  {item.classLabel}
-                </span>
-              </span>
-              <span
-                className="shrink-0"
-                style={{
-                  padding: "4px 9px",
-                  borderRadius: 999,
-                  background: c.background,
-                  border: `1px solid ${c.borderColor}`,
-                  fontSize: 9.5,
-                  fontWeight: 800,
-                  color: st.text,
-                }}
-              >
-                {item.statusLabel}
-              </span>
-              <span
-                className="flex shrink-0 items-center justify-center"
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 11,
-                  background: selected ? accentGrad : CHECK_OFF_BG,
-                  boxShadow: selected ? "0 4px 10px rgba(124,58,237,0.4)" : undefined,
-                }}
-              >
-                <CheckGlyph />
-              </span>
-            </button>
-          );
-        })}
-        <div style={{ height: 18 }} />
-      </div>
-    </div>
-  );
+/** «оценка / оценки / оценок» — для подписи «N оценок за 7 дней». */
+function pluralGrades(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "оценка";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "оценки";
+  return "оценок";
 }
 
 /* ─── Экран ───────────────────────────────────────────────────────────────── */
 
-export function ProgressView() {
-  const children = getChildren();
-  const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX]?.id ?? "");
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(0); // 0 grades, 1 skills, 2 dyn
-
-  const periods = getGradePeriods();
-  const [period, setPeriod] = useState<string>(periods.default_period);
+export function ProgressView({ data }: { data: ProgressViewData }) {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState(0); // 0 — Оценки, 1 — Динамика
+  const [period, setPeriod] = useState<string>(data.defaultPeriod);
   const [periodOpen, setPeriodOpen] = useState(false);
 
-  const parent = getParent();
-  const ctx = getSelectedChildContext(childId);
-  const child = ctx.child;
-  const summary = getGradesSummary();
-  const stats = getSubjectStats();
-  const skills = getSkillsTab();
-  const notes = getGradesAssistantNotes();
-  const review = getTeacherReviews()[0]!;
-  const bellCount = getUnreadNotificationsCount();
+  const { child, grades, subjects: subjectList, dynamics } = data;
 
-  /**
-   * Радар «Профиль навыков»: 6 названий осей через словарь, число у каждой
-   * подписи — ЕЁ реальный radar_values[i] (фикстура не меняется).
-   */
-  const skillsRadarLabels = useMemo(
-    () =>
-      [T.axisLogic, T.axisCommunication, T.axisDiscipline, T.axisCreativity, T.axisIndependence, T.axisTeamwork].map(
-        (name, i) => `${name} ${skills.radar_values[i]}%`,
-      ),
-    [skills.radar_values],
+  useEffect(() => {
+    router.prefetch(R.notifications);
+    router.prefetch(R.profile);
+  }, [router]);
+
+  const subjectByName = useMemo(
+    () => new Map(subjectList.map((s) => [s.name, s])),
+    [subjectList],
   );
 
-  /**
-   * Sparkline данные для карточки «Средний балл» — точки макета строка 286
-   * «2,19 14,16 26,17 38,10 50,12 62,4»: значения = 24 − y (viewBox 64×24),
-   * так шаг «выше — больше» сохраняется.
-   */
-  const weekSparklineValues = useMemo(
-    () =>
-      summary.sparkline_points.split(" ").map((p) => {
-        const y = parseFloat(p.split(",")[1] ?? "0");
-        return 24 - y;
-      }),
-    [summary.sparkline_points],
+  /** Средний балл за всё время — как в макете (карточка не зависит от периода). */
+  const overallAverage = useMemo(() => averageOf(grades.map((g) => g.grade5)), [grades]);
+
+  /** Предыдущий месяц относительно выбранного периода (для дельт). */
+  const prevMonth = useMemo(() => {
+    if (period === "all") return null;
+    const idx = data.periods.findIndex((p) => p.id === period);
+    const next = idx >= 0 ? data.periods[idx + 1] : undefined;
+    return next && next.id !== "all" ? next.id : null;
+  }, [period, data.periods]);
+
+  const periodGrades = useMemo(
+    () => (period === "all" ? grades : grades.filter((g) => g.month === period)),
+    [grades, period],
   );
 
-  /** То же для вкладки «Динамика» (строка 362, viewBox 320×90). */
-  const dynSparklineValues = useMemo(
+  const subjectStats = useMemo<SubjectStat[]>(() => {
+    const byName = new Map<string, number[]>();
+    for (const g of periodGrades) {
+      const list = byName.get(g.subject);
+      if (list) list.push(g.grade5);
+      else byName.set(g.subject, [g.grade5]);
+    }
+    const prevByName = new Map<string, number[]>();
+    if (prevMonth) {
+      for (const g of grades) {
+        if (g.month !== prevMonth) continue;
+        const list = prevByName.get(g.subject);
+        if (list) list.push(g.grade5);
+        else prevByName.set(g.subject, [g.grade5]);
+      }
+    }
+    return Array.from(byName.entries())
+      .map(([name, values]) => {
+        const avg = averageOf(values) ?? 0;
+        const prevAvg = averageOf(prevByName.get(name) ?? []);
+        return {
+          subject:
+            subjectByName.get(name) ?? ({ id: null, name, key: "prog", glyph: SUBJECT_GLYPH.prog } as ProgressSubject),
+          avg,
+          count: values.length,
+          delta: prevAvg == null ? null : avg - prevAvg,
+        };
+      })
+      .sort((a, b) => b.avg - a.avg);
+  }, [periodGrades, grades, prevMonth, subjectByName]);
+
+  /** Сильные стороны / зоны роста — от среднего ЗА ПЕРИОД, без выдуманных ярлыков. */
+  const periodAverage = useMemo(() => averageOf(periodGrades.map((g) => g.grade5)), [periodGrades]);
+  const strengths = useMemo(
     () =>
-      summary.dynamics_points.split(" ").map((p) => {
-        const y = parseFloat(p.split(",")[1] ?? "0");
-        return 90 - y;
-      }),
-    [summary.dynamics_points],
+      periodAverage == null
+        ? []
+        : subjectStats.filter((s) => s.avg >= periodAverage).slice(0, 3).map((s) => s.subject.name),
+    [subjectStats, periodAverage],
+  );
+  const growthAreas = useMemo(
+    () =>
+      periodAverage == null
+        ? []
+        : subjectStats.filter((s) => s.avg < periodAverage).slice(-3).map((s) => s.subject.name),
+    [subjectStats, periodAverage],
   );
 
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${T.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
+  /** Дельта периода к предыдущему месяцу — подпись справа от кнопки периода. */
+  const periodDeltaNote = useMemo(() => {
+    if (!prevMonth || periodAverage == null) return null;
+    const prevAvg = averageOf(grades.filter((g) => g.month === prevMonth).map((g) => g.grade5));
+    if (prevAvg == null) return null;
+    const diff = periodAverage - prevAvg;
+    const prep = data.periods.find((p) => p.id === prevMonth)?.prepLabel ?? "";
+    if (Math.abs(diff) < 0.05) return { text: `Столько же, что и в ${prep}`, up: true };
+    return {
+      text: `${diff > 0 ? "Выше" : "Ниже"} на ${Math.abs(diff).toFixed(1)}, чем в ${prep} ${diff > 0 ? "↗" : "↘"}`,
+      up: diff > 0,
+    };
+  }, [prevMonth, periodAverage, grades, data.periods]);
+
+  const dynamicsValues = useMemo(() => dynamics.map((d) => d.avg), [dynamics]);
+
+  /** Текст ассистента — только из реальных чисел. */
+  const assistantNote = useMemo(() => {
+    if (overallAverage == null) return T.noGradesHint;
+    const best = subjectStats[0];
+    const worst = subjectStats.length > 1 ? subjectStats[subjectStats.length - 1] : undefined;
+    const parts = [`Средний балл — ${gradeLabel(overallAverage)}.`];
+    if (best) parts.push(`Лучше всего идёт «${best.subject.name}» (${gradeLabel(best.avg)}).`);
+    if (worst && best && worst.subject.name !== best.subject.name) {
+      parts.push(`Больше внимания стоит уделить предмету «${worst.subject.name}» (${gradeLabel(worst.avg)}).`);
+    }
+    return parts.join(" ");
+  }, [overallAverage, subjectStats]);
+
+  const weekLabel =
+    data.weekActivity.deltaPct != null
+      ? `${data.weekActivity.deltaPct > 0 ? "+" : ""}${data.weekActivity.deltaPct}%`
+      : data.weekActivity.thisWeek > 0
+        ? String(data.weekActivity.thisWeek)
+        : "—";
+
+  const review = data.reviews[0];
 
   return (
     <>
       {/* Шапка (274–279): заголовок «Успехи» 17/600, колокольчик с бейджем,
           аватар родителя. Общий компонент каркаса v2 — своей копии не заводим. */}
-      <RootHeader title={T.navGrades} titleSize={17} showLogo bellBadge={bellCount} initials={parent.initials} />
+      <RootHeader
+        title={T.navGrades}
+        titleSize={17}
+        showLogo
+        bellBadge={data.bellCount}
+        initials={data.parent.initials}
+        onBell={() => router.push(R.notifications)}
+        onAvatar={() => router.push(R.profile)}
+      />
 
       <div
         className="mx-auto flex w-full max-w-[430px] flex-col"
         style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 4, paddingBottom: 8, gap: 12 }}
       >
-        {/* ChildSwitcherCard compact (281): r18, паддинг 10×12, аватар 44. */}
-        <GlassCard radius={18} onClick={() => setSheetOpen(true)}>
-          <div className="flex items-center" style={{ padding: "10px 12px", gap: 10 }}>
-            {/* Кольца аватара выступают наружу — компенсируем зазором. */}
-            <span className="block shrink-0" style={{ margin: child.avatar_ring ? 4.5 : 2 }}>
-              <Avatar
-                initials={child.first_name.slice(0, 1)}
-                gradient={child.avatar_gradient}
-                ringColor={child.avatar_ring}
-                size={44}
-              />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, color: ink1 }}>
-                {child.full_name}
-              </span>
-              <span className="flex items-center" style={{ gap: 4 }}>
-                <span className="truncate" style={{ fontSize: 11, fontWeight: 700, color: ink2 }}>
-                  {`${child.class_name} ${T.class}`}
-                </span>
-                <ChevronDown size={10} color={ink2} strokeWidth={2.4} />
-              </span>
-            </span>
-            <span className="flex shrink-0 flex-col items-end" style={{ gap: 4 }}>
-              {child.status_chip ? (
-                <span
-                  className="inline-flex items-center"
-                  style={{
-                    gap: 4,
-                    padding: "4px 9px",
-                    borderRadius: 999,
-                    background: chip(status.green.rgb).background,
-                    border: `1px solid ${chip(status.green.rgb).borderColor}`,
-                  }}
-                >
-                  <span style={{ width: 5, height: 5, borderRadius: 3, background: `rgb(${status.green.rgb})` }} />
-                  <span style={{ fontSize: 9.5, fontWeight: 800, color: status.green.text }}>{child.status_chip}</span>
-                </span>
-              ) : null}
-              <span style={{ fontSize: 10.5, fontWeight: 800, color: LINK }}>{`${T.switchChild} ›`}</span>
-            </span>
-          </div>
-        </GlassCard>
-
-        {/* AccentCard «Средний балл» (282–289). */}
-        <AccentCard
-          gradient={["#f97316", "#ec4899"]}
-          shadowRgb="249,115,22"
-          radius={22}
-          contentStyle={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <div className="flex items-start">
-            <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 6 }}>
-              <AccentCapsLabel>{T.average}</AccentCapsLabel>
-              <div className="flex items-end" style={{ gap: 6 }}>
-                <span style={{ fontFamily: fontDisplay, fontWeight: 600, fontSize: 34, color: "#FFFFFF" }}>
-                  {summary.average_label}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "rgba(255,255,255,0.85)",
-                    marginBottom: 6,
-                  }}
-                >
-                  {`/${summary.average_max_label}`}
+        {!child ? (
+          <GlassCard radius={22}>
+            <EmptyBlock title={T.noChild} hint={T.noChildHint} />
+          </GlassCard>
+        ) : (
+          <>
+            {/* ChildSwitcherCard compact (281): r18, паддинг 10×12, аватар 44.
+                Внутри две разные цели, поэтому карточка — контейнер. */}
+            <GlassCard radius={18}>
+              <div className="flex items-center" style={{ padding: "10px 12px", gap: 10 }}>
+                <Link href={R.child} className="flex min-w-0 flex-1 items-center" style={{ gap: 10 }}>
+                  <span className="block shrink-0" style={{ margin: 2 }}>
+                    <Avatar initials={child.initial} gradient={child.gradient} size={44} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, color: ink1 }}>
+                      {child.fullName}
+                    </span>
+                    <span className="flex items-center" style={{ gap: 4 }}>
+                      <span className="truncate" style={{ fontSize: 11, fontWeight: 700, color: ink2 }}>
+                        {/* className из parent-context уже содержит слово
+                            «класс» («10-А класс») — без проверки выводилось
+                            «10-А класс класс». */}
+                        {child.className
+                          ? (/класс/i.test(child.className) ? child.className : `${child.className} ${T.class}`)
+                          : "—"}
+                      </span>
+                      <ChevronDown size={10} color={ink2} strokeWidth={2.4} />
+                    </span>
+                  </span>
+                </Link>
+                <span className="flex shrink-0 flex-col items-end" style={{ gap: 4 }}>
+                  {child.statusLabel ? (
+                    <Link
+                      href={R.day}
+                      className="inline-flex items-center"
+                      style={{
+                        gap: 4,
+                        padding: "4px 9px",
+                        borderRadius: 999,
+                        background: chip(status.green.rgb).background,
+                        border: `1px solid ${chip(status.green.rgb).borderColor}`,
+                      }}
+                    >
+                      <span style={{ width: 5, height: 5, borderRadius: 3, background: `rgb(${status.green.rgb})` }} />
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: status.green.text }}>
+                        {child.statusLabel}
+                      </span>
+                    </Link>
+                  ) : null}
+                  <Link href={R.child} style={{ fontSize: 10.5, fontWeight: 800, color: LINK }}>
+                    {`${T.childProfile} ›`}
+                  </Link>
                 </span>
               </div>
-              <StarRating count={summary.stars_filled} size={14} />
-            </div>
-            {summary.average_chip ? (
-              <span
-                className="shrink-0"
-                style={{
-                  padding: "5px 10px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.35)",
-                  background: "rgba(255,255,255,0.2)",
-                  fontSize: 10.5,
-                  fontWeight: 800,
-                  color: "#FFFFFF",
-                }}
-              >
-                {summary.average_chip}
-              </span>
-            ) : null}
-          </div>
+            </GlassCard>
 
-          <div className="flex" style={{ gap: 10 }}>
-            <AccentInset
-              radius={14}
-              className="flex flex-1 flex-col"
-              style={{ padding: 12, gap: 6, display: "flex", flexDirection: "column" }}
+            {/* AccentCard «Средний балл» (282–289). */}
+            <AccentCard
+              gradient={["#f97316", "#ec4899"]}
+              shadowRgb="249,115,22"
+              radius={22}
+              contentStyle={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}
             >
-              <AccentCapsLabel>{T.weekProgress}</AccentCapsLabel>
-              <span className="flex items-center" style={{ gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>{summary.week_progress_label}</span>
-                <Sparkline values={weekSparklineValues} width={56} height={20} strokeColor="#FFFFFF" strokeWidth={2.2} />
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
-                {summary.week_progress_note}
-              </span>
-            </AccentInset>
-
-            <AccentInset
-              radius={14}
-              pressable
-              className="flex-1"
-              style={{ padding: 12, gap: 6, display: "flex", flexDirection: "column" }}
-            >
-              <span className="flex items-center justify-between">
-                <AccentCapsLabel>{T.attendance}</AccentCapsLabel>
-                <ChevronRight />
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>{`${summary.attendance_pct}%`}</span>
-              <span className="block" style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.3)" }}>
+              <div className="flex items-start">
+                <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 6 }}>
+                  <AccentCapsLabel>{T.average}</AccentCapsLabel>
+                  <div className="flex items-end" style={{ gap: 6 }}>
+                    <span style={{ fontFamily: fontDisplay, fontWeight: 600, fontSize: 34, color: "#FFFFFF" }}>
+                      {overallAverage != null ? gradeLabel(overallAverage) : "—"}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+                      /5
+                    </span>
+                  </div>
+                  <StarRating count={overallAverage != null ? Math.round(overallAverage) : 0} size={14} />
+                </div>
                 <span
-                  className="block"
+                  className="shrink-0"
                   style={{
-                    height: 4,
-                    borderRadius: 2,
-                    width: `${summary.attendance_pct}%`,
-                    background: "#FFFFFF",
-                  }}
-                />
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
-                {`${T.attendanceRatioPrefix} ${summary.attendance_ratio_label}`}
-              </span>
-            </AccentInset>
-          </div>
-        </AccentCard>
-
-        {/* SegmentPills 3 таба (290). */}
-        <SegmentPills
-          items={[T.tabGrades, T.tabSkills, T.tabDyn]}
-          activeIndex={activeTab}
-          onChange={setActiveTab}
-        />
-
-        {/* ─── Ветка «Оценки» ─────────────────────────────────────────────── */}
-        {activeTab === 0 && (
-          <>
-            {/* Период + delta (294–304). */}
-            <div className="flex items-center" style={{ gap: 10 }}>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setPeriodOpen((v) => !v)}
-                  className="flex items-center"
-                  style={{
-                    padding: "7px 12px",
+                    padding: "5px 10px",
                     borderRadius: 999,
-                    border: `1px solid ${glassBorder}`,
-                    background: PERIOD_BG,
-                    gap: 6,
+                    border: "1px solid rgba(255,255,255,0.35)",
+                    background: "rgba(255,255,255,0.2)",
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    color: "#FFFFFF",
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 800, color: ink1 }}>{period}</span>
-                  <ChevronDown size={10} color={ink1} strokeWidth={2.4} />
-                </button>
-                {periodOpen ? (
-                  <div
-                    className="absolute left-0 flex flex-col"
-                    style={{
-                      top: "110%",
-                      zIndex: 25,
-                      width: 170,
-                      borderRadius: 16,
-                      border: `1px solid ${POPOVER_BORDER}`,
-                      background: POPOVER_BG,
-                      backdropFilter: "blur(24px)",
-                      WebkitBackdropFilter: "blur(24px)",
-                      boxShadow: POPOVER_SHADOW,
-                      paddingTop: 4,
-                      paddingBottom: 4,
-                    }}
-                  >
-                    {periods.periods.map((p) => (
+                  {`${grades.length} ${pluralGrades(grades.length)}`}
+                </span>
+              </div>
+
+              <div className="flex" style={{ gap: 10 }}>
+                <AccentInset
+                  radius={14}
+                  className="flex flex-1 flex-col"
+                  style={{ padding: 12, gap: 6, display: "flex", flexDirection: "column" }}
+                >
+                  <AccentCapsLabel>{T.weekProgress}</AccentCapsLabel>
+                  <span className="flex items-center" style={{ gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>{weekLabel}</span>
+                    <Sparkline
+                      values={dynamicsValues}
+                      width={56}
+                      height={20}
+                      strokeColor="#FFFFFF"
+                      strokeWidth={2.2}
+                    />
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+                    {`${data.weekActivity.thisWeek} ${pluralGrades(data.weekActivity.thisWeek)} за 7 дней`}
+                  </span>
+                </AccentInset>
+
+                <AccentInset
+                  radius={14}
+                  href={R.attendance}
+                  className="flex-1"
+                  style={{ padding: 12, gap: 6, display: "flex", flexDirection: "column" }}
+                >
+                  <span className="flex items-center justify-between">
+                    <AccentCapsLabel>{T.attendance}</AccentCapsLabel>
+                    <ChevronRight />
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>
+                    {`${data.attendance.pct}%`}
+                  </span>
+                  <span className="block" style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.3)" }}>
+                    <span
+                      className="block"
+                      style={{ height: 4, borderRadius: 2, width: `${data.attendance.pct}%`, background: "#FFFFFF" }}
+                    />
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+                    {`${T.attendanceRatioPrefix} ${data.attendance.present}/${data.attendance.total}`}
+                  </span>
+                </AccentInset>
+              </div>
+            </AccentCard>
+
+            {/* SegmentPills (290). Вкладки «Навыки» нет — под неё нет данных. */}
+            <SegmentPills items={[T.tabGrades, T.tabDyn]} activeIndex={activeTab} onChange={setActiveTab} />
+
+            {/* ─── Ветка «Оценки» ─────────────────────────────────────────── */}
+            {activeTab === 0 &&
+              (grades.length === 0 ? (
+                <GlassCard radius={22}>
+                  <EmptyBlock title={T.noGrades} hint={T.noGradesHint} />
+                </GlassCard>
+              ) : (
+                <>
+                  {/* Период + delta (294–304). */}
+                  <div className="flex items-center" style={{ gap: 10 }}>
+                    <div className="relative">
                       <button
-                        key={p}
                         type="button"
-                        onClick={() => {
-                          setPeriod(p);
-                          setPeriodOpen(false);
-                        }}
-                        className="text-left"
+                        onClick={() => setPeriodOpen((v) => !v)}
+                        className="flex items-center"
                         style={{
-                          padding: "9px 14px",
-                          fontSize: 12,
-                          fontWeight: p === period ? 800 : 700,
-                          color: p === period ? accent : ink1,
+                          padding: "7px 12px",
+                          borderRadius: 999,
+                          border: `1px solid ${glassBorder}`,
+                          background: PERIOD_BG,
+                          gap: 6,
                         }}
                       >
-                        {p}
+                        <span style={{ fontSize: 11, fontWeight: 800, color: ink1 }}>
+                          {data.periods.find((p) => p.id === period)?.label ?? T.periodAll}
+                        </span>
+                        <ChevronDown size={10} color={ink1} strokeWidth={2.4} />
                       </button>
-                    ))}
+                      {periodOpen ? (
+                        <div
+                          className="absolute left-0 flex flex-col"
+                          style={{
+                            top: "110%",
+                            zIndex: 25,
+                            width: 170,
+                            borderRadius: 16,
+                            border: `1px solid ${POPOVER_BORDER}`,
+                            background: POPOVER_BG,
+                            backdropFilter: "blur(24px)",
+                            WebkitBackdropFilter: "blur(24px)",
+                            boxShadow: POPOVER_SHADOW,
+                            paddingTop: 4,
+                            paddingBottom: 4,
+                          }}
+                        >
+                          {data.periods.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setPeriod(p.id);
+                                setPeriodOpen(false);
+                              }}
+                              className="text-left"
+                              style={{
+                                padding: "9px 14px",
+                                fontSize: 12,
+                                fontWeight: p.id === period ? 800 : 700,
+                                color: p.id === period ? accent : ink1,
+                              }}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-1 justify-end">
+                      {periodDeltaNote ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: periodDeltaNote.up ? status.green.text : status.red.text,
+                          }}
+                        >
+                          {periodDeltaNote.text}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: ink3 }}>
+                          {`${periodGrades.length} ${pluralGrades(periodGrades.length)}`}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                ) : null}
-              </div>
-              <div className="flex flex-1 justify-end">
-                <span style={{ fontSize: 11, fontWeight: 800, color: status.green.text }}>
-                  {`${summary.vs_prev_month_note} ↗`}
-                </span>
-              </div>
-            </div>
 
-            {/* Subjects grid (305–312). */}
-            <SectionHeader title={T.subjectsSection} linkLabel={`${T.allSubjects} ›`} />
-            <div className="flex flex-wrap" style={{ gap: 8 }}>
-              {stats.map((s) => (
-                <SubjectGridTile key={s.subject_id} stat={s} subjectName={getSubject(s.subject_id).name} />
+                  {subjectStats.length === 0 ? (
+                    <GlassCard radius={22}>
+                      <EmptyBlock title={T.noGradesPeriod} />
+                    </GlassCard>
+                  ) : (
+                    <>
+                      {/* Subjects grid (305–312). */}
+                      <SectionHeader
+                        title={T.subjectsSection}
+                        linkLabel={`${T.allSubjects} ›`}
+                        linkHref={R.subjects}
+                      />
+                      <div className="flex flex-wrap" style={{ gap: 8 }}>
+                        {subjectStats.map((s) => (
+                          <Link
+                            key={s.subject.name}
+                            href={subjectHref(s.subject.id)}
+                            className="flex flex-col items-center"
+                            style={{
+                              flex: "1 1 31%",
+                              gap: 6,
+                              padding: "12px 6px",
+                              borderRadius: 16,
+                              border: `1px solid ${glassBorder}`,
+                              background: TILE_BG,
+                            }}
+                          >
+                            <SubjectTile subjectKey={s.subject.key} size={34} radius={11} glyph={s.subject.glyph} />
+                            <span className="flex items-center" style={{ gap: 3 }}>
+                              <span style={{ fontSize: 13, fontWeight: 800, color: ink1 }}>{gradeLabel(s.avg)}</span>
+                              <StarGlyph size={11} />
+                            </span>
+                            <span
+                              className="w-full truncate text-center"
+                              style={{ fontSize: 8.5, fontWeight: 700, color: ink2 }}
+                            >
+                              {s.subject.name}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+
+                      {/* Строки ProgressBar по предметам (313–319). */}
+                      <GlassCard radius={22} style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                        {subjectStats.map((s) => {
+                          const g = subjects[s.subject.key].grad;
+                          const deltaLabel =
+                            s.delta == null
+                              ? `${s.count} ${pluralGrades(s.count)}`
+                              : `${s.delta >= 0 ? "↑" : "↓"} ${Math.abs(s.delta).toFixed(1)}`;
+                          return (
+                            <Link
+                              key={s.subject.name}
+                              href={subjectHref(s.subject.id)}
+                              className="flex items-center"
+                              style={{ gap: 10 }}
+                            >
+                              <SubjectTile subjectKey={s.subject.key} size={28} radius={9} glyph={s.subject.glyph} />
+                              <span
+                                className="truncate text-left"
+                                style={{ width: 96, flexShrink: 0, fontSize: 11, fontWeight: 800, color: ink1 }}
+                              >
+                                {s.subject.name}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <ProgressBar pct={s.avg / 5} height={5.5} fillGradient={[g[0], g[1]]} />
+                              </span>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: ink1 }}>{gradeLabel(s.avg)}</span>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  color: s.delta == null ? ink3 : s.delta >= 0 ? status.green.text : status.red.text,
+                                  minWidth: 46,
+                                  textAlign: "right",
+                                }}
+                              >
+                                {deltaLabel}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </GlassCard>
+
+                      {/* «Сильные / зоны роста» (320–325). */}
+                      {strengths.length > 0 || growthAreas.length > 0 ? (
+                        <GlassCard
+                          radius={22}
+                          style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}
+                        >
+                          <CapsLabel color={status.green.text}>{T.strengths}</CapsLabel>
+                          <div className="flex flex-wrap" style={{ gap: 6 }}>
+                            {strengths.map((s) => (
+                              <ToneChip key={s} label={s} tone="green" />
+                            ))}
+                          </div>
+                          <div style={{ height: 1, background: CARD_DIVIDER }} />
+                          <CapsLabel color={status.red.text}>{T.growthAreas}</CapsLabel>
+                          <div className="flex flex-wrap" style={{ gap: 6 }}>
+                            {growthAreas.length > 0 ? (
+                              growthAreas.map((s) => <ToneChip key={s} label={s} tone="red" />)
+                            ) : (
+                              <span style={{ fontSize: 11, fontWeight: 700, color: ink3 }}>
+                                Отстающих предметов нет
+                              </span>
+                            )}
+                          </div>
+                        </GlassCard>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* Отзыв учителя (326–331). */}
+                  <SectionHeader title={T.lastReviews} linkLabel={`${T.viewAll} ›`} linkHref={R.reviews} />
+                  {review ? (
+                    <GlassCard radius={22} style={{ padding: 0 }}>
+                      <Link
+                        href={R.reviews}
+                        className="flex"
+                        style={{ padding: 14, flexDirection: "row", gap: 10 }}
+                      >
+                        <span className="relative block shrink-0" style={{ width: 38, height: 38 }}>
+                          <Avatar initials={review.teacherInitials} gradient={review.teacherGradient} size={38} />
+                          <span
+                            className="absolute block"
+                            style={{
+                              right: -1,
+                              bottom: -1,
+                              width: 10,
+                              height: 10,
+                              borderRadius: 5,
+                              background: ONLINE_DOT,
+                              border: "2px solid #FFFFFF",
+                            }}
+                          />
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col" style={{ gap: 4 }}>
+                          <span className="flex items-center justify-between">
+                            <span className="truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+                              {[review.teacherName, review.subjectName].filter(Boolean).join(" · ")}
+                            </span>
+                            <span className="shrink-0" style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>
+                              {review.timeLabel}
+                            </span>
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 600, lineHeight: "16.5px", color: ink2, ...CLAMP_3 }}>
+                            {review.comment}
+                          </span>
+                        </span>
+                        <span
+                          className="flex shrink-0 items-center justify-center"
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 8,
+                            background: `rgba(${status.green.rgb},0.14)`,
+                            border: `1px solid rgba(${status.green.rgb},0.35)`,
+                          }}
+                        >
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
+                            <path
+                              d={THUMB_PATH}
+                              stroke={status.green.text}
+                              strokeWidth={1.8}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </span>
+                      </Link>
+                    </GlassCard>
+                  ) : (
+                    <GlassCard radius={22}>
+                      <EmptyBlock title={T.noReviews} hint={T.noReviewsHint} />
+                    </GlassCard>
+                  )}
+
+                  {/* Assistant CTA (332–336). */}
+                  <AssistantCard note={assistantNote} />
+                </>
               ))}
-            </div>
 
-            {/* Строки ProgressBar по предметам (313–319). */}
-            <GlassCard radius={22} style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-              {stats.map((s) => {
-                const subject = getSubject(s.subject_id);
-                const isDown = !s.is_up;
-                return (
-                  <button key={s.subject_id} type="button" className="flex items-center" style={{ gap: 10 }}>
-                    <SubjectTile subjectId={s.subject_id} size={28} radius={9} glyph={SUBJECT_GLYPH[s.subject_id]} />
-                    <span
-                      className="truncate text-left"
-                      style={{ width: 96, flexShrink: 0, fontSize: 11, fontWeight: 800, color: ink1 }}
-                    >
-                      {subject.name}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <ProgressBar pct={s.pct / 100} height={5.5} fillGradient={subject.gradient} />
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: ink1 }}>{s.grade_label}</span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: isDown ? status.red.text : status.green.text,
-                        minWidth: 32,
-                        textAlign: "right",
-                      }}
-                    >
-                      {s.delta_label}
-                    </span>
-                  </button>
-                );
-              })}
-            </GlassCard>
-
-            {/* «Сильные / зоны роста» (320–325). */}
-            <GlassCard radius={22} style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-              <CapsLabel color={status.green.text}>{T.strengths}</CapsLabel>
-              <div className="flex flex-wrap" style={{ gap: 6 }}>
-                {summary.strengths.map((s) => (
-                  <ToneChip key={s} label={s} tone="green" />
-                ))}
-              </div>
-              <div style={{ height: 1, background: CARD_DIVIDER }} />
-              <CapsLabel color={status.red.text}>{T.growthAreas}</CapsLabel>
-              <div className="flex flex-wrap" style={{ gap: 6 }}>
-                {summary.growth_areas.map((s) => (
-                  <ToneChip key={s} label={s} tone="red" />
-                ))}
-              </div>
-            </GlassCard>
-
-            {/* Отзыв учителя (326–331). */}
-            <SectionHeader title={T.lastReviews} linkLabel={`${T.viewAll} ›`} />
-            <GlassCard radius={22} style={{ padding: 14, display: "flex", flexDirection: "row", gap: 10 }}>
-              <span className="relative block shrink-0" style={{ width: 38, height: 38 }}>
-                <span
-                  className="flex items-center justify-center text-white"
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 19,
-                    background: lg(135, "#8b5cf6", "#6366f1"),
-                    fontSize: 12,
-                    fontWeight: 800,
-                  }}
-                >
-                  ГЮ
-                </span>
-                <span
-                  className="absolute block"
-                  style={{
-                    right: -1,
-                    bottom: -1,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    background: ONLINE_DOT,
-                    border: "2px solid #FFFFFF",
-                  }}
-                />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col" style={{ gap: 4 }}>
-                <span className="flex items-center justify-between">
-                  <span className="truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-                    {`${review.teacher_name} · ${getSubject(review.subject_id).name}`}
-                  </span>
-                  <span className="shrink-0" style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>
-                    {review.time_label}
-                  </span>
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 600, lineHeight: "16.5px", color: ink2, ...CLAMP_3 }}>
-                  {getAssistantTexts(childId).review}
-                </span>
-              </span>
-              <span
-                className="flex shrink-0 items-center justify-center"
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 8,
-                  background: `rgba(${status.green.rgb},0.14)`,
-                  border: `1px solid rgba(${status.green.rgb},0.35)`,
-                }}
-              >
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-                  <path
-                    d={THUMB_PATH}
-                    stroke={status.green.text}
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-            </GlassCard>
-
-            {/* Assistant CTA (332–336). */}
-            <AssistantCard note={notes.grades} />
-          </>
-        )}
-
-        {/* ─── Ветка «Навыки» ─────────────────────────────────────────────── */}
-        {activeTab === 1 && (
-          <>
-            <SectionHeader title={T.skillsProgress} linkLabel={`${T.more} ›`} />
-            {/* 4 плитки навыков одной строкой (343–348). */}
-            <div className="flex flex-nowrap" style={{ gap: 6 }}>
-              {skills.tiles.map((t) => (
-                <div
-                  key={t.name}
-                  className="flex min-w-0 flex-1 flex-col"
-                  style={{
-                    padding: 10,
-                    borderRadius: 14,
-                    border: `1px solid ${glassBorder}`,
-                    background: TILE_BG,
-                    gap: 6,
-                  }}
-                >
-                  <span className="flex items-center" style={{ gap: 6 }}>
-                    <span
-                      className="block shrink-0"
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 8,
-                        background: lg(135, t.gradient[0], t.gradient[1]),
-                      }}
+            {/* ─── Ветка «Динамика» ───────────────────────────────────────── */}
+            {activeTab === 1 &&
+              (dynamics.length < 2 ? (
+                <GlassCard radius={22}>
+                  <EmptyBlock title={T.noDynamics} hint={grades.length === 0 ? T.noGradesHint : undefined} />
+                </GlassCard>
+              ) : (
+                <>
+                  <GlassCard radius={22} style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                    <CapsLabel color={ink3}>{T.dynAvg}</CapsLabel>
+                    <Sparkline
+                      values={dynamicsValues}
+                      width={320}
+                      height={90}
+                      strokeColor={accent}
+                      strokeWidth={3}
+                      endDot
+                      endDotRadius={4.5}
+                      fluid
                     />
-                    <span style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>{`${t.pct}%`}</span>
-                  </span>
-                  <span className="block truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink2 }}>
-                    {t.name}
-                  </span>
-                  <ProgressBar pct={t.pct / 100} height={3.5} fillGradient={t.gradient} />
-                </div>
-              ))}
-            </div>
+                    <div className="flex justify-between">
+                      {dynamics.map((m) => (
+                        <span key={m.monthKey} style={{ fontSize: 10, fontWeight: 700, color: ink3 }}>
+                          {m.label}
+                        </span>
+                      ))}
+                    </div>
+                  </GlassCard>
 
-            {/* Профиль навыков — Radar (349–353). */}
-            <GlassCard
-              radius={22}
-              style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}
-            >
-              <div className="w-full">
-                <CapsLabel color={ink3}>{T.skillsProfile}</CapsLabel>
-              </div>
-              <Radar
-                values={skills.radar_values}
-                max={100}
-                size={224}
-                fillColor={`rgba(${status.violet.rgb},0.28)`}
-                strokeColor={accent}
-                labels={skillsRadarLabels}
-                labelFontSize={7.5}
-                gridRings={[0.33, 0.66, 1]}
-                showSpokes
-                showDots
-              />
-            </GlassCard>
+                  <GlassCard radius={22} style={{ padding: 14 }}>
+                    {dynamics
+                      .slice()
+                      .reverse()
+                      .map((m, i, arr) => {
+                        const prev = arr[i + 1];
+                        const diff = prev ? m.avg - prev.avg : null;
+                        return (
+                          <div
+                            key={m.monthKey}
+                            className="flex items-center"
+                            style={{
+                              paddingTop: 10,
+                              paddingBottom: 10,
+                              borderTop: i === 0 ? undefined : `1px solid ${ROW_DIVIDER}`,
+                            }}
+                          >
+                            <span
+                              className="flex-1"
+                              style={{ fontSize: 12, fontWeight: i === 0 ? 800 : 700, color: ink1 }}
+                            >
+                              {m.label}
+                            </span>
+                            <span
+                              style={{ fontSize: 12, fontWeight: i === 0 ? 800 : 700, color: ink1, marginRight: 12 }}
+                            >
+                              {gradeLabel(m.avg)}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: diff == null ? ink3 : diff >= 0 ? status.green.text : status.red.text,
+                              }}
+                            >
+                              {diff == null ? "—" : `${diff >= 0 ? "↑" : "↓"} ${Math.abs(diff).toFixed(1)}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </GlassCard>
 
-            <AssistantCard note={notes.skills} />
-          </>
-        )}
-
-        {/* ─── Ветка «Динамика» ───────────────────────────────────────────── */}
-        {activeTab === 2 && (
-          <>
-            <GlassCard radius={22} style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-              <CapsLabel color={ink3}>{T.dynAvg}</CapsLabel>
-              <Sparkline
-                values={dynSparklineValues}
-                width={320}
-                height={90}
-                strokeColor={accent}
-                strokeWidth={3}
-                endDot
-                endDotRadius={4.5}
-                fluid
-              />
-              <div className="flex justify-between">
-                {T.dynMonths.map((m) => (
-                  <span key={m} style={{ fontSize: 10, fontWeight: 700, color: ink3 }}>
-                    {m}
-                  </span>
-                ))}
-              </div>
-            </GlassCard>
-
-            <GlassCard radius={22} style={{ padding: 14 }}>
-              {summary.dynamics_months.map((m, i) => {
-                const isCurrent = i === summary.dynamics_months.length - 1;
-                return (
-                  <div
-                    key={m.month_label}
-                    className="flex items-center"
+                  <p
                     style={{
-                      paddingTop: 10,
-                      paddingBottom: 10,
-                      borderTop: i === 0 ? undefined : `1px solid ${ROW_DIVIDER}`,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: ink2,
+                      textAlign: "center",
+                      paddingLeft: 12,
+                      paddingRight: 12,
                     }}
                   >
-                    <span className="flex-1" style={{ fontSize: 12, fontWeight: isCurrent ? 800 : 700, color: ink1 }}>
-                      {m.month_label}
-                    </span>
-                    <span
-                      style={{ fontSize: 12, fontWeight: isCurrent ? 800 : 700, color: ink1, marginRight: 12 }}
-                    >
-                      {m.avg_label}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: status.green.text }}>{m.delta_label}</span>
-                  </div>
-                );
-              })}
-            </GlassCard>
-
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: ink2,
-                textAlign: "center",
-                paddingLeft: 12,
-                paddingRight: 12,
-              }}
-            >
-              {summary.dynamics_note}
-            </p>
+                    {assistantNote}
+                  </p>
+                </>
+              ))}
           </>
         )}
-
-        {/* Шторка выбора ребёнка (2632–2644). */}
-        <ChildPickerSheet
-          open={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          title={T.chooseChild}
-          items={pickerItems}
-          selectedId={childId}
-          onSelect={(id) => {
-            setChildId(id);
-            setSheetOpen(false);
-          }}
-        />
       </div>
     </>
   );

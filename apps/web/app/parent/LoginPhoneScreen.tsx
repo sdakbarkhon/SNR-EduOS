@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getDictionary, type Locale } from "@snr/core";
+import { loginParentByPhone } from "@/app/actions/parentPhoneAuth";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { GlassButton } from "@/components/parent/glass/GlassButton";
@@ -18,10 +20,13 @@ import {
   UzFlagIcon,
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
-import { AuthDemoSheet } from "./AuthDemoSheet";
 import { LangThemeButtons } from "./LangThemeButtons";
 
-type SheetKey = null | "help" | "demo";
+/** Единственный демо-родитель: Исмаилов Бахтиёр (ребёнок — Шерзод, 10-А).
+ *  Тот же номер, что в packages/core PARENT_PHONE_ACCOUNTS. */
+const DEMO_PARENT_PHONE = "912345678";
+
+type SheetKey = null | "help";
 
 /** Формат «90 123 45 67» — 1:1 с мобильным LoginPhoneScreen.tsx. */
 function formatPhone(digits: string): string {
@@ -40,7 +45,7 @@ type Props = {
 /**
  * Экран входа по номеру — 1:1 перенос apps/mobile-parent LoginPhoneScreen.tsx
  * (иконки/шторки — тоже 1:1, см. auth/icons.tsx, AuthHelpSheet.tsx,
- * AuthDemoSheet.tsx). Валидацию номера и переход к SMS-коду не трогаем —
+ * AuthDemoSheet.tsx удалён — демо теперь одна кнопка). Валидацию номера
  * phone/onSubmit управляются в AuthFlow.tsx как и раньше.
  *
  * Селектор страны в этой версии статичен (только Узбекистан) — клик
@@ -56,6 +61,32 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
   const [sheet, setSheet] = useState<SheetKey>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<number | null>(null);
+
+  // Демо-вход родителя: ОДНА кнопка → сразу заходим под Исмаиловым
+  // Бахтиёром (телефон 91 234 56 78, ребёнок — Исмаилов Шерзод, 10-А).
+  // Раньше кнопка открывала шит с ВЫБОРОМ из трёх родителей
+  // (Исмаилов/Рахимов/Каримов) — по решению заказчика демо сведено к
+  // одной семье, выбор убран. Вход идёт тем же server action, что и
+  // обычный флоу «номер + SMS» (код не проверяется по-настоящему,
+  // сверяется только формат), поэтому экран SMS можно пропустить.
+  const router = useRouter();
+  const [demoBusy, setDemoBusy] = useState(false);
+  const demoBusyRef = useRef(false);
+
+  async function handleDemoLogin() {
+    if (demoBusyRef.current) return;
+    demoBusyRef.current = true;
+    setDemoBusy(true);
+    const result = await loginParentByPhone(DEMO_PARENT_PHONE, "0000");
+    if (!result.ok) {
+      demoBusyRef.current = false;
+      setDemoBusy(false);
+      setNotice(t.loginFailed);
+      return;
+    }
+    router.replace(result.dest);
+    router.refresh();
+  }
 
   function showComingSoon() {
     setNotice(comingSoonText);
@@ -133,8 +164,9 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
 
         <button
           type="button"
-          onClick={() => setSheet("demo")}
-          className="flex items-center gap-2.5 p-3.5 text-left"
+          onClick={handleDemoLogin}
+          disabled={demoBusy}
+          className="flex items-center gap-2.5 p-3.5 text-left disabled:opacity-60"
           style={{ ...ctaCardStyle, border: "1.5px solid rgba(124,58,237,0.5)" }}
         >
           <div
@@ -203,7 +235,6 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
       )}
 
       <AuthHelpSheet visible={sheet === "help"} onClose={() => setSheet(null)} />
-      <AuthDemoSheet visible={sheet === "demo"} onClose={() => setSheet(null)} />
     </div>
   );
 }

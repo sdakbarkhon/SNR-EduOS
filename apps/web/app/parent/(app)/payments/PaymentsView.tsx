@@ -529,9 +529,25 @@ const capsLabel: CSSProperties = {
   color: "rgba(255,255,255,0.85)",
 };
 
-export function PaymentsView() {
-  // Активный ребёнок — из DEFAULT_CHILD_INDEX фикстур (как в мобилке): Малика.
-  const { child, wallet_balance } = getSelectedChildContext();
+export function PaymentsView({
+  childName,
+  childClassName,
+}: {
+  /** Реальный ребёнок с сервера (см. page.tsx). Суммы ниже — мок. */
+  childName: string | null;
+  childClassName: string | null;
+}) {
+  // Суммы/кошелёк — по-прежнему фикстуры (платёжного бэкенда нет), но
+  // ИМЯ ребёнка берём настоящее: раньше здесь стоял DEFAULT_CHILD_INDEX
+  // фикстур и экран показывал чужую семью.
+  const { wallet_balance } = getSelectedChildContext();
+  // «Шерзод» → родительный «Шерзода» для шаблона «Кошелёк {gen}».
+  const givenName = (childName ?? "").trim().split(/\s+/).slice(-1)[0] ?? "";
+  const child = {
+    first_name: givenName || "—",
+    first_name_gen: givenName ? `${givenName}а` : "—",
+    class_name: childClassName ?? "",
+  };
   const parent = getParent();
   const overview = getPaymentsOverview();
   const dueBills = getDueBills();

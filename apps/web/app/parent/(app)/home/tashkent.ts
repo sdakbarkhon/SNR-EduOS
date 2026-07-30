@@ -20,3 +20,38 @@ export function tashkentDateKey(iso: string): string {
 export function tashkentToday(): string {
   return tashkentDateKey(getDemoNow().toISOString());
 }
+
+/** ISO-таймстамп → «10:20» по Ташкенту. */
+export function tashkentTimeLabel(iso: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: APP_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+/** YYYY-MM-DD → «3 августа» (без года). */
+export function tashkentDayLabel(dateKey: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: APP_TIME_ZONE,
+    day: "numeric",
+    month: "long",
+  }).format(new Date(`${dateKey}T12:00:00+05:00`));
+}
+
+/**
+ * Человеческая подпись дня относительно «сегодня» демо-сессии:
+ * «сегодня» / «завтра» / «3 августа». Возвращает null для сегодняшнего дня —
+ * вызывающий сам решает, дописывать ли слово (на «Следующем уроке» сегодняшний
+ * день не подписывается вовсе, как в макете).
+ */
+export function tashkentRelativeDayLabel(dateKey: string, todayKey: string): string | null {
+  if (dateKey === todayKey) return null;
+  const dayMs = 86400000;
+  const diff = Math.round(
+    (new Date(`${dateKey}T12:00:00+05:00`).getTime() - new Date(`${todayKey}T12:00:00+05:00`).getTime()) / dayMs,
+  );
+  if (diff === 1) return "завтра";
+  return tashkentDayLabel(dateKey);
+}

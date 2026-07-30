@@ -1,17 +1,20 @@
+import { getSelectedChild } from "@/lib/parent-queries";
 import { PaymentsView } from "./PaymentsView";
 
 /**
- * «Оплаты» (П17) — редизайн v2. Экран полностью перенесён 1:1 из мобильного
- * apps/mobile-parent/src/screens/tabs/PaymentsScreen.tsx (ветка
- * `feat/mobile-parent-redesign`) и читает данные ТОЛЬКО из фикстур
- * app/parent/(app)/v2/data (точная копия data-слоя мобилки) — теми же
- * аксессорами, что и RN-экран. Поэтому серверных props здесь больше нет:
- * прежняя версия тянула ребёнка из cookie и WALLETS из @snr/core, теперь
- * единственный источник чисел — v2/data (getSelectedChildContext и др.),
- * чтобы веб и мобилка не расходились.
+ * «Оплаты» (П17). СУММЫ здесь намеренно остаются МОКАМИ — платёжного
+ * бэкенда в проекте нет вовсе (таблицы payments/charges есть, но пустые и
+ * не отражают реальных счетов), поэтому счета/кошелёк/история берутся из
+ * фикстур v2/data, как в мобилке.
+ *
+ * А вот РЕБЁНОК — настоящий: имя и класс приходят с сервера из
+ * parent-queries. Раньше экран брал ребёнка из DEFAULT_CHILD_INDEX фикстур
+ * и показывал чужую семью (Малику Каримову) — при том, что у нашего
+ * родителя ребёнок один и это Исмаилов Шерзод.
  *
  * Авторизация/редирект — на уровне layout.tsx этого сегмента.
  */
-export default function ParentPaymentsPage() {
-  return <PaymentsView />;
+export default async function ParentPaymentsPage() {
+  const child = await getSelectedChild();
+  return <PaymentsView childName={child?.full_name ?? null} childClassName={child?.className ?? null} />;
 }

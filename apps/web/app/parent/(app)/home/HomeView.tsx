@@ -3,7 +3,7 @@
 /**
  * П5 «Главная» (Dashboard) — ВЕБ-порт экрана родительского приложения.
  *
- * Источник 1:1 — apps/mobile-parent/src/screens/tabs/HomeScreen.tsx с ветки
+ * Вёрстка 1:1 — apps/mobile-parent/src/screens/tabs/HomeScreen.tsx с ветки
  * `feat/mobile-parent-redesign` (то, что реально крутится в Expo Go), который
  * сам перенесён дословно из макета «SNR EduOS v2 Light.dc.html», строки 219–271:
  *   227      приветствие;
@@ -13,27 +13,31 @@
  *   250–254  AccentCard «EduOS Assistant» с 2 CTA;
  *   255–263  QuickActionsGrid 3×2;
  *   264      SectionHeader ленты;
- *   265–269  GlassCard с 3 ListRow «Сегодня»;
- *   + шторка выбора ребёнка (2632–2644).
+ *   265–269  GlassCard с 3 ListRow «Сегодня».
  *
- * Данные — ТОЛЬКО через аксессоры ../v2/data (точная копия data-слоя мобилки):
- * getChildren, getDashboard, getParent, getSelectedChildContext. Числа и тексты
- * не пересчитываются и не выдумываются. Ветка isRealFlow мобилки (Supabase)
- * на вебе не переносится — БД к этому экрану не подключена.
+ * ДАННЫЕ: экран больше НЕ читает фикстуры ../v2/data. Он чистая презентация —
+ * весь view-model собирает серверный page.tsx из lib/parent-queries (Supabase,
+ * всегда со studentId выбранного ребёнка) и передаёт пропсом `data`. Числа не
+ * пересчитываются здесь и не выдумываются; мок остался только там, где нет
+ * бэкенда вовсе (кошелёк / «К оплате» / «Питание» — см. page.tsx).
  *
- * UI-компоненты мобилки (ChildSwitcherCard, MetricsSplitRow, AccentCard,
- * AccentInset, StatusChip, ListRow, SectionHeader, QuickActionTile/Grid,
- * Avatar, BottomSheetFrame, ChildPickerSheetContent) перенесены сюда локально
- * с их точными радиусами/паддингами/цветами; общее стекло и токены берутся из
- * ../v2/GlassCard и ../v2/tokens — вторых копий не заводим.
+ * НАВИГАЦИЯ: карточки кликабельные (next/link, prefetch по умолчанию).
+ * Шапка (RootHeader) принимает колбэки, а не ссылки, поэтому колокольчик и
+ * аватар ведут через router.push с ручным router.prefetch на маунте.
+ *
+ * UI-компоненты мобилки (MetricsSplitRow, AccentCard, AccentInset, StatusChip,
+ * ListRow, SectionHeader, QuickActionTile/Grid, Avatar) перенесены сюда
+ * локально с их точными радиусами/паддингами/цветами; общее стекло и токены
+ * берутся из ../v2/GlassCard и ../v2/tokens — вторых копий не заводим.
  *
  * Только светлая тема.
  */
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { GlassCard } from "../v2/GlassCard";
 import { RootHeader } from "../v2/RootHeader";
 import {
-  accentGrad,
   chip,
   fontDisplay,
   glass1,
@@ -45,14 +49,63 @@ import {
   status,
   type StatusKey,
 } from "../v2/tokens";
-import {
-  DEFAULT_CHILD_INDEX,
-  getChildren,
-  getDashboard,
-  getParent,
-  getSelectedChildContext,
-  getUnreadNotificationsCount,
-} from "../v2/data";
+
+/* ─── Контракт данных (заполняется серверным page.tsx) ────────────────────── */
+
+export type Gradient = [string, string];
+
+export type HomeBadge =
+  | { kind: "grade"; value: number }
+  | { kind: "chip"; label: string; tone: StatusKey };
+
+export interface HomeFeedRow {
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  /** Плитка 36×36: либо текстовый глиф предмета («√x»), либо иконка «питание». */
+  icon: { gradient: Gradient; glyph: string | null };
+  badge: HomeBadge;
+}
+
+export interface HomeViewData {
+  parent: { firstName: string; initials: string };
+  bellCount: number;
+  /** null — у родителя нет привязанного ребёнка (пустое состояние). */
+  child: { fullName: string; initial: string; className: string; gradient: Gradient } | null;
+  greeting: { title: string; subtitle: string };
+  statusChip: { label: string; tone: StatusKey } | null;
+  metrics: {
+    atSchoolSince: string;
+    lessonsTotal: string;
+    attended: string;
+    homework: string;
+    walletLabel: string;
+  };
+  nextLesson: { subjectName: string; metaLabel: string; glyph: string; gradient: Gradient } | null;
+  /** Мок: платёжного бэкенда нет (см. page.tsx). */
+  due: { amountLabel: string; subtitle: string };
+  /** Мок: сервиса питания нет (см. page.tsx). */
+  meals: { statusLabel: string; untilLabel: string };
+  assistantText: string;
+  feed: HomeFeedRow[];
+}
+
+/* ─── Маршруты (создаются соседними экранами родителя) ────────────────────── */
+
+const R = {
+  notifications: "/parent/notifications",
+  day: "/parent/day",
+  schedule: "/parent/schedule",
+  payments: "/parent/payments",
+  meals: "/parent/meals",
+  homework: "/parent/homework",
+  services: "/parent/services",
+  child: "/parent/child",
+  profile: "/parent/profile",
+  progress: "/parent/progress",
+  messages: "/parent/messages",
+} as const;
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Локальные константы, которых нет в v2/tokens.ts: в мобилке это приватные
@@ -74,16 +127,8 @@ const ACCENT_INSET_SHADOW = "inset 0 1.5px 0 rgba(255,255,255,0.35)";
 /** AccentInset: стекло внутри непрозрачной градиентной карточки (строка 2741). */
 const ACCENT_INSET_BG = "rgba(255,255,255,0.2)";
 const ACCENT_INSET_BORDER = "rgba(255,255,255,0.35)";
-/** Шторка (BottomSheetFrame, макет 4227–4228). */
-const SHEET_OVERLAY = "rgba(23,18,67,0.35)";
-const SHEET_BG = "linear-gradient(160deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76))";
-const SHEET_BORDER = "rgba(255,255,255,0.9)";
-const SHEET_SHADOW = "0 -16px 50px rgba(64,54,150,0.3)";
-const SHEET_GRIP = "rgba(23,18,67,0.2)";
-/** ChildPickerSheetContent: фон невыбранной галочки (макет строка 4381). */
-const CHECK_OFF_BG = "rgba(23,18,67,0.08)";
 /** StatusChip variant="new" (макет строка 2715). */
-const NEW_GRAD: readonly [string, string] = ["#8B5CF6", "#6366F1"];
+const NEW_GRAD: Gradient = ["#8B5CF6", "#6366F1"];
 const NEW_BORDER = "rgba(255,255,255,0.4)";
 const NEW_SHADOW = "0 5px 12px rgba(124,58,237,0.35)";
 
@@ -106,13 +151,18 @@ const T = {
   attended: "Посещено", // home.attended
   hw: "ДЗ", // home.hw
   wallet: "Кошелёк", // home.wallet
-  sum: "сум", // pay.sum
   pay: "Оплатить", // home.pay
   hwShort: "Дом. задания", // home.hwShort
   services: "Все сервисы", // scr.services
   childProfile: "Профиль ребёнка", // scr.childProfile
   schedule: "Расписание", // scr.schedule
-  chooseChild: "Выберите ребёнка", // auth.chooseChild
+  /** Пустые состояния — своих ключей в словаре нет, литералы ru. */
+  noChild: "К аккаунту не привязан ни один ребёнок",
+  noChildHint: "Обратитесь в администрацию школы — она свяжет профиль ученика с вашим аккаунтом.",
+  noNextLesson: "Ближайших уроков нет",
+  noNextLessonHint: "Как только появится расписание, урок покажется здесь",
+  emptyFeed: "Сегодня событий пока нет",
+  emptyFeedHint: "Оценки, посещаемость и домашние задания появятся здесь в течение дня",
 } as const;
 
 /**
@@ -147,23 +197,6 @@ const CLAMP_2: CSSProperties = {
   overflow: "hidden",
 };
 
-/**
- * formatMoney — дословно apps/mobile-parent/src/lib/format.ts: разряды по 3
- * цифры, разделитель — неразрывный пробел U+00A0 (макет: «185 000»).
- * Валюта не приклеивается (берётся из словаря на месте вызова).
- */
-const NBSP = " ";
-function formatMoney(value: number): string {
-  const n = Math.round(Math.abs(value));
-  const s = String(n);
-  const groups: string[] = [];
-  for (let i = s.length; i > 0; i -= 3) {
-    groups.unshift(s.slice(Math.max(0, i - 3), i));
-  }
-  const joined = groups.join(NBSP);
-  return value < 0 ? `-${joined}` : joined;
-}
-
 /* ─── Атомы (перенос ui-компонентов мобилки) ──────────────────────────────── */
 
 /** Иконка-глиф из inline SVG-paths, белым, stroke 1.9 (WhiteGlyph мобилки). */
@@ -196,23 +229,6 @@ function ChevronRight({ size, color, strokeWidth }: { size: number; color: strin
   );
 }
 
-function ChevronDown({ size, color, strokeWidth }: { size: number; color: string; strokeWidth: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-      <path d="m6 9 6 6 6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Галочка 12px stroke 3 белым (шторка выбора ребёнка, макет строка 4381). */
-function CheckGlyph() {
-  return (
-    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-      <path d="M20 6 9 17l-5-5" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 /**
  * Avatar — инициалы на градиенте 135° + кольца (av(), макет строка 3832):
  * box-shadow 0 0 0 2px #fff + 0 0 0 4.5px ring. В вебе это ИСХОДНАЯ форма
@@ -225,7 +241,7 @@ function Avatar({
   size,
 }: {
   initials: string;
-  gradient: readonly [string, string];
+  gradient: Gradient;
   ringColor?: string;
   size: number;
 }) {
@@ -249,24 +265,25 @@ function Avatar({
 /**
  * AccentCard — непрозрачная акцентная градиентная карточка (макет §s4,
  * строки 2729–2741): градиент 135°, цветная тень в тоне градиента (shColor)
- * + верхний блик inset 0 1.5 0 W35.
+ * + верхний блик inset 0 1.5 0 W35. `href` превращает её в next/link —
+ * в мобилке это был Pressable с навигацией.
  */
 function AccentCard({
   gradient,
   angle = 135,
   shadowRgb,
   radius: r = 18,
-  pressable = false,
+  href,
   className = "",
   style,
   contentStyle,
   children,
 }: {
-  gradient: readonly [string, string];
+  gradient: Gradient;
   angle?: number;
   shadowRgb?: string;
   radius?: number;
-  pressable?: boolean;
+  href?: string;
   className?: string;
   style?: CSSProperties;
   contentStyle?: CSSProperties;
@@ -281,11 +298,15 @@ function AccentCard({
   };
   const inner = <div style={contentStyle}>{children}</div>;
 
-  if (pressable) {
+  if (href) {
     return (
-      <button type="button" className={`block w-full text-left ${className}`} style={surface}>
+      <Link
+        href={href}
+        className={`block w-full text-left transition-transform active:scale-[0.99] ${className}`}
+        style={surface}
+      >
         {inner}
-      </button>
+      </Link>
     );
   }
   return (
@@ -340,7 +361,7 @@ function NewChip({ label }: { label: string }) {
 }
 
 /** SectionHeader (макет строка 2772): caps 10.5/800 + правая ссылка 11.5/800. */
-function SectionHeader({ title, linkLabel }: { title: string; linkLabel?: string }) {
+function SectionHeader({ title, linkLabel, linkHref }: { title: string; linkLabel?: string; linkHref?: string }) {
   return (
     <div className="flex items-center justify-between">
       <span
@@ -354,10 +375,10 @@ function SectionHeader({ title, linkLabel }: { title: string; linkLabel?: string
       >
         {title}
       </span>
-      {linkLabel ? (
-        <button type="button" style={{ fontSize: 11.5, fontWeight: 800, color: status.violet.text }}>
+      {linkLabel && linkHref ? (
+        <Link href={linkHref} style={{ fontSize: 11.5, fontWeight: 800, color: status.violet.text }}>
           {linkLabel}
-        </button>
+        </Link>
       ) : null}
     </div>
   );
@@ -365,12 +386,14 @@ function SectionHeader({ title, linkLabel }: { title: string; linkLabel?: string
 
 /** ListRow (макет §s7 строка 2771 + строки 266–268): padding 10 0, gap 11. */
 function ListRow({
+  href,
   left,
   title,
   subtitle,
   right,
   divider = false,
 }: {
+  href: string;
   left: ReactNode;
   title: string;
   subtitle?: string;
@@ -378,8 +401,8 @@ function ListRow({
   divider?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Link
+      href={href}
       className="flex w-full items-center text-left"
       style={{
         gap: 11,
@@ -400,7 +423,7 @@ function ListRow({
         ) : null}
       </span>
       {right}
-    </button>
+    </Link>
   );
 }
 
@@ -458,19 +481,21 @@ function MetricsSplitRow({ cells, topDivider = false }: { cells: MetricCell[]; t
  */
 function QuickActionTile({
   label,
+  href,
   gradient,
   shadowRgb,
   iconPaths,
 }: {
   label: string;
-  gradient: readonly [string, string];
+  href: string;
+  gradient: Gradient;
   shadowRgb: string;
   iconPaths: readonly string[];
 }) {
   return (
-    <button
-      type="button"
-      className="flex h-full w-full flex-col items-center justify-center"
+    <Link
+      href={href}
+      className="flex h-full w-full flex-col items-center justify-center transition-transform active:scale-[0.97]"
       style={{
         borderRadius: 18,
         border: `1px solid ${glassBorder}`,
@@ -495,12 +520,12 @@ function QuickActionTile({
         <WhiteGlyph paths={iconPaths} size={17} />
       </span>
       <span style={{ fontSize: 10.5, fontWeight: 700, color: ink1, textAlign: "center", ...CLAMP_2 }}>{label}</span>
-    </button>
+    </Link>
   );
 }
 
 /** Плитка 46×46 grad-glass с глифом-строкой («√x») — макет строка 244. */
-function AccentGlyphTile({ gradient, glyph, size = 46 }: { gradient: readonly [string, string]; glyph: string; size?: number }) {
+function AccentGlyphTile({ gradient, glyph, size = 46 }: { gradient: Gradient; glyph: string; size?: number }) {
   return (
     <span
       className="flex shrink-0 items-center justify-center text-white"
@@ -521,7 +546,7 @@ function AccentGlyphTile({ gradient, glyph, size = 46 }: { gradient: readonly [s
 
 /** Chip-«5» 30×30 rounded-10 зелёный — макет строка 267 (feed #1, оценка). */
 function GradeBadge({ value }: { value: number }) {
-  const st = status.green;
+  const st = value >= 4 ? status.green : value >= 3 ? status.orange : status.red;
   return (
     <span
       className="flex shrink-0 items-center justify-center"
@@ -542,15 +567,7 @@ function GradeBadge({ value }: { value: number }) {
 }
 
 /** Иконка feed-ряда 36×36 rounded-12 с градиентом и текстовым/SVG-глифом. */
-function FeedIconTile({
-  gradient,
-  glyph,
-  svgPaths,
-}: {
-  gradient: readonly [string, string];
-  glyph?: string;
-  svgPaths?: readonly string[];
-}) {
+function FeedIconTile({ gradient, glyph }: { gradient: Gradient; glyph: string | null }) {
   return (
     <span
       className="flex shrink-0 items-center justify-center text-white"
@@ -563,16 +580,16 @@ function FeedIconTile({
         fontWeight: 800,
       }}
     >
-      {svgPaths ? <WhiteGlyph paths={svgPaths} size={17} /> : glyph}
+      {glyph ?? <WhiteGlyph paths={ICONS.check} size={17} />}
     </span>
   );
 }
 
 /** CTA-glass кнопка акцентной карточки ассистента: 50/50, minHeight 36. */
-function AssistantCta({ label }: { label: string }) {
+function AssistantCta({ label, href }: { label: string; href: string }) {
   return (
-    <button
-      type="button"
+    <Link
+      href={href}
       className="flex flex-1 items-center justify-center text-center text-white"
       style={{
         minHeight: 36,
@@ -587,495 +604,313 @@ function AssistantCta({ label }: { label: string }) {
       }}
     >
       <span style={CLAMP_2}>{label}</span>
-    </button>
+    </Link>
   );
 }
 
-/* ─── Шторка выбора ребёнка ───────────────────────────────────────────────── */
-
-interface ChildPickerItem {
-  id: string;
-  initials: string;
-  gradient: readonly [string, string];
-  ringColor?: string;
-  name: string;
-  classLabel: string;
-  statusLabel: string;
-  statusTone: StatusKey;
-}
-
-/**
- * BottomSheetFrame + ChildPickerSheetContent (макет 2462–2645 / 2632–2644):
- * оверлей rgba(23,18,67,.35)+blur(4) с opacity .28s; панель left/right/bottom 8,
- * r30, 160° W92→W76, blur(26), border W90, тень 0 -16 50 + inset-блик,
- * translateY(115%) → 0 за .32s cubic-bezier(.2,.7,.3,1); грип 44×5 r3.
- */
-function ChildPickerSheet({
-  open,
-  onClose,
-  title,
-  items,
-  selectedId,
-  onSelect,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  items: ChildPickerItem[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  const [mounted, setMounted] = useState(open);
-  const [shown, setShown] = useState(open);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const raf = window.requestAnimationFrame(() => setShown(true));
-      return () => window.cancelAnimationFrame(raf);
-    }
-    setShown(false);
-    const timer = window.setTimeout(() => setMounted(false), 280);
-    return () => window.clearTimeout(timer);
-  }, [open]);
-
-  if (!mounted) return null;
-
+/** Пустое состояние внутри стеклянной карточки (не «в разработке» — просто нет данных). */
+function EmptyBlock({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="fixed inset-0" style={{ zIndex: 60 }}>
-      <button
-        type="button"
-        aria-label="Закрыть"
-        onClick={onClose}
-        className="absolute inset-0 block h-full w-full"
-        style={{
-          background: SHEET_OVERLAY,
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
-          opacity: shown ? 1 : 0,
-          transition: "opacity .28s cubic-bezier(.2,.7,.3,1)",
-        }}
-      />
-      <div
-        className="absolute mx-auto"
-        style={{
-          left: 8,
-          right: 8,
-          bottom: 8,
-          maxWidth: 414,
-          borderRadius: 30,
-          border: `1px solid ${SHEET_BORDER}`,
-          background: SHEET_BG,
-          backdropFilter: "blur(26px)",
-          WebkitBackdropFilter: "blur(26px)",
-          boxShadow: `${SHEET_SHADOW}, ${glassInset}`,
-          paddingBottom: 12,
-          transform: shown ? "translateY(0)" : "translateY(115%)",
-          transition: "transform .32s cubic-bezier(.2,.7,.3,1)",
-        }}
-      >
-        {/* Полоска-грип 44×5 (макет строка 2464). */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Закрыть"
-          className="flex w-full justify-center"
-          style={{ paddingTop: 10, paddingBottom: 4 }}
-        >
-          <span style={{ width: 44, height: 5, borderRadius: 3, background: SHEET_GRIP }} />
-        </button>
-
-        <p
-          style={{
-            fontSize: 14,
-            fontWeight: 800,
-            color: ink1,
-            paddingTop: 2,
-            paddingLeft: 20,
-            paddingRight: 20,
-            paddingBottom: 10,
-          }}
-        >
-          {title}
-        </p>
-
-        {items.map((item) => {
-          const selected = item.id === selectedId;
-          const st = status[item.statusTone];
-          const c = chip(st.rgb);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className="flex w-full items-center text-left"
-              style={{ gap: 12, padding: "11px 20px" }}
-            >
-              {/* Кольца аватара выступают наружу — компенсируем зазором, как в мобилке. */}
-              <span className="block shrink-0" style={{ margin: item.ringColor ? 4.5 : 2 }}>
-                <Avatar initials={item.initials} gradient={item.gradient} ringColor={item.ringColor} size={44} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, color: ink1 }}>
-                  {item.name}
-                </span>
-                <span className="block truncate" style={{ fontSize: 11, fontWeight: 700, color: ink2 }}>
-                  {item.classLabel}
-                </span>
-              </span>
-              <span
-                className="shrink-0"
-                style={{
-                  padding: "4px 9px",
-                  borderRadius: 999,
-                  background: c.background,
-                  border: `1px solid ${c.borderColor}`,
-                  fontSize: 9.5,
-                  fontWeight: 800,
-                  color: st.text,
-                }}
-              >
-                {item.statusLabel}
-              </span>
-              {/* Галочка: выбран — accent-градиент с тенью, иначе плоский фон
-                  (в макете белая галочка рендерится и у невыбранных). */}
-              <span
-                className="flex shrink-0 items-center justify-center"
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 11,
-                  background: selected ? accentGrad : CHECK_OFF_BG,
-                  boxShadow: selected ? "0 4px 10px rgba(124,58,237,0.4)" : undefined,
-                }}
-              >
-                <CheckGlyph />
-              </span>
-            </button>
-          );
-        })}
-        <div style={{ height: 18 }} />
-      </div>
+    <div className="flex flex-col items-center text-center" style={{ gap: 4, padding: "22px 16px" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>{title}</span>
+      {hint ? <span style={{ fontSize: 11, fontWeight: 600, color: ink2 }}>{hint}</span> : null}
     </div>
   );
 }
 
 /* ─── Экран ───────────────────────────────────────────────────────────────── */
 
-export function HomeView() {
-  const children = getChildren();
-  const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX]?.id ?? "");
-  const [sheetOpen, setSheetOpen] = useState(false);
+export function HomeView({ data }: { data: HomeViewData }) {
+  const router = useRouter();
+  const { parent, child } = data;
 
-  const parent = getParent();
-  const dashboard = getDashboard(childId);
-  const ctx = getSelectedChildContext(childId);
-  const child = ctx.child;
-  // В мобилке идентичность карточки берётся из реального Supabase-ребёнка для
-  // phone-flow; на вебе БД к экрану не подключена — работает демо-ветка.
-  const identityChild = child;
-  const bellCount = getUnreadNotificationsCount();
+  // RootHeader принимает колбэки, а не href — prefetch делаем руками, чтобы
+  // переход был таким же мгновенным, как по next/link.
+  useEffect(() => {
+    router.prefetch(R.notifications);
+    router.prefetch(R.profile);
+  }, [router]);
 
-  // Приветствие (макет строка 227): «Доброе утро, Дилноза!» + «Вот что
-  // происходит у Малики сегодня».
-  const greetingTitle = `${dashboard.greeting.title_prefix}${parent.first_name}!`;
-  const greetingSub = dashboard.greeting.subtitle_template.replace("{gen}", child.first_name_gen);
-
-  // 5 колонок метрики-сплит (макет 230–240). Валюта коротким — «185 000 сум».
+  // 5 колонок метрики-сплит (макет 230–240).
   const metricCells: MetricCell[] = [
-    { label: T.atSchoolSince, value: dashboard.child_status.at_school_since_label },
-    { label: T.lessons, value: String(dashboard.child_status.lessons_total) },
-    {
-      label: T.attended,
-      value: `${dashboard.child_status.lessons_attended}/${dashboard.child_status.lessons_total}`,
-      valueColor: status.green.text,
-    },
-    {
-      label: T.hw,
-      value: String(dashboard.child_status.homework_count),
-      valueColor: status.orange.text,
-    },
-    {
-      label: T.wallet,
-      value: `${formatMoney(dashboard.wallet_balance)} ${T.sum}`,
-      flex: 1.4,
-    },
+    { label: T.atSchoolSince, value: data.metrics.atSchoolSince },
+    { label: T.lessons, value: data.metrics.lessonsTotal },
+    { label: T.attended, value: data.metrics.attended, valueColor: status.green.text },
+    { label: T.hw, value: data.metrics.homework, valueColor: status.orange.text },
+    { label: T.wallet, value: data.metrics.walletLabel, flex: 1.4 },
   ];
 
-  const nextLessonView = {
-    subjectName: dashboard.next_lesson.subject_name,
-    timeRoomTeacherLabel: dashboard.next_lesson.time_room_teacher_label,
-    tileLabel: dashboard.next_lesson.tile_label,
-  };
-
-  const dueSum = `${formatMoney(dashboard.due_card.amount)} ${T.sum}`;
-  const dueSubtitle = `${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`;
-
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${T.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
-
   // Быстрые действия (макет 256–263). Иконки из ICONS + inline paths.
-  const QUICKS: { label: string; gradient: readonly [string, string]; iconPaths: readonly string[]; shadowRgb: string }[] = [
-    { label: T.pay, gradient: ["#fb923c", "#ef4444"], iconPaths: ICONS.card, shadowRgb: "251,146,60" },
-    { label: T.hwShort, gradient: ["#60a5fa", "#2563eb"], iconPaths: ICONS.check, shadowRgb: "96,165,250" },
-    { label: T.services, gradient: ["#a78bfa", "#7c3aed"], iconPaths: ICONS.grid, shadowRgb: "167,139,250" },
-    { label: T.meals, gradient: ["#f472b6", "#db2777"], iconPaths: ICONS.food, shadowRgb: "244,114,182" },
-    { label: T.childProfile, gradient: ["#34d399", "#059669"], iconPaths: ICONS.user, shadowRgb: "52,211,153" },
-    { label: T.schedule, gradient: ["#22d3ee", "#0891b2"], iconPaths: ICONS.cal, shadowRgb: "34,211,238" },
+  const QUICKS: { label: string; href: string; gradient: Gradient; iconPaths: readonly string[]; shadowRgb: string }[] = [
+    { label: T.pay, href: R.payments, gradient: ["#fb923c", "#ef4444"], iconPaths: ICONS.card, shadowRgb: "251,146,60" },
+    { label: T.hwShort, href: R.homework, gradient: ["#60a5fa", "#2563eb"], iconPaths: ICONS.check, shadowRgb: "96,165,250" },
+    { label: T.services, href: R.services, gradient: ["#a78bfa", "#7c3aed"], iconPaths: ICONS.grid, shadowRgb: "167,139,250" },
+    { label: T.meals, href: R.meals, gradient: ["#f472b6", "#db2777"], iconPaths: ICONS.food, shadowRgb: "244,114,182" },
+    { label: T.childProfile, href: R.child, gradient: ["#34d399", "#059669"], iconPaths: ICONS.user, shadowRgb: "52,211,153" },
+    { label: T.schedule, href: R.schedule, gradient: ["#22d3ee", "#0891b2"], iconPaths: ICONS.cal, shadowRgb: "34,211,238" },
   ];
 
   return (
     <>
       {/* Шапка (220–225): лого + «SNR EduOS» 14/600, колокольчик с бейджем,
           аватар родителя. Общий компонент каркаса v2 — своей копии не заводим. */}
-      <RootHeader title="SNR EduOS" titleSize={14} showLogo bellBadge={bellCount} initials={parent.initials} />
+      <RootHeader
+        title="SNR EduOS"
+        titleSize={14}
+        showLogo
+        bellBadge={data.bellCount}
+        initials={parent.initials}
+        onBell={() => router.push(R.notifications)}
+        onAvatar={() => router.push(R.profile)}
+      />
 
       <div
         className="mx-auto flex w-full max-w-[430px] flex-col"
         style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 4, paddingBottom: 8, gap: 12 }}
       >
-        {/* Приветствие (227). */}
+        {/* Приветствие (227) — по имени РОДИТЕЛЯ. */}
         <div className="flex flex-col" style={{ gap: 4 }}>
-          <h1 style={{ fontFamily: fontDisplay, fontWeight: 600, fontSize: 20, color: ink1 }}>{greetingTitle}</h1>
-          <p style={{ fontSize: 12, fontWeight: 600, color: ink2 }}>{greetingSub}</p>
+          <h1 style={{ fontFamily: fontDisplay, fontWeight: 600, fontSize: 20, color: ink1 }}>{data.greeting.title}</h1>
+          <p style={{ fontSize: 12, fontWeight: 600, color: ink2 }}>{data.greeting.subtitle}</p>
         </div>
 
-        {/* ChildSwitcherCard large + MetricsSplitRow (228–241). */}
-        <GlassCard radius={22} onClick={() => setSheetOpen(true)}>
-          <div className="flex flex-col" style={{ padding: "12px 14px", gap: 10 }}>
-            <div className="flex items-center" style={{ gap: 11 }}>
-              {/* Кольца аватара выступают наружу — компенсируем зазором. */}
-              <span className="block shrink-0" style={{ margin: identityChild.avatar_ring ? 4.5 : 2 }}>
-                <Avatar
-                  initials={identityChild.first_name.slice(0, 1)}
-                  gradient={identityChild.avatar_gradient}
-                  ringColor={identityChild.avatar_ring}
-                  size={50}
-                />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate" style={{ fontSize: 14.5, fontWeight: 800, color: ink1 }}>
-                  {identityChild.full_name}
-                </span>
-                <span className="flex items-center" style={{ gap: 4 }}>
-                  <span className="truncate" style={{ fontSize: 11.5, fontWeight: 700, color: ink2 }}>
-                    {`${identityChild.class_name} ${T.class}`}
+        {child ? (
+          <>
+            {/* ChildSwitcherCard large + MetricsSplitRow (228–241).
+                Внутри две разные цели, поэтому карточка — контейнер, а
+                кликабельны её части (иначе получилась бы ссылка в ссылке). */}
+            <GlassCard radius={22}>
+              <div className="flex flex-col" style={{ padding: "12px 14px", gap: 10 }}>
+                <div className="flex items-center" style={{ gap: 11 }}>
+                  <Link href={R.child} className="flex min-w-0 flex-1 items-center" style={{ gap: 11 }}>
+                    {/* Кольца аватара выступают наружу — компенсируем зазором. */}
+                    <span className="block shrink-0" style={{ margin: 2 }}>
+                      <Avatar initials={child.initial} gradient={child.gradient} size={50} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate" style={{ fontSize: 14.5, fontWeight: 800, color: ink1 }}>
+                        {child.fullName}
+                      </span>
+                      <span className="flex items-center" style={{ gap: 4 }}>
+                        <span className="truncate" style={{ fontSize: 11.5, fontWeight: 700, color: ink2 }}>
+                          {/* className из parent-context — это имя группы, и оно
+                              обычно УЖЕ содержит слово «класс» («10-А класс»).
+                              Без этой проверки выводилось «10-А класс класс». */}
+                          {child.className
+                            ? (/класс/i.test(child.className) ? child.className : `${child.className} ${T.class}`)
+                            : "—"}
+                        </span>
+                      </span>
+                    </span>
+                  </Link>
+
+                  {/* Статус-чип «В школе» → «Статус дня». */}
+                  {data.statusChip ? (
+                    <Link
+                      href={R.day}
+                      className="inline-flex shrink-0 items-center"
+                      style={{
+                        gap: 5,
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        background: chip(status[data.statusChip.tone].rgb).background,
+                        border: `1px solid ${chip(status[data.statusChip.tone].rgb).borderColor}`,
+                        boxShadow: `0 4px 10px rgba(${status[data.statusChip.tone].rgb},0.18)`,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          background: `rgb(${status[data.statusChip.tone].rgb})`,
+                        }}
+                      />
+                      <span style={{ fontSize: 10, fontWeight: 800, color: status[data.statusChip.tone].text }}>
+                        {data.statusChip.label}
+                      </span>
+                      <ChevronRight size={10} color={status[data.statusChip.tone].text} strokeWidth={2.6} />
+                    </Link>
+                  ) : null}
+                  <ChevronRight size={15} color={CHEVRON} strokeWidth={2.2} />
+                </div>
+                <MetricsSplitRow cells={metricCells} topDivider />
+              </div>
+            </GlassCard>
+
+            {/* AccentCard «Следующий урок» (242–245) → расписание. */}
+            {data.nextLesson ? (
+              <AccentCard
+                gradient={data.nextLesson.gradient}
+                angle={135}
+                shadowRgb="99,102,241"
+                radius={20}
+                href={R.schedule}
+                contentStyle={{ padding: 14, display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}
+              >
+                <span className="flex min-w-0 flex-1 flex-col" style={{ gap: 4 }}>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 800,
+                      letterSpacing: 0.72, // .08em при 9px
+                      textTransform: "uppercase",
+                      color: "rgba(255,255,255,0.75)",
+                    }}
+                  >
+                    {T.nextLesson}
                   </span>
-                  <ChevronDown size={11} color={ink2} strokeWidth={2.4} />
+                  <span style={{ fontSize: 15.5, fontWeight: 800, color: "#FFFFFF" }}>
+                    {data.nextLesson.subjectName}
+                  </span>
+                  {data.nextLesson.metaLabel ? (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
+                      {data.nextLesson.metaLabel}
+                    </span>
+                  ) : null}
                 </span>
-              </span>
-              {/* Статус-чип «В школе»: дот 6, шеврон 10, тень 0 4 10 rgba(16,185,129,.18). */}
-              <span
-                className="inline-flex shrink-0 items-center"
-                style={{
-                  gap: 5,
-                  padding: "5px 10px",
-                  borderRadius: 999,
-                  background: chip(status.green.rgb).background,
-                  border: `1px solid ${chip(status.green.rgb).borderColor}`,
-                  boxShadow: `0 4px 10px rgba(${status.green.rgb},0.18)`,
-                }}
+                <AccentGlyphTile gradient={data.nextLesson.gradient} glyph={data.nextLesson.glyph} />
+              </AccentCard>
+            ) : (
+              <GlassCard radius={20}>
+                <EmptyBlock title={T.noNextLesson} hint={T.noNextLessonHint} />
+              </GlassCard>
+            )}
+
+            {/* Ряд «К оплате / Питание» (246–249). Оба значения — мок (нет бэкенда). */}
+            <div className="flex" style={{ gap: 10 }}>
+              <AccentCard
+                gradient={["#fb7185", "#e11d48"]}
+                shadowRgb="244,63,94"
+                radius={18}
+                href={R.payments}
+                className="flex-1"
+                contentStyle={{ padding: 12, display: "flex", flexDirection: "column", gap: 4 }}
               >
                 <span
-                  style={{ width: 6, height: 6, borderRadius: 3, background: `rgb(${status.green.rgb})` }}
-                />
-                <span style={{ fontSize: 10, fontWeight: 800, color: status.green.text }}>{child.status_chip}</span>
-                <ChevronRight size={10} color={status.green.text} strokeWidth={2.6} />
-              </span>
-              <ChevronRight size={15} color={CHEVRON} strokeWidth={2.2} />
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    letterSpacing: 0.72,
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.85)",
+                  }}
+                >
+                  {T.due}
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>{data.due.amountLabel}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
+                  {data.due.subtitle}
+                </span>
+              </AccentCard>
+              <AccentCard
+                gradient={["#34d399", "#059669"]}
+                shadowRgb="52,211,153"
+                radius={18}
+                href={R.meals}
+                className="flex-1"
+                contentStyle={{ padding: 12, display: "flex", flexDirection: "column", gap: 4 }}
+              >
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    letterSpacing: 0.72,
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.85)",
+                  }}
+                >
+                  {T.meals}
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>{data.meals.statusLabel}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
+                  {data.meals.untilLabel}
+                </span>
+              </AccentCard>
             </div>
-            <MetricsSplitRow cells={metricCells} topDivider />
-          </div>
-        </GlassCard>
 
-        {/* AccentCard «Следующий урок» (242–245). */}
-        <AccentCard
-          gradient={dashboard.next_lesson.gradient}
-          angle={135}
-          shadowRgb="99,102,241"
-          radius={20}
-          pressable
-          contentStyle={{ padding: 14, display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}
-        >
-          <span className="flex min-w-0 flex-1 flex-col" style={{ gap: 4 }}>
-            <span
-              style={{
-                fontSize: 9,
-                fontWeight: 800,
-                letterSpacing: 0.72, // .08em при 9px
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.75)",
-              }}
+            {/* AccentCard «EduOS Assistant» + 2 CTA (250–254). */}
+            <AccentCard
+              gradient={["#8b5cf6", "#6366f1"]}
+              shadowRgb="139,92,246"
+              radius={20}
+              contentStyle={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}
             >
-              {T.nextLesson}
-            </span>
-            <span style={{ fontSize: 15.5, fontWeight: 800, color: "#FFFFFF" }}>{nextLessonView.subjectName}</span>
-            {nextLessonView.timeRoomTeacherLabel ? (
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
-                {nextLessonView.timeRoomTeacherLabel}
-              </span>
-            ) : null}
-          </span>
-          <AccentGlyphTile gradient={dashboard.next_lesson.gradient} glyph={nextLessonView.tileLabel} />
-        </AccentCard>
+              <div className="flex items-center" style={{ gap: 10 }}>
+                <span
+                  className="flex shrink-0 items-center justify-center"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 11,
+                    border: `1px solid ${ACCENT_INSET_BORDER}`,
+                    background: ACCENT_INSET_BG,
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                  }}
+                >
+                  <WhiteGlyph paths={ICONS.spark} size={18} />
+                </span>
+                <span className="min-w-0 flex-1" style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>
+                  EduOS Assistant
+                </span>
+                <NewChip label="NEW" />
+              </div>
+              <p style={{ fontSize: 12, fontWeight: 600, lineHeight: "18.6px", color: "rgba(255,255,255,0.95)" }}>
+                {data.assistantText}
+              </p>
+              <div className="flex items-stretch" style={{ gap: 8 }}>
+                <AssistantCta label={T.viewProgress} href={R.progress} />
+                <AssistantCta label={T.msgTeacher} href={R.messages} />
+              </div>
+            </AccentCard>
 
-        {/* Ряд «К оплате / Питание» (246–249). */}
-        <div className="flex" style={{ gap: 10 }}>
-          <AccentCard
-            gradient={dashboard.due_card.gradient}
-            shadowRgb="244,63,94"
-            radius={18}
-            pressable
-            className="flex-1"
-            contentStyle={{ padding: 12, display: "flex", flexDirection: "column", gap: 4 }}
-          >
-            <span
-              style={{
-                fontSize: 9,
-                fontWeight: 800,
-                letterSpacing: 0.72,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.85)",
-              }}
-            >
-              {T.due}
-            </span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>{dueSum}</span>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>{dueSubtitle}</span>
-          </AccentCard>
-          <AccentCard
-            gradient={dashboard.meals_card.gradient}
-            shadowRgb="52,211,153"
-            radius={18}
-            pressable
-            className="flex-1"
-            contentStyle={{ padding: 12, display: "flex", flexDirection: "column", gap: 4 }}
-          >
-            <span
-              style={{
-                fontSize: 9,
-                fontWeight: 800,
-                letterSpacing: 0.72,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.85)",
-              }}
-            >
-              {T.meals}
-            </span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>{dashboard.meals_card.status_label}</span>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
-              {dashboard.meals_card.until_label}
-            </span>
-          </AccentCard>
-        </div>
-
-        {/* AccentCard «EduOS Assistant» + 2 CTA (250–254). */}
-        <AccentCard
-          gradient={["#8b5cf6", "#6366f1"]}
-          shadowRgb="139,92,246"
-          radius={20}
-          contentStyle={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}
-        >
-          <div className="flex items-center" style={{ gap: 10 }}>
-            <span
-              className="flex shrink-0 items-center justify-center"
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 11,
-                border: `1px solid ${ACCENT_INSET_BORDER}`,
-                background: ACCENT_INSET_BG,
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-              }}
-            >
-              <WhiteGlyph paths={ICONS.spark} size={18} />
-            </span>
-            <span className="min-w-0 flex-1" style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>
-              EduOS Assistant
-            </span>
-            <NewChip label="NEW" />
-          </div>
-          <p style={{ fontSize: 12, fontWeight: 600, lineHeight: "18.6px", color: "rgba(255,255,255,0.95)" }}>
-            {dashboard.assistant_text}
-          </p>
-          <div className="flex items-stretch" style={{ gap: 8 }}>
-            <AssistantCta label={T.viewProgress} />
-            <AssistantCta label={T.msgTeacher} />
-          </div>
-        </AccentCard>
-
-        {/* Быстрые действия (255–263). */}
-        <SectionHeader title={T.quickActions} />
-        <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 9 }}>
-          {QUICKS.map((q) => (
-            <QuickActionTile
-              key={q.label}
-              label={q.label}
-              gradient={q.gradient}
-              shadowRgb={q.shadowRgb}
-              iconPaths={q.iconPaths}
-            />
-          ))}
-        </div>
-
-        {/* Лента «Сегодня» (264–269). */}
-        <SectionHeader title={T.todaySection} linkLabel={`${T.viewAll} ›`} />
-        <GlassCard radius={22} style={{ paddingLeft: 14, paddingRight: 14 }}>
-          {dashboard.feed.map((row, idx) => {
-            // Иконка ряда — по маршруту go: d11 → math √x, d12 → eng Aa, dmeals → food.
-            const icon =
-              row.go === "d11" ? (
-                <FeedIconTile gradient={["#facc15", "#ca8a04"]} glyph="√x" />
-              ) : row.go === "d12" ? (
-                <FeedIconTile gradient={["#f472b6", "#db2777"]} glyph="Aa" />
-              ) : (
-                <FeedIconTile gradient={["#34d399", "#0ea5e9"]} svgPaths={ICONS.food} />
-              );
-            const right =
-              row.badge.kind === "grade" ? (
-                <GradeBadge value={row.badge.value} />
-              ) : (
-                <StatusChip
-                  label={row.badge.label}
-                  family={
-                    row.badge.label === "Успешно" ? "green" : row.badge.label.indexOf("Срок") === 0 ? "orange" : "gray"
-                  }
+            {/* Быстрые действия (255–263). */}
+            <SectionHeader title={T.quickActions} />
+            <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 9 }}>
+              {QUICKS.map((q) => (
+                <QuickActionTile
+                  key={q.label}
+                  label={q.label}
+                  href={q.href}
+                  gradient={q.gradient}
+                  shadowRgb={q.shadowRgb}
+                  iconPaths={q.iconPaths}
                 />
-              );
-            return (
-              <ListRow
-                key={row.title}
-                left={icon}
-                title={row.title}
-                subtitle={row.subtitle}
-                right={right}
-                divider={idx > 0}
-              />
-            );
-          })}
-        </GlassCard>
+              ))}
+            </div>
 
-        {/* Шторка выбора ребёнка. */}
-        <ChildPickerSheet
-          open={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          title={T.chooseChild}
-          items={pickerItems}
-          selectedId={childId}
-          onSelect={(id) => {
-            setChildId(id);
-            setSheetOpen(false);
-          }}
-        />
+            {/* Лента «Сегодня» (264–269). */}
+            <SectionHeader title={T.todaySection} linkLabel={`${T.viewAll} ›`} linkHref={R.day} />
+            <GlassCard radius={22} style={{ paddingLeft: 14, paddingRight: 14 }}>
+              {data.feed.length === 0 ? (
+                <EmptyBlock title={T.emptyFeed} hint={T.emptyFeedHint} />
+              ) : (
+                data.feed.map((row, idx) => (
+                  <ListRow
+                    key={row.id}
+                    href={row.href}
+                    left={<FeedIconTile gradient={row.icon.gradient} glyph={row.icon.glyph} />}
+                    title={row.title}
+                    subtitle={row.subtitle}
+                    right={
+                      row.badge.kind === "grade" ? (
+                        <GradeBadge value={row.badge.value} />
+                      ) : (
+                        <StatusChip label={row.badge.label} family={row.badge.tone} />
+                      )
+                    }
+                    divider={idx > 0}
+                  />
+                ))
+              )}
+            </GlassCard>
+          </>
+        ) : (
+          <GlassCard radius={22}>
+            <EmptyBlock title={T.noChild} hint={T.noChildHint} />
+          </GlassCard>
+        )}
       </div>
     </>
   );

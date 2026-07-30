@@ -3885,3 +3885,21 @@ typecheck (`apps/web`) и `next build` — чистые.
 В `packages/core`: `code_completion` добавлен в `NATIVE_CONTENT_TYPES` (иначе ДЗ считалось бы внешним сервисом и уехало бы с `external_url` вместо полезной нагрузки) и `createTeacherHomework` принимает `codeCompletionData` → пишет в `homework.code_completion_data`. Позиция этапа не трогалась — `addLessonStage` уже считает её правильно (не наивный `MAX+1`, иначе этап встал бы после «Итога»).
 
 typecheck (`packages/core` + `apps/web`), `next build` и `pnpm lint:hooks` — чистые.
+
+## Веб-родитель: реальные данные, внутренние экраны, один демо-вход
+
+**Пункт 1 (регрессия онбординга/логина) — премиса не подтвердилась.** Проверено живьём на 390px: `/parent` рендерит карусель онбординга («Начать» / «Узнать больше»), «Начать» открывает экран входа по номеру. Коммит `ae86323` на корневом уровне тронул ТОЛЬКО `layout.tsx` (подключил шрифты Manrope/Unbounded) — `page.tsx`, `AuthFlow.tsx`, `OnboardingCarousel.tsx`, `LoginPhoneScreen.tsx` он не касался, и middleware `/parent` не гейтит (`isParentLoginRoute` возвращает рано). Экраны «пропадают» на ДЕСКТОПЕ: при ширине ≥640px `ViewportGate` подменяет весь `/parent` на QR-гейт — это решение «Части A», трогать которое запрещено задачей. Правок не потребовалось.
+
+**Пункт 2 (демо-вход) — был реальный, исправлен.** Кнопка «Демо-вход для родителя» открывала шторку с ВЫБОРОМ из трёх родителей (Исмаилов / Рахимов / Каримов). Теперь это прямой вход под Исмаиловым Бахтиёром (`912345678`) тем же server action `loginParentByPhone`, что и обычный флоу; `AuthDemoSheet.tsx` удалён. Проверено кликом: один клик → `/parent/home`.
+
+**Пункты 3–4 (внутренние экраны + реальная БД).** Создано 20 маршрутов `/parent/*`: home, progress, schedule, homework, homework/[id], attendance, subject/[id], subjects, day, notifications, announcements, messages, chat/[id], child, documents, notif-settings, lang-security, about, profile, payments. Карточки и пункты меню кликабельны и ведут на эти экраны; колокольчик — на `/parent/notifications`.
+
+Данные — настоящие из Supabase по `sherzod_10`, через новый серверный слой `apps/web/lib/parent-queries.ts` (`cache()`-обёртки, сами резолвят выбранного ребёнка). Проверено живьём: «Добрый день, Bakhtiyor!», «Ismailov Sherzod, 10-А класс», реальный следующий урок «Программирование, каб. 101, Rustam Rakhmatov», средний балл 4.2 по 38 оценкам, посещаемость 19/19. Каримовых/Рахимовых на экранах нет.
+
+В `packages/core` добавлено: `getChildMaterials(db, studentId)`, `getChildLessonDetail(db, studentId, lessonId)` (в `getLessonById` посещаемость и сдачи читались БЕЗ фильтра по ученику — на втором ребёнке это чужая строка), и у `getNextStudentLessonDate` появился опциональный `studentId` (была единственная функция расписания без него).
+
+**Миграция 161** (`161_parent_rls_gaps.sql`) закрывает 4 дыры в RLS для роли parent, каждая из которых давала ТИХИЙ ноль: `classwork` и `projects` (их `!inner`-джойн в `getStudentGrades` ронял classwork/project-оценки целиком), `lesson_materials`, разбор теста (`test_questions`/`test_question_options`/`test_answers`) и SELECT в бакете `homework-files` (без него скачивание вложений ДЗ у родителя не молчит, а падает). Базовое покрытие родителя уже было (миграции 74/75/76/77/82/126/128) — блокера не было. **НЕ применена к прод-базе**, ручной шаг заказчика.
+
+**Что осталось моками и почему:** оплаты целиком (платёжного бэкенда нет; суммы из фикстур, но ФИО теперь настоящее — `payments/page.tsx` стал серверным и передаёт реального ребёнка), кошелёк и питание на «Главной» (вынесены в явные константы `MOCK_*`), сервисные экраны мобилки (питание/транспорт/портфолио/медкарта/заявления) — под них нет таблиц. Вкладка «Навыки» на «Успехах» удалена: в БД нет схемы оценки навыков, радар был чистой фикстурой.
+
+typecheck (`packages/core` + `apps/web`), `next build` (92 страницы) и `pnpm lint:hooks` — чистые.
