@@ -1,4 +1,5 @@
 import { APP_TIME_ZONE } from "@snr/core";
+import { getDemoNow } from "@/lib/demo-date";
 
 /** ISO-таймстамп → YYYY-MM-DD по Ташкенту. Тот же приём, что уже
  *  используется веб-родителем (dashboard/page.tsx, старый) и мобилкой
@@ -17,5 +18,5 @@ export function tashkentDateKey(iso: string): string {
 }
 
 export function tashkentToday(): string {
-  return tashkentDateKey(new Date().toISOString());
+  return tashkentDateKey(getDemoNow().toISOString());
 }

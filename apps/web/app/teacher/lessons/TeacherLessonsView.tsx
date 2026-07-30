@@ -22,6 +22,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { useDemoEditBlocked, isDemoEditBlockedError } from "@/lib/useIsDemoSession";
+import { getDemoNow } from "@/lib/demo-date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -301,7 +302,7 @@ function DatePickerField({
               onChange(`${y}-${m}-${day}`);
               setOpen(false);
             }}
-            disabled={minToday ? { before: new Date(new Date().setHours(0, 0, 0, 0)) } : undefined}
+            disabled={minToday ? { before: new Date(getDemoNow().setHours(0, 0, 0, 0)) } : undefined}
           />
         </div>
       )}
@@ -574,7 +575,7 @@ export function TeacherLessonsView({
   const dbRef = useRef(createClient());
   const db = dbRef.current;
 
-  const now = new Date();
+  const now = getDemoNow();
   const todayKey = localDateKey(now);
 
   const [viewYear, setViewYear] = useState(now.getFullYear());

@@ -40,6 +40,29 @@ function startOfTodayTashkentUtcIso(): string {
   return new Date(tashkentMidnightUtcMs).toISOString();
 }
 
+/** Большой фикс: React #310 + заморозка даты + cron, Фикс 3 — школы с
+ *  schools.nightly_close_enabled=false (демо-школа) исключаются из
+ *  ежесуточного авто-закрытия, чтобы демо-уроки не улетали в 'completed' в
+ *  полночь. Колонка добавлена миграцией 156_schools_nightly_close_enabled.sql,
+ *  которая НЕ применена к прод-базе этим заходом (нет DDL-доступа в этой
+ *  среде — см. миграцию). Пока колонки нет, select на неё падает с 42703 —
+ *  деградируем к старому поведению (никого не исключаем), а не роняем крон
+ *  целиком: реальная школа не должна пострадать из-за неприменённой
+ *  миграции. После применения 156 подхватывается автоматически, без правок
+ *  кода. */
+async function getExcludedSchoolIds(db: ReturnType<typeof createAdminClient>): Promise<Set<string>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("schools").select("id").eq("nightly_close_enabled", false);
+  if (error) {
+    if (error.code !== "42703") {
+      console.error("[close-past-lessons] excluded schools read failed:", error.message);
+    }
+    return new Set();
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new Set((data ?? []).map((r: any) => r.id as string));
+}
+
 export async function POST(req: NextRequest) {
   const cronSecret = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? req.headers.get("x-cron-secret");
   if (!process.env.CRON_SECRET || cronSecret !== process.env.CRON_SECRET) {
@@ -48,19 +71,23 @@ export async function POST(req: NextRequest) {
 
   const db = createAdminClient();
   const cutoff = startOfTodayTashkentUtcIso();
+  const excludedSchoolIds = await getExcludedSchoolIds(db);
 
-  // 1. Собрать id уроков строго прошедших дней, не в 'completed'.
-  //    completeLessons() потом сам сделает UPDATE (guarded neq='completed'
-  //    внутри) и fill только для тех, кого реально переключил.
+  // 1. Собрать id уроков строго прошедших дней, не в 'completed', кроме школ
+  //    с nightly_close_enabled=false (демо). completeLessons() потом сам
+  //    сделает UPDATE (guarded neq='completed' внутри) и fill только для
+  //    тех, кого реально переключил.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: pastRows, error: pastErr } = await (db as any).from("lessons")
-    .select("id").lt("ends_at", cutoff).neq("status", "completed");
+    .select("id, school_id").lt("ends_at", cutoff).neq("status", "completed");
   if (pastErr) {
     console.error("[close-past-lessons] past lessons read failed:", pastErr.message);
     return NextResponse.json({ error: pastErr.message }, { status: 500 });
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pastIds: string[] = (pastRows ?? []).map((r: any) => r.id);
+  const pastIds: string[] = (pastRows ?? [])
+    .filter((r: any) => !excludedSchoolIds.has(r.school_id))
+    .map((r: any) => r.id);
 
   let closed = 0;
   let closeAttCreated = 0;
@@ -83,10 +110,12 @@ export async function POST(req: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: recent, error: recentErr } = await (db as any)
-      .from("lessons").select("id").lt("ends_at", cutoff).gte("ends_at", recentFrom);
+      .from("lessons").select("id, school_id").lt("ends_at", cutoff).gte("ends_at", recentFrom);
     if (recentErr) throw new Error(`recent lessons: ${recentErr.message}`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recentIds: string[] = (recent ?? []).map((r: any) => r.id);
+    const recentIds: string[] = (recent ?? [])
+      .filter((r: any) => !excludedSchoolIds.has(r.school_id))
+      .map((r: any) => r.id);
     const res = await fillAttendanceAndGrades(db, recentIds);
     retroAttCreated = res.attCreated; retroGradesCreated = res.gradesCreated; retroSkipped = res.skippedNoTeacher;
   } catch (e) {

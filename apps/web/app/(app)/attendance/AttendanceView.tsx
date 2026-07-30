@@ -12,6 +12,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon, useLocale } from "@/components";
 import { cn } from "@/lib/cn";
+import { getDemoNow } from "@/lib/demo-date";
 
 type AttendanceRecord = {
   id: string;
@@ -156,13 +157,13 @@ export function AttendanceView({
     return Array.from(set).sort();
   }, [initialRecords]);
 
-  const calYear = month ? parseInt(month.slice(0, 4)) : new Date().getFullYear();
-  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : new Date().getMonth();
+  const calYear = month ? parseInt(month.slice(0, 4)) : getDemoNow().getFullYear();
+  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : getDemoNow().getMonth();
   const calendarDays = useMemo(() => getCalendarDays(calYear, calMonth), [calYear, calMonth]);
 
   const [todayKey, setTodayKey] = useState("");
   useEffect(() => {
-    const t = new Date();
+    const t = getDemoNow();
     setTodayKey(t.toISOString().slice(0, 10));
   }, []);
 

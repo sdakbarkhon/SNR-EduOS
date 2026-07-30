@@ -1,4 +1,5 @@
 import type { Dictionary } from "@snr/core";
+import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 const TZ = "Asia/Tashkent";
 
@@ -14,8 +15,8 @@ export function dayKey(iso: string): string {
 /** "Сегодня" / "Вчера" / "14 мая" (short=true → "14.05" для превью в списке тредов). */
 export function dayLabel(iso: string, d: Dictionary, locale: string, short: boolean): string {
   const key = isoDayKey(iso);
-  const todayKey = isoDayKey(new Date().toISOString());
-  const yesterdayKey = isoDayKey(new Date(Date.now() - 86400000).toISOString());
+  const todayKey = isoDayKey(getDemoNow().toISOString());
+  const yesterdayKey = isoDayKey(new Date(getDemoNowMs() - 86400000).toISOString());
 
   if (!short) {
     if (key === todayKey) return d.chat.today;

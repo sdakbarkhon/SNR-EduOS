@@ -5,6 +5,7 @@ import { getDictionary, formatDate, LOCALE_TAG, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { ink1, ink2, ink3, glassBorder } from "@/lib/parent/glass-tokens";
+import { getDemoNow } from "@/lib/demo-date";
 
 export type SubjectStat = { subject: string; label: string; color: string; avg: number; count: number };
 export type TeacherReview = { teacherName: string | null; subjectName: string | null; comment: string; gradedAtIso: string };
@@ -147,7 +148,7 @@ export function ProgressView({ childName, average, subjectStats, review }: Props
     average == null ? null : average >= 4.5 ? d.grades.gradeChipExcellent : average >= 3.5 ? d.grades.gradeChipGood : d.grades.gradeChipNeedsWork;
 
   const months = Array.from({ length: DYN_SPARK_VALUES.length }, (_, i) => {
-    const date = new Date();
+    const date = getDemoNow();
     date.setDate(1);
     date.setMonth(date.getMonth() - (DYN_SPARK_VALUES.length - 1 - i));
     return new Intl.DateTimeFormat(LOCALE_TAG[loc], { month: "short" }).format(date);

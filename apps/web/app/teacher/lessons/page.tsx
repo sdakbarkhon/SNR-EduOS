@@ -3,6 +3,7 @@ import { getTeacherLessonsByMonth, getTeacherGroups } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
+import { getDemoNow } from "@/lib/demo-date";
 import { TeacherLessonsView } from "./TeacherLessonsView";
 import { redirect } from "next/navigation";
 
@@ -29,7 +30,7 @@ export default async function TeacherLessonsPage() {
   // was the single slowest query on this page (413ms measured at 396 rows,
   // scales with total lesson count, unbounded) — fetch only the current
   // month up front instead, matching what's actually shown on first paint.
-  const now = new Date();
+  const now = getDemoNow();
   const [lessonsRes, groupsRes] = await Promise.all([
     safeQuery(getTeacherLessonsByMonth(db, now.getFullYear(), now.getMonth() + 1), [], "TeacherLessonsPage.lessons"),
     safeQuery(Promise.resolve(getTeacherGroups(db)), [], "TeacherLessonsPage.groups"),

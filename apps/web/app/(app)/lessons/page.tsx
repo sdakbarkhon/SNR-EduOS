@@ -6,17 +6,18 @@ import {
 import { getMyStudent } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
+import { getDemoNowMs } from "@/lib/demo-date";
 import { LessonsView } from "./LessonsView";
 
 // ── Tashkent date helpers (UTC+5) ─────────────────────────────────────────────
 
 function getTashkentToday(): string {
-  const tashkentMs = Date.now() + 5 * 60 * 60 * 1000;
+  const tashkentMs = getDemoNowMs() + 5 * 60 * 60 * 1000;
   return new Date(tashkentMs).toISOString().slice(0, 10);
 }
 
 function getTashkentWeekMonday(): string {
-  const base = new Date(Date.now() + 5 * 60 * 60 * 1000);
+  const base = new Date(getDemoNowMs() + 5 * 60 * 60 * 1000);
   const dow = base.getUTCDay(); // 0=Sun
   const offset = dow === 0 ? -6 : 1 - dow;
   base.setUTCDate(base.getUTCDate() + offset);

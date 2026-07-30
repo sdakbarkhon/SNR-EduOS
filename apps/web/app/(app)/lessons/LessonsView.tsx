@@ -19,6 +19,7 @@ import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForW
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
+import { getDemoNow } from "@/lib/demo-date";
 import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
@@ -189,12 +190,12 @@ export function LessonsView({
   const [weekLoading, setWeekLoading] = useState(false);
 
   useEffect(() => {
-    setNow(new Date());
+    setNow(getDemoNow());
     try {
       const saved = localStorage.getItem(MODE_KEY);
       if (saved === "week" || saved === "today") setMode(saved);
     } catch { /* blocked */ }
-    const t = setInterval(() => setNow(new Date()), 30_000);
+    const t = setInterval(() => setNow(getDemoNow()), 30_000);
     return () => clearInterval(t);
   }, []);
 

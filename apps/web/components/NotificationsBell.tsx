@@ -14,6 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "./LocaleProvider";
 import { cn } from "@/lib/cn";
+import { getDemoNowMs } from "@/lib/demo-date";
 
 const ICONS: Record<NotificationKind, typeof Bell> = {
   announcement: Megaphone,
@@ -68,8 +69,8 @@ export const NotificationsBell = memo(function NotificationsBell() {
   useEffect(() => {
     db.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
     reload();
-    setNowMs(Date.now());
-    const id = setInterval(() => setNowMs(Date.now()), 30000);
+    setNowMs(getDemoNowMs());
+    const id = setInterval(() => setNowMs(getDemoNowMs()), 30000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -15,6 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
+import { getDemoNowMs } from "@/lib/demo-date";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -127,8 +128,8 @@ export function NotificationsView({
     const db = createClient();
     dbRef.current = db;
     db.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null)).catch(() => null);
-    setNowMs(Date.now());
-    const id = setInterval(() => setNowMs(Date.now()), 30000);
+    setNowMs(getDemoNowMs());
+    const id = setInterval(() => setNowMs(getDemoNowMs()), 30000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -12,6 +12,7 @@ import { PageContainer } from "@/components/PageContainer";
 import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
+import { getDemoNow } from "@/lib/demo-date";
 
 type Submission = { id: string; status: string };
 type TestSub = { id: string; student_id: string };
@@ -35,7 +36,7 @@ type StatusFilter = "all" | "active" | "done";
 type UrgencyFilter = "all" | "this_week" | "next_week" | "later";
 
 function isActive(hw: HomeworkItem): boolean {
-  const now = new Date().toISOString();
+  const now = getDemoNow().toISOString();
   const hasPending = hw.submissions.some((s) => s.status === "submitted");
   return !hw.due_date || hw.due_date > now || hasPending;
 }
@@ -142,7 +143,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   // null on server + first client render → no overdue counted until after mount,
   // keeping SSR and hydration identical (avoids React error #418).
   const [nowIso, setNowIso] = useState<string | null>(null);
-  useEffect(() => { setNowIso(new Date().toISOString()); }, []);
+  useEffect(() => { setNowIso(getDemoNow().toISOString()); }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setQuery(rawQuery), 300);

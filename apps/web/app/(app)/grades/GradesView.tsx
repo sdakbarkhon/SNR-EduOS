@@ -10,6 +10,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
 import { PageContainer } from "@/components/PageContainer";
 import { cn } from "@/lib/cn";
+import { getDemoNowMs } from "@/lib/demo-date";
 import { GradeFilterDropdown } from "./GradeFilterDropdown";
 import { GradeDistributionDonut } from "./GradeDistributionDonut";
 import { GradeDetailModal } from "./GradeDetailModal";
@@ -62,7 +63,7 @@ export const KIND_BADGE: Record<StudentGradeItem["kind"], string> = {
 function withinPeriod(dateStr: string, period: PeriodFilter): boolean {
   if (period === "all" || !dateStr) return true;
   const days = period === "week" ? 7 : period === "month" ? 30 : 120;
-  return new Date(dateStr).getTime() >= Date.now() - days * 86400000;
+  return new Date(dateStr).getTime() >= getDemoNowMs() - days * 86400000;
 }
 
 function sortGrades(items: StudentGradeItem[], sort: SortValue): StudentGradeItem[] {

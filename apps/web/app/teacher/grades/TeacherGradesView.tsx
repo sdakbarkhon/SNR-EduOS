@@ -17,6 +17,7 @@ import {
 import { LessonGradeDetailModal } from "./LessonGradeDetailModal";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { getDemoNow } from "@/lib/demo-date";
 
 type CategoryFilter = "all" | "assignment" | "lesson";
 
@@ -114,7 +115,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
   }
 
   function cellFor(studentId: string, hw: GradeMatrixData["homework"][number]): { state: CellState; label: string } {
-    const now = new Date().toISOString();
+    const now = getDemoNow().toISOString();
     const overdue = !!hw.due_date && hw.due_date < now;
     if (hw.content_type === "test") {
       const t = findTest(studentId, hw.id);

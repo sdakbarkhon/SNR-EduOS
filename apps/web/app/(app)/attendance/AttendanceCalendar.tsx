@@ -8,6 +8,7 @@ import {
   type AttendanceWithLesson,
 } from "@snr/core";
 import { colors } from "@snr/ui-tokens";
+import { getDemoNow } from "@/lib/demo-date";
 
 const DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -54,7 +55,7 @@ export function AttendanceCalendar({
   // avoid hydration error #418 (server UTC date vs client local date can differ).
   const [todayKey, setTodayKey] = useState<string>("");
   useEffect(() => {
-    const t = new Date();
+    const t = getDemoNow();
     setTodayKey(`${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`);
   }, []);
 

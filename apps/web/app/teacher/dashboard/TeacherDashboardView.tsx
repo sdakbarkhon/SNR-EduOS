@@ -8,6 +8,7 @@ import {
 import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime } from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { getDemoNow } from "@/lib/demo-date";
 import { Avatar } from "@/components/Avatar";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
@@ -262,8 +263,8 @@ export function TeacherDashboardView({
 
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 60_000);
+    setNow(getDemoNow());
+    const id = setInterval(() => setNow(getDemoNow()), 60_000);
     return () => clearInterval(id);
   }, []);
 

@@ -23,6 +23,7 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { getDemoNow } from "@/lib/demo-date";
 import { useLocale } from "@/components";
 import { useToast } from "@/components/Toast";
 import { getClassLabel } from "@/lib/student-class-label";
@@ -118,8 +119,8 @@ export function DashboardView({
   // "Сейчас"/"Скоро" badges don't get stuck once a lesson's ends_at passes.
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
-    setNow(new Date());
-    const interval = setInterval(() => setNow(new Date()), 30_000);
+    setNow(getDemoNow());
+    const interval = setInterval(() => setNow(getDemoNow()), 30_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -185,7 +186,7 @@ export function DashboardView({
     setSubjectDetail(list.find((s) => s.id === sub.id) ?? null);
   }
   const classLabel = getClassLabel(groups);
-  const greeting = t.greetings[dayOfYear(now ?? new Date()) % t.greetings.length];
+  const greeting = t.greetings[dayOfYear(now ?? getDemoNow()) % t.greetings.length];
   const factEmoji = factEmojiFor(aiFactText);
 
   // Today's lessons — only computed client-side once `now` is set, for the

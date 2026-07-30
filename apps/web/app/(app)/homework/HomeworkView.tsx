@@ -22,6 +22,7 @@ import {
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
+import { getDemoNow } from "@/lib/demo-date";
 import { useLocale, useToast } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { HomeworkStatsDonut } from "./HomeworkStatsDonut";
@@ -77,7 +78,7 @@ export function HomeworkView({
   const showToast = useToast();
 
   const [rows, setRows] = useState<HomeworkWithSubmission[]>(initialRows);
-  const [now] = useState(() => new Date());
+  const [now] = useState(() => getDemoNow());
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>(initialSubject);
