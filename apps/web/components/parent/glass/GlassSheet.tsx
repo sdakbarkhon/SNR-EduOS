@@ -45,7 +45,8 @@ export function GlassSheet({
           type="button"
           onClick={onClose}
           aria-label="Закрыть"
-          className="mx-auto mb-2 block h-[5px] w-11 rounded-full bg-black/15"
+          className="mx-auto mb-2 block h-[5px] w-11 rounded-full"
+          style={{ background: "var(--p-control-off, rgba(23,18,67,0.14))" }}
         />
         {children}
       </div>

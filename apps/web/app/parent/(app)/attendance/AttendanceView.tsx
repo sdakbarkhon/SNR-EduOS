@@ -38,7 +38,7 @@ import {
   StatTile,
   ToneBadge,
 } from "../_study/parts";
-import { accentGrad, ink1, ink2, ink3, status } from "../v2/tokens";
+import { accentGrad, glass2, glassBorder, ink1, ink2, ink3, status } from "../v2/tokens";
 import { WEEKDAY_SHORT, ruMonthYear } from "../_study/util";
 
 export type AttendanceLastDay = {
@@ -69,12 +69,18 @@ const BADGE: Record<AttendanceStatus, { tone: "green" | "orange" | "red"; kind: 
   absent_unexcused: { tone: "red", kind: "x" },
 };
 
+/** Фон дня без отметки: в светлой теме это ink-налёт на белом стекле, в тёмной —
+ *  белый той же плотности (--p-att-*). У p/u/n заливка сигнальная, а цифра на
+ *  ней белая в обеих темах — они остаются литералами. */
+const ATT_PAST = "var(--p-att-past, rgba(23,18,67,0.05))";
+const ATT_FUTURE = "var(--p-att-future, rgba(23,18,67,0.08))";
+
 const CELL_STYLE: Record<Exclude<CellCode, "e" | "t">, { bg: string; color: string }> = {
   p: { bg: "rgba(16,185,129,0.72)", color: "#FFFFFF" },
   u: { bg: "rgba(249,115,22,0.78)", color: "#FFFFFF" },
   n: { bg: "rgba(239,68,68,0.78)", color: "#FFFFFF" },
-  w: { bg: "rgba(23,18,67,0.05)", color: ink3 },
-  f: { bg: "rgba(23,18,67,0.08)", color: ink3 },
+  w: { bg: ATT_PAST, color: ink3 },
+  f: { bg: ATT_FUTURE, color: ink3 },
 };
 
 function buildCells(
@@ -213,8 +219,8 @@ export function AttendanceView({
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  background: "rgba(255,255,255,0.55)",
-                  border: "1px solid rgba(255,255,255,0.8)",
+                  background: glass2.background,
+                  border: `1px solid ${glassBorder}`,
                 }}
               >
                 <IconChevronLeft size={13} color={ink1} strokeWidth={2.2} />
@@ -232,8 +238,8 @@ export function AttendanceView({
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  background: "rgba(255,255,255,0.55)",
-                  border: "1px solid rgba(255,255,255,0.8)",
+                  background: glass2.background,
+                  border: `1px solid ${glassBorder}`,
                 }}
               >
                 <IconChevronRight size={13} color={ink1} strokeWidth={2.2} />
@@ -268,7 +274,7 @@ export function AttendanceView({
               <LegendMarker color="rgba(16,185,129,0.75)" label="Присутствовал" />
               <LegendMarker color="rgba(249,115,22,0.8)" label="Уважительная" />
               <LegendMarker color="rgba(239,68,68,0.8)" label="Без причины" />
-              <LegendMarker color="rgba(23,18,67,0.08)" label="Нет занятий" />
+              <LegendMarker color={ATT_FUTURE} label="Нет занятий" />
             </div>
           </div>
         </GlassPanel>

@@ -31,7 +31,17 @@ import {
   StatusChip,
   WHITE,
 } from "../../_ui/screen-kit";
-import { accentGrad, glass1, glassBorder, ink1, ink2, ink3, shCard, status } from "../../v2/tokens";
+import {
+  accentGrad,
+  glass1,
+  glass2,
+  glassBorder,
+  ink1,
+  ink2,
+  ink3,
+  shCard,
+  status,
+} from "../../v2/tokens";
 import { markParentThreadRead, sendParentMessage } from "./actions";
 
 export type ChatBubbleItem = {
@@ -55,10 +65,13 @@ export type ChatHeaderInfo = {
   subjectLabel: string | null;
 };
 
-const COMPOSER_BG = "rgba(255,255,255,0.72)";
-const COMPOSER_BORDER = "rgba(255,255,255,0.85)";
-const DIVIDER_BG = "rgba(255,255,255,0.7)";
-const DIVIDER_BORDER = "rgba(255,255,255,0.8)";
+/** Композер — стеклянная пилюля glass-1, разделитель дня — тонкое стекло
+ *  glass-2; рамка у обоих общая, glass-border. В тёмной теме все три
+ *  переворачиваются сами, поэтому набранный текст (ink1) остаётся читаемым. */
+const COMPOSER_BG = glass1.background;
+const COMPOSER_BORDER = glassBorder;
+const DIVIDER_BG = glass2.background;
+const DIVIDER_BORDER = glassBorder;
 
 export function ChatView({
   header,
@@ -187,8 +200,10 @@ export function ChatView({
             borderRadius: 24,
             background: COMPOSER_BG,
             border: `1px solid ${COMPOSER_BORDER}`,
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
+            /* Радиус размытия композера в макете — 20px; это же значение у
+               --p-glass2-blur в обеих темах, поэтому берём его, а не glass-1. */
+            backdropFilter: "blur(var(--p-glass2-blur, 20px))",
+            WebkitBackdropFilter: "blur(var(--p-glass2-blur, 20px))",
             boxShadow: shCard,
           }}
         >
@@ -263,8 +278,8 @@ function Bubble({
         borderBottomLeftRadius: own ? 18 : 6,
         background: own ? accentGrad : glass1.background,
         border: own ? undefined : `1px solid ${glassBorder}`,
-        backdropFilter: own ? undefined : `blur(${glass1.blur}px)`,
-        WebkitBackdropFilter: own ? undefined : `blur(${glass1.blur}px)`,
+        backdropFilter: own ? undefined : "blur(var(--p-glass1-blur, 22px))",
+        WebkitBackdropFilter: own ? undefined : "blur(var(--p-glass1-blur, 22px))",
         boxShadow: own ? "0 8px 18px rgba(124,58,237,0.28)" : shCard,
         opacity: ghost ? 0.65 : 1,
       }}

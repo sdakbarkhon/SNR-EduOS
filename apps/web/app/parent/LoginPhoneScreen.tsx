@@ -9,7 +9,17 @@ import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { GlassButton } from "@/components/parent/glass/GlassButton";
 import { GlassInput } from "@/components/parent/glass/GlassInput";
 import { GlassCircleButton } from "@/components/parent/glass/GlassCircleButton";
-import { ink1, ink2, ink3, glassBorder, glass1Css, shCardCss, accent } from "@/lib/parent/glass-tokens";
+import {
+  ink1,
+  ink2,
+  ink3,
+  glassBorder,
+  glass1Css,
+  glass2Css,
+  shCardCss,
+  accent,
+  accentGradCss,
+} from "@/lib/parent/glass-tokens";
 import {
   AppleIcon,
   BackArrowIcon,
@@ -25,6 +35,23 @@ import { LangButton } from "./LangButton";
 /** Единственный демо-родитель: Исмаилов Бахтиёр (ребёнок — Шерзод, 10-А).
  *  Тот же номер, что в packages/core PARENT_PHONE_ACCOUNTS. */
 const DEMO_PARENT_PHONE = "912345678";
+
+/**
+ * Плитка 34×34 под логотипом соцвхода — ЖЁСТКИЙ белый в обеих темах: это
+ * фирменная подложка Google/Apple, она белая и в тёмном интерфейсе.
+ *
+ * Задаётся инлайном, а не Tailwind-классом `bg-white`, намеренно:
+ * app/globals.css держит голое правило `.dark .bg-white { background:#131a30 }`
+ * для ученических экранов, и с появлением тёмной темы у родителя класс `dark`
+ * доезжает и до /parent. Инлайн-стиль это правило перебить не может.
+ */
+const SOCIAL_TILE_BG = "#FFFFFF";
+/**
+ * Глиф Apple ЛЕЖИТ на этой белой плитке, поэтому он тоже жёстко тёмный и
+ * НЕ красится ink1: ink1 в тёмной теме становится белым — получилась бы белая
+ * иконка на белом. Значение — светлое значение ink1, привязанное к подложке.
+ */
+const ON_WHITE_INK = "#171243";
 
 type SheetKey = null | "help";
 
@@ -128,7 +155,7 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
               type="button"
               onClick={showComingSoon}
               className="flex shrink-0 items-center gap-1.5 rounded-[14px] px-2.5 py-3"
-              style={{ background: "rgba(255,255,255,0.55)", border: `1px solid ${glassBorder}` }}
+              style={{ background: glass2Css.background, border: `1px solid ${glassBorder}` }}
             >
               <UzFlagIcon size={18} />
               <span className="text-[13px] font-extrabold" style={{ color: ink1 }}>
@@ -162,6 +189,9 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           <div className="h-px flex-1" style={{ background: ink3 }} />
         </div>
 
+        {/* Рамка кнопки и цветная тень плитки — акцентный фиолет с альфой: он
+            читается и на светлом, и на тёмном стекле, поэтому оставлен
+            литералом (как ONLINE_GREEN — сигнальная заливка, не «цвет текста»). */}
         <button
           type="button"
           onClick={handleDemoLogin}
@@ -171,8 +201,9 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
         >
           <div
             className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
-            style={{ background: "linear-gradient(135deg, #7C3AED, #4F6DF5)", boxShadow: "0 6px 14px rgba(124,58,237,0.35)" }}
+            style={{ background: accentGradCss, boxShadow: "0 6px 14px rgba(124,58,237,0.35)" }}
           >
+            {/* Белый глиф на градиентной плитке — белый в обеих темах. */}
             <SparkleIcon size={16} color="#FFFFFF" />
           </div>
           <div className="flex-1">
@@ -192,7 +223,10 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           className="flex items-center gap-2.5 p-3.5 text-left"
           style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
         >
-          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] bg-white">
+          <div
+            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
+            style={{ background: SOCIAL_TILE_BG }}
+          >
             <GoogleIcon size={18} />
           </div>
           <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
@@ -206,8 +240,11 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           className="flex items-center gap-2.5 p-3.5 text-left"
           style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
         >
-          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] bg-white">
-            <AppleIcon size={18} color={ink1} />
+          <div
+            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
+            style={{ background: SOCIAL_TILE_BG }}
+          >
+            <AppleIcon size={18} color={ON_WHITE_INK} />
           </div>
           <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
             {t.withApple}
@@ -228,6 +265,9 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
 
       {notice && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-6">
+          {/* Тост намеренно НЕ темизируется: это тёмная плашка с белым текстом,
+              одинаковая в обеих схемах (как snackbar в Material). Инвертировать
+              её по правилу «ink → белый» нельзя — текст на ней белый. */}
           <div className="rounded-full px-4 py-2.5 text-[12.5px] font-semibold text-white shadow-lg" style={{ background: "rgba(23,18,67,0.92)" }}>
             {notice}
           </div>

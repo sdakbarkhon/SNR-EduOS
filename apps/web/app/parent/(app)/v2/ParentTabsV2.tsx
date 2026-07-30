@@ -43,7 +43,12 @@ export function ParentTabsV2() {
   const items: FloatingTabItem[] = TABS.map(({ key, Icon, navKey }) => ({
     key,
     label: nav[navKey],
-    icon: (color: string) => <Icon size={20} strokeWidth={1.9} color={color} />,
+    // Цвет — через style, а НЕ через проп `color`: lucide кладёт color прямо в
+    // presentation-атрибут <svg stroke>, а браузеры не разрешают там var().
+    // После темизации сюда приезжает var(--p-tab-inactive, …), и с атрибутом
+    // четыре из пяти иконок таб-бара стали бы бесцветными — в ОБЕИХ темах и на
+    // каждом экране. Тот же приём уже стоит у колокольчика в RootHeader.
+    icon: (color: string) => <Icon size={20} strokeWidth={1.9} style={{ stroke: color }} />,
     badge: key === "/parent/messages" ? unread : undefined,
   }));
 

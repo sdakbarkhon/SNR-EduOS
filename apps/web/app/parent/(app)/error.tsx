@@ -52,7 +52,8 @@ export default function ParentSegmentError({
               height={20}
               viewBox="0 0 24 24"
               fill="none"
-              stroke={ink2}
+              /* stroke — стилем: var() в SVG-атрибуте браузеры не разрешают. */
+              style={{ stroke: ink2 }}
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"

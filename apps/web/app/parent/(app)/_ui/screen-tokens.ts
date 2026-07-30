@@ -26,23 +26,36 @@
  * к остальным генераторам градиентов.)
  */
 
-/* ── Производные цвета (в мобилке — внутри соответствующих ui-компонентов) ── */
+/* ── Производные цвета (в мобилке — внутри соответствующих ui-компонентов) ──
+ *
+ * ТЁМНАЯ ТЕМА. Как и остальные токены родителя, эти значения применяются
+ * инлайн-стилями из серверных компонентов, поэтому хранят не цвет, а ссылку
+ * на CSS-переменную; обе схемы заданы в apps/web/app/parent/parent-theme.css
+ * и переключаются классом `dark` на <html>. Второй аргумент var() — светлое
+ * значение, дословно то, что было здесь до темизации.
+ *
+ * В darkTokens мобильного эталона этих производных нет — они выведены по
+ * правилу «база ink меняется на белую, альфа сохраняется» (в светлой они
+ * тёмные rgba поверх белого стекла, в тёмной — светлые поверх тёмного).
+ * Исключения расписаны в parent-theme.css.
+ */
 
 /** Разделитель строк внутри карточки-списка. */
-export const DIVIDER = "rgba(23,18,67,0.07)";
+export const DIVIDER = "var(--p-divider, rgba(23,18,67,0.07))";
 /** Цвет SectionHeader — rgba(26,19,74,.5). */
-export const SECTION_CAP = "rgba(26,19,74,0.5)";
+export const SECTION_CAP = "var(--p-section-cap, rgba(26,19,74,0.5))";
 /** Шеврон строки. */
-export const CHEVRON = "rgba(26,19,74,0.4)";
-/** Неактивная пилюля SegmentPills: 160° W60→W40, текст .66. */
+export const CHEVRON = "var(--p-chevron, rgba(26,19,74,0.4))";
+/** Неактивная пилюля SegmentPills: 160° W60→W40, текст .66 (в тёмной — стоп glass-2). */
 export const PILL_INACTIVE_BG =
-  "linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4))";
-export const PILL_INACTIVE_TEXT = "rgba(26,19,74,0.66)";
-/** Тень активной пилюли: 0 8 18 rgba(124,58,237,.35). */
-export const PILL_ACTIVE_SHADOW = "0 8px 18px rgba(124,58,237,0.35)";
-/** Онлайн-точка макета: #22C55E + белая обводка 2px. */
-export const ONLINE_GREEN = "#22C55E";
-export const WHITE = "#FFFFFF";
+  "var(--p-pill-inactive-bg, linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4)))";
+export const PILL_INACTIVE_TEXT = "var(--p-pill-inactive-text, rgba(26,19,74,0.66))";
+/** Тень активной пилюли: 0 8 18 rgba(124,58,237,.35); в тёмной — глоу на тёмном accent. */
+export const PILL_ACTIVE_SHADOW = "var(--p-pill-active-shadow, 0 8px 18px rgba(124,58,237,0.35))";
+/** Онлайн-точка макета: #22C55E + белая обводка 2px (сигнальная заливка, одна в обеих темах). */
+export const ONLINE_GREEN = "var(--p-online-green, #22C55E)";
+/** Белый текст/глиф на цветной плитке — константа обеих тем, не «цвет текста». */
+export const WHITE = "var(--p-white, #FFFFFF)";
 
 /** Часто используемые глифы (те же пути, что в RN-экранах мобилки). */
 export const ICON = {

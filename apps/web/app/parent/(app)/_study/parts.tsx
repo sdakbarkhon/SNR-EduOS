@@ -18,6 +18,7 @@ import {
   accentGrad,
   chip,
   fontDisplay,
+  glass1,
   glassBorder,
   glassInset,
   ink1,
@@ -27,6 +28,7 @@ import {
   status,
   type StatusKey,
 } from "../v2/tokens";
+import { DIVIDER, SECTION_CAP } from "../_ui/screen-tokens";
 import { hexToRgbCsv, initials, subjectColor, subjectGlyph } from "./util";
 
 /* ─── контейнер контента (макет: padding 4/18/118, gap 12) ────────────────── */
@@ -43,7 +45,9 @@ export function ScreenBody({ children }: { children: ReactNode }) {
 
 /* ─── caps-заголовок секции (SectionHeader, макет 2772) ───────────────────── */
 
-const SECTION_TITLE = "rgba(26,19,74,0.5)";
+/** Тот же цвет, что у общего SectionHeader родителя, — берём его токеном
+ *  (rgba(26,19,74,.5) в светлой, белый с той же альфой в тёмной). */
+const SECTION_TITLE = SECTION_CAP;
 
 export function SectionCaps({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
@@ -237,10 +241,10 @@ export function GlassPanel({
     <div
       style={{
         borderRadius: radius,
-        background: "linear-gradient(160deg, rgba(255,255,255,0.72), rgba(255,255,255,0.46))",
+        background: glass1.background,
         border: `1px solid ${glassBorder}`,
-        backdropFilter: "blur(22px)",
-        WebkitBackdropFilter: "blur(22px)",
+        backdropFilter: "blur(var(--p-glass1-blur, 22px))",
+        WebkitBackdropFilter: "blur(var(--p-glass1-blur, 22px))",
         boxShadow: `${shCard}, ${glassInset}`,
         ...style,
       }}
@@ -251,9 +255,11 @@ export function GlassPanel({
 }
 
 /** Разделитель строк внутри стеклянной карточки (макет: 1px rgba(23,18,67,.07)). */
-export const ROW_DIVIDER = "rgba(23,18,67,0.07)";
-/** Разделитель колонок сводных полос (макет: 1px rgba(23,18,67,.08)). */
-export const COL_DIVIDER = "rgba(23,18,67,0.08)";
+export const ROW_DIVIDER = DIVIDER;
+/** Разделитель колонок сводных полос (макет: 1px rgba(23,18,67,.08)) — тот же
+ *  hairline, что и ROW_DIVIDER: разница в сотую альфы на глаз не читается, а
+ *  отдельная пара переменных под неё темизацию только запутала бы. */
+export const COL_DIVIDER = DIVIDER;
 
 /* ─── пустое состояние ────────────────────────────────────────────────────── */
 
@@ -271,6 +277,11 @@ export function EmptyCard({ children }: { children: ReactNode }) {
 
 type IconProps = { size?: number; color?: string; strokeWidth?: number };
 
+/** Цвет обводки задаётся CSS-свойством `stroke`, а не одноимённым атрибутом:
+ *  сюда приходят токены-переменные (ink1 по умолчанию, status[*].text от
+ *  вызывающих), а var() в презентационных атрибутах SVG браузеры не разрешают —
+ *  глиф остался бы бесцветным в ОБЕИХ темах. Геометрия обводки (ширина,
+ *  скругления) остаётся атрибутами, как в макете. */
 function Stroke({
   size = 16,
   color = ink1,
@@ -283,7 +294,7 @@ function Stroke({
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={color}
+      style={{ stroke: color }}
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -340,7 +351,7 @@ export const IconChat = (p: IconProps) => <Stroke {...p} paths={["M7.9 20A9 9 0 
 /** Звезда рядом с оценкой (макет 1372, #F59E0B). */
 export function IconStar({ size = 12, color = "#F59E0B" }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ fill: color }} aria-hidden className="shrink-0">
       <path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6L12 2z" />
     </svg>
   );
@@ -368,7 +379,10 @@ export function ToneBadge({ tone, kind }: { tone: StatusKey; kind: "check" | "x"
 
 /* ─── прогресс-полоса (ui/charts/ProgressBar) ─────────────────────────────── */
 
-const TRACK = "rgba(23,18,67,0.09)";
+/** Незаполненный трек полосы/кольца прогресса. Своего токена у него нет —
+ *  под него заведена пара --p-progress-track в parent-theme.css по правилу
+ *  «база ink → белая, альфа сохраняется». */
+const TRACK = "var(--p-progress-track, rgba(23,18,67,0.09))";
 
 export function ProgressBar({
   pct,
@@ -401,10 +415,12 @@ export function ProgressRing({ pct, family }: { pct: number; family: StatusKey }
   const st = status[family];
   const C = 100.53; // 2πr при r=16 — dasharray макета «100.5 100.5»
   const len = (Math.max(0, Math.min(100, pct)) / 100) * C;
-  const track = pct === 0 && family === "red" ? `rgba(${st.rgb},0.2)` : "rgba(23,18,67,0.09)";
+  const track = pct === 0 && family === "red" ? `rgba(${st.rgb},0.2)` : TRACK;
   return (
     <svg width={42} height={42} viewBox="0 0 44 44" aria-hidden className="shrink-0">
-      <circle cx={22} cy={22} r={16} fill="none" stroke={track} strokeWidth={4.5} />
+      {/* stroke/fill — style-свойствами: в них попадают var()-токены (TRACK,
+          status[*].text), а в презентационных атрибутах SVG var() не работает. */}
+      <circle cx={22} cy={22} r={16} fill="none" style={{ stroke: track }} strokeWidth={4.5} />
       {pct > 0 && (
         <circle
           cx={22}
@@ -424,7 +440,7 @@ export function ProgressRing({ pct, family }: { pct: number; family: StatusKey }
         textAnchor="middle"
         fontSize={9.5}
         fontWeight={800}
-        fill={st.text}
+        style={{ fill: st.text }}
       >
         {`${pct}%`}
       </text>

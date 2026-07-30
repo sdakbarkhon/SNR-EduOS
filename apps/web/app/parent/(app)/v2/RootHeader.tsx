@@ -17,11 +17,18 @@
  * Платформенные отличия: paddingTop в RN был max(safe-area, 46) — здесь
  * max(env(safe-area-inset-top), 46px); колокольчик — lucide-react Bell
  * вместо inline-SVG макета (та же геометрия 17px / stroke 1.8).
+ *
+ * ТЁМНАЯ ТЕМА. Стекло кнопки-колокольчика берётся из общих токенов
+ * (glass-1 + glass-border), иначе в тёмной теме белый глиф ink1 оказался бы
+ * на белом круге. Цвет самого глифа задан style-свойством `stroke`, а не
+ * prop-ом `color`: lucide кладёт color в ПРЕЗЕНТАЦИОННЫЙ атрибут <svg stroke>,
+ * а var() в атрибутах SVG браузеры не разрешают — глиф стал бы бесцветным
+ * в обеих темах. CSS-свойство stroke атрибут перекрывает.
  */
 
 import Image from "next/image";
 import { Bell } from "lucide-react";
-import { fontDisplay, ink1, accentGrad } from "./tokens";
+import { fontDisplay, glass1, glassBorder, ink1, accentGrad } from "./tokens";
 
 export function RootHeader({
   title = "SNR EduOS",
@@ -74,13 +81,13 @@ export function RootHeader({
             width: 38,
             height: 38,
             borderRadius: 19,
-            background: "linear-gradient(160deg, rgba(255,255,255,0.72), rgba(255,255,255,0.46))",
-            border: "1px solid rgba(255,255,255,0.80)",
+            background: glass1.background,
+            border: `1px solid ${glassBorder}`,
             backdropFilter: "blur(18px)",
             WebkitBackdropFilter: "blur(18px)",
           }}
         >
-          <Bell size={17} strokeWidth={1.8} color={ink1} />
+          <Bell size={17} strokeWidth={1.8} style={{ stroke: ink1 }} />
           {bellBadge ? (
             <span
               className="absolute flex items-center justify-center font-extrabold text-white"

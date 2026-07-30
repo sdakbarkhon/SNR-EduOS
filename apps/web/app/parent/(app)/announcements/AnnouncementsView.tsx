@@ -21,7 +21,8 @@
 import { useMemo, useState } from "react";
 import { GlassCard } from "../v2/GlassCard";
 import { EmptyState, Glyph, ICON, SegmentPills, StatusChip, grad135 } from "../_ui/screen-kit";
-import { ink1, ink2, ink3, type StatusKey } from "../v2/tokens";
+import { DIVIDER } from "../_ui/screen-tokens";
+import { glassBorder, ink1, ink2, ink3, type StatusKey } from "../v2/tokens";
 
 export type AnnouncementItem = {
   id: string;
@@ -115,7 +116,9 @@ function AnnouncementCard({ row }: { row: AnnouncementItem }) {
           height: 104,
           borderRadius: 14,
           background: grad135(meta.hero),
-          border: "1px solid rgba(255,255,255,0.8)",
+          // Рамка стекла, а не «белая линия»: в тёмной теме glassBorder сам
+          // становится еле заметным W16, иначе hero светился белым контуром.
+          border: `1px solid ${glassBorder}`,
         }}
       >
         <Glyph paths={ICON.mega} size={26} color={ink3} strokeWidth={1.7} />
@@ -130,7 +133,7 @@ function AnnouncementCard({ row }: { row: AnnouncementItem }) {
       {/* Футер: hairline + автор. */}
       <div
         className="flex items-center gap-2"
-        style={{ paddingTop: 6, borderTop: `1px solid rgba(26,19,74,0.10)` }}
+        style={{ paddingTop: 6, borderTop: `1px solid ${DIVIDER}` }}
       >
         <span className="min-w-0 flex-1 truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
           {row.authorName ?? (row.isFromAdmin ? "Администрация школы" : "Школа")}

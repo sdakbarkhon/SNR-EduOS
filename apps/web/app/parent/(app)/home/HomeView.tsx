@@ -37,6 +37,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GlassCard } from "../v2/GlassCard";
 import { RootHeader } from "../v2/RootHeader";
+import { CHEVRON, DIVIDER, SECTION_CAP } from "../_ui/screen-tokens";
 import {
   chip,
   fontDisplay,
@@ -110,18 +111,19 @@ const R = {
 /* ─────────────────────────────────────────────────────────────────────────────
  * Локальные константы, которых нет в v2/tokens.ts: в мобилке это приватные
  * константы соответствующих ui-компонентов (значения светлой темы, дословно).
+ *
+ * ТЁМНАЯ ТЕМА. Раньше здесь лежали ещё пять тёмно-чернильных литералов
+ * (разделитель ListRow, разделители MetricsSplitRow, caps-лейбл метрики,
+ * заголовок секции и шеврон) — в тёмной теме они оставались тёмными на тёмном
+ * стекле. Теперь всё это берётся из общих производных `_ui/screen-tokens.ts`:
+ * DIVIDER / SECTION_CAP / CHEVRON. Разделители метрик были .08 против .07 у
+ * DIVIDER — разница на глаз неразличима, второй токен ради неё не заводим.
+ *
+ * Оставшиеся ниже белые константы — блик, фон и рамка ПОВЕРХ непрозрачной
+ * цветной плитки. Они белые в обеих темах (это WHITE, а не «цвет текста»),
+ * поэтому не темизируются.
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** ListRow: разделитель border-top 1px (макет строка 267). */
-const ROW_DIVIDER = "rgba(23,18,67,0.07)";
-/** MetricsSplitRow: вертикальные разделители и верхний border-top. */
-const METRIC_SEPARATOR = "rgba(23,18,67,0.08)";
-/** MetricsSplitRow: caps-лейбл 8/800 (макет строки 230–239). */
-const METRIC_LABEL = "rgba(26,19,74,0.5)";
-/** SectionHeader: заголовок 10.5/800 (макет строка 2772). */
-const SECTION_TITLE = "rgba(26,19,74,0.5)";
-/** Хвостовой шеврон карточки ребёнка / строк списка. */
-const CHEVRON = "rgba(26,19,74,0.4)";
 /** AccentCard: внутренний блик inset 0 1.5 0 W35 (макет строка 242). */
 const ACCENT_INSET_SHADOW = "inset 0 1.5px 0 rgba(255,255,255,0.35)";
 /** AccentInset: стекло внутри непрозрачной градиентной карточки (строка 2741). */
@@ -221,10 +223,23 @@ function WhiteGlyph({ paths, size = 17 }: { paths: readonly string[]; size?: num
   );
 }
 
+/**
+ * Цвет обводки идёт через `style`, а НЕ через presentation-атрибут `stroke=`:
+ * сюда приходят токены (CHEVRON, status[*].text), а это уже не цвета, а
+ * var(--p-*), и в SVG-атрибутах браузер var() не разрешает — глиф остался бы
+ * бесцветным в обеих темах. Геометрия (strokeWidth, linecap) — по-прежнему
+ * атрибуты.
+ */
 function ChevronRight({ size, color, strokeWidth }: { size: number; color: string; strokeWidth: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-      <path d="m9 18 6-6-6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="m9 18 6-6-6-6"
+        style={{ stroke: color }}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -370,7 +385,7 @@ function SectionHeader({ title, linkLabel, linkHref }: { title: string; linkLabe
           fontWeight: 800,
           letterSpacing: 0.84, // .08em при 10.5px
           textTransform: "uppercase",
-          color: SECTION_TITLE,
+          color: SECTION_CAP,
         }}
       >
         {title}
@@ -408,7 +423,7 @@ function ListRow({
         gap: 11,
         paddingTop: 10,
         paddingBottom: 10,
-        borderTop: divider ? `1px solid ${ROW_DIVIDER}` : undefined,
+        borderTop: divider ? `1px solid ${DIVIDER}` : undefined,
       }}
     >
       {left}
@@ -442,12 +457,12 @@ function MetricsSplitRow({ cells, topDivider = false }: { cells: MetricCell[]; t
       style={{
         gap: 6,
         paddingTop: topDivider ? 10 : undefined,
-        borderTop: topDivider ? `1px solid ${METRIC_SEPARATOR}` : undefined,
+        borderTop: topDivider ? `1px solid ${DIVIDER}` : undefined,
       }}
     >
       {cells.map((cell, i) => (
         <div key={cell.label} className="flex min-w-0" style={{ gap: 6, flex: `${cell.flex ?? 1} 1 0%` }}>
-          {i > 0 ? <div style={{ width: 1, background: METRIC_SEPARATOR }} /> : null}
+          {i > 0 ? <div style={{ width: 1, background: DIVIDER }} /> : null}
           <div className="flex min-w-0 flex-1 flex-col items-center" style={{ gap: 1 }}>
             <span
               className="w-full truncate text-center"
@@ -456,7 +471,7 @@ function MetricsSplitRow({ cells, topDivider = false }: { cells: MetricCell[]; t
                 fontWeight: 800,
                 letterSpacing: 0.4, // .05em при 8px
                 textTransform: "uppercase",
-                color: METRIC_LABEL,
+                color: SECTION_CAP,
               }}
             >
               {cell.label}

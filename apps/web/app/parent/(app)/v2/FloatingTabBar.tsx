@@ -20,15 +20,23 @@
  *     домашним индикатором, но не ниже макетных 14px);
  *   * inset-блик — настоящий inset box-shadow вместо линии-вьюхи;
  *   * иконки — lucide-react вместо @expo/vector-icons.
- * Только светлая тема.
+ *
+ * ТЁМНАЯ ТЕМА (эталон — тот же мобильный FloatingTabBar, ветка
+ * feat/mobile-parent-redesign):
+ *   * поверхность и рамка бара больше не свои литералы, а общие токены
+ *     glass-1 / glass-border — в мобилке тёмная пара к светлому «W78→W55»
+ *     ровно они и есть. Иначе внизу тёмной страницы оставалась бы яркая
+ *     белая плашка на всех пяти корневых экранах;
+ *   * blur 26 у бара СОБСТВЕННЫЙ и в эталоне одинаков в обеих темах
+ *     (`{ ...tokens.glass1, blur: 26 }`), поэтому остаётся числом;
+ *   * цвет неактивного пункта не совпал ни с ink2 (.64), ни с ink3 (.45) —
+ *     под него заведена своя пара --p-tab-inactive в parent-theme.css.
  */
 
 import type { ReactNode } from "react";
-import { accentGrad, glassInset, shFloat } from "./tokens";
+import { accentGrad, glass1, glassBorder, glassInset, shFloat } from "./tokens";
 
-const BAR_GLASS = "linear-gradient(160deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55))";
-const BAR_BORDER = "rgba(255,255,255,0.85)";
-const ITEM_INACTIVE = "rgba(26,19,74,0.55)";
+const ITEM_INACTIVE = "var(--p-tab-inactive, rgba(26,19,74,0.55))";
 const PILL_SHADOW = "0 8px 20px rgba(124,58,237,0.4)";
 
 export interface FloatingTabItem {
@@ -62,8 +70,8 @@ export function FloatingTabBar({
           style={{
             borderRadius: 28,
             padding: 7,
-            background: BAR_GLASS,
-            border: `1px solid ${BAR_BORDER}`,
+            background: glass1.background,
+            border: `1px solid ${glassBorder}`,
             backdropFilter: "blur(26px)",
             WebkitBackdropFilter: "blur(26px)",
             boxShadow: glassInset,

@@ -34,6 +34,7 @@ import {
   ScreenBody,
   SubjectSquare,
 } from "../_study/parts";
+import { DIVIDER, PILL_INACTIVE_BG, PILL_INACTIVE_TEXT } from "../_ui/screen-tokens";
 import { ink1, ink2, ink3, status, type StatusKey } from "../v2/tokens";
 
 export type HomeworkCardVM = {
@@ -82,11 +83,13 @@ function FilterChip({
         paddingBlock: 6,
         paddingInline: 10,
         borderRadius: 999,
-        background: active ? "rgba(23,18,67,0.09)" : "rgba(255,255,255,0.55)",
-        border: "1px solid rgba(23,18,67,0.06)",
+        /* Активный чип — ink-налёт (в тёмной теме белый, --p-chip-active-bg),
+           неактивный — та же стеклянная пилюля, что у SegmentPills. */
+        background: active ? "var(--p-chip-active-bg, rgba(23,18,67,0.09))" : PILL_INACTIVE_BG,
+        border: `1px solid ${DIVIDER}`,
         fontSize: 10.5,
         fontWeight: 800,
-        color: active ? ink1 : ink2,
+        color: active ? ink1 : PILL_INACTIVE_TEXT,
       }}
     >
       {`${label} · ${count}`}
@@ -97,7 +100,7 @@ function FilterChip({
 function HomeworkCard({ card }: { card: HomeworkCardVM }) {
   const st = status[card.family];
   const emphasize = card.family === "orange" || card.family === "red";
-  const metaColor = emphasize ? st.text : "rgba(26,19,74,0.5)";
+  const metaColor = emphasize ? st.text : ink3;
 
   const right =
     card.progress === "hourglass" ? (
@@ -123,10 +126,7 @@ function HomeworkCard({ card }: { card: HomeworkCardVM }) {
             </span>
             <MiniChip label={card.statusLabel} family={card.family} />
           </span>
-          <span
-            className="line-clamp-2"
-            style={{ fontSize: 10.5, fontWeight: 600, color: "rgba(26,19,74,0.66)" }}
-          >
+          <span className="line-clamp-2" style={{ fontSize: 10.5, fontWeight: 600, color: ink2 }}>
             {card.title}
           </span>
           <span className="flex items-center" style={{ gap: 4 }}>
@@ -149,7 +149,7 @@ function SummaryCol({ value, label, color }: { value: number; label: string; col
   return (
     <span className="flex flex-1 flex-col items-center" style={{ gap: 1 }}>
       <span style={{ fontSize: 15, fontWeight: 800, color }}>{value}</span>
-      <span style={{ fontSize: 8.5, fontWeight: 700, color: "rgba(26,19,74,0.55)" }}>{label}</span>
+      <span style={{ fontSize: 8.5, fontWeight: 700, color: ink2 }}>{label}</span>
     </span>
   );
 }

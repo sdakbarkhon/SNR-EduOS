@@ -23,16 +23,19 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fontDisplay, ink1 } from "../v2/tokens";
+import { fontDisplay, glass1, glassBorder, ink1 } from "../v2/tokens";
 
 /** Круглая стеклянная кнопка 38 — та же геометрия, что у колокольчика
- *  RootHeader (макет: 160° W72→W46, blur 18, border W80). */
+ *  RootHeader (макет: 160° W72→W46, blur 18, border W80).
+ *
+ *  Поверхность и рамка — общие токены стекла, а не литералы макета: иначе в
+ *  тёмной теме белая стрелка ink1 оказалась бы на белом круге. */
 export const GLASS_CIRCLE_STYLE = {
   width: 38,
   height: 38,
   borderRadius: 19,
-  background: "linear-gradient(160deg, rgba(255,255,255,0.72), rgba(255,255,255,0.46))",
-  border: "1px solid rgba(255,255,255,0.80)",
+  background: glass1.background,
+  border: `1px solid ${glassBorder}`,
   backdropFilter: "blur(18px)",
   WebkitBackdropFilter: "blur(18px)",
 } as const;
@@ -64,7 +67,11 @@ export function GlassCircle({
   );
 }
 
-/** Стрелка «назад» 18 stroke 2 (макет строка 688). */
+/** Стрелка «назад» 18 stroke 2 (макет строка 688).
+ *
+ *  Цвет — style-свойством `stroke`, а не одноимённым атрибутом: ink1 теперь
+ *  var(), а var() в презентационных атрибутах SVG браузеры не разрешают —
+ *  стрелка стала бы бесцветной в ОБЕИХ темах. Геометрия остаётся атрибутами. */
 function BackArrow() {
   return (
     <svg
@@ -72,7 +79,7 @@ function BackArrow() {
       height={18}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={ink1}
+      style={{ stroke: ink1 }}
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"

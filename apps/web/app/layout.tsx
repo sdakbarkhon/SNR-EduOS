@@ -15,19 +15,39 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="ru" suppressHydrationWarning>
       <head>
         {/* Apply saved theme before hydration to prevent flash.
-            /parent — светлая тема принудительно и без вариантов: переключателя
-            там нет, а сохранённое 'dark'/'system' иначе красило бы родителя в
-            тёмное ещё до гидратации (класс вешается здесь, до первой
-            отрисовки — один React-эффект этот флеш убрать не успевает).
-            Ветка ученика/учителя не меняется ни на байт. */}
+
+            Скрипт ОБЯЗАН оставаться блокирующим и стоять до первой отрисовки:
+            класс `dark` вешается здесь, а не в React-эффекте — иначе тёмная
+            тема мигала бы светлой на каждой загрузке.
+
+            Две ветки, потому что политика темы у них разная:
+
+            • ВНЕ /parent (ученик, учитель, админ) — исходное поведение без
+              единого изменения: 'dark' → тёмная, 'system' → по
+              prefers-color-scheme, остальное → светлая. Выражение ниже
+              дословно то же, что было до появления /parent-ветки.
+
+            • НА /parent — тёмная только при ЯВНОМ 'dark'. 'system', пустое
+              значение и мусор дают светлую, prefers-color-scheme на /parent
+              не спрашивается вовсе: у родителя переключатель из двух кнопок
+              («Светлая»/«Тёмная»), варианта «Системная» нет, и первый вход с
+              пустым localStorage обязан быть светлым даже на тёмной ОС.
+              color-scheme проставляется тут же, чтобы нативные элементы
+              (скроллбар, поля ввода) не мигали чужой темой. */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
             var t = localStorage.getItem('snr-theme') || 'light';
             var parent = location.pathname === '/parent' || location.pathname.indexOf('/parent/') === 0;
-            if (!parent && (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))) {
+            var dark = parent
+              ? t === 'dark'
+              : (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+            if (dark) {
               document.documentElement.classList.add('dark');
             } else {
               document.documentElement.classList.remove('dark');
+            }
+            if (parent) {
+              document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
             }
           } catch(e) {}
         `}} />

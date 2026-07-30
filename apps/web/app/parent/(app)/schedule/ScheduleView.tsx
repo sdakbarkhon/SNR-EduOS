@@ -35,6 +35,8 @@ import {
 import {
   accent,
   accentGrad,
+  glass1,
+  glass2,
   glassBorder,
   glassInset,
   ink1,
@@ -107,12 +109,13 @@ function DayPill({
         paddingBlock: 8,
         borderRadius: 14,
         gap: 2,
+        /* Активная пилюля лежит на accent-градиенте — её белая рамка белая в
+           обеих темах. Неактивная — обычное стекло glass-1, поэтому и фон, и
+           рамка, и радиус размытия идут из токенов. */
         border: `1px solid ${active ? "rgba(255,255,255,0.35)" : glassBorder}`,
-        background: active
-          ? accentGrad
-          : "linear-gradient(160deg, rgba(255,255,255,0.72), rgba(255,255,255,0.46))",
-        backdropFilter: active ? undefined : "blur(22px)",
-        WebkitBackdropFilter: active ? undefined : "blur(22px)",
+        background: active ? accentGrad : glass1.background,
+        backdropFilter: active ? undefined : "blur(var(--p-glass1-blur, 22px))",
+        WebkitBackdropFilter: active ? undefined : "blur(var(--p-glass1-blur, 22px))",
         boxShadow: active ? shColor(status.violet.rgb) : undefined,
       }}
     >
@@ -140,12 +143,8 @@ function LessonRow({ row }: { row: Row }) {
     return (
       <div className="flex items-stretch" style={{ gap: 8, opacity: 0.82 }}>
         <div className="flex flex-col items-center" style={{ width: 44, gap: 4, paddingTop: 11 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(26,19,74,0.65)" }}>
-            {row.start}
-          </span>
-          <span style={{ fontSize: 9.5, fontWeight: 600, color: "rgba(26,19,74,0.5)" }}>
-            {row.end}
-          </span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: ink2 }}>{row.start}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 600, color: ink3 }}>{row.end}</span>
         </div>
         <GlassPanel radius={18} style={{ flex: 1, minWidth: 0 }}>
           <div style={{ paddingBlock: 11, paddingInline: 13 }}>
@@ -179,12 +178,12 @@ function LessonRow({ row }: { row: Row }) {
           {l.title}
         </span>
         {subtitle && (
-          <span className="truncate" style={{ fontSize: 9.5, fontWeight: 600, color: "rgba(26,19,74,0.6)" }}>
+          <span className="truncate" style={{ fontSize: 9.5, fontWeight: 600, color: ink2 }}>
             {subtitle}
           </span>
         )}
         {l.topic && (
-          <span className="truncate" style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(26,19,74,0.48)" }}>
+          <span className="truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
             Тема: {l.topic}
           </span>
         )}
@@ -200,15 +199,13 @@ function LessonRow({ row }: { row: Row }) {
           style={{
             fontSize: 12,
             fontWeight: 800,
-            color: l.live ? ink1 : "rgba(26,19,74,0.65)",
+            color: l.live ? ink1 : ink2,
           }}
         >
           {l.timeStart}
         </span>
         {l.timeEnd && (
-          <span style={{ fontSize: 9.5, fontWeight: 600, color: "rgba(26,19,74,0.5)" }}>
-            {l.timeEnd}
-          </span>
+          <span style={{ fontSize: 9.5, fontWeight: 600, color: ink3 }}>{l.timeEnd}</span>
         )}
         {/* Точка 9px с ореолом 3px в цвете предмета (макет 3541). */}
         <span
@@ -221,7 +218,11 @@ function LessonRow({ row }: { row: Row }) {
       </div>
       <GlassPanel
         radius={18}
-        style={{ flex: 1, minWidth: 0, boxShadow: `0 12px 28px rgba(99,86,214,0.13), ${glassInset}` }}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          boxShadow: `var(--p-sh-row, 0 12px 28px rgba(99,86,214,0.13)), ${glassInset}`,
+        }}
       >
         {l.subjectId ? (
           <Link href={`/parent/subject/${l.subjectId}`} className="block transition-transform active:scale-[0.99]">
@@ -282,7 +283,7 @@ export function ScheduleView({
               width: 44,
               borderRadius: 15,
               border: `1px solid ${glassBorder}`,
-              background: "rgba(255,255,255,0.5)",
+              background: glass2.background,
               boxShadow: shCard,
             }}
           >

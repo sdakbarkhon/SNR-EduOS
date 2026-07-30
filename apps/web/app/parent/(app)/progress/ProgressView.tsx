@@ -42,6 +42,14 @@ import { useRouter } from "next/navigation";
 import { GlassCard } from "../v2/GlassCard";
 import { RootHeader } from "../v2/RootHeader";
 import {
+  DIVIDER,
+  ONLINE_GREEN,
+  PILL_ACTIVE_SHADOW,
+  PILL_INACTIVE_BG,
+  PILL_INACTIVE_TEXT,
+  SECTION_CAP,
+} from "../_ui/screen-tokens";
+import {
   accent,
   accentGrad,
   chip,
@@ -143,38 +151,44 @@ const subjectHref = (id: string | null) => (id ? `/parent/subject/${id}` : R.sub
 /* ─────────────────────────────────────────────────────────────────────────────
  * Локальные константы, которых нет в v2/tokens.ts: в мобилке это приватные
  * константы соответствующих ui-компонентов (значения светлой темы, дословно).
+ *
+ * ТЁМНАЯ ТЕМА. Здесь лежала СВОЯ палитра из тринадцати литералов, и половина
+ * экрана в тёмной теме оставалась светлой (плитки предметов, кнопка периода,
+ * поповер, неактивные пилюли), а вторая половина — тёмной на тёмном
+ * (разделители, caps-заголовок, текст пилюли, трек полосы). Теперь:
+ *   * разделители / заголовок секции / неактивные пилюли / тень активной /
+ *     онлайн-точка берутся из общих производных `_ui/screen-tokens.ts`
+ *     (DIVIDER, SECTION_CAP, PILL_*, ONLINE_GREEN) — вторых копий не держим;
+ *   * ссылка «Профиль ребёнка ›» — status.violet.text: в светлой это тот же
+ *     #6D28D9, что был литералом, в тёмной — светло-сиреневый;
+ *   * трём поверхностям, для которых токена нет вовсе (заливка плитки
+ *     предмета, кнопка периода, поповер периода), заведены свои пары --p-* в
+ *     apps/web/app/parent/parent-theme.css; трек полосы взят из готовой
+ *     --p-progress-track.
+ *
+ * Оставшиеся ниже белые ACCENT_INSET_* лежат ПОВЕРХ непрозрачной цветной
+ * карточки, а янтарная звезда — сигнальная заливка: и то, и другое одинаково
+ * в обеих темах и не темизируется.
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** SectionHeader: заголовок 10.5/800 rgba(26,19,74,.5) (макет строка 2772). */
-const SECTION_TITLE = "rgba(26,19,74,0.5)";
-/** ChildSwitcherCard: правая ссылка #6d28d9 (макет строка 281). */
-const LINK = "#6D28D9";
 /** AccentCard: внутренний блик inset 0 1.5 0 W35 (макет строка 242). */
 const ACCENT_INSET_SHADOW = "inset 0 1.5px 0 rgba(255,255,255,0.35)";
 /** AccentInset: стекло внутри непрозрачной градиентной карточки (строка 2741). */
 const ACCENT_INSET_BG = "rgba(255,255,255,0.2)";
 const ACCENT_INSET_BORDER = "rgba(255,255,255,0.35)";
-/** Разделитель строк «Динамики» (borderTop, макет строки 366–368). */
-const ROW_DIVIDER = "rgba(23,18,67,0.07)";
-/** Разделитель «Сильные стороны / Зоны роста» (макет строка 323). */
-const CARD_DIVIDER = "rgba(23,18,67,0.08)";
-/** ProgressBar: трек светлой темы. */
-const TRACK = "rgba(23,18,67,0.09)";
+/** ProgressBar: трек полосы. Своей переменной не заводим — в parent-theme.css
+ *  уже есть --p-progress-track ровно с этим светлым значением (общий трек
+ *  полос/колец учебных экранов). */
+const TRACK = "var(--p-progress-track, rgba(23,18,67,0.09))";
 /** Плитки предметов: полупрозрачная заливка (макет строка 306). */
-const TILE_BG = "rgba(255,255,255,0.4)";
+const TILE_BG = "var(--p-tile-bg, rgba(255,255,255,0.4))";
 /** Кнопка периода (макет строка 294). */
-const PERIOD_BG = "rgba(255,255,255,0.6)";
+const PERIOD_BG = "var(--p-period-bg, rgba(255,255,255,0.6))";
 /** Popover периода (макет строка 298): 160° W94→W82, blur 24, border W90. */
-const POPOVER_BG = "linear-gradient(160deg, rgba(255,255,255,0.94), rgba(255,255,255,0.82))";
-const POPOVER_BORDER = "rgba(255,255,255,0.9)";
-const POPOVER_SHADOW = "0 18px 40px rgba(64,54,150,0.28)";
-/** SegmentPills gt (макет строки 290, 3835): активная — accent-градиент с тенью,
- *  неактивная — 160° W60→W40 БЕЗ рамки (осознанная правка мобилки, пост-заход 8). */
-const PILL_INACTIVE_BG = "linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4))";
-const PILL_INACTIVE_TEXT = "rgba(26,19,74,0.66)";
-const PILL_ACTIVE_SHADOW = "0 8px 18px rgba(124,58,237,0.35)";
-/** Онлайн-точка на аватаре учителя (макет строка 327). */
-const ONLINE_DOT = "#22C55E";
+const POPOVER_BG =
+  "var(--p-popover-bg, linear-gradient(160deg, rgba(255,255,255,0.94), rgba(255,255,255,0.82)))";
+const POPOVER_BORDER = "var(--p-popover-border, rgba(255,255,255,0.9))";
+const POPOVER_SHADOW = "var(--p-popover-shadow, 0 18px 40px rgba(64,54,150,0.28))";
 /** Звезда рядом с оценкой предмета (макет строка 306). */
 const STAR_AMBER = "#F59E0B";
 
@@ -244,9 +258,14 @@ const SPARK_PATH = "M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 
 /** Иконка «лайк» в карточке отзыва (макет строка 330). */
 const THUMB_PATH = "M7 22V11m0 0h10a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3h-3l1 4a2 2 0 1 1-4 0v-1H7Z";
 
+/* Во всех глифах ниже цвет идёт через `style`, а не presentation-атрибутом
+   fill=/stroke=: любой из них может получить токен (var(--p-*)), а var() в
+   SVG-атрибутах браузер не разрешает — глиф стал бы бесцветным в обеих темах.
+   Геометрия (strokeWidth, linecap) остаётся атрибутами. */
+
 function StarGlyph({ size = 12, color = STAR_AMBER }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} className="shrink-0" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ fill: color }} className="shrink-0" aria-hidden>
       <path d={STAR_PATH} />
     </svg>
   );
@@ -263,15 +282,33 @@ function ChevronRight({
 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-      <path d="m9 18 6-6-6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="m9 18 6-6-6-6"
+        style={{ stroke: color }}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
+/**
+ * Цвет — через `style`, а не presentation-атрибутом `stroke=`: сюда приходят
+ * токены (ink1/ink2), то есть var(--p-*), а var() в SVG-атрибутах браузер не
+ * разрешает — шеврон стал бы бесцветным в обеих темах. Геометрия остаётся
+ * атрибутами.
+ */
 function ChevronDown({ size, color, strokeWidth }: { size: number; color: string; strokeWidth: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
-      <path d="m6 9 6 6 6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="m6 9 6 6 6-6"
+        style={{ stroke: color }}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -442,7 +479,7 @@ function SectionHeader({ title, linkLabel, linkHref }: { title: string; linkLabe
           fontWeight: 800,
           letterSpacing: 0.84, // .08em при 10.5px
           textTransform: "uppercase",
-          color: SECTION_TITLE,
+          color: SECTION_CAP,
         }}
       >
         {title}
@@ -476,7 +513,7 @@ function StarRating({
     <span className="flex" style={{ gap }}>
       {Array.from({ length: total }, (_, i) => (
         <svg key={i} width={size} height={size} viewBox="0 0 24 24" className="shrink-0" aria-hidden>
-          <path d={STAR_PATH} fill={i < count ? color : mutedColor} />
+          <path d={STAR_PATH} style={{ fill: i < count ? color : mutedColor }} />
         </svg>
       ))}
     </span>
@@ -609,15 +646,25 @@ function Sparkline({
       style={fluid ? { width: "100%", maxWidth: width } : undefined}
       aria-hidden
     >
+      {/* Цвет линии и точки — через style: на вкладке «Динамика» сюда приходит
+          токен accent = var(--p-accent, …), а var() в SVG-атрибутах stroke=/fill=
+          не разрешается — график остался бы бесцветным в обеих темах. */}
       <polyline
         points={pts.join(" ")}
         fill="none"
-        stroke={strokeColor}
+        style={{ stroke: strokeColor }}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {endDot ? <circle cx={lastX} cy={lastY} r={endDotRadius ?? strokeWidth * 1.6} fill={strokeColor} /> : null}
+      {endDot ? (
+        <circle
+          cx={lastX}
+          cy={lastY}
+          r={endDotRadius ?? strokeWidth * 1.6}
+          style={{ fill: strokeColor }}
+        />
+      ) : null}
     </svg>
   );
 }
@@ -940,7 +987,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                       </span>
                     </Link>
                   ) : null}
-                  <Link href={R.child} style={{ fontSize: 10.5, fontWeight: 800, color: LINK }}>
+                  <Link href={R.child} style={{ fontSize: 10.5, fontWeight: 800, color: status.violet.text }}>
                     {`${T.childProfile} ›`}
                   </Link>
                 </span>
@@ -1216,7 +1263,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                               <ToneChip key={s} label={s} tone="green" />
                             ))}
                           </div>
-                          <div style={{ height: 1, background: CARD_DIVIDER }} />
+                          <div style={{ height: 1, background: DIVIDER }} />
                           <CapsLabel color={status.red.text}>{T.growthAreas}</CapsLabel>
                           <div className="flex flex-wrap" style={{ gap: 6 }}>
                             {growthAreas.length > 0 ? (
@@ -1251,7 +1298,9 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                               width: 10,
                               height: 10,
                               borderRadius: 5,
-                              background: ONLINE_DOT,
+                              background: ONLINE_GREEN,
+                              // Белая обводка точки — часть сигнального
+                              // маркера макета, одна в обеих темах.
                               border: "2px solid #FFFFFF",
                             }}
                           />
@@ -1280,9 +1329,11 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                           }}
                         >
                           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" className="shrink-0" aria-hidden>
+                            {/* status.green.text — это var(--p-status-green-text, …):
+                                в атрибуте stroke= var() не работает, поэтому style. */}
                             <path
                               d={THUMB_PATH}
-                              stroke={status.green.text}
+                              style={{ stroke: status.green.text }}
                               strokeWidth={1.8}
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -1345,7 +1396,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                             style={{
                               paddingTop: 10,
                               paddingBottom: 10,
-                              borderTop: i === 0 ? undefined : `1px solid ${ROW_DIVIDER}`,
+                              borderTop: i === 0 ? undefined : `1px solid ${DIVIDER}`,
                             }}
                           >
                             <span

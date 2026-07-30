@@ -41,12 +41,26 @@ import { accentGrad, fontDisplay, ink1, ink2, ink3, status } from "../v2/tokens"
 /** Версия приложения — совпадает с app.json мобилки. */
 const APP_VERSION = "1.0.0";
 
-/** Стекло confirm-панели — BottomSheetFrame макета (строка 4228). */
-const SHEET_BG = "linear-gradient(160deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76))";
-const SHEET_BORDER = "rgba(255,255,255,0.9)";
-const SHEET_SHADOW = "0 -16px 50px rgba(64,54,150,0.3), inset 0 1.5px 0 rgba(255,255,255,0.95)";
+/**
+ * Стекло confirm-панели — BottomSheetFrame макета (строка 4228).
+ *
+ * ТЁМНАЯ ТЕМА. Шторка плотнее обычного стекла (W92→W76 против W72→W46 у
+ * glass-1), поэтому подставить glass1/glassBorder нельзя — панель потеряла бы
+ * «непрозрачность модалки». Заведена своя тройка --p-sheet-* в
+ * apps/web/app/parent/parent-theme.css; в тёмной это такое же плотное, но
+ * ТЁМНОЕ стекло, и белый ink1 на кнопке «Отмена» снова читается.
+ */
+const SHEET_BG =
+  "var(--p-sheet-bg, linear-gradient(160deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76)))";
+const SHEET_BORDER = "var(--p-sheet-border, rgba(255,255,255,0.9))";
+const SHEET_SHADOW =
+  "var(--p-sheet-shadow, 0 -16px 50px rgba(64,54,150,0.3), inset 0 1.5px 0 rgba(255,255,255,0.95))";
+/** Затемнение под модалкой. Оно тёмное в ОБЕИХ темах — это скрим, а не «чернила»,
+ *  поэтому по правилу «база ink → белая» его не переворачиваем. */
 const CONF_OVERLAY = "rgba(23,18,67,0.38)";
-const CONF_TEXT = "rgba(26,19,74,0.66)";
+/** Фон вторичной кнопки («Отмена») внутри шторки: не текст и не стекло —
+ *  своя пара --p-control-soft (в тёмной та же альфа по белой базе). */
+const CONTROL_SOFT = "var(--p-control-soft, rgba(23,18,67,0.06))";
 
 interface HubMenuItem {
   key: string;
@@ -339,7 +353,7 @@ export function ProfileView({
                     fontSize: 11,
                     fontWeight: 600,
                     lineHeight: "17px",
-                    color: CONF_TEXT,
+                    color: ink2,
                     textAlign: "center",
                   }}
                 >
@@ -355,7 +369,7 @@ export function ProfileView({
                       paddingTop: 14,
                       paddingBottom: 14,
                       borderRadius: 16,
-                      background: "rgba(23,18,67,0.06)",
+                      background: CONTROL_SOFT,
                       fontSize: 12.5,
                       fontWeight: 800,
                       color: ink1,

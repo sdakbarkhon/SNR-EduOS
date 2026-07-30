@@ -7,8 +7,11 @@ import { useLocale } from "@/components/LocaleProvider";
 import { FeaturesSheet } from "./FeaturesSheet";
 import { LangButton } from "./LangButton";
 import { ink1, ink2, ink3 } from "@/lib/parent/glass-tokens";
+import { status } from "@/app/parent/(app)/v2/tokens";
 
 const SLIDE_COUNT = 3;
+/** Активная точка пагинации — оранжевый из градиента кнопки «Начать».
+ *  Сигнальный цвет, одинаково читается на светлой и тёмной странице. */
 const DOT_ACTIVE = "#f97316";
 
 /**
@@ -139,7 +142,7 @@ export function OnboardingCarousel({ onStart }: { onStart: () => void }) {
         type="button"
         onClick={() => setMoreOpen(true)}
         className="pb-0.5 pt-1.5 text-center text-[12px] font-extrabold"
-        style={{ color: "#6d28d9" }}
+        style={{ color: status.violet.text }}
       >
         {t.learnMore}
       </button>

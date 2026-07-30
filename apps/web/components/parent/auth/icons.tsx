@@ -1,12 +1,21 @@
 /**
  * Иконки экрана входа — 1:1 порт apps/mobile-parent/src/ui/auth/icons.tsx
  * (только те, что используются на LoginPhoneScreen). Пути SVG — дословно.
+ *
+ * ТЁМНАЯ ТЕМА: почему цвет здесь в style, а не в атрибуте.
+ * Вызывающий передаёт в `color` токен вида `var(--p-ink1, #171243)`. Браузеры
+ * НЕ разрешают var() в presentation-атрибутах SVG (fill=/stroke=) — значение
+ * просто не разбирается, и глиф остаётся бесцветным в ОБЕИХ темах. В CSS-
+ * свойстве (style) var() работает штатно, а CSS-свойство перебивает атрибут.
+ * Поэтому цвет ушёл в style, а геометрия (strokeWidth/strokeLinecap/fill="none")
+ * осталась атрибутами. Тот же приём уже применён в общем примитиве Glyph
+ * (app/parent/(app)/_ui/screen-kit.tsx).
  */
 type IconProps = { size?: number; color?: string; strokeWidth?: number };
 
 export function BackArrowIcon({ size = 18, color = "#171243", strokeWidth = 2 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }}>
       <path d="M19 12H5" />
       <path d="m12 19-7-7 7-7" />
     </svg>
@@ -16,7 +25,7 @@ export function BackArrowIcon({ size = 18, color = "#171243", strokeWidth = 2 }:
 export function ChevronDownIcon({ size = 11, color = "rgba(26,19,74,0.5)", strokeWidth = 2 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="m6 9 6 6 6-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m6 9 6 6 6-6" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }} />
     </svg>
   );
 }
@@ -24,14 +33,14 @@ export function ChevronDownIcon({ size = 11, color = "rgba(26,19,74,0.5)", strok
 export function ChevronRightIcon({ size = 16, color = "rgba(26,19,74,0.45)", strokeWidth = 2 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="m9 6 6 6-6 6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m9 6 6 6-6 6" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }} />
     </svg>
   );
 }
 
 export function SparkleIcon({ size = 18, color = "#FFFFFF" }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ fill: color }}>
       <path d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z" />
     </svg>
   );
@@ -50,7 +59,7 @@ export function GoogleIcon({ size = 18 }: { size?: number }) {
 
 export function AppleIcon({ size = 18, color = "#171243" }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ fill: color }}>
       <path d="M17.6 12.5c0-2 1.6-2.9 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3.1.7-.6 0-1.6-.7-2.7-.7-1.4 0-2.7.8-3.4 2-1.5 2.5-.4 6.3 1 8.4.7 1 1.5 2.2 2.6 2.2 1 0 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.7 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.2-.8-2.2-3.7zM15.6 6c.6-.7 1-1.7.9-2.6-.8 0-1.9.5-2.4 1.2-.5.6-1 1.6-.8 2.6.9.1 1.8-.5 2.3-1.2z" />
     </svg>
   );
@@ -59,7 +68,7 @@ export function AppleIcon({ size = 18, color = "#171243" }: IconProps) {
 /** Глобус — кнопка выбора языка на онбординге/экране входа. */
 export function GlobeIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }}>
       <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
       <path d="M3 12h18" />
       <path d="M12 3a13 13 0 0 1 0 18" />
@@ -71,7 +80,7 @@ export function GlobeIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: I
 /** Солнце — 1:1 с apps/mobile-parent LangSecurityScreen.tsx SunIcon. */
 export function SunIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }}>
       <circle cx={12} cy={12} r={4} />
       <path d="M12 2v2" />
       <path d="M12 20v2" />
@@ -88,7 +97,7 @@ export function SunIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: Ico
 /** Луна — 1:1 с apps/mobile-parent LangSecurityScreen.tsx MoonIcon. */
 export function MoonIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }}>
       <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
     </svg>
   );
@@ -97,7 +106,7 @@ export function MoonIcon({ size = 17, color = "#171243", strokeWidth = 1.8 }: Ic
 /** Монитор — 1:1 с apps/mobile-parent LangSecurityScreen.tsx DeviceIcon («Системная»). */
 export function MonitorIcon({ size = 17, color = "#FFFFFF", strokeWidth = 1.8 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: color }}>
       <rect x={6} y={2} width={12} height={20} rx={3} />
       <path d="M12 18h.01" />
     </svg>

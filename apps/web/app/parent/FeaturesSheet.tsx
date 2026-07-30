@@ -5,7 +5,10 @@ import { useLocale } from "@/components/LocaleProvider";
 import { GlassSheet } from "@/components/parent/glass/GlassSheet";
 import { GlassButton } from "@/components/parent/glass/GlassButton";
 import { ink1, ink2 } from "@/lib/parent/glass-tokens";
+import { DIVIDER } from "@/app/parent/(app)/_ui/screen-tokens";
 
+/* Глифы лежат на цветных градиентных плитках — белые в обеих темах,
+   поэтому stroke="#FFFFFF" здесь литерал, а не токен. */
 function IconBase({ children }: { children: React.ReactNode }) {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
@@ -65,7 +68,7 @@ export function FeaturesSheet({ visible, onClose }: { visible: boolean; onClose:
             <div
               key={r.title}
               className="flex items-center gap-2.5 py-2.5"
-              style={i > 0 ? { borderTop: "1px solid rgba(23,18,67,0.06)" } : undefined}
+              style={i > 0 ? { borderTop: `1px solid ${DIVIDER}` } : undefined}
             >
               <div
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px]"

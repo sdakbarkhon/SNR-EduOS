@@ -27,7 +27,15 @@ export function QrGatePage() {
         className="flex flex-col items-center gap-5 p-8 text-center"
         style={{ ...glass1Css, border: `1px solid ${glassBorder}`, borderRadius: radius.card, boxShadow: shCardCss, maxWidth: 380 }}
       >
-        <div className="rounded-2xl bg-white p-4">
+        {/* Подложка QR — ЖЁСТКИЙ белый в обеих темах, и намеренно инлайном.
+            Раньше здесь был Tailwind-класс `bg-white`, но app/globals.css
+            держит голое правило `.dark .bg-white { background:#131a30 }` для
+            ученических экранов. С появлением тёмной темы у родителя класс
+            `dark` доезжает и до /parent — подложка стала бы тёмной, чёрные
+            модули QR слились бы с ней, и код перестал бы сканироваться.
+            Инлайн-стиль этот оверрайд перебить не может. Модули (fgColor)
+            остаются дефолтно-чёрными: контраст задаёт сама подложка. */}
+        <div className="rounded-2xl p-4" style={{ background: "#FFFFFF" }}>
           {url ? <QRCodeSVG value={url} size={200} /> : <div style={{ width: 200, height: 200 }} />}
         </div>
         <div>

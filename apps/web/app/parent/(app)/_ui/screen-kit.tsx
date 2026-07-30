@@ -92,8 +92,16 @@ export function Glyph({
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill={fill}
-      stroke={fill === "none" ? color : "none"}
+      /* Цвета — через style, а НЕ через presentation-атрибуты fill/stroke.
+         Браузеры не разрешают var() в атрибутах SVG (это не CSS-значение), а
+         после темизации сюда приезжает именно "var(--p-ink1, …)". С атрибутами
+         глифы остались бы бесцветными в ОБЕИХ темах. В CSS-свойстве var()
+         работает штатно. Геометрия (strokeWidth/linecap) var() не содержит и
+         остаётся атрибутами. */
+      style={{
+        fill,
+        stroke: fill === "none" ? color : "none",
+      }}
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -392,15 +400,21 @@ export function Toggle({
       style={{
         width: 44,
         height: 26,
-        background: value ? accentGrad : "rgba(23,18,67,0.14)",
+        /* Выключенный трек: своего токена нет — пара --p-control-off в
+           parent-theme.css, иначе в тёмной теме тумблер сливается с фоном. */
+        background: value ? accentGrad : "var(--p-control-off, rgba(23,18,67,0.14))",
         boxShadow: value ? "0 6px 14px rgba(124,58,237,0.32)" : undefined,
         opacity: disabled ? 0.55 : 1,
         cursor: disabled ? "default" : "pointer",
       }}
     >
       <span
-        className="absolute rounded-full bg-white transition-all"
+        // bg-white убран намеренно: голое правило `.dark .bg-white` из
+        // globals.css перекрашивало ползунок в почти чёрный. Белый здесь —
+        // константа обеих тем, поэтому задаётся инлайном (его .dark не перебьёт).
+        className="absolute rounded-full transition-all"
         style={{
+          background: WHITE,
           top: 3,
           left: value ? 21 : 3,
           width: 20,
@@ -417,7 +431,9 @@ export function CheckDot({ active }: { active: boolean }) {
     return (
       <span
         className="shrink-0 rounded-full"
-        style={{ width: 22, height: 22, border: "1.5px solid rgba(23,18,67,0.22)" }}
+        /* Рамка неотмеченного пункта: пара --p-control-outline в
+           parent-theme.css — без неё в тёмной теме пустой кружок не виден. */
+        style={{ width: 22, height: 22, border: "1.5px solid var(--p-control-outline, rgba(23,18,67,0.22))" }}
       />
     );
   }

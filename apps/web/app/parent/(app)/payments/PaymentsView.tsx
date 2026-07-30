@@ -50,6 +50,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { GlassCard } from "../v2/GlassCard";
+import { CHEVRON, DIVIDER, SECTION_CAP } from "../_ui/screen-tokens";
 import {
   accentGrad,
   chip,
@@ -157,11 +158,22 @@ function WhiteGlyph({ paths, size = 20 }: { paths: readonly string[]; size?: num
   );
 }
 
-/** Шеврон › ListRow: 14px, stroke rgba(26,19,74,.4), strokeWidth 2.2. */
+/** Шеврон › ListRow: 14px, stroke CHEVRON, strokeWidth 2.2.
+ *
+ *  Цвет задаётся через `style`, а не presentation-атрибутом `stroke=`: сюда
+ *  приходит токен CHEVRON, то есть var(--p-chevron, …), а var() в SVG-атрибутах
+ *  браузер не разрешает — шеврон остался бы бесцветным в обеих темах.
+ *  Геометрия (strokeWidth, linecap) остаётся атрибутами. */
 function Chevron({ color, size = 14, width = 2.2 }: { color: string; size?: number; width?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
-      <path d="m9 18 6-6-6-6" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="m9 18 6-6-6-6"
+        style={{ stroke: color }}
+        strokeWidth={width}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -266,7 +278,7 @@ function ListRow({
     gap,
     paddingTop: verticalPadding,
     paddingBottom: verticalPadding,
-    borderTop: divider ? "1px solid rgba(23,18,67,0.07)" : undefined,
+    borderTop: divider ? `1px solid ${DIVIDER}` : undefined,
   };
   const inner = (
     <>
@@ -282,7 +294,7 @@ function ListRow({
         ) : null}
       </div>
       {right}
-      {chevron ? <Chevron color="rgba(26,19,74,0.4)" /> : null}
+      {chevron ? <Chevron color={CHEVRON} /> : null}
     </>
   );
 
@@ -300,7 +312,14 @@ function ListRow({
   );
 }
 
-/** Toggle 44×26 r13: off-трек rgba(23,18,67,.14), on — accent-градиент, кноб 20 (ход 18). */
+/**
+ * Off-трек тумблера. Своей переменной не заводим: в parent-theme.css уже есть
+ * --p-control-off ровно с этим светлым значением (её же использует Toggle из
+ * `_ui/screen-kit`), а второй токен под тот же цвет — это будущее расхождение.
+ */
+const TOGGLE_OFF = "var(--p-control-off, rgba(23,18,67,0.14))";
+
+/** Toggle 44×26 r13: off-трек TOGGLE_OFF, on — accent-градиент, кноб 20 (ход 18). */
 function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (next: boolean) => void }) {
   return (
     <button
@@ -314,7 +333,7 @@ function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (next
         width: 44,
         height: 26,
         borderRadius: 13,
-        background: "rgba(23,18,67,0.14)",
+        background: TOGGLE_OFF,
         boxShadow: value ? "0 4px 10px rgba(124,58,237,0.35)" : undefined,
       }}
     >
@@ -522,12 +541,15 @@ function RootHeader({
             border: `1px solid ${glassBorder}`,
           }}
         >
+          {/* Цвет глифа — через style: ink1 это var(--p-ink1, …), а var() в
+              SVG-атрибуте stroke= браузер не разрешит и колокольчик станет
+              бесцветным в обеих темах. */}
           <svg
             width={17}
             height={17}
             viewBox="0 0 24 24"
             fill="none"
-            stroke={ink1}
+            style={{ stroke: ink1 }}
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -708,7 +730,7 @@ export function PaymentsView({
                 fontWeight: 800,
                 letterSpacing: 0.84,
                 textTransform: "uppercase",
-                color: "rgba(26,19,74,0.5)",
+                color: SECTION_CAP,
               }}
             >
               {T.dueNow}

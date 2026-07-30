@@ -35,6 +35,7 @@ import {
   ScreenBody,
   SubjectSquare,
 } from "../../_study/parts";
+import { DIVIDER } from "../../_ui/screen-tokens";
 import { accentGrad, chip, ink1, ink2, ink3, status, type StatusKey } from "../../v2/tokens";
 
 type Attachment = {
@@ -179,17 +180,15 @@ export function HomeworkDetailView({
             </div>
             <div
               className="flex flex-wrap items-center"
-              style={{ gap: 12, paddingTop: 9, borderTop: "1px solid rgba(23,18,67,0.07)" }}
+              style={{ gap: 12, paddingTop: 9, borderTop: `1px solid ${DIVIDER}` }}
             >
               <span className="flex items-center" style={{ gap: 5 }}>
-                <IconCalendar size={13} color="rgba(26,19,74,0.66)" strokeWidth={1.9} />
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(26,19,74,0.66)" }}>
-                  {dueLabel}
-                </span>
+                <IconCalendar size={13} color={ink2} strokeWidth={1.9} />
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>{dueLabel}</span>
               </span>
               <span className="ml-auto flex items-center" style={{ gap: 6 }}>
                 <TeacherAvatar initials={teacherInitials} />
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(26,19,74,0.66)" }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>
                   {teacherName ?? "Учитель не назначен"}
                 </span>
               </span>
@@ -207,7 +206,7 @@ export function HomeworkDetailView({
                   fontSize: 11.5,
                   fontWeight: 600,
                   lineHeight: 1.6,
-                  color: "rgba(26,19,74,0.78)",
+                  color: ink2,
                   whiteSpace: "pre-wrap",
                 }}
               >
@@ -233,7 +232,7 @@ export function HomeworkDetailView({
                   <span className="truncate" style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>
                     {attachment.name}
                   </span>
-                  <span style={{ fontSize: 9.5, fontWeight: 600, color: "rgba(26,19,74,0.55)" }}>
+                  <span style={{ fontSize: 9.5, fontWeight: 600, color: ink2 }}>
                     {attachment.size}
                   </span>
                 </span>
@@ -305,7 +304,7 @@ export function HomeworkDetailView({
                       maxHeight: 220,
                       padding: 10,
                       borderRadius: 12,
-                      background: "rgba(23,18,67,0.05)",
+                      background: "var(--p-code-bg, rgba(23,18,67,0.05))",
                       fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                       fontSize: 10.5,
                       lineHeight: 1.5,
@@ -342,7 +341,7 @@ export function HomeworkDetailView({
                         fontSize: 11.5,
                         fontWeight: 600,
                         lineHeight: 1.6,
-                        color: "rgba(26,19,74,0.78)",
+                        color: ink2,
                         whiteSpace: "pre-wrap",
                       }}
                     >
@@ -357,7 +356,7 @@ export function HomeworkDetailView({
                       <span className="truncate" style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>
                         {submission.fileName}
                       </span>
-                      <span style={{ fontSize: 9.5, fontWeight: 600, color: "rgba(26,19,74,0.55)" }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 600, color: ink2 }}>
                         {submission.fileSize}
                       </span>
                     </span>
@@ -387,7 +386,7 @@ export function HomeworkDetailView({
                     fontSize: 11.5,
                     fontWeight: 600,
                     lineHeight: 1.55,
-                    color: "rgba(26,19,74,0.78)",
+                    color: ink2,
                     whiteSpace: "pre-wrap",
                   }}
                 >

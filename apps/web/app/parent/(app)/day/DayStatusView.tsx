@@ -36,6 +36,11 @@ import {
 } from "../_study/parts";
 import { chip, fontDisplay, ink1, ink2, ink3, status } from "../v2/tokens";
 
+/** Незакрашенный трек кольца и точка «урок ещё не отмечен»: в светлой теме —
+ *  ink-налёт, в тёмной — белый той же плотности (см. parent-theme.css). */
+const TRACK = "var(--p-track, rgba(23,18,67,0.08))";
+const DOT_IDLE = "var(--p-dot-idle, rgba(23,18,67,0.18))";
+
 export type DayLessonVM = {
   id: string;
   timeStart: string;
@@ -69,7 +74,9 @@ function AttendanceDonut({
     <span className="relative flex shrink-0 items-center justify-center" style={{ width: 86, height: 86 }}>
       <svg width={86} height={86} viewBox="0 0 86 86" aria-hidden>
         <g transform="rotate(-90 43 43)">
-          <circle cx={43} cy={43} r={R} fill="none" stroke="rgba(23,18,67,0.08)" strokeWidth={9} />
+          {/* Цвет трека идёт стилем, а не атрибутом stroke: var() в
+              presentation-атрибутах SVG браузеры не разрешают. */}
+          <circle cx={43} cy={43} r={R} fill="none" strokeWidth={9} style={{ stroke: TRACK }} />
           {presentLen > 0 && (
             <circle
               cx={43}
@@ -111,7 +118,7 @@ function AttendanceDonut({
         <span style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 600, color: ink1 }}>
           {present}/{total}
         </span>
-        <span style={{ fontSize: 8.5, fontWeight: 700, color: "rgba(26,19,74,0.55)" }}>уроков</span>
+        <span style={{ fontSize: 8.5, fontWeight: 700, color: ink2 }}>уроков</span>
       </span>
     </span>
   );
@@ -164,7 +171,7 @@ function AttendanceMark({ attendance }: { attendance: AttendanceStatus | null })
   return (
     <span
       className="shrink-0"
-      style={{ width: 8, height: 8, borderRadius: 4, background: "rgba(23,18,67,0.18)" }}
+      style={{ width: 8, height: 8, borderRadius: 4, background: DOT_IDLE }}
       aria-hidden
     />
   );
@@ -325,7 +332,7 @@ export function DayStatusView({
                 >
                   <span
                     className="shrink-0"
-                    style={{ width: 40, fontSize: 11, fontWeight: 800, color: "rgba(26,19,74,0.64)" }}
+                    style={{ width: 40, fontSize: 11, fontWeight: 800, color: ink2 }}
                   >
                     {l.timeStart}
                   </span>

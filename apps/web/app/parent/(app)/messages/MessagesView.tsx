@@ -38,6 +38,7 @@ import {
   grad135,
   WHITE,
 } from "../_ui/screen-kit";
+import { SECTION_CAP } from "../_ui/screen-tokens";
 import { accentGrad, chip, fontDisplay, ink1, ink2, ink3, status } from "../v2/tokens";
 
 /* ── Пропсы: всё считает сервер (см. page.tsx) ───────────────────────────── */
@@ -168,7 +169,10 @@ export function MessagesView({
                       fontWeight: 800,
                       letterSpacing: 0.84,
                       textTransform: "uppercase",
-                      color: "rgba(26,19,74,0.5)",
+                      // Тот же caps-заголовок секции, что у SectionCap: раньше
+                      // был локальным тёмным литералом и в тёмной теме
+                      // оставался тёмным на тёмном.
+                      color: SECTION_CAP,
                     }}
                   >
                     Объявления школы

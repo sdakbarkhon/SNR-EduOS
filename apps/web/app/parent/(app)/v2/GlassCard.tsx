@@ -10,6 +10,12 @@
  * inset-тени) и был отдельный fallback-режим без блюра — в вебе и то и
  * другое нативно, поэтому здесь ИСХОДНАЯ форма макета: настоящий
  * inset box-shadow + backdrop-filter.
+ *
+ * ТЁМНАЯ ТЕМА. Цвета приходят токенами сами, а вот радиус блюра берётся не из
+ * `g.blur` (число, всегда светлое 22/20), а из переменной --p-glass1-blur /
+ * --p-glass2-blur: в тёмной схеме у glass-1 он 24. Собирать строку фильтра из
+ * числа нельзя — `blur(var(--…)px)` невалидно и убило бы backdrop-filter
+ * целиком, поэтому переменная хранит значение вместе с единицей.
  */
 import type { CSSProperties, ReactNode } from "react";
 import { glass1, glass2, glassBorder, glassInset, radius, shCard } from "./tokens";
@@ -30,12 +36,14 @@ export function GlassCard({
   children?: ReactNode;
 }) {
   const g = variant === "glass2" ? glass2 : glass1;
+  const blur =
+    variant === "glass2" ? "blur(var(--p-glass2-blur, 20px))" : "blur(var(--p-glass1-blur, 22px))";
   const surface: CSSProperties = {
     borderRadius: r,
     background: g.background,
     border: `1px solid ${glassBorder}`,
-    backdropFilter: `blur(${g.blur}px)`,
-    WebkitBackdropFilter: `blur(${g.blur}px)`,
+    backdropFilter: blur,
+    WebkitBackdropFilter: blur,
     boxShadow: `${shCard}, ${glassInset}`,
     ...style,
   };

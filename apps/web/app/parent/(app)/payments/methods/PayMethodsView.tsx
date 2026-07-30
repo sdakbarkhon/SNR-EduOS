@@ -25,7 +25,7 @@
 import { useState } from "react";
 import { GlassCard } from "../../v2/GlassCard";
 import { DIVIDER, Glyph, ScreenScroll, SectionCap, WHITE } from "../../_ui/screen-kit";
-import { ink1, ink2, status } from "../../v2/tokens";
+import { glass2, ink1, ink2, status } from "../../v2/tokens";
 import { MAIN_CARD, OTHER_CARDS, OTHER_METHODS, SOON_PAYMENTS } from "../mock-data";
 import { BrandChip, NoticeBanner, PAY_GLYPH, SoonNote } from "../parts";
 
@@ -142,7 +142,7 @@ export function PayMethodsView() {
             gap: 8,
             padding: 13,
             borderRadius: 15,
-            background: "rgba(255,255,255,0.4)",
+            background: glass2.background,
             border: "1.5px solid rgba(124,58,237,0.45)",
           }}
         >

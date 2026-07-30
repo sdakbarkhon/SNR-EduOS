@@ -9,6 +9,7 @@ import { GlassButton } from "@/components/parent/glass/GlassButton";
 import { GlassInput } from "@/components/parent/glass/GlassInput";
 import { loginParentByPhone } from "@/app/actions/parentPhoneAuth";
 import { ink1, ink2 } from "@/lib/parent/glass-tokens";
+import { status } from "@/app/parent/(app)/v2/tokens";
 import { OnboardingCarousel } from "./OnboardingCarousel";
 import { LoginPhoneScreen } from "./LoginPhoneScreen";
 
@@ -99,7 +100,7 @@ export function AuthFlow() {
             className="text-center text-2xl tracking-[0.5em]"
           />
           {error && (
-            <p className="text-sm font-medium" style={{ color: "#B91C1C" }}>
+            <p className="text-sm font-medium" style={{ color: status.red.text }}>
               {error}
             </p>
           )}

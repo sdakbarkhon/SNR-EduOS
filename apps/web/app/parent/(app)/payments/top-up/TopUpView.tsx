@@ -184,7 +184,7 @@ export function TopUpView({ childName }: { childName: string | null }) {
             gap: 8,
             padding: 15,
             borderRadius: 16,
-            background: hasValue ? accentGrad : "rgba(23,18,67,0.08)",
+            background: hasValue ? accentGrad : "var(--p-track, rgba(23,18,67,0.08))",
             boxShadow: hasValue ? "0 14px 32px rgba(124,58,237,0.4)" : undefined,
             cursor: hasValue ? "pointer" : "default",
           }}
@@ -203,7 +203,7 @@ export function TopUpView({ childName }: { childName: string | null }) {
             style={{
               fontSize: 14,
               fontWeight: 800,
-              color: hasValue ? WHITE : "rgba(26,19,74,0.4)",
+              color: hasValue ? WHITE : ink3,
             }}
           >
             {ctaLabel}

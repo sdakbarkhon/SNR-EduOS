@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 import { Manrope, Unbounded } from "next/font/google";
 import { GlassBackground } from "@/components/parent/glass/GlassBackground";
 import { ViewportGate } from "@/components/parent/ViewportGate";
-import { ParentLightTheme } from "./ParentLightTheme";
+import { ParentThemeSync } from "./ParentThemeSync";
+// Значения обеих схем (--p-*). Импорт именно здесь, на уровне /parent: CSS
+// уедет в <head> только для роутов /parent/**, ученика и учителя не заденет.
+import "./parent-theme.css";
 
 /**
  * Блок 7.1 — шрифты макета v2 подключены здесь, на уровне /parent, и
@@ -37,7 +40,7 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
       className={`${manrope.variable} ${unbounded.variable} relative min-h-dvh w-full`}
       style={{ fontFamily: "var(--font-manrope), 'Segoe UI', sans-serif" }}
     >
-      <ParentLightTheme />
+      <ParentThemeSync />
       <GlassBackground />
       <ViewportGate>{children}</ViewportGate>
     </div>

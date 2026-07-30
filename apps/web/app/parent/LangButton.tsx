@@ -5,17 +5,23 @@ import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCircleButton } from "@/components/parent/glass/GlassCircleButton";
 import { GlassSheet } from "@/components/parent/glass/GlassSheet";
-import { ink1, ink2 } from "@/lib/parent/glass-tokens";
+import { ink1, ink2, accentGradCss } from "@/lib/parent/glass-tokens";
+import { DIVIDER } from "@/app/parent/(app)/_ui/screen-tokens";
 import { CheckIcon, GlobeIcon } from "@/components/parent/auth/icons";
 
 const LANGUAGE_AUTONYMS: Record<Locale, string> = { ru: "Русский", uz: "Oʻzbekcha", en: "English" };
 
+/** Кольцо невыбранного пункта. Общего токена под него не было — пара заведена
+ *  в parent-theme.css (--p-control-outline) по правилу «база ink → белая, альфа та же». */
+const RADIO_RING = "var(--p-control-outline, rgba(23,18,67,0.22))";
+
 function CheckDot({ active }: { active: boolean }) {
   if (!active) {
-    return <div className="h-[22px] w-[22px] shrink-0 rounded-full" style={{ border: "1.5px solid rgba(23,18,67,0.22)" }} />;
+    return <div className="h-[22px] w-[22px] shrink-0 rounded-full" style={{ border: `1.5px solid ${RADIO_RING}` }} />;
   }
   return (
-    <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full" style={{ background: "linear-gradient(135deg, #7C3AED, #4F6DF5)" }}>
+    <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full" style={{ background: accentGradCss }}>
+      {/* Галочка белая на акцентном градиенте — белая в обеих темах. */}
       <CheckIcon />
     </div>
   );
@@ -27,7 +33,7 @@ function PickerRow({ onClick, divider, children }: { onClick: () => void; divide
       type="button"
       onClick={onClick}
       className="flex w-full items-center gap-3 py-2.5 text-left"
-      style={divider ? { borderTop: "1px solid rgba(23,18,67,0.06)" } : undefined}
+      style={divider ? { borderTop: `1px solid ${DIVIDER}` } : undefined}
     >
       {children}
     </button>
