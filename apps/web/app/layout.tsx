@@ -55,6 +55,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               document.documentElement.classList.remove('dark');
             }
             if (parent) {
+              // Тот же атрибут-намерение, что ставит ParentThemeSync. Он должен
+              // существовать УЖЕ на первом кадре: наблюдатель сверяет класс
+              // именно с ним, и без атрибута первая же посторонняя правка
+              // класса (глобальный ThemeProvider) откатила бы тему в светлую.
+              document.documentElement.setAttribute('data-parent-theme', dark ? 'dark' : 'light');
               document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
             }
           } catch(e) {}

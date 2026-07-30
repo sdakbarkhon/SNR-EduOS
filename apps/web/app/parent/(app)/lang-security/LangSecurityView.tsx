@@ -126,6 +126,8 @@ export function LangSecurityView() {
    * положение галочки на один кадр.
    */
   const [theme, setTheme] = useState<ParentTheme>("light");
+  /** Хранилище недоступно — выбор действует, но не переживёт перезагрузку. */
+  const [themeVolatile, setThemeVolatile] = useState(false);
 
   useEffect(() => {
     setTheme(readParentTheme());
@@ -138,8 +140,13 @@ export function LangSecurityView() {
   }, [soonTick]);
 
   function pickTheme(next: ParentTheme) {
-    setParentTheme(next);
+    // Тема применяется всегда; persisted говорит лишь о том, переживёт ли
+    // выбор перезагрузку. В демо-режиме и в webview хранилище бывает срезано,
+    // и молчать об этом нельзя: иначе родитель выбирает тему, после
+    // перезагрузки видит старую и считает, что переключатель сломан.
+    const persisted = setParentTheme(next);
     setTheme(next);
+    setThemeVolatile(!persisted);
   }
 
   function pick(option: LanguageOption) {
@@ -179,6 +186,13 @@ export function LangSecurityView() {
           </CardRow>
         ))}
       </GlassCard>
+
+      {themeVolatile ? (
+        <span style={{ fontSize: 9, fontWeight: 600, lineHeight: "14px", color: ink3, textAlign: "center" }}>
+          Тема применена, но не сохранится: браузер не даёт этому сайту хранить
+          настройки. Проверьте приватный режим или блокировку данных сайтов.
+        </span>
+      ) : null}
 
       <SectionCap label="Язык приложения" />
       <GlassCard radius={20} className="px-[14px] py-1">

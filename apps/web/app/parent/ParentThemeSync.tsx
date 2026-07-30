@@ -48,12 +48,22 @@ export type ParentTheme = "light" | "dark";
 const STORAGE_KEY = "snr-parent-theme";
 
 /**
- * Какое состояние класса `dark` считается верным на /parent прямо сейчас.
- * Модульная переменная, а не React-state: её читает MutationObserver, который
- * живёт вне рендера и обязан видеть свежее значение немедленно, ещё до
- * перерисовки экрана настроек.
+ * Атрибут-источник правды: `<html data-parent-theme="light|dark">`.
+ *
+ * ПОЧЕМУ В DOM, А НЕ В МОДУЛЬНОЙ ПЕРЕМЕННОЙ. Раньше желаемое состояние лежало
+ * в `let desiredDark`, а MutationObserver возвращал класс к нему. Это ломало
+ * переключатель наглухо: экран настроек и layout — разные клиентские чанки, и
+ * если бандлер отдаёт им РАЗНЫЕ экземпляры модуля, то тап менял `desiredDark`
+ * в одном экземпляре, а наблюдатель из другого немедленно возвращал класс
+ * обратно. Внешне это выглядело так, будто кнопки вообще ничего не делают —
+ * ни «Светлая», ни «Тёмная».
+ *
+ * Атрибут на <html> один на всю страницу, его видят все экземпляры модуля и
+ * любой другой код. Дополнительный плюс — переключение работает даже там, где
+ * localStorage недоступен (webview, приватный режим, заблокированное
+ * хранилище): тема применится, просто не переживёт перезагрузку.
  */
-let desiredDark = false;
+const THEME_ATTR = "data-parent-theme";
 
 function readStored(): string | null {
   try {
@@ -64,39 +74,66 @@ function readStored(): string | null {
   }
 }
 
-/** Тема /parent из хранилища. Всё, что не ровно 'dark', — светлая. */
+/**
+ * Текущая тема /parent. Сначала спрашиваем DOM (там лежит актуальный выбор
+ * этой сессии, даже если хранилище недоступно), и только потом хранилище.
+ * Всё, что не ровно 'dark', — светлая.
+ */
 export function readParentTheme(): ParentTheme {
+  if (typeof document !== "undefined") {
+    const attr = document.documentElement.getAttribute(THEME_ATTR);
+    if (attr === "dark" || attr === "light") return attr;
+  }
   return readStored() === "dark" ? "dark" : "light";
 }
 
 function applyToRoot(theme: ParentTheme) {
   const root = document.documentElement;
+  // Атрибут ПЕРВЫМ: наблюдатель ниже реагирует на смену класса и обязан уже
+  // видеть новое намерение, иначе он откатит только что сделанный выбор.
+  root.setAttribute(THEME_ATTR, theme);
   root.classList.toggle("dark", theme === "dark");
   root.style.colorScheme = theme;
 }
 
-/** Сохранить выбор родителя и применить его немедленно. */
-export function setParentTheme(theme: ParentTheme) {
-  desiredDark = theme === "dark";
+/**
+ * Применить выбор родителя немедленно и попытаться сохранить.
+ *
+ * @returns `true`, если выбор реально записан в хранилище и переживёт
+ *   перезагрузку; `false` — если хранилище недоступно (приватный режим,
+ *   webview со срезанным storage, запрет сторонних данных). Тема в этом
+ *   случае всё равно применяется — просто до конца сессии. Возврат нужен,
+ *   чтобы экран настроек мог честно предупредить, а не молчать.
+ */
+export function setParentTheme(theme: ParentTheme): boolean {
+  applyToRoot(theme);
   try {
     localStorage.setItem(STORAGE_KEY, theme);
+    // Читаем обратно: часть браузеров в приватном режиме принимает setItem
+    // молча, но ничего не сохраняет.
+    return localStorage.getItem(STORAGE_KEY) === theme;
   } catch {
-    // не сохранилось — тема всё равно применится на эту сессию
+    return false;
   }
-  applyToRoot(theme);
 }
 
 export function ParentThemeSync() {
   useEffect(() => {
     const root = document.documentElement;
 
-    const initial = readParentTheme();
-    desiredDark = initial === "dark";
-    applyToRoot(initial);
+    applyToRoot(readParentTheme());
 
+    // Наблюдатель сверяет класс с атрибутом-намерением, а не с переменной
+    // модуля. Поэтому он больше не может «перебить» только что сделанный
+    // выбор: applyToRoot меняет атрибут раньше класса, и к моменту срабатывания
+    // намерение уже новое. Его единственная работа — вернуть класс на место,
+    // если его тронул кто-то посторонний (глобальный ThemeProvider при
+    // сохранённой у ученика «Системной» слушает matchMedia и переставляет
+    // класс на <html> в любой момент).
     const observer = new MutationObserver(() => {
-      if (root.classList.contains("dark") !== desiredDark) {
-        root.classList.toggle("dark", desiredDark);
+      const wantDark = root.getAttribute(THEME_ATTR) === "dark";
+      if (root.classList.contains("dark") !== wantDark) {
+        root.classList.toggle("dark", wantDark);
       }
     });
     observer.observe(root, { attributes: true, attributeFilter: ["class"] });
@@ -117,6 +154,8 @@ export function ParentThemeSync() {
         saved === "dark" ||
         (saved === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       root.classList.toggle("dark", dark);
+      // Атрибут-намерение живёт только внутри /parent.
+      root.removeAttribute(THEME_ATTR);
       // Сбрасываем в пустоту, а не в «снимок при монтировании»: к моменту
       // монтирования colorScheme уже проставил блокирующий скрипт для /parent,
       // так что снимок содержал бы родительское значение и уезжал бы вместе с
