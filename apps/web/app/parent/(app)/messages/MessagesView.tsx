@@ -1,387 +1,420 @@
 "use client";
 
-import { useState } from "react";
-import { getDictionary, type Locale } from "@snr/core";
-import { useLocale } from "@/components/LocaleProvider";
-import { GlassCard } from "@/components/parent/glass/GlassCard";
-import { GlassCircleButton } from "@/components/parent/glass/GlassCircleButton";
-import { ink1, ink2, ink3 } from "@/lib/parent/glass-tokens";
+/**
+ * Экран d24 «Сообщения» — ВЕБ-порт 1:1 из
+ * apps/mobile-parent/src/screens/tabs/MessagesScreen.tsx (ветка
+ * feat/mobile-parent-redesign), который сам перенесён из макета
+ * «SNR EduOS v2 Light.dc.html» (строки 747–766).
+ *
+ * Порядок блоков — как в RN-экране:
+ *  1. Шапка: заголовок «Сообщения» (Unbounded 17/600) + две круглые
+ *     стеклянные кнопки Поиск / Написать. padding 46/18/8, gap 12.
+ *  2. Горизонтальная лента сториз (5 круглых 54×54): «Важные»,
+ *     «Кл. руковод.» (СУ), «Математика» (ГЮ), «Английский» (НА),
+ *     «Администрация». Инициалы — с зелёной точкой онлайн и кольцом
+ *     accent-градиента; иконки — кольцо своего градиента, белый зазор 2.
+ *  3. SegmentPills 4 таба «Все / Чаты / Объявления / Сервисы».
+ *     На «Сервисы» — красная точка-бейдж 6×6 (dotIndexes={[3]}).
+ *  4. Список тредов: стеклянные карточки r24, каждая — аватар 42 + row
+ *     (name, role-чип, время справа) + row (preview 2 строки, badge справа).
+ *     Фильтрация по выбранной вкладке через getMessageThreads(category).
+ *
+ * Данные — ТОЛЬКО из ../v2/data (точная копия data-слоя мобилки).
+ * Тексты — ru-ветка словаря мобилки (packages/core/src/i18n/ru.ts,
+ * parentApp.nav.messages + parentApp.msg.*), зашиты строками: вебу нужен
+ * только русский.
+ */
 
-type IconKey = "mega" | "grid" | "card" | "food" | "clock" | "plus";
+import { useMemo, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import {
+  Clock,
+  CreditCard,
+  LayoutGrid,
+  Megaphone,
+  MessageCircle,
+  PenLine,
+  Plus,
+  Search,
+  Utensils,
+  type LucideIcon,
+} from "lucide-react";
+import { GlassCard } from "../v2/GlassCard";
+import { getMessageThreads, getMessagesStories } from "../v2/data";
+import type { MessagesStoryRow, MessageThreadRow } from "../v2/data";
+import {
+  accentGrad,
+  chip,
+  fontDisplay,
+  glass1,
+  glassBorder,
+  ink1,
+  ink2,
+  ink3,
+  status,
+} from "../v2/tokens";
 
-function IconBase({ children, size = 18 }: { children: React.ReactNode; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      {children}
-    </svg>
-  );
-}
+/* ═══ Иконки: ICONS макета (SVG-пути 24×24) → lucide-react ═══ */
 
-const MegaIcon = () => (
-  <IconBase>
-    <path d="m3 11 18-7v16L3 13v-2Z" />
-    <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-  </IconBase>
-);
-const GridIcon = () => (
-  <IconBase>
-    <path d="M3 3h7v7H3z" />
-    <path d="M14 3h7v7h-7z" />
-    <path d="M3 14h7v7H3z" />
-    <path d="M14 14h7v7h-7z" />
-  </IconBase>
-);
-const CardIcon = () => (
-  <IconBase>
-    <path d="M2 8a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z" />
-    <path d="M2 10h20" />
-  </IconBase>
-);
-const FoodIcon = () => (
-  <IconBase>
-    <path d="M4 2v7a3 3 0 0 0 6 0V2" />
-    <path d="M7 12v10" />
-    <path d="M20 2a4 4 0 0 0-4 4v7h4" />
-    <path d="M20 13v9" />
-  </IconBase>
-);
-const ClockIcon = () => (
-  <IconBase>
-    <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
-    <path d="M12 7v5l3 2" />
-  </IconBase>
-);
-const PlusIcon = () => (
-  <IconBase>
-    <path d="M12 5v14" />
-    <path d="M5 12h14" />
-  </IconBase>
-);
-
-const AVATAR_ICONS: Record<IconKey, React.ReactNode> = {
-  mega: <MegaIcon />,
-  grid: <GridIcon />,
-  card: <CardIcon />,
-  food: <FoodIcon />,
-  clock: <ClockIcon />,
-  plus: <PlusIcon />,
+const ICON_MAP: Record<string, LucideIcon> = {
+  mega: Megaphone,
+  grid: LayoutGrid,
+  card: CreditCard,
+  food: Utensils,
+  clock: Clock,
+  plus: Plus,
+  chat: MessageCircle,
 };
 
-function SearchIcon() {
-  return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={ink1} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
+/* ═══ Табы (CATEGORIES + CAT_LABEL_KEY RN-экрана, ru-словарь) ═══ */
 
-function ComposeIcon() {
-  return (
-    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={ink1} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
+type Cat = "all" | MessageThreadRow["category"];
 
-type ThreadCategory = "chats" | "ann" | "svc";
-
-type ThreadRow = {
-  category: ThreadCategory;
-  name: string;
-  roleLabel: string | null;
-  preview: string;
-  timeLabel: string;
-  badge: number | null;
-  avatarGradient: [string, string];
-  avatarInitials?: string;
-  avatarIconKey?: IconKey;
-  isOnline?: boolean;
-};
-
-// Мок 1:1 с apps/mobile-parent/src/data/fixtures/messages.ts (MESSAGE_THREADS) —
-// личных чатов родитель-учитель по факту 0 в БД (только один групповой тред
-// «Родители»), поэтому экран остаётся на фикстуре, как и в самой мобилке.
-const MESSAGE_THREADS: ThreadRow[] = [
-  {
-    category: "chats",
-    name: "Гульнора Юсупова",
-    roleLabel: "Учитель",
-    preview: "И поздравляю Малику с пятёркой за контрольную 🎉",
-    timeLabel: "09:00",
-    badge: 2,
-    avatarGradient: ["#8b5cf6", "#6366f1"],
-    avatarInitials: "ГЮ",
-    isOnline: true,
-  },
-  {
-    category: "ann",
-    name: "Объявления школы",
-    roleLabel: null,
-    preview: "24 июля состоится школьная ярмарка. Будем рады видеть вас!",
-    timeLabel: "вчера",
-    badge: 3,
-    avatarGradient: ["#a78bfa", "#7c3aed"],
-    avatarIconKey: "mega",
-  },
-  {
-    category: "chats",
-    name: "Севара Умарова",
-    roleLabel: "Куратор 7-А",
-    preview: "Уважаемые родители! Напоминаю о родительском собрании 30 июля",
-    timeLabel: "вчера",
-    badge: 1,
-    avatarGradient: ["#f472b6", "#8b5cf6"],
-    avatarInitials: "СУ",
-    isOnline: true,
-  },
-  {
-    category: "chats",
-    name: "Администрация",
-    roleLabel: null,
-    preview: "Ваше заявление на справку принято. Готовность: 26 июля",
-    timeLabel: "19 июля",
-    badge: null,
-    avatarGradient: ["#60a5fa", "#2563eb"],
-    avatarIconKey: "grid",
-  },
-  {
-    category: "svc",
-    name: "Бухгалтерия",
-    roleLabel: null,
-    preview: "Поступил платёж на сумму 4 500 000 сум за июль. Спасибо!",
-    timeLabel: "18 июля",
-    badge: null,
-    avatarGradient: ["#34d399", "#059669"],
-    avatarIconKey: "card",
-  },
-  {
-    category: "svc",
-    name: "Питание",
-    roleLabel: null,
-    preview: "Меню на следующую неделю уже доступно в разделе «Питание»",
-    timeLabel: "18 июля",
-    badge: null,
-    avatarGradient: ["#f472b6", "#db2777"],
-    avatarIconKey: "food",
-  },
-  {
-    category: "svc",
-    name: "Транспорт",
-    roleLabel: null,
-    preview: "Изменение маршрута №3 с 28 июля. Проверьте расписание",
-    timeLabel: "17 июля",
-    badge: null,
-    avatarGradient: ["#fbbf24", "#f97316"],
-    avatarIconKey: "clock",
-  },
-  {
-    category: "svc",
-    name: "Медкабинет",
-    roleLabel: null,
-    preview: "Плановый медосмотр 30 июля. Подробнее в объявлении",
-    timeLabel: "17 июля",
-    badge: null,
-    avatarGradient: ["#fb7185", "#e11d48"],
-    avatarIconKey: "plus",
-  },
+const CATEGORIES: { key: Cat; label: string }[] = [
+  { key: "all", label: "Все" },
+  { key: "chats", label: "Чаты" },
+  { key: "ann", label: "Объявления" },
+  { key: "svc", label: "Сервисы" },
 ];
 
-type StoryRow = {
-  id: string;
-  labelKey: string;
-  gradient: [string, string];
-  kind: "chat" | "icon";
-  initials?: string;
-  isOnline?: boolean;
-  iconKey?: IconKey;
+/** Красная точка-бейдж — только на «Сервисы» (dotIndexes={[3]}). */
+const DOT_INDEXES = [3];
+
+/** parentApp.msg.story* — лейблы сториз (label_key фикстуры → ru). */
+const STORY_LABELS: Record<string, string> = {
+  storyImportant: "Важные",
+  storyCurator: "Кл. руковод.",
+  storyMath: "Математика",
+  storyEng: "Английский",
+  storyAdmin: "Администрация",
 };
 
-// Мок 1:1 с MESSAGES_STORIES из той же фикстуры.
-const MESSAGES_STORIES: StoryRow[] = [
-  { id: "important", labelKey: "storyImportant", gradient: ["#a78bfa", "#7c3aed"], kind: "icon", iconKey: "mega" },
-  { id: "curator", labelKey: "storyCurator", gradient: ["#f472b6", "#8b5cf6"], kind: "chat", initials: "СУ", isOnline: true },
-  { id: "math", labelKey: "storyMath", gradient: ["#8b5cf6", "#6366f1"], kind: "chat", initials: "ГЮ", isOnline: true },
-  { id: "eng", labelKey: "storyEng", gradient: ["#f472b6", "#db2777"], kind: "chat", initials: "НА", isOnline: true },
-  { id: "admin", labelKey: "storyAdmin", gradient: ["#60a5fa", "#2563eb"], kind: "icon", iconKey: "grid" },
-];
+/** Онлайн-точка макета (строки 2759/3581): #22C55E + border 2px #fff. */
+const ONLINE_GREEN = "#22C55E";
+const INNER_RING = "#FFFFFF";
 
-function StoryCircle({ story }: { story: StoryRow }) {
-  const inner =
-    story.kind === "chat" ? (
-      <span className="text-[16px] font-extrabold text-white">{story.initials}</span>
-    ) : (
-      story.iconKey && AVATAR_ICONS[story.iconKey]
-    );
+/** Неактивная gt-пилюля SegmentPills: 160° W60→W40, текст .66 (строка 3835). */
+const PILL_INACTIVE_BG =
+  "linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4))";
+const PILL_INACTIVE_TEXT = "rgba(26,19,74,0.66)";
+/** Тень активной пилюли gt: 0 8 18 rgba(124,58,237,.35). */
+const PILL_ACTIVE_SHADOW = "0 8px 18px rgba(124,58,237,0.35)";
+/** Тень accent-бейджа списка сообщений: 0 4 10 rgba(124,58,237,.4) (строка 3585). */
+const BADGE_ACCENT_SHADOW = "0 4px 10px rgba(124,58,237,0.4)";
+
+const gradient135 = (g: readonly [string, string]) =>
+  `linear-gradient(135deg, ${g[0]}, ${g[1]})`;
+
+export function MessagesView() {
+  const [category, setCategory] = useState<Cat>("all");
+
+  const stories = getMessagesStories();
+  const threads = useMemo<MessageThreadRow[]>(
+    () => (category === "all" ? getMessageThreads() : getMessageThreads(category)),
+    [category],
+  );
 
   return (
-    <div className="relative h-[54px] w-[54px] shrink-0">
-      <div
-        className="flex h-full w-full items-center justify-center rounded-full p-[2.5px]"
-        style={{ background: `linear-gradient(135deg, ${story.gradient[0]}, ${story.gradient[1]})` }}
-      >
-        <div className="flex h-full w-full items-center justify-center rounded-full bg-white p-[2px]">
-          <div
-            className="flex h-full w-full items-center justify-center rounded-full"
-            style={{ background: `linear-gradient(135deg, ${story.gradient[0]}, ${story.gradient[1]})` }}
-          >
-            {inner}
+    <div className="mx-auto w-full max-w-[430px]">
+      {/* ─── 1. Шапка: заголовок + Поиск + Написать (46/18/8) ─── */}
+      <div className="flex items-center gap-3 px-[18px] pb-2 pt-[46px]">
+        <h1
+          className="flex-1 text-[17px]"
+          style={{ fontFamily: fontDisplay, fontWeight: 600, color: ink1 }}
+        >
+          Сообщения
+        </h1>
+        <GlassCircleButton>
+          {/* ICONS.search 16, stroke 2. */}
+          <Search size={16} color={ink1} strokeWidth={2} />
+        </GlassCircleButton>
+        <GlassCircleButton>
+          {/* Глиф «карандаш» 15, stroke 1.9 (M12 20h9 / M16.5 3.5…). */}
+          <PenLine size={15} color={ink1} strokeWidth={1.9} />
+        </GlassCircleButton>
+      </div>
+
+      {/* ─── Скролл-часть экрана (TabScreenScroll: gap 11, paddingBottom 8) ─── */}
+      <div className="flex flex-col gap-[11px] pb-2">
+        {/* ─── 2. Лента сториз (paddingH 18, paddingV 4, gap 12) ─── */}
+        <div
+          className="flex gap-3 overflow-x-auto px-[18px] py-1 [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {stories.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className="flex w-[56px] shrink-0 flex-col items-center gap-1"
+            >
+              <StoryCircle story={s} />
+              <span
+                className="w-[56px] truncate text-center text-[8px]"
+                style={{ fontWeight: 700, color: ink2 }}
+              >
+                {STORY_LABELS[s.label_key] ?? s.label_key}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* ─── 3. SegmentPills — 4 таба, красная точка на «Сервисы» ─── */}
+        <div className="px-[18px]">
+          <div className="flex gap-[7px]">
+            {CATEGORIES.map((c, i) => {
+              const active = c.key === category;
+              const pillStyle: CSSProperties = active
+                ? {
+                    background: accentGrad,
+                    color: "#FFFFFF",
+                    fontWeight: 800,
+                    boxShadow: PILL_ACTIVE_SHADOW,
+                  }
+                : {
+                    background: PILL_INACTIVE_BG,
+                    color: PILL_INACTIVE_TEXT,
+                    fontWeight: 700,
+                  };
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setCategory(c.key)}
+                  className="relative flex flex-1 items-center justify-center rounded-full py-[9px] text-[11.5px]"
+                  style={pillStyle}
+                >
+                  {c.label}
+                  {DOT_INDEXES.includes(i) ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute rounded-full"
+                      style={{
+                        top: 4,
+                        right: 6,
+                        width: 6,
+                        height: 6,
+                        background: "#ef4444",
+                      }}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
+
+        {/* ─── 4. Список тредов — стеклянные карточки (paddingH 18, gap 11) ─── */}
+        <div className="flex flex-col gap-[11px] px-[18px]">
+          {threads.map((m) => (
+            <ThreadCard key={`${m.category}-${m.name}`} row={m} />
+          ))}
+        </div>
       </div>
-      {story.isOnline && (
-        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white" style={{ background: "#22c55e" }} />
-      )}
     </div>
   );
 }
 
-function ThreadAvatar({ row }: { row: ThreadRow }) {
-  if (row.avatarInitials) {
-    return (
-      <div className="relative shrink-0">
-        <div
-          className="flex h-[42px] w-[42px] items-center justify-center rounded-full border-2 border-white text-[13px] font-extrabold text-white"
-          style={{ background: `linear-gradient(135deg, ${row.avatarGradient[0]}, ${row.avatarGradient[1]})` }}
-        >
-          {row.avatarInitials}
+/* ═══ Круглая стеклянная кнопка 38 (RootHeader.GlassCircleButton) ═══ */
+
+/** Строка 223 макета: 38×38 r19, glass-1 160° W72→W46, blur(18), border W80. */
+function GlassCircleButton({ children }: { children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full"
+      style={{
+        background: glass1.background,
+        border: `1px solid ${glassBorder}`,
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ═══ Story-круг 54×54: наружное кольцо 2.5 + белый зазор 2 ═══ */
+
+function StoryCircle({ story }: { story: MessagesStoryRow }) {
+  const SIZE = 54;
+  const isChat = story.kind === "chat" && Boolean(story.initials);
+  const face = gradient135(story.gradient);
+  /**
+   * Чат-сториз рисуется через Avatar variant="story" БЕЗ storyGradient —
+   * значит внешнее кольцо у него accent-градиентное, а градиент данных
+   * уходит на лицо круга. У icon-сториз кольцо и лицо — один градиент.
+   */
+  const ring = isChat ? accentGrad : face;
+  const Icon = story.icon_key ? ICON_MAP[story.icon_key] : undefined;
+
+  return (
+    <div className="relative" style={{ width: SIZE, height: SIZE }}>
+      <div className="h-full w-full rounded-full" style={{ background: ring, padding: 2.5 }}>
+        <div className="h-full w-full rounded-full" style={{ background: INNER_RING, padding: 2 }}>
+          <div
+            className="flex h-full w-full items-center justify-center rounded-full"
+            style={{ background: face }}
+          >
+            {isChat ? (
+              // av(): fontSize = round(54 × 0.3) = 16, вес 800, белый.
+              <span style={{ fontSize: 16, fontWeight: 800, color: "#FFFFFF" }}>
+                {story.initials}
+              </span>
+            ) : Icon ? (
+              <Icon size={18} color="#FFFFFF" strokeWidth={1.8} />
+            ) : null}
+          </div>
         </div>
-        {row.isOnline && (
-          <span className="absolute bottom-0 right-0 h-[11px] w-[11px] rounded-full border-2 border-white" style={{ background: "#22c55e" }} />
-        )}
+      </div>
+      {isChat && story.is_online ? (
+        <span
+          className="absolute bottom-0 right-0 rounded-full"
+          style={{
+            width: 12,
+            height: 12,
+            background: ONLINE_GREEN,
+            border: `2px solid ${INNER_RING}`,
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* ═══ Карточка треда: аватар + name/role/time + preview/badge ═══ */
+
+function ThreadCard({ row }: { row: MessageThreadRow }) {
+  return (
+    <GlassCard className="flex items-center gap-[11px]" style={{ padding: "11px 13px" }}>
+      <ThreadAvatar row={row} />
+
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {/* Верх: имя + role-чип + время. */}
+        <div className="flex items-center gap-1.5">
+          <span
+            className="min-w-0 shrink truncate text-[12.5px]"
+            style={{ fontWeight: 800, color: ink1 }}
+          >
+            {row.name}
+          </span>
+          {row.role_label ? <RoleChip label={row.role_label} /> : null}
+          <span className="flex-1" />
+          <span className="shrink-0 text-[9px]" style={{ fontWeight: 700, color: ink3 }}>
+            {row.time_label}
+          </span>
+        </div>
+
+        {/* Низ: preview (2 строки) + badge. */}
+        <div className="flex items-start gap-2">
+          <p
+            className="min-w-0 flex-1 text-[10.5px]"
+            style={{
+              fontWeight: 600,
+              lineHeight: "15px",
+              color: ink2,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {row.preview}
+          </p>
+          {row.badge ? <CountBadge value={row.badge} /> : null}
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+/** Аватар треда: 42×42 круг с инициалами (+online) или квадрат-градиент r13 с иконкой. */
+function ThreadAvatar({ row }: { row: MessageThreadRow }) {
+  const SIZE = 42;
+  const grad: [string, string] = row.avatar_gradient ?? ["#8b5cf6", "#6366f1"];
+  const bg = gradient135(grad);
+
+  if (row.avatar_initials) {
+    return (
+      <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+        <div
+          className="flex h-full w-full items-center justify-center rounded-full"
+          style={{
+            background: bg,
+            // Avatar variant="ring": box-shadow 0 0 0 2px #fff (строки 2759, 3580).
+            boxShadow: `0 0 0 2px ${INNER_RING}`,
+            // av(): fontSize = round(42 × 0.3) = 13.
+            fontSize: 13,
+            fontWeight: 800,
+            color: "#FFFFFF",
+          }}
+        >
+          {row.avatar_initials}
+        </div>
+        {row.is_online ? (
+          <span
+            className="absolute bottom-0 right-0 rounded-full"
+            style={{
+              width: 11,
+              height: 11,
+              background: ONLINE_GREEN,
+              border: `2px solid ${INNER_RING}`,
+            }}
+          />
+        ) : null}
       </div>
     );
   }
+
+  const Icon = ICON_MAP[row.avatar_icon_key ?? "chat"] ?? MessageCircle;
   return (
     <div
-      className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px]"
-      style={{ background: `linear-gradient(135deg, ${row.avatarGradient[0]}, ${row.avatarGradient[1]})` }}
+      className="flex shrink-0 items-center justify-center"
+      style={{ width: SIZE, height: SIZE, borderRadius: 13, background: bg }}
     >
-      {row.avatarIconKey && AVATAR_ICONS[row.avatarIconKey]}
+      <Icon size={20} color="#FFFFFF" strokeWidth={1.9} />
     </div>
   );
 }
 
-type TabKey = "all" | "chats" | "ann" | "svc";
-
-/**
- * «Сообщения» — 1:1 по составу с apps/mobile-parent/src/screens/tabs/
- * MessagesScreen.tsx: сторис + 4 таба (Все/Чаты/Объявления/Сервисы,
- * статичная красная точка на «Сервисы») + список тредов. Поиск/компоуз в
- * шапке и сами треды — заглушки (в мобилке ведут на экраны, которых на
- * вебе пока нет), без write-роутов.
- */
-export function MessagesView() {
-  const { locale } = useLocale();
-  const dict = getDictionary(locale as Locale).parentApp;
-  const t = dict.msg;
-  const msgDict = t as unknown as Record<string, string>;
-
-  const [tab, setTab] = useState<TabKey>("all");
-
-  const threads = tab === "all" ? MESSAGE_THREADS : MESSAGE_THREADS.filter((m) => m.category === tab);
-
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: "all", label: t.tabAll },
-    { key: "chats", label: t.tabChats },
-    { key: "ann", label: t.tabAnn },
-    { key: "svc", label: t.tabSvc },
-  ];
-
+/** Мини-чип роли (Учитель / Куратор 7-А) — 8.5/800, r999, статус violet. */
+function RoleChip({ label }: { label: string }) {
+  const c = status.violet;
+  const cs = chip(c.rgb);
   return (
-    <div className="flex flex-1 flex-col gap-3 py-4">
-      {/* Заголовок экрана (свой, отдельно от шапки ParentAppShell — как и в d24) */}
-      <div className="flex items-center gap-2.5 px-0.5">
-        <h1 className="flex-1 text-lg font-bold" style={{ color: ink1 }}>
-          {dict.nav.messages}
-        </h1>
-        <GlassCircleButton>
-          <SearchIcon />
-        </GlassCircleButton>
-        <GlassCircleButton>
-          <ComposeIcon />
-        </GlassCircleButton>
-      </div>
+    <span
+      className="shrink-0 whitespace-nowrap rounded-full"
+      style={{
+        padding: "2px 7px",
+        background: cs.background,
+        border: `1px solid ${cs.borderColor}`,
+        color: c.text,
+        fontSize: 8.5,
+        fontWeight: 800,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
-      {/* Сторис */}
-      <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
-        {MESSAGES_STORIES.map((s) => (
-          <div key={s.id} className="flex w-14 shrink-0 flex-col items-center gap-1">
-            <StoryCircle story={s} />
-            <span className="w-14 truncate text-center text-[8px] font-bold" style={{ color: ink2 }}>
-              {msgDict[s.labelKey] ?? s.labelKey}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Табы */}
-      <div className="grid grid-cols-4 gap-2">
-        {tabs.map((tb) => {
-          const active = tab === tb.key;
-          return (
-            <button
-              key={tb.key}
-              type="button"
-              onClick={() => setTab(tb.key)}
-              className="relative flex items-center justify-center rounded-full py-2 text-[11.5px] font-bold"
-              style={
-                active
-                  ? { background: "linear-gradient(135deg, #7C3AED, #4F6DF5)", color: "#fff", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }
-                  : { background: "rgba(255,255,255,0.5)", color: "rgba(26,19,74,0.66)" }
-              }
-            >
-              {tb.label}
-              {tb.key === "svc" && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full" style={{ background: "#ef4444" }} />}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Список тредов */}
-      <div className="flex flex-col gap-2.5">
-        {threads.map((m) => (
-          <GlassCard key={`${m.category}-${m.name}`} className="flex items-center gap-2.5 p-3">
-            <ThreadAvatar row={m} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-[12.5px] font-extrabold" style={{ color: ink1 }}>
-                  {m.name}
-                </span>
-                {m.roleLabel && (
-                  <span
-                    className="shrink-0 rounded-full px-1.5 py-0.5 text-[8.5px] font-extrabold"
-                    style={{ background: "rgba(139,92,246,0.13)", border: "1px solid rgba(139,92,246,0.33)", color: "#6D28D9" }}
-                  >
-                    {m.roleLabel}
-                  </span>
-                )}
-                <span className="flex-1" />
-                <span className="shrink-0 text-[9px] font-bold" style={{ color: ink3 }}>
-                  {m.timeLabel}
-                </span>
-              </div>
-              <div className="mt-0.5 flex items-start gap-2">
-                <span
-                  className="flex-1 text-[10.5px] font-semibold leading-[1.4]"
-                  style={{ color: ink2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-                >
-                  {m.preview}
-                </span>
-                {m.badge != null && (
-                  <span
-                    className="flex h-[17px] min-w-[17px] shrink-0 items-center justify-center rounded-full px-1 text-[9.5px] font-extrabold text-white"
-                    style={{ background: "linear-gradient(135deg, #7C3AED, #4F6DF5)", boxShadow: "0 4px 10px rgba(124,58,237,0.4)" }}
-                  >
-                    {m.badge}
-                  </span>
-                )}
-              </div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
-    </div>
+/** CountBadge preset="accent" size={17} — строка 3585 макета. */
+function CountBadge({ value }: { value: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full"
+      style={{
+        minWidth: 17,
+        height: 17,
+        padding: "0 4px",
+        background: accentGrad,
+        boxShadow: BADGE_ACCENT_SHADOW,
+        fontSize: 9.5,
+        fontWeight: 800,
+        color: "#FFFFFF",
+      }}
+    >
+      {value}
+    </span>
   );
 }

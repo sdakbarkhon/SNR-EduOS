@@ -1,78 +1,36 @@
 "use client";
 
+/**
+ * Блок 7.1 — каркас табов родителя, пересобран под макет v2.
+ *
+ * Было (Этап 1, liquid-glass): своя шапка с именем родителя + строка чипов
+ * выбора ребёнка + прижатый снизу ParentTabBar. В мобилке v2 этого каркаса
+ * нет: там RootHeader (лого + колокольчик + аватар) внутри КАЖДОГО экрана
+ * и плавающий FloatingTabBar поверх контента, а выбор ребёнка живёт на
+ * «Профиле»/через ChildSwitcherCard, а не отдельной строкой в шапке.
+ *
+ * Поэтому здесь остаётся только то, что действительно общее: фон страницы
+ * (AppBackground) + скролл-контейнер шириной телефона + плавающий таб-бар.
+ * Шапку рисует сам экран — так же, как в Expo Go.
+ *
+ * Ширина: макет — кадр 390px. На телефоне контент занимает всю ширину, на
+ * десктопе центрируется колонкой 430px (как «телефон по центру»). Заметка:
+ * на ≥640px весь /parent всё равно подменяется QR-гейтом (ViewportGate,
+ * см. app/parent/layout.tsx) — это решение «Части A», здесь не трогается.
+ */
+
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { getDictionary, type Locale } from "@snr/core";
-import { useLocale } from "@/components/LocaleProvider";
-import { SELECTED_CHILD_COOKIE, type ParentChild } from "@/lib/parent-child";
-import { LogoutButton } from "@/components/LogoutButton";
-import { GlassCard } from "@/components/parent/glass/GlassCard";
-import { glassBorder } from "@/lib/parent/glass-tokens";
-import { ParentTabBar } from "./ParentTabBar";
+import { AppBackground } from "./v2/AppBackground";
+import { ParentTabsV2 } from "./v2/ParentTabsV2";
 
-export function ParentAppShell({
-  parentName,
-  kids,
-  selectedChildId,
-  children,
-}: {
-  parentName: string;
-  kids: ParentChild[];
-  selectedChildId: string | null;
-  children: ReactNode;
-}) {
-  const { locale } = useLocale();
-  const d = getDictionary(locale as Locale).parentApp.auth;
-  const router = useRouter();
-
-  function selectChild(id: string) {
-    document.cookie = `${SELECTED_CHILD_COOKIE}=${id}; path=/; max-age=${60 * 60 * 24 * 365}`;
-    router.refresh();
-  }
-
+export function ParentAppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between gap-3 px-5 pb-2 pt-6">
-        <span className="text-sm font-semibold" style={{ color: "#171243" }}>
-          {parentName}
-        </span>
-        <LogoutButton />
-      </header>
-
-      {kids.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto px-5 pb-3">
-          {kids.map((k) => (
-            <button
-              key={k.id}
-              type="button"
-              onClick={() => selectChild(k.id)}
-              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition"
-              style={{
-                border: `1px solid ${glassBorder}`,
-                background: k.id === selectedChildId ? "linear-gradient(135deg, #7C3AED, #4F6DF5)" : "rgba(255,255,255,0.5)",
-                color: k.id === selectedChildId ? "#fff" : "#171243",
-              }}
-            >
-              {k.full_name}
-              {k.className ? ` · ${k.className}` : ""}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {kids.length === 0 && (
-        <div className="px-5 pb-3">
-          <GlassCard className="px-4 py-2.5">
-            <span className="text-xs" style={{ color: "rgba(26,19,74,0.64)" }}>
-              {d.chooseChild}: —
-            </span>
-          </GlassCard>
-        </div>
-      )}
-
-      <main className="flex-1 overflow-y-auto px-5 pb-28">{children}</main>
-
-      <ParentTabBar />
-    </div>
+    <AppBackground>
+      <div className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col">
+        {/* pb — высота плавающего таб-бара (≈68) + его отступ снизу (14) + воздух. */}
+        <div className="flex-1 pb-[104px]">{children}</div>
+      </div>
+      <ParentTabsV2 />
+    </AppBackground>
   );
 }
