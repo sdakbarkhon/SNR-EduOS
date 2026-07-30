@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry } from "../types";
+import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
@@ -251,6 +251,7 @@ export const getHomeworkWithSubmissions = async (db: Db, studentId?: string) => 
         group: { subject: string; name: string };
         submissions: HomeworkSubmission[];
         test_subs: TestSubmission[];
+        code_completion_data: CodeCompletionPayload | null;
       }>).map((r) => ({
         ...r,
         attachments: (r.attachments ?? []) as HomeworkAttachment[],
@@ -305,6 +306,7 @@ export const getHomeworkById = async (db: Db, id: string): Promise<HomeworkWithS
     group: { subject: string; name: string };
     submissions: HomeworkSubmission[];
     test_subs: TestSubmission[];
+    code_completion_data: CodeCompletionPayload | null;
   };
   const hw = {
     ...raw,
@@ -1945,6 +1947,59 @@ export const submitProgrammingHomework = async (
       .insert({ homework_id: homeworkId, student_id: studentId, ...payload });
     if (error) throw error;
   }
+};
+
+/** Большой фикс, Блок 6.5 — сдача ДЗ типа "code_completion" (Drag & Drop
+ *  заполнение пропусков). score/total пересчитываются ЗДЕСЬ, на сервере, по
+ *  homework.code_completion_data.gaps — клиентскому score не доверяем (тот
+ *  же принцип, что submitTest() выше сверяет с test_question_options.is_correct,
+ *  а не берёт готовый счёт от клиента). Авто-оценка сразу (status='graded'),
+ *  как у теста с test_auto_grade — здесь отдельного флага-выключателя нет,
+ *  ручной проверки для этого типа ДЗ не предусмотрено. */
+export const submitCodeCompletionHomework = async (
+  db: Db,
+  homeworkId: string,
+  studentId: string,
+  answers: Record<string, string>,
+): Promise<CodeCompletionAnswers> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const { data: hwRow, error: hwErr } = await db2
+    .from("homework")
+    .select("code_completion_data")
+    .eq("id", homeworkId)
+    .maybeSingle();
+  if (hwErr) throw hwErr;
+  const gaps = ((hwRow?.code_completion_data as CodeCompletionPayload | null)?.gaps) ?? [];
+  const total = gaps.length;
+  let score = 0;
+  for (const gap of gaps) if (answers[gap.id] === gap.correct) score++;
+  const result: CodeCompletionAnswers = { answers, score, total };
+  const grade = total > 0 ? autoGradeFromRatio(score, total) : null;
+
+  const existing = await db2
+    .from("homework_submissions")
+    .select("id")
+    .eq("homework_id", homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle()
+    .then(({ data }: { data: { id: string } | null }) => data);
+  const payload = {
+    code_completion_answers: result,
+    grade,
+    status: "graded",
+    submitted_at: new Date().toISOString(),
+  };
+  if (existing) {
+    const { error } = await db2.from("homework_submissions").update(payload).eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await db2
+      .from("homework_submissions")
+      .insert({ homework_id: homeworkId, student_id: studentId, ...payload });
+    if (error) throw error;
+  }
+  return result;
 };
 
 /** Последняя отправка кода ученика (для восстановления редактора). */

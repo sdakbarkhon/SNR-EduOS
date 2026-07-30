@@ -182,6 +182,26 @@ export function StageViewModal({
             </div>
           )}
 
+          {stage.content_type === "code_completion" && (() => {
+            const payload = (stage.config ?? null) as { code_template?: string; gaps?: { id: string; correct: string }[]; language?: string } | null;
+            if (!payload?.code_template) return null;
+            const preview = payload.gaps?.reduce(
+              (acc, g) => acc.replaceAll(`__${g.id}__`, `[${g.correct}]`),
+              payload.code_template,
+            ) ?? payload.code_template;
+            return (
+              <div className="space-y-3">
+                {payload.language && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{payload.language}</p>
+                )}
+                <pre className="overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100">
+                  <code>{preview}</code>
+                </pre>
+                <p className="text-xs text-slate-400">Пропуски (в скобках — правильный вариант): {payload.gaps?.length ?? 0}</p>
+              </div>
+            );
+          })()}
+
           {serviceMeta && serviceUrl && (
             <div className="space-y-2">
               <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">

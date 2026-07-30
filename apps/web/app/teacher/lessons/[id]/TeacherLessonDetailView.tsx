@@ -10,7 +10,7 @@ import {
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Hand, Play, Link2,
-  Keyboard, GraduationCap,
+  Keyboard, GraduationCap, Blocks,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
@@ -78,6 +78,7 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   learningapps:   <Brain className="h-4 w-4" />,
   sqlonline:      <Database className="h-4 w-4" />,
   typerun:        <Keyboard className="h-4 w-4" />,
+  code_completion: <Blocks className="h-4 w-4" />,
 };
 
 function fmtDate(iso: string): string {
@@ -1207,6 +1208,7 @@ export function TeacherLessonDetailView({
       learningapps:   dl.stageContentLearningapps,
       sqlonline:      dl.stageContentSqlonline,
       typerun:        dl.stageContentTyperun,
+      code_completion: dl.stageContentCodeCompletion,
     };
     return map[ct] ?? ct;
   }

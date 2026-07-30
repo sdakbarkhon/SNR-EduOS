@@ -350,11 +350,13 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
               hw.content_type === "test" ? "bg-violet-100 text-violet-700"
                 : hw.content_type === "programming" ? "bg-emerald-100 text-emerald-700"
                 : hw.content_type === "bundle" ? "bg-indigo-100 text-indigo-700"
+                : hw.content_type === "code_completion" ? "bg-violet-100 text-violet-700"
                 : isExternalService(hw.content_type) ? "bg-sky-100 text-sky-700"
                 : "bg-blue-100 text-blue-700")}>
               {hw.content_type === "test" ? d.homework.typeTest
                 : hw.content_type === "programming" ? d.homework.typeProgramming
                 : hw.content_type === "bundle" ? d.homework.typeBundle
+                : hw.content_type === "code_completion" ? d.homework.typeCodeCompletion
                 : isExternalService(hw.content_type) ? SERVICE_CONFIG[hw.content_type].name
                 : d.homework.typeFile}
             </span>

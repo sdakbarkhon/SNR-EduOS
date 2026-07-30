@@ -1052,6 +1052,7 @@ export interface Dictionary {
     // Homework types (migration 31)
     typeProgramming: string;
     typeBundle: string;
+    typeCodeCompletion: string;
     // новые ключи — редизайн /homework (Iter5 P8)
     searchPlaceholder: string;
     typeAll: string;
@@ -1640,6 +1641,7 @@ export interface Dictionary {
     stageContentLearningapps: string;  // "Learning Apps"
     stageContentSqlonline: string;     // "SQL Online"
     stageContentTyperun: string;       // "TypeRun"
+    stageContentCodeCompletion: string; // "Код с пропусками"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"
     stageStepLabel: string;            // "Этап {n}"

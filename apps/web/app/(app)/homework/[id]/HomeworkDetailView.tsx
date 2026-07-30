@@ -22,6 +22,7 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
+import { CodeCompletionSolver } from "./CodeCompletionSolver";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { useFullscreenToggle } from "@/lib/useFullscreenToggle";
 import { HomeworkHintPanel } from "./HomeworkHintPanel";
@@ -565,7 +566,7 @@ function ExternalServiceCard({ hw }: { hw: HomeworkWithSubmission }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dx = d.lesson.external;
-  const service = hw.content_type as Exclude<HomeworkWithSubmission["content_type"], "file" | "test" | "programming" | "bundle">;
+  const service = hw.content_type as Exclude<HomeworkWithSubmission["content_type"], "file" | "test" | "programming" | "bundle" | "code_completion">;
   const meta = SERVICE_CONFIG[service];
   const embedUrl = hw.external_url ? (meta.extractEmbedUrl(hw.external_url) ?? DEFAULT_EXTERNAL_URLS[service]) : DEFAULT_EXTERNAL_URLS[service];
   const { ref, isFullscreen, toggle } = useFullscreenToggle<HTMLDivElement>();
@@ -646,6 +647,17 @@ export function HomeworkDetailView({ hw }: { hw: HomeworkWithSubmission }) {
       <>
         {hintPanel}
         <BundleSolver hw={hw} />
+      </>
+    );
+  }
+
+  // Большой фикс, Блок 6.5 — code_completion homework: Drag & Drop
+  // заполнение пропусков, отдельная страница как у programming/bundle.
+  if (hw.content_type === "code_completion") {
+    return (
+      <>
+        {hintPanel}
+        <CodeCompletionSolver hw={hw} />
       </>
     );
   }

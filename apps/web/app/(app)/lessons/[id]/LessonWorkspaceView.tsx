@@ -25,6 +25,7 @@ import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { StudentPresentationViewer } from "@/components/lesson-stages/StudentPresentationViewer";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
+import { CodeCompletionStageView } from "./CodeCompletionStageView";
 import { ExternalStageModal } from "./ExternalStageModal";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { QiaQuizModal } from "./QiaQuizModal";
@@ -148,6 +149,7 @@ function TaskStubModal({
         learningapps:   d.stageContentLearningapps,
         sqlonline:      d.stageContentSqlonline,
         typerun:        d.stageContentTyperun,
+        code_completion: d.stageContentCodeCompletion,
       }[stage.content_type] ?? stage.content_type
     : null;
 
@@ -1196,7 +1198,8 @@ export function LessonWorkspaceView({
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
               const isCodeOrExternal = stage.content_type === "code" || isExternalService(stage.content_type)
-                || stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot";
+                || stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot"
+                || stage.content_type === "code_completion";
 
               return (
                 <div key={isCompleted ? stage.id : `${stage.id}-${animKey}`} className={`relative${isCompleted ? "" : " animate-stage-in"}`}>
@@ -1353,6 +1356,15 @@ export function LessonWorkspaceView({
                       ) : stage.content_type === "quiz_kahoot" ? (
                         mounted && studentId && (
                           <KahootStudentModal
+                            key={stage.id}
+                            stage={stage}
+                            studentId={studentId}
+                            onSubmitted={handleStageSubmitted}
+                          />
+                        )
+                      ) : stage.content_type === "code_completion" ? (
+                        mounted && studentId && (
+                          <CodeCompletionStageView
                             key={stage.id}
                             stage={stage}
                             studentId={studentId}

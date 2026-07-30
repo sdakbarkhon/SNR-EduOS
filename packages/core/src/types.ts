@@ -120,7 +120,29 @@ export type LessonContentType =
   | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
   | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'typerun'
-  | 'quiz_qia' | 'quiz_kahoot';
+  | 'quiz_qia' | 'quiz_kahoot' | 'code_completion';
+
+// Большой фикс, Блок 6.5 — Drag & Drop заполнение пропусков в коде.
+// lesson_stages: живёт в config (JSON-конфигурация под тип, см. миграция
+// 20260620000035) — {code_template, gaps, language, task_description}.
+// homework: выделенная колонка code_completion_data (у homework нет
+// generic jsonb-слота, миграция 159) — та же форма.
+export type CodeCompletionGap = { id: string; correct: string; options: string[] };
+export type CodeCompletionPayload = {
+  code_template: string;
+  gaps: CodeCompletionGap[];
+  language: string;
+  task_description?: string;
+};
+// Ответ ученика: gapId -> выбранный вариант. score/total пересчитываются
+// на сервере при отправке (submitCodeCompletionHomework сверяет с
+// gaps[].correct из БД, не доверяет числу от клиента — тот же принцип,
+// что у submitTest()/test_question_options.is_correct).
+export type CodeCompletionAnswers = {
+  answers: Record<string, string>;
+  score: number;
+  total: number;
+};
 
 // Сложность этапа (migration 55) — задаётся учителем или ИИ-генератором.
 export type StageDifficulty = 'easy' | 'medium' | 'hard';
@@ -610,13 +632,14 @@ export type HomeworkSubmission = {
   ai_reviewed_at: string | null;               // migration 140
   teacher_approved_at: string | null;          // migration 140
   teacher_approved_by: string | null;          // migration 140
+  code_completion_answers: CodeCompletionAnswers | null; // migration 159
 };
 
 /** Homework с join'ом группы и опциональной сдачей студента. */
 // content_type: the 4 "native" homework kinds plus the 12 SERVICE_CONFIG
 // external services (migration 95, УЧ.10) — each rendered as an iframe using
 // homework.external_url, the same SERVICE_CONFIG the lesson stages use.
-export type ContentType = 'file' | 'test' | 'programming' | 'bundle' | ExternalServiceType;
+export type ContentType = 'file' | 'test' | 'programming' | 'bundle' | 'code_completion' | ExternalServiceType;
 export type ProgrammingLanguage = CodeLanguage;
 export type HomeworkSource = 'curriculum' | 'teacher';
 
@@ -734,6 +757,7 @@ export type HomeworkWithSubmission = {
   submission: HomeworkSubmission | null;
   test_submission: TestSubmission | null;
   subtasks?: HomeworkSubtask[];               // bundle only, populated by getHomeworkById
+  code_completion_data: CodeCompletionPayload | null; // migration 159
 };
 
 // ── Projects (migration 33) ─────────────────────────────────────────
