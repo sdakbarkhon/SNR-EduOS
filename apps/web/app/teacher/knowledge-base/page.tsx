@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMaterials, getTeacherGroups, getAllBooks, getBookSignedUrl } from "@snr/core";
+import { getMaterials, getTeacherGroups, getAllBooks, getBookSignedUrl, getLibraryMaterials } from "@snr/core";
 import { safeQuery } from "@/lib/safe-query";
 import { TeacherKnowledgeBaseView } from "./TeacherKnowledgeBaseView";
 
@@ -7,23 +7,27 @@ export default async function TeacherKnowledgeBasePage() {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  const teacherId = user
+  const teacherRow = user
     ? await supabase
         .from("teachers")
-        .select("id")
+        .select("id, subject_slug")
         .eq("user_id", user.id)
         .maybeSingle()
-        .then((r) => (r.data as { id: string } | null)?.id ?? "")
-    : "";
+        .then((r) => r.data as { id: string; subject_slug: string | null } | null)
+    : null;
+  const teacherId = teacherRow?.id ?? "";
+  const subjectSlug = teacherRow?.subject_slug ?? null;
 
-  const [materialsRes, groupsRes, booksRes] = await Promise.all([
+  const [materialsRes, groupsRes, booksRes, libraryRes] = await Promise.all([
     safeQuery(getMaterials(supabase), [], "TeacherKnowledgeBasePage.materials"),
     safeQuery(getTeacherGroups(supabase), [], "TeacherKnowledgeBasePage.groups"),
     safeQuery(getAllBooks(supabase), [], "TeacherKnowledgeBasePage.books"),
+    safeQuery(getLibraryMaterials(supabase), [], "TeacherKnowledgeBasePage.libraryMaterials"),
   ]);
   const materials = materialsRes.data;
   const groups = groupsRes.data;
   const books = booksRes.data;
+  const libraryMaterials = libraryRes.data;
 
   const coverUrls: Record<string, string> = {};
   await Promise.all(
@@ -45,6 +49,8 @@ export default async function TeacherKnowledgeBasePage() {
       initialTeacherId={teacherId}
       books={books}
       coverUrls={coverUrls}
+      libraryMaterials={libraryMaterials}
+      initialSubjectSlug={subjectSlug}
     />
   );
 }

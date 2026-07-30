@@ -92,7 +92,7 @@ function formatLibSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
-function LibraryUploadModal({
+export function LibraryUploadModal({
   groups,
   teacherId,
   subjectSlug,
@@ -316,7 +316,7 @@ function LibraryUploadModal({
   );
 }
 
-function LibraryVideoLinkModal({
+export function LibraryVideoLinkModal({
   groups,
   subjectSlug,
   dt,

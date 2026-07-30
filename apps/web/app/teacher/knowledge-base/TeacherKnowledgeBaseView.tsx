@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { FolderOpen, Library } from "lucide-react";
-import type { MaterialWithGroup, Book } from "@snr/core";
+import { FolderOpen, Library, GraduationCap } from "lucide-react";
+import type { MaterialWithGroup, Book, LibraryMaterialWithDetails } from "@snr/core";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { TeacherMaterialsView, type TeacherGroup } from "../materials/TeacherMaterialsView";
 import { TeacherBooksView } from "../books/TeacherBooksView";
+import { TeacherLibraryTabView } from "./TeacherLibraryTabView";
 
-type Tab = "materials" | "library";
+type Tab = "materials" | "library" | "teacherLibrary";
 
 export function TeacherKnowledgeBaseView({
   materials,
@@ -17,12 +18,16 @@ export function TeacherKnowledgeBaseView({
   initialTeacherId,
   books,
   coverUrls,
+  libraryMaterials,
+  initialSubjectSlug,
 }: {
   materials: MaterialWithGroup[];
   groups: TeacherGroup[];
   initialTeacherId: string;
   books: Book[];
   coverUrls: Record<string, string>;
+  libraryMaterials: LibraryMaterialWithDetails[];
+  initialSubjectSlug: string | null;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -47,6 +52,14 @@ export function TeacherKnowledgeBaseView({
         >
           <Library className="h-4 w-4" /> {d.tabLibrary}
         </button>
+        <button
+          onClick={() => setTab("teacherLibrary")}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+            tab === "teacherLibrary" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <GraduationCap className="h-4 w-4" /> {d.tabTeacherLibrary}
+        </button>
       </div>
 
       <div className={tab === "materials" ? "" : "hidden"}>
@@ -54,6 +67,14 @@ export function TeacherKnowledgeBaseView({
       </div>
       <div className={tab === "library" ? "" : "hidden"}>
         <TeacherBooksView initialBooks={books} initialTeacherId={initialTeacherId} coverUrls={coverUrls} hideHeading />
+      </div>
+      <div className={tab === "teacherLibrary" ? "" : "hidden"}>
+        <TeacherLibraryTabView
+          initialMaterials={libraryMaterials}
+          groups={groups}
+          initialTeacherId={initialTeacherId}
+          initialSubjectSlug={initialSubjectSlug}
+        />
       </div>
     </div>
   );
