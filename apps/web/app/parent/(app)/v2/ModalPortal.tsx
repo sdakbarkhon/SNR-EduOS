@@ -1,0 +1,38 @@
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+
+/**
+ * Обёртка для модалок/шторок родителя: портал в document.body + слой ВЫШЕ
+ * плавающего таб-бара.
+ *
+ * ЗАЧЕМ. Модалка «Выйти из аккаунта?» на /parent/profile обрезалась снизу:
+ * кнопка «Выйти» уходила под навигацию, сквозь панель просвечивали иконки
+ * табов. Причина — ничья по z-index: модалка стояла `fixed inset-0 z-50`, и
+ * FloatingTabBar тоже `z-50`. При равном z-index выигрывает тот, кто позже
+ * в DOM, а таб-бар рендерится в ParentAppShell ПОСЛЕ {children}, то есть
+ * всегда поверх. Плюс модалка жила внутри stacking-контекста каркаса, и
+ * поднять её одним z-index было ненадёжно.
+ *
+ * РЕШЕНИЕ. Портал в document.body полностью выносит модалку из контекста
+ * каркаса, а слой Z_MODAL гарантированно выше Z_TAB_BAR.
+ *
+ * ШКАЛА (единственный источник правды, не хардкодить z-index в модалках):
+ *   z-50   — FloatingTabBar (v2/FloatingTabBar.tsx)
+ *   100    — оверлей модалки/шторки  (Z_MODAL)
+ *   110    — панель поверх оверлея   (Z_MODAL_PANEL)
+ *
+ * Рендерит null на сервере и до монтирования — document.body там нет.
+ */
+
+export const Z_TAB_BAR = 50;
+export const Z_MODAL = 100;
+export const Z_MODAL_PANEL = 110;
+
+export function ModalPortal({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return createPortal(children, document.body);
+}

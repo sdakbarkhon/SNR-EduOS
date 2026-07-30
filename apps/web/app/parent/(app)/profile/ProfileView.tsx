@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LogoutOverlay, useLogout } from "@/components/LogoutOverlay";
 import { GlassCard } from "../v2/GlassCard";
+import { ModalPortal, Z_MODAL, Z_MODAL_PANEL } from "../v2/ModalPortal";
 import {
   Avatar,
   CardRow,
@@ -268,9 +269,13 @@ export function ProfileView({
         </div>
       </div>
 
-      {/* Подтверждение выхода. */}
+      {/* Подтверждение выхода. Через ModalPortal (портал в document.body +
+          слой выше таб-бара): раньше стояло `fixed inset-0 z-50`, как и у
+          FloatingTabBar, и при равном z-index побеждал таб-бар — он
+          рендерится в каркасе позже. Кнопку «Выйти» перекрывала навигация. */}
       {modalMounted ? (
-        <div className="fixed inset-0 z-50">
+        <ModalPortal>
+        <div className="fixed inset-0" style={{ zIndex: Z_MODAL }}>
           <button
             type="button"
             aria-label="Закрыть"
@@ -284,7 +289,10 @@ export function ProfileView({
               transitionDuration: "280ms",
             }}
           />
-          <div className="pointer-events-none absolute inset-0 mx-auto flex max-w-[430px] items-end">
+          <div
+            className="pointer-events-none absolute inset-0 mx-auto flex max-w-[430px] items-end"
+            style={{ zIndex: Z_MODAL_PANEL }}
+          >
             <div
               className="pointer-events-auto w-full overflow-hidden"
               style={{
@@ -384,6 +392,7 @@ export function ProfileView({
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
 
       {loggingOut ? <LogoutOverlay /> : null}

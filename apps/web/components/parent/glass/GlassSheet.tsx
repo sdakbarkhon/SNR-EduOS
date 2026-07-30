@@ -1,9 +1,18 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { glass1Css, glassBorder, radius } from "@/lib/parent/glass-tokens";
+import { Z_MODAL, Z_MODAL_PANEL } from "@/app/parent/(app)/v2/ModalPortal";
 
-/** Bottom-sheet: overlay (клик закрывает) + grip-хендл + контент, glass-поверхность. */
+/** Bottom-sheet: overlay (клик закрывает) + grip-хендл + контент, glass-поверхность.
+ *
+ *  Портал в document.body + слой выше таб-бара — тот же фикс, что у модалки
+ *  выхода на /parent/profile. Здесь это профилактика: сейчас шторку зовут
+ *  только экраны входа (AuthHelpSheet/FeaturesSheet/LangButton), где
+ *  FloatingTabBar ещё нет, но прежние `fixed inset-0 z-50` в точности
+ *  повторяли конфликт — при первом же использовании внутри (app) шторка
+ *  ушла бы под навигацию. Шкала z-index — в v2/ModalPortal.tsx. */
 export function GlassSheet({
   visible,
   onClose,
@@ -13,15 +22,19 @@ export function GlassSheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  if (!visible) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+  if (!visible || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: Z_MODAL }}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
-        className="relative z-10 mx-auto w-full max-w-[430px] pb-2 pt-2.5"
+        className="relative mx-auto w-full max-w-[430px] pb-2 pt-2.5"
         style={{
           ...glass1Css,
+          zIndex: Z_MODAL_PANEL,
           borderTopLeftRadius: radius.card,
           borderTopRightRadius: radius.card,
           border: `1px solid ${glassBorder}`,
@@ -36,6 +49,7 @@ export function GlassSheet({
         />
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
