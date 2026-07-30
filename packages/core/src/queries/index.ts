@@ -1522,7 +1522,10 @@ export const declineAiHomeworkReview = (
   input: { submissionId: string; grade: number; comment: string },
 ): Promise<void> => finalizeAiHomeworkReview(db, { ...input, aiReviewStatus: "teacher_declined_manual_grade" });
 
-const NATIVE_CONTENT_TYPES = ["file", "test", "programming", "bundle"] as const;
+// code_completion — тоже НАШ тип, а не внешний сервис. Без него в этом
+// списке isExternal ниже станет true и ДЗ уедет в БД с external_url вместо
+// полезной нагрузки (учитель получил бы пустое упражнение).
+const NATIVE_CONTENT_TYPES = ["file", "test", "programming", "bundle", "code_completion"] as const;
 
 /** Создать ДЗ (file/test/programming/bundle или один из 12 внешних сервисов). Returns created homework record. */
 export const createTeacherHomework = async (
@@ -1546,9 +1549,12 @@ export const createTeacherHomework = async (
     testsAttachmentFilename?: string | null;
     testsAttachmentSizeBytes?: number | null;
     externalUrl?: string | null;
+    /** content_type='code_completion': {code_template, gaps[], language, task_description}. */
+    codeCompletionData?: CodeCompletionPayload | null;
   },
 ) => {
   const isProg = input.contentType === "programming";
+  const isCodeCompletion = input.contentType === "code_completion";
   const isExternal = !(NATIVE_CONTENT_TYPES as readonly string[]).includes(input.contentType);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
@@ -1572,6 +1578,7 @@ export const createTeacherHomework = async (
       tests_attachment_filename: isProg ? (input.testsAttachmentFilename ?? null) : null,
       tests_attachment_size_bytes: isProg ? (input.testsAttachmentSizeBytes ?? null) : null,
       external_url: isExternal ? (input.externalUrl ?? null) : null,
+      code_completion_data: isCodeCompletion ? (input.codeCompletionData ?? null) : null,
     })
     .select()
     .single();

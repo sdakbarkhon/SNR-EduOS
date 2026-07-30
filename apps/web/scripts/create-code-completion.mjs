@@ -59,7 +59,10 @@ async function throttle() {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastCallAt = Date.now();
 }
-const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+// Запасные модели: gemini-2.0-flash и 2.0-flash-lite ОТКЛЮЧЕНЫ Google
+// (отдают 404 «no longer available»), т.е. фолбэк был мёртвым — при 503 у
+// основной модели скрипт просто падал. Заменены на живые 2.5-семейства.
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"];
 let modelName = null;
 const exhaustedModels = new Set();
 async function pickWorkingModel() {
@@ -138,6 +141,19 @@ function systemPromptFor(className, topic) {
 Код должен быть ${spec.lines} строк, ${spec.gaps} пропусков. Каждый пропуск имеет
 4 варианта (1 правильный + 3 правдоподобных, но ошибочных). ${spec.extra}
 
+ЯЗЫК В КОДЕ (строго):
+- Имена переменных, функций и любые идентификаторы — ТОЛЬКО НА АНГЛИЙСКОМ
+  (name, sum, num1, num2, total, count, result, teacher_name...). Никакой
+  кириллицы в идентификаторах — ни в коде, ни в вариантах ответов.
+- Строковые литералы внутри "..." — МОЖНО и НУЖНО на русском.
+- Комментарии после # — можно на русском.
+Пример правильного стиля:
+    teacher_name = "Марина"
+    print("Меня зовут", teacher_name)
+    num1 = 10
+    total = num1 + num2
+    print("Сумма чисел:", total)  # выводим результат
+
 Пропуски в коде обозначай литерально как __GAP1__, __GAP2__ и т.д. (ровно в
 таком формате, с двумя подчёркиваниями с каждой стороны).
 
@@ -152,6 +168,28 @@ function systemPromptFor(className, topic) {
 }`;
 }
 
+const CYRILLIC = /[Ѐ-ӿ]/;
+
+/** Код без строковых литералов и комментариев — там кириллицы быть не должно
+ *  (идентификаторы только английские). Внутри "..." и после # — можно. */
+function codeWithoutTextLiterals(code) {
+  return code
+    .replace(/"""[\s\S]*?"""|'''[\s\S]*?'''/g, "")
+    .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
+    .replace(/#[^\n]*/g, "")
+    .replace(/\/\/[^\n]*/g, "");
+}
+
+/** Промт может не послушаться — проверяем фактически, а не на доверии.
+ *  ВАЖНО: к вариантам ответа применяется та же логика, что к коду. Вариант
+ *  вроде "пять" (строковый литерал с русским текстом) — ЛЕГИТИМЕН, это не
+ *  имя переменной. Первая версия проверки резала такие варианты и
+ *  забраковала половину сгенерированного — отсюда отдельный strip. */
+function hasCyrillicIdentifiers(payload) {
+  if (CYRILLIC.test(codeWithoutTextLiterals(payload.code_template))) return true;
+  return payload.gaps.some((g) => g.options.some((o) => CYRILLIC.test(codeWithoutTextLiterals(String(o)))));
+}
+
 function validate(parsed) {
   if (typeof parsed?.code_template !== "string" || !parsed.code_template.trim()) return null;
   if (!Array.isArray(parsed?.gaps) || parsed.gaps.length < 3) return null;
@@ -161,6 +199,7 @@ function validate(parsed) {
     if (!g.options.includes(g.correct)) return null;
     if (!parsed.code_template.includes(`__${g.id}__`)) return null;
   }
+  if (hasCyrillicIdentifiers(parsed)) return null;
   return {
     code_template: parsed.code_template.trim(),
     gaps: parsed.gaps.map((g) => ({ id: g.id, correct: g.correct, options: g.options })),

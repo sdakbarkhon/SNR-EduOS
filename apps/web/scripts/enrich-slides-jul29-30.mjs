@@ -89,7 +89,10 @@ async function throttle() {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastCallAt = Date.now();
 }
-const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+// Запасные модели: gemini-2.0-flash и 2.0-flash-lite ОТКЛЮЧЕНЫ Google
+// (отдают 404 «no longer available»), т.е. фолбэк был мёртвым — при 503 у
+// основной модели скрипт просто падал. Заменены на живые 2.5-семейства.
+const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"];
 let modelName = null;
 const exhaustedModels = new Set();
 async function pickWorkingModel() {

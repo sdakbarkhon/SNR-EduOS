@@ -27,11 +27,12 @@ import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
   LessonStageType, LessonMaterial, Teacher, ExcuseRequestWithStudent,
   CodeLanguage, CodeStageConfig, ExternalServiceConfig, ExternalServiceType,
-  QuizQuestionInput, QuizConfigForStage,
+  QuizQuestionInput, QuizConfigForStage, CodeCompletionPayload, CodeCompletionGap,
 } from "@snr/core";
 import { SERVICE_CONFIG, validateServiceUrl, isExternalService, getServicesForSubject } from "@/lib/external-services";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
+import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
@@ -107,6 +108,9 @@ const TASK_CONTENT_TYPES: LessonContentType[] = [
   "code", "wokwi", "codesandbox", "quiz_qia", "quiz_kahoot",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
   "typerun",
+  // Drag & Drop «код с пропусками». Раньше этап такого типа можно было
+  // создать только скриптом — в форме учителя пункта не было вовсе.
+  "code_completion",
 ];
 
 function StageModal({
@@ -203,6 +207,16 @@ function StageModal({
   const [quizMinutes, setQuizMinutes] = useState<number>(existingQuizCfg.time_limit_minutes ?? 5);
   const [quizPoints, setQuizPoints] = useState<number>(existingQuizCfg.points_per_question ?? 1);
 
+  // code_completion (Drag & Drop код). Хуки — на верхнем уровне рядом с
+  // остальными, а не внутри if: правило react-hooks/rules-of-hooks включено
+  // (коммит 506c514) именно из-за рецидивов React #310.
+  const isCodeCompletion = contentType === "code_completion";
+  const existingCcCfg = (existing?.config ?? {}) as Partial<CodeCompletionPayload>;
+  const [ccTemplate, setCcTemplate] = useState<string>(existingCcCfg.code_template ?? "");
+  const [ccGaps, setCcGaps] = useState<CodeCompletionGap[]>(existingCcCfg.gaps ?? []);
+  const [ccLang, setCcLang] = useState<CodeLanguage>((existingCcCfg.language as CodeLanguage) ?? "python");
+  const ccReady = !isCodeCompletion || codeCompletionValid(ccTemplate, ccGaps);
+
   useEffect(() => {
     if (isEdit && isQuiz && existing) {
       getQuizQuestions(db, existing.id).then((qs) => {
@@ -281,6 +295,13 @@ function StageModal({
         ...q,
         options: q.options.map((o) => o.trim()).filter((_, i) => i < 4),
       }));
+    } else if (isCodeCompletion) {
+      config = {
+        code_template: ccTemplate,
+        gaps: ccGaps.map((g) => ({ ...g, options: g.options.filter((o) => o.trim()) })),
+        language: ccLang,
+        task_description: desc.trim() || undefined,
+      };
     } else if (isPresentation && presentationFile) {
       config = { presentation_file: presentationFile };
     }
@@ -311,7 +332,7 @@ function StageModal({
       style={{ zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
     >
       <div
-        className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${isCode || isQuiz ? "max-w-2xl" : "max-w-lg"}`}
+        className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${isCode || isQuiz || isCodeCompletion ? "max-w-2xl" : "max-w-lg"}`}
         style={{ background: "var(--surface-1)" }}
       >
         {/* Header */}
@@ -400,7 +421,7 @@ function StageModal({
               {!isEdit && <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">{d.stageStep3Title}</p>}
 
               {/* Stub note: still a placeholder for content types we haven't built yet */}
-              {contentType && contentType !== "presentation" && !isCode && !isExternal && !isQuiz && (
+              {contentType && contentType !== "presentation" && !isCode && !isExternal && !isQuiz && !isCodeCompletion && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                   {d.stageContentStubNote}
                 </div>
@@ -501,6 +522,19 @@ function StageModal({
               )}
 
               {/* Quiz stage: question builder + (QIA) options */}
+              {isCodeCompletion && (
+                <div className="mb-4">
+                  <CodeCompletionBuilder
+                    codeTemplate={ccTemplate}
+                    onCodeTemplateChange={setCcTemplate}
+                    gaps={ccGaps}
+                    onGapsChange={setCcGaps}
+                    language={ccLang}
+                    onLanguageChange={setCcLang}
+                  />
+                </div>
+              )}
+
               {isQuiz && (
                 <div className="mb-4 space-y-4">
                   {isQqia && (
@@ -680,7 +714,7 @@ function StageModal({
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType)) || !externalReady || !quizReady}
+                  disabled={saving || !title.trim() || (!isEdit && (!stageType || !contentType)) || !externalReady || !quizReady || !ccReady}
                   className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 disabled:opacity-50"
                 >
                   {saving ? "Сохранение…" : isEdit ? d.stageSaveBtn2 : d.stageAddConfirmBtn}

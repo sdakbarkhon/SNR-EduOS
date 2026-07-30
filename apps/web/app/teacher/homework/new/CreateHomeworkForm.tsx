@@ -17,10 +17,11 @@ import {
   linkedMaterialAttachmentPath,
   linkedBookAttachmentPath,
 } from "@snr/core";
-import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage, SubjectWithGroup } from "@snr/core";
+import type { Locale, HomeworkSubtaskType, ContentType, CodeLanguage, SubjectWithGroup, CodeCompletionGap } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
-import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch, Link2 } from "lucide-react";
+import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code, Layers, GripVertical, Puzzle, Globe, AlertCircle, FolderSearch, Link2, Blocks } from "lucide-react";
+import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { parseVideoUrl } from "@/lib/video-url";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
@@ -57,6 +58,12 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   const [expectedOutput, setExpectedOutput] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
   const [externalUrlError, setExternalUrlError] = useState<string | null>(null);
+  // content_type='code_completion' (Drag & Drop код) — раньше учитель не мог
+  // создать такое ДЗ вообще, тип существовал только для сгенерированных
+  // скриптом. Редактор общий с формой этапа урока (CodeCompletionBuilder).
+  const [ccTemplate, setCcTemplate] = useState("");
+  const [ccGaps, setCcGaps] = useState<CodeCompletionGap[]>([]);
+  const [ccLang, setCcLang] = useState<CodeLanguage>("python");
   const [testsFile, setTestsFile] = useState<File | null>(null);
   const testsRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
@@ -213,6 +220,10 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
     if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
     if (format === "file" && videoUrlInvalid) { setError(d.lesson.materialInvalidVideoUrl); return; }
+    if (format === "code_completion" && !codeCompletionValid(ccTemplate, ccGaps)) {
+      setError("Проверьте упражнение: шаблон кода и пропуски заполнены не полностью");
+      return;
+    }
     // БОЛЬШОЕ ОБНОВЛЕНИЕ §9.1 — ссылка необязательна: пустая строка → на
     // просмотре у ученика подставится DEFAULT_EXTERNAL_URLS, как на уроках
     // (см. TeacherLessonDetailView.tsx's `externalReady` — тот же паттерн).
@@ -252,6 +263,14 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         starterCode: format === "programming" ? (starterCode || null) : null,
         expectedOutput: format === "programming" ? (expectedOutput || null) : null,
         externalUrl: isExternalService(format) ? (externalUrl.trim() || null) : null,
+        codeCompletionData: format === "code_completion"
+          ? {
+              code_template: ccTemplate,
+              gaps: ccGaps.map((g) => ({ ...g, options: g.options.filter((o) => o.trim()) })),
+              language: ccLang,
+              task_description: description.trim() || undefined,
+            }
+          : null,
       });
       if (format === "test" && questions.length > 0) {
         await createTestQuestions(supabase, hw.id, questions.map((q, i) => ({
@@ -343,6 +362,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
     { key: "programming", label: d.homework.typeProgramming, Icon: Code },
     { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
+    { key: "code_completion", label: d.homework.typeCodeCompletion, Icon: Blocks },
     ...allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
   ];
   const SUBTASK_TYPE_TABS: Array<{ key: HomeworkSubtaskType; label: string }> = [
@@ -788,6 +808,20 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
               </label>
             )}
           </div>
+        </div>
+      )}
+
+      {format === "code_completion" && (
+        <div className="rounded-[20px] border border-white/80 bg-white/70 p-4 backdrop-blur-xl"
+          style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+          <CodeCompletionBuilder
+            codeTemplate={ccTemplate}
+            onCodeTemplateChange={setCcTemplate}
+            gaps={ccGaps}
+            onGapsChange={setCcGaps}
+            language={ccLang}
+            onLanguageChange={setCcLang}
+          />
         </div>
       )}
 
