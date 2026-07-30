@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  BookOpen, Flame, Lock,
+  BookOpen, Flame,
   Sparkles, ArrowRight, FileText, Folder, UserPlus, Calendar,
   Check, Award, Trophy, Target, type LucideIcon,
 } from "lucide-react";
@@ -545,54 +545,36 @@ export function DashboardView({
               </div>
             </button>
 
-            {/* Предметы класса — полный каталог (перенесён сюда, справа от «Мой
-                прогресс», ЧАСТЬ 1). Рабочие предметы кликабельны (в /lessons);
-                заглушки (is_active=false) затемнены, клик → тост. */}
+            {/* Предметы класса — только активные (перенесён сюда, справа от
+                «Мой прогресс», ЧАСТЬ 1). Клик по карточке открывает модалку
+                деталей предмета. */}
             {mySubjects.length > 0 ? (
               <div className="rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)]">
                 <h3 className="text-[18px] font-extrabold text-[#2A2A45]">{t.classSubjectsTitle}</h3>
-                {/* 5 колонок на 2xl → 10 предметов = ровно 2 полных ряда,
-                    блок заполняет всю ширину справа без пустого поля; на
-                    узких — 2–4 колонки. Длинные названия переносятся
-                    (break-words), карточки одинаковой высоты (min-h у
-                    названия + h-full).
-                    xl НАМЕРЕННО откатывается на 3 колонки, а не растёт до
-                    5 сразу после lg=4 — на 1280-1535 (xl) этот блок делит
-                    ширину с правым aside (`xl:w-[340px]`, ниже) и с левой
-                    300px-колонкой «Мой прогресс», из-за чего карточка на
-                    lg:grid-cols-5 падала до ~38-60px (иконка 40px+паддинг
-                    ~64px не помещались, налезали друг на друга). До 2xl,
-                    где aside+прогресс уже не так давят на ширину, карточка
-                    снова безопасно растёт до 5 колонок. */}
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-5">
-                  {[...mySubjects].sort((a, b) => Number(b.is_active) - Number(a.is_active)).map((sub) => {
+                {/* Только активные предметы (is_active=false — заглушки
+                    История/Биология/Химия/Физика/Обществознание — больше не
+                    показываем на дашборде вообще, ни затемнёнными). Ровно 5
+                    активных предметов на класс → grid-cols-5 всегда влезает
+                    в один ряд начиная с sm, карточки шире, чем раньше при
+                    10 штуках. Имя предмета — одна строка (truncate), а не
+                    line-clamp-2, чтобы не увеличивать высоту карточки. */}
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                  {mySubjects.filter((sub) => sub.is_active).map((sub) => {
                     const SubIcon = LUCIDE_ICONS[sub.icon] ?? BookOpen;
-                    const card = (
-                      <div
-                        className={`flex h-full flex-col items-center gap-2 rounded-[16px] p-3 text-center transition ${sub.is_active ? "hover:-translate-y-0.5" : "opacity-60"}`}
-                        style={{ backgroundColor: sub.is_active ? `${sub.color}1F` : "#F1F1F5" }}
-                      >
-                        <div
-                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
-                          style={{ background: sub.is_active ? sub.color : "#B7B7CE" }}
-                        >
-                          <SubIcon className="h-5 w-5 text-white" />
-                          {!sub.is_active && (
-                            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow">
-                              <Lock className="h-2.5 w-2.5 text-[#9A9AB5]" />
-                            </span>
-                          )}
-                        </div>
-                        <p className="line-clamp-2 hyphens-auto w-full break-words text-center text-[12px] font-bold leading-tight text-[#2A2A45] min-h-[30px]" lang="ru">{sub.name}</p>
-                      </div>
-                    );
-                    return sub.is_active ? (
+                    return (
                       <button key={sub.id} type="button" onClick={() => openSubjectDetail(sub)} className="text-left">
-                        {card}
-                      </button>
-                    ) : (
-                      <button key={sub.id} type="button" onClick={() => showToast(t.subjectComingSoon)} className="text-left">
-                        {card}
+                        <div
+                          className="flex h-full flex-col items-center gap-2 rounded-[16px] p-3 text-center transition hover:-translate-y-0.5"
+                          style={{ backgroundColor: `${sub.color}1F` }}
+                        >
+                          <div
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                            style={{ background: sub.color }}
+                          >
+                            <SubIcon className="h-5 w-5 text-white" />
+                          </div>
+                          <p className="w-full truncate text-center text-[12px] font-bold leading-tight text-[#2A2A45]" lang="ru" title={sub.name}>{sub.name}</p>
+                        </div>
                       </button>
                     );
                   })}

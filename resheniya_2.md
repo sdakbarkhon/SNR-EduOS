@@ -3511,3 +3511,19 @@ typecheck (`packages/core` + `apps/web`) и `next build` чистые.
 **Счётчики**: 466 presentation-этапов со слайдами найдено, 466 вставлено (0 уже было). По группам: 3-А — 160, 7-А — 154, 10-А — 152. Независимая проверка: 0 presentation-этапов со слайдами без материала.
 
 typecheck (`packages/core` + `apps/web`) и `next build` чистые.
+
+## Регенерация 29.07, этап 9: оценки за уроки + мелочи UI
+
+**Часть A.** 540 оценок (`lesson_grades`) для всех 54 уроков со статусом `completed` (27-29 июля), все 10 учеников каждой группы, без показательных случаев — единое распределение для всех.
+
+Схема (`supabase/migrations/20260623000040_lesson_grades.sql`): `lesson_id`+`student_id` UNIQUE, `grade int CHECK BETWEEN 1 AND 5`, `graded_by uuid NOT NULL REFERENCES teachers` (обязателен — под service-role нет `current_teacher_id()`, взят `subjects.teacher_id` урока), `comment` не заполнялся (не запрошено). `apps/web/scripts/create-grades-week.mjs` (новый) — seeded-рандом (`xmur3`+`mulberry32`, seed=`studentId|lessonId`, воспроизводимо), идемпотентность — `upsert(onConflict:"lesson_id,student_id", ignoreDuplicates:true)`, тот же приём, что в Этапе 8.
+
+Счётчики: 540/540 вставлено (0 уже было). Распределение: 5 — 162 (30.0%), 4 — 215 (39.8%), 3 — 134 (24.8%), 2 — 29 (5.4%) — практически точное совпадение с целевыми 30/40/25/5%. Все 54 урока — ровно по 10 оценок.
+
+**Часть B.** [`apps/web/app/(app)/dashboard/DashboardView.tsx`](apps/web/app/(app)/dashboard/DashboardView.tsx) — блок "Предметы класса". Раньше рендерились ВСЕ 10 предметов группы (5 активных + 5 заглушек `is_active=false`, затемнённые, клик → тост "скоро"); теперь — `mySubjects.filter(sub => sub.is_active)`, заглушки не показываются вообще (не просто затемнены — убраны). Сетка: `grid-cols-2 sm:grid-cols-5` (было `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-5` — сложная ступенчатая раскладка компенсировала 10 предметов/2 ряда на разных ширинах; при 5 предметах это больше не нужно, один ряд с `sm`). Название предмета — `truncate` вместо `line-clamp-2` (одна строка, обрезка с `title=` для полного текста по hover, без переноса на 2 строки). Функциональность клика (`openSubjectDetail`) не тронута. Удалён более не используемый импорт `Lock`.
+
+**Часть C.** [`apps/web/app/(app)/materials/MaterialsView.tsx:245`](apps/web/app/(app)/materials/MaterialsView.tsx) — заголовок секции `"Недавно открытые"` → `"Недавно загруженные"`. Только текст, единственное вхождение в apps/web.
+
+**Верификация UI (Части B/C)**: живая проверка в браузере уперлась в то же окружение-специфичное ограничение сессии, что описано ранее в этой сессии (demo-login выставляет auth-cookies, но любая следующая навигация отбрасывает на `/login` — воспроизводится и на немодифицированном коде, не связано с этими правками). Изменения проверены статическим ревью кода + чистым typecheck/build.
+
+typecheck (`packages/core` + `apps/web`) и `next build` чистые.

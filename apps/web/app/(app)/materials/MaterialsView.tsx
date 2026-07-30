@@ -242,7 +242,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
       {/* Recently opened */}
       {recent.length > 0 && (
         <section className="mb-10">
-          <h2 className="mb-4 px-1 text-lg font-bold text-slate-800">Недавно открытые</h2>
+          <h2 className="mb-4 px-1 text-lg font-bold text-slate-800">Недавно загруженные</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {recent.map((mat) => {
               const Icon = TYPE_ICON[mat._type];
