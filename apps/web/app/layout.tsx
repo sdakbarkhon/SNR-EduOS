@@ -27,20 +27,28 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               prefers-color-scheme, остальное → светлая. Выражение ниже
               дословно то же, что было до появления /parent-ветки.
 
-            • НА /parent — тёмная только при ЯВНОМ 'dark'. 'system', пустое
-              значение и мусор дают светлую, prefers-color-scheme на /parent
-              не спрашивается вовсе: у родителя переключатель из двух кнопок
-              («Светлая»/«Тёмная»), варианта «Системная» нет, и первый вход с
-              пустым localStorage обязан быть светлым даже на тёмной ОС.
+            • НА /parent — СВОЙ ключ 'snr-parent-theme' и тёмная только при
+              явном 'dark'. Ключи разведены намеренно: пока он был общий,
+              «Тёмная», выбранная когда-то в приложении УЧЕНИКА на этом же
+              устройстве, утаскивала родителя в тёмное, хотя в самом /parent
+              её никто не выбирал — родитель открывал приложение и видел
+              тёмный экран при выбранной «Светлой». Теперь пустой ключ
+              (а он пуст у всех, кто не жал переключатель ИМЕННО в /parent)
+              даёт светлую, даже на телефоне с тёмной ОС.
+              prefers-color-scheme на /parent не спрашивается вовсе: у
+              родителя переключатель из двух кнопок, «Системной» нет.
               color-scheme проставляется тут же, чтобы нативные элементы
               (скроллбар, поля ввода) не мигали чужой темой. */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
-            var t = localStorage.getItem('snr-theme') || 'light';
             var parent = location.pathname === '/parent' || location.pathname.indexOf('/parent/') === 0;
-            var dark = parent
-              ? t === 'dark'
-              : (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+            var dark;
+            if (parent) {
+              dark = localStorage.getItem('snr-parent-theme') === 'dark';
+            } else {
+              var t = localStorage.getItem('snr-theme') || 'light';
+              dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            }
             if (dark) {
               document.documentElement.classList.add('dark');
             } else {

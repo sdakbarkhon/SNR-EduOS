@@ -23,11 +23,6 @@ function applyTheme(t: Theme) {
   }
 }
 
-/** Кто-то записал 'snr-theme' мимо провайдера — просьба перечитать хранилище.
- *  Событие `storage` для этого не годится: браузер шлёт его только ДРУГИМ
- *  вкладкам, а /parent меняет тему в этой же. */
-export const THEME_CHANGE_EVENT = "snr-theme-change";
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
 
@@ -36,22 +31,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(saved);
     applyTheme(saved);
 
-    /* Хранилище могут поменять В ОБХОД провайдера: экран /parent пишет тот же
-       ключ 'snr-theme' напрямую (app/parent/ParentThemeSync.tsx), да и вторая
-       вкладка тоже. Без этой синхронизации состояние провайдера оставалось бы
-       от значения, прочитанного при монтировании: если родитель выбрал тёмную,
-       а здесь всё ещё числится 'system', то смена темы ОС дёрнула бы
-       applyTheme('system') и перебила бы явный выбор пользователя. */
+    /* Другая вкладка могла сменить тему — подхватываем, чтобы состояние
+       провайдера не разъезжалось с реально применённым классом.
+       (/parent сюда больше не пишет: у него свой ключ 'snr-parent-theme'.) */
     const resync = () => {
       const next = (localStorage.getItem("snr-theme") as Theme) ?? "light";
       setThemeState(next);
     };
     window.addEventListener("storage", resync);
-    window.addEventListener(THEME_CHANGE_EVENT, resync);
-    return () => {
-      window.removeEventListener("storage", resync);
-      window.removeEventListener(THEME_CHANGE_EVENT, resync);
-    };
+    return () => window.removeEventListener("storage", resync);
   }, []);
 
   /* Слушатель системной темы живёт РОВНО пока выбран вариант «Системная».
