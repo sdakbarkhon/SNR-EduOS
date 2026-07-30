@@ -52,6 +52,10 @@ interface Props {
   recentSubmissions: Submission[];
   grades: Array<{ group_id: string | null; score: number }>;
   todayLessonsError?: boolean;
+  announcements: Array<{
+    id: string; title: string; body: string; created_at: string;
+    is_pinned: boolean; authorName: string | null; isFromAdmin: boolean; groupName: string | null;
+  }>;
 }
 
 // ── Timeline constants ────────────────────────────────────────────────────────
@@ -256,7 +260,7 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
 
 export function TeacherDashboardView({
   teacher, groups, homework, todayLessons, recentSubmissions, grades,
-  todayLessonsError = false,
+  todayLessonsError = false, announcements,
 }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -458,15 +462,38 @@ export function TeacherDashboardView({
             )}
           </section>
 
-          {/* Block 2 — Announcements stub */}
+          {/* Block 2 — Announcements (Большой фикс, Блок 4): школьные
+              (админ, scope='all_my_groups') + классные для своих групп
+              (scope='group', is_my_teacher_group) — миграция 158. */}
           <section className="rounded-[24px] border border-white bg-white/70 p-5 shadow-sm backdrop-blur-xl">
             <h2 className="mb-3 text-[15px] font-bold text-slate-800">Объявления</h2>
-            <div className="flex flex-col items-center gap-2 py-4 text-center text-slate-400">
-              <Megaphone className="h-7 w-7 opacity-40" />
-              <p className="text-[12px] leading-relaxed">
-                Здесь скоро появится<br />школьная лента объявлений
-              </p>
-            </div>
+            {announcements.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-4 text-center text-slate-400">
+                <Megaphone className="h-7 w-7 opacity-40" />
+                <p className="text-[12px] leading-relaxed">
+                  Пока нет объявлений
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {announcements.map((a) => (
+                  <div key={a.id} className="rounded-xl p-2.5 transition-colors hover:bg-slate-50">
+                    <div className="flex items-start gap-2">
+                      <Megaphone className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", a.is_pinned ? "text-amber-500" : "text-slate-300")} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-semibold text-slate-800">{a.title}</div>
+                        <div className="mt-0.5 line-clamp-2 text-[12px] text-slate-500">{a.body}</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-400">
+                          <span>{a.isFromAdmin ? "Школа" : a.groupName ?? a.authorName ?? ""}</span>
+                          <span>·</span>
+                          <span>{timeAgo(a.created_at, now?.getTime() ?? null)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Block 3 — Activity feed */}

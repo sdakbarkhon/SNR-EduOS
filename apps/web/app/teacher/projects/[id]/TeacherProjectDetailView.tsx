@@ -82,7 +82,7 @@ export function TeacherProjectDetailView({
   const due = project.deadline ? new Date(project.deadline).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent" }) : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5">
       <Link href="/teacher/projects" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-blue-600">
         <ChevronLeft size={16} /> {t.title}
       </Link>

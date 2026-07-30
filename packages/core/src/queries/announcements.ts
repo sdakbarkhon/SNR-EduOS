@@ -4,7 +4,7 @@
 import type { Db } from "../supabase/factory";
 import type {
   AnnouncementScope, AnnouncementCategory, Announcement,
-  TeacherAnnouncement, StudentAnnouncement, ParentAnnouncement, AppNotification,
+  TeacherAnnouncement, TeacherAnnouncementFeedItem, StudentAnnouncement, ParentAnnouncement, AppNotification,
 } from "../types";
 
 // ── Teacher / Admin: announcements ──
@@ -122,6 +122,32 @@ export const getTeacherAnnouncements = async (db: Db, teacherId: string): Promis
     totalRecipients: a.scope === "group" ? (gSize.get(a.group_id) ?? 0)
       : a.scope === "student" ? 1 : totalAll,
   })) as TeacherAnnouncement[];
+};
+
+// Большой фикс, Блок 4 (учительский дашборд) — отдельно от
+// getTeacherAnnouncements (CRUD-вид ТОЛЬКО своих постов, страница "Мои
+// объявления"): читает школьные + классные (свои группы) объявления, включая
+// чужие/админские, по новой SELECT-политике "teacher reads announcements for
+// their groups" (миграция 158) — тот же no-client-filter/RLS-driven паттерн,
+// что getParentAnnouncements. РАЗВЕДКА: до 158 у учителя вообще не было
+// SELECT-доступа к чужим/админским строкам (только created_by=self) — не
+// баг фильтра на клиенте, чинить было нечего без новой RLS-политики.
+export const getTeacherAnnouncementsFeed = async (db: Db, limit = 10): Promise<TeacherAnnouncementFeedItem[]> => {
+  const { data, error } = await (db as any).from("announcements")
+    .select("*, teacher:teachers(full_name), admin:admins(full_name), group:groups(name)")
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((a) => ({
+    ...a,
+    authorName: a.teacher?.full_name ?? a.admin?.full_name ?? null,
+    isFromAdmin: a.admin_id != null,
+    groupName: a.group?.name ?? null,
+    teacher: undefined,
+    admin: undefined,
+    group: undefined,
+  })) as TeacherAnnouncementFeedItem[];
 };
 
 // ── Student: announcements ──

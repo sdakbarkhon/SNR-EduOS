@@ -509,6 +509,13 @@ export type StudentLessonView = {
    *  "Начать урок"/"Закончить урок" в PreLessonView/LessonWorkspaceView —
    *  сама RLS (миграция 151) отдельно и независимо блокирует запись. */
   schoolAutostartEnabled: boolean;
+  /** Большой фикс: Блок 3 (правило 3-го урока) — true ТОЛЬКО для демо-школы
+   *  на 3-м и последующих уроках дня группы (fn_lesson_day_index, миграция
+   *  157): ученик — чистый зритель (не активирует этапы, не листает слайды,
+   *  не стартует/не завершает урок). Реальная школа и 1-2-й урок дня —
+   *  всегда false. Гейтит UI-кнопки — сама RLS (миграция 157) отдельно и
+   *  независимо блокирует запись. */
+  isThirdLessonViewer: boolean;
 };
 
 export type Attendance = {
@@ -828,6 +835,15 @@ export type StudentAnnouncement = Announcement & {
 export type ParentAnnouncement = Announcement & {
   authorName: string | null; // teacher OR admin full_name, whichever is set
   isFromAdmin: boolean;
+};
+// Большой фикс, Блок 4 — учительский дашборд: школьные + классные (свои
+// группы) объявления, включая чужие/админские (миграция 158). Отдельно от
+// TeacherAnnouncement (CRUD-вид ТОЛЬКО своих постов, страница "Мои
+// объявления") — этот тип для read-only ленты.
+export type TeacherAnnouncementFeedItem = Announcement & {
+  authorName: string | null;
+  isFromAdmin: boolean;
+  groupName: string | null;
 };
 export type NotificationKind =
   | "announcement" | "new_homework" | "new_grade" | "homework_graded"

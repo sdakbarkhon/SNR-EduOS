@@ -2286,8 +2286,16 @@ export const getStudentLessonView = async (
   // П.2: schools.autostart_enabled школы этого урока — гейтит рендер кнопок
   // "Начать урок"/"Закончить урок" (см. StudentLessonView.schoolAutostartEnabled).
   const schoolQuery = db3.from("schools").select("autostart_enabled").eq("id", lesson.school_id).maybeSingle();
+  // Большой фикс, Блок 3 — правило 3-го урока действует ТОЛЬКО в демо-школе
+  // (см. StudentLessonView.isThirdLessonViewer), поэтому fn_lesson_day_index
+  // (миграция 157) вызывается только для неё — не гоняем лишний RPC для
+  // реальной школы, где это правило никогда не применяется.
+  const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+  const dayIndexQuery = lesson.school_id === DEMO_SCHOOL_ID
+    ? db3.rpc("fn_lesson_day_index", { p_lesson_id: lessonId })
+    : Promise.resolve({ data: null, error: null });
 
-  const [curatorRes, materialsRes, stagesRaw, subjectRes, schoolRes] = await Promise.all([
+  const [curatorRes, materialsRes, stagesRaw, subjectRes, schoolRes, dayIndexRes] = await Promise.all([
     curatorId
       ? db.from("teachers").select("id, full_name").eq("id", curatorId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -2303,6 +2311,7 @@ export const getStudentLessonView = async (
     db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
     schoolQuery,
+    dayIndexQuery,
   ]);
 
   const { teacher_id: _tid, ...groupData } = lesson.group;
@@ -2310,6 +2319,8 @@ export const getStudentLessonView = async (
   const stagesTyped = stagesRaw as { data: unknown[] | null; error: { message: string } | null };
   const schoolTyped = schoolRes as { data: { autostart_enabled: boolean } | null; error: { message: string } | null };
   if (schoolTyped.error) console.error("[getStudentLessonView] schools query failed:", schoolTyped.error.message);
+  const dayIndexTyped = dayIndexRes as { data: number | null; error: { message: string } | null };
+  if (dayIndexTyped.error) console.error("[getStudentLessonView] fn_lesson_day_index rpc failed:", dayIndexTyped.error.message);
   const subjectTyped = subjectRes as {
     data: { name: string; icon: string | null; color: string | null; teacher: { id: string; full_name: string } | null } | null;
     error: { message: string } | null;
@@ -2347,6 +2358,7 @@ export const getStudentLessonView = async (
     materials: (materialsTyped.data ?? []) as LessonMaterial[],
     stages: stagesWithProgress as LessonStageWithProgress[],
     schoolAutostartEnabled: schoolTyped.data?.autostart_enabled ?? false,
+    isThirdLessonViewer: lesson.school_id === DEMO_SCHOOL_ID && (dayIndexTyped.data ?? 1) >= 3,
   };
 };
 

@@ -29,7 +29,7 @@ import { SlideViewer } from "./SlideViewer";
  * срабатывать — кадр сам укладывается в бюджет высоты.
  */
 export function StudentPresentationViewer({
-  slides, stageId, initialSlide, lessonStatus, onExportPptx, chromeAbovePx,
+  slides, stageId, initialSlide, lessonStatus, onExportPptx, chromeAbovePx, viewerOnly = false,
 }: {
   slides: LessonSlide[];
   stageId: string;
@@ -37,6 +37,8 @@ export function StudentPresentationViewer({
   lessonStatus: string;
   onExportPptx: () => void;
   chromeAbovePx: number;
+  /** Большой фикс, Блок 3 — см. SlideViewer.tsx. */
+  viewerOnly?: boolean;
 }) {
   return (
     <div
@@ -52,6 +54,7 @@ export function StudentPresentationViewer({
         initialSlide={initialSlide}
         lessonStatus={lessonStatus}
         chromeAbovePx={chromeAbovePx}
+        viewerOnly={viewerOnly}
       />
     </div>
   );

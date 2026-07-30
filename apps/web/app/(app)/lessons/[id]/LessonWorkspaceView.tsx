@@ -546,7 +546,7 @@ export function LessonWorkspaceView({
   // 1-в-1: тот же confirm, тот же toast-on-error, тот же reload на успехе).
   const [endingLesson, setEndingLesson] = useState(false);
   async function handleFinishLesson() {
-    if (endingLesson || !window.confirm(dl.endLessonConfirm)) return;
+    if (endingLesson || lesson.isThirdLessonViewer || !window.confirm(dl.endLessonConfirm)) return;
     setEndingLesson(true);
     try {
       await endLesson(db, lesson.id);
@@ -566,7 +566,7 @@ export function LessonWorkspaceView({
   // перевести урок в 'completed' пока панель открыта); настоящая защита —
   // RLS-политика на lessons (см. отчёт по задаче).
   async function handleActivateStage(stageId: string) {
-    if (isCompleted || activatingStageId) return;
+    if (isCompleted || activatingStageId || lesson.isThirdLessonViewer) return;
     setActivatingStageId(stageId);
     try {
       await setActiveStage(db, lesson.id, stageId);
@@ -942,7 +942,7 @@ export function LessonWorkspaceView({
                 {dl.leaveLessonBtn}
               </button>
             )}
-            {!isCompleted && !lesson.schoolAutostartEnabled && (
+            {!isCompleted && !lesson.schoolAutostartEnabled && !lesson.isThirdLessonViewer && (
               <button
                 onClick={handleFinishLesson}
                 disabled={endingLesson}
@@ -1031,7 +1031,7 @@ export function LessonWorkspaceView({
               <LogOut className="h-4 w-4" />
             </button>
           )}
-          {!isCompleted && !lesson.schoolAutostartEnabled && (
+          {!isCompleted && !lesson.schoolAutostartEnabled && !lesson.isThirdLessonViewer && (
             <button
               onClick={handleFinishLesson}
               disabled={endingLesson}
@@ -1106,7 +1106,7 @@ export function LessonWorkspaceView({
               "Активировать". Действие меняет active_stage_id для ВСЕГО
               урока (см. handleActivateStage выше) — realtime-канал уже
               разносит это учителю и остальным ученикам без изменений. */}
-          {!isCompleted && allMiddleStages.length > 0 && (
+          {!isCompleted && !lesson.isThirdLessonViewer && allMiddleStages.length > 0 && (
             <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
               <div className="flex items-center gap-2">
                 <span className="flex h-2 w-2 rounded-full bg-violet-500" />
@@ -1268,6 +1268,7 @@ export function LessonWorkspaceView({
                         lessonStatus={lesson.status}
                         onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
                         chromeAbovePx={PRESENTATION_CHROME_ABOVE_PX}
+                        viewerOnly={lesson.isThirdLessonViewer}
                       />
                     ) : stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
                       <div className="mb-3">
@@ -1279,6 +1280,7 @@ export function LessonWorkspaceView({
                           stageId={stage.id}
                           initialSlide={stage.current_slide_index ?? 0}
                           lessonStatus={lesson.status}
+                          viewerOnly={lesson.isThirdLessonViewer}
                         />
                       </div>
                     ) : (stage.config as { presentation_file?: { storagePath: string; filename: string; sizeBytes: number } })?.presentation_file ? (

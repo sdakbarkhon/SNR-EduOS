@@ -23,6 +23,7 @@ export function SlideViewer({
   stageId,
   initialSlide = 0,
   lessonStatus,
+  viewerOnly = false,
   chromeAbovePx,
 }: {
   slides: LessonSlide[];
@@ -36,6 +37,13 @@ export function SlideViewer({
   initialSlide?: number;
   /** "in_progress": student gets the same live nav as the teacher, writes sync to everyone via Realtime. "completed": students browse freely for review — same as teacher nav, but never writes current_slide_index (that's live-lesson-only state). */
   lessonStatus?: string;
+  /** Большой фикс, Блок 3 (правило 3-го урока) — true только для демо-школы,
+   *  студент на 3+ уроке дня: форсирует canNavigate/syncsWrite в false
+   *  независимо от lessonStatus — ученик только смотрит (realtime-подписка
+   *  на current_slide_index остаётся активной, так что слайд всё равно
+   *  синхронно следует за учителем/другими участниками). Никогда не
+   *  задаётся для isTeacher или для post-completion review. */
+  viewerOnly?: boolean;
   /** Сколько "остального" над этим SlideViewer в текущем макете (шапка
    *  урока в обычном режиме / почти ничего в фокус-режиме — см.
    *  LessonWorkspaceView.tsx PRESENTATION_CHROME_ABOVE_PX). Когда задан,
@@ -53,12 +61,12 @@ export function SlideViewer({
   // lesson is actually ongoing (RLS scopes the write to the student's own
   // group + the lesson's currently-active stage); "completed" review mode
   // is unchanged (navigate locally, never write).
-  const canNavigate = isTeacher || lessonStatus === "completed" || lessonStatus === "in_progress";
+  const canNavigate = !viewerOnly && (isTeacher || lessonStatus === "completed" || lessonStatus === "in_progress");
   // Writes to the shared current_slide_index: teacher always (unchanged —
   // e.g. prepping a not-yet-started lesson), student only while the lesson
   // is actually live. Completed-review browsing for a student stays purely
   // local, exactly as before.
-  const syncsWrite = isTeacher || lessonStatus === "in_progress";
+  const syncsWrite = !viewerOnly && (isTeacher || lessonStatus === "in_progress");
   // Solo (unsynced) review is the ONLY case where nobody else can move this
   // slide — everyone else (teacher during any status, or a student during a
   // live lesson) must stay subscribed so they see every participant's clicks,

@@ -122,7 +122,7 @@ export function ProjectDetailView({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-8">
+    <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 md:px-8">
       <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-blue-600">
         <ChevronLeft size={16} /> {t.title}
       </Link>
