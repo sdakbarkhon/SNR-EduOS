@@ -509,6 +509,7 @@ export function KnowledgeBaseFilePicker({
   multiSelect = true,
   acceptedTypes,
   allowVideoLinks = false,
+  initialTab,
 }: {
   open: boolean;
   onClose: () => void;
@@ -516,6 +517,12 @@ export function KnowledgeBaseFilePicker({
   /** Group(s) whose "Материалы группы" should be shown — student/teacher's accessible groups. */
   groupIds: string[];
   multiSelect?: boolean;
+  /** Этап 12 финал, Фикс 2 — какая вкладка открыта при показе пикера.
+   *  По умолчанию "materials" (как раньше) — передаётся только вызывающей
+   *  стороной, у которой есть отдельная кнопка-шорткат ("+ Прикрепить из
+   *  Кафедры" в TeacherLessonDetailView.tsx), чтобы не заставлять учителя
+   *  кликать вкладку вручную после явного намерения. */
+  initialTab?: Tab;
   /** When set, both tabs only show items whose fileType matches (e.g.
    *  ["application/pdf"] for lesson-materials, which now accepts PDF only).
    *  Omit to show everything — the homework-attachment picker relies on
@@ -573,6 +580,7 @@ export function KnowledgeBaseFilePicker({
 
   useEffect(() => {
     if (!open) return;
+    setTab(initialTab ?? "materials");
     setSelected(new Map());
     setQuery("");
     setTabError({ library: false, materials: false, teacherLibrary: false });
@@ -615,7 +623,7 @@ export function KnowledgeBaseFilePicker({
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, groupIdsKey]);
+  }, [open, groupIdsKey, initialTab]);
 
   async function refetchLibrary() {
     try {

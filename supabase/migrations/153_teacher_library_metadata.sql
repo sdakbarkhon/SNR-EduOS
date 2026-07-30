@@ -48,6 +48,25 @@ COMMENT ON COLUMN public.teacher_library_materials.material_type IS
 COMMENT ON COLUMN public.teacher_library_materials.kb_bucket IS
   'Если задан — storage_path указывает в этот бакет вместо "materials" (copy-by-reference на уже существующий файл, напр. книгу из БЗ, без дублирования байт). NULL — обычный случай, файл лежит в "materials".';
 
+-- ── Данные — material_type для 10 демо-материалов кафедры ───────────────
+-- Финал Этапа 12, Фикс 1: без этого шага колонка была бы добавлена, но
+-- пустой у всех существующих строк (бейдж в UI просто не показывался бы).
+-- Материалы созданы apps/web/scripts/backfill-department-materials.mjs
+-- (зеркало книг библиотеки) — 10 конкретных title, известных заранее,
+-- матчатся по title+school_id (тот же приём, что идемпотентность в самом
+-- скрипте). Если этот скрипт ещё не был запущен на момент применения
+-- миграции — просто 0 строк обновится, не ошибка.
+UPDATE public.teacher_library_materials SET material_type = 'учебник'   WHERE title = 'Электроника для детей'          AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'учебник'   WHERE title = 'Hello Ruby'                      AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'сборник'   WHERE title = 'Занимательная анатомия роботов'  AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'сборник'   WHERE title = 'Магия математики'                AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'конспект'  WHERE title = 'Весёлая математика'              AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'методичка' WHERE title = 'Python для детей'                AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'конспект'  WHERE title = 'JavaScript для детей'            AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'методичка' WHERE title = 'Arduino для начинающих'          AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'план'      WHERE title = 'Занимательная грамматика'        AND material_type IS NULL;
+UPDATE public.teacher_library_materials SET material_type = 'план'      WHERE title = 'English for Kids'                AND material_type IS NULL;
+
 -- ── Регистрация ──────────────────────────────────────────────────────
 INSERT INTO supabase_migrations.schema_migrations (version)
 VALUES ('153')

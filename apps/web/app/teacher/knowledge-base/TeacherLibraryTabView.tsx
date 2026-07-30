@@ -1,28 +1,32 @@
 "use client";
 
-// Регенерация 29.07, ЭТАП 12 — "Материалы кафедры", отдельная просматриваемая
-// вкладка (не только модалка-пикер прикрепления). Переиспользует 100%
-// существующий бэкенд миграции 147/148 (teacher_library_materials) —
-// getLibraryMaterials/createLibraryMaterial/deleteLibraryMaterial и
-// LibraryUploadModal/LibraryVideoLinkModal (экспортированы из
-// KnowledgeBaseFilePicker.tsx, форма 1:1, без дублирования кода). Никакой
-// новой таблицы/RLS — см. resheniya_2.md за полное объяснение (стандалон-
-// страница "Материалы кафедры" существовала раньше под /teacher/library,
-// была снесена и её CRUD перенесён в пикер — здесь тот же бэкенд просто
-// снова получает отдельную вкладку для чтения/просмотра, не только выбора
-// при прикреплении к уроку).
+// Регенерация 29.07, ЭТАП 12 (+ финал) — "Материалы кафедры", отдельная
+// просматриваемая вкладка (не только модалка-пикер прикрепления).
+// Переиспользует 100% существующий бэкенд миграции 147/148
+// (teacher_library_materials) — getLibraryMaterials/createLibraryMaterial/
+// deleteLibraryMaterial и LibraryUploadModal/LibraryVideoLinkModal
+// (экспортированы из KnowledgeBaseFilePicker.tsx, форма 1:1, без
+// дублирования кода). Никакой новой таблицы/RLS в базовом Этапе 12 — см.
+// resheniya_2.md.
 //
 // НЕТ "Избранное" — не реализовывалось (нет такой колонки/RLS на этой
 // таблице, в отличие от books/book_favorites).
-// НЕТ material_type/author/description — колонок нет в живой схеме (RLS
-// миграции 147/148 их не содержат) — см. resheniya_2.md, миграция-черновик
-// с этими полями подготовлена, но НЕ применена (нет доступа к прямому
-// Postgres-подключению/Supabase CLI с прод-проектом в этой среде — ручной
-// шаг заказчика).
+//
+// Финал Этапа 12 — material_type/author/description: колонки добавлены
+// миграцией 153 (supabase/migrations/153_teacher_library_metadata.sql),
+// которую заказчик применяет вручную через Supabase Dashboard (в этой
+// среде нет прямого Postgres-подключения/привязанного Supabase CLI — см.
+// комментарий в самом файле миграции). До применения миграции эти поля
+// просто отсутствуют в объекте, вернувшемся из select("*") — весь код
+// ниже читает их через truthy-проверку (m.material_type && ...), поэтому
+// безопасно работает и до, и после применения (просто бейджа не будет,
+// пока колонки нет).
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Link as LinkIcon, Trash2, Search, Video, FileText, FileImage, File as FileIcon, Library } from "lucide-react";
+import {
+  Plus, Link as LinkIcon, Trash2, Search, Video, FileText, FileImage, File as FileIcon, Library, X, BookOpen,
+} from "lucide-react";
 import { useLocale } from "@/components";
 import { getDictionary, getSubjectStyle, deleteLibraryMaterial } from "@snr/core";
 import type { Locale, LibraryMaterialWithDetails } from "@snr/core";
@@ -43,6 +47,112 @@ function formatSize(bytes: number | null): string {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+// Этап 12 финал, Фикс 1 — цвет/подпись бейджа material_type. Значения в
+// БД (CHECK на teacher_library_materials.material_type, миграция 153) —
+// нижним регистром: сборник/конспект/план/учебник/методичка/презентация.
+// "план" отображается как "План урока" (промт фикса 1 просит именно эту
+// подпись), остальные — с большой буквы как есть.
+const MATERIAL_TYPE_STYLES: Record<string, { label: string; className: string }> = {
+  "сборник": { label: "Сборник", className: "bg-blue-100 text-blue-700" },
+  "конспект": { label: "Конспект", className: "bg-emerald-100 text-emerald-700" },
+  "план": { label: "План урока", className: "bg-orange-100 text-orange-700" },
+  "методичка": { label: "Методичка", className: "bg-purple-100 text-purple-700" },
+  "учебник": { label: "Учебник", className: "bg-slate-200 text-slate-700" },
+  "презентация": { label: "Презентация", className: "bg-pink-100 text-pink-700" },
+};
+function materialTypeStyle(materialType: string) {
+  return MATERIAL_TYPE_STYLES[materialType] ?? { label: materialType, className: "bg-slate-100 text-slate-600" };
+}
+
+function MaterialTypeBadge({ materialType, large }: { materialType: string; large?: boolean }) {
+  const style = materialTypeStyle(materialType);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full font-bold ${style.className} ${large ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-[10px]"}`}
+    >
+      {style.label}
+    </span>
+  );
+}
+
+// ── Detail modal (Фикс 1 — "в модалке при открытии материала — большая
+// надпись material_type под title/рядом с автором"), 1:1 по структуре с
+// TeacherBookDetailModal (apps/web/app/teacher/books/TeacherBooksView.tsx). ──
+function LibraryMaterialDetailModal({
+  material,
+  onClose,
+  onOpen,
+  opening,
+}: {
+  material: LibraryMaterialWithDetails;
+  onClose: () => void;
+  onOpen: () => void;
+  opening: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  const style = material.subject_slug ? getSubjectStyle(material.subject_slug) : null;
+  const isVideo = material.content_type !== "file";
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+    >
+      <div
+        className={`relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/40 bg-white p-8 shadow-2xl transition-all duration-200 ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <h2 className="mb-1 pr-8 text-2xl font-bold leading-tight text-slate-900">{material.title}</h2>
+        {material.author && <p className="mb-3 text-sm text-slate-500">{material.author}</p>}
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {material.material_type && <MaterialTypeBadge materialType={material.material_type} large />}
+          {style && (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: `${style.color}22`, color: style.color }}>
+              {style.label}
+            </span>
+          )}
+        </div>
+
+        {material.description && (
+          <p className="mb-3 line-clamp-5 text-sm leading-relaxed text-slate-600">{material.description}</p>
+        )}
+
+        <div className="mt-4">
+          <button
+            onClick={onOpen}
+            disabled={opening}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#185AF7] py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+          >
+            {opening ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <BookOpen className="h-4 w-4" />
+            )}
+            {opening ? "Открываем…" : isVideo ? "Смотреть видео" : "Открыть материал"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function TeacherLibraryTabView({
@@ -69,6 +179,7 @@ export function TeacherLibraryTabView({
   const [filterSubject, setFilterSubject] = useState<string>(initialSubjectSlug ?? "all");
   const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => { setMaterials(initialMaterials); }, [initialMaterials]);
   useEffect(() => {
@@ -92,6 +203,8 @@ export function TeacherLibraryTabView({
     });
   }, [materials, query, filterSubject]);
 
+  const selectedMaterial = selectedId ? (materials.find((m) => m.id === selectedId) ?? null) : null;
+
   function handleUploadSuccess() {
     setShowUpload(false);
     router.refresh();
@@ -110,6 +223,7 @@ export function TeacherLibraryTabView({
     setOpeningId(m.id);
     try {
       const fileName = m.storage_path?.split("/").pop() || m.title;
+      setSelectedId(null);
       setViewer({ url: m.url, title: m.title, fileName });
     } finally {
       setOpeningId(null);
@@ -132,6 +246,15 @@ export function TeacherLibraryTabView({
 
   return (
     <div className="text-slate-800">
+      {selectedMaterial && (
+        <LibraryMaterialDetailModal
+          material={selectedMaterial}
+          onClose={() => setSelectedId(null)}
+          onOpen={() => handleOpen(selectedMaterial)}
+          opening={openingId === selectedMaterial.id}
+        />
+      )}
+
       {viewer && (
         <FileViewerModal url={viewer.url} title={viewer.title} fileName={viewer.fileName} onClose={() => setViewer(null)} />
       )}
@@ -224,11 +347,17 @@ export function TeacherLibraryTabView({
             const isMine = m.uploaded_by === initialTeacherId;
             const style = m.subject_slug ? getSubjectStyle(m.subject_slug) : null;
             return (
-              <div key={m.id} className="group relative cursor-pointer" onClick={() => handleOpen(m)}>
+              <div key={m.id} className="group relative cursor-pointer" onClick={() => setSelectedId(m.id)}>
                 <div
                   className="relative mb-3 flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl"
                   style={{ background: style ? `linear-gradient(135deg, ${style.color}, ${style.color}CC)` : "linear-gradient(135deg, #64748B, #334155)" }}
                 >
+                  {/* Фикс 1 — бейдж material_type в углу карточки */}
+                  {m.material_type && (
+                    <div className="absolute left-2 top-2 z-10">
+                      <MaterialTypeBadge materialType={m.material_type} />
+                    </div>
+                  )}
                   {isMine && (
                     <button
                       type="button"
@@ -241,14 +370,10 @@ export function TeacherLibraryTabView({
                     </button>
                   )}
                   <Icon className="h-12 w-12 text-white/90 transition-transform duration-300 group-hover:scale-110" />
-                  {openingId === m.id && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    </div>
-                  )}
                 </div>
                 {style && <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">{style.label}</p>}
                 <h3 className="line-clamp-2 text-sm font-bold leading-tight text-slate-800">{m.title}</h3>
+                {m.author && <p className="mt-0.5 text-xs text-slate-400">{m.author}</p>}
                 {m.uploader_name && <p className="mt-0.5 text-xs text-slate-400">{m.uploader_name}</p>}
                 {m.file_size_bytes ? <p className="mt-0.5 text-[10px] text-slate-300">{formatSize(m.file_size_bytes)}</p> : null}
               </div>

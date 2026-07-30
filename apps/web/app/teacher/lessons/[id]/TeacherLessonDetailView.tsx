@@ -10,7 +10,7 @@ import {
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Hand, Play, Link2,
-  Keyboard,
+  Keyboard, GraduationCap,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
@@ -768,6 +768,12 @@ export function TeacherLessonDetailView({
   // exclusive with uploadFile (see handleUpload).
   const [pickedFromKB, setPickedFromKB] = useState<PickedKnowledgeBaseFile | null>(null);
   const [showKBPicker, setShowKBPicker] = useState(false);
+  // Этап 12 финал, Фикс 2 — "+ Прикрепить из Кафедры" открывает тот же
+  // пикер, но сразу на вкладке "Материалы кафедры" (teacherLibrary),
+  // вместо дефолтной "Материалы группы" — сама возможность прикрепить
+  // существовала и раньше через общую кнопку "Обзор базы знаний" (эта
+  // вкладка уже была одной из трёх), это просто более короткий путь.
+  const [kbPickerInitialTab, setKbPickerInitialTab] = useState<"materials" | "library" | "teacherLibrary">("materials");
   // Пачка 4 — третий взаимоисключающий вариант: ссылка на YouTube/RuTube
   // вместо файла. Валидность — производное значение (parseVideoUrl), не
   // отдельный кусок state, чтобы не рассинхронизировалось с полем ввода.
@@ -1818,17 +1824,30 @@ export function TeacherLessonDetailView({
                   </button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowKBPicker(true)}
-                  disabled={hasFileChoice || hasVideoChoice}
-                  className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500 ${
-                    hasFileChoice || hasVideoChoice ? "pointer-events-none opacity-40" : ""
-                  }`}
-                >
-                  <FolderSearch className="h-5 w-5" />
-                  {d.knowledgeBase.browse}
-                </button>
+                <div className={hasFileChoice || hasVideoChoice ? "pointer-events-none opacity-40" : undefined}>
+                  <button
+                    type="button"
+                    onClick={() => { setKbPickerInitialTab("materials"); setShowKBPicker(true); }}
+                    disabled={hasFileChoice || hasVideoChoice}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500"
+                  >
+                    <FolderSearch className="h-5 w-5" />
+                    {d.knowledgeBase.browse}
+                  </button>
+                  {/* Этап 12 финал, Фикс 2 — прямой шорткат на вкладку
+                      "Материалы кафедры" (тот же пикер, та же вкладка, что
+                      уже была доступна через кнопку выше — просто в один
+                      клик, без выбора вкладки вручную). */}
+                  <button
+                    type="button"
+                    onClick={() => { setKbPickerInitialTab("teacherLibrary"); setShowKBPicker(true); }}
+                    disabled={hasFileChoice || hasVideoChoice}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2 text-xs font-semibold text-gray-500 hover:border-blue-300 hover:text-blue-600"
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    + Прикрепить из Кафедры
+                  </button>
+                </div>
               )}
 
               {/* Visibility toggle */}
@@ -1876,6 +1895,7 @@ export function TeacherLessonDetailView({
         groupIds={[lesson.group_id]}
         multiSelect={false}
         acceptedTypes={["application/pdf"]}
+        initialTab={kbPickerInitialTab}
         // 6А, Заход D3 — урок уже умеет video_* материалы (миграция 138,
         // addLessonMaterialVideo ниже в handleUpload) — библиотечные
         // видео-ссылки показываем в пикере тем же путём.

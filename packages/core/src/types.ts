@@ -377,6 +377,18 @@ export type LibraryMaterial = {
   external_url: string | null;
   source_url: string | null;
   created_at: string;
+  // Этап 12 финал — миграция 153 (не применена к прод-базе на момент
+  // написания этого типа, применяется вручную заказчиком через Supabase
+  // Dashboard). До применения миграции эти поля просто отсутствуют в
+  // сырых данных из PostgREST (select("*") их не запросит явно, только
+  // вернёт то, что реально есть) — весь код читает их через `?.`/truthy-
+  // проверку, поэтому безопасен и до, и после применения.
+  author?: string | null;
+  description?: string | null;
+  material_type?: string | null;
+  // Ссылка на файл в ДРУГОМ бакете (напр. 'books') вместо "materials" —
+  // тот же приём, что lesson_materials.kb_bucket (миграция 115).
+  kb_bucket?: string | null;
 };
 
 export type LibraryMaterialGroup = { id: string; name: string };
