@@ -34,14 +34,22 @@ export function useIsFullscreenLesson(): boolean {
   return ctx?.fullscreen ?? false;
 }
 
-/** Вызывается ТОЛЬКО из LessonWorkspaceView (живой урок, status="in_progress")
- *  — единственное место, где нужен fullscreen. Снимается автоматически при
- *  размонтировании (переход в completed/scheduled или уход со страницы). */
-export function useRegisterFullscreenLesson(): void {
+/** Блок 2, Баг 3 — раньше вызывалась ТОЛЬКО из LessonWorkspaceView
+ *  (ученик, живой урок) безусловно на весь маунт — учитель
+ *  (TeacherLessonDetailView.tsx) не имел симметричной кнопки "Во весь
+ *  экран" вообще (не оверсайт: комментарий выше явно называл это
+ *  единственным нужным местом). Теперь принимает необязательный `enabled`
+ *  (по умолчанию true — существующий вызов без аргумента у ученика ведёт
+ *  себя ТОЧНО как раньше, безусловно). Учитель передаёт свой локальный
+ *  `focusMode` — эффект пере-срабатывает на каждое изменение `enabled`,
+ *  включая/выключая общий каркас (AppShell/TeacherShell — сайдбар/топбар
+ *  приложения) по клику кнопки, а не один раз на монтировании. Снимается
+ *  автоматически при размонтировании (переход на другую страницу). */
+export function useRegisterFullscreenLesson(enabled: boolean = true): void {
   const ctx = useContext(FullscreenLessonContext);
   useEffect(() => {
-    ctx?.setFullscreen(true);
+    ctx?.setFullscreen(enabled);
     return () => ctx?.setFullscreen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [enabled]);
 }

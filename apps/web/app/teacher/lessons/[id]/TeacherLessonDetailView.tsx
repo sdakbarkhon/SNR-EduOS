@@ -52,6 +52,7 @@ import { TeacherLiveCodeControl } from "@/components/lesson-stages/TeacherLiveCo
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { demoKind } from "@/lib/material-kind";
 import { parseVideoUrl } from "@/lib/video-url";
+import { useRegisterFullscreenLesson } from "@/components/fullscreen-lesson-context";
 import { DemoMaterialContent } from "@/components/DemoMaterialContent";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
@@ -818,6 +819,15 @@ export function TeacherLessonDetailView({
   const [startedAt] = useState<string | null>(lesson.started_at);
   const [endedAt] = useState<string | null>(lesson.ended_at);
 
+  // Блок 2, Баг 3 — "Во весь экран" у учителя, симметрично ученику
+  // (LessonWorkspaceView.tsx). Прячет ТОЛЬКО общий каркас приложения
+  // (сайдбар/топбар TeacherShell) — не собственную панель управления
+  // уроком на этой странице (этапы/посещаемость/поднятые руки и т.д.):
+  // в отличие от ученика, учителю эти элементы нужны рабочими и во время
+  // живого урока, скрывать их целиком было бы регрессом функциональности,
+  // не только косметикой.
+  const [focusMode, setFocusMode] = useState(false);
+  useRegisterFullscreenLesson(focusMode);
 
   const [confirmDeleteMatOpen, setConfirmDeleteMatOpen] = useState(false);
   const [matToDelete, setMatToDelete] = useState<LessonMaterial | null>(null);
@@ -1247,6 +1257,15 @@ export function TeacherLessonDetailView({
                 {endingLesson ? "…" : dl.endLessonBtn}
               </button>
             )}
+            {/* Блок 2, Баг 3 — симметрично кнопке ученика (w.fullscreen в
+                LessonWorkspaceView.tsx): прячет сайдбар/топбар TeacherShell. */}
+            <button
+              onClick={() => setFocusMode((v) => !v)}
+              className="flex items-center gap-2 rounded-[11px] border border-[#E6E7EF] bg-white px-3 py-2 text-sm font-bold text-[#5B6178] transition-colors hover:bg-slate-50"
+            >
+              {focusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <span className="hidden sm:inline">{focusMode ? "Свернуть" : "Во весь экран"}</span>
+            </button>
           </>
         }
         pills={

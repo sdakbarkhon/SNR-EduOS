@@ -10,6 +10,7 @@ import { TeacherTopbar } from "./TeacherTopbar";
 import { Home, BookOpen, Award, Users, Settings } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { useIsFullscreenLesson } from "./fullscreen-lesson-context";
 
 const teacherNavItems = [
   { key: "home", href: "/teacher/dashboard", icon: Home, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHome },
@@ -32,6 +33,14 @@ export function TeacherShell({
 
   // Сообщения — фиксированная Telegram-раскладка, см. AppShell.tsx для того же паттерна.
   const isMessagesRoute = pathname === "/teacher/messages";
+
+  // Блок 2, Баг 3 — "Во весь экран" учителя (TeacherLessonDetailView.tsx)
+  // прячет общий каркас (сайдбар/топбар) ровно тем же способом, что уже
+  // работает у ученика — см. AppShell.tsx для идентичного паттерна.
+  const isFullscreenLesson = useIsFullscreenLesson();
+  if (isFullscreenLesson) {
+    return <div className="min-h-screen" style={{ background: "var(--shell-gradient)" }}>{children}</div>;
+  }
 
   return (
     // Ширина/масштаб больше не решаются здесь — ScaleWrapper.tsx (см.

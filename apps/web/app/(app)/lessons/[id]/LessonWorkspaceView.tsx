@@ -34,6 +34,7 @@ import { PdfViewer } from "@/components/PdfViewer";
 import { DemoMaterialContent } from "@/components/DemoMaterialContent";
 import { createClient } from "@/lib/supabase/client";
 import { useRegisterFullscreenLesson } from "@/components/fullscreen-lesson-context";
+import { useIsDemoSession } from "@/lib/useIsDemoSession";
 
 function initials(name: string): string {
   return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
@@ -286,6 +287,12 @@ export function LessonWorkspaceView({
   // Единственное место, где AppShell прячет каркас (сайдбар/топбар/паддинги) —
   // см. fullscreen-lesson-context.tsx.
   useRegisterFullscreenLesson();
+  // Блок 2, Баг 1 — жёлтая полоса "демо-режим" (DemoBanner.tsx) рендерится
+  // fixed top-0 z-[100], высотой ~40px (h-10 спейсер). Компактная полоска
+  // кнопок фокус-режима ниже — тоже fixed, top-4 (16px), z-40: при демо-
+  // сессии баннер (выше и по z-index, и физически) перекрывает её. Сдвигаем
+  // вниз, только когда баннер реально показан.
+  const isDemo = useIsDemoSession();
 
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -406,18 +413,6 @@ export function LessonWorkspaceView({
     const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [showCompletedModal, countdown, router]);
-
-  // Live elapsed timer (client-only → "00:00:00" until mounted)
-  const [nowMs, setNowMs] = useState<number | null>(null);
-  useEffect(() => {
-    setNowMs(Date.now());
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const elapsed =
-    nowMs !== null && lesson.started_at
-      ? fmtElapsed(nowMs - new Date(lesson.started_at).getTime())
-      : "00:00:00";
 
   // Applies a lesson row's live-state fields (active_stage_id/demo_material_id/
   // status) to local state — shared by the realtime handler below and the
@@ -979,9 +974,6 @@ export function LessonWorkspaceView({
         }
         pills={
           <>
-            <LessonHeaderPill icon={<Clock className="h-4 w-4 text-[#9CA0B4]" />}>
-              <span className="font-mono tabular-nums">{elapsed}</span>
-            </LessonHeaderPill>
             {!isCompleted && (
               <LessonHeaderPill tone="live" icon={<span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />}>
                 {w.live}
@@ -1016,7 +1008,7 @@ export function LessonWorkspaceView({
           выхода из фокуса (та же "Во весь экран", теперь только иконка).
           Fixed, в углу поверх контента — не занимает место в потоке. */}
       {focusMode && (
-        <div className="fixed right-4 top-4 z-40 flex items-center gap-1.5 rounded-2xl border border-[#ECEDF4] bg-white/95 p-1.5 shadow-lg backdrop-blur">
+        <div className={`fixed right-4 z-40 flex items-center gap-1.5 rounded-2xl border border-[#ECEDF4] bg-white/95 p-1.5 shadow-lg backdrop-blur ${isDemo ? "top-14" : "top-4"}`}>
           {studentId && <RaiseHandButton lessonId={lesson.id} studentId={studentId} compact />}
           {!isCompleted && (
             <button
