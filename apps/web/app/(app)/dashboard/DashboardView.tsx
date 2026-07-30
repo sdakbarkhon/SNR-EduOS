@@ -377,46 +377,46 @@ export function DashboardView({
           <div className="flex flex-col gap-6 lg:flex-row">
             {/* Факт дня */}
             <div
-              className="relative flex min-h-[240px] flex-[1.08] flex-col rounded-[24px] p-6 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
+              className="relative flex min-h-[152px] flex-[1.08] flex-col rounded-[24px] p-4 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
               style={{ background: "linear-gradient(135deg,#8E74F2 0%,#6A48E4 100%)" }}
             >
               {/* Декор-слой позади текста, обрезан по скруглению карточки. */}
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-                <span className="animate-twinkle absolute left-1/2 top-[70px] text-[15px] text-white/90">✦</span>
-                <span className="animate-twinkle absolute left-[44%] top-[140px] text-[11px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
-                <span className="animate-twinkle absolute right-11 top-9 text-[13px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
+                <span className="animate-twinkle absolute left-1/2 top-[46px] text-[13px] text-white/90">✦</span>
+                <span className="animate-twinkle absolute left-[44%] top-[92px] text-[10px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
+                <span className="animate-twinkle absolute right-9 top-6 text-[11px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
                 {/* Иллюстрация по теме факта (ЧАСТЬ 2): при распознанной теме —
                     тематический эмодзи; иначе дефолт — пчела + цветок. */}
                 {factEmoji ? (
-                  <div className="animate-float-slow absolute -bottom-1 right-3 text-[96px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">{factEmoji}</div>
+                  <div className="animate-float-slow absolute -bottom-1 right-2 text-[64px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">{factEmoji}</div>
                 ) : (
                   <>
-                    <div className="animate-float-medium absolute bottom-6 right-16 text-[56px] leading-none">🌸</div>
-                    <div className="animate-float-slow absolute -bottom-1 right-3 text-[100px] leading-none drop-shadow-[0_12px_18px_rgba(50,20,100,0.32)]">🐝</div>
+                    <div className="animate-float-medium absolute bottom-4 right-11 text-[38px] leading-none">🌸</div>
+                    <div className="animate-float-slow absolute -bottom-1 right-2 text-[68px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">🐝</div>
                   </>
                 )}
               </div>
 
-              <div className="relative flex items-center gap-2 text-[16px] font-extrabold">
-                <Sparkles className="h-[22px] w-[22px] text-[#FFE08A]" /> {t.factOfDay}
+              <div className="relative flex items-center gap-1.5 text-[14px] font-extrabold">
+                <Sparkles className="h-[18px] w-[18px] text-[#FFE08A]" /> {t.factOfDay}
               </div>
 
               {factLoading ? (
-                <div className="relative mt-4 flex gap-1.5 py-2">
+                <div className="relative mt-2 flex gap-1.5 py-1">
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:0ms]" />
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:150ms]" />
                   <span className="h-2 w-2 animate-bounce rounded-full bg-white/50 [animation-delay:300ms]" />
                 </div>
               ) : (
-                <p className="relative mt-4 max-w-[72%] break-words text-[21px] font-extrabold leading-snug">{aiFactText}</p>
+                <p className="relative mt-2 max-w-[72%] break-words text-[16px] font-extrabold leading-snug">{aiFactText}</p>
               )}
 
               {!factLoading && aiFactText && (
                 <button
                   onClick={learnMore}
-                  className="relative mt-auto flex items-center gap-2 self-start rounded-2xl bg-white px-5 py-3 text-[15px] font-extrabold text-[#6A48E4] shadow-[0_8px_18px_rgba(40,20,90,0.2)] transition hover:-translate-y-0.5"
+                  className="relative mt-auto flex items-center gap-1.5 self-start rounded-2xl bg-white px-3.5 py-2 text-[13px] font-extrabold text-[#6A48E4] shadow-[0_8px_18px_rgba(40,20,90,0.2)] transition hover:-translate-y-0.5"
                 >
-                  {t.learnMore} <ArrowRight className="h-4 w-4" />
+                  {t.learnMore} <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
@@ -424,14 +424,14 @@ export function DashboardView({
             {/* Серия успехов — реальные данные по посещаемости (ЧАСТЬ 3), клик → /attendance */}
             <Link
               href="/attendance"
-              className="group relative flex min-h-[240px] flex-1 flex-col overflow-hidden rounded-[24px] bg-white p-[22px] shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
+              className="group relative flex min-h-[152px] flex-1 flex-col overflow-hidden rounded-[24px] bg-white p-4 shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
             >
-              <div className="flex items-center gap-2 text-[16px] font-extrabold text-[#2A2A45]">
-                <Flame className="h-[22px] w-[22px] text-[#FF7A2E]" /> {t.streakTitle}
+              <div className="flex items-center gap-1.5 text-[14px] font-extrabold text-[#2A2A45]">
+                <Flame className="h-[18px] w-[18px] text-[#FF7A2E]" /> {t.streakTitle}
               </div>
-              <div className="mt-2 flex items-baseline gap-2.5">
-                <span className="text-[42px] font-black leading-none text-[#7C5CFF]">{streak}</span>
-                <span className="text-[15px] font-bold text-[#8E8EA9]">{t.streakDays.replace("{n}", "").trim()}</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-[30px] font-black leading-none text-[#7C5CFF]">{streak}</span>
+                <span className="text-[13px] font-bold text-[#8E8EA9]">{t.streakDays.replace("{n}", "").trim()}</span>
               </div>
               <div className="relative mt-1 flex-1">
                 {hasGraph && graphPath ? (
@@ -461,16 +461,16 @@ export function DashboardView({
                   return (
                     <div key={i} className="flex flex-col items-center gap-1.5">
                       <div
-                        className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[11px] font-black"
+                        className="flex h-[24px] w-[24px] items-center justify-center rounded-full text-[10px] font-black"
                         style={{
                           background: present ? "#4E86F7" : wd.state === "absent" ? "#FDE4E4" : "#EEF0F6",
                           color: present ? "#fff" : wd.state === "absent" ? "#E5484D" : "#B7B7CE",
                           boxShadow: present ? "0 4px 10px rgba(78,134,247,.3)" : undefined,
                         }}
                       >
-                        {present ? <Check className="h-3.5 w-3.5" /> : wd.state === "absent" ? "×" : "·"}
+                        {present ? <Check className="h-3 w-3" /> : wd.state === "absent" ? "×" : "·"}
                       </div>
-                      <span className="text-[11px] font-bold capitalize text-[#9A9AB5]">{wd.label}</span>
+                      <span className="text-[10px] font-bold capitalize text-[#9A9AB5]">{wd.label}</span>
                     </div>
                   );
                 })}
