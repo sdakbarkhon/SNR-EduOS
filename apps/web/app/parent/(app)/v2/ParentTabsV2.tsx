@@ -32,6 +32,45 @@ const TABS = [
   { key: "/parent/profile", Icon: User, navKey: "profile" as const },
 ];
 
+/**
+ * Внутренние (не-корневые) сегменты /parent, сгруппированные по «родительскому»
+ * табу. РАНЬШЕ активный таб определялся одним `pathname.startsWith(t.key)` по
+ * TABS — это верно только для самих 5 корневых экранов и их прямых подпутей
+ * (/parent/payments/top-up и т.п.), но /parent/documents, /parent/child,
+ * /parent/chat/[id], /parent/attendance и т.д. — ОТДЕЛЬНЫЕ сегменты, ни с
+ * одним ключом TABS не совпадающие, поэтому startsWith проваливался на всех
+ * них и код тихо падал в `?? TABS[0]!.key` — «Главная» подсвечивалась
+ * независимо от того, где реально находится родитель.
+ */
+const SECTION_TABS: readonly { prefix: string; tab: string }[] = [
+  // Профиль и всё, что открывается ИЗ профиля.
+  { prefix: "/parent/documents", tab: "/parent/profile" },
+  { prefix: "/parent/notif-settings", tab: "/parent/profile" },
+  { prefix: "/parent/lang-security", tab: "/parent/profile" },
+  { prefix: "/parent/about", tab: "/parent/profile" },
+  { prefix: "/parent/child", tab: "/parent/profile" },
+  // Сообщения: сама вкладка, переписка и уведомления (открываются из шапки
+  // «Главной», но по смыслу — тот же почтовый ящик, что и «Сообщения»).
+  { prefix: "/parent/chat", tab: "/parent/messages" },
+  { prefix: "/parent/notifications", tab: "/parent/messages" },
+  // Успехи: оценки/предметы/посещаемость/отзывы.
+  { prefix: "/parent/subjects", tab: "/parent/progress" },
+  { prefix: "/parent/subject", tab: "/parent/progress" },
+  { prefix: "/parent/attendance", tab: "/parent/progress" },
+  { prefix: "/parent/reviews", tab: "/parent/progress" },
+];
+
+/** Активный таб по текущему пути. Порядок: сами TABS → SECTION_TABS →
+ *  «Главная» — прямые совпадения (/parent/payments/top-up и т.п.) не должны
+ *  зависеть от порядка проверки внутренних сегментов. */
+function activeTabKey(pathname: string): string {
+  const direct = TABS.find((t) => pathname.startsWith(t.key));
+  if (direct) return direct.key;
+  const section = SECTION_TABS.find((s) => pathname.startsWith(s.prefix));
+  if (section) return section.tab;
+  return TABS[0]!.key;
+}
+
 export function ParentTabsV2() {
   const pathname = usePathname();
   const router = useRouter();
@@ -52,7 +91,7 @@ export function ParentTabsV2() {
     badge: key === "/parent/messages" ? unread : undefined,
   }));
 
-  const active = TABS.find((t) => pathname.startsWith(t.key))?.key ?? TABS[0]!.key;
+  const active = activeTabKey(pathname);
 
   return <FloatingTabBar items={items} activeKey={active} onSelect={(k) => router.push(k)} />;
 }

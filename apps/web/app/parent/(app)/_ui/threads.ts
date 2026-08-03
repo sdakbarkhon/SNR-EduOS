@@ -113,7 +113,24 @@ export const parentThreadParticipantNames = cache(
   },
 );
 
-/** Тред поддержки: admin_ai → по названию → первый групповой. null = такого нет. */
+/**
+ * Тред поддержки: admin_ai/по названию → куратор класса (direct-тред с тем
+ * же учителем, что ведёт группу) → null.
+ *
+ * РАНЬШЕ третьим шагом был `threads.find(t => t.kind === "group")` — ЛЮБОЙ
+ * групповой чат класса. В системе нет ни одного admin_ai/«поддержка»-треда
+ * (проверено на живой БД), поэтому этот fallback срабатывал ВСЕГДА: клик по
+ * «Помощь и поддержка» неизменно открывал групповой чат класса — ровно то,
+ * что явно запрещено («Никаких групповых чатов класса»). Куратор — direct-
+ * тред, `isCuratorThread` уже вычисляется в @snr/core (packages/core/src/
+ * queries/chat.ts) как совпадение teacher_id треда с groups.teacher_id.
+ * Если и его нет, ../chat/[id]/page.tsx уже показывает честное пустое
+ * состояние вместо переадресации — используем его, а не выдумываем чат.
+ */
 export function pickSupportThread(threads: ParentThreadVM[]): ParentThreadVM | null {
-  return threads.find((t) => t.isSupport) ?? threads.find((t) => t.kind === "group") ?? null;
+  return (
+    threads.find((t) => t.isSupport) ??
+    threads.find((t) => t.kind === "direct" && t.roleLabel === "Куратор") ??
+    null
+  );
 }

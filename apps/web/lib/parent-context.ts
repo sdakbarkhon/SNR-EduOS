@@ -13,6 +13,18 @@ export const getParentContext = cache(async (): Promise<{
   parentId: string;
   parentName: string;
   children: ParentChild[];
+  /**
+   * true, если хотя бы один из трёх запросов ниже РЕАЛЬНО упал (сеть/RLS/
+   * что угодно), а не просто вернул пусто. Раньше сбой и «детей действительно
+   * нет» давали ОДИНАКОВЫЙ результат — `children: []` — и экраны (home/page.tsx,
+   * ProgressView) показывали один и тот же текст «К аккаунту не привязан ни
+   * один ребёнок» в обоих случаях. Это неотличимо на скриншоте: баг диагностики
+   * (данные и RLS для parent_ismailov проверены живьём и корректны — см.
+   * миграцию 163) и настоящий сбой выглядели бы для пользователя одинаково.
+   * Этот флаг даёт экранам показать честное «Не удалось загрузить данные»
+   * вместо вводящего в заблуждение «не привязан», если такое повторится.
+   */
+  hadError: boolean;
 } | null> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -20,6 +32,7 @@ export const getParentContext = cache(async (): Promise<{
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
+  let hadError = false;
   // Промт 6: логируем реальную ошибку на каждом из трёх запросов — раньше
   // РЕАЛЬНЫЙ сбой (RLS/сеть) был неотличим от "не родитель"/"нет детей" и
   // тихо уводил на /login. Не меняем сам fallback (null/[]) — эта функция
@@ -28,9 +41,10 @@ export const getParentContext = cache(async (): Promise<{
   // необработанный throw здесь означало бы заменить редирект на голую
   // дефолтную страницу ошибки Next.js — не факт что лучше, и явно за
   // рамками "починить silent-fail" (это была бы новая архитектура
-  // error-boundary). Логирование делает сбой хотя бы диагностируемым.
+  // error-boundary). Логирование делает сбой хотя бы диагностируемым, а
+  // hadError (см. выше) — ещё и видимым пользователю честным текстом.
   const { data: parent, error: parentErr } = await sb.from("parents").select("id, full_name").eq("user_id", user.id).single();
-  if (parentErr) console.error("[getParentContext] parents query failed:", parentErr.message);
+  if (parentErr) { console.error("[getParentContext] parents query failed:", parentErr.message); hadError = true; }
   if (!parent) return null;
 
   const { data: links, error: linksErr } = await sb
@@ -38,7 +52,7 @@ export const getParentContext = cache(async (): Promise<{
     .select("student_id, created_at")
     .eq("parent_id", parent.id)
     .order("created_at", { ascending: true });
-  if (linksErr) console.error("[getParentContext] parent_students query failed:", linksErr.message);
+  if (linksErr) { console.error("[getParentContext] parent_students query failed:", linksErr.message); hadError = true; }
 
   const studentIds = ((links ?? []) as { student_id: string; created_at: string }[]).map((l) => l.student_id);
 
@@ -48,7 +62,7 @@ export const getParentContext = cache(async (): Promise<{
       .from("students")
       .select("id, full_name, student_groups(groups(name))")
       .in("id", studentIds);
-    if (studentsErr) console.error("[getParentContext] students query failed:", studentsErr.message);
+    if (studentsErr) { console.error("[getParentContext] students query failed:", studentsErr.message); hadError = true; }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const byId = new Map<string, ParentChild>(
@@ -64,5 +78,5 @@ export const getParentContext = cache(async (): Promise<{
     children = studentIds.map((id) => byId.get(id)).filter((c): c is ParentChild => Boolean(c));
   }
 
-  return { parentId: parent.id, parentName: parent.full_name, children };
+  return { parentId: parent.id, parentName: parent.full_name, children, hadError };
 });

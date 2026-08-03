@@ -124,6 +124,10 @@ export interface ProgressViewData {
     gradient: Gradient;
     statusLabel: string | null;
   } | null;
+  /** true — child===null потому что запрос к БД реально упал (см.
+   *  lib/parent-context.ts hadError), а не потому что ребёнок правда не
+   *  привязан. Тот же приём, что в home/HomeView.tsx. */
+  childLoadError?: boolean;
   subjects: ProgressSubject[];
   grades: ProgressGrade[];
   periods: ProgressPeriod[];
@@ -218,6 +222,10 @@ const T = {
   /** Пустые состояния. */
   noChild: "К аккаунту не привязан ни один ребёнок",
   noChildHint: "Обратитесь в администрацию школы — она свяжет профиль ученика с вашим аккаунтом.",
+  /** Отличается от noChild тем же способом, что в home/HomeView.tsx —
+   *  см. комментарий там. */
+  loadError: "Не удалось загрузить данные",
+  loadErrorHint: "Проверьте соединение и обновите страницу. Если это повторится — напишите в поддержку школы.",
   noGrades: "Оценок пока нет",
   noGradesHint: "Как только учитель выставит первую оценку, она появится здесь",
   noGradesPeriod: "За выбранный период оценок нет",
@@ -805,7 +813,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
   const [period, setPeriod] = useState<string>(data.defaultPeriod);
   const [periodOpen, setPeriodOpen] = useState(false);
 
-  const { child, grades, subjects: subjectList, dynamics } = data;
+  const { child, childLoadError, grades, subjects: subjectList, dynamics } = data;
 
   useEffect(() => {
     router.prefetch(R.notifications);
@@ -939,7 +947,10 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
       >
         {!child ? (
           <GlassCard radius={22}>
-            <EmptyBlock title={T.noChild} hint={T.noChildHint} />
+            <EmptyBlock
+              title={childLoadError ? T.loadError : T.noChild}
+              hint={childLoadError ? T.loadErrorHint : T.noChildHint}
+            />
           </GlassCard>
         ) : (
           <>

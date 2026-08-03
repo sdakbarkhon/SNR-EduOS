@@ -161,7 +161,17 @@ export function ProfileView({
   }, [logoutOpen]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[430px] flex-col">
+    // БЕЗ h-full: он пинил корень экрана РОВНО в высоту вьюпорта, а
+    // AppBackground (v2/AppBackground.tsx) — единственный предок с
+    // overflow-hidden — не давал странице вырасти под контент. Итог: всё
+    // ниже первого экрана («Помощь и поддержка», «О приложении», «Выйти»,
+    // версия) обрезалось СТЕКЛОМ, без какого-либо способа проскроллить —
+    // это не «не хватает отступа», а буквально недостижимый контент.
+    // HomeView/PaymentsView/MessagesView такого корневого h-full не имеют —
+    // их страницы растут естественно, и общий pb-[104px] из ParentAppShell
+    // (учтён ниже, paddingBottom: 8 — это доп. воздух, не замена отступа
+    // под таб-бар) корректно освобождает место под плавающий таб-бар.
+    <div className="mx-auto flex w-full max-w-[430px] flex-col">
       {/* 1. Шапка dhub: заголовок + кнопка «Язык и безопасность». */}
       <div
         className="flex items-center"

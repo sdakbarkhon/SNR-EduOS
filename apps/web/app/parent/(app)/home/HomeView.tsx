@@ -74,6 +74,10 @@ export interface HomeViewData {
   bellCount: number;
   /** null — у родителя нет привязанного ребёнка (пустое состояние). */
   child: { fullName: string; initial: string; className: string; gradient: Gradient } | null;
+  /** true — child===null потому что запрос к БД реально упал (см.
+   *  lib/parent-context.ts hadError), а не потому что ребёнок правда не
+   *  привязан. Разные тексты пустого состояния, см. T.loadError. */
+  childLoadError?: boolean;
   greeting: { title: string; subtitle: string };
   statusChip: { label: string; tone: StatusKey } | null;
   metrics: {
@@ -161,6 +165,12 @@ const T = {
   /** Пустые состояния — своих ключей в словаре нет, литералы ru. */
   noChild: "К аккаунту не привязан ни один ребёнок",
   noChildHint: "Обратитесь в администрацию школы — она свяжет профиль ученика с вашим аккаунтом.",
+  /** Отличается от noChild: сервер реально не смог прочитать данные (см.
+   *  getParentContext().hadError), а не «ребёнка правда нет». Раньше оба
+   *  случая показывали ОДИН И ТОТ ЖЕ текст noChild — сбой был неотличим от
+   *  честного «не привязан» ни на скриншоте, ни для пользователя. */
+  loadError: "Не удалось загрузить данные",
+  loadErrorHint: "Проверьте соединение и обновите страницу. Если это повторится — напишите в поддержку школы.",
   noNextLesson: "Ближайших уроков нет",
   noNextLessonHint: "Как только появится расписание, урок покажется здесь",
   emptyFeed: "Сегодня событий пока нет",
@@ -637,7 +647,7 @@ function EmptyBlock({ title, hint }: { title: string; hint?: string }) {
 
 export function HomeView({ data }: { data: HomeViewData }) {
   const router = useRouter();
-  const { parent, child } = data;
+  const { parent, child, childLoadError } = data;
 
   // RootHeader принимает колбэки, а не href — prefetch делаем руками, чтобы
   // переход был таким же мгновенным, как по next/link.
@@ -923,7 +933,10 @@ export function HomeView({ data }: { data: HomeViewData }) {
           </>
         ) : (
           <GlassCard radius={22}>
-            <EmptyBlock title={T.noChild} hint={T.noChildHint} />
+            <EmptyBlock
+              title={childLoadError ? T.loadError : T.noChild}
+              hint={childLoadError ? T.loadErrorHint : T.noChildHint}
+            />
           </GlassCard>
         )}
       </div>

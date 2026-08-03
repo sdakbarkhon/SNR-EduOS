@@ -169,13 +169,19 @@ export default async function ParentHomePage() {
   const bellCount = await parentUnreadCount();
 
   if (!child) {
+    // ctx может быть null и по совсем другой причине (гонка с редиректом —
+    // см. комментарий в profile/page.tsx), тогда hadError не имеет смысла.
+    const childLoadError = Boolean(ctx?.hadError);
     const data: HomeViewData = {
       parent: { firstName: parentFirstName, initials: parentInitials },
       bellCount,
       child: null,
+      childLoadError,
       greeting: {
         title: `${greetingPrefix()}${parentFirstName ? `, ${parentFirstName}` : ""}!`,
-        subtitle: "Профиль ученика ещё не привязан к вашему аккаунту",
+        subtitle: childLoadError
+          ? "Не удалось загрузить данные — попробуйте обновить страницу"
+          : "Профиль ученика ещё не привязан к вашему аккаунту",
       },
       statusChip: null,
       metrics: { atSchoolSince: "—", lessonsTotal: "0", attended: "0/0", homework: "0", walletLabel: "—" },

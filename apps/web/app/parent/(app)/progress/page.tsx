@@ -136,6 +136,7 @@ export default async function ParentProgressPage() {
       parent: { initials: parentInitials },
       bellCount,
       child: null,
+      childLoadError: Boolean(ctx?.hadError),
       subjects: [],
       grades: [],
       periods: [],
