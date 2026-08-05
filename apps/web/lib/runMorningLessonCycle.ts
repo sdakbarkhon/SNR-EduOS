@@ -1,22 +1,22 @@
-// Общий модуль "утренний цикл уроков" — переиспользуется:
-//   1) apps/web/app/api/cron/morning-lesson-cycle/route.ts — Vercel Cron
-//      в 04:00 UTC (= 09:00 Ташкент), гарантированный запуск раз в день;
-//   2) apps/web/lib/ensureMorningCycleRan.ts — фолбэк из RSC при загрузке
-//      страниц уроков/расписания, на случай если крон не отработал или
-//      человек зашёл до крона (в тесте).
+// DISABLED 05.08.2026 — auto-start/auto-close of lessons removed by client
+// request. Manual lesson start only, via "Start lesson" button. Kept for
+// reference (not deleted) — see apps/web/lib/ensureMorningCycleRan.ts and
+// apps/web/app/api/cron/morning-lesson-cycle/route.ts, both also disabled;
+// neither imports this module anymore, so runMorningLessonCycle() below has
+// zero live callers — the early return is defense in depth in case
+// something calls it directly in the future.
 //
-// Логика на КАЖДЫЙ из 3 классов (10-А / 7-А / 3-А):
-//   a) Взять сегодняшние (Ташкент) уроки, сортировка по starts_at.
-//   b) Если первый ещё не 'completed' — закрыть его (completeLessons: перевод
-//      в completed + upsert посещаемости и оценок).
-//   c) Если есть второй И он всё ещё 'scheduled' — стартовать
-//      (status='in_progress', started_at=now()), guard AND status='scheduled'
-//      (идемпотентно — уже in_progress/completed не трогает).
-//
-// Возвращает список действий для логирования — вызов из cron-роута
-// сериализует его в ответ, вызов из RSC-фолбэка просто пишет в console.
+// Original logic per class (10-А / 7-А / 3-А), preserved below as a comment:
+//   a) Take today's (Tashkent) lessons, sorted by starts_at.
+//   b) If the first isn't 'completed' yet — close it (completeLessons()).
+//   c) If there's a second AND it's still 'scheduled' — start it
+//      (status='in_progress', started_at=now()), guarded on status='scheduled'.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+/* ORIGINAL IMPLEMENTATION — preserved for reference, no longer called from
+   anywhere in the codebase.
+
 import { completeLessons } from "@/app/api/cron/_lib/complete-lessons";
 
 const TZ_MS = 5 * 60 * 60 * 1000; // Ташкент, UTC+5
@@ -25,29 +25,13 @@ const TZ_MS = 5 * 60 * 60 * 1000; // Ташкент, UTC+5
 // Если появятся новые классы, добавить сюда (или брать из БД по признаку).
 const TARGET_GROUP_NAMES = ["10-А класс", "7-А класс", "3-А класс"] as const;
 
-/** [today_start_iso, today_end_iso] по Ташкенту (UTC+5), выраженные в UTC. */
+// [today_start_iso, today_end_iso] по Ташкенту (UTC+5), выраженные в UTC.
 export function tashkentTodayWindow(nowMs: number = Date.now()): { start: string; end: string } {
   const tashkentNow = new Date(nowMs + TZ_MS);
   const startMs =
     Date.UTC(tashkentNow.getUTCFullYear(), tashkentNow.getUTCMonth(), tashkentNow.getUTCDate()) - TZ_MS;
   const endMs = startMs + 24 * 60 * 60 * 1000;
   return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
-}
-
-export interface MorningActionLog {
-  group_id: string;
-  group_name: string;
-  first_lesson_id: string | null;
-  first_closed: boolean;
-  second_lesson_id: string | null;
-  second_started: boolean;
-  note?: string;
-}
-
-export interface MorningCycleResult {
-  processed_groups: number;
-  actions: MorningActionLog[];
-  window: { start: string; end: string };
 }
 
 export async function runMorningLessonCycle(admin: SupabaseClient): Promise<MorningCycleResult> {
@@ -151,4 +135,26 @@ export async function runMorningLessonCycle(admin: SupabaseClient): Promise<Morn
     actions,
     window,
   };
+}
+*/
+
+export interface MorningActionLog {
+  group_id: string;
+  group_name: string;
+  first_lesson_id: string | null;
+  first_closed: boolean;
+  second_lesson_id: string | null;
+  second_started: boolean;
+  note?: string;
+}
+
+export interface MorningCycleResult {
+  processed_groups: number;
+  actions: MorningActionLog[];
+  window: { start: string; end: string };
+}
+
+export async function runMorningLessonCycle(admin: SupabaseClient): Promise<MorningCycleResult> {
+  void admin;
+  return { processed_groups: 0, actions: [], window: { start: "", end: "" } };
 }

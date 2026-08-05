@@ -1,43 +1,17 @@
-// Фолбэк для утреннего цикла уроков — вызывается из RSC при загрузке
-// страниц уроков/расписания. Гарантия: если Vercel Cron
-// (/api/cron/morning-lesson-cycle) по какой-то причине не отработал в 09:00
-// Ташкент (сбой, ретрай, тестовый прогон вне расписания), первый вход
-// пользователя после 09:00 сам подтянет закрытие 1-го и старт 2-го урока.
+// DISABLED 05.08.2026 — auto-start/auto-close of lessons removed by client
+// request. Manual lesson start only, via "Start lesson" button.
 //
-// ВАЖНО:
-//   - Работает от service-role (createAdminClient), т.к. может выполнять
-//     UPDATE на уроках других классов (RLS этого не даст обычному юзеру).
-//   - Идемпотентно (см. runMorningLessonCycle: guarded UPDATEs).
-//   - Проверяет "сейчас Ташкент >= 09:00" — раньше 09:00 ничего не делает.
-//   - Ошибки НЕ бросает — тихо логгирует. Никогда не должен уронить RSC.
-//   - Кэш не нужен: сама функция дешёвая (SELECT первых двух уроков ×3
-//     класса + guarded UPDATE'ы), не в критическом пути (fire-and-forget
-//     ok'ей быть не может из RSC, но потери задержки минимальны).
+// Was: RSC fallback for the "утренний цикл уроков", called on load from
+// apps/web/app/(app)/lessons/page.tsx, apps/web/app/(app)/lessons/[id]/page.tsx,
+// apps/web/app/teacher/lessons/page.tsx, apps/web/app/teacher/lessons/[id]/page.tsx
+// — all four call sites are unchanged (`try { await ensureMorningCycleRan(); }
+// catch { /* noop */ }`) and now simply await a no-op. Signature kept
+// (zero args, Promise<void>) so those call sites keep compiling unchanged.
+//
+// See apps/web/lib/runMorningLessonCycle.ts (also disabled, original logic
+// preserved there as a comment) and apps/web/app/api/cron/morning-lesson-cycle/route.ts
+// (cron entry removed from vercel.json, route left as a no-op).
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { runMorningLessonCycle } from "@/lib/runMorningLessonCycle";
-
-const TZ_MS = 5 * 60 * 60 * 1000;
-const NINE_AM_MS = 9 * 60 * 60 * 1000;
-
-function tashkentSecondsSinceMidnight(nowMs: number = Date.now()): number {
-  const tashkentNow = new Date(nowMs + TZ_MS);
-  const secs =
-    tashkentNow.getUTCHours() * 3600 + tashkentNow.getUTCMinutes() * 60 + tashkentNow.getUTCSeconds();
-  return secs;
-}
-
-export async function ensureMorningCycleRan(): Promise<{ skipped: string } | { ok: true; actions: number }> {
-  const nowSec = tashkentSecondsSinceMidnight();
-  if (nowSec * 1000 < NINE_AM_MS) {
-    return { skipped: "too early (Tashkent < 09:00)" };
-  }
-  try {
-    const admin = createAdminClient();
-    const res = await runMorningLessonCycle(admin);
-    return { ok: true, actions: res.actions.length };
-  } catch (e) {
-    console.error("[ensureMorningCycleRan] failed:", (e as Error)?.message ?? e);
-    return { skipped: `error: ${(e as Error)?.message ?? "unknown"}` };
-  }
+export async function ensureMorningCycleRan(): Promise<void> {
+  return;
 }

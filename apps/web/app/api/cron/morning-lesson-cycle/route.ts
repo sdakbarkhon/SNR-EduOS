@@ -1,37 +1,14 @@
-// Утренний крон: раз в сутки в 04:00 UTC (= 09:00 Ташкент, см. vercel.json),
-// для каждого из 3 классов:
-//   - закрывает 1-й урок дня (если ещё не 'completed');
-//   - стартует 2-й урок дня (если ещё 'scheduled').
+// DISABLED 05.08.2026 — auto-start/auto-close of lessons removed by client
+// request. Manual lesson start only, via "Start lesson" button. Cron entry
+// removed from vercel.json; this route is kept (not deleted) as a harmless
+// no-op in case anything still hits the path directly.
 //
-// Логика идентична фолбэку из RSC (apps/web/lib/ensureMorningCycleRan.ts) —
-// это гарантированный "тик" в 09:00 Ташкент, ensureMorningCycleRan — сеть
-// безопасности на случай сбоя крона или тестовых запусков вне расписания.
-//
-// Идемпотентно по конструкции: completeLessons() внутри гардит neq='completed',
-// UPDATE второго урока гардит status='scheduled'. Повторный вызов ничего
-// не портит.
+// Original implementation called runMorningLessonCycle() — see
+// apps/web/lib/runMorningLessonCycle.ts, also disabled, logic preserved
+// there as a comment for reference.
 
-import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { runMorningLessonCycle } from "@/lib/runMorningLessonCycle";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  const cronSecret =
-    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    req.headers.get("x-cron-secret");
-  if (!process.env.CRON_SECRET || cronSecret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-  try {
-    const res = await runMorningLessonCycle(admin);
-    console.log(
-      `[morning-lesson-cycle] processed_groups=${res.processed_groups} actions=${JSON.stringify(res.actions)}`,
-    );
-    return NextResponse.json(res);
-  } catch (e) {
-    console.error("[morning-lesson-cycle] failed:", (e as Error)?.message ?? e);
-    return NextResponse.json({ error: (e as Error)?.message ?? "morning cycle failed" }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json({ ok: true, skipped: "morning-lesson-cycle disabled permanently 05.08.2026" });
 }

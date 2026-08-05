@@ -3929,3 +3929,17 @@ typecheck (`apps/web`), `next build` (92 страницы) и `pnpm lint:hooks` 
 Проверено, что других оверлеев под таб-баром не осталось: `GlassBackground` — `-z-10` (фон, корректно позади), `LogoutOverlay` — уже `z-[9999]`. Разметка, анимации (`translateY(115%)→0`, opacity 280 мс) и логика не тронуты.
 
 typecheck (`apps/web`), `next build` (92 страницы) и `pnpm lint:hooks` — чистые. Живьём не проверял: headless-браузер в этой среде не отрисовывает содержимое.
+
+## 05.08.2026 — Отключение авто-старт/авто-конец уроков навсегда
+
+По требованию заказчика: автоматическое управление статусами уроков (крон `morning-lesson-cycle` + SSR-дублёр `ensureMorningCycleRan`) отключено навсегда. Причина: подготовка к заморозке времени приложения на 29.07.2026 (следующая задача) + требование "управление уроками только вручную кнопкой Начать урок".
+
+Отключено:
+- `vercel.json` — удалён крон `morning-lesson-cycle`
+- `apps/web/app/api/cron/morning-lesson-cycle/route.ts` — no-op
+- `apps/web/lib/ensureMorningCycleRan.ts` — no-op
+- `apps/web/lib/runMorningLessonCycle.ts` — код сохранён закомментированным для истории
+
+`ensureMorningCycleRan` вызывалась из 4 мест, не 2 — помимо списков (`(app)/lessons/page.tsx`, `teacher/lessons/page.tsx`) ещё и со страниц конкретного урока (`(app)/lessons/[id]/page.tsx`, `teacher/lessons/[id]/page.tsx`), той же логикой. Погашены все 4.
+
+НЕ ЗАТРОНУТО: логика "1-completed / 2-in_progress / 3+ ручной старт" живёт в других местах, работает как есть.
