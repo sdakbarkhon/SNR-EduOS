@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import {
   getChildAttendanceDetail,
@@ -46,6 +47,7 @@ import type {
   StudentGradeItem,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
 import type { ParentChild } from "@/lib/parent-child";
 import { getDemoNowMs } from "@/lib/demo-date";
@@ -120,13 +122,56 @@ export const getSelectedChildId = cache(async (): Promise<string | null> => {
 
 // ── Расписание / уроки ───────────────────────────────────────────────────────
 
+/**
+ * Кэш расписания на неделю — `unstable_cache`, revalidate 60с (задача
+ * «убрать 2-3 сек задержку», приоритет 3: «самое результативное для
+ * повторных переходов»). Расписание меняется редко (правка учителем/
+ * админом), 60 секунд — не заметная пользователю задержка актуальности,
+ * зато повторный заход на ту же неделю в течение минуты — 0 сетевых
+ * запросов вместо одного.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНАЯ ФУНКЦИЯ СО СВОИМ КЛИЕНТОМ, А НЕ ПРОСТО ОБЁРНУТЬ
+ * childScheduleWeek ЦЕЛИКОМ. Next.js прямо запрещает `cookies()`/`headers()`
+ * ВНУТРИ функции, обёрнутой в `unstable_cache` (кидает рантайм-ошибку) — а
+ * `createClient()` из `@/lib/supabase/server.ts` читает cookies() под
+ * капотом (сессия родителя). Поэтому кэшируемая часть работает через
+ * `createAdminClient()` (service-role, без cookies и без RLS) и принимает
+ * childId ЯВНЫМ аргументом, а не резолвит его сама.
+ *
+ * ПОЧЕМУ ЭТО БЕЗОПАСНО, ХОТЯ КЭШ ОБЩИЙ НА ДЕПЛОЙ (не per-request/per-user).
+ * `unstable_cache` кладёт результат в Data Cache, видимый ЛЮБОМУ следующему
+ * запросу с тем же ключом — а ключ здесь ровно (childId, weekStart) (Next.js
+ * сам примешивает АРГУМЕНТЫ функции к ключу поверх статичных keyParts, см.
+ * "parent-schedule-week" ниже). Авторизацию «этому родителю МОЖНО видеть
+ * именно этот childId» кэш не проверяет — её уже проверил вызывающий код
+ * СНАРУЖИ (getSelectedChildId() резолвит childId из cookie, ограниченной
+ * RLS-списком детей ИМЕННО этого родителя, до вызова кэша). Раз мы дошли до
+ * вызова с конкретным childId, он уже легитимен для текущего запроса.
+ * Расписание САМО ПО СЕБЕ не персонализировано под зрителя — оно ОДНО и то
+ * же для любого легитимного зрителя этого ребёнка (второй родитель, если
+ * появится) — поэтому делить кэш по childId, а не по user_id, корректно:
+ * это кэш ДАННЫХ ребёнка, а не кэш ответа конкретному пользователю.
+ *
+ * Чаты и уведомления — вне этого приёма (задача явно требует «не
+ * кешировать»): они персонализированы (непрочитанность у каждого своя) и
+ * должны быть свежими на каждый заход, поэтому childHomework/childGrades/
+ * реакции-в-реальном-времени этот кэш не трогает вовсе.
+ */
+const getCachedScheduleWeek = unstable_cache(
+  async (childId: string, weekStart: string): Promise<LessonWithSubject[]> => {
+    const admin = createAdminClient();
+    return getStudentLessonsForWeek(admin, weekStart, childId);
+  },
+  ["parent-schedule-week"],
+  { revalidate: 60 },
+);
+
 /** Уроки выбранного ребёнка за неделю. weekStart — понедельник, YYYY-MM-DD
  *  (по умолчанию текущая демо-неделя). */
 export const childScheduleWeek = cache(async (weekStart?: string): Promise<LessonWithSubject[]> => {
   const childId = await getSelectedChildId();
   if (!childId) return [];
-  const db = await createClient();
-  return getStudentLessonsForWeek(db, weekStart ?? parentWeekMonday(), childId);
+  return getCachedScheduleWeek(childId, weekStart ?? parentWeekMonday());
 });
 
 /** Уроки выбранного ребёнка за конкретный день (по умолчанию демо-«сегодня»). */

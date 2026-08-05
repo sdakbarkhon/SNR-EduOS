@@ -17,6 +17,7 @@
  * скопированного data-слоя, поэтому число совпадает с мобилкой.
  */
 
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CreditCard, Home, MessageCircle, TrendingUp, User } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
@@ -78,6 +79,17 @@ export function ParentTabsV2() {
   const nav = getDictionary(locale as Locale).parentApp.nav;
 
   const unread = getUnreadMessageThreadsCount();
+
+  // ПЕРФ (задача «убрать 2-3 сек задержку между экранами»): таб-бар — это
+  // <button onClick={router.push}>, НЕ <Link>, значит у него нет вообще
+  // никакого автопрефетча Next.js (ни на hover, ни на появление во
+  // вьюпорте) — а это самая частая навигация во всём /parent, видна на
+  // каждом экране. RootHeader рядом уже прогревает так же руками
+  // (HomeView.tsx: router.prefetch(R.notifications/profile)) — тот же приём,
+  // применённый ко всем пяти вкладкам сразу при монтировании бара.
+  useEffect(() => {
+    for (const t of TABS) router.prefetch(t.key);
+  }, [router]);
 
   const items: FloatingTabItem[] = TABS.map(({ key, Icon, navKey }) => ({
     key,

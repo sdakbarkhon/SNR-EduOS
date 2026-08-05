@@ -166,9 +166,15 @@ export default async function ParentHomePage() {
   const parentFirstName = givenNameOf(parentFullName);
   const parentInitials = parentFullName ? initialsOf(parentFullName) : "?";
 
-  const bellCount = await parentUnreadCount();
+  // parentUnreadCount() раньше ждали ДО развилки child/no-child отдельным
+  // await — лишний последовательный round-trip перед стартом остальных
+  // запросов. Он не зависит от child, поэтому запускаем его сразу и
+  // Promise.all'им с остальными: экономит один сетевой round-trip на каждый
+  // заход на /parent/home (ветка «есть ребёнок» — самая частая).
+  const bellCountPromise = parentUnreadCount();
 
   if (!child) {
+    const bellCount = await bellCountPromise;
     // ctx может быть null и по совсем другой причине (гонка с редиректом —
     // см. комментарий в profile/page.tsx), тогда hadError не имеет смысла.
     const childLoadError = Boolean(ctx?.hadError);
@@ -195,11 +201,12 @@ export default async function ParentHomePage() {
   }
 
   const today = parentToday();
-  const [stats, dayStatus, homework, gradesSummary] = await Promise.all([
+  const [stats, dayStatus, homework, gradesSummary, bellCount] = await Promise.all([
     childDailyStats(today),
     childDailyStatus(today),
     childHomework(),
     childGradesSummary(),
+    bellCountPromise,
   ]);
 
   const childGiven = givenNameOf(child.full_name);
