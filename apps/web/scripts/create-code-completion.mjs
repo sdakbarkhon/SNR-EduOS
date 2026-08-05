@@ -133,13 +133,23 @@ const LEVEL_SPEC = {
   },
 };
 
-function systemPromptFor(className, topic) {
+// Пачка A (хвост от 15774c8): та же эскалация промта, что в
+// create-code-completion-homework.mjs, — на простых темах 3-А («команда
+// print») короткого кода не хватало на нужное число пропусков.
+function systemPromptFor(className, topic, escalate = false) {
   const spec = LEVEL_SPEC[className];
+  const escalation = escalate
+    ? `\n\nВАЖНО (предыдущая попытка не дала достаточно пропусков): даже для
+самой простой темы код ОБЯЗАН содержать НЕСКОЛЬКО отдельных строк с выводом/
+переменными — например 3-4 разных print() с разными сообщениями и/или 2-3
+переменные, которые заполняются и используются по очереди. НЕ одна короткая
+строка — сделай мини-сценарий так, чтобы гарантированно набралось ${spec.gaps} пропусков.`
+    : "";
   return `Ты школьный учитель Python. Создай упражнение "заполни пропуск в коде" по
 теме урока "${topic}" для класса "${className}".
 
 Код должен быть ${spec.lines} строк, ${spec.gaps} пропусков. Каждый пропуск имеет
-4 варианта (1 правильный + 3 правдоподобных, но ошибочных). ${spec.extra}
+4 варианта (1 правильный + 3 правдоподобных, но ошибочных). ${spec.extra}${escalation}
 
 ЯЗЫК В КОДЕ (строго):
 - Имена переменных, функций и любые идентификаторы — ТОЛЬКО НА АНГЛИЙСКОМ
@@ -246,12 +256,14 @@ async function main() {
     const middlePositions = stages.filter((s) => s.stage_role === "middle").map((s) => s.position);
     const newPosition = (middlePositions.length ? Math.max(...middlePositions) : 0) + 1;
 
+    // До 4 попыток (было 2) — на простых темах 3-А двух не хватало. С 3-й
+    // попытки (escalate=true) промт настойчивее требует достаточно пропусков.
     let v = null;
-    for (let attempt = 0; attempt < 2 && !v; attempt++) {
+    for (let attempt = 0; attempt < 4 && !v; attempt++) {
       geminiCalls++;
       let response;
       try {
-        response = await callGeminiWithRetry(systemPromptFor(className, topic), `Класс: ${className}\nТема урока: ${topic}`);
+        response = await callGeminiWithRetry(systemPromptFor(className, topic, attempt >= 2), `Класс: ${className}\nТема урока: ${topic}`);
       } catch (e) {
         if (e.isDailyQuota) { console.warn(`${logPrefix} → ДНЕВНОЙ ЛИМИТ — остановка.`); return; }
         console.error(`${logPrefix} → ERROR (Gemini: ${(e.message ?? "").split("\n")[0]})`);

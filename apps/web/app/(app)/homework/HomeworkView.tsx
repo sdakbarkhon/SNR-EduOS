@@ -166,6 +166,7 @@ export function HomeworkView({
     { value: "file", label: d.homework.typeFile },
     { value: "test", label: d.homework.typeTest },
     { value: "programming", label: d.homework.typeProgrammingShort },
+    { value: "code_completion", label: d.homework.typeCodeCompletion },
   ];
   const deadlineOptions: { value: DeadlineFilter; label: string }[] = [
     { value: "all", label: d.homework.deadlineAll },

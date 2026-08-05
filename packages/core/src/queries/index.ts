@@ -971,7 +971,7 @@ export type GradeSourceTable =
 
 export type StudentGradeItem = {
   id: string;
-  kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson";
+  kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson" | "code_completion";
   sourceTable: GradeSourceTable;
   title: string;
   subject: string;
@@ -1033,7 +1033,14 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
   }>) {
     items.push({
       id: r.id,
-      kind: r.homework?.content_type === "programming" ? "programming" : "file",
+      // Аудит Пачки A: было бинарно programming/file — ЛЮБОЙ другой
+      // content_type (в т.ч. code_completion) молча падал в "file". С
+      // появлением реальных code_completion-ДЗ (create-code-completion-
+      // homework.mjs) это стало видимой ошибкой — задание с кодом и
+      // пропусками подписывалось на /grades как «Файл».
+      kind: r.homework?.content_type === "programming" ? "programming"
+        : r.homework?.content_type === "code_completion" ? "code_completion"
+        : "file",
       sourceTable: "homework_submissions",
       title: r.homework?.title ?? "",
       subject: getSubjectKeyByLabel(r.homework?.subject?.name) ?? "",
@@ -1146,10 +1153,13 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       stage: { title: string; content_type: string; lesson: { group: { name: string } | null; subject: { name: string } | null } | null } | null;
     }>) {
       const ct = r.stage?.content_type ?? "";
+      // Аудит Пачки A: code_completion падал в "external" (общий фолбэк) —
+      // этап урока с кодом и пропусками подписывался бы как «Внешний сервис».
       const kind: StudentGradeItem["kind"] =
         ct === "quiz_qia" ? "quiz" :
         ct === "quiz_kahoot" ? "kahoot" :
         ct === "code" ? "programming" :
+        ct === "code_completion" ? "code_completion" :
         "external";
       items.push({
         id: r.id,

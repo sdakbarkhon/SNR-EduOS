@@ -38,6 +38,7 @@ export function kindLabel(kind: StudentGradeItem["kind"], d: Dictionary): string
   switch (kind) {
     case "test": return d.homework.typeTest;
     case "programming": return d.homework.typeProgramming;
+    case "code_completion": return d.homework.typeCodeCompletion;
     case "classwork": return d.classwork.title;
     case "project": return d.projects.badge;
     case "quiz": return d.lesson.quiz.kindQuiz;
@@ -58,6 +59,7 @@ export const KIND_BADGE: Record<StudentGradeItem["kind"], string> = {
   external: "bg-cyan-100 text-cyan-700",
   lesson: "bg-violet-100 text-violet-700",
   file: "bg-blue-100 text-blue-700",
+  code_completion: "bg-fuchsia-100 text-fuchsia-700",
 };
 
 function withinPeriod(dateStr: string, period: PeriodFilter): boolean {

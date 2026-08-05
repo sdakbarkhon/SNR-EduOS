@@ -37,6 +37,7 @@ function stageTypeIcon(ct: LessonContentType | null): LucideIcon {
     case "wokwi": case "codesandbox":
     case "geogebra": case "phet": case "desmos": case "blockly_games": case "visualgo":
     case "p5js": case "excalidraw": case "learningapps": case "sqlonline":
+    case "code_completion":
       return Puzzle;
     default: return BookOpen;
   }
@@ -59,6 +60,7 @@ function stageTypeLabel(ct: LessonContentType | null, dl: ReturnType<typeof getD
     case "excalidraw": return dl.stageContentExcalidraw;
     case "learningapps": return dl.stageContentLearningapps;
     case "sqlonline": return dl.stageContentSqlonline;
+    case "code_completion": return dl.stageContentCodeCompletion;
     default: return "";
   }
 }

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getDictionary, getSubjectConfig, deleteHomework } from "@snr/core";
-import type { Locale } from "@snr/core";
+import type { Locale, CodeCompletionPayload } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
@@ -17,8 +17,15 @@ import { getDemoNow } from "@/lib/demo-date";
 type Submission = { id: string; status: string };
 type TestSub = { id: string; student_id: string };
 type HomeworkItem = {
-  id: string; title: string; due_date: string | null; content_type: "file" | "test" | "programming" | "bundle";
+  id: string; title: string; due_date: string | null;
+  content_type: "file" | "test" | "programming" | "bundle" | "code_completion";
   teacher_id: string | null;
+  // Аудит Пачки A: getTeacherHomework() уже делал select("*", ...) — колонка
+  // всегда была в ответе, просто не было в этом локальном типе (как и
+  // "code_completion" в content_type выше). Нужна для копирования в
+  // duplicateHW(): без неё дубль code_completion-ДЗ создавался бы без кода/
+  // пропусков/вариантов — пустышкой.
+  code_completion_data: CodeCompletionPayload | null;
   group: {
     id: string; name: string; subject: string;
     enrolled: Array<{ student_id: string }>;
@@ -216,6 +223,12 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
         .insert({
           group_id: hw.group.id, title: hw.title + " (копия)", description: null,
           due_date: hw.due_date, content_type: hw.content_type, source: "teacher", teacher_id: hw.teacher_id,
+          // Аудит Пачки A: у "test" своя копия в test_questions ниже; у
+          // "code_completion" вся суть задания — в этой JSONB-колонке самой
+          // строки (нет child-таблицы, см. create-code-completion-homework.mjs)
+          // — без неё дубль получился бы формально code_completion, но без
+          // кода/пропусков/вариантов.
+          code_completion_data: hw.content_type === "code_completion" ? hw.code_completion_data : null,
         })
         .select("id").single();
       if (hwErr || !newHW) throw hwErr ?? new Error("no data");
@@ -364,10 +377,13 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
                         ? "border-emerald-200/50 bg-emerald-100/80 text-emerald-700"
                         : hw.content_type === "bundle"
                         ? "border-purple-200/50 bg-purple-100/80 text-purple-700"
+                        : hw.content_type === "code_completion"
+                        ? "border-violet-200/50 bg-violet-100/80 text-violet-700"
                         : "border-gray-200/50 bg-gray-100/80 text-gray-700")}>
                       {hw.content_type === "test" ? d.homework.typeTest
                         : hw.content_type === "programming" ? d.homework.typeProgramming
                         : hw.content_type === "bundle" ? d.homework.typeBundle
+                        : hw.content_type === "code_completion" ? d.homework.typeCodeCompletion
                         : d.homework.typeFile}
                     </span>
                     {active && (
