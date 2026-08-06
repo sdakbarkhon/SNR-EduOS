@@ -3943,3 +3943,16 @@ typecheck (`apps/web`), `next build` (92 страницы) и `pnpm lint:hooks` 
 `ensureMorningCycleRan` вызывалась из 4 мест, не 2 — помимо списков (`(app)/lessons/page.tsx`, `teacher/lessons/page.tsx`) ещё и со страниц конкретного урока (`(app)/lessons/[id]/page.tsx`, `teacher/lessons/[id]/page.tsx`), той же логикой. Погашены все 4.
 
 НЕ ЗАТРОНУТО: логика "1-completed / 2-in_progress / 3+ ручной старт" живёт в других местах, работает как есть.
+
+## 05.08.2026 — Убраны демо-родители Rakhimov и Karimov
+
+По требованию заказчика: оставлен только parent_ismailov в качестве демо-родителя. Причина: упрощение демо-флоу, чтобы клиенту было понятно кто где — один родитель, один ребёнок (sherzod_10).
+
+Что сделано:
+- parent_rakhimov, parent_karimov удалены полностью (`supabase.auth.admin.deleteUser()` × 2 — вся остальная очистка каскадная: `parents`/`parent_students`/`parent_invites`/`chat_participants`/`chat_read_state`/`notifications`/`user_sessions`/`demo_leases`/`announcement_user_reads` висят на `auth.users(id) ON DELETE CASCADE`, никакого ручного DELETE по таблицам не понадобилось; `chat_messages.sender_id` — `ON DELETE SET NULL`, у них было 0 сообщений, не актуально).
+- Их бывшие 5 детей переименованы в `demo_student_{класс}_{номер}`, продолжая нумерацию внутри своего класса (реальная схема БД — не плоская `demo_student_XX`, а `demo_student_{grade}_{seq}`): `nodira_07` → `demo_student_7_31`, `rustam_03` → `demo_student_3_31`, `aziz_03` → `demo_student_3_32`, `farrukh_10` → `demo_student_10_29`, `malika_07` → `demo_student_7_32`. Переименован и `students.username`, и `auth.users.email`/`user_metadata.username` (логин резолвит username → email через `usernameToEmail()`, иначе бы сломался). Данные детей (оценки, ДЗ, посещаемость, история чатов с учителями, проекты) полностью сохранены — они просто больше не привязаны к родителям.
+- `apps/web/scripts/_backfill-shared.mjs` (единственный переиспользуемый бэкфилл-хелпер, импортируется другими скриптами): `REAL_STUDENT_USERNAMES`/`GRADE_PROFILES`/`HOMEWORK_PROFILES` почищены — остался только `sherzod_10`. 5 других исторических одноразовых `.mjs`-скриптов и вся документация (`.md`) — намеренно не тронуты (уже отработали своё / точки-в-времени записи).
+- Мобилка `apps/mobile-parent/src/lib/testAccounts.ts`: в `TEST_ACCOUNTS` оставлен только номер Ismailov.
+- Веб `/parent` демо-логин (миграция 163) уже жёстко ведёт в Ismailov — не тронут.
+
+Скрипт `apps/web/scripts/purge-extra-parents.mjs` (recon + execute) оставлен в репозитории для истории.

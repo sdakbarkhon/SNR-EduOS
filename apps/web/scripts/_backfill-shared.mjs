@@ -88,32 +88,24 @@ export async function attachBooksToLesson(db, { lessonId, subjectName, teacherId
   return { attached: rows.length, reason: "ok" };
 }
 
-// Промт 8.2: + 3 новых реальных ученика (rustam_03/farrukh_10/malika_07,
-// миграция 125) — по профилю зеркалят одного из исходных трёх (см. ниже).
-export const REAL_STUDENT_USERNAMES = ["sherzod_10", "nodira_07", "aziz_03", "rustam_03", "farrukh_10", "malika_07"];
+// 05.08.2026: rustam_03/farrukh_10/malika_07/nodira_07/aziz_03 переименованы
+// в demo_student_{класс}_{номер} (родители Rakhimov/Karimov удалены, дети
+// остались в группах, но стали обычными demo-учениками — см. resheniya_2.md,
+// "Убраны демо-родители Rakhimov и Karimov"). REAL_STUDENT_USERNAMES/
+// GRADE_PROFILES/HOMEWORK_PROFILES ниже почищены под это — остался только
+// sherzod_10 (единственный ребёнок оставшегося демо-родителя Ismailov).
+export const REAL_STUDENT_USERNAMES = ["sherzod_10"];
 
 // Промт 7.3: профили реальных учеников — распределение оценок (веса, не проценты
 // строго — normalizeWeights ниже приводит к сумме 1).
 export const GRADE_PROFILES = {
   sherzod_10: { 5: 0.70, 4: 0.25, 3: 0.05 },
-  nodira_07: { 4: 0.60, 5: 0.25, 3: 0.15 },
-  aziz_03: { 3: 0.40, 4: 0.40, 5: 0.15, 2: 0.05 },
-  // Промт 8.2: farrukh_10 — отличник (= sherzod_10), rustam_03 — хорошист
-  // (= nodira_07), malika_07 — средний (= aziz_03), по прямому указанию промта.
-  farrukh_10: { 5: 0.70, 4: 0.25, 3: 0.05 },
-  rustam_03: { 4: 0.60, 5: 0.25, 3: 0.15 },
-  malika_07: { 3: 0.40, 4: 0.40, 5: 0.15, 2: 0.05 },
 };
 // Демо-ученики — рандом по «нормальному» распределению 3-5 (без 1-2, редкая 2 у демо не нужна).
 export const DEMO_GRADE_PROFILE = { 5: 0.30, 4: 0.45, 3: 0.25 };
 
 export const HOMEWORK_PROFILES = {
   sherzod_10: { onTime: 0.95, late: 0.05, missed: 0.0 },
-  nodira_07: { onTime: 0.85, late: 0.10, missed: 0.05 },
-  aziz_03: { onTime: 0.70, late: 0.20, missed: 0.10 },
-  farrukh_10: { onTime: 0.95, late: 0.05, missed: 0.0 },
-  rustam_03: { onTime: 0.85, late: 0.10, missed: 0.05 },
-  malika_07: { onTime: 0.70, late: 0.20, missed: 0.10 },
 };
 export const DEMO_HOMEWORK_PROFILE = { onTime: 0.75, late: 0.15, missed: 0.10 };
 

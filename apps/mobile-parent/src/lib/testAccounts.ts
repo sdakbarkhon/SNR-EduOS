@@ -35,32 +35,19 @@ export interface TestAccount {
 }
 
 /** Ключ — 9 национальных цифр без кода страны (формат setPhone уже отдаёт
- *  ровно это: `digits.replace(/\D/g, "").slice(0, 9)`). */
+ *  ровно это: `digits.replace(/\D/g, "").slice(0, 9)`).
+ *
+ * 05.08.2026: Rakhimov/Karimov убраны — оба родителя удалены из БД вместе
+ * со всеми связанными данными (их бывшие дети остались в группах, просто
+ * переименованы в demo_student_*, больше не привязаны к родителю). Остался
+ * единственный тестовый номер — Ismailov. См. resheniya_2.md, "Убраны
+ * демо-родители Rakhimov и Karimov". */
 export const TEST_ACCOUNTS: Record<string, TestAccount> = {
   "912345678": {
     username: "parent_ismailov",
     fixtureChildIds: ["child-ismailov-azizbek"],
     displayName: "Ismailov Bakhtiyor",
     displayChildren: [{ name: "Ismailov Sherzod", className: "10-А" }],
-  },
-  "934567890": {
-    username: "parent_rakhimov",
-    fixtureChildIds: ["child-rakhimov-madina", "child-rakhimov-humoyun"],
-    displayName: "Rakhimov Odil",
-    displayChildren: [
-      { name: "Rakhimova Nodira", className: "7-А" },
-      { name: "Rakhimov Rustam", className: "3-А" },
-    ],
-  },
-  "901234567": {
-    username: "parent_karimov",
-    fixtureChildIds: ["child-aziz", "child-malika", "child-farrukh"],
-    displayName: "Karimov Sardor",
-    displayChildren: [
-      { name: "Karimov Aziz", className: "3-А" },
-      { name: "Karimov Farrukh", className: "10-А" },
-      { name: "Karimova Malika", className: "7-А" },
-    ],
   },
 };
 
