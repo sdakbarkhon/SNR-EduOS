@@ -3041,6 +3041,26 @@ export const addLessonStage = async (
     }
   }
 
+  // K.2, 05.08.2026 — приготовление фоновой AI-генерации картинки/mermaid
+  // для нового этапа (Programming/Robotics — остальные предметы endpoint
+  // сам молча скипает, media_status='generated'). Единая точка вставки:
+  // и ручное создание (TeacherLessonDetailView::handleAddStage), и
+  // AI-генерация (AiGenerateStagesModal::addToLesson) вызывают именно эту
+  // функцию — см. resheniya_2.md почему /api/ai/generate-stages сам НЕ
+  // вставляет этапы (только возвращает JSON клиенту). Fire-and-forget:
+  // этап уже создан и возвращается клиенту независимо от результата;
+  // keepalive держит запрос живым даже если вкладка сразу же
+  // навигирует/закрывается. Safety-net крон подхватит, если fetch вообще
+  // не долетел (см. /api/cron/stage-media-backfill).
+  if (typeof window !== "undefined") {
+    fetch("/api/stage-media/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stageId: (data as LessonStage).id }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
   return data as LessonStage;
 };
 

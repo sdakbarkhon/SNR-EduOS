@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/close-past-lessons",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/stage-media-backfill",
+      "schedule": "0 2 * * *"
     }
   ]
 }
