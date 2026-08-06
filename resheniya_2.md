@@ -3981,3 +3981,25 @@ typecheck (`apps/web`), `next build` (92 страницы) и `pnpm lint:hooks` 
 - `morning-lesson-cycle` уже отключён (05.08.2026, предыдущее решение)
 - `close-past-lessons` продолжает работать по реальному времени, но исключает демо-школу через `nightly_close_enabled=false`
 - `rag-process-queue`, `homework-review-process` — от времени не зависят
+
+## 05.08.2026 — Починка cron endpoint для RAG и AI-проверки ДЗ
+
+По требованию заказчика: обе фичи внешне выглядели рабочими, но по факту были тихо сломаны — E.1 (RAG retrieval в AI-чате) и E.3 (AI-проверка ДЗ) вообще ни разу не выполнялись реальным Vercel Cron с момента появления.
+
+**Настоящая причина (обе фичи) — не то, что предполагалось в исходной разведке.** И `rag-process-queue/route.ts`, и `homework-review-process/route.ts` экспортировали только `POST`. Vercel Cron Jobs всегда шлют **HTTP GET** на настроенный path (документация: vercel.com/docs/cron-jobs, «Vercel makes an HTTP GET request»). Next.js App Router возвращает 405 Method Not Allowed для метода без соответствующего экспорта — то есть каждый плановый вызов крона с момента деплоя получал 405, тело функции не выполнялось вообще. Отсюда: RAG-очередь копилась с 29.07 (516 записей, `lesson_stage_embeddings` пусто), а «~20/день» у E.3 из предыдущей разведки — это, по всей видимости, следы ручных POST-тестов, а не настоящего крона.
+
+**План Vercel — Hobby, не Pro** (подтверждено `GET /v2/teams/{teamId}` → `billing: "hobby"`). Проверено против живой документации Vercel (WebFetch, дата страницы 2026-07-01) — на Hobby это не блокер: до 100 cron job на проект, минимальная частота — раз в сутки (у нас все три cron уже daily), точность ±59 минут от заданного часа. По `maxDuration` отдельно проверено два возможных лимита: legacy-Hobby без Fluid Compute — 10s; текущий Hobby через Fluid Compute — 300s (5 минут), совпадает с потолком у самого Pro-плана по умолчанию (Pro идёт дальше, до 800s/1800s). Через Vercel API (`GET /v9/projects/{id}`) подтверждено `resourceConfig.fluid: true`, `functionDefaultTimeout: 300` — Fluid Compute на проекте уже включён, значит доступны все 300s.
+
+CRON_SECRET в prod env — есть (`target: ["production","preview"]`), не был проблемой.
+
+**Что сделано:**
+- `apps/web/app/api/cron/rag-process-queue/route.ts`: тело функции вынесено в общий `handler()`, `GET` и `POST` оба его вызывают (POST оставлен для ручных curl/dev-тестов). `export const maxDuration = 300`, `export const dynamic = "force-dynamic"`. `BATCH_LIMIT` 20→100. Per-item try/catch с `attempts++`/`last_error` уже был реализован раньше — не трогал.
+- `apps/web/app/api/cron/homework-review-process/route.ts`: та же схема (общий `handler()`, GET+POST, maxDuration=300, force-dynamic). `BATCH_LIMIT` 10→30 (меньше чем у RAG — `reviewHomework()` это генеративный Gemini-вызов с длинным промптом, дороже по времени чем embedding). `processHomeworkReviewQueueBatch()` (`lib/ai/process-homework-review-queue.ts`) уже обрабатывает очередь последовательным for-циклом с per-item try/catch — Promise.all() без таймаутов, которого боялась исходная разведка, там никогда не было.
+
+**Тестовый запуск (локально, `next dev`, тот же код что уйдёт в прод, реальные Supabase+Gemini):**
+- `GET /api/cron/rag-process-queue` с `Authorization: Bearer $CRON_SECRET` → `200`, 174 сек, `{"processed":100,"embedded_chunks":115,"deleted_stale":100,"errors":0}`. Живой DB-чек до/после: `lesson_stages_embedding_queue` 516→416, `lesson_stage_embeddings` 0→115. Ошибок (`attempts>0`) не накопилось.
+- `GET /api/cron/homework-review-process` → `200`, 4 сек, `{"processed":0,"errors":0}`. Негативные тесты: без заголовка → `401`, с неверным secret → `401` — авторизация работает корректно.
+
+**Честно про homework-review:** `ai_homework_review_queue` на момент теста пуста (0 записей), и все 460 `homework_submissions` имеют `ai_review_status = NULL` — ни один никогда не попадал в очередь. Это отдельная, не входившая в E.3 проблема (сам GET/maxDuration-фикс подтверждён работающим — 401/200 корректны, крash нет), но per-item AI-review логику вживую проверить не удалось, потому что нечего было обрабатывать. Похоже, что либо все 460 сдач засеяны до появления триггера очереди (миграция 140), либо новых сдач с тех пор не создавалось (заморозка времени). Не чинил — вне границ этой задачи, флагую на будущее.
+
+**Планы:** оба крона продолжат работать по расписанию раз в сутки (Hobby-ограничение) — RAG в `0 0 * * *` UTC, homework в `0 1 * * *` UTC. Отдельное наблюдение (не трогал, вне запроса): эти два времени в UTC — то есть по факту 05:00 и 06:00 Ташкента, а не 00:00/01:00, если исходно имелось в виду локальное время (Vercel cron всегда в UTC). Backfill оставшихся ~416 RAG-записей при batch=100/день — примерно 5 дней. Если нужно быстрее — либо чаще ручной curl, либо апгрейд Vercel до Pro (~$20/мес, снимает ограничение «раз в сутки», можно расписание почаще).

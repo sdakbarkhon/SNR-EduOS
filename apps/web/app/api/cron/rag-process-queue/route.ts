@@ -1,13 +1,26 @@
 // Пачка 5.1 — Vercel Cron (см. vercel.json): обрабатывает
 // lesson_stages_embedding_queue — считает эмбеддинги и пишет их в
 // lesson_stage_embeddings.
-
+//
+// 05.08.2026, фикс E.1: cron ни разу не отрабатывал с 29.07 (516 в очереди,
+// embeddings пусто). Причина — Vercel Cron всегда шлёт HTTP GET
+// (https://vercel.com/docs/cron-jobs: "Vercel makes an HTTP GET request"),
+// а здесь был экспортирован только POST — Next.js App Router отвечал 405 на
+// каждый реальный вызов планировщика, тело функции не выполнялось вообще.
+// GET и POST теперь оба вызывают общий handler() (POST оставлен для ручного
+// вызова из dev-инструментов/curl). maxDuration=300 — потолок Hobby-плана
+// через Fluid Compute (подтверждено: resourceConfig.fluid=true,
+// functionDefaultTimeout=300 у этого проекта), не Pro-only. BATCH_LIMIT
+// поднят 20→100 под этот бюджет времени.
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeEmbedding } from "@/lib/ai/embeddings";
 import { extractChunks } from "@/lib/ai/chunk-extractor";
 
-const BATCH_LIMIT = 20;
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
+const BATCH_LIMIT = 100;
 const MAX_ATTEMPTS = 3;
 const INTER_CALL_DELAY_MS = 500;
 
@@ -15,7 +28,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? req.headers.get("x-cron-secret");
   if (!process.env.CRON_SECRET || cronSecret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -123,4 +136,12 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(results);
+}
+
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
 }
