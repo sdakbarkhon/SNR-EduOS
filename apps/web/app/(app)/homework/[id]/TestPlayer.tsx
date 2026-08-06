@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle, Circle, XCircle, Loader2, Play, Clock, ChevronDown } from "lucide-react";
+import { Loader2, Play, Clock, ChevronDown } from "lucide-react";
 import {
   getDictionary,
   getTestQuestions,
@@ -19,6 +19,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { cn } from "@/lib/cn";
+import { QuizChoiceTile, QuizChoiceGrid, OPTION_LETTERS } from "@/components/quiz/QuizChoiceTile";
 
 const sb = createClient();
 
@@ -120,28 +121,26 @@ function Results({
                       <p className="text-sm font-semibold text-slate-700">{q.question_text}</p>
                     </div>
                     {q.question_type === "single_choice" && (
-                      <div className="flex flex-col gap-1.5">
-                        {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt) => {
+                      <QuizChoiceGrid>
+                        {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt, oi) => {
                           const isPicked = ans?.selected_option_id === opt.id;
                           const isCorrect = opt.is_correct;
-                          // green = верный; red = ученик выбрал неверный; нейтральный — остальные.
-                          const cls = isCorrect
-                            ? "bg-green-50 text-green-700 font-semibold"
-                            : isPicked
-                              ? "bg-red-50 text-red-700 font-semibold"
-                              : "text-slate-600";
-                          const Icon = isCorrect ? CheckCircle : isPicked ? XCircle : Circle;
-                          const iconCls = isCorrect ? "text-green-600" : isPicked ? "text-red-500" : "text-slate-300";
+                          // green = верный; red = ученик выбрал неверный; остальные — приглушены.
+                          const tileState = isCorrect ? "correct" : isPicked ? "wrong" : "disabled";
                           return (
-                            <div key={opt.id} className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm", cls)}>
-                              <Icon size={14} className={cn("shrink-0", iconCls)} />
-                              {opt.option_text}
-                              {isCorrect && <span className="ml-1 text-xs text-green-600">— {t.correctAnswer}</span>}
-                              {isPicked && !isCorrect && <span className="ml-1 text-xs text-red-500">— {t.yourAnswer}</span>}
+                            <div key={opt.id} className="flex flex-col items-center gap-1">
+                              <QuizChoiceTile
+                                index={oi}
+                                label={opt.option_text}
+                                optionLetter={OPTION_LETTERS[oi]}
+                                state={tileState}
+                              />
+                              {isCorrect && <span className="text-xs font-semibold text-green-600">{t.correctAnswer}</span>}
+                              {isPicked && !isCorrect && <span className="text-xs font-semibold text-red-500">{t.yourAnswer}</span>}
                             </div>
                           );
                         })}
-                      </div>
+                      </QuizChoiceGrid>
                     )}
                     {q.question_type === "open" && (
                       <div className="flex flex-col gap-1.5">
@@ -318,24 +317,21 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
               {q.question_text}
             </p>
             {q.question_type === "single_choice" && (
-              <fieldset className="flex flex-col gap-2">
-                {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt) => {
+              <QuizChoiceGrid>
+                {q.options.slice().sort((a, b) => a.order_index - b.order_index).map((opt, oi) => {
                   const selected = answers.get(q.id)?.selectedOptionId === opt.id;
                   return (
-                    <label key={opt.id} className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-all",
-                      selected ? "border-blue-500 bg-blue-50 font-semibold text-blue-700" : "border-slate-200 bg-white/80 text-slate-600 hover:border-blue-300",
-                    )}>
-                      <input type="radio" name={`q-${q.id}`} value={opt.id} checked={selected}
-                        onChange={() => setOption(q.id, opt.id)} className="sr-only" />
-                      <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2", selected ? "border-blue-500" : "border-slate-300")}>
-                        {selected && <span className="h-2 w-2 rounded-full bg-blue-500" />}
-                      </span>
-                      {opt.option_text}
-                    </label>
+                    <QuizChoiceTile
+                      key={opt.id}
+                      index={oi}
+                      label={opt.option_text}
+                      optionLetter={OPTION_LETTERS[oi]}
+                      state={selected ? "selected" : "idle"}
+                      onClick={() => setOption(q.id, opt.id)}
+                    />
                   );
                 })}
-              </fieldset>
+              </QuizChoiceGrid>
             )}
             {q.question_type === "open" && (
               <textarea

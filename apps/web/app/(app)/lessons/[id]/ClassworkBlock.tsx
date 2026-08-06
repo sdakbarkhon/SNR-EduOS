@@ -7,6 +7,7 @@ import { getClasswork, getMyClassworkSubmission, submitClasswork, getDictionary 
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { QuizChoiceTile, QuizChoiceGrid, OPTION_LETTERS } from "@/components/quiz/QuizChoiceTile";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -235,30 +236,18 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
                 <p className="text-sm font-medium text-[var(--text-1)]">
                   {qi + 1}. {q.question_text}
                 </p>
-                <div className="space-y-1.5">
+                <QuizChoiceGrid>
                   {q.options.map((opt: string, oi: number) => (
-                    <button
+                    <QuizChoiceTile
                       key={oi}
+                      index={oi}
+                      label={opt}
+                      optionLetter={OPTION_LETTERS[oi]}
+                      state={testAnswers[qi] === oi ? "selected" : "idle"}
                       onClick={() => setTestAnswers((prev) => prev.map((a, i) => (i === qi ? oi : a)))}
-                      className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl border text-sm transition-colors ${
-                        testAnswers[qi] === oi
-                          ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
-                          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-2)] hover:border-[var(--text-3)]"
-                      }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                          testAnswers[qi] === oi
-                            ? "border-[var(--accent)] bg-[var(--accent)]"
-                            : "border-current"
-                        }`}
-                      >
-                        {testAnswers[qi] === oi && <span className="w-2 h-2 rounded-full bg-white" />}
-                      </span>
-                      {opt}
-                    </button>
+                    />
                   ))}
-                </div>
+                </QuizChoiceGrid>
               </div>
             ))}
 

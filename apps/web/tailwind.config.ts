@@ -48,9 +48,22 @@ const config: Config = {
           "0%":   { transform: "translateX(100%)" },
           "100%": { transform: "translateX(-100%)" },
         },
+        // K.4 — SNR-плитки вариантов ответа теста (QuizChoiceTile).
+        "tile-pop": {
+          "0%":   { transform: "scale(1)" },
+          "50%":  { transform: "scale(1.05)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "tile-shake": {
+          "0%, 100%": { transform: "translateX(0)" },
+          "25%":      { transform: "translateX(-4px)" },
+          "75%":      { transform: "translateX(4px)" },
+        },
       },
       animation: {
         marquee: "marquee 18s linear forwards",
+        "tile-pop": "tile-pop 300ms ease-in-out",
+        "tile-shake": "tile-shake 200ms ease-in-out",
       },
     },
   },
