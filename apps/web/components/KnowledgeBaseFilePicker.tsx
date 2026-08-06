@@ -45,6 +45,7 @@ import { useLocale } from "@/components";
 import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { parseVideoUrl } from "@/lib/video-url";
+import { uploadVideoFile } from "@/lib/video-storage";
 
 export type PickedKnowledgeBaseFile = {
   source: "material" | "book" | "teacherLibrary";
@@ -58,7 +59,7 @@ export type PickedKnowledgeBaseFile = {
   // D3 — только для source==="teacherLibrary" (migration 148): отличает
   // обычный файл от видео-ссылки. undefined для source "material"/"book"
   // (у них своя, файловая, форма данных).
-  contentType?: "file" | "video_youtube" | "video_rutube";
+  contentType?: "file" | "video_youtube" | "video_rutube" | "video_mp4";
   externalUrl?: string | null;
   sourceUrl?: string | null;
 };
@@ -146,26 +147,42 @@ export function LibraryUploadModal({
 
     try {
       const sb = createClient();
-      const materialId = crypto.randomUUID();
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const storagePath = `${teacherId}/library/${materialId}/${safeName}`;
-
       const ramp = setInterval(() => setProgress((p) => Math.min(p + 5, 90)), 300);
-      const { error: uploadErr } = await sb.storage
-        .from("materials")
-        .upload(storagePath, file, { contentType: file.type || undefined, upsert: false });
-      clearInterval(ramp);
 
-      if (uploadErr) throw uploadErr;
-      setProgress(95);
+      // K.1, 05.08.2026 — .mp4 идёт отдельным путём: bucket lesson-videos
+      // (не "materials") + content_type='video_mp4'.
+      if (file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4")) {
+        const uploaded = await uploadVideoFile(sb, teacherId, file);
+        clearInterval(ramp);
+        setProgress(95);
+        await createLibraryMaterial(sb, {
+          contentType: "video_mp4",
+          title: title.trim(),
+          storagePath: uploaded.storagePath,
+          fileSizeBytes: uploaded.sizeBytes,
+          groupIds: Array.from(selectedGroupIds),
+        });
+      } else {
+        const materialId = crypto.randomUUID();
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `${teacherId}/library/${materialId}/${safeName}`;
 
-      await createLibraryMaterial(sb, {
-        title: title.trim(),
-        storagePath,
-        fileType: file.type || null,
-        fileSizeBytes: file.size,
-        groupIds: Array.from(selectedGroupIds),
-      });
+        const { error: uploadErr } = await sb.storage
+          .from("materials")
+          .upload(storagePath, file, { contentType: file.type || undefined, upsert: false });
+        clearInterval(ramp);
+
+        if (uploadErr) throw uploadErr;
+        setProgress(95);
+
+        await createLibraryMaterial(sb, {
+          title: title.trim(),
+          storagePath,
+          fileType: file.type || null,
+          fileSizeBytes: file.size,
+          groupIds: Array.from(selectedGroupIds),
+        });
+      }
 
       setProgress(100);
       onSuccess();
@@ -742,7 +759,7 @@ export function KnowledgeBaseFilePicker({
   // letting a KB-sourced video link through here is the same content kind,
   // just picked instead of typed.
   const isVideoItem = (it: { picked: PickedKnowledgeBaseFile }) =>
-    it.picked.contentType === "video_youtube" || it.picked.contentType === "video_rutube";
+    it.picked.contentType === "video_youtube" || it.picked.contentType === "video_rutube" || it.picked.contentType === "video_mp4";
   const items = acceptedTypes
     ? allItems.filter((it) => isVideoItem(it) || (it.picked.fileType && acceptedTypes.includes(it.picked.fileType)))
     : allItems;

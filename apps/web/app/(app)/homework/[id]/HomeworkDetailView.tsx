@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
@@ -67,8 +68,60 @@ function TeacherAttachmentCard({ hw }: { hw: HomeworkWithSubmission }) {
   const d = getDictionary(locale as Locale);
   const [downloading, setDownloading] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  // K.1, 05.08.2026 — video_mp4 (загруженный файл, bucket lesson-videos) —
+  // signed URL резолвится по клику, не готов заранее (в отличие от
+  // attachment_external_url у youtube/rutube).
+  const [mp4Url, setMp4Url] = useState<string | null>(null);
+  const [mp4Loading, setMp4Loading] = useState(false);
 
   const isVideo = hw.attachment_content_type === "video_youtube" || hw.attachment_content_type === "video_rutube";
+  const isVideoMp4 = hw.attachment_content_type === "video_mp4";
+
+  if (isVideoMp4) {
+    if (!hw.attachment_storage_path) {
+      return (
+        <GlassCard className="mb-4 p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+            {d.homework.teacherVideo}
+          </p>
+          <p className="text-sm text-slate-400">{d.homework.attachmentUnavailable}</p>
+        </GlassCard>
+      );
+    }
+    return (
+      <GlassCard className="mb-4 p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+          {d.homework.teacherVideo}
+        </p>
+        {!videoOpen ? (
+          <button
+            type="button"
+            disabled={mp4Loading}
+            onClick={async () => {
+              setMp4Loading(true);
+              try {
+                const url = await getHomeworkAttachmentUrl(sb, hw.attachment_storage_path!);
+                setMp4Url(url);
+                setVideoOpen(true);
+              } finally {
+                setMp4Loading(false);
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white/80 p-3 text-left transition hover:border-brand-blue/30 disabled:opacity-60"
+          >
+            <Video size={16} className="flex-shrink-0 text-brand-blue" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{hw.title}</span>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-brand-blue">
+              <Play size={12} />
+              {mp4Loading ? "…" : d.homework.detailWatch}
+            </span>
+          </button>
+        ) : mp4Url ? (
+          <VideoEmbedPlayer url={mp4Url} />
+        ) : null}
+      </GlassCard>
+    );
+  }
 
   if (isVideo) {
     // Защита от битых данных — CHECK homework_attachment_shape_chk (миграция

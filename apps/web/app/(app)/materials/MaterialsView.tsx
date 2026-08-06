@@ -171,6 +171,13 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
         }
         return;
       }
+      // K.1, 05.08.2026 — загруженный .mp4-файл (не ссылка): FileViewerModal
+      // не умеет .mp4 (нет такой ветки в resolveFileViewerKind), поэтому
+      // тем же videoPlayer-состоянием, что и для видео-ссылок выше.
+      if (mat.storage_path && resolveType(mat) === "video") {
+        setVideoPlayer({ url, title: mat.title });
+        return;
+      }
       const fileName = mat.storage_path?.split("/").pop() || mat.title || "material";
       setViewer({ url, title: mat.title, fileName });
     } catch (err) {

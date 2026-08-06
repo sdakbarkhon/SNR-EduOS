@@ -32,6 +32,7 @@ import { getDictionary, getSubjectStyle, deleteLibraryMaterial } from "@snr/core
 import type { Locale, LibraryMaterialWithDetails } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { FileViewerModal } from "@/components/FileViewerModal";
+import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { LibraryUploadModal, LibraryVideoLinkModal } from "@/components/KnowledgeBaseFilePicker";
 
 function iconFor(fileType: string | null, isVideo: boolean) {
@@ -178,6 +179,9 @@ export function TeacherLibraryTabView({
   const [query, setQuery] = useState("");
   const [filterSubject, setFilterSubject] = useState<string>(initialSubjectSlug ?? "all");
   const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
+  // K.1, 05.08.2026 — video_mp4-материалы (bucket lesson-videos) рендерятся
+  // через VideoEmbedPlayer, не FileViewerModal (тот не умеет .mp4).
+  const [videoPlayer, setVideoPlayer] = useState<{ url: string; title: string } | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -215,8 +219,14 @@ export function TeacherLibraryTabView({
   }
 
   async function handleOpen(m: LibraryMaterialWithDetails) {
-    if (m.content_type !== "file") {
+    if (m.content_type === "video_youtube" || m.content_type === "video_rutube") {
       if (m.external_url) window.open(m.external_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (m.content_type === "video_mp4") {
+      if (!m.url) { setError(dt.libraryErrUploadFailed); return; }
+      setSelectedId(null);
+      setVideoPlayer({ url: m.url, title: m.title });
       return;
     }
     if (!m.url) { setError(dt.libraryErrUploadFailed); return; }
@@ -257,6 +267,27 @@ export function TeacherLibraryTabView({
 
       {viewer && (
         <FileViewerModal url={viewer.url} title={viewer.title} fileName={viewer.fileName} onClose={() => setViewer(null)} />
+      )}
+
+      {videoPlayer && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+          onClick={() => setVideoPlayer(null)}
+        >
+          <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
+              <button
+                onClick={() => setVideoPlayer(null)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <VideoEmbedPlayer url={videoPlayer.url} />
+          </div>
+        </div>
       )}
 
       {showUpload && (

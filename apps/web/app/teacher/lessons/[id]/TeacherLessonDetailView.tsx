@@ -16,7 +16,7 @@ import {
   getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
   uploadLessonMaterial, deleteLessonMaterial, getLessonMaterialUrl,
-  linkLessonMaterialFromKnowledgeBase, addLessonMaterialVideo,
+  linkLessonMaterialFromKnowledgeBase, addLessonMaterialVideo, addLessonMaterialVideoFile,
   getSubjectStyle, getLessonExcuseRequests,
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
@@ -30,6 +30,7 @@ import type {
   QuizQuestionInput, QuizConfigForStage, CodeCompletionPayload, CodeCompletionGap,
 } from "@snr/core";
 import { SERVICE_CONFIG, validateServiceUrl, isExternalService, getServicesForSubject } from "@/lib/external-services";
+import { uploadVideoFile } from "@/lib/video-storage";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
@@ -839,15 +840,24 @@ export function TeacherLessonDetailView({
     setUploadVisibility('all');
   }
 
-  // Заказчик: материалы урока принимают ТОЛЬКО PDF. Проверяем и MIME
-  // (application/pdf — надёжно только когда браузер его правильно
-  // определил), и расширение (fallback для файлов с неверным/пустым MIME).
+  // Заказчик 11.07.2026 (325e84e): материалы урока принимают ТОЛЬКО PDF.
+  // Расширено 05.08.2026 (K.1) добавив .mp4 — новое явное требование того же
+  // заказчика перекрывает предыдущее (см. resheniya_2.md). Проверяем MIME
+  // (надёжно только когда браузер его правильно определил) и расширение
+  // (fallback для файлов с неверным/пустым MIME) для обоих форматов.
   function handleMaterialFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     if (!f) { setUploadFile(null); setUploadFileError(""); return; }
     const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      setUploadFileError("Разрешены только PDF файлы");
+    const isMp4 = f.type === "video/mp4" || f.name.toLowerCase().endsWith(".mp4");
+    if (!isPdf && !isMp4) {
+      setUploadFileError("Разрешены только PDF или .mp4 файлы");
+      setUploadFile(null);
+      e.target.value = "";
+      return;
+    }
+    if (isMp4 && f.size > 52428800) {
+      setUploadFileError("Файл слишком большой. Макс 50MB");
       setUploadFile(null);
       e.target.value = "";
       return;
@@ -1172,6 +1182,17 @@ export function TeacherLessonDetailView({
             platform: parsedVideoUrl.platform, sourceUrl: uploadVideoUrl.trim(), embedUrl: parsedVideoUrl.embedUrl,
             visibility: uploadVisibility,
           })
+        // K.1, 05.08.2026 — .mp4 файл идёт отдельным путём: bucket lesson-videos
+        // (не lesson-materials) + content_type='video_mp4', а не 'file'.
+        : uploadFile && uploadFile.name.toLowerCase().endsWith(".mp4")
+        ? await (async () => {
+            const uploaded = await uploadVideoFile(db, teacher.id, uploadFile);
+            return addLessonMaterialVideoFile(db, {
+              lessonId: lesson.id, teacherId: teacher.id, title: uploadTitle.trim(),
+              storagePath: uploaded.storagePath, fileSizeBytes: uploaded.sizeBytes,
+              visibility: uploadVisibility,
+            });
+          })()
         : await uploadLessonMaterial(db, {
             lessonId: lesson.id, teacherId: teacher.id, file: uploadFile!,
             title: uploadTitle.trim(), visibility: uploadVisibility,
@@ -1196,7 +1217,10 @@ export function TeacherLessonDetailView({
 
   async function handleDeleteMaterial() {
     if (!matToDelete) return;
-    await deleteLessonMaterial(db, matToDelete.id, matToDelete.file_storage_path, matToDelete.from_knowledge_base).catch(() => null);
+    await deleteLessonMaterial(
+      db, matToDelete.id, matToDelete.file_storage_path, matToDelete.from_knowledge_base,
+      matToDelete.content_type === "video_mp4" ? "lesson-videos" : "lesson-materials",
+    ).catch(() => null);
     setMaterials((prev) => prev.filter((m) => m.id !== matToDelete.id));
     setMatToDelete(null);
   }
@@ -1841,11 +1865,11 @@ export function TeacherLessonDetailView({
 
               {/* Блок 1 — файл */}
               <div className={hasVideoChoice || hasKBChoice ? "pointer-events-none opacity-40" : undefined}>
-                <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleMaterialFileChange} disabled={hasVideoChoice || hasKBChoice} />
+                <input ref={fileRef} type="file" accept=".pdf,application/pdf,.mp4,video/mp4" className="hidden" onChange={handleMaterialFileChange} disabled={hasVideoChoice || hasKBChoice} />
                 <button onClick={() => fileRef.current?.click()} disabled={hasVideoChoice || hasKBChoice}
                   className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
                   <Upload className="h-5 w-5" />
-                  {uploadFile ? uploadFile.name : "Выбрать PDF файл (макс. 50 МБ)"}
+                  {uploadFile ? uploadFile.name : "Выбрать PDF или .mp4 файл (макс. 50 МБ)"}
                 </button>
                 {uploadFileError && <p className="text-center text-[12px] text-red-500">{uploadFileError}</p>}
               </div>

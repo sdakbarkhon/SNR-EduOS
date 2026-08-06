@@ -10,6 +10,7 @@ import {
   uploadHomeworkAttachment,
   setHomeworkAttachment,
   setHomeworkAttachmentVideo,
+  setHomeworkAttachmentVideoFile,
   uploadHomeworkTestsFile,
   uploadHomeworkHint,
   setHomeworkHint,
@@ -24,6 +25,7 @@ import { FileText, ClipboardList, Trash2, Paperclip, X, ChevronLeft, Check, Code
 import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { parseVideoUrl } from "@/lib/video-url";
+import { uploadVideoFile } from "@/lib/video-storage";
 import { HomeworkAiGenerateModal, type GeneratedHomework } from "./HomeworkAiGenerateModal";
 import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { CodeEditor } from "@/components/CodeEditor";
@@ -302,6 +304,13 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
             path: linkedPath, sizeByte: pickedFromKB.sizeBytes ?? 0, fileName: pickedFromKB.title,
           });
         }
+      } else if (format === "file" && attachFile && attachFile.name.toLowerCase().endsWith(".mp4")) {
+        // K.1, 05.08.2026 — .mp4 идёт отдельным путём: bucket lesson-videos
+        // (не homework-files) + attachment_content_type='video_mp4'.
+        const uploaded = await uploadVideoFile(supabase, resolvedTeacherId, attachFile);
+        await setHomeworkAttachmentVideoFile(supabase, hw.id, {
+          storagePath: uploaded.storagePath, sizeByte: uploaded.sizeBytes, fileName: attachFile.name,
+        });
       } else if (format === "file" && attachFile) {
         const { path, sizeByte } = await uploadHomeworkAttachment(supabase, {
           teacherId: resolvedTeacherId,

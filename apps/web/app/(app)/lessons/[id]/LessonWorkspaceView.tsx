@@ -218,7 +218,7 @@ function TaskStubModal({
 }
 
 // ── MaterialViewerModal ────────────────────────────────────────────────────────
-type ViewerMaterial = { url: string; type: "pdf" | "image" | "embed" | "other"; title: string };
+type ViewerMaterial = { url: string; type: "pdf" | "image" | "embed" | "video" | "other"; title: string };
 
 function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: () => void }) {
   const { locale } = useLocale();
@@ -272,6 +272,10 @@ function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: (
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
+        )}
+        {mat.type === "video" && (
+          // K.1, 05.08.2026 — загруженный .mp4 (не youtube/rutube-ссылка).
+          <video controls src={mat.url} className="max-h-full max-w-full" />
         )}
       </div>
     </div>,
@@ -611,7 +615,7 @@ export function LessonWorkspaceView({
     const fname = m.file_original_name ?? m.title;
     const kind = demoKind(fname, url);
     const viewerType: ViewerMaterial["type"] =
-      kind === "pdf" ? "pdf" : kind === "image" ? "image" : kind === "embed" ? "embed" : "other";
+      kind === "pdf" ? "pdf" : kind === "image" ? "image" : kind === "embed" ? "embed" : kind === "video" ? "video" : "other";
     if (viewerType === "other") {
       window.open(url, "_blank", "noopener,noreferrer");
     } else {

@@ -532,6 +532,11 @@ export function TeacherMaterialsView({
         }
         return;
       }
+      // K.1, 05.08.2026 — загруженный .mp4-файл (не ссылка).
+      if (mat.storage_path && resolveType(mat) === "video") {
+        setVideoPlayer({ url, title: mat.title });
+        return;
+      }
       const fileName = mat.storage_path?.split("/").pop() || mat.title || "material";
       setViewer({ url, title: mat.title, fileName });
     } catch {

@@ -373,7 +373,7 @@ export type LessonMaterial = {
   // поля этой группы NULL. external_url — уже нормализованный embed-URL
   // (готов для <iframe src>), source_url — то, что вставил учитель (для
   // отображения "откуда").
-  content_type: 'file' | 'video_youtube' | 'video_rutube';
+  content_type: 'file' | 'video_youtube' | 'video_rutube' | 'video_mp4';
   external_url: string | null;
   source_url: string | null;
 };
@@ -386,7 +386,7 @@ export type LessonMaterial = {
 // Зеркалит lesson_materials.content_type/external_url/source_url
 // (миграция 138) — тот же классификатор (apps/web/lib/material-kind.ts,
 // FileViewerModal.tsx) уже умеет их рендерить без правок.
-export type LibraryMaterialContentType = "file" | "video_youtube" | "video_rutube";
+export type LibraryMaterialContentType = "file" | "video_youtube" | "video_rutube" | "video_mp4";
 
 export type LibraryMaterial = {
   id: string;
@@ -741,7 +741,7 @@ export type TestAnswer = {
 // использует свои content_type/external_url на homework). Имена нарочно
 // с префиксом attachment_, чтобы не столкнуться с уже занятыми
 // content_type/external_url.
-export type HomeworkAttachmentContentType = 'file' | 'video_youtube' | 'video_rutube';
+export type HomeworkAttachmentContentType = 'file' | 'video_youtube' | 'video_rutube' | 'video_mp4';
 
 export type HomeworkWithSubmission = {
   id: string;

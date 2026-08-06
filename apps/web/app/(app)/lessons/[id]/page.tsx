@@ -44,14 +44,18 @@ export default async function LessonPage({
   const materialUrls: Record<string, string> = {};
   await Promise.all(
     lesson.materials.map(async (m) => {
-      // Пачка 4 — видео-материал не в Storage (file_storage_path=null),
-      // getLessonMaterialUrl упал бы на нём; embed-URL уже готов на записи.
-      if (m.content_type !== "file") {
+      // Пачка 4 — видео-ссылка (youtube/rutube) не в Storage
+      // (file_storage_path=null), getLessonMaterialUrl упал бы на ней;
+      // embed-URL уже готов на записи.
+      if (m.content_type === "video_youtube" || m.content_type === "video_rutube") {
         if (m.external_url) materialUrls[m.id] = m.external_url;
         return;
       }
+      // K.1, 05.08.2026 — video_mp4 живёт в Storage (file_storage_path),
+      // но в отдельном бакете lesson-videos, не lesson-materials/kb_bucket.
+      const bucket = m.content_type === "video_mp4" ? "lesson-videos" : (m.kb_bucket ?? "lesson-materials");
       try {
-        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path!, undefined, m.kb_bucket ?? "lesson-materials");
+        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path!, undefined, bucket);
       } catch { /* skip if URL generation fails */ }
     }),
   );

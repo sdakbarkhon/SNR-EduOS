@@ -2762,18 +2762,54 @@ export const addLessonMaterialVideo = async (
   return data as LessonMaterial;
 };
 
+/** K.1, 05.08.2026 — материал урока как загруженный .mp4-файл (миграция 167,
+ *  bucket lesson-videos — отдельный от "lesson-materials"). storagePath уже
+ *  готов (загрузка в Storage делает вызывающий код, apps/web/lib/
+ *  video-storage.ts::uploadVideoFile — сюда, как и в addLessonMaterialVideo
+ *  выше, саму загрузку не тащим). */
+export const addLessonMaterialVideoFile = async (
+  db: Db,
+  input: {
+    lessonId: string;
+    teacherId: string;
+    title: string;
+    storagePath: string;
+    fileSizeBytes: number;
+    visibility?: 'all' | 'teacher_only';
+  },
+): Promise<LessonMaterial> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_materials")
+    .insert({
+      lesson_id: input.lessonId,
+      title: input.title,
+      content_type: "video_mp4",
+      file_storage_path: input.storagePath,
+      file_size_bytes: input.fileSizeBytes,
+      uploaded_by: input.teacherId,
+      visibility: input.visibility ?? 'all',
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as LessonMaterial;
+};
+
 /** Удаляет материал из Storage и БД. Файл из Storage НЕ удаляется, если это
  *  линк на Базу знаний (from_knowledge_base) — тот же файл used ещё
  *  course_materials/books записью, удаление сломало бы её — ИЛИ если это
- *  video-материал (storagePath пуст, нечего удалять в Storage). */
+ *  video-ссылка (storagePath пуст, нечего удалять в Storage). bucket — K.1,
+ *  05.08.2026: video_mp4-записи лежат в "lesson-videos", не "lesson-materials". */
 export const deleteLessonMaterial = async (
   db: Db,
   materialId: string,
   storagePath: string | null,
   fromKnowledgeBase = false,
+  bucket: "lesson-materials" | "lesson-videos" = "lesson-materials",
 ): Promise<void> => {
   if (!fromKnowledgeBase && storagePath) {
-    await db.storage.from("lesson-materials").remove([storagePath]);
+    await db.storage.from(bucket).remove([storagePath]);
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (db as any).from("lesson_materials").delete().eq("id", materialId);
@@ -3986,6 +4022,32 @@ export const setHomeworkAttachmentVideo = async (
   if (error) throw error;
 };
 
+/** K.1, 05.08.2026, миграция 167 — вложение задания как загруженный .mp4-
+ *  файл (bucket lesson-videos, не "homework-files"). storagePath уже готов
+ *  — загрузку делает apps/web/lib/video-storage.ts::uploadVideoFile. Явно
+ *  зануляет video-URL поля (CHECK требует их NULL для video_mp4), тем же
+ *  принципом что setHomeworkAttachment/setHomeworkAttachmentVideo выше. */
+export const setHomeworkAttachmentVideoFile = async (
+  db: Db,
+  homeworkId: string,
+  file: { storagePath: string; sizeByte: number; fileName: string },
+) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db.from("homework") as any)
+    .update({
+      attachment_content_type: "video_mp4",
+      // videoAttachmentPath() — "video:"-префикс, resolveAttachmentBucket()
+      // ниже раскодирует его в bucket "lesson-videos" при чтении/удалении.
+      attachment_storage_path: `video:${file.storagePath}`,
+      attachment_size_bytes: file.sizeByte,
+      attachment_filename: file.fileName,
+      attachment_external_url: null,
+      attachment_source_url: null,
+    })
+    .eq("id", homeworkId);
+  if (error) throw error;
+};
+
 /** Signed URL for teacher attachment (accessible to both student and teacher). */
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.4 — attaching an existing Knowledge Base file
 // (course_materials/books) to homework must NOT copy it: the homework row's
@@ -4003,12 +4065,25 @@ export function linkedBookAttachmentPath(storagePath: string): string {
   return `${KB_BOOK_PREFIX}${storagePath}`;
 }
 
+// K.1, 05.08.2026 — video_mp4-вложение живёт в bucket "lesson-videos", не
+// "homework-files". В отличие от KB_MATERIAL_PREFIX/KB_BOOK_PREFIX это НЕ
+// линк на чужой файл (isLinked:false ниже) — загрузка своя, принадлежит
+// этому homework, поэтому deleteHomeworkAttachment должен реально удалить
+// объект из Storage при снятии вложения, как и для обычного 'file'.
+const VIDEO_PREFIX = "video:";
+export function videoAttachmentPath(storagePath: string): string {
+  return `${VIDEO_PREFIX}${storagePath}`;
+}
+
 function resolveAttachmentBucket(storagePath: string): { bucket: string; path: string; isLinked: boolean } {
   if (storagePath.startsWith(KB_MATERIAL_PREFIX)) {
     return { bucket: "materials", path: storagePath.slice(KB_MATERIAL_PREFIX.length), isLinked: true };
   }
   if (storagePath.startsWith(KB_BOOK_PREFIX)) {
     return { bucket: "books", path: storagePath.slice(KB_BOOK_PREFIX.length), isLinked: true };
+  }
+  if (storagePath.startsWith(VIDEO_PREFIX)) {
+    return { bucket: "lesson-videos", path: storagePath.slice(VIDEO_PREFIX.length), isLinked: false };
   }
   return { bucket: "homework-files", path: storagePath, isLinked: false };
 }

@@ -23,19 +23,21 @@ type LibraryMaterialRow = LibraryMaterial & {
   groups: Array<{ group: { id: string; name: string } | null }> | null;
 };
 
-/** Signed URL (1 час) на файл библиотеки в бакете "materials" —
- *  переиспользует тот же бакет и тот же 3600s-паттерн, что
- *  getMaterialDownloadUrl/getLessonMaterialUrl в index.ts (не импортируем
- *  их напрямую — см. комментарий в шапке файла про циклическую зависимость;
- *  каждый домен в этой кодовой базе держит свой тонкий сигнед-урл враппер,
- *  см. getLessonMaterialUrl/getMaterialDownloadUrl/getStageAttachmentUrl). */
+/** Signed URL (1 час) на файл библиотеки — бакет "materials" по умолчанию,
+ *  переиспользует тот же паттерн, что getMaterialDownloadUrl/
+ *  getLessonMaterialUrl в index.ts (не импортируем их напрямую — см.
+ *  комментарий в шапке файла про циклическую зависимость; каждый домен в
+ *  этой кодовой базе держит свой тонкий сигнед-урл враппер, см.
+ *  getLessonMaterialUrl/getMaterialDownloadUrl/getStageAttachmentUrl).
+ *  bucket — K.1, 05.08.2026: video_mp4-записи лежат в "lesson-videos". */
 export const getLibraryMaterialUrl = (
   db: Db,
   storagePath: string,
   downloadAs?: string,
+  bucket: string = "materials",
 ): Promise<string> =>
   db.storage
-    .from("materials")
+    .from(bucket)
     .createSignedUrl(storagePath, 3600, downloadAs ? { download: downloadAs } : undefined)
     .then(({ data, error }) => {
       if (error) throw error;
@@ -82,9 +84,13 @@ export async function getLibraryMaterials(
       groups: (r.groups ?? [])
         .map((g) => g.group)
         .filter((g): g is LibraryMaterialGroup => g !== null),
-      // migration 148 — видео-ссылки не имеют Storage-объекта: signed URL
-      // не запрашиваем (нечего подписывать), открывать по external_url.
-      url: r.content_type === "file" && r.storage_path ? await getLibraryMaterialUrl(db, r.storage_path) : null,
+      // migration 148 — video_youtube/video_rutube не имеют Storage-объекта:
+      // signed URL не запрашиваем (нечего подписывать), открывать по
+      // external_url. video_mp4 (K.1, 05.08.2026) — есть storage_path, но в
+      // отдельном бакете lesson-videos, не "materials".
+      url: r.storage_path
+        ? await getLibraryMaterialUrl(db, r.storage_path, undefined, r.content_type === "video_mp4" ? "lesson-videos" : "materials")
+        : null,
     })),
   );
 }
@@ -110,6 +116,16 @@ export type CreateLibraryMaterialInput =
       title: string;
       externalUrl: string;
       sourceUrl: string;
+      groupIds: string[];
+    }
+  | {
+      // K.1, 05.08.2026, миграция 167 — загруженный .mp4 (bucket
+      // lesson-videos, не "materials"). storagePath уже готов — загрузку
+      // делает apps/web/lib/video-storage.ts::uploadVideoFile.
+      contentType: "video_mp4";
+      title: string;
+      storagePath: string;
+      fileSizeBytes: number;
       groupIds: string[];
     };
 
@@ -146,8 +162,7 @@ export async function createLibraryMaterial(
     throw new Error("Куратор (без привязки к предмету) не может загружать материалы в библиотеку");
   }
 
-  const isVideo = "externalUrl" in input;
-  const insertRow = isVideo
+  const insertRow = "externalUrl" in input
     ? {
         uploaded_by: teacher.id,
         subject_slug: teacher.subject_slug,
@@ -155,6 +170,15 @@ export async function createLibraryMaterial(
         content_type: input.contentType,
         external_url: input.externalUrl,
         source_url: input.sourceUrl,
+      }
+    : input.contentType === "video_mp4"
+    ? {
+        uploaded_by: teacher.id,
+        subject_slug: teacher.subject_slug,
+        title: input.title,
+        content_type: "video_mp4" as const,
+        storage_path: input.storagePath,
+        file_size_bytes: input.fileSizeBytes,
       }
     : {
         uploaded_by: teacher.id,
