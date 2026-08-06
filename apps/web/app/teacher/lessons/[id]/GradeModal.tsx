@@ -8,7 +8,6 @@ import type { Locale, LessonGrade } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { useIsDemoSession } from "@/lib/useIsDemoSession";
 
 const GRADE_COLORS: Record<number, { bg: string; text: string; ring: string }> = {
   1: { bg: "bg-red-500",    text: "text-white", ring: "ring-red-400" },
@@ -33,10 +32,6 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
   const db = createClient();
-  // existing === null: новая оценка — всегда разрешена (создание, не правка).
-  // existing.is_demo === false: реальная оценка — демо-сессии её править нельзя.
-  const isDemoSession = useIsDemoSession();
-  const editBlocked = isDemoSession && existing != null && !existing.is_demo;
 
   const [grade, setGrade] = useState<number | null>(existing?.grade ?? null);
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
@@ -51,7 +46,7 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
   const canSave = grade != null && (selectedPreset != null || (isOther && customText.trim().length > 0));
 
   async function handleSave() {
-    if (!canSave || !grade || editBlocked) return;
+    if (!canSave || !grade) return;
     setSaving(true);
     try {
       const saved = await gradeStudentForLesson(db, lessonId, teacherId, studentId, grade, comment);
@@ -90,11 +85,6 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
         </div>
 
         <div className="p-5 space-y-5">
-          {editBlocked && (
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-              {d.demoMode.cannotEditRealData}
-            </p>
-          )}
           {/* Grade picker */}
           <div>
             <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-slate-400">{dl.gradeChoose}</p>
@@ -173,8 +163,7 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
           </button>
           <button
             onClick={handleSave}
-            disabled={!canSave || saving || editBlocked}
-            title={editBlocked ? d.demoMode.cannotEditRealData : undefined}
+            disabled={!canSave || saving}
             className="inline-flex items-center gap-1.5 rounded-xl bg-brand-blue px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-brand-blue/90 active:scale-95 disabled:opacity-40"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}

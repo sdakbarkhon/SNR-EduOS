@@ -22,15 +22,12 @@ export function useIsDemoSession(): boolean {
   return useSyncExternalStore(subscribe, readCookie, () => false);
 }
 
-/**
- * P2: в новой модели демо-сессия правит РЕАЛЬНЫЕ данные — эта функция
- * всегда возвращает false. Оставлена как совместимый no-op, чтобы не
- * править ~10 вызывающих компонентов одним патчем; callers постепенно
- * зачищаются в последующих коммитах.
- */
-export function useDemoEditBlocked(_recordIsDemo: boolean | null | undefined): boolean {
-  return false;
-}
+// 06.08.2026: useDemoEditBlocked() удалён — последний вызывающий
+// (TeacherLessonsView) зачищен вместе с 5 inline-проверками вида
+// `isDemoSession && !record.is_demo`, которые из-за дропнутой в 132 колонки
+// схлопывались в чистый isDemoSession и молча блокировали учителя в демо.
+// Экспортировать всегда-false хелпер дальше опасно: он выглядит как живая
+// защита, но ею не является (см. resheniya_2.md 06.08).
 
 /**
  * P2: триггер fn_stamp_is_demo (миграция 110) удалён миграцией 132 —

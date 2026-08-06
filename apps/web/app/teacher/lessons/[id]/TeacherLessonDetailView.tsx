@@ -45,7 +45,7 @@ import { RaisedHandsBlock } from "./RaisedHandsBlock";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { useToast } from "@/components/Toast";
-import { useIsDemoSession, isDemoEditBlockedError } from "@/lib/useIsDemoSession";
+import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
@@ -742,7 +742,6 @@ export function TeacherLessonDetailView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
-  const isDemoSession = useIsDemoSession();
 
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
@@ -1414,7 +1413,6 @@ export function TeacherLessonDetailView({
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {materials.map((mat) => {
-              const matEditBlocked = isDemoSession && !mat.is_demo;
               const isVideo = mat.content_type !== "file";
               return (
               <div key={mat.id} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -1454,10 +1452,9 @@ export function TeacherLessonDetailView({
                     )}
                     {!readOnly && (
                       <button
-                        onClick={() => { if (matEditBlocked) return; setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
-                        disabled={matEditBlocked}
+                        onClick={() => { setMatToDelete(mat); setConfirmDeleteMatOpen(true); }}
                         className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                        title={matEditBlocked ? d.demoMode.cannotEditRealData : dl.deleteConfirm}>
+                        title={dl.deleteConfirm}>
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -1775,10 +1772,8 @@ export function TeacherLessonDetailView({
                     </>
                   )}
                   <button
-                    onClick={() => { if (isDemoSession && !stage.is_demo) return; setStageToDelete(stage); }}
-                    disabled={isDemoSession && !stage.is_demo}
+                    onClick={() => setStageToDelete(stage)}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-                    title={isDemoSession && !stage.is_demo ? d.demoMode.cannotEditRealData : undefined}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

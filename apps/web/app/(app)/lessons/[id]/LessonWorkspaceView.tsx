@@ -466,8 +466,13 @@ export function LessonWorkspaceView({
     // When lesson ends, show completion modal (intercepts router.refresh)
     if (newStatus && newStatus !== lesson.status) {
       if (newStatus === "completed") {
+        // 06.08.2026: замороженное время, не Date.now() — иначе после переноса
+        // якоря на 01.08 (там есть реально идущий урок со started_at того же
+        // дня) длительность считалась бы от НАСТОЯЩИХ часов и росла на сутки
+        // в сутки: «123:27:44» вместо «00:27:16». Строка 407 рядом уже
+        // использует getDemoNow(), это место просто про неё забыли.
         const duration = lesson.started_at
-          ? Date.now() - new Date(lesson.started_at).getTime()
+          ? getDemoNow().getTime() - new Date(lesson.started_at).getTime()
           : 0;
         if (duration > 60000) {
           setCompletedElapsed(fmtElapsed(duration));
