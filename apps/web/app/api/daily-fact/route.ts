@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/lib/ai/gemini-client";
+import { getDemoNow } from "@/lib/demo-date";
 
 function getTashkentDate(): string {
-  return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+  return getDemoNow().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
 }
 
 // Промт 6.2.1: реальная причина 502 — не сам факт отказа AI-вызова (тот уже

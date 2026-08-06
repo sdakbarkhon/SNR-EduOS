@@ -77,6 +77,7 @@ import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSupabase } from "../../lib/supabase";
 import { tashkentDateKey } from "../../lib/tashkent";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
+import { getAppNow } from "../../lib/appTime";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -323,7 +324,7 @@ export default function HomeScreen() {
   // подходящего. Если его нет во всём 7-дневном скользящем окне — честный
   // нейтральный placeholder (не фейк), не «эта неделя закончилась».
   const nextLessonReal = useMemo(
-    () => (weekLessons ?? []).find((l) => l.starts_at >= new Date().toISOString()) ?? null,
+    () => (weekLessons ?? []).find((l) => l.starts_at >= getAppNow().toISOString()) ?? null,
     [weekLessons],
   );
   const attendanceTodayReal = useMemo(

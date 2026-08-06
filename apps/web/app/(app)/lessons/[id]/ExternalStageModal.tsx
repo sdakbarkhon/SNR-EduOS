@@ -13,6 +13,7 @@ import type {
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS } from "@/lib/external-services";
+import { getDemoNow } from "@/lib/demo-date";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { useFullscreenToggle } from "@/lib/useFullscreenToggle";
 
@@ -102,7 +103,7 @@ export function ExternalStageModal({
   // Only used by the (currently unreachable — all 4 services embed) non-embeddable fallback below.
   function handleOpenService() {
     if (openUrl) window.open(openUrl, "_blank", "noopener,noreferrer");
-    setLastOpenedAt(new Date().toISOString());
+    setLastOpenedAt(getDemoNow().toISOString());
   }
 
   const requiredOk =
@@ -118,7 +119,7 @@ export function ExternalStageModal({
       const submission: ExternalServiceSubmission = {
         link: link.trim() || undefined,
         screenshot_path: screenshotPath || undefined,
-        last_opened_at: lastOpenedAt || new Date().toISOString(),
+        last_opened_at: lastOpenedAt || getDemoNow().toISOString(),
       };
       const progress = await submitStageTask(db, stage.id, studentId, submission as unknown as Record<string, unknown>);
       onSubmitted(progress);

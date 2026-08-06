@@ -6,16 +6,21 @@
  */
 import type { DatePickerMonth, DemoToday, LessonSetId, ScheduleDayRow, SubjectKey } from "../types";
 
-/** Демо-«сегодня» = среда 23 июля 2026 (initial state: dsMonth 1, dsSel 23,
- *  schedDay 2; «сейчас» — идёт 3-й урок, оценка в 10:42). */
+/** Демо-«сегодня» = среда 29 июля 2026 (05.08.2026: заморозка времени
+ *  навсегда, client requirement — было 23 июля). weekday_index не менялся —
+ *  29.07.2026 тоже среда (index 2), совпало. Время внутри now_iso (10:42,
+ *  «идёт 3-й урок») НЕ трогаю — привязано к отдельной, защищённой логике
+ *  "1-completed/2-in_progress/3+ ручной старт" (TODAY_LIVE_LESSON_INDEX
+ *  ниже), которую эта задача явно просила не трогать/не рефакторить. Только
+ *  дата внутри now_iso сдвинута на новую, время осталось как было. */
 export const DEMO_TODAY: DemoToday = {
-  iso_date: "2026-07-23",
-  now_iso: "2026-07-23T10:42:00+05:00",
-  day: 23,
+  iso_date: "2026-07-29",
+  now_iso: "2026-07-29T10:42:00+05:00",
+  day: 29,
   month_index: 1,
   weekday_index: 2,
-  label_full: "Среда, 23 июля",
-  label_today: "Сегодня, 23 июля",
+  label_full: "Среда, 29 июля",
+  label_today: "Сегодня, 29 июля",
 };
 
 export const SLOT_STARTS = ["08:30", "09:25", "10:20", "11:15", "12:10", "13:05"] as const;

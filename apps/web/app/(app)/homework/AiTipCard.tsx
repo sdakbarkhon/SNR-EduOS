@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { getStudyTip } from "@/app/actions/ai";
+import { getDemoNow } from "@/lib/demo-date";
 
 function RobotMascot() {
   return (
@@ -125,7 +126,7 @@ export function AiTipCard({ tipLabel }: { tipLabel: string }) {
 
   async function load() {
     setLoading(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getDemoNow().toISOString().slice(0, 10);
     const key = `study_tip_${today}`;
     const cached = typeof window !== "undefined" ? localStorage.getItem(key) : null;
     if (cached) { setTip(cached); setLoading(false); return; }

@@ -48,7 +48,8 @@
       },
       "supabaseUrl": "https://qaljcmkkajqyawccxetq.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhbGpjbWtrYWpxeWF3Y2N4ZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA5ODksImV4cCI6MjA5NzIwNjk4OX0.PrvoDl7xAqBd51Y9mbfZSjXcmSHskXmGcvNsmA4Sd70",
-      "webApiBaseUrl": "https://snr-edu-os-web.vercel.app"
+      "webApiBaseUrl": "https://snr-edu-os-web.vercel.app",
+      "frozenDate": "2026-07-29T05:50:00.000Z"
     },
     "updates": {
       "url": "https://u.expo.dev/b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"

@@ -13,6 +13,7 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { getDemoNow } from "@/lib/demo-date";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
 import { GradeModal } from "./GradeModal";
@@ -84,7 +85,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
     if (readOnly || next === oldStatus || rowEditBlocked) return;
     setRows((prev) =>
       prev.map((r) =>
-        r.student_id === studentId ? { ...r, status: next, marked_at: new Date().toISOString() } : r,
+        r.student_id === studentId ? { ...r, status: next, marked_at: getDemoNow().toISOString() } : r,
       ),
     );
     try {

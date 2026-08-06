@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { tashkentToday } from "../lib/tashkent";
+import { getAppNowMs } from "../lib/appTime";
 
 /**
  * Долги, проход 2 — «сегодня» (Ташкент) больше не застывает на дате
@@ -58,5 +59,5 @@ export function useTashkentToday(): string {
 function msUntilNextTashkentMidnight(): number {
   const [y, m, d] = tashkentToday().split("-").map(Number);
   const nextMidnightUtcMs = Date.UTC(y, m - 1, d + 1) - 5 * 3600000;
-  return Math.max(1000, nextMidnightUtcMs - Date.now() + 500);
+  return Math.max(1000, nextMidnightUtcMs - getAppNowMs() + 500);
 }

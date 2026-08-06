@@ -3956,3 +3956,28 @@ typecheck (`apps/web`), `next build` (92 страницы) и `pnpm lint:hooks` 
 - Веб `/parent` демо-логин (миграция 163) уже жёстко ведёт в Ismailov — не тронут.
 
 Скрипт `apps/web/scripts/purge-extra-parents.mjs` (recon + execute) оставлен в репозитории для истории.
+
+## 05.08.2026 — Заморозка времени приложения на 29.07.2026 10:50 Ташкент
+
+По требованию заказчика: всё видимое в UI время (веб + мобилка + родитель) навсегда зафиксировано на среду 29.07.2026, 10:50 утра Ташкент. Причина: демо-школа не должна показывать реальные текущие даты, каждый день заходя на сайт заказчик видит статичное состояние.
+
+Якорь 10:50 выбран специально: соответствует перемене между 2-м и 3-м уроком. Правило "1-й урок completed / 2-й in_progress / 3+ начинается вручную" встаёт естественно.
+
+Что заморожено:
+- `apps/web/lib/demo-date.ts` — переведён с переключаемого `NEXT_PUBLIC_DEMO_FROZEN_DATE` (env var) на хардкод-константу `FROZEN_AT_ISO = "2026-07-29T10:50:00+05:00"`, `isDemoMode()` теперь всегда `true` (0 вызывающих мест в кодовой базе — проверено, безопасно).
+- Дисплейные `new Date()`/`Date.now()` в клиентском UI (11 из 13 мест списка — 2 не нашлись, см. ниже), SSR/Server Actions (проверка инвайтов, `signOut()` last_activity, промпт AI-совета), API routes (`/api/mobile/insight` — тело ответа + 30-дневное окно анализа, `start-with-close-previous`, `daily-fact`).
+- `homeworkCategory()`/`deadlineUrgency()` в `packages/core/src/presenters/derive.ts` — добавлен параметр `now` (по образцу уже существующих `nextLesson()`/`lessonStatus()` в тех же файлах). Заодно прокинут через `homeworkCounts()` (не было в изначальном списке — нашлась при реализации: она сама вызывает `homeworkCategory()` внутри, без прокидывания счётчики табов разошлись бы со списком на том же экране `HomeworkView.tsx`). Прокинуто в `HomeworkView.tsx`, `HomeworkCard.tsx`, `HomeworkCalendarCard.tsx` — теперь ученик/учитель/родитель видят одинаковый статус ДЗ.
+- Мобилка `apps/mobile-parent`: новая утилита `src/lib/appTime.ts` (`getAppNow()/getAppNowMs()/isFrozen()`), значение — `app.json` → `expo.extra.frozenDate` (тот же паттерн, что уже используется для `supabaseUrl`/`supabaseAnonKey`, публикуется через `eas update`, нового APK не требует). Подключена в `tashkent.ts::tashkentToday()`, `useTashkentToday.ts` (таймер полуночи), `HomeScreen.tsx` ("следующий урок"). `HomeworksScreen.tsx:145-146` отдельно не трогал — там `todayKey` уже приходит из `useTashkentToday()`, чинится транзитивно. `DEMO_TODAY` в `data/fixtures/schedule.ts` — это не строка, а структурный объект (`iso_date/now_iso/day/month_index/weekday_index/label_full/label_today`) — обновил все поля-даты на 29.07 (29.07.2026 тоже среда — `weekday_index` совпал, менять не пришлось), но ВРЕМЯ внутри `now_iso` (10:42, "идёт 3-й урок") сознательно не тронул — оно привязано к защищённой логике "1-completed/2-in_progress/3+ ручной старт" в этом же файле, которую явно просили не трогать.
+
+Что НЕ заморожено (осознанно):
+- Таймеры тестов (`TestPlayer`, `ClassworkBlock`) — реальные обратные отсчёты
+- RLS-политики БД (15-мин редактирование чата) и триггеры БД — работают по реальному Postgres `now()`
+- Bookkeeping-триггеры БД (`updated_at`, `graded_at`) — реальные метки записи
+- Декоративные тикеры (пульс в `PreLessonView`, Kahoot/QiaQuiz, `SandboxView`, `RaisedHandsBlock`, `TeacherLessonsView`/`AttendanceReminderBanner`, `TeacherLiveCodeControl`)
+
+Не нашлись при реализации (стали stale с момента разведки `plan-freeze-time.md`, не патчил вслепую): `TeacherGradesView.tsx` (не было ни одного `new Date()` во всём файле — вероятно, правка оценок и так read-only, TD.3 в `report-backlog-sanity-check.md`) и `TeacherHomeworkView.tsx:622` (файл всего 432 строки, `submitted_at`-паттерна нет вообще).
+
+Кроны затронуты:
+- `morning-lesson-cycle` уже отключён (05.08.2026, предыдущее решение)
+- `close-past-lessons` продолжает работать по реальному времени, но исключает демо-школу через `nightly_close_enabled=false`
+- `rag-process-queue`, `homework-review-process` — от времени не зависят

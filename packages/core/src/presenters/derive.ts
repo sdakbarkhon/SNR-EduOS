@@ -136,33 +136,39 @@ export function lessonsOnDay<T extends Pick<Lesson, "starts_at">>(
 
 export type HomeworkTab = "active" | "review" | "completed" | "overdue";
 
-/** Категория ДЗ для табов (единая логика, не путать с homeworkState-StatusBadge). */
+/** Категория ДЗ для табов (единая логика, не путать с homeworkState-StatusBadge).
+ *  `now` — по умолчанию реальное время (как и было), но вызывающий может
+ *  передать замороженное `getDemoNow().getTime()` — иначе категоризация
+ *  "просрочено" расходится между ролями, у которых свой источник "сейчас"
+ *  (см. resheniya_2.md, заморозка времени 05.08.2026). */
 export function homeworkCategory(
   hw: Pick<Homework, "due_date"> & { content_type?: ContentType; test_submission?: TestSubmission | null },
   submission?: Pick<HomeworkSubmission, "status"> | null,
+  now: number = Date.now(),
 ): HomeworkTab {
   if (hw.content_type === "test") {
     if (hw.test_submission) return "completed";
     const due = hw.due_date ? new Date(hw.due_date).setHours(23, 59, 59, 999) : null;
-    if (due !== null && due < Date.now()) return "overdue";
+    if (due !== null && due < now) return "overdue";
     return "active";
   }
   if (submission) {
     return submission.status === "graded" ? "completed" : "review";
   }
   const due = hw.due_date ? new Date(hw.due_date).setHours(23, 59, 59, 999) : null;
-  if (due !== null && due < Date.now()) return "overdue";
+  if (due !== null && due < now) return "overdue";
   return "active";
 }
 
 export type DeadlineUrgency = "normal" | "soon" | "overdue";
 
-/** Срочность дедлайна: просрочено / < 2 дней / нормально. */
-export function deadlineUrgency(dueDate: string | null): DeadlineUrgency {
+/** Срочность дедлайна: просрочено / < 2 дней / нормально. `now` — см.
+ *  комментарий у homeworkCategory() выше, тот же принцип. */
+export function deadlineUrgency(dueDate: string | null, now: number = Date.now()): DeadlineUrgency {
   if (!dueDate) return "normal";
   const due = new Date(dueDate).setHours(23, 59, 59, 999);
-  if (due < Date.now()) return "overdue";
-  if (due - Date.now() < 2 * 86_400_000) return "soon";
+  if (due < now) return "overdue";
+  if (due - now < 2 * 86_400_000) return "soon";
   return "normal";
 }
 
@@ -174,11 +180,14 @@ export type HomeworkCounts = {
   total: number;
 };
 
-/** Счётчики по всем табам за один проход. */
-export function homeworkCounts(rows: HomeworkWithSubmission[]): HomeworkCounts {
+/** Счётчики по всем табам за один проход. `now` — см. homeworkCategory():
+ *  найдено при заморозке времени 05.08.2026 — эта функция тоже зовёт
+ *  homeworkCategory() внутри, без прокидывания now() счётчики бейджей
+ *  разошлись бы с фильтрацией списка на том же экране. */
+export function homeworkCounts(rows: HomeworkWithSubmission[], now: number = Date.now()): HomeworkCounts {
   let active = 0, review = 0, completed = 0, overdue = 0;
   for (const r of rows) {
-    const tab = homeworkCategory(r, r.submission);
+    const tab = homeworkCategory(r, r.submission, now);
     if (tab === "active") active++;
     else if (tab === "review") review++;
     else if (tab === "completed") completed++;

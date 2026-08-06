@@ -12,6 +12,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useIsDemoSession } from "@/lib/useIsDemoSession";
+import { getDemoNow } from "@/lib/demo-date";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -175,7 +176,7 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
       setSubmissions((prev) =>
         prev.map((s) =>
           s.id === submissionId
-            ? { ...s, grade: gradeNum, teacher_comment: g.comment || null, graded_at: new Date().toISOString() }
+            ? { ...s, grade: gradeNum, teacher_comment: g.comment || null, graded_at: getDemoNow().toISOString() }
             : s,
         ),
       );

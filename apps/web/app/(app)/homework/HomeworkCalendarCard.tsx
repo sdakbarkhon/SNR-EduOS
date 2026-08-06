@@ -60,7 +60,7 @@ export function HomeworkCalendarCard({ rows, now }: { rows: HomeworkWithSubmissi
   const upcoming = useMemo(
     () =>
       rows
-        .filter((r) => r.due_date && homeworkCategory(r, r.submission) !== "completed")
+        .filter((r) => r.due_date && homeworkCategory(r, r.submission, now.getTime()) !== "completed")
         .sort((a, b) => (a.due_date as string).localeCompare(b.due_date as string))
         .slice(0, 3),
     [rows],

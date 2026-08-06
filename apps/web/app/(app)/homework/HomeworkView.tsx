@@ -38,10 +38,11 @@ type SortMode = "deadline" | "deadlineDesc" | "title" | "subject";
 
 function matchesDeadlineFilter(hw: HomeworkWithSubmission, filter: DeadlineFilter): boolean {
   if (filter === "all") return true;
-  const cat = homeworkCategory(hw, hw.submission);
+  const nowMs = getDemoNow().getTime();
+  const cat = homeworkCategory(hw, hw.submission, nowMs);
   if (filter === "overdue") return cat === "overdue";
   // "soon": ещё активно (не сдано/не оценено/не просрочено) и дедлайн < 2 дней
-  return cat !== "overdue" && cat !== "completed" && cat !== "review" && deadlineUrgency(hw.due_date) === "soon";
+  return cat !== "overdue" && cat !== "completed" && cat !== "review" && deadlineUrgency(hw.due_date, nowMs) === "soon";
 }
 
 function cmpDue(a: HomeworkWithSubmission, b: HomeworkWithSubmission): number {
@@ -86,7 +87,7 @@ export function HomeworkView({
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>("all");
   const [sortBy, setSortBy] = useState<SortMode>("deadline");
 
-  const counts = useMemo(() => homeworkCounts(rows), [rows]);
+  const counts = useMemo(() => homeworkCounts(rows, now.getTime()), [rows, now]);
 
   const subjectStyles = useMemo(() => {
     const map = new Map<string, { label: string; color: string; icon?: string }>();

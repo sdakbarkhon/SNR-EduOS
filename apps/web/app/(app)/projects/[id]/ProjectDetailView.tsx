@@ -13,6 +13,7 @@ import {
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon, useLocale } from "@/components";
+import { getDemoNow } from "@/lib/demo-date";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { cn } from "@/lib/cn";
@@ -73,7 +74,7 @@ export function ProjectDetailView({
       await toggleStageCompletion(db, submission.id, stageId, next, notes[stageId] ?? null);
       setProgress((p) => {
         const others = p.filter((x) => x.stage_id !== stageId);
-        return [...others, { id: current?.id ?? stageId, submission_id: submission.id, stage_id: stageId, is_completed: next, completed_at: next ? new Date().toISOString() : null, student_notes: notes[stageId] ?? null }];
+        return [...others, { id: current?.id ?? stageId, submission_id: submission.id, stage_id: stageId, is_completed: next, completed_at: next ? getDemoNow().toISOString() : null, student_notes: notes[stageId] ?? null }];
       });
     } catch { /* noop */ } finally { setBusy(false); }
   }
@@ -107,7 +108,7 @@ export function ProjectDetailView({
   async function handleSubmit() {
     if (!submission) return;
     await submitProject(db, submission.id).catch(() => null);
-    setSubmission((s) => (s ? { ...s, is_submitted: true, submitted_at: new Date().toISOString() } : s));
+    setSubmission((s) => (s ? { ...s, is_submitted: true, submitted_at: getDemoNow().toISOString() } : s));
   }
 
   function FileRow({ att }: { att: ProjectAttachment }) {

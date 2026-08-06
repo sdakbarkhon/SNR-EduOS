@@ -18,6 +18,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
+import { getDemoNow } from "@/lib/demo-date";
 import { RaiseHandButton } from "./RaiseHandButton";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { AiChatPanel } from "./AiChatPanel";
@@ -398,7 +399,7 @@ export function LessonWorkspaceView({
             stage_id: activeStageId,
             student_id: studentId,
             is_completed: true,
-            completed_at: new Date().toISOString(),
+            completed_at: getDemoNow().toISOString(),
             submission_data: st.progress?.submission_data ?? null,
             grade: st.progress?.grade ?? null,
             teacher_comment: st.progress?.teacher_comment ?? null,

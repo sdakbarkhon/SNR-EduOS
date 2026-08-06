@@ -13,6 +13,7 @@ import {
   type ChatThreadSummary,
   type ChatMessageRow,
 } from "@snr/core";
+import { getDemoNow } from "@/lib/demo-date";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { useLocale } from "../LocaleProvider";
@@ -183,7 +184,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
       thread_id: activeThreadId,
       sender_id: myUserId,
       body,
-      created_at: new Date().toISOString(),
+      created_at: getDemoNow().toISOString(),
       edited_at: null,
       deleted_at: null,
     };

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { buildParentInsightPrompt, type InsightDataContext } from "@/lib/ai/prompts";
 import { PARENT_INSIGHT_SCHEMA } from "@/lib/ai/schemas";
+import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 // Промт МОБ-7, ЧАСТЬ 2 — v8 "EduOS Assistant Insight". Вызывается из
 // apps/mobile-parent/src/screens/InsightScreen.tsx — мобильный fetch не
@@ -27,7 +28,7 @@ type AllowedLocale = (typeof ALLOWED_LOCALES)[number];
 type InsightPayload = { summary: string; insights: Array<{ title: string; body: string; category: string; sentiment: string }> };
 
 function daysAgoIso(days: number): string {
-  return new Date(Date.now() - days * 86400000).toISOString();
+  return new Date(getDemoNowMs() - days * 86400000).toISOString();
 }
 
 export async function POST(req: NextRequest) {
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  if (!force && cached && new Date(cached.generated_at).getTime() >= Date.now() - CACHE_DAYS * 86400000) {
+  if (!force && cached && new Date(cached.generated_at).getTime() >= getDemoNowMs() - CACHE_DAYS * 86400000) {
     return NextResponse.json({ ...(cached.insight_json as InsightPayload), generatedAt: cached.generated_at, cached: true });
   }
 
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
         .eq("student_id", childId)
         .in("homework_id", homeworkList.map((h) => h.id));
       const submittedByHw = new Map((subRows ?? []).map((s: { homework_id: string; submitted_at: string }) => [s.homework_id, s.submitted_at]));
-      const nowMs = Date.now();
+      const nowMs = getDemoNowMs();
       for (const hw of homeworkList) {
         const submittedAt = submittedByHw.get(hw.id) as string | undefined;
         const dueMs = hw.due_date ? new Date(hw.due_date).getTime() : null;
@@ -178,7 +179,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4. Пишем в БД через service_role (RLS не даёт INSERT никому другому) ──
-  const generatedAt = new Date().toISOString();
+  const generatedAt = getDemoNow().toISOString();
   try {
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

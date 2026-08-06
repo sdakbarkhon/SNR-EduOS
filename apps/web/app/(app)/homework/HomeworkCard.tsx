@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { EXTERNAL_SERVICE_ORDER, SERVICE_CONFIG, isExternalService } from "@/lib/external-services";
+import { getDemoNow } from "@/lib/demo-date";
 
 type TypeStyle = { bg: string; text: string; Icon: LucideIcon };
 
@@ -53,8 +54,9 @@ export function HomeworkCard({ hw }: { hw: HomeworkWithSubmission }) {
   const subjectLabel = hw.subjectName ?? fallbackStyle.label;
   const subjectColor = hw.subjectColor ?? fallbackStyle.color;
 
-  const cat = homeworkCategory(hw, hw.submission);
-  const urgency = deadlineUrgency(hw.due_date);
+  const nowMs = getDemoNow().getTime();
+  const cat = homeworkCategory(hw, hw.submission, nowMs);
+  const urgency = deadlineUrgency(hw.due_date, nowMs);
 
   const typeStyle = TYPE_STYLE[hw.content_type] ?? FALLBACK_TYPE_STYLE;
   const typeLabel =

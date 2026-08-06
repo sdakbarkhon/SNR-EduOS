@@ -99,7 +99,7 @@ function dayTextClass(status: "present" | "excused" | "unexcused" | "none", inMo
 
 function getMonthOptions(n: number): Array<{ value: string; label: string }> {
   const opts: Array<{ value: string; label: string }> = [];
-  const now = new Date();
+  const now = getDemoNow();
   for (let i = 0; i < n; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

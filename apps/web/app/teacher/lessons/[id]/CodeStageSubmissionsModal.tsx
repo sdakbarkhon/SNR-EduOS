@@ -13,6 +13,7 @@ import { CodeViewer } from "@/components/CodeEditor";
 import { pyodideReady } from "@/lib/pyodide";
 import { runCode, isUnsupportedCppFeatureError, type RunResult } from "@/lib/code-runner";
 import { CODE_LANGUAGE_LABELS, isHtmlLanguage } from "@/lib/code-languages";
+import { getDemoNow } from "@/lib/demo-date";
 
 type Row = LessonStageProgress & {
   student: { id: string; full_name: string; avatar_url: string | null };
@@ -58,7 +59,7 @@ export function CodeStageSubmissionsModal({
   function applyGrade(studentId: string, grade: number, comment: string | null) {
     setRows((prev) => prev.map((r) =>
       r.student_id === studentId
-        ? { ...r, grade, teacher_comment: comment, graded_at: new Date().toISOString(), graded_by: teacherId }
+        ? { ...r, grade, teacher_comment: comment, graded_at: getDemoNow().toISOString(), graded_by: teacherId }
         : r,
     ));
   }

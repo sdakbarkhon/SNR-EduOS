@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 import { registerSession } from "@/lib/register-session";
+import { getDemoNow } from "@/lib/demo-date";
 
 // P2 (пачка 2) — переработка демо-режима. Демо-логика теперь живёт в
 // endpoints apps/web/app/api/demo/*, но demoLogin остаётся как «серверный
@@ -158,7 +159,7 @@ export async function signOut() {
     if (userId) {
       await admin
         .from("user_sessions")
-        .update({ last_activity: new Date().toISOString() })
+        .update({ last_activity: getDemoNow().toISOString() })
         .eq("user_id", userId);
     }
   });

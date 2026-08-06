@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getDemoNowMs } from "@/lib/demo-date";
 import { ParentsView } from "./ParentsView";
 
 export default async function AdminParentsPage() {
@@ -65,7 +66,7 @@ export default async function AdminParentsPage() {
       children: childrenByParent.get(p.id) ?? [],
       childIds: childIdsByParent.get(p.id) ?? [],
       inviteCode: invite?.code ?? null,
-      inviteExpired: invite ? new Date(invite.expires_at).getTime() < Date.now() : true,
+      inviteExpired: invite ? new Date(invite.expires_at).getTime() < getDemoNowMs() : true,
     };
   });
 

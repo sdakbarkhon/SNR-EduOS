@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getDemoNow } from "@/lib/demo-date";
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id: lessonId } = await ctx.params;
@@ -87,7 +88,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   //    уроки той же группы атомарно внутри этого же UPDATE.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: started, error: startErr } = await (admin as any).from("lessons")
-    .update({ status: "in_progress", started_at: new Date().toISOString() })
+    .update({ status: "in_progress", started_at: getDemoNow().toISOString() })
     .eq("id", lessonId)
     .eq("status", "scheduled")
     .select("id");

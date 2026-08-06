@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -538,7 +539,7 @@ export async function verifyParentInvite(code: string): Promise<ParentInviteChec
 
   if (!invite) return { valid: false, reason: "not_found" };
   if (invite.used_at) return { valid: false, reason: "used" };
-  if (new Date(invite.expires_at).getTime() < Date.now()) return { valid: false, reason: "expired" };
+  if (new Date(invite.expires_at).getTime() < getDemoNowMs()) return { valid: false, reason: "expired" };
 
   const { data: parent } = await sb
     .from("parents")
@@ -578,7 +579,7 @@ export async function completeParentJoin(data: {
     .eq("code", data.code.trim().toUpperCase())
     .maybeSingle();
 
-  if (!invite || invite.used_at || new Date(invite.expires_at).getTime() < Date.now()) {
+  if (!invite || invite.used_at || new Date(invite.expires_at).getTime() < getDemoNowMs()) {
     return { success: false, error: "invalid_code" };
   }
 
@@ -599,7 +600,7 @@ export async function completeParentJoin(data: {
     return { success: false, error: "server_error" };
   }
 
-  await sb.from("parent_invites").update({ used_at: new Date().toISOString() }).eq("id", invite.id);
+  await sb.from("parent_invites").update({ used_at: getDemoNow().toISOString() }).eq("id", invite.id);
 
   return { success: true };
 }

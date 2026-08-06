@@ -4,6 +4,7 @@ import { chat, generateText } from "@/lib/ai/gemini-client";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/auth";
 import { computeEmbedding } from "@/lib/ai/embeddings";
+import { getDemoNow } from "@/lib/demo-date";
 
 const RAG_TOP_K = 5;
 // Ниже этого порога совпадение считается нерелевантным — не подмешиваем
@@ -125,7 +126,7 @@ ${rag.contextBlock}`;
 }
 
 export async function getStudyTip(): Promise<{ text: string } | { error: string }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getDemoNow().toISOString().slice(0, 10);
   const prompt = `Ты — школьный коуч. Дай один практичный совет по учёбе, концентрации или продуктивности — 1-2 предложения, конкретно и по делу. Только совет, без вводных фраз. Дата: ${today}.\n\nДай совет по учёбе на сегодня.`;
   const { text, error } = await generateText(prompt);
   if (error) return { error };

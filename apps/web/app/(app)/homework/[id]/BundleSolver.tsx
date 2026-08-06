@@ -29,6 +29,7 @@ import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
+import { getDemoNow } from "@/lib/demo-date";
 
 type TestQuestionConfig = { question: string; options: string[]; correctIndex: number };
 type Dict = ReturnType<typeof getDictionary>;
@@ -394,8 +395,8 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
         subtask_id: subtaskId,
         content,
         completed,
-        created_at: existing?.created_at ?? new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: existing?.created_at ?? getDemoNow().toISOString(),
+        updated_at: getDemoNow().toISOString(),
       });
       return next;
     });

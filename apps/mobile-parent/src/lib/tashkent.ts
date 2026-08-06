@@ -1,4 +1,5 @@
 import { APP_TIME_ZONE } from "@snr/core";
+import { getAppNow } from "./appTime";
 
 /**
  * Заход 2, шаг 4 — общий хелпер для ScheduleScreen/HomeScreen (тот же
@@ -24,7 +25,7 @@ export function tashkentDateKey(iso: string): string {
 }
 
 export function tashkentToday(): string {
-  return tashkentDateKey(new Date().toISOString());
+  return tashkentDateKey(getAppNow().toISOString());
 }
 
 /** Индекс дня недели (Пн=0..Вс=6) для YYYY-MM-DD — чистая календарная
