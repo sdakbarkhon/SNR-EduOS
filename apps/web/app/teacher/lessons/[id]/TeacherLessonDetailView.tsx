@@ -814,7 +814,16 @@ export function TeacherLessonDetailView({
   // вместо файла. Валидность — производное значение (parseVideoUrl), не
   // отдельный кусок state, чтобы не рассинхронизировалось с полем ввода.
   const [uploadVideoUrl, setUploadVideoUrl] = useState("");
-  const parsedVideoUrl = uploadVideoUrl.trim() ? parseVideoUrl(uploadVideoUrl.trim()) : null;
+  // K.3, 05.08.2026 — parseVideoUrl теперь распознаёт и .mp4 (platform:"mp4"),
+  // но lesson_materials/addLessonMaterialVideo поддерживают только
+  // youtube/rutube (DB constraint) — эту логику явно просили не трогать.
+  // Отфильтровываем "mp4" здесь же, чтобы поведение формы не изменилось:
+  // вставленная .mp4-ссылка по-прежнему считается невалидной для этого поля.
+  const parsedVideoUrlRaw = uploadVideoUrl.trim() ? parseVideoUrl(uploadVideoUrl.trim()) : null;
+  const parsedVideoUrl: { platform: "youtube" | "rutube"; id: string; embedUrl: string } | null =
+    parsedVideoUrlRaw && parsedVideoUrlRaw.platform !== "mp4"
+      ? { platform: parsedVideoUrlRaw.platform, id: parsedVideoUrlRaw.id, embedUrl: parsedVideoUrlRaw.embedUrl }
+      : null;
   const videoUrlInvalid = uploadVideoUrl.trim().length > 0 && !parsedVideoUrl;
   const hasFileChoice = !!uploadFile;
   const hasVideoChoice = uploadVideoUrl.trim().length > 0;

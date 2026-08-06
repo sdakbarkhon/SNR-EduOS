@@ -4025,3 +4025,33 @@ CRON_SECRET в prod env — есть (`target: ["production","preview"]`), не 
 - Учительский preview — TestPlayer/ClassworkBlock нигде не используются в `teacher/*`
 
 Честно про верификацию: typecheck (`tsc --noEmit`) и `eslint` на все 3 файла — чисто. Живую E2E-проверку в браузере (демо-вход учеником, открыть реальный тест) начал, но упёрся в воспроизводимую `net::ERR_CONNECTION_RESET` на server action `demo-login` — окружение-специфичная проблема (файл я не трогал вообще), не код этой задачи. Скриншот тоже недоступен в этой сессии («Browser pane is not displayed»). Визуально design-намерение (цвета/раскладка/анимации) проверено отдельным статичным HTML-мокапом с теми же hex-цветами и keyframes — совпадает со спекой; полного end-to-end клика через реальный live-тест подтвердить в этой сессии не удалось.
+
+## 05.08.2026 — Унификация видео-плеера (K.3)
+
+По требованию заказчика: YouTube+RuTube+прямые .mp4 работают инлайн-плеером везде, где реально нашлась поломка.
+
+Разведка (Часть 1) нашла заметно меньше сломанных мест, чем ожидалось в промте (~5-7): только **одно** реально сломанное и исправимое место — `course_materials.link_url` → `MaterialsView.tsx` (ученик, `window.open` вместо инлайн-плеера). Всё остальное из проверенного списка либо уже работает через существующий `video-url.ts`/`FileViewerModal` (`lesson_materials`, Библиотека кафедры, `homework.attachment_external_url` — видео-вложение ДЗ), либо у соответствующей таблицы физически нет колонки под видео/ссылку (`announcements`, `projects` — прикрепить ссылку сейчас нельзя вообще), либо вне `apps/web` (в `apps/mobile-parent` подобной функциональности не нашлось).
+
+**Расширение границ (по вашему подтверждению):** `apps/web/app/teacher/materials/TeacherMaterialsView.tsx` — файл-близнец `MaterialsView.tsx` с идентичным багом (тот же `window.open`), обычно вне `teacher/*`, но здесь это чисто визуальный фикс параллельного вьюера той же фичи, не логика ролей — почтарен и исправлен симметрично в этом же коммите.
+
+**Известное ограничение — mp4 для homework/Библиотеки кафедры недостижим без миграции.** У `homework.attachment_content_type` и `teacher_library_materials.content_type` — CHECK-constraint в БД, жёстко ограниченный `'video_youtube' | 'video_rutube'`. Добавить туда `.mp4` без миграции нельзя, а миграции в этой задаче запрещены. Остаётся отдельной будущей задачей с миграцией, если понадобится.
+
+Инфраструктура:
+- `video-url.ts`: добавлен `'mp4'` как значение `VideoPlatform` (`parseVideoUrl` теперь возвращает `{platform:'mp4', id:url, embedUrl:url}` для ссылок, оканчивающихся на `.mp4`), добавлена `isVideoUrl(url)`. **Сигнатуры `parseVideoUrl()`/`toEmbedUrl()` НЕ менялись** (объектная форма `{platform,id,embedUrl}`, `toEmbedUrl(platform,id)`) — намеренно, чтобы не сломать живых потребителей (`FileViewerModal.tsx`, `KnowledgeBaseFilePicker.tsx`/`LibraryVideoLinkModal`) у lesson_materials/Библиотеки кафедры. `isVideoEmbedUrl()` (отдельный классификатор для уже-embed-URL тех же потребителей) — не трогал вовсе.
+- Новый `apps/web/components/video/VideoEmbedPlayer.tsx` — универсальный инлайн-плеер: `<iframe>` для YouTube/RuTube через `parseVideoUrl(url).embedUrl`, `<video controls>` для `.mp4`, плашка "неподдерживаемая ссылка" для остального.
+
+Что починено:
+- `apps/web/app/(app)/materials/MaterialsView.tsx` — `window.open` для `link_url`-материалов заменён: если ссылка распознаётся `isVideoUrl` — открывается `<VideoEmbedPlayer>` в модалке (новый `videoPlayer` state, по образцу уже существующих `viewer`/`slideViewer`); если нет (обычная не-видео ссылка) — поведение не изменилось, всё так же открывается во внешней вкладке.
+- `apps/web/app/teacher/materials/TeacherMaterialsView.tsx` — симметрично тот же фикс (см. выше про расширение границ).
+
+Побочный фикс типов (не фича, следствие расширения `VideoPlatform`): `apps/web/app/teacher/lessons/[id]/TeacherLessonDetailView.tsx` — форма вставки видео-ссылки для `lesson_materials` использует `parseVideoUrl()` напрямую и передаёт `.platform` в `addLessonMaterialVideo()`, типизированный строго `"youtube"|"rutube"` (тот же DB constraint). Расширение `VideoPlatform` до `"youtube"|"rutube"|"mp4"` сломало бы typecheck и — если бы не поймали — тихо пропустило mp4-ссылку в функцию, которая её не поддерживает. Добавлена явная фильтрация: `.mp4`-ссылка в этом поле по-прежнему считается невалидной, как и до этой задачи — поведение lesson_materials не изменилось ни на бит, это чисто type-safety фикс.
+
+Что не поменялось:
+- `lesson_materials` (материалы урока) — уже работало
+- Библиотека кафедры — уже работало
+- `homework.attachment_external_url` (видео-вложение ДЗ) — уже работало для YouTube/RuTube через `FileViewerModal`; .mp4 недостижим без миграции (см. выше)
+- Объявления, Проекты — нет колонки под ссылку/видео вообще, нечего чинить
+
+Валидация: `isVideoUrl()` на клиенте, mp4 — только по расширению файла (без HEAD-запроса), учитель сам увидит битую ссылку при предпросмотре — как и просили.
+
+Vimeo, VK Video, TikTok — не в скоупе, добавим по требованию.

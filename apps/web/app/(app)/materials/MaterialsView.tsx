@@ -3,12 +3,14 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, FileText, BookOpen, Link as LinkIcon,
-  Video, FileImage, File, FolderOpen,
+  Video, FileImage, File, FolderOpen, X,
 } from "lucide-react";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
 import { getMaterialUrl, getMaterialSlides } from "@/app/actions/materials";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { SlidesViewerModal } from "@/components/SlidesViewerModal";
+import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
+import { isVideoUrl } from "@/lib/video-url";
 
 // ── File type helpers ─────────────────────────────────────────────────
 
@@ -82,6 +84,10 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ url: string; title: string; fileName: string } | null>(null);
   const [slideViewer, setSlideViewer] = useState<{ slides: LessonSlide[]; title: string } | null>(null);
+  // K.3 — video-ссылки (link_url, YouTube/RuTube/.mp4) раньше открывались
+  // window.open вместо inline-плеера. Отдельное состояние вместо `viewer`
+  // (тот заточен под FileViewerModal — pdf/image/office/text, не видео).
+  const [videoPlayer, setVideoPlayer] = useState<{ url: string; title: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Debounce search 300ms
@@ -156,7 +162,13 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
         return;
       }
       if (mat.link_url && !mat.storage_path) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        // K.3 — YouTube/RuTube/.mp4 открываем inline-плеером; прочие
+        // ссылки (статьи и т.п., не видео) — как раньше, во внешней вкладке.
+        if (isVideoUrl(url)) {
+          setVideoPlayer({ url, title: mat.title });
+        } else {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
         return;
       }
       const fileName = mat.storage_path?.split("/").pop() || mat.title || "material";
@@ -191,6 +203,26 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
           title={slideViewer.title}
           onClose={() => setSlideViewer(null)}
         />
+      )}
+      {videoPlayer && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+          onClick={() => setVideoPlayer(null)}
+        >
+          <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{videoPlayer.title}</p>
+              <button
+                onClick={() => setVideoPlayer(null)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <VideoEmbedPlayer url={videoPlayer.url} />
+          </div>
+        </div>
       )}
       {/* Header — omitted when hosted under the Knowledge Base tab switcher
           (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2), which already shows its own title. */}

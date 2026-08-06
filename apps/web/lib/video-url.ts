@@ -2,9 +2,18 @@
 // Поддерживаемые форматы:
 //   YouTube: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID
 //   RuTube:  rutube.ru/video/ID/, rutube.ru/play/embed/ID
+//   mp4:     любой URL, заканчивающийся на .mp4 (без учёта query) — K.3, 05.08.2026
 // Параметры вида ?t=15s, &list=... игнорируются — извлекаем только ID.
+//
+// K.3 — добавлен 'mp4' как platform. Сигнатуры parseVideoUrl()/toEmbedUrl()
+// НЕ менялись (объект {platform,id,embedUrl}, toEmbedUrl(platform,id)) —
+// намеренно, у них уже есть живые вызывающие места (FileViewerModal.tsx,
+// KnowledgeBaseFilePicker.tsx/LibraryVideoLinkModal), которые полагаются на
+// эту форму для lesson_materials/Библиотеки кафедры — эту логику явно
+// просили не трогать. mp4 просто добавлен как ещё один вариант platform,
+// id/embedUrl для него — сам исходный URL (нет отдельного embed-варианта).
 
-export type VideoPlatform = "youtube" | "rutube";
+export type VideoPlatform = "youtube" | "rutube" | "mp4";
 export type ParsedVideoUrl = { platform: VideoPlatform; id: string; embedUrl: string };
 
 const YOUTUBE_ID_RE = /^[a-zA-Z0-9_-]{6,}$/;
@@ -20,6 +29,13 @@ export function parseVideoUrl(raw: string): ParsedVideoUrl | null {
   } catch {
     return null;
   }
+
+  // .mp4 — до провайдер-специфичной логики ниже: не привязан к хосту.
+  const withoutQuery = trimmed.split("?")[0] ?? trimmed;
+  if (withoutQuery.toLowerCase().endsWith(".mp4")) {
+    return { platform: "mp4", id: trimmed, embedUrl: trimmed };
+  }
+
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
 
   if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
@@ -54,14 +70,24 @@ export function parseVideoUrl(raw: string): ParsedVideoUrl | null {
   return null;
 }
 
+/** K.3 — true если ссылка распознана как видео (YouTube/RuTube/.mp4). Для
+ *  клиентской валидации форм — намеренно НЕ трогает isVideoEmbedUrl ниже
+ *  (та классифицирует уже-embed-домены для FileViewerModal/lesson_materials,
+ *  которую просили не трогать; расширять её на .mp4 нельзя — resolveFileViewerKind
+ *  рендерит kind='embed' как <iframe>, что сломало бы <video>-случай). */
+export function isVideoUrl(url: string): boolean {
+  return parseVideoUrl(url) !== null;
+}
+
 export function toEmbedUrl(platform: VideoPlatform, id: string): string {
   // YouTube "ошибка 153" ("Ошибка настройки видеопроигрывателя") —
   // youtube-nocookie.com — тот же embed-плеер без cookie-домена Google Ads,
   // который часто ломается блокировщиками рекламы на клиенте. rel=0 — без
   // чужих "похожих видео" в конце, modestbranding=1 — минимальный брендинг.
-  return platform === "youtube"
-    ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=0&modestbranding=1&rel=0`
-    : `https://rutube.ru/play/embed/${id}`;
+  if (platform === "youtube") return `https://www.youtube-nocookie.com/embed/${id}?autoplay=0&modestbranding=1&rel=0`;
+  if (platform === "rutube") return `https://rutube.ru/play/embed/${id}`;
+  // mp4 — нет отдельного embed-варианта, id уже сам исходный URL (см. parseVideoUrl).
+  return id;
 }
 
 /** Домен встроенного embed-URL — используется классификаторами (demoKind,
