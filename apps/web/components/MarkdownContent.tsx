@@ -1,8 +1,8 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { markdownCodeComponents } from "./lesson-stages/markdownCode";
+import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "./markdown-plugins";
 
 // Общий рендерер для длинных описательных текстов (проекты, ДЗ, этапы
 // уроков) — те же react-markdown + remark-gfm + markdownCodeComponents,
@@ -12,7 +12,11 @@ import { markdownCodeComponents } from "./lesson-stages/markdownCode";
 export function MarkdownContent({ text, className = "" }: { text: string; className?: string }) {
   return (
     <div className={`prose prose-slate max-w-none dark:prose-invert ${className}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownCodeComponents}>
+      <ReactMarkdown
+        remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+        rehypePlugins={MARKDOWN_REHYPE_PLUGINS as never}
+        components={markdownCodeComponents}
+      >
         {text}
       </ReactMarkdown>
     </div>

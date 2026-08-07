@@ -3,9 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import ReactMarkdown, { type Components } from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "./markdown-plugins";
 import { Bot, Send, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "./LocaleProvider";
@@ -260,7 +258,7 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="max-w-[82%] rounded-[16px] rounded-tl-md bg-[#F3F1FB] px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-700">
                     <div className="prose prose-sm max-w-none prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0 [&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
-                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} components={messageComponents}>
+                      <ReactMarkdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={MARKDOWN_REHYPE_PLUGINS as never} components={messageComponents}>
                         {m.text}
                       </ReactMarkdown>
                     </div>

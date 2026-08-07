@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { HelpCircle, Image as ImageIcon, Quote as QuoteIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "@/components/markdown-plugins";
 import type { LessonSlide, LessonSlideMiniQuiz } from "@snr/core";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { markdownCodeComponents } from "./markdownCode";
@@ -11,7 +11,11 @@ import { SyntaxHighlighter, oneDark } from "./highlighter";
 
 function Md({ children }: { children: string }) {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownCodeComponents}>
+    <ReactMarkdown
+      remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+      rehypePlugins={MARKDOWN_REHYPE_PLUGINS as never}
+      components={markdownCodeComponents}
+    >
       {children}
     </ReactMarkdown>
   );
