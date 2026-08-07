@@ -3086,7 +3086,12 @@ export const addLessonStage = async (
   // keepalive держит запрос живым даже если вкладка сразу же
   // навигирует/закрывается. Safety-net крон подхватит, если fetch вообще
   // не долетел (см. /api/cron/stage-media-backfill).
-  if (typeof window !== "undefined") {
+  // 07.08.2026: было `typeof window !== "undefined"` — ломало монорепозиторный
+  // pnpm type-check с 4dc2299 (у packages/core в lib нет DOM, поэтому имени
+  // window для tsc не существует; в apps/web DOM есть, поэтому там проверка
+  // проходила и регрессия не была замечена). Проверка через globalThis
+  // типизируется без DOM и означает ровно то же — «мы в браузере».
+  if (typeof globalThis !== "undefined" && "window" in globalThis) {
     fetch("/api/stage-media/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
