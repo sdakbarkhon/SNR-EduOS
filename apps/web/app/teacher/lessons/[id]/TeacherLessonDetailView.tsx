@@ -1538,126 +1538,18 @@ export function TeacherLessonDetailView({
           )}
         </div>
 
-        {/* Активация этапов — раньше отдельная секция, теперь верх блока "Этапы" (§7.4).
-            Куратору блок управления скрыт целиком (активация/live-code — мутации). */}
-        {(status === "in_progress" || status === "scheduled") && !isCurator && middleStages.length > 0 && (
-          <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-violet-500" />
-              <h3 className="text-xs font-bold uppercase tracking-widest text-violet-700">
-                {dl.activeStage.manageStages}
-              </h3>
-            </div>
-            {stageActivationError && <p className="text-xs text-red-500">{stageActivationError}</p>}
+        {/* 07.08.2026 — блок «Активация этапов» удалён: он рисовал ТОТ ЖЕ
+            массив middleStages вторым списком, и учитель прокручивал одни и
+            те же этапы дважды. Всё его содержимое переехало в единый список
+            ниже: кнопка активации и состояние — в плитку, AI-медиа,
+            презентация и live-код активного этапа — под неё. Здесь остался
+            только показ ошибки активации, ему в плитке места нет. */}
+        {stageActivationError && (
+          <p className="text-xs font-semibold text-red-500">{stageActivationError}</p>
+        )}
 
-            <div className="flex flex-col divide-y divide-violet-100 rounded-xl border border-violet-100 bg-white overflow-hidden">
-              {middleStages.map((stage) => {
-                const isActive = stage.id === activeStageId;
-                const activePos = middleStages.find((s) => s.id === activeStageId)?.position ?? Infinity;
-                const isPassed = stage.position < activePos && activeStageId !== null;
-                const isActivating = activatingStageId === stage.id;
-
-                const hasSlides = isActive && stage.slides && stage.slides.length > 0;
-                const hasLiveCode = isActive && stage.content_type === "code";
-
-                return (
-                  <div key={stage.id}>
-                    <div
-                      className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                        isActive ? "bg-violet-50" : ""
-                      }`}
-                    >
-                      {/* State indicator */}
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        isActive
-                          ? "bg-violet-600 text-white"
-                          : isPassed
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
-                      }`}>
-                        {isPassed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : stage.position}
-                      </div>
-
-                      {/* Title + badge */}
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-sm font-semibold ${isActive ? "text-violet-800" : "text-slate-700"}`}>
-                          {stage.title}
-                        </span>
-                        {isActive && (
-                          <p className="mt-0.5 text-[11px] text-violet-500">{dl.activeStage.studentsSeeThis}</p>
-                        )}
-                      </div>
-
-                      {/* Status label or button */}
-                      {isActive ? (
-                        <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white">
-                          {dl.activeStage.activeNow}
-                        </span>
-                      ) : isPassed ? (
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className="text-[11px] font-semibold text-emerald-600">{dl.activeStage.passed}</span>
-                          <button
-                            onClick={() => handleActivateStage(stage.id)}
-                            disabled={status !== "in_progress" || isActivating}
-                            className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {isActivating ? "…" : dl.activeStage.activate}
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleActivateStage(stage.id)}
-                          disabled={status !== "in_progress" || isActivating}
-                          title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
-                          className="shrink-0 flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {isActivating ? "…" : `▶ ${dl.activeStage.activate}`}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* AI-медиа этапа (backfill 05.08.2026) — только для активного этапа */}
-                    {isActive && (
-                      <div className="border-t border-violet-100 bg-white p-3">
-                        <StageMedia
-                          image_url={(stage as { image_url?: string | null }).image_url ?? null}
-                          mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
-                          media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
-                          media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
-                          isTeacher
-                        />
-                      </div>
-                    )}
-
-                    {/* Teacher presentation control — drives students' current_slide_index via Realtime */}
-                    {hasSlides && (
-                      <div className="border-t border-violet-100 bg-white p-3">
-                        <SlideViewer
-                          slides={stage.slides ?? []}
-                          canExport
-                          onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
-                          isTeacher
-                          stageId={stage.id}
-                          initialSlide={stage.current_slide_index ?? 0}
-                        />
-                      </div>
-                    )}
-
-                    {/* Live coding — drives students' fullscreen read-only view via Realtime */}
-                    {hasLiveCode && (
-                      <div className="h-[60vh] min-h-[420px] border-t border-violet-100 bg-white p-3">
-                        <TeacherLiveCodeControl stage={stage} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {status === "scheduled" && (
-              <p className="text-[11px] text-violet-400">{dl.activeStage.lessonNotStarted}</p>
-            )}
-          </div>
+        {status === "scheduled" && !isCurator && middleStages.length > 0 && (
+          <p className="text-[11px] text-violet-400">{dl.activeStage.lessonNotStarted}</p>
         )}
 
         <div className="flex flex-col gap-2">
@@ -1692,24 +1584,52 @@ export function TeacherLessonDetailView({
               </div>
             )
           ) : (
-            middleStages.map((stage, idx) => (
+            middleStages.map((stage, idx) => {
+              // 07.08.2026 — состояние этапа переехало сюда из отдельного
+              // блока «Активация этапов», который рисовал ЭТОТ ЖЕ массив
+              // вторым списком выше. Учитель прокручивал одни и те же этапы
+              // дважды — отсюда жалоба «много места уходит просто так».
+              // Логика активации не менялась: те же isActive/isPassed и тот
+              // же handleActivateStage.
+              const isActive = stage.id === activeStageId;
+              const activePos = middleStages.find((s) => s.id === activeStageId)?.position ?? Infinity;
+              const isPassed = stage.position < activePos && activeStageId !== null;
+              const isActivating = activatingStageId === stage.id;
+              const hasSlides = isActive && stage.slides && stage.slides.length > 0;
+              const hasLiveCode = isActive && stage.content_type === "code";
+              // Управление активацией — только там, где оно и было: живой или
+              // ещё не начатый урок, не куратор (для него это мутация).
+              const canActivate = (status === "in_progress" || status === "scheduled") && !isCurator;
+
+              return (
+              <div key={stage.id} className="flex flex-col">
               <div
-                key={stage.id}
                 onClick={() => setViewStage(stage)}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors ${
-                  isLessonCompleted
+                className={`flex cursor-pointer items-start gap-3 border px-4 py-4 transition-colors ${
+                  isActive || hasSlides || hasLiveCode ? "rounded-t-xl" : "rounded-xl"
+                } ${
+                  isActive
+                    ? "border-violet-300 bg-violet-50 hover:bg-violet-100/60 dark:border-violet-500/40 dark:bg-violet-500/10"
+                    : isLessonCompleted
                     ? "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100/60 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+                    : isPassed
+                    ? "border-emerald-100 bg-emerald-50/40 hover:border-emerald-200 dark:border-emerald-500/20 dark:bg-emerald-500/5"
                     : "border-slate-100 bg-white hover:border-blue-200 hover:bg-blue-50/30 dark:border-white/10 dark:bg-white/5"
                 }`}
               >
-                {/* Position + type badge */}
+                {/* Position + state. Кружок показывает пройденность (галочка),
+                    как это делал индикатор в блоке активации. */}
                 <div className="mt-0.5 flex shrink-0 flex-col items-center gap-1">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold ${
-                    stage.stage_type === "task"
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold ${
+                    isActive
+                      ? "bg-violet-600 text-white"
+                      : isPassed
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                      : stage.stage_type === "task"
                       ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
                       : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
                   }`}>
-                    {idx + 1}
+                    {isPassed ? <Check className="h-4 w-4" strokeWidth={3} /> : idx + 1}
                   </div>
                 </div>
 
@@ -1762,7 +1682,34 @@ export function TeacherLessonDetailView({
                   {stage.description && (
                     <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{stage.description}</p>
                   )}
+                  {isActive && (
+                    <p className="mt-1 text-[11px] font-semibold text-violet-600">{dl.activeStage.studentsSeeThis}</p>
+                  )}
                 </div>
+
+                {/* Активация — перенесено из блока «Активация этапов». Условия
+                    показа и disabled те же, что были там: активировать можно
+                    только на идущем уроке, куратору кнопка не показывается. */}
+                {canActivate && (
+                  isActive ? (
+                    <span className="shrink-0 rounded-full bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white">
+                      {dl.activeStage.activeNow}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleActivateStage(stage.id); }}
+                      disabled={status !== "in_progress" || isActivating}
+                      title={status === "scheduled" ? dl.activeStage.lessonNotStarted : undefined}
+                      className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold shadow-sm transition-colors active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+                        isPassed
+                          ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          : "bg-violet-600 text-white hover:bg-violet-700"
+                      }`}
+                    >
+                      {isActivating ? "…" : isPassed ? dl.activeStage.activate : `▶ ${dl.activeStage.activate}`}
+                    </button>
+                  )
+                )}
 
                 {/* Review submissions — always available, incl. after the lesson ends.
                     07.08.2026: было только `code` + внешние сервисы. Добавлены
@@ -1832,7 +1779,50 @@ export function TeacherLessonDetailView({
                 </div>
                 )}
               </div>
-            ))
+
+              {/* Под плиткой активного этапа — ровно то, что раньше было под
+                  плиткой в блоке «Активация этапов»: AI-медиа, презентация с
+                  синхронизацией слайдов (канал stage-slide-<id>) и панель
+                  live-кода. Логика и пропсы не менялись, переехала только
+                  точка вставки. */}
+              {isActive && (
+                <div className="border-x border-b border-violet-300 bg-white p-3 dark:border-violet-500/40">
+                  <StageMedia
+                    image_url={(stage as { image_url?: string | null }).image_url ?? null}
+                    mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
+                    media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
+                    media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
+                    isTeacher
+                  />
+                </div>
+              )}
+
+              {hasSlides && (
+                <div className="border-x border-b border-violet-300 bg-white p-3 dark:border-violet-500/40">
+                  <SlideViewer
+                    slides={stage.slides ?? []}
+                    canExport
+                    onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
+                    isTeacher
+                    stageId={stage.id}
+                    initialSlide={stage.current_slide_index ?? 0}
+                  />
+                </div>
+              )}
+
+              {hasLiveCode && (
+                <div className="h-[60vh] min-h-[420px] border-x border-b border-violet-300 bg-white p-3 dark:border-violet-500/40">
+                  <TeacherLiveCodeControl stage={stage} />
+                </div>
+              )}
+
+              {/* Скругление нижней кромки у последнего подблока активного этапа. */}
+              {(isActive || hasSlides || hasLiveCode) && (
+                <div className="h-0 rounded-b-xl border-x border-b border-violet-300 dark:border-violet-500/40" />
+              )}
+              </div>
+              );
+            })
           )}
 
           {/* Summary stage */}
