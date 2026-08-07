@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createCurriculumPlanProcessing, replaceCurriculumPlanProcessing } from "@snr/core";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createCurriculumPlanProcessing, replaceCurriculumPlanProcessing, markCurriculumPlanError } from "@snr/core";
 
 // Большой фикс, Блок 6, ЗАДАЧА 1 — заменяет старый флоу "распарсить →
 // отредактировать темы → сохранить" (blocking 10-30с в модалке). Теперь:
@@ -12,6 +13,49 @@ import { createCurriculumPlanProcessing, replaceCurriculumPlanProcessing } from 
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
+
+/** 07.08.2026 — фикс «план висит на 10%».
+ *
+ *  Было: голый `fetch(...)` без await. На serverless функция замораживается
+ *  сразу после возврата ответа, и незавершённый запрос умирает вместе с ней —
+ *  background-parse не вызывался НИ РАЗУ. Симптом ровно этот: план остаётся
+ *  на progress_percent=10 (значение, выставленное здесь) с error_message=NULL,
+ *  потому что background-parse ставит 30 ПЕРЕД первым обращением к Gemini,
+ *  то есть до его try-блока дело не доходило вообще.
+ *
+ *  Стало: after() из next/server — тот же приём, что уже используется в
+ *  apps/web/app/actions/auth.ts для освобождения демо-слота. Ответ уходит
+ *  клиенту сразу, а функция живёт до завершения колбэка.
+ *
+ *  Плюс: если триггер всё-таки не сработал (нет CRON_SECRET, сеть, не-2xx),
+ *  план переводится в status='error' с текстом. Раньше в этом случае он
+ *  висел в 'processing' бесконечно и учитель видел вечный спиннер. */
+function triggerBackgroundParse(origin: string, planId: string, label: string) {
+  after(async () => {
+    const fail = async (reason: string) => {
+      console.error(`[${label}] background-parse trigger failed:`, reason);
+      try {
+        await markCurriculumPlanError(createAdminClient(), planId, `Не удалось запустить разбор файла: ${reason}`);
+      } catch (e) {
+        console.error(`[${label}] markCurriculumPlanError also failed:`, (e as Error)?.message);
+      }
+    };
+
+    if (!process.env.CRON_SECRET) return fail("CRON_SECRET не задан");
+
+    try {
+      const res = await fetch(`${origin}/api/curriculum-plans/${planId}/background-parse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+      });
+      // background-parse сам пишет ошибку в план при сбое парсинга; сюда
+      // попадаем только если не достучались до него (401/404/5xx).
+      if (!res.ok) await fail(`background-parse ответил ${res.status}`);
+    } catch (e) {
+      await fail((e as Error)?.message ?? "сетевая ошибка");
+    }
+  });
+}
 
 export async function POST(req: NextRequest) {
   const db = await createClient();
@@ -66,14 +110,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка создания плана" }, { status: 500 });
   }
 
-  if (process.env.CRON_SECRET) {
-    fetch(`${req.nextUrl.origin}/api/curriculum-plans/${plan.id}/background-parse`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
-    }).catch((e) => console.error("[create-processing] background-parse trigger failed:", e));
-  } else {
-    console.error("[create-processing] CRON_SECRET отсутствует — фоновый парсинг НЕ запущен, план останется в processing");
-  }
+  triggerBackgroundParse(req.nextUrl.origin, plan.id, "create-processing");
 
   return NextResponse.json({ id: plan.id });
 }

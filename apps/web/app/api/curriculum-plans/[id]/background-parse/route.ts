@@ -15,7 +15,16 @@ import { updateCurriculumPlanProgress, markCurriculumPlanReady, markCurriculumPl
 // как общий "доверенный внутренний вызов" секрет, не заводим отдельный.
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// 07.08.2026: было 60 — и этого НЕ ХВАТАЛО. Живой прогон на реальном файле
+// учителя (Робототехника 3-А) занял 65 секунд: скачивание из Storage +
+// извлечение текста + до 3 попыток generateJSON с ретраями внутри
+// gemini-client. На Vercel функция была бы убита на 60-й секунде ПОСЛЕ того,
+// как progress уже сдвинулся на 30/60 — то есть план снова завис бы, просто
+// на другом проценте, и снова без error_message (catch не успевает
+// отработать при принудительном завершении). 300 — потолок Hobby-плана через
+// Fluid Compute, тот же, что уже стоит у /api/cron/rag-process-queue и
+// /api/stage-media/generate.
+export const maxDuration = 300;
 
 const MAX_TOPICS = 40;
 type ParsedTopic = { title: string; description: string | null; estimated_lessons: number };
