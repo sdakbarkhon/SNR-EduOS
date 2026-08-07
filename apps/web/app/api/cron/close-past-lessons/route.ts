@@ -29,6 +29,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { completeLessons, fillAttendanceAndGrades } from "../_lib/complete-lessons";
 
+// 07.08.2026 — GET и POST через общий handler(). Раньше был ТОЛЬКО POST, а
+// Vercel Cron всегда шлёт GET: крон отвечал 405 и, судя по всему, не
+// отрабатывал ни разу. В проекте это уже третий случай на тех же граблях —
+// приём тот же, что в rag-process-queue и restore-demo-lesson-shape.
+// Демо-школы это не касается (исключена флагом nightly_close_enabled=false),
+// но реальные школы оставались без ночного закрытия прошедших уроков.
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
 const TZ_MS = 5 * 60 * 60 * 1000; // Ташкент, UTC+5 — фиксированное смещение, не системный часовой пояс
 const RECENT_WINDOW_DAYS = 3; // насколько назад крон досоздаёт посещаемость/оценки
 
@@ -63,7 +72,7 @@ async function getExcludedSchoolIds(db: ReturnType<typeof createAdminClient>): P
   return new Set((data ?? []).map((r: any) => r.id as string));
 }
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const cronSecret = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? req.headers.get("x-cron-secret");
   if (!process.env.CRON_SECRET || cronSecret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -127,4 +136,12 @@ export async function POST(req: NextRequest) {
   const gradesCreated = closeGradesCreated + retroGradesCreated;
   console.log(`[close-past-lessons] cutoff=${cutoff} closed=${closed} attendance+=${attendanceCreated} grades+=${gradesCreated} skippedNoTeacher=${retroSkipped}`);
   return NextResponse.json({ cutoff, closed, attendanceCreated, gradesCreated, skippedNoTeacher: retroSkipped });
+}
+
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
 }

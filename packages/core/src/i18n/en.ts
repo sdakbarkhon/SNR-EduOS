@@ -1834,6 +1834,8 @@ export const en: Dictionary = {
       leaderboard: "Leaderboard",
       close: "Close",
       launchGame: "Launch game",
+      results: "Results",
+      noAttempts: "Nobody has taken it yet",
       waitingTeacher: "Waiting for the teacher",
       teacherWillStart: "The teacher will start the game soon!",
       ready: "Ready!",

@@ -59,6 +59,7 @@ import { useRegisterFullscreenLesson } from "@/components/fullscreen-lesson-cont
 import { DemoMaterialContent } from "@/components/DemoMaterialContent";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
+import { QuizResultsModal } from "./QuizResultsModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
@@ -733,6 +734,12 @@ function StageModal({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
+
+/** Квизы хранят сдачи в quiz_attempts/quiz_answers, а не в
+ *  lesson_stage_progress — отсюда отдельная модалка результатов. */
+function isQuizType(ct: string | null | undefined): boolean {
+  return ct === "quiz_qia" || ct === "quiz_kahoot";
+}
 
 export function TeacherLessonDetailView({
   lesson,
@@ -1748,8 +1755,19 @@ export function TeacherLessonDetailView({
                   )}
                 </div>
 
-                {/* Review submissions — code + external stages, always available (incl. after lesson ends) */}
-                {(stage.content_type === "code" || isExternalService(stage.content_type)) && (
+                {/* Review submissions — always available, incl. after the lesson ends.
+                    07.08.2026: было только `code` + внешние сервисы. Добавлены
+                    DnD (code_completion) и оба типа квизов. Хранилища у них
+                    разные — code/code_completion/внешние лежат в
+                    lesson_stage_progress (все пишутся через submitStageTask),
+                    квизы в quiz_attempts/quiz_answers, — поэтому ниже разные
+                    модалки, а кнопка одна. Презентации сюда НЕ входят: это
+                    теория, сдавать там нечего (записи прогресса у них есть, но
+                    это отметки «изучено», а не работа на оценку). */}
+                {(stage.content_type === "code"
+                  || stage.content_type === "code_completion"
+                  || isQuizType(stage.content_type)
+                  || isExternalService(stage.content_type)) && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setReviewStage(stage); }}
                     className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
@@ -2173,12 +2191,17 @@ export function TeacherLessonDetailView({
         document.body,
       )}
 
-      {/* Submissions review — code vs external service */}
+      {/* Submissions review — по типу хранилища: code, квизы, всё остальное */}
       {mounted && reviewStage && (
         reviewStage.content_type === "code" ? (
           <CodeStageSubmissionsModal
             stage={reviewStage}
             teacherId={teacher.id}
+            onClose={() => setReviewStage(null)}
+          />
+        ) : isQuizType(reviewStage.content_type) ? (
+          <QuizResultsModal
+            stage={reviewStage}
             onClose={() => setReviewStage(null)}
           />
         ) : (

@@ -1834,6 +1834,8 @@ export const uz: Dictionary = {
       leaderboard: "Reyting",
       close: "Yopish",
       launchGame: "O'yinni ishga tushirish",
+      results: "Natijalar",
+      noAttempts: "Hozircha hech kim topshirmagan",
       waitingTeacher: "O'qituvchi kutilmoqda",
       teacherWillStart: "O'qituvchi tez orada o'yinni boshlaydi!",
       ready: "Tayyor!",

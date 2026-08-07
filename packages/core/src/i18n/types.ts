@@ -1897,6 +1897,8 @@ export interface Dictionary {
       leaderboard: string;
       close: string;
       launchGame: string;
+      results: string;
+      noAttempts: string;
       // Kahoot student
       waitingTeacher: string;
       teacherWillStart: string;

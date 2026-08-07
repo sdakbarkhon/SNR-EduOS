@@ -1834,6 +1834,8 @@ export const ru: Dictionary = {
       leaderboard: "Лидерборд",
       close: "Закрыть",
       launchGame: "Запустить игру",
+      results: "Результаты",
+      noAttempts: "Пока никто не проходил",
       waitingTeacher: "Ожидание учителя",
       teacherWillStart: "Учитель скоро начнёт игру!",
       ready: "Готов!",

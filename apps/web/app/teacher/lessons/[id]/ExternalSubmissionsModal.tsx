@@ -35,7 +35,10 @@ export function ExternalSubmissionsModal({
   const db = createClient();
 
   const service = stage.content_type as ExternalServiceType;
-  const meta = SERVICE_CONFIG[service];
+  // 07.08.2026: сюда попадает не только внешний сервис, но и DnD
+  // (code_completion) — у него записи в SERVICE_CONFIG нет, поэтому доступ
+  // опциональный, иначе meta.name уронил бы модалку.
+  const meta = SERVICE_CONFIG[service] as { name?: string } | undefined;
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +72,7 @@ export function ExternalSubmissionsModal({
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
             <h3 className="text-base font-bold text-slate-900">{dx.reviewSubmissions}</h3>
-            <p className="text-xs text-slate-400">{stage.title} · {meta.name}</p>
+            <p className="text-xs text-slate-400">{meta?.name ? stage.title + " · " + meta.name : stage.title}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X className="h-5 w-5" />
@@ -93,6 +96,7 @@ export function ExternalSubmissionsModal({
                   onZoom={setZoomUrl}
                   teacherId={teacherId}
                   stageId={stage.id}
+                  isCodeCompletion={stage.content_type === "code_completion"}
                 />
               ))}
             </div>
@@ -117,7 +121,7 @@ export function ExternalSubmissionsModal({
 }
 
 function ExternalRow({
-  row, expanded, onToggle, onGraded, onZoom, teacherId, stageId,
+  row, expanded, onToggle, onGraded, onZoom, teacherId, stageId, isCodeCompletion,
 }: {
   row: Row;
   expanded: boolean;
@@ -126,9 +130,12 @@ function ExternalRow({
   onZoom: (url: string) => void;
   teacherId: string;
   stageId: string;
+  /** DnD-этап: другая форма submission_data, см. рендер ниже. */
+  isCodeCompletion: boolean;
 }) {
   const { locale } = useLocale();
   const dx = getDictionary(locale as Locale).lesson.external;
+  const dl = getDictionary(locale as Locale).lesson;
   const db = createClient();
 
   const sub = (row.submission_data ?? {}) as ExternalServiceSubmission;
@@ -178,6 +185,34 @@ function ExternalRow({
 
       {expanded && (
         <div className="space-y-4 border-t border-slate-100 px-4 py-4">
+          {/* 07.08.2026 — DnD (code_completion) хранится в том же
+              lesson_stage_progress, но форма сдачи другая:
+              {score, total, answers: {GAP1: "...", ...}} вместо
+              link/screenshot_path. Показываем счёт и ответы по пропускам;
+              блоки ссылки и скриншота для этого типа не рендерим — они
+              всегда были бы пустыми. Оценку учитель ставит теми же
+              контролами ниже, они общие. */}
+          {isCodeCompletion ? (
+            <div>
+              <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                {dl.stageContentCodeCompletion}
+              </h4>
+              <p className="mb-2 text-sm font-semibold text-slate-700">
+                {String((sub as unknown as { score?: number }).score ?? "—")}
+                {" / "}
+                {String((sub as unknown as { total?: number }).total ?? "—")}
+              </p>
+              <div className="flex flex-col gap-1">
+                {Object.entries(((sub as unknown as { answers?: Record<string, string> }).answers ?? {})).map(([gap, val]) => (
+                  <div key={gap} className="flex items-baseline gap-2 rounded-lg bg-slate-50 px-3 py-1.5">
+                    <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-400">{gap}</span>
+                    <code className="min-w-0 flex-1 truncate text-xs text-slate-700">{String(val)}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+          <>
           {/* Link */}
           <div>
             <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400">{dx.studentLink}</h4>
@@ -203,6 +238,8 @@ function ExternalRow({
                 <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
               )}
             </div>
+          )}
+          </>
           )}
 
           {/* Grade */}
