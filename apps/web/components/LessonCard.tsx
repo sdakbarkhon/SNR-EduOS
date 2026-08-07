@@ -5,7 +5,7 @@ import {
   MapPin, User, ChevronRight, BookOpen,
   Calculator, Globe, Languages, BookText, Scroll, Map, Leaf, Atom,
   FlaskConical, Monitor, Code, Bot, Dumbbell, Music, Palette, Hammer,
-  TreePine, Users,
+  TreePine, Users, Library, Lightbulb, Target, Rocket,
 } from "lucide-react";
 import type { LessonWithSubject } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -15,10 +15,15 @@ import { cn } from "@/lib/cn";
 // 30.3 kB на /teacher/lessons) ради иконки по имени-строке из subjects.icon.
 // Эти имена всегда приходят из SUBJECT_DEFAULTS (packages/core/queries/
 // subjects.ts) — конечный список, явная карта вместо wildcard-импорта.
+//
+// Z.2.2: реестр синхронизирован с lib/subject-icons.ts::LUCIDE_ICONS. Раньше
+// они расходились: здесь не было Library (её предлагал пикер в админке) и
+// Lightbulb/Target/Rocket, из-за чего выбранная иконка молча подменялась на
+// BookOpen. Два реестра надо держать одинаковыми.
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; color?: string }>> = {
   Calculator, BookOpen, Globe, Languages, BookText, Scroll, Map, Leaf, Atom,
   FlaskConical, Monitor, Code, Bot, Dumbbell, Music, Palette, Hammer,
-  TreePine, Users,
+  TreePine, Users, Library, Lightbulb, Target, Rocket,
 };
 
 // ── helpers ──────────────────────────────────────────────────────────────────

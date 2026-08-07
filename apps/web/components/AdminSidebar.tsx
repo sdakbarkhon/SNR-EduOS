@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, Settings,
   LogOut, PanelLeftClose, PanelLeftOpen, Megaphone, Library, Heart, MessagesSquare,
+  Layers,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -55,7 +56,9 @@ export function AdminSidebar() {
     { key: "students",  href: "/admin/students",  icon: GraduationCap,   label: da.navStudents },
     { key: "teachers",  href: "/admin/teachers",  icon: Users,           label: da.navTeachers },
     { key: "groups",         href: "/admin/groups",         icon: BookOpen,   label: da.navGroups },
+    // Z.2.2: справочник и назначения — разные экраны
     { key: "subjects",       href: "/admin/subjects",       icon: Library,    label: da.navSubjects },
+    { key: "assignments",    href: "/admin/subject-assignments", icon: Layers, label: da.navAssignments },
     { key: "announcements",  href: "/admin/announcements",  icon: Megaphone,  label: da.navAnnouncements },
     { key: "parents",        href: "/admin/parents",        icon: Heart,      label: da.navParents },
     { key: "profile",        href: "/admin/profile",        icon: Settings,   label: da.navProfile },

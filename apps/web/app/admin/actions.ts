@@ -4,8 +4,11 @@ import {
   createStudent, updateStudent, resetStudentPassword, deleteStudent,
   createTeacher, updateTeacher, resetTeacherPassword, deleteTeacher,
   createGroup, updateGroup, deleteGroup,
+  createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
+  createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
+import { getSubjectKeyByLabel } from "@snr/core";
 import { revalidatePath } from "next/cache";
 
 /** Returns the calling admin's school_id — the service-role client used by
@@ -109,12 +112,31 @@ export async function actionDeleteTeacher(teacherId: string, userId: string) {
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
 
+/** Z.2.2: форма группы шлёт id записи справочника, а groups.subject — это
+ *  text NOT NULL, куда исторически пишется СЛАГ ('programming' и т.п.), и по
+ *  нему по всему приложению работает getSubjectStyle(). Поэтому резолвим:
+ *  справочник → название → слаг. Если название не из 10 известных ключей
+ *  (админ завёл свой предмет), слага нет — пишем само название: колонка
+ *  NOT NULL, пустую строку туда класть хуже. Стиль такого предмета будет
+ *  дефолтным серым — известный предел, зафиксирован отдельным шагом в
+ *  plan-z2-admin-rebuild.md. Схему groups.subject тут НЕ трогаем (Z.2.5/Z.2.6). */
+async function resolveGroupSubject(formData: FormData, schoolId: string): Promise<string> {
+  const catalogId = String(formData.get("subject_catalog_id") ?? "").trim();
+  if (!catalogId) throw new Error("Missing fields");
+  const sb = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: row } = await (sb as any)
+    .from("school_subjects").select("name, school_id").eq("id", catalogId).maybeSingle();
+  if (!row || row.school_id !== schoolId) throw new Error("Предмет не найден");
+  return getSubjectKeyByLabel(row.name) ?? row.name;
+}
+
 export async function actionCreateGroup(formData: FormData) {
   const { schoolId } = await verifyAdmin();
   const name = String(formData.get("name") ?? "").trim();
-  const subject = String(formData.get("subject") ?? "").trim();
   const teacher_id = String(formData.get("teacher_id") ?? "").trim();
-  if (!name || !subject || !teacher_id) throw new Error("Missing fields");
+  if (!name || !teacher_id) throw new Error("Missing fields");
+  const subject = await resolveGroupSubject(formData, schoolId);
   const id = await createGroup({ name, subject, teacher_id, school_id: schoolId });
   revalidatePath("/admin/groups");
   revalidatePath("/admin");
@@ -125,8 +147,8 @@ export async function actionUpdateGroup(formData: FormData) {
   const { schoolId, isSuperAdmin } = await verifyAdmin();
   const group_id = String(formData.get("group_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const subject = String(formData.get("subject") ?? "").trim();
   const teacher_id = String(formData.get("teacher_id") ?? "").trim();
+  const subject = await resolveGroupSubject(formData, schoolId);
   await updateGroup(group_id, { name, subject, teacher_id }, schoolId, isSuperAdmin);
   revalidatePath("/admin/groups");
 }
@@ -136,4 +158,80 @@ export async function actionDeleteGroup(groupId: string) {
   await deleteGroup(groupId, schoolId, isSuperAdmin);
   revalidatePath("/admin/groups");
   revalidatePath("/admin");
+}
+
+// ── SCHOOL SUBJECTS: справочник (Z.2.2) ──────────────────────────────────────
+// school_id всегда берётся из verifyAdmin() на сервере, из FormData НЕ читается
+// — до Z.2.2 эта форма была единственной в админке, писавшей прямо из браузера
+// и полагавшейся на DEFAULT current_school_id().
+
+function revalidateSubjects() {
+  revalidatePath("/admin/subjects");
+  revalidatePath("/admin/subject-assignments");
+  revalidatePath("/admin/groups");
+}
+
+export async function actionCreateSchoolSubject(formData: FormData) {
+  const { schoolId } = await verifyAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
+  const color = String(formData.get("color") ?? "").trim() || "#64748B";
+  if (!name) throw new Error("Missing fields");
+  const id = await createSchoolSubject({ name, icon, color, school_id: schoolId });
+  revalidateSubjects();
+  return id;
+}
+
+export async function actionUpdateSchoolSubject(formData: FormData) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
+  const color = String(formData.get("color") ?? "").trim() || "#64748B";
+  if (!id || !name) throw new Error("Missing fields");
+  await updateSchoolSubject(id, { name, icon, color }, schoolId, isSuperAdmin);
+  revalidateSubjects();
+}
+
+export async function actionSetSchoolSubjectActive(id: string, isActive: boolean) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  await setSchoolSubjectActive(id, isActive, schoolId, isSuperAdmin);
+  revalidateSubjects();
+}
+
+// ── SUBJECT ASSIGNMENTS: предмет × группа × учитель (Z.2.2) ──────────────────
+// Назначение учителя будит trg_subject_teacher_direct_chats — личные чаты со
+// всеми учениками группы. Это штатно, но по одной строке за раз; в UI об этом
+// есть подсказка под полем учителя.
+
+export async function actionCreateSubjectAssignment(formData: FormData) {
+  const { schoolId } = await verifyAdmin();
+  const catalog_id = String(formData.get("catalog_id") ?? "").trim();
+  const group_id = String(formData.get("group_id") ?? "").trim();
+  const teacher_id = String(formData.get("teacher_id") ?? "").trim();
+  if (!catalog_id || !group_id) throw new Error("Missing fields");
+  const id = await createSubjectAssignment({
+    catalog_id, group_id, teacher_id: teacher_id || null, school_id: schoolId,
+  });
+  revalidateSubjects();
+  return id;
+}
+
+export async function actionUpdateSubjectAssignment(formData: FormData) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  const id = String(formData.get("id") ?? "");
+  const catalog_id = String(formData.get("catalog_id") ?? "").trim();
+  const group_id = String(formData.get("group_id") ?? "").trim();
+  const teacher_id = String(formData.get("teacher_id") ?? "").trim();
+  if (!id || !catalog_id || !group_id) throw new Error("Missing fields");
+  await updateSubjectAssignment(
+    id, { catalog_id, group_id, teacher_id: teacher_id || null }, schoolId, isSuperAdmin,
+  );
+  revalidateSubjects();
+}
+
+export async function actionDeleteSubjectAssignment(id: string) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  await deleteSubjectAssignment(id, schoolId, isSuperAdmin);
+  revalidateSubjects();
 }

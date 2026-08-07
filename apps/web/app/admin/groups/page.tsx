@@ -9,7 +9,14 @@ export default async function AdminGroupsPage({
   const { action } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: groups, error: groupsError }, { data: teachers, error: teachersError }] = await Promise.all([
+  // Z.2.2: справочник школы вместо захардкоженного списка предметов в форме.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sbAny = supabase as any;
+  const [
+    { data: groups, error: groupsError },
+    { data: teachers, error: teachersError },
+    { data: catalog, error: catalogError },
+  ] = await Promise.all([
     supabase
       .from("groups")
       .select(
@@ -17,14 +24,17 @@ export default async function AdminGroupsPage({
       )
       .order("name"),
     supabase.from("teachers").select("id, full_name").order("full_name"),
+    sbAny.from("school_subjects").select("id, name, is_active").order("name"),
   ]);
   if (groupsError) console.error("[AdminGroupsPage] groups query failed:", groupsError.message);
   if (teachersError) console.error("[AdminGroupsPage] teachers query failed:", teachersError.message);
+  if (catalogError) console.error("[AdminGroupsPage] catalog query failed:", catalogError.message);
 
   return (
     <GroupsView
       groups={groups ?? []}
       teachers={teachers ?? []}
+      catalog={catalog ?? []}
       defaultOpenAdd={action === "add"}
     />
   );

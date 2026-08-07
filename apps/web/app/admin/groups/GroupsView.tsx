@@ -3,12 +3,19 @@
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2, Plus, X } from "lucide-react";
-import { getDictionary, type Locale, subjects } from "@snr/core";
+// Z.2.2: захардкоженная карта `subjects` (10 ключей из config/subjects.ts)
+// больше НЕ питает выпадающий список — предметы берутся из справочника школы
+// (school_subjects). getSubjectKeyByLabel остаётся: это мост «русское название
+// → слаг», нужный чтобы groups.subject продолжал хранить слаг, как сегодня, и
+// getSubjectStyle по всему приложению не сломался. Сам config/subjects.ts
+// живёт дальше — он слой стилей для всего проекта, включая apps/mobile.
+import { getDictionary, getSubjectKeyByLabel, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
 
 type Teacher = { id: string; full_name: string };
+export type CatalogItem = { id: string; name: string; is_active: boolean };
 type Group = {
   id: string;
   name: string;
@@ -80,6 +87,7 @@ type AdminDict = ReturnType<typeof getDictionary>["admin"];
 function GroupForm({
   defaultValues,
   teachers,
+  catalog,
   isPending,
   t,
   onClose,
@@ -88,13 +96,20 @@ function GroupForm({
 }: {
   defaultValues?: Partial<Group>;
   teachers: Teacher[];
+  catalog: CatalogItem[];
   isPending: boolean;
   t: AdminDict;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
   submitLabel: string;
 }) {
-  const subjectEntries = Object.entries(subjects);
+  // Скрытые предметы не предлагаем; но если у редактируемой группы стоит
+  // именно скрытый — оставляем его в списке, иначе сохранение молча
+  // переключило бы предмет на другой.
+  const currentSlug = defaultValues?.subject ?? "";
+  const options = catalog.filter(
+    (c) => c.is_active || getSubjectKeyByLabel(c.name) === currentSlug,
+  );
 
   return (
     <form
@@ -105,10 +120,21 @@ function GroupForm({
         <Input name="name" required placeholder="Математика 7А" defaultValue={defaultValues?.name} />
       </Field>
       <Field label={t.fieldSubject}>
-        <Select name="subject" required defaultValue={defaultValues?.subject ?? ""}>
-          <option value="" disabled>{t.selectSubjectPlaceholder}</option>
-          {subjectEntries.map(([key, cfg]) => (
-            <option key={key} value={key}>{cfg.label}</option>
+        {/* Z.2.2: значение — id записи справочника; слаг для groups.subject
+            резолвит server action. Пустой справочник = новая школа, админ
+            заводит предметы на /admin/subjects. */}
+        <Select
+          name="subject_catalog_id"
+          required
+          defaultValue={options.find((c) => getSubjectKeyByLabel(c.name) === currentSlug)?.id ?? ""}
+        >
+          <option value="" disabled>
+            {catalog.length === 0 ? t.groupsNoSubjectsYet : t.selectSubjectPlaceholder}
+          </option>
+          {options.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}{c.is_active ? "" : ` (${t.subjectsHiddenBadge})`}
+            </option>
           ))}
         </Select>
       </Field>
@@ -133,15 +159,26 @@ function GroupForm({
 export function GroupsView({
   groups,
   teachers,
+  catalog,
   defaultOpenAdd,
 }: {
   groups: Group[];
   teachers: Teacher[];
+  catalog: CatalogItem[];
   defaultOpenAdd?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.admin;
+
+  // Z.2.2: подпись предмета в таблице берём из справочника школы, а не из
+  // захардкоженной карты. groups.subject хранит слаг, справочник — русские
+  // названия, поэтому мост тот же getSubjectKeyByLabel.
+  const nameBySlug = new Map<string, string>();
+  for (const c of catalog) {
+    const slug = getSubjectKeyByLabel(c.name);
+    if (slug) nameBySlug.set(slug, c.name);
+  }
 
   const [modal, setModal] = useState<Modal | null>(defaultOpenAdd ? { kind: "add" } : null);
   const [search, setSearch] = useState("");
@@ -208,7 +245,7 @@ export function GroupsView({
                 </tr>
               ) : (
                 filtered.map((g) => {
-                  const subjectLabel = subjects[g.subject]?.label ?? g.subject;
+                  const subjectLabel = nameBySlug.get(g.subject) ?? g.subject;
                   return (
                     <tr key={g.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-3 font-medium text-gray-800">{g.name}</td>
@@ -239,6 +276,7 @@ export function GroupsView({
           <ModalCard title={t.addGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
               teachers={teachers}
+              catalog={catalog}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
@@ -263,6 +301,7 @@ export function GroupsView({
             <GroupForm
               defaultValues={modal.group}
               teachers={teachers}
+              catalog={catalog}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}

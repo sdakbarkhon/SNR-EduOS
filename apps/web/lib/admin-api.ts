@@ -24,13 +24,18 @@ function generatePassword(length = 8): string {
  *  bypass (cross-school management is their whole purpose). */
 async function assertSameSchool(
   sb: ReturnType<typeof getServiceClient>,
-  table: "students" | "teachers" | "groups" | "parents",
+  // Z.2.2: + school_subjects (справочник) и subjects (назначения). Обе несут
+  // school_id, поэтому проверка та же; as any на .from() нужен только потому,
+  // что school_subjects (миграция 171) ещё нет в сгенерированном Database-типе
+  // — он намеренно не перегенерирован, см. resheniya_2.md Z.2.1.
+  table: "students" | "teachers" | "groups" | "parents" | "school_subjects" | "subjects",
   targetId: string,
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ): Promise<void> {
   if (callerIsSuperAdmin) return;
-  const { data, error } = await sb.from(table).select("school_id").eq("id", targetId).single();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (sb as any).from(table).select("school_id").eq("id", targetId).single();
   if (error || !data) throw error ?? new Error(`${table}: запись не найдена`);
   if ((data as { school_id: string }).school_id !== callerSchoolId) {
     throw new Error("Нельзя редактировать записи чужой школы");
@@ -277,6 +282,167 @@ export async function deleteGroup(groupId: string, callerSchoolId: string, calle
   await assertSameSchool(sb, "groups", groupId, callerSchoolId, callerIsSuperAdmin);
 
   const { error } = await sb.from("groups").delete().eq("id", groupId);
+  if (error) throw error;
+}
+
+// ── ADMIN: SCHOOL SUBJECTS (справочник, Z.2.2) ───────────────────────────────
+// Справочник предметов школы. Определение предмета (название/иконка/цвет)
+// живёт здесь, а «предмет × группа × учитель» — в public.subjects (ниже,
+// назначения). Всё пишется service-role клиентом со ЯВНЫМ school_id: до Z.2.2
+// эта форма была единственной в админке, которая писала прямо из браузера и
+// полагалась на DEFAULT current_school_id().
+
+export type SchoolSubjectRow = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  is_active: boolean;
+  assignments: number;
+};
+
+export async function createSchoolSubject(data: {
+  name: string; icon: string; color: string; school_id: string;
+}): Promise<string> {
+  const sb = getServiceClient();
+  const { data: row, error } = await sb
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from("school_subjects" as any)
+    .insert({ name: data.name, icon: data.icon, color: data.color, school_id: data.school_id })
+    .select("id")
+    .single();
+  if (error || !row) throw error ?? new Error("School subject insert failed");
+  return (row as { id: string }).id;
+}
+
+/** Переименование/смена стиля. Назначения тянутся через catalog_id, поэтому
+ *  переименование справочника их не ломает — но subjects.name это отдельная
+ *  копия (колонка NOT NULL, осталась с до-Z.2.1 модели), и её надо держать в
+ *  синхроне, иначе списки назначений покажут старое имя. */
+export async function updateSchoolSubject(
+  id: string,
+  data: { name: string; icon: string; color: string },
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "school_subjects", id, callerSchoolId, callerIsSuperAdmin);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any)
+    .from("school_subjects").update(data).eq("id", id);
+  if (error) throw error;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: syncErr } = await (sb as any)
+    .from("subjects")
+    .update({ name: data.name, icon: data.icon, color: data.color })
+    .eq("catalog_id", id);
+  if (syncErr) throw syncErr;
+}
+
+/** Скрыть/показать. Удаления нет намеренно — решение заказчика: скрывать, а не
+ *  удалять (гварды удаления — Z.2.3). Скрытый предмет исчезает из выпадающих
+ *  списков при создании назначений, но существующие назначения работают. */
+export async function setSchoolSubjectActive(
+  id: string,
+  isActive: boolean,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "school_subjects", id, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any)
+    .from("school_subjects").update({ is_active: isActive }).eq("id", id);
+  if (error) throw error;
+}
+
+// ── ADMIN: SUBJECT ASSIGNMENTS (public.subjects, Z.2.2) ──────────────────────
+// ВНИМАНИЕ: teacher_id здесь — это предикат is_subject_owner(), гейтящий запись
+// уроков учителем, И на него висит trg_subject_teacher_direct_chats, который
+// при смене значения заводит личные чаты со всеми учениками группы. Поэтому:
+// одна строка за раз, никаких массовых UPDATE. Единая привязка (subjects +
+// group_teachers одним действием) — отдельный шаг Z.2.4, здесь НЕ делается.
+
+export async function createSubjectAssignment(data: {
+  catalog_id: string; group_id: string; teacher_id: string | null; school_id: string;
+}): Promise<string> {
+  const sb = getServiceClient();
+
+  // name/icon/color копируются из справочника: subjects.name — NOT NULL
+  // (модель до Z.2.1), icon/color тоже NOT NULL.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: cat, error: catErr } = await (sb as any)
+    .from("school_subjects")
+    .select("id, name, icon, color, school_id, is_active")
+    .eq("id", data.catalog_id)
+    .maybeSingle();
+  if (catErr) throw catErr;
+  if (!cat || cat.school_id !== data.school_id) throw new Error("Предмет не найден");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: row, error } = await (sb as any)
+    .from("subjects")
+    .insert({
+      catalog_id: cat.id,
+      name: cat.name,
+      icon: cat.icon,
+      color: cat.color,
+      group_id: data.group_id,
+      teacher_id: data.teacher_id,
+      school_id: data.school_id,
+    })
+    .select("id")
+    .single();
+  if (error || !row) throw error ?? new Error("Assignment insert failed");
+  return (row as { id: string }).id;
+}
+
+export async function updateSubjectAssignment(
+  id: string,
+  data: { catalog_id: string; group_id: string; teacher_id: string | null },
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "subjects", id, callerSchoolId, callerIsSuperAdmin);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: cat, error: catErr } = await (sb as any)
+    .from("school_subjects")
+    .select("id, name, icon, color, school_id")
+    .eq("id", data.catalog_id)
+    .maybeSingle();
+  if (catErr) throw catErr;
+  if (!cat || (!callerIsSuperAdmin && cat.school_id !== callerSchoolId)) {
+    throw new Error("Предмет не найден");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any)
+    .from("subjects")
+    .update({
+      catalog_id: cat.id,
+      name: cat.name,
+      icon: cat.icon,
+      color: cat.color,
+      group_id: data.group_id,
+      teacher_id: data.teacher_id,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteSubjectAssignment(
+  id: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "subjects", id, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any).from("subjects").delete().eq("id", id);
   if (error) throw error;
 }
 

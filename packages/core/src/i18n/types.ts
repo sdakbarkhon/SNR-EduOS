@@ -264,6 +264,7 @@ export interface Dictionary {
     navTeachers: string;
     navGroups: string;
     navSubjects: string;
+    navAssignments: string;
     navAnnouncements: string;
     navParents: string;
     navProfile: string;
@@ -302,6 +303,33 @@ export interface Dictionary {
     subjectsEmpty: string;
     subjectsIcon: string;
     subjectsColor: string;
+    // Z.2.2 — справочник предметов + назначения
+    subjectsCatalogHint: string;
+    subjectsCatalogEmpty: string;
+    subjectsHiddenBadge: string;
+    subjectsHide: string;
+    subjectsShow: string;
+    subjectsUsageCount: string;
+    subjectsUsageNone: string;
+    subjectsRenameHint: string;
+    groupsNoSubjectsYet: string;
+    assignmentsTitle: string;
+    assignmentsHint: string;
+    assignmentsAdd: string;
+    assignmentsEdit: string;
+    assignmentsEmpty: string;
+    assignmentsSubject: string;
+    assignmentsPickSubject: string;
+    assignmentsPickGroup: string;
+    assignmentsCreateSubject: string;
+    assignmentsCreateSubjectHint: string;
+    assignmentsTeacherChatsHint: string;
+    assignmentsAllGroups: string;
+    assignmentsAllSubjects: string;
+    assignmentsAllTeachers: string;
+    assignmentsDeleteTitle: string;
+    assignmentsDeleteConfirm: string;
+    assignmentsDeleteWarning: string;
     role: string;
     // dashboard
     statStudents: string;
