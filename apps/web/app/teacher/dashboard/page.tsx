@@ -6,6 +6,7 @@ import {
 } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
+import { getDemoNowMs } from "@/lib/demo-date";
 import { TeacherDashboardView } from "./TeacherDashboardView";
 
 export default async function TeacherDashboardPage() {
@@ -15,7 +16,8 @@ export default async function TeacherDashboardPage() {
     safeQuery(getMyTeacher(supabase), null, "TeacherDashboardPage.teacher"),
     safeQuery(getTeacherGroups(supabase), [], "TeacherDashboardPage.groups"),
     safeQuery(getTeacherHomework(supabase), [], "TeacherDashboardPage.homework"),
-    safeQuery(getTeacherTodayLessons(supabase), [], "TeacherDashboardPage.todayLessons"),
+    // 07.08.2026: «сегодня» — замороженная дата, а не реальные часы сервера.
+    safeQuery(getTeacherTodayLessons(supabase, getDemoNowMs()), [], "TeacherDashboardPage.todayLessons"),
     safeQuery(getTeacherRecentSubmissions(supabase, 8), [], "TeacherDashboardPage.recentSubmissions"),
     safeQuery(getTeacherGrades(supabase), [], "TeacherDashboardPage.grades"),
     safeQuery(getTeacherAnnouncementsFeed(supabase, 8), [], "TeacherDashboardPage.announcements"),

@@ -1704,12 +1704,29 @@ function filterBySubject<T extends { subject_id?: string | null }>(
   return rows.filter((r) => r.subject_id != null && ids.has(r.subject_id));
 }
 
-/** Уроки учителя на сегодня (локальная дата). */
-export const getTeacherTodayLessons = async (db: Db) => {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+/** Уроки учителя на сегодня (день по Ташкенту, UTC+5).
+ *
+ *  07.08.2026 — фикс «учитель не видит расписание на сегодня». Было
+ *  `new Date()` + `setHours()`, то есть РЕАЛЬНЫЕ часы сервера: при
+ *  замороженном времени (29.07.2026, см. apps/web/lib/demo-date.ts) функция
+ *  спрашивала уроки на настоящую дату, где их просто нет — блок «Уроки
+ *  сегодня» на дашборде учителя оставался пустым. Вдобавок `setHours()`
+ *  считал границы дня в таймзоне СЕРВЕРА (на Vercel это UTC), а не Ташкента,
+ *  так что даже без заморозки день сдвигался на 5 часов.
+ *
+ *  nowMs обязателен и приходит из слоя приложения: packages/core не может
+ *  импортировать apps/web/lib/demo-date. Тот же приём, что уже используют
+ *  ученические страницы (getTashkentToday в app/(app)/lessons/page.tsx).
+ *  Параметр НЕ сделан опциональным намеренно — дефолт `Date.now()` был бы
+ *  ровно той ловушкой, которую этот фикс и устраняет. */
+const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+export const getTeacherTodayLessons = async (db: Db, nowMs: number) => {
+  // Границы ташкентских суток, выраженные в UTC.
+  const t = new Date(nowMs + TASHKENT_OFFSET_MS);
+  const y = t.getUTCFullYear(), m = t.getUTCMonth(), d = t.getUTCDate();
+  const todayStart = new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - TASHKENT_OFFSET_MS);
+  const todayEnd = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - TASHKENT_OFFSET_MS);
   const { data, error } = await db
     .from("lessons")
     .select("*, group:groups!inner(id, name, subject)")
