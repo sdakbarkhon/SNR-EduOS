@@ -10,7 +10,6 @@ import type {
 import { getSubjectStyle } from "@snr/core";
 import { ProgressView } from "./ProgressView";
 import { getParentContext } from "@/lib/parent-context";
-import { getDemoNowMs } from "@/lib/demo-date";
 import {
   childAttendanceRecords,
   childDailyStatus,
@@ -231,15 +230,17 @@ export default async function ParentProgressPage() {
   });
 
   /* ── Статус дня для чипа в карточке ребёнка ─────────────────────────────── */
-  // «Сейчас» берём из демо-часов (lib/demo-date), а не из getChildDailyStats:
-  // тот сравнивает уроки с РЕАЛЬНЫМ Date.now(), и при замороженной демо-дате
-  // «следующий урок» получился бы неверным.
-
-  const nowIso = new Date(getDemoNowMs()).toISOString();
+  // 07.08.2026: раньше «остались ли ещё уроки» считалось сравнением по
+  // времени с демо-часами. Теперь — по статусу урока, как у ученика и
+  // учителя (presenters/lessonNow.ts): ребёнок «в школе», если день ещё не
+  // доигран, то есть остался хотя бы один не завершённый урок. Заодно уходит
+  // расхождение на границе слота (урок, начинающийся ровно в замороженный
+  // момент, строгим `>` терялся). getChildDailyStats больше не сравнивает с
+  // реальными часами — исправлено там же.
   const statusLabel =
     dayStatus.totalLessons > 0 &&
     dayStatus.attendedCount > 0 &&
-    dayStatus.lessons.some((l) => l.startsAt > nowIso)
+    dayStatus.lessons.some((l) => l.status === "scheduled" || l.status === "in_progress")
       ? "В школе"
       : null;
 

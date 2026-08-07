@@ -22,7 +22,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
-import { getDemoNow } from "@/lib/demo-date";
+import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -674,14 +674,14 @@ export function TeacherLessonsView({
         room: form.room || null, title: form.title || null, description: form.desc || null,
         subjectId: form.subjectId || null,
         curriculumTopicId: form.curriculumTopicId || null,
-      });
+      }, getDemoNowMs());
       setFormModal(null);
       router.push(`/teacher/lessons/${created.id}`);
     } else if (formModal === "edit" && editLesson) {
       await updateLesson(db, editLesson.id, {
         group_id: form.groupId, starts_at: startsAt, duration_minutes: durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
-      });
+      }, getDemoNowMs());
       setFormModal(null);
       await loadMonth(viewYear, viewMonth);
     }

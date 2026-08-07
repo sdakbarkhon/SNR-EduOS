@@ -5,7 +5,8 @@
  * читают текущего пользователя сами (как getMyNotifications/getMyThreadSummaries),
  * без параметра parentId. */
 import type { Db } from "../supabase/factory";
-import type { AttendanceStatus, LessonWithSubject } from "../types";
+import type { AttendanceStatus, LessonStatus, LessonWithSubject } from "../types";
+import { findNextLesson } from "../presenters/lessonNow";
 
 // Тот же select, что LESSON_SUBJECT_SELECT в index.ts — не импортируем оттуда
 // напрямую, чтобы не создавать циклическую зависимость index.ts <-> parent.ts
@@ -127,8 +128,14 @@ export async function getChildDailyStats(db: Db, studentId: string, dateStr: str
     .filter((r) => r.marked_at)
     .sort((a, b) => (a.marked_at! < b.marked_at! ? -1 : 1))[0]?.marked_at ?? null;
 
-  const nowIso = new Date().toISOString();
-  const next = lessons.find((l) => l.starts_at > nowIso) ?? null;
+  // 07.08.2026: было `lessons.find(l => l.starts_at > new Date().toISOString())`
+  // — РЕАЛЬНЫЕ часы, поэтому под заморозкой (29.07) родитель видел не тот урок,
+  // что ученик и учитель. Плюс сравнение по времени само по себе неверно: в
+  // проекте единственный источник истины для «сейчас/далее» — статус урока,
+  // см. presenters/lessonNow.ts (там же объяснение, почему сравнение по
+  // времени приводило к «Сейчас» сразу на нескольких уроках). Переходим на
+  // тот же презентер — заодно исчезает нужда в параметре момента.
+  const next = findNextLesson(lessons) ?? null;
 
   return {
     arrivalTime,
@@ -156,6 +163,13 @@ export type DailyStatusLesson = {
   room: string | null;
   teacherName: string | null;
   attendanceStatus: AttendanceStatus | null; // null = ещё не отмечено
+  /** 07.08.2026 — статус САМОГО урока (scheduled/in_progress/completed).
+   *  Запрос его и раньше выбирал, но маппинг терял, из-за чего родительские
+   *  страницы вынужденно определяли «сейчас/далее» сравнением по времени —
+   *  и расходились с учеником и учителем, которые идут по статусу
+   *  (presenters/lessonNow.ts). Поле добавлено, чтобы все трое считали
+   *  одинаково. Не путать с attendanceStatus выше — это посещаемость. */
+  status: LessonStatus;
 };
 
 export type ChildDailyStatus = {
@@ -170,6 +184,7 @@ export type ChildDailyStatus = {
 
 type DailyStatusLessonRow = {
   id: string; title: string | null; starts_at: string; ends_at: string | null; room: string | null; group_id: string;
+  status: LessonStatus;
   subject: { id: string; name: string; teacher: { id: string; full_name: string } | null } | null;
   group: { id: string; name: string; teacher: { id: string; full_name: string } | null } | null;
 };
@@ -219,6 +234,7 @@ export async function getChildDailyStatus(db: Db, studentId: string, dateStr: st
     room: l.room,
     teacherName: l.subject?.teacher?.full_name ?? l.group?.teacher?.full_name ?? null,
     attendanceStatus: attendanceByLesson.get(l.id) ?? null,
+    status: l.status,
   }));
 
   const attendedCount = lessons.filter((l) => l.attendanceStatus === "present").length;

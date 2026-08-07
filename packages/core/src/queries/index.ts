@@ -2624,8 +2624,12 @@ export const updateLesson = async (
     room?: string | null;
     group_id?: string;
   },
+  /** Момент «сейчас» из слоя приложения (getDemoNowMs()). Обязателен: дефолт
+   *  Date.now() под заморозкой отвергал бы любой урок на замороженную дату
+   *  как «в прошлом» — см. комментарий у createLesson ниже. */
+  nowMs: number,
 ): Promise<void> => {
-  if (patch.starts_at && new Date(patch.starts_at) < new Date()) {
+  if (patch.starts_at && new Date(patch.starts_at).getTime() < nowMs) {
     throw new Error("Нельзя создать урок в прошедшее время");
   }
   if (patch.duration_minutes !== undefined && (patch.duration_minutes < 5 || patch.duration_minutes > 240)) {
@@ -2654,9 +2658,22 @@ export const createLesson = async (
     subjectId?: string | null;
     curriculumTopicId?: string | null;
   },
+  /** 07.08.2026 — момент «сейчас» из слоя приложения (getDemoNowMs()).
+   *  Было `new Date()`, то есть РЕАЛЬНЫЕ часы: под заморозкой (29.07.2026)
+   *  учитель, создающий урок на «сегодня», получал отказ «урок в прошлом»,
+   *  потому что настоящая дата уже 07.08 — создание уроков было заблокировано
+   *  полностью. Параметр обязателен намеренно: дефолт Date.now() вернул бы
+   *  ровно этот баг для любого нового вызывающего.
+   *
+   *  ВАЖНО: клиентской проверки мало. На lessons висит БД-триггер
+   *  trg_validate_lesson_start (WHEN CURRENT_USER = 'authenticated'), который
+   *  сравнивает starts_at с настоящим Postgres now() и заморозку не видит —
+   *  он отклонит INSERT на 29.07 даже после этого фикса. Решение по триггеру
+   *  отложено (см. resheniya_2.md 07.08). */
+  nowMs: number,
 ): Promise<{ id: string }> => {
   const dur = input.durationMinutes ?? 45;
-  if (new Date(input.startsAt) < new Date()) throw new Error("Нельзя создать урок в прошедшее время");
+  if (new Date(input.startsAt).getTime() < nowMs) throw new Error("Нельзя создать урок в прошедшее время");
   if (dur < 5 || dur > 240) throw new Error("Некорректная длительность");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
@@ -3758,8 +3775,14 @@ export const getTeacherLessonsByMonth = async (
   year: number,
   month: number,
 ): Promise<TeacherLessonListItem[]> => {
-  const start = new Date(year, month - 1, 1).toISOString();
-  const end = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
+  // 07.08.2026: было new Date(year, month-1, 1) — границы месяца строились в
+  // таймзоне СЕРВЕРА (на Vercel это UTC), а расписание живёт по Ташкенту.
+  // Сдвиг на 5 часов: месяц начинался в 05:00 первого числа и захватывал
+  // 00:00–05:00 первого числа следующего. Сейчас уроков в эти часы не бывает,
+  // поэтому эффекта не было, — но это ровно та ловушка, что уже выстрелила в
+  // getTeacherTodayLessons. Считаем границы явно по Ташкенту (UTC+5).
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - TASHKENT_OFFSET_MS).toISOString();
+  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999) - TASHKENT_OFFSET_MS).toISOString();
   const { data, error } = await db
     .from("lessons")
     .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, subject_id, group:groups!inner(id, name, subject)")

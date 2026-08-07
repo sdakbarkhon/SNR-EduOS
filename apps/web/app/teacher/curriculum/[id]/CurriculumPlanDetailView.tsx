@@ -12,6 +12,7 @@ import {
 } from "@snr/core";
 import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { getDemoNowMs } from "@/lib/demo-date";
 import { PageContainer } from "@/components/PageContainer";
 import { useRealtimeChannel } from "@/lib/realtime";
 
@@ -207,7 +208,7 @@ export function CurriculumPlanDetailView({
         description: t.description,
         subjectId: plan.subject_id,
         curriculumTopicId: t.id,
-      });
+      }, getDemoNowMs());
       setTopics((cur) => cur.map((x) => (x.id === t.id ? { ...x, used_in_lessons: x.used_in_lessons + 1 } : x)));
     } catch (e) {
       setOneByOneError({ id: t.id, message: e instanceof Error ? e.message : "Не удалось создать урок" });

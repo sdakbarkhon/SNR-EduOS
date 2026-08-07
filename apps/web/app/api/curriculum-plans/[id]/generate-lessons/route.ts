@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getDemoNowMs } from "@/lib/demo-date";
 import { getCurriculumPlanById, getCurriculumTopicsWithUsage, createLesson, getGroupLessonsInDateRange } from "@snr/core";
 
 // Учебные планы, Часть 2А — "Создать все уроки автоматически": раскладывает
@@ -154,7 +155,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         description: a.description,
         subjectId: plan.subject_id,
         curriculumTopicId: a.topicId,
-      });
+      }, getDemoNowMs());
       created.push({ topicId: a.topicId, title: a.title, date: a.date, time: a.time });
     } catch (e) {
       return NextResponse.json({

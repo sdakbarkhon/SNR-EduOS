@@ -12,6 +12,7 @@ import {
   parentToday,
   parentUnreadCount,
 } from "@/lib/parent-queries";
+import { findNextLesson } from "@snr/core";
 import { getDemoNowMs } from "@/lib/demo-date";
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
 import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
@@ -214,7 +215,6 @@ export default async function ParentHomePage() {
 
   /* ── Следующий урок: сегодняшний, иначе первый урок ближайшего учебного дня ── */
 
-  const nowIso = new Date(getDemoNowMs()).toISOString();
   let next: {
     subjectName: string;
     startsAt: string;
@@ -223,7 +223,15 @@ export default async function ParentHomePage() {
     dateKey: string;
   } | null = null;
 
-  const upcomingToday = dayStatus.lessons.find((l) => l.startsAt > nowIso);
+  // 07.08.2026: было `l.startsAt > nowIso` — сравнение по времени, к тому же
+  // СТРОГОЕ: урок, начинающийся ровно в замороженный момент (10:50), в выборку
+  // не попадал, и родителю показывался следующий за ним (11:55) — то есть не
+  // тот урок, что видят ученик и учитель. Переходим на статус-презентер
+  // (presenters/lessonNow.ts), единый для всех ролей: «далее» = первый
+  // scheduled после идущего in_progress.
+  const upcomingToday = findNextLesson(
+    dayStatus.lessons.map((l) => ({ ...l, starts_at: l.startsAt })),
+  );
   if (upcomingToday) {
     next = {
       subjectName: upcomingToday.subjectName ?? upcomingToday.title,
