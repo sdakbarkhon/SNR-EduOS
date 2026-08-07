@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { StageMedia } from "@/components/lesson-stages/StageMedia";
 
 const LIVE_SCORES_POLL_MS = 12000;
 
@@ -126,6 +127,14 @@ export function StageViewModal({
 
         {/* Body */}
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
+          <StageMedia
+            image_url={(stage as { image_url?: string | null }).image_url ?? null}
+            mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
+            media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
+            media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
+            isTeacher
+          />
+
           {stage.description && <MarkdownContent text={stage.description} className="text-sm text-slate-700" />}
 
           {stage.slides && stage.slides.length > 0 && (

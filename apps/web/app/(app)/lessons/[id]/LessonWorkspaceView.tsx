@@ -24,6 +24,7 @@ import { StageActionButton } from "@/components/lesson-stages/StageActionButton"
 import { AiChatPanel } from "./AiChatPanel";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { StudentPresentationViewer } from "@/components/lesson-stages/StudentPresentationViewer";
+import { StageMedia } from "@/components/lesson-stages/StageMedia";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
 import { CodeCompletionStageView } from "./CodeCompletionStageView";
@@ -1262,6 +1263,13 @@ export function LessonWorkspaceView({
                       )}
                     </div>
                   )}
+
+                  <StageMedia
+                    image_url={(stage as { image_url?: string | null }).image_url ?? null}
+                    mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
+                    media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
+                    media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
+                  />
 
                   {/* Theory: full presentation (slides) when generated, else plain text.
                       While in_progress, student AND teacher both drive navigation —

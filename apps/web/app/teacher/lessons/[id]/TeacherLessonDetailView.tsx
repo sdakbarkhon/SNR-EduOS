@@ -61,6 +61,7 @@ import { KahootTeacherModal } from "./KahootTeacherModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
 import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
+import { StageMedia } from "@/components/lesson-stages/StageMedia";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -1587,6 +1588,19 @@ export function TeacherLessonDetailView({
                         </button>
                       )}
                     </div>
+
+                    {/* AI-медиа этапа (backfill 05.08.2026) — только для активного этапа */}
+                    {isActive && (
+                      <div className="border-t border-violet-100 bg-white p-3">
+                        <StageMedia
+                          image_url={(stage as { image_url?: string | null }).image_url ?? null}
+                          mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
+                          media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
+                          media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
+                          isTeacher
+                        />
+                      </div>
+                    )}
 
                     {/* Teacher presentation control — drives students' current_slide_index via Realtime */}
                     {hasSlides && (
