@@ -333,7 +333,11 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
         <div className="shrink-0 border-b border-gray-100 px-4 py-4">
           <h1 className="text-lg font-bold text-gray-800">{d.chat.title}</h1>
         </div>
-        <div className="scrollbar-hide flex-1 overflow-y-auto">
+        {/* 07.08.2026 — min-h-0 обязателен: без него flex-элемент не может
+            стать ниже своего содержимого, overflow-y-auto не включается, и
+            вместо колонки растёт вся страница. Та же ловушка, что была с
+            сайдбаром (коммит 0464a63). */}
+        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto">
           {loadedThreads && threads.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-gray-400">
@@ -408,7 +412,9 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
         </div>
       </div>
 
-      <div className={`min-w-0 flex-1 flex-col ${activeThreadId ? "flex" : "hidden md:flex"}`}>
+      {/* min-h-0 — по той же причине, что и слева: иначе колонка не сожмётся
+          и лента с композером уедут за нижнюю кромку. */}
+      <div className={`min-h-0 min-w-0 flex-1 flex-col ${activeThreadId ? "flex" : "hidden md:flex"}`}>
         {!activeThread ? (
           <div className="flex flex-1 items-center justify-center text-sm text-gray-400">{d.chat.noThreadSelected}</div>
         ) : (
@@ -441,7 +447,10 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
               </div>
             </div>
 
-            <div ref={feedRef} onScroll={handleFeedScroll} className="scrollbar-hide flex-1 space-y-1 overflow-y-auto px-4 py-4">
+            {/* Лента — единственное, что прокручивается в правой колонке.
+                Шапка выше и композер ниже уже shrink-0, поэтому с min-h-0
+                здесь композер оказывается прибит к низу, как в телеграме. */}
+            <div ref={feedRef} onScroll={handleFeedScroll} className="scrollbar-hide min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4">
               {messages.length === 0 && (
                 <div className="flex h-full items-center justify-center text-sm text-gray-400">{d.chat.noMessagesInThread}</div>
               )}
