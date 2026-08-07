@@ -376,23 +376,30 @@ export function DashboardView({
           {/* HERO ROW: Факт дня + Серия успехов */}
           <div className="flex flex-col gap-6 lg:flex-row">
             {/* Факт дня */}
+            {/* 07.08.2026: карточка была заметно выше плиток «Быстрых действий»
+                (min-h-[150px]), а короткий факт + `mt-auto` на кнопке давали
+                провал между текстом и кнопкой. Высота приведена к плитке «Моё
+                задание», кнопка идёт сразу за текстом. min-h, а не фиксированная
+                h — длинный факт всё ещё может растянуть карточку, а не обрезаться. */}
             <div
-              className="relative flex min-h-[152px] flex-[1.08] flex-col rounded-[24px] p-4 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
+              className="relative flex min-h-[150px] flex-[1.08] flex-col rounded-[24px] p-4 text-white shadow-[0_16px_34px_rgba(107,74,230,0.3)]"
               style={{ background: "linear-gradient(135deg,#8E74F2 0%,#6A48E4 100%)" }}
             >
               {/* Декор-слой позади текста, обрезан по скруглению карточки. */}
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-                <span className="animate-twinkle absolute left-1/2 top-[46px] text-[13px] text-white/90">✦</span>
-                <span className="animate-twinkle absolute left-[44%] top-[92px] text-[10px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
+                <span className="animate-twinkle absolute left-1/2 top-[38px] text-[13px] text-white/90">✦</span>
+                <span className="animate-twinkle absolute left-[44%] top-[74px] text-[10px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
                 <span className="animate-twinkle absolute right-9 top-6 text-[11px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
                 {/* Иллюстрация по теме факта (ЧАСТЬ 2): при распознанной теме —
                     тематический эмодзи; иначе дефолт — пчела + цветок. */}
+                {/* Маскот уменьшен под новую высоту карточки: 64/68px в кадре
+                    150px упирался в верхний край и обрезался снизу. */}
                 {factEmoji ? (
-                  <div className="animate-float-slow absolute -bottom-1 right-2 text-[64px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">{factEmoji}</div>
+                  <div className="animate-float-slow absolute -bottom-1 right-2 text-[52px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">{factEmoji}</div>
                 ) : (
                   <>
-                    <div className="animate-float-medium absolute bottom-4 right-11 text-[38px] leading-none">🌸</div>
-                    <div className="animate-float-slow absolute -bottom-1 right-2 text-[68px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">🐝</div>
+                    <div className="animate-float-medium absolute bottom-3 right-9 text-[30px] leading-none">🌸</div>
+                    <div className="animate-float-slow absolute -bottom-1 right-2 text-[54px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">🐝</div>
                   </>
                 )}
               </div>
@@ -414,7 +421,7 @@ export function DashboardView({
               {!factLoading && aiFactText && (
                 <button
                   onClick={learnMore}
-                  className="relative mt-auto flex items-center gap-1.5 self-start rounded-2xl bg-white px-3.5 py-2 text-[13px] font-extrabold text-[#6A48E4] shadow-[0_8px_18px_rgba(40,20,90,0.2)] transition hover:-translate-y-0.5"
+                  className="relative mt-3 flex items-center gap-1.5 self-start rounded-2xl bg-white px-3.5 py-2 text-[13px] font-extrabold text-[#6A48E4] shadow-[0_8px_18px_rgba(40,20,90,0.2)] transition hover:-translate-y-0.5"
                 >
                   {t.learnMore} <ArrowRight className="h-3.5 w-3.5" />
                 </button>
@@ -424,38 +431,49 @@ export function DashboardView({
             {/* Серия успехов — реальные данные по посещаемости (ЧАСТЬ 3), клик → /attendance */}
             <Link
               href="/attendance"
-              className="group relative flex min-h-[152px] flex-1 flex-col overflow-hidden rounded-[24px] bg-white p-4 shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
+              className="group relative flex min-h-[150px] flex-1 flex-col overflow-hidden rounded-[24px] bg-white p-4 shadow-[0_10px_30px_rgba(93,80,150,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(93,80,150,0.12)]"
             >
               <div className="flex items-center gap-1.5 text-[14px] font-extrabold text-[#2A2A45]">
                 <Flame className="h-[18px] w-[18px] text-[#FF7A2E]" /> {t.streakTitle}
               </div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-[30px] font-black leading-none text-[#7C5CFF]">{streak}</span>
-                <span className="text-[13px] font-bold text-[#8E8EA9]">{t.streakDays.replace("{n}", "").trim()}</span>
+              {/* 07.08.2026: раньше число, график и дни шли тремя ярусами, а
+                  график стоял на `flex-1` — то есть съедал всю оставшуюся
+                  высоту и тянул карточку вверх. Теперь число и график в одной
+                  строке, у графика явная высота: карточка встаёт в габарит
+                  плитки «Моё задание» и график перестал зависеть от свободного
+                  места. Данные и расчёт стрика не тронуты. */}
+              <div className="mt-1.5 flex items-end gap-3">
+                <div className="flex shrink-0 items-baseline gap-1.5">
+                  <span className="text-[28px] font-black leading-none text-[#7C5CFF]">{streak}</span>
+                  <span className="text-[12px] font-bold text-[#8E8EA9]">{t.streakDays.replace("{n}", "").trim()}</span>
+                </div>
+                <div className="relative h-[34px] min-w-0 flex-1">
+                  {hasGraph && graphPath ? (
+                    <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="none" className="block overflow-visible">
+                      <defs>
+                        <linearGradient id="streakLine" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0" stopColor="#FFD36E" />
+                          <stop offset="1" stopColor="#FF9F2E" />
+                        </linearGradient>
+                        <linearGradient id="streakFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stopColor="rgba(255,183,62,.26)" />
+                          <stop offset="1" stopColor="rgba(255,183,62,0)" />
+                        </linearGradient>
+                      </defs>
+                      <path d={graphPath.area} fill="url(#streakFill)" stroke="none" />
+                      <path d={graphPath.line} fill="none" stroke="url(#streakLine)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    </svg>
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-center text-[12px] font-semibold text-[#B7B7CE]">{t.streakEmpty}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="relative mt-1 flex-1">
-                {hasGraph && graphPath ? (
-                  <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="none" className="block overflow-visible">
-                    <defs>
-                      <linearGradient id="streakLine" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stopColor="#FFD36E" />
-                        <stop offset="1" stopColor="#FF9F2E" />
-                      </linearGradient>
-                      <linearGradient id="streakFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stopColor="rgba(255,183,62,.26)" />
-                        <stop offset="1" stopColor="rgba(255,183,62,0)" />
-                      </linearGradient>
-                    </defs>
-                    <path d={graphPath.area} fill="url(#streakFill)" stroke="none" />
-                    <path d={graphPath.line} fill="none" stroke="url(#streakLine)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                  </svg>
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <p className="text-center text-[12px] font-semibold text-[#B7B7CE]">{t.streakEmpty}</p>
-                  </div>
-                )}
-              </div>
-              <div className="mt-2 flex justify-between">
+              {/* mt-auto прижимает ряд дней к низу: если «Факт дня» вырастет на
+                  длинном тексте, эта карточка растянется вслед за ним, а дни
+                  останутся на нижней кромке, а не повиснут посередине. */}
+              <div className="mt-auto flex justify-between pt-2.5">
                 {(weekDayStates.length ? weekDayStates : Array.from({ length: 7 }, () => ({ label: "", state: "none" as const }))).map((wd, i) => {
                   const present = wd.state === "present";
                   return (
