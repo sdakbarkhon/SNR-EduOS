@@ -161,7 +161,7 @@ export const uz: Dictionary = {
     noLessonsToday: "Bugun darslar yo'q",
     fullSchedule: "To'liq jadval",
     now: "Hozir",
-    next: "Tez orada",
+    next: "Keyingi",
     finished: "Tugagan",
     myAchievements: "Mening yutuqlarim",
     allAchievements: "Barchasi",

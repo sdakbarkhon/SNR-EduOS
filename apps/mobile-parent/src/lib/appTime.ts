@@ -1,4 +1,4 @@
-// Заморозка времени навсегда — 29.07.2026 10:50 Ташкент (client requirement
+// Заморозка времени навсегда — 29.07.2026 10:15 Ташкент (client requirement
 // 05.08.2026, тот же принцип и та же дата, что apps/web/lib/demo-date.ts).
 // Значение читается из app.json → expo.extra.frozenDate
 // (Constants.expoConfig.extra — тот же первичный источник, что уже
@@ -21,7 +21,7 @@
 
 import Constants from "expo-constants";
 
-const FROZEN = new Date((Constants.expoConfig?.extra?.frozenDate as string | undefined) ?? "2026-07-29T05:50:00.000Z");
+const FROZEN = new Date((Constants.expoConfig?.extra?.frozenDate as string | undefined) ?? "2026-07-29T05:15:00.000Z");
 
 export function getAppNow(): Date {
   return new Date(FROZEN);
