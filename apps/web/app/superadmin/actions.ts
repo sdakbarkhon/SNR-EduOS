@@ -3,6 +3,7 @@
 import {
   createSchoolAdmin, changeOwnPassword, createSchool,
   updateSchoolAdmin, deleteSchoolAdmin, resetSchoolAdminPassword,
+  assertSchoolIsManageable, assertAdminIsManageable,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -40,6 +41,8 @@ export async function actionCreateSchoolAdmin(formData: FormData) {
   const password = String(formData.get("password") ?? "").trim();
   const school_id = String(formData.get("school_id") ?? "").trim();
   if (!full_name || !username || !password || !school_id) throw new Error("Missing fields");
+  // Z.1: school_id приходит из FormData — фильтр в <select> ничего не гарантирует.
+  await assertSchoolIsManageable(school_id);
   const result = await createSchoolAdmin({ full_name, username, password, school_id });
   revalidatePath("/superadmin/admins");
   revalidatePath("/superadmin/dashboard");
@@ -52,12 +55,19 @@ export async function actionUpdateSchoolAdmin(formData: FormData) {
   const full_name = String(formData.get("full_name") ?? "").trim();
   const school_id = String(formData.get("school_id") ?? "").trim();
   if (!admin_id || !full_name || !school_id) throw new Error("Missing fields");
+  // Z.1: проверяем ОБА конца — нельзя ни тронуть демо-админа, ни перенести
+  // кого-либо В демо-школу.
+  await assertAdminIsManageable({ adminId: admin_id });
+  await assertSchoolIsManageable(school_id);
   await updateSchoolAdmin(admin_id, { full_name, school_id });
   revalidatePath("/superadmin/admins");
 }
 
 export async function actionDeleteSchoolAdmin(userId: string) {
   await verifySuperAdmin();
+  // Z.1: hard delete через auth.admin.deleteUser — без этой проверки crafted
+  // POST сносит демо-админа (admin/admin123) вместе с auth-пользователем.
+  await assertAdminIsManageable({ userId });
   await deleteSchoolAdmin(userId);
   revalidatePath("/superadmin/admins");
   revalidatePath("/superadmin/dashboard");
@@ -65,6 +75,8 @@ export async function actionDeleteSchoolAdmin(userId: string) {
 
 export async function actionResetSchoolAdminPassword(userId: string) {
   await verifySuperAdmin();
+  // Z.1: иначе можно молча сменить пароль демо-админу.
+  await assertAdminIsManageable({ userId });
   const newPassword = await resetSchoolAdminPassword(userId);
   revalidatePath("/superadmin/admins");
   return newPassword;

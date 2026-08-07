@@ -20,7 +20,11 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = await getCurrentUserRole(supabase, user.id);
-  if (role !== "admin" && role !== "super_admin") {
+  // Z.1, 06.08.2026: super_admin убран из гейта — см. app/api/admin/chats/route.ts.
+  // Роут мутирует глобальную ai_homework_review_queue без школьного скоупа, то
+  // есть суперадмин трогал бы данные демо-школы. Крон ходит своим путём
+  // (/api/cron/homework-review-process, CRON_SECRET) и не задет.
+  if (role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   console.log("[batch] auth checked, role:", role);

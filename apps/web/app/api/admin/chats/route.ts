@@ -29,7 +29,14 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = await getCurrentUserRole(supabase, user.id);
-  if (role !== "admin" && role !== "super_admin") {
+  // Z.1, 06.08.2026: super_admin УБРАН из гейта. /api/* исключён из matcher'а
+  // middleware, поэтому пин «суперадмин только в /superadmin/*» сюда не
+  // доходит, а RLS-политика chat_threads несёт `OR is_super_admin()` — то
+  // есть суперадмин вручную набранным URL читал все чаты демо-школы, мимо
+  // всей фильтрации Z.1. Единственный UI-потребитель этого роута —
+  // app/admin/chats (роль admin), туда суперадмина middleware не пускает,
+  // так что ветка была недостижима легальным путём. Демо-админ не задет.
+  if (role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

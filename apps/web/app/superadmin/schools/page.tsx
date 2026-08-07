@@ -4,9 +4,12 @@ import { SchoolsView } from "./SchoolsView";
 export default async function SuperAdminSchoolsPage() {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Z.1: демо-школа не показывается суперадмину (schools.is_demo, миграция 170).
+  // Без фильтра она шла ПЕРВОЙ строкой — создана 04.07 против 29.07 у реальной.
   const { data: schools } = await (supabase as any)
     .from("schools")
     .select("id, name, code, autostart_enabled, created_at")
+    .eq("is_demo", false)
     .order("created_at");
 
   const rows = (schools ?? []) as {

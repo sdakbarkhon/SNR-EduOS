@@ -280,6 +280,54 @@ export async function deleteGroup(groupId: string, callerSchoolId: string, calle
   if (error) throw error;
 }
 
+// ── SUPER ADMIN: демо-школа вне зоны видимости ───────────────────────────────
+// Z.1, 06.08.2026. Суперадмин управляет только НЕ-демо школами. Фильтра в UI
+// для этого мало: все четыре write-действия ниже принимают school_id/userId
+// прямо из FormData, идут service-role клиентом (RLS не применяется вовсе), а
+// у таблицы admins есть ровно одна политика — SELECT. То есть второй линии
+// обороны не существует, и crafted POST мог бы удалить или перехватить
+// демо-админа. Отсюда обязательные серверные проверки.
+//
+// Тексты ошибок намеренно нейтральные («не найдена»/«не найден»): для
+// суперадмина демо-школы не существует, и сообщение не должно выдавать
+// обратное.
+
+/** Бросает, если школы нет ИЛИ она демо. Использовать для любого school_id,
+ *  пришедшего от клиента. */
+export async function assertSchoolIsManageable(schoolId: string): Promise<void> {
+  const sb = getServiceClient();
+  const { data, error } = await sb
+    .from("schools")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select("id, is_demo" as any)
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  const row = data as { id: string; is_demo: boolean } | null;
+  if (!row || row.is_demo) throw new Error("Школа не найдена");
+}
+
+/** Бросает, если админа нет ИЛИ он принадлежит демо-школе. Возвращает его
+ *  school_id для последующих проверок. Принимает admins.user_id ИЛИ admins.id
+ *  — оба варианта приходят из разных действий. */
+export async function assertAdminIsManageable(
+  ref: { userId: string } | { adminId: string },
+): Promise<string> {
+  const sb = getServiceClient();
+  const q = sb.from("admins").select("id, user_id, school_id");
+  const { data, error } = await ("userId" in ref
+    ? q.eq("user_id", ref.userId)
+    : q.eq("id", ref.adminId)
+  ).maybeSingle();
+  if (error) throw error;
+  const row = data as { id: string; user_id: string | null; school_id: string } | null;
+  if (!row) throw new Error("Администратор не найден");
+  await assertSchoolIsManageable(row.school_id).catch(() => {
+    throw new Error("Администратор не найден");
+  });
+  return row.school_id;
+}
+
 // ── SUPER ADMIN: SCHOOLS ──────────────────────────────────────────────────────
 
 export async function createSchool(data: {

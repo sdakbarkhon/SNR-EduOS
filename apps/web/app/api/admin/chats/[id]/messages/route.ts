@@ -26,7 +26,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = await getCurrentUserRole(supabase, user.id);
-  if (role !== "admin" && role !== "super_admin") {
+  // Z.1, 06.08.2026: super_admin убран из гейта — см. комментарий в
+  // app/api/admin/chats/route.ts. Этот роут отдавал тела сообщений
+  // демо-школы тем же путём.
+  if (role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

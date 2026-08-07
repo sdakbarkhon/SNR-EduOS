@@ -17,7 +17,10 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = await getCurrentUserRole(supabase, user.id);
-  if (role !== "admin" && role !== "super_admin") {
+  // Z.1, 06.08.2026: super_admin убран из гейта — см. app/api/admin/chats/route.ts.
+  // Роут ставит в очередь этапы без школьного скоупа (сейчас все они
+  // демо-школы). Крон /api/cron/rag-process-queue не задет.
+  if (role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
