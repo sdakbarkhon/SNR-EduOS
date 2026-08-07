@@ -34,6 +34,7 @@ import { QiaQuizModal } from "./QiaQuizModal";
 import { KahootStudentModal } from "./KahootStudentModal";
 import { isExternalService } from "@/lib/external-services";
 import { demoKind } from "@/lib/material-kind";
+import { resolveMaterialUrl } from "@/lib/material-url";
 import { PdfViewer } from "@/components/PdfViewer";
 import { DemoMaterialContent } from "@/components/DemoMaterialContent";
 import { createClient } from "@/lib/supabase/client";
@@ -329,6 +330,24 @@ export function LessonWorkspaceView({
   // логики активации здесь нет.
   const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
   const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
+  // 07.08.2026 — материал демонстрации резолвится В МОМЕНТ ПОКАЗА, а не
+  // берётся из снимка страницы.
+  //
+  // Раньше рендер брал `lesson.materials.find(...)` и `materialUrls[id]` —
+  // и то и другое считается на СЕРВЕРЕ один раз при загрузке страницы, а
+  // realtime обновляет только demo_material_id. Отсюда «у ученика материал
+  // появляется только после F5», причём по двум разным причинам сразу:
+  //   * signed URL живёт ЧАС (getLessonMaterialUrl подписывает на 3600 с) —
+  //     у того, кто открыл урок раньше, ссылка уже мертва, оверлей
+  //     показывается, а файл не грузится;
+  //   * материал, загруженный учителем уже после загрузки страницы, в
+  //     снимке отсутствует вовсе — `mat` не находится и ученик видит
+  //     «формат не поддерживается».
+  // Видео на YouTube от этого не страдало: там «ссылка» — external_url,
+  // который не протухает и не требует Storage. Поэтому симптом выглядел как
+  // «видео работает, файлы нет».
+  const [demoMat, setDemoMat] = useState<LessonMaterial | null>(null);
+  const [demoUrl, setDemoUrl] = useState<string | null>(null);
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
@@ -338,6 +357,33 @@ export function LessonWorkspaceView({
   const [countdown, setCountdown] = useState(5);
   const [completedElapsed, setCompletedElapsed] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Резолв материала демонстрации: сначала ищем в снимке страницы, а если его
+  // там нет (учитель загрузил материал уже после нашей загрузки) — дочитываем
+  // строку из БД. Ссылку берём всегда свежую, тем же общим резолвером, что и
+  // учитель (lib/material-url.ts) — раньше эти правила жили в трёх местах и
+  // разъехались, см. коммит 4220653.
+  useEffect(() => {
+    if (!demoMaterialId) { setDemoMat(null); setDemoUrl(null); return; }
+    let cancelled = false;
+    (async () => {
+      let mat = lesson.materials.find((m) => m.id === demoMaterialId) ?? null;
+      if (!mat) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (db as any)
+          .from("lesson_materials")
+          .select("*")
+          .eq("id", demoMaterialId)
+          .maybeSingle();
+        mat = (data as LessonMaterial | null) ?? null;
+      }
+      if (cancelled) return;
+      setDemoMat(mat);
+      setDemoUrl(mat ? await resolveMaterialUrl(db, mat) : null);
+    })().catch(() => { if (!cancelled) { setDemoMat(null); setDemoUrl(null); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoMaterialId]);
 
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
@@ -1075,8 +1121,10 @@ export function LessonWorkspaceView({
           student side. Only the teacher stopping the demo (demo_material_id
           → null, synced via Realtime) can dismiss it. */}
       {mounted && demoMaterialId && (() => {
-        const mat = lesson.materials.find((m) => m.id === demoMaterialId);
-        const url = mat ? materialUrls[mat.id] : undefined;
+        // Свежерезолвленные mat/url (см. эффект выше), а НЕ снимок страницы:
+        // materialUrls считается на сервере один раз и протухает через час.
+        const mat = demoMat;
+        const url = demoUrl ?? undefined;
         const name = mat?.file_original_name ?? mat?.title ?? "";
         const kind = demoKind(name, url);
         return createPortal(

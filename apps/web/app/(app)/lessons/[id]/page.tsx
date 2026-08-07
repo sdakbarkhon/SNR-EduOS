@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStudentLessonView, getLessonMaterialUrl, getHomeworkByLessonId, isDemoSchoolLesson } from "@snr/core";
+import { getStudentLessonView, getHomeworkByLessonId, isDemoSchoolLesson } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
+import { resolveMaterialUrl } from "@/lib/material-url";
 import { LessonView } from "./LessonView";
 
 export default async function LessonPage({
@@ -44,19 +45,16 @@ export default async function LessonPage({
   const materialUrls: Record<string, string> = {};
   await Promise.all(
     lesson.materials.map(async (m) => {
-      // Пачка 4 — видео-ссылка (youtube/rutube) не в Storage
-      // (file_storage_path=null), getLessonMaterialUrl упал бы на ней;
-      // embed-URL уже готов на записи.
-      if (m.content_type === "video_youtube" || m.content_type === "video_rutube") {
-        if (m.external_url) materialUrls[m.id] = m.external_url;
-        return;
-      }
-      // K.1, 05.08.2026 — video_mp4 живёт в Storage (file_storage_path),
-      // но в отдельном бакете lesson-videos, не lesson-materials/kb_bucket.
-      const bucket = m.content_type === "video_mp4" ? "lesson-videos" : (m.kb_bucket ?? "lesson-materials");
-      try {
-        materialUrls[m.id] = await getLessonMaterialUrl(db, m.file_storage_path!, undefined, bucket);
-      } catch { /* skip if URL generation fails */ }
+      // 07.08.2026 — правила резолва (внешняя ссылка / бакет по content_type)
+      // вынесены в lib/material-url.ts и общие для сервера, учителя и ученика.
+      // Раньше их было три копии, и учительская отстала — см. коммит 4220653.
+      //
+      // Эти ссылки подписаны на ЧАС и годятся только для списка материалов при
+      // загрузке страницы. Демонстрация классу их НЕ использует: там ссылка
+      // резолвится в момент показа (LessonWorkspaceView), иначе у зрителя с
+      // давно открытой страницей она уже мертва.
+      const url = await resolveMaterialUrl(db, m);
+      if (url) materialUrls[m.id] = url;
     }),
   );
 

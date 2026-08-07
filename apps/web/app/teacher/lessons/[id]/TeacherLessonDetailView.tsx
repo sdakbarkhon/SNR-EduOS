@@ -57,6 +57,7 @@ import { demoKind } from "@/lib/material-kind";
 import { parseVideoUrl } from "@/lib/video-url";
 import { useRegisterFullscreenLesson } from "@/components/fullscreen-lesson-context";
 import { DemoMaterialContent } from "@/components/DemoMaterialContent";
+import { resolveMaterialUrl } from "@/lib/material-url";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { QuizResultsModal } from "./QuizResultsModal";
@@ -794,15 +795,8 @@ export function TeacherLessonDetailView({
     // есть). Отсюда же не работала и синхронизация: без плеера учителю нечем
     // было породить события play/pause, и в канал lesson-video-<id> ничего не
     // уходило. Один дефект, два симптома.
-    if (mat.content_type === "video_youtube" || mat.content_type === "video_rutube") {
-      setDemoMaterialUrl(mat.external_url);
-      return;
-    }
-    // Прочие записи без файла в Storage (внешние ссылки) — как раньше.
-    if (!mat.file_storage_path) { setDemoMaterialUrl(mat.external_url); return; }
-    const bucket = mat.content_type === "video_mp4" ? "lesson-videos" : (mat.kb_bucket ?? "lesson-materials");
     let cancelled = false;
-    getLessonMaterialUrl(db, mat.file_storage_path, undefined, bucket)
+    resolveMaterialUrl(db, mat)
       .then((url) => { if (!cancelled) setDemoMaterialUrl(url); })
       .catch(() => { if (!cancelled) setDemoMaterialUrl(null); });
     return () => { cancelled = true; };
