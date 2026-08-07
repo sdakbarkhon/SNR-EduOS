@@ -1513,6 +1513,8 @@ export const en: Dictionary = {
       fullscreen: "Fullscreen",
       exitFullscreen: "Exit fullscreen (Esc)",
       fullscreenTitle: "Presentation",
+      lockedHint: "The presentation is running. Hold Esc to leave",
+      holdingExit: "Keep holding Esc…",
     },
     contentSource: {
       label: "Content source",

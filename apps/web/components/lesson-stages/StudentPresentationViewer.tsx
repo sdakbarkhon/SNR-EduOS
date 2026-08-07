@@ -30,6 +30,7 @@ import { SlideViewer } from "./SlideViewer";
  */
 export function StudentPresentationViewer({
   slides, stageId, initialSlide, lessonStatus, onExportPptx, chromeAbovePx, viewerOnly = false,
+  locked = false,
 }: {
   slides: LessonSlide[];
   stageId: string;
@@ -39,6 +40,9 @@ export function StudentPresentationViewer({
   chromeAbovePx: number;
   /** Большой фикс, Блок 3 — см. SlideViewer.tsx. */
   viewerOnly?: boolean;
+  /** Выход только удержанием Esc, пока этап активен (07.08.2026). Считает
+   *  родитель — см. LessonWorkspaceView.tsx, presentationLocked. */
+  locked?: boolean;
 }) {
   return (
     <div
@@ -61,6 +65,14 @@ export function StudentPresentationViewer({
         // причиной, по которой полноэкранный режим тогда убрали (см.
         // комментарий к компоненту выше) — теперь ученик не заперт.
         autoFullscreen
+        // 07.08.2026, вторая правка того же дня — заказчик попросил, чтобы
+        // ученик не выходил, пока идёт этап. Сделан «выход с усилием»
+        // (удержать Esc), а НЕ полный запрет: полного запрета система не
+        // выдерживает, признак «этап кончился» приходит только от нажатия
+        // человека. Разбор — в комментарии к пропу в SlideViewer.tsx и в
+        // resheniya_2.md. Не «доделывать до конца» — это вернёт ловушку,
+        // из-за которой полноэкранный режим уже убирали.
+        lockedUntilStageEnds={locked}
       />
     </div>
   );

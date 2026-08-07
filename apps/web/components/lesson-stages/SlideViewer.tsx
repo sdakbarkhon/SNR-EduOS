@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Download, Maximize2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Lock, Maximize2, X } from "lucide-react";
 import { getDictionary, setCurrentSlide } from "@snr/core";
 import type { Locale, LessonSlide } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -16,6 +16,15 @@ import { SlideBody } from "./SlideBody";
  *  доступную высоту (frameMaxHeight ниже), саму панель не затрагивает. */
 const NAV_BAR_PX = 72;
 
+/** Сколько держать Esc, чтобы выйти из презентации, пока идёт этап. */
+const EXIT_HOLD_MS = 2000;
+/** Через сколько после входа проявляется кнопка закрытия. До этого выход
+ *  только удержанием — чтобы в первые секунды объяснения крестик не тянул
+ *  на себя внимание класса. */
+const EXIT_BUTTON_DELAY_MS = 20000;
+/** Сколько висит подсказка после короткого нажатия Esc. */
+const HINT_MS = 3500;
+
 export function SlideViewer({
   slides,
   onExportPptx,
@@ -27,6 +36,7 @@ export function SlideViewer({
   viewerOnly = false,
   chromeAbovePx,
   autoFullscreen = false,
+  lockedUntilStageEnds = false,
 }: {
   slides: LessonSlide[];
   onExportPptx: () => void;
@@ -68,6 +78,23 @@ export function SlideViewer({
    *  полноэкранный режим убрали целиком; теперь он вернулся вместе с выходом,
    *  которого не хватало. */
   autoFullscreen?: boolean;
+  /** 07.08.2026 — «выход с усилием» у ученика, пока этап активен: короткий Esc
+   *  не выводит (вместо этого подсказка), нужно УДЕРЖАТЬ Esc ~2 с; кнопка
+   *  закрытия появляется только через 20 с. На учителя не действует ни при
+   *  каких значениях — ниже стоит явный `!isTeacher`.
+   *
+   *  ПОЧЕМУ УСИЛИЕ, А НЕ ПОЛНЫЙ ЗАПРЕТ — не «недоделали», а осознанный отказ,
+   *  подробности в resheniya_2.md (07.08.2026). Коротко: полного запрета
+   *  система не выдерживает. Признак «этап кончился» в БД появляется ТОЛЬКО
+   *  от нажатия человека — `lessons.active_stage_id` пишет один
+   *  setActiveStage(), endLesson() его не очищает, а у демо-школы отключено
+   *  и авто-завершение (`autostart_enabled=false`), и ночной крон
+   *  (`nightly_close_enabled=false`). Учитель закрыл ноутбук, не переключив
+   *  этап, — сигнала не будет никогда, и при полном запрете ученик заперт
+   *  навсегда. Ровно из-за этого полноэкранный режим уже убирали 06.08.
+   *  Удержание закрывает просьбу заказчика (случайно не выйдешь, посреди
+   *  объяснения не «отщёлкнешься»), но ловушку сделать не даёт. */
+  lockedUntilStageEnds?: boolean;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.slides;
@@ -132,9 +159,15 @@ export function SlideViewer({
   // (StudentPresentationViewer / StageViewModal), а SlideViewer — общий.
   const [isFull, setIsFull] = useState(autoFullscreen);
 
+  // Учителя не запираем никогда — см. комментарий к пропу. Флаг приходит
+  // обычным пропом, поэтому снятие блокировки (этап кончился, урок завершён,
+  // потеряна связь с сервером) сразу возвращает обычные Esc и кнопку.
+  const holdToExit = isFull && lockedUntilStageEnds && !isTeacher;
+
   useEffect(() => {
     if (!isFull) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFull(false); };
+    // При holdToExit коротким Esc не выходим — этим занимается эффект ниже.
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !holdToExit) setIsFull(false); };
     window.addEventListener("keydown", onKey);
     // Пока слайд во весь экран, страница под ним скроллиться не должна.
     const prev = document.body.style.overflow;
@@ -143,7 +176,84 @@ export function SlideViewer({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [isFull]);
+    // holdToExit в зависимостях обязателен: иначе обработчик остался бы
+    // замкнут на старое значение и Esc не заработал бы обратно после снятия.
+  }, [isFull, holdToExit]);
+
+  // ── Выход удержанием Esc ────────────────────────────────────────────────────
+  // 0 → не держим, 1 → додержал. Считаем реальными часами: getDemoNow() —
+  // это константа для дат уроков (lib/demo-date.ts), Date.now() ею НЕ
+  // подменяется и для измерения интервалов подходит.
+  const [holdProgress, setHoldProgress] = useState(0);
+  // Счётчик коротких нажатий: каждое новое перезапускает таймер подсказки
+  // (обычный boolean не перезапустил бы — состояние не изменилось бы).
+  const [hintTick, setHintTick] = useState(0);
+
+  useEffect(() => {
+    if (!holdToExit) { setHoldProgress(0); return; }
+    let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let startedAt = 0;
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf);
+      if (timer) clearTimeout(timer);
+      raf = 0; timer = undefined; startedAt = 0;
+      setHoldProgress(0);
+    };
+    // Сам выход держится на setTimeout, а rAF рисует ТОЛЬКО полоску. Раньше
+    // порог срабатывал внутри rAF — и это ловилось на проверке: если страница
+    // не отрисовывается, rAF не вызывается вовсе, прогресс стоит на нуле и
+    // выйти нельзя. Выход — функция, а не анимация, и от отрисовки зависеть
+    // не должен.
+    const tick = () => {
+      setHoldProgress(Math.min(1, (Date.now() - startedAt) / EXIT_HOLD_MS));
+      raf = requestAnimationFrame(tick);
+    };
+    const onDown = (e: KeyboardEvent) => {
+      // e.repeat — автоповтор при зажатой клавише, начинать отсчёт заново
+      // нельзя; startedAt страхует на случай браузера без repeat.
+      if (e.key !== "Escape" || e.repeat || startedAt) return;
+      e.preventDefault();
+      startedAt = Date.now();
+      timer = setTimeout(() => { stop(); setIsFull(false); }, EXIT_HOLD_MS);
+      raf = requestAnimationFrame(tick);
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !startedAt) return;
+      const held = Date.now() - startedAt;
+      stop();
+      if (held < EXIT_HOLD_MS) setHintTick((n) => n + 1);
+    };
+    // Уход со вкладки во время удержания не должен «дожать» выход втихую.
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", stop);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", stop);
+      if (raf) cancelAnimationFrame(raf);
+      if (timer) clearTimeout(timer);
+    };
+  }, [holdToExit]);
+
+  useEffect(() => {
+    if (hintTick === 0) return;
+    const id = setTimeout(() => setHintTick(0), HINT_MS);
+    return () => clearTimeout(id);
+  }, [hintTick]);
+
+  // Кнопка закрытия: у учителя и у разблокированного ученика — сразу, у
+  // запертого — через EXIT_BUTTON_DELAY_MS.
+  // Инициализация не `false`: у учителя и в незапертых местах кнопка должна
+  // быть с первого кадра, а не появляться после первого эффекта.
+  const [exitButtonReady, setExitButtonReady] = useState(!(lockedUntilStageEnds && !isTeacher));
+  useEffect(() => {
+    if (!holdToExit) { setExitButtonReady(true); return; }
+    setExitButtonReady(false);
+    const id = setTimeout(() => setExitButtonReady(true), EXIT_BUTTON_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [holdToExit]);
 
   const slide = slides[current];
   if (!slide) return null;
@@ -269,14 +379,43 @@ export function SlideViewer({
   // его поверх — у предков есть и overflow-hidden, и свои stacking-контексты.
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-900">
-      <button
-        onClick={() => setIsFull(false)}
-        title={t.exitFullscreen}
-        aria-label={t.exitFullscreen}
-        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-      >
-        <X className="h-5 w-5" />
-      </button>
+      {exitButtonReady && (
+        <button
+          onClick={() => setIsFull(false)}
+          title={t.exitFullscreen}
+          aria-label={t.exitFullscreen}
+          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      )}
+
+      {/* Индикатор удержания — без него непонятно, что нажатие вообще
+          засчиталось и сколько ещё держать. */}
+      {holdProgress > 0 && (
+        <div
+          role="status"
+          className="pointer-events-none absolute left-1/2 top-6 z-20 -translate-x-1/2 rounded-2xl bg-black/70 px-4 py-2.5 backdrop-blur-sm"
+        >
+          <p className="mb-1.5 text-center text-xs font-medium text-white/90">{t.holdingExit}</p>
+          <div className="h-1 w-40 overflow-hidden rounded-full bg-white/25">
+            <div className="h-full rounded-full bg-white" style={{ width: `${Math.round(holdProgress * 100)}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Подсказка на короткое нажатие — единственное место, где ученик
+          узнаёт про удержание, поэтому текст называет клавишу явно. */}
+      {hintTick > 0 && holdProgress === 0 && (
+        <div
+          role="status"
+          className="pointer-events-none absolute left-1/2 top-6 z-20 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-black/70 px-4 py-2.5 text-xs font-medium text-white/90 backdrop-blur-sm"
+        >
+          <Lock className="h-4 w-4 shrink-0" />
+          {t.lockedHint}
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1 flex-col justify-center">{body}</div>
     </div>,
     document.body,

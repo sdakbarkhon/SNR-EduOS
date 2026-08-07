@@ -285,6 +285,12 @@ function MaterialViewerModal({ mat, onClose }: { mat: ViewerMaterial; onClose: (
   );
 }
 
+/** Сколько молчания сервера считаем потерей связи. Опрос живого состояния
+ *  идёт раз в 3 с; пока он отвечает, о конце этапа мы узнаём максимум за эти
+ *  3 с. Замолчал дольше — узнать больше нечем, и «выход с усилием» у ученика
+ *  снимается совсем. */
+const LIVE_SYNC_STALE_MS = 15000;
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function LessonWorkspaceView({
@@ -329,6 +335,9 @@ export function LessonWorkspaceView({
   // разносит изменение всей группе, включая учителя. Никакой параллельной
   // логики активации здесь нет.
   const [activatingStageId, setActivatingStageId] = useState<string | null>(null);
+  // Отвечает ли ещё сервер на опрос живого состояния урока — см. сторож ниже.
+  // Единственный потребитель — «выход с усилием» (presentationLocked).
+  const [liveSyncOk, setLiveSyncOk] = useState(true);
   const [demoMaterialId, setDemoMaterialId] = useState<string | null>(lesson.demo_material_id);
   // 07.08.2026 — материал демонстрации резолвится В МОМЕНТ ПОКАЗА, а не
   // берётся из снимка страницы.
@@ -388,6 +397,8 @@ export function LessonWorkspaceView({
   // Refs for stable callback in realtime handler (avoid stale closure)
   const activeStageIdRef = useRef(activeStageId);
   useEffect(() => { activeStageIdRef.current = activeStageId; }, [activeStageId]);
+  // Последний УЖЕ применённый статус урока — см. applyLessonLiveUpdate.
+  const appliedStatusRef = useRef<string>(lesson.status);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setAnimKey((k) => k + 1); }, [activeStageId]);
@@ -517,7 +528,17 @@ export function LessonWorkspaceView({
     }
 
     // When lesson ends, show completion modal (intercepts router.refresh)
-    if (newStatus && newStatus !== lesson.status) {
+    //
+    // 07.08.2026 — сравниваем с РЕФОМ последнего применённого статуса, а не с
+    // пропом lesson.status. Проп приходит из RSC и в течение сессии не
+    // меняется (на ветке "completed" никакого router.refresh() нет), поэтому
+    // опрос раз в 3 с заново входил сюда и каждый раз делал setCountdown(5).
+    // Счётчик колебался 5→4→3→5 и до нуля не доходил — обещанный автоматом
+    // переход на /schedule не срабатывал НИКОГДА (ученика спасала только
+    // кнопка в модалке). Тот же приём уже применён рядом для активного этапа
+    // (activeStageIdRef).
+    if (newStatus && newStatus !== appliedStatusRef.current) {
+      appliedStatusRef.current = newStatus;
       if (newStatus === "completed") {
         // 06.08.2026: замороженное время, не Date.now() — иначе после переноса
         // якоря на 01.08 (там есть реально идущий урок со started_at того же
@@ -538,7 +559,7 @@ export function LessonWorkspaceView({
         router.refresh();
       }
     }
-  }, [lesson.status, lesson.started_at, router]);
+  }, [lesson.started_at, router]);
 
   // Realtime: listen for lesson changes (status + active_stage_id)
   useRealtimeChannel(
@@ -558,6 +579,19 @@ export function LessonWorkspaceView({
   // events (dropped connection, auth hiccup). Queries the live columns
   // directly rather than router.refresh(), since local state here doesn't
   // re-sync from a refreshed RSC prop on its own (see applyLessonLiveUpdate).
+  //
+  // 07.08.2026 — этот же опрос стал сторожем для «выхода с усилием» у
+  // ученика. Пока он отвечает, о смене этапа мы узнаём максимум за 3 секунды.
+  // Замолчал — узнать больше нечем, и удержание Esc отменяется: выход
+  // становится обычным.
+  //
+  // Сторож считает МОЛЧАНИЕ, а не подряд идущие ошибки. Разница
+  // принципиальная: у запроса нет таймаута, и на полуоткрытом соединении
+  // (мобильная сеть, captive portal, VPN) он не завершается ни успехом, ни
+  // ошибкой — счётчик ошибок так и остался бы нулём, а сторож молчал бы
+  // вечно. Часы тут настоящие: getDemoNow() — это константа для дат уроков
+  // (lib/demo-date.ts), Date.now() ею не подменяется.
+  const lastSyncOkAtRef = useRef(Date.now());
   useEffect(() => {
     const poll = setInterval(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -567,11 +601,16 @@ export function LessonWorkspaceView({
         .eq("id", lesson.id)
         .maybeSingle()
         .then(({ data }: { data: { active_stage_id: string | null; demo_material_id: string | null; status: string } | null }) => {
-          if (data) applyLessonLiveUpdate(data);
+          if (!data) return;
+          lastSyncOkAtRef.current = Date.now();
+          applyLessonLiveUpdate(data);
         })
         .catch(() => null);
     }, 3000);
-    return () => clearInterval(poll);
+    const watchdog = setInterval(() => {
+      setLiveSyncOk(Date.now() - lastSyncOkAtRef.current < LIVE_SYNC_STALE_MS);
+    }, 1000);
+    return () => { clearInterval(poll); clearInterval(watchdog); };
   }, [lesson.id, db, applyLessonLiveUpdate]);
 
 
@@ -735,9 +774,33 @@ export function LessonWorkspaceView({
   // вместо маленькой инлайн-карточки) и (б) авто-сворачивание бокового меню
   // (эффект чуть ниже). Ученик больше НЕ заперт — меню/выход из урока всегда
   // доступны, это derived-флаг только про размер/обёртку слайда.
+  //
+  // 07.08.2026 — добавлен !showCompletedModal. isCompleted читает
+  // lesson.status из пропа RSC, а тот в течение сессии не меняется, поэтому
+  // после завершения урока учителем презентация оставалась смонтированной под
+  // модалкой (сама модалка видна — она z-[10000] против z-[9999] портала).
+  // Теперь завершение урока гасит презентацию сразу: это второй, независимый
+  // от размонтирования путь выхода.
   const isPresentationActive =
-    !isCompleted && !demoMaterialId &&
+    !isCompleted && !showCompletedModal && !demoMaterialId &&
     currentCenterStage?.stage_type === "theory" && !!currentCenterStage?.slides?.length;
+
+  // «Выход с усилием» у ученика — пока этап активен, короткий Esc не выводит,
+  // нужно удержать (см. SlideViewer.tsx, там же — почему не полный запрет).
+  //
+  // Условия узкие:
+  //   • только живой урок: на завершённом ученик пересматривает слайды сам;
+  //   • только пока опрос живого состояния отвечает (liveSyncOk) — иначе о
+  //     конце этапа узнать нечем и держать ученика нельзя;
+  //   • «третий урок» (viewerOnly) не исключение: он смотрит ту же
+  //     презентацию синхронно с классом, просто не листает.
+  //
+  // Автоматический выход при этом держится НЕ на этом флаге, а на
+  // размонтировании: centerStages = [activeMiddleStage], поэтому смена
+  // активного этапа убирает презентацию из дерева вместе с порталом
+  // независимо от любых флагов. Проп lesson.status ниже устаревший, но это
+  // безвредно — завершение урока гасит саму isPresentationActive выше.
+  const presentationLocked = isPresentationActive && lesson.status === "in_progress" && liveSyncOk;
 
   // Авто-сворачивание бокового меню при входе в активную презентацию —
   // больше места слайду. Ученик может развернуть меню вручную (toggle кнопка
@@ -1344,6 +1407,7 @@ export function LessonWorkspaceView({
                         onExportPptx={() => exportSlidesToPptx(stage.slides ?? [], stage.title)}
                         chromeAbovePx={PRESENTATION_CHROME_ABOVE_PX}
                         viewerOnly={lesson.isThirdLessonViewer}
+                        locked={presentationLocked}
                       />
                     ) : stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
                       <div className="mb-3">

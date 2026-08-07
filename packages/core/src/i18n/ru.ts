@@ -1513,6 +1513,8 @@ export const ru: Dictionary = {
       fullscreen: "Во весь экран",
       exitFullscreen: "Выйти из полноэкранного режима (Esc)",
       fullscreenTitle: "Презентация",
+      lockedHint: "Презентация идёт. Удерживайте Esc чтобы выйти",
+      holdingExit: "Удерживайте Esc…",
     },
     contentSource: {
       label: "Источник контента",

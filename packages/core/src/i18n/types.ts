@@ -1553,6 +1553,10 @@ export interface Dictionary {
       fullscreen: string;
       exitFullscreen: string;
       fullscreenTitle: string; // header shown in the auto-fullscreen student presentation overlay
+      /** Ученику на короткое нажатие Esc, пока этап активен. */
+      lockedHint: string;
+      /** Ученику, пока он удерживает Esc (рядом с индикатором прогресса). */
+      holdingExit: string;
     };
     contentSource: {
       label: string;
