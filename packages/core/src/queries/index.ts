@@ -2550,6 +2550,34 @@ export async function setCurrentSlide(
 }
 
 /**
+ * Принадлежит ли урок ДЕМО-ШКОЛЕ (schools.is_demo, миграция 170).
+ *
+ * 07.08.2026 — нужен для прав на управление видео: в демо-школе ученик может
+ * сам ставить на паузу и продолжать (локально, без трансляции остальным), в
+ * реальной школе управление только у учителя. См. DemoMaterialContent.tsx.
+ *
+ * ВАЖНО, три разных «демо» в проекте, их легко перепутать:
+ *   • это — свойство ШКОЛЫ (schools.is_demo);
+ *   • isDemoMode() в apps/web/lib/demo-date.ts — про ЗАМОРОЖЕННОЕ ВРЕМЯ;
+ *   • useIsDemoSession() — про демо-СЕССИЮ (кука), то есть гостевой вход в
+ *     реальный аккаунт.
+ *
+ * Ошибку глотаем и возвращаем false — то есть при любой неопределённости
+ * применяются правила РЕАЛЬНОЙ школы (ученик только смотрит). Отказ в
+ * безопасную сторону: лишний раз не дать управление хуже не сделает.
+ */
+export async function isDemoSchoolLesson(db: Db, lessonId: string): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lessons")
+    .select("school:schools!inner(is_demo)")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (error) return false;
+  return Boolean((data as { school?: { is_demo?: boolean } } | null)?.school?.is_demo);
+}
+
+/**
  * Учитель показывает классу материал (или останавливает показ при null).
  * Realtime на lessons доставляет изменение demo_material_id ученикам урока.
  */

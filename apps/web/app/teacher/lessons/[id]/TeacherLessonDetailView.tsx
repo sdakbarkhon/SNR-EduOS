@@ -2102,7 +2102,7 @@ export function TeacherLessonDetailView({
             </div>
             <div className="flex-1 overflow-auto bg-white">
               {kind !== "other" ? (
-                <DemoMaterialContent url={demoMaterialUrl} title={name} kind={kind} />
+                <DemoMaterialContent url={demoMaterialUrl} title={name} kind={kind} lessonId={lesson.id} canControl />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
                   <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>

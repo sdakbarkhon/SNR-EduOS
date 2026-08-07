@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStudentLessonView, getLessonMaterialUrl, getHomeworkByLessonId } from "@snr/core";
+import { getStudentLessonView, getLessonMaterialUrl, getHomeworkByLessonId, isDemoSchoolLesson } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
 import { notFound } from "next/navigation";
 import { safeQuery } from "@/lib/safe-query";
@@ -66,12 +66,19 @@ export default async function LessonPage({
     ? (await safeQuery(getHomeworkByLessonId(db, id), [], "LessonPage.linkedHomework")).data
     : [];
 
+  // schools.is_demo — решает, оставить ли ученику контролы у видео, которое
+  // показывает учитель (в демо-школе паузить можно локально, в реальной —
+  // только смотреть). Хелпер глотает ошибку и отдаёт false, то есть при сбое
+  // применяются правила реальной школы — отказ в безопасную сторону.
+  const isDemoSchool = await isDemoSchoolLesson(db, id);
+
   return (
     <LessonView
       lesson={lesson}
       materialUrls={materialUrls}
       studentId={student?.id ?? null}
       linkedHomework={linkedHomework}
+      isDemoSchool={isDemoSchool}
     />
   );
 }

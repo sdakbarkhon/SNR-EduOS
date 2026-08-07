@@ -6,6 +6,8 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { PdfViewer } from "@/components/PdfViewer";
+import { createClient } from "@/lib/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // Ночной прогон, ЧАСТЬ 5 — локальный, чисто визуальный зум (CSS
 // transform: scale) для "Учитель показывает материал классу". Общий для
@@ -36,12 +38,33 @@ function clampZoom(z: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 }
 
+/** Порог рассинхрона, при котором ученику двигают позицию. Меньше — не
+ *  трогаем: постановка допускает расхождение до 2 с, а дёргать currentTime
+ *  на каждое сообщение значит подвешивать плеер рывками. */
+const VIDEO_SYNC_THRESHOLD_S = 1;
+
+type VideoSyncPayload = {
+  action: "play" | "pause" | "seek";
+  position: number;
+  timestamp: number;
+};
+
 export function DemoMaterialContent({
-  url, title, kind,
+  url, title, kind, lessonId, canControl = false, isDemoSchool = false,
 }: {
   url: string;
   title: string;
   kind: "pdf" | "video" | "image" | "office" | "embed";
+  /** Урок, в рамках которого идёт показ. Задаёт broadcast-канал
+   *  `lesson-video-<lessonId>`. Не задан — синхронизации нет (компонент
+   *  используется и вне урока). */
+  lessonId?: string;
+  /** true у УЧИТЕЛЯ: его play/pause/seek транслируются классу. */
+  canControl?: boolean;
+  /** Демо-школа (schools.is_demo). У ученика демо-школы остаются собственные
+   *  контролы — он может поставить на паузу локально, но его действия НЕ
+   *  транслируются. В реальной школе контролы у ученика убраны совсем. */
+  isDemoSchool?: boolean;
 }) {
   const { locale } = useLocale();
   const dv = getDictionary(locale as Locale).viewer;
@@ -58,6 +81,76 @@ export function DemoMaterialContent({
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [url]);
+
+  /* ─── Синхронизация видео учитель → ученики ────────────────────────────
+   * Тот же приём, что у live-кода (TeacherLiveCodeControl → CodeStageView):
+   * эфемерный broadcast-канал Supabase, без записи в БД и без миграции.
+   * Учитель шлёт события своего <video>, ученик применяет их к своему.
+   * Ученик ничего не шлёт — трансляция строго односторонняя, поэтому эха и
+   * циклов «применил → отправил → применил» не возникает в принципе. */
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  /* Пока применяем удалённое событие, свои обработчики play/pause молчат —
+   * иначе учитель, догоняющий чужую позицию, ретранслировал бы её обратно. */
+  const applyingRef = useRef(false);
+
+  const syncEnabled = kind === "video" && Boolean(lessonId);
+
+  useEffect(() => {
+    if (!syncEnabled || !lessonId) return;
+    const db = createClient();
+    // Ровно та же форма вызова, что в CodeStageView: .channel().on().subscribe()
+    // одной цепочкой. Если разорвать её (сохранить канал и вызвать .on()
+    // отдельно или собрать через тернарник), TS выбирает "system"-перегрузку
+    // и отвергает событие "broadcast".
+    const channel = db
+      .channel(`lesson-video-${lessonId}`)
+      .on(
+        "broadcast",
+        { event: "video" },
+        (msg: { payload?: Partial<VideoSyncPayload> }) => {
+        // Учитель — источник; собственные события применять не нужно.
+        if (canControl) return;
+        const p = msg.payload;
+        const el = videoRef.current;
+        if (!p || !el) return;
+        applyingRef.current = true;
+        try {
+          if (typeof p.position === "number" && Math.abs(el.currentTime - p.position) > VIDEO_SYNC_THRESHOLD_S) {
+            el.currentTime = p.position;
+          }
+          if (p.action === "play") void el.play().catch(() => null);
+          else if (p.action === "pause") el.pause();
+        } finally {
+          // play/pause прилетает асинхронно после вызова — снимаем флаг
+          // следующим тиком, а не сразу.
+          setTimeout(() => { applyingRef.current = false; }, 0);
+        }
+        },
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+    return () => {
+      db.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [syncEnabled, lessonId, canControl]);
+
+  const broadcast = useCallback((action: VideoSyncPayload["action"]) => {
+    if (!canControl || applyingRef.current) return;
+    const el = videoRef.current;
+    if (!el) return;
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "video",
+      payload: { action, position: el.currentTime, timestamp: Date.now() } satisfies VideoSyncPayload,
+    });
+  }, [canControl]);
+
+  // Ученик реальной школы смотрит без контролов; в демо-школе контролы
+  // остаются — он может поставить на паузу, но это чисто локально.
+  const videoControls = canControl || isDemoSchool || !syncEnabled;
 
   const zoomIn = useCallback(() => setZoom((z) => clampZoom(z + ZOOM_STEP)), []);
   const zoomOut = useCallback(() => {
@@ -155,7 +248,15 @@ export function DemoMaterialContent({
         {kind === "pdf" && <PdfViewer url={url} title={title} scale={zoom} />}
         {kind === "video" && (
           // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video src={url} controls className="h-full w-full object-contain" />
+          <video
+            ref={videoRef}
+            src={url}
+            controls={videoControls}
+            onPlay={() => broadcast("play")}
+            onPause={() => broadcast("pause")}
+            onSeeked={() => broadcast("seek")}
+            className="h-full w-full object-contain"
+          />
         )}
         {kind === "embed" && (
           <iframe

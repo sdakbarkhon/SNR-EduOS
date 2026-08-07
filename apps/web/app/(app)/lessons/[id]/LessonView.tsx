@@ -32,9 +32,12 @@ interface Props {
   materialUrls: Record<string, string>;
   studentId: string | null;
   linkedHomework: Array<{ id: string; title: string; content_type: ContentType; due_date: string | null }>;
+  /** schools.is_demo — только для прав на управление видео, см.
+   *  DemoMaterialContent.tsx. */
+  isDemoSchool?: boolean;
 }
 
-export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: Props) {
+export function LessonView({ lesson, materialUrls, studentId, linkedHomework, isDemoSchool = false }: Props) {
   // Hooks must run unconditionally on every render — declared before the
   // scheduled/in_progress early returns below, even though they're only
   // used by the completed branch.
@@ -47,7 +50,7 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
   }
   // Lesson is live → workspace (design lesson_workspace).
   if (lesson.status === "in_progress") {
-    return <LessonWorkspaceView lesson={lesson} materialUrls={materialUrls} studentId={studentId} />;
+    return <LessonWorkspaceView lesson={lesson} materialUrls={materialUrls} studentId={studentId} isDemoSchool={isDemoSchool} />;
   }
 
   const style = getSubjectStyle(lesson.group.subject);

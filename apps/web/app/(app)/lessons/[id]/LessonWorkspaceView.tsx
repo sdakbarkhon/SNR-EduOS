@@ -290,10 +290,16 @@ export function LessonWorkspaceView({
   lesson,
   materialUrls,
   studentId,
+  isDemoSchool = false,
 }: {
   lesson: StudentLessonView;
   materialUrls: Record<string, string>;
   studentId: string | null;
+  /** schools.is_demo — нужен только для прав на управление видео: ученик
+   *  демо-школы может ставить на паузу локально, ученик реальной школы
+   *  смотрит без контролов. Не путать с замороженным временем (isDemoMode)
+   *  и демо-СЕССИЕЙ (кука). См. DemoMaterialContent.tsx. */
+  isDemoSchool?: boolean;
 }) {
   // Единственное место, где AppShell прячет каркас (сайдбар/топбар/паддинги) —
   // см. fullscreen-lesson-context.tsx.
@@ -1084,7 +1090,7 @@ export function LessonWorkspaceView({
             </div>
             <div className="flex-1 overflow-auto bg-white">
               {mat && url && kind !== "other" ? (
-                <DemoMaterialContent url={url} title={mat.title} kind={kind} />
+                <DemoMaterialContent url={url} title={mat.title} kind={kind} lessonId={lesson.id} isDemoSchool={isDemoSchool} />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">
                   <p className="text-sm font-semibold text-slate-700">{d.demo.unsupportedFormat}</p>
