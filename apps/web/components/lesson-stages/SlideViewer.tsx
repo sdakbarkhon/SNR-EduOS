@@ -77,11 +77,17 @@ export function SlideViewer({
   // group + the lesson's currently-active stage); "completed" review mode
   // is unchanged (navigate locally, never write).
   const canNavigate = !viewerOnly && (isTeacher || lessonStatus === "completed" || lessonStatus === "in_progress");
-  // Writes to the shared current_slide_index: teacher always (unchanged —
-  // e.g. prepping a not-yet-started lesson), student only while the lesson
-  // is actually live. Completed-review browsing for a student stays purely
-  // local, exactly as before.
-  const syncsWrite = !viewerOnly && (isTeacher || lessonStatus === "in_progress");
+  // Writes to the shared current_slide_index — ТОЛЬКО пока урок реально идёт,
+  // одинаково для учителя и ученика.
+  //
+  // 07.08.2026: было `isTeacher || lessonStatus === "in_progress"`, то есть
+  // учитель писал ВСЕГДА, в том числе готовясь к ещё не начатому уроку. Его
+  // перелистывания при подготовке уходили в общий current_slide_index и
+  // долетали до всех, кто уже открыл урок. Теперь до старта (и после
+  // завершения) учитель листает локально — материал его, но трансляции быть
+  // не должно. Живой урок не затронут: там lessonStatus === "in_progress" и
+  // синхронизация работает как раньше.
+  const syncsWrite = !viewerOnly && lessonStatus === "in_progress";
   // Solo (unsynced) review is the ONLY case where nobody else can move this
   // slide — everyone else (teacher during any status, or a student during a
   // live lesson) must stay subscribed so they see every participant's clicks,

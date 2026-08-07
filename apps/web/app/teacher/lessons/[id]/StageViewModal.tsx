@@ -132,8 +132,14 @@ export function StageViewModal({
             <div className="overflow-hidden rounded-xl border border-slate-100">
               {/* 07.08.2026 — презентация этапа открывается во весь экран,
                   симметрично ученику (StudentPresentationViewer). Выход —
-                  Esc и кнопка закрытия, см. SlideViewer.tsx. */}
-              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} autoFullscreen />
+                  Esc и кнопка закрытия, см. SlideViewer.tsx.
+                  isTeacher: без него SlideViewer считал листание разрешённым
+                  только при lessonStatus completed/in_progress, и учитель,
+                  открывший презентацию ДО начала урока, не мог пролистать
+                  дальше первого слайда. Трансляции отсюда нет и не было —
+                  stageId не передаётся, значит ни записи current_slide_index,
+                  ни подписки: этот модал целиком локальный просмотр. */}
+              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} isTeacher autoFullscreen />
             </div>
           )}
 
