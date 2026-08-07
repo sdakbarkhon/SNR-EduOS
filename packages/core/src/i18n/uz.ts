@@ -1684,6 +1684,7 @@ export const uz: Dictionary = {
     openGrades: "Baholar",
     inProgressAutoNote: "Dars ketmoqda.",
     startLessonBtn: "Darsni boshlash",
+    startBlockedPastDay: "Bu dars allaqachon o'tgan — uni boshlab bo'lmaydi",
     endLessonBtn: "Darsni tugatish",
     endLessonConfirm: "Darsni hozir tugatasizmi? Bu amalni bekor qilib bo'lmaydi.",
     leaveLessonBtn: "Darsdan chiqish",

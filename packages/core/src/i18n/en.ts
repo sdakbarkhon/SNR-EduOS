@@ -1684,6 +1684,7 @@ export const en: Dictionary = {
     openGrades: "Grades",
     inProgressAutoNote: "Lesson is in progress.",
     startLessonBtn: "Start lesson",
+    startBlockedPastDay: "This lesson is in the past and cannot be started",
     endLessonBtn: "End lesson",
     endLessonConfirm: "End the lesson now? This can't be undone.",
     leaveLessonBtn: "Leave lesson",

@@ -1739,6 +1739,7 @@ export interface Dictionary {
     // Lesson status — manual start/end only (решение 21.07, авто-режим по времени отключён)
     inProgressAutoNote: string;        // "Урок идёт."
     startLessonBtn: string;            // "Начать урок" — БОЛЬШОЕ ОБНОВЛЕНИЕ §7.6
+    startBlockedPastDay: string;       // урок прошедшего дня начать нельзя (миграция 173)
     endLessonBtn: string;              // "Закончить урок" — ТОЛЬКО учитель, завершает урок для всех
     endLessonConfirm: string;          // confirm text before manual end (учитель)
     reloadPage: string;                // "Обновить страницу" — reload button next to endLessonBtn

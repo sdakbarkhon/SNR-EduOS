@@ -1684,6 +1684,7 @@ export const ru: Dictionary = {
     openGrades: "Оценки",
     inProgressAutoNote: "Урок идёт.",
     startLessonBtn: "Начать урок",
+    startBlockedPastDay: "Этот урок уже прошёл — начать его нельзя",
     endLessonBtn: "Закончить урок",
     endLessonConfirm: "Закончить урок сейчас? Действие нельзя отменить.",
     leaveLessonBtn: "Выйти из урока",

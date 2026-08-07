@@ -35,6 +35,7 @@ import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
 import { createClient } from "@/lib/supabase/client";
+import { isPastDayLesson } from "@/lib/demo-date";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
@@ -1308,7 +1309,17 @@ export function TeacherLessonDetailView({
         actions={
           <>
             {/* Manual start/end (§7.6) — pg_cron auto-transitions still run independently */}
-            {status === "scheduled" && !isCurator && (
+            {/* 07.08.2026: урок прошедшего дня начать нельзя — БД отдаёт
+                P0001 (trg_block_past_day_lesson_start, миграция 173). Вместо
+                кнопки показываем причину, чтобы учитель не упирался в сырую
+                ошибку Postgres. Замороженный день и всё, что позже,
+                стартуются как раньше — правило 1/2/3+ не затронуто. */}
+            {status === "scheduled" && !isCurator && isPastDayLesson(lesson.starts_at) && (
+              <span className="rounded-[11px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
+                {dl.startBlockedPastDay}
+              </span>
+            )}
+            {status === "scheduled" && !isCurator && !isPastDayLesson(lesson.starts_at) && (
               <button
                 onClick={handleStartLesson}
                 disabled={startingLesson}

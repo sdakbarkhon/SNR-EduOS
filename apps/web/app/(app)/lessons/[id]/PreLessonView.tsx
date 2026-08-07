@@ -10,6 +10,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
+import { isPastDayLesson } from "@/lib/demo-date";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
 } from "@snr/core";
@@ -452,15 +453,27 @@ export function PreLessonView({
               стартуют кроном по расписанию — ручной кнопки у ученика там
               быть не должно (API-роут start-with-close-previous всё равно
               отдаст 403, это просто убирает мёртвую кнопку из UI). */}
+          {/* 07.08.2026: урок прошедшего дня начать нельзя — БД отдаёт P0001
+              (триггер trg_block_past_day_lesson_start, миграция 173). Здесь
+              вместо кнопки показываем причину, чтобы человек не упирался в
+              сырую ошибку Postgres. Замороженный день и всё, что позже,
+              по-прежнему стартуется — включая 3-й урок и дальше, то есть
+              правило 1/2/3+ не затронуто. */}
           {!lesson.schoolAutostartEnabled && (
-            <button
-              onClick={handleStartLesson}
-              disabled={starting}
-              className="inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-8 py-3 text-base font-bold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-60 disabled:hover:translate-y-0"
-            >
-              <Play className="h-5 w-5" fill="currentColor" />
-              {starting ? "…" : dl.startLessonBtn}
-            </button>
+            isPastDayLesson(lesson.starts_at) ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/60 backdrop-blur-md">
+                {dl.startBlockedPastDay}
+              </span>
+            ) : (
+              <button
+                onClick={handleStartLesson}
+                disabled={starting}
+                className="inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-8 py-3 text-base font-bold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-60 disabled:hover:translate-y-0"
+              >
+                <Play className="h-5 w-5" fill="currentColor" />
+                {starting ? "…" : dl.startLessonBtn}
+              </button>
+            )
           )}
 
           {/* Excuse button (replaces the old "Перейти сейчас") */}

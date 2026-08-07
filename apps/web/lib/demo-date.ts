@@ -48,6 +48,29 @@ export function getDemoNowMs(): number {
   return getDemoNow().getTime();
 }
 
+const TZ_MS = 5 * 60 * 60 * 1000; // Ташкент
+
+/** Ташкентская дата (YYYY-MM-DD) для ISO-момента. */
+function tashkentDay(iso: string | number | Date): string {
+  return new Date(new Date(iso).getTime() + TZ_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Урок лежит в дне СТРОГО РАНЬШЕ замороженного — значит начать его нельзя.
+ *
+ * 07.08.2026 — зеркало БД-триггера `trg_block_past_day_lesson_start`
+ * (миграция 173). Источник истины — БД: она отдаёт P0001 «Нельзя начать урок
+ * за прошедший день» независимо от того, что показал UI. Здесь проверка
+ * нужна только чтобы не показывать заведомо нерабочую кнопку и не ронять
+ * пользователя в сырую ошибку Postgres.
+ *
+ * Сам замороженный день (29.07) и всё, что позже, начинать МОЖНО: заказчик
+ * показывает клиентам, что уроки запускаются наперёд.
+ */
+export function isPastDayLesson(startsAtIso: string): boolean {
+  return tashkentDay(startsAtIso) < tashkentDay(FROZEN_AT_ISO);
+}
+
 export function isDemoMode(): boolean {
   return true;
 }
