@@ -783,11 +783,26 @@ export function TeacherLessonDetailView({
     if (!demoMaterialId) { setDemoMaterialUrl(null); return; }
     const mat = materials.find((m) => m.id === demoMaterialId);
     if (!mat) { setDemoMaterialUrl(null); return; }
-    // Пачка 4 — видео-материал не в Storage (file_storage_path=null),
-    // getLessonMaterialUrl упал бы на нём; embed-URL уже готов на самой записи.
-    if (mat.content_type !== "file") { setDemoMaterialUrl(mat.external_url); return; }
+    // 07.08.2026 — резолв приведён к тому же виду, что на ученической странице
+    // (app/(app)/lessons/[id]/page.tsx). Было `content_type !== "file"` →
+    // взять external_url, и это ломало .mp4: K.1 (05.08) завёл content_type
+    // 'video_mp4' с файлом в ОТДЕЛЬНОМ бакете lesson-videos, у такой записи
+    // external_url пуст. Условие уводило её в ветку внешней ссылки,
+    // demoMaterialUrl становился null, а вся учительская панель показа висит
+    // на нём гейтом — учитель не видел ВООБЩЕ НИЧЕГО, пока ученики видео
+    // получали (у них ссылки считаются на сервере, где ветка на video_mp4
+    // есть). Отсюда же не работала и синхронизация: без плеера учителю нечем
+    // было породить события play/pause, и в канал lesson-video-<id> ничего не
+    // уходило. Один дефект, два симптома.
+    if (mat.content_type === "video_youtube" || mat.content_type === "video_rutube") {
+      setDemoMaterialUrl(mat.external_url);
+      return;
+    }
+    // Прочие записи без файла в Storage (внешние ссылки) — как раньше.
+    if (!mat.file_storage_path) { setDemoMaterialUrl(mat.external_url); return; }
+    const bucket = mat.content_type === "video_mp4" ? "lesson-videos" : (mat.kb_bucket ?? "lesson-materials");
     let cancelled = false;
-    getLessonMaterialUrl(db, mat.file_storage_path!, undefined, mat.kb_bucket ?? "lesson-materials")
+    getLessonMaterialUrl(db, mat.file_storage_path, undefined, bucket)
       .then((url) => { if (!cancelled) setDemoMaterialUrl(url); })
       .catch(() => { if (!cancelled) setDemoMaterialUrl(null); });
     return () => { cancelled = true; };
