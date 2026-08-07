@@ -2438,7 +2438,16 @@ export const getStudentLessonView = async (
     // exist. Matches the teacher-side materials query (line ~1654), which
     // already used "*" for the same reason (unrelated to this migration).
     db3.from("lesson_materials").select("*").eq("lesson_id", lessonId).neq("visibility", "teacher_only").order("created_at"),
-    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
+    // 07.08.2026 — добавлены image_url/mermaid_code/media_status/
+    // media_queued_at. Учитель читает этапы через select("*")
+    // (getTeacherLessonView выше) и потому видел AI-медиа этапа, а здесь
+    // колонки перечислены поимённо, и медиа-колонок в списке не было ни
+    // одной — миграции 165/166/168 их добавили, а этот select не обновили.
+    // Из-за этого StageMedia у УЧЕНИКА всегда получал null и молча ничего
+    // не рендерил: картинки и mermaid-схемы не появлялись даже после
+    // перезагрузки. Ни RLS, ни приватный бакет тут ни при чём — image_url
+    // хранит signed URL сроком на 10 лет, он работает у обеих ролей.
+    db3.from("lesson_stages").select("id, lesson_id, position, stage_role, stage_type, content_type, title, description, config, difficulty, duration_min, is_completed, completed_at, created_at, slides, current_slide_index, starter_code, programming_language, expected_output, live_code, is_live_active, image_url, mermaid_code, media_status, media_queued_at, progress:lesson_stage_progress(*)").eq("lesson_id", lessonId).order("position"),
     subjectQuery,
     schoolQuery,
     dayIndexQuery,
