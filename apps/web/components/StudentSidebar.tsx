@@ -187,7 +187,7 @@ export function StudentSidebar({ isDemo }: { isDemo?: boolean } = {}) {
       )}
       <aside
         className={cn(
-          "hidden shrink-0 flex-col gap-2 rounded-r-[24px] bg-white p-3 pb-16 md:flex",
+          "hidden shrink-0 flex-col gap-2 overflow-hidden rounded-r-[24px] bg-white p-3 pb-16 md:flex",
           "shadow-[0_8px_24px_rgba(93,80,150,0.05)] transition-[width] duration-200 ease-in-out",
           // Промт 6.2: развёрнутая ширина на планшете (md-lg, 768-1024) сужена
           // с 320px до 210px — оставлено (верный фикс, не трогаем). Свёрнутая
@@ -240,7 +240,7 @@ export function StudentSidebar({ isDemo }: { isDemo?: boolean } = {}) {
           "разъезжались" — на самом деле сами пункты просто оставались
           сверху, а под ними образовывалась одна большая пустая зона).
           Теперь список занимает ровно свою естественную высоту. */}
-      <nav className="flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
         {SIDEBAR_ITEMS.map((item) => {
           const isActive = !item.isStub && pathname.startsWith(item.href);
           const Icon = item.icon as LucideIcon;

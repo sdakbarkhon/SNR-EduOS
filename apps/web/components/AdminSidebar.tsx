@@ -68,7 +68,7 @@ export function AdminSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 sticky top-0 h-screen overflow-y-auto",
+        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-full overflow-hidden",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #7C3AED, #4C1D95)" }}
@@ -106,7 +106,7 @@ export function AdminSidebar() {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
         {navItems.map((item) => {
           const active = item.key === "dashboard"
             ? pathname === "/admin"

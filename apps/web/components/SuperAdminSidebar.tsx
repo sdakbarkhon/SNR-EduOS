@@ -60,7 +60,7 @@ export function SuperAdminSidebar() {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 sticky top-0 h-screen overflow-y-auto",
+        "hidden shrink-0 flex-col py-6 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-full overflow-hidden",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #1e293b, #0f172a)" }}
@@ -98,7 +98,7 @@ export function SuperAdminSidebar() {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
         {navItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;

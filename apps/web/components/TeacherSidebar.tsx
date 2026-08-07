@@ -131,7 +131,7 @@ export function TeacherSidebar() {
   return (
     <aside
       className={cn(
-        "scrollbar-hide hidden shrink-0 flex-col py-4 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-screen overflow-y-auto sticky top-0",
+        "scrollbar-hide hidden shrink-0 flex-col py-4 shadow-2xl rounded-r-[32px] md:flex transition-[width] duration-200 h-full overflow-hidden",
         width,
       )}
       style={{ background: "linear-gradient(to bottom, #2563EB, #1E3A8A)" }}
@@ -163,7 +163,7 @@ export function TeacherSidebar() {
           TeacherTopbar.tsx рядом с аватаром/именем учителя, симметрично
           студенческому Topbar.tsx (LogoutButton). Список заканчивается
           на "Настройки". */}
-      <nav className="space-y-1 px-2">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2">
         {teacherNavItems.filter((item) => !item.hideFromSidebar).map((item) => {
           const active = pendingHref ? pendingHref === item.href : pathname.startsWith(item.href);
           const Icon = item.icon;
