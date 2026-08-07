@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Play,
@@ -76,7 +75,6 @@ export function PreLessonView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
-  const router = useRouter();
   const showToast = useToast();
   const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
   const style = getSubjectStyle(lesson.group.subject);
@@ -128,19 +126,50 @@ export function PreLessonView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id, studentId]);
 
-  // Realtime: when teacher starts the lesson (status → in_progress), refresh.
-  useRealtimeChannel(`lesson-status-${lesson.id}`, "lessons", `id=eq.${lesson.id}`, () => {
-    router.refresh();
+  // 07.08.2026 — ученик застревал на экране ожидания после того, как учитель
+  // начал урок: у учителя урок «идёт», у ученика тот же урок «в ожидании».
+  //
+  // Причина — НЕ доставка данных. Проверено симуляцией: смена статуса видна
+  // ученику под его же RLS мгновенно, realtime для lessons включён,
+  // REPLICA IDENTITY FULL на месте. Ломался последний шаг — перерисовка.
+  // Здесь и в поллинге ниже стоял `router.refresh()`, а страница урока
+  // ветвится по `lesson.status` (LessonView: scheduled → PreLessonView,
+  // in_progress → LessonWorkspaceView), и статус приходит пропом из
+  // серверного компонента.
+  //
+  // Что этот же проект уже выяснил про router.refresh() — дословно из
+  // TeacherLessonDetailView.tsx: «router.refresh alone is unreliable for
+  // Server Components in Next 15». Именно поэтому УЧИТЕЛЬ делает
+  // window.location.reload() и в realtime-колбэке, и в своём поллинге — и
+  // поэтому у учителя статус обновлялся, а у ученика нет. Асимметрия была
+  // ровно в этом.
+  //
+  // Повторяем учительский приём: сравниваем пришедший статус с текущим и,
+  // если он изменился, делаем полную перезагрузку. Она гарантирует свежие
+  // серверные пропы, а значит и правильную ветку экрана.
+  useRealtimeChannel(`lesson-status-${lesson.id}`, "lessons", `id=eq.${lesson.id}`, (payload) => {
+    const newStatus = payload?.new?.status as string | undefined;
+    if (newStatus && newStatus !== lesson.status) window.location.reload();
   });
 
-  // Belt-and-suspenders poll: `router.refresh()` re-fetches the server
-  // component, so as soon as the teacher flips status this picks it up even
-  // on the (rare) occasion the realtime event above doesn't arrive — the
-  // waiting screen must never require an F5 to notice the lesson started.
+  // Страховка на случай, если realtime-событие не дойдёт. Спрашиваем статус
+  // напрямую, а не router.refresh() — по той же причине, что выше.
   useEffect(() => {
-    const poll = setInterval(() => router.refresh(), 5000);
+    const poll = setInterval(() => {
+      const db = dbRef.current ?? createClient();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db as any)
+        .from("lessons")
+        .select("status")
+        .eq("id", lesson.id)
+        .maybeSingle()
+        .then(({ data }: { data: { status: string } | null }) => {
+          if (data?.status && data.status !== lesson.status) window.location.reload();
+        })
+        .catch(() => null);
+    }, 5000);
     return () => clearInterval(poll);
-  }, [router]);
+  }, [lesson.id, lesson.status]);
 
   // Зациклённый таймер (LOOPED countdown, 45 мин цикл, anchor = сегодня 09:55
   // Ташкент). Не привязан к starts_at конкретного урока — это визуальный
@@ -187,10 +216,14 @@ export function PreLessonView({
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
       // Не сбрасываем starting=false тут — успешный старт переводит
-      // lesson.status в 'in_progress', router.refresh() перерендерит
-      // серверный компонент выше (LessonView.tsx), тот сам переключит с
-      // PreLessonView на LessonWorkspaceView — этот компонент размонтируется.
-      router.refresh();
+      // lesson.status в 'in_progress', перезагрузка отдаёт свежие серверные
+      // пропы, LessonView переключается с PreLessonView на
+      // LessonWorkspaceView, и этот компонент размонтируется.
+      //
+      // 07.08.2026: здесь тоже был router.refresh() — та же ловушка, что
+      // выше (ненадёжен для Server Components в Next 15), то есть ученик,
+      // начавший урок САМ, точно так же оставался на экране ожидания.
+      window.location.reload();
     } catch (e) {
       console.error("[PreLessonView] start-with-close-previous failed:", (e as Error)?.message ?? e);
       showToast(d.common.error);
