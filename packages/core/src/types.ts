@@ -970,6 +970,11 @@ export type CourseMaterial = {
 
 export type MaterialWithGroup = CourseMaterial & {
   group: { name: string; subject: string };
+  /** Урок, на котором материал использовался (course_materials.lesson_id).
+   *  null у записей, загруженных прямо в материалы группы — фильтр по датам
+   *  их не теряет, см. apps/web/lib/material-filters.ts. Необязательное поле:
+   *  getChildMaterials (родительский контур) урок не выбирает. */
+  lesson?: { id: string; title: string | null; topic: string | null; starts_at: string } | null;
 };
 
 export type LessonDetail = {

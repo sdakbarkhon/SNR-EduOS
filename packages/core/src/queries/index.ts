@@ -656,7 +656,13 @@ export const uploadHomeworkFile = async (
 export const getMaterials = (db: Db) =>
   db
     .from("course_materials")
-    .select("*, group:groups!inner(name, subject)")
+    // 07.08.2026 — подтягиваем урок: после автопубликации (миграция 174)
+    // материалов стали сотни, и экранам нужны дата и название урока для
+    // фильтрации. Связь уже была в данных (course_materials.lesson_id,
+    // миграция 119) — не хватало только её в выборке. Эмбед необязательный
+    // (без !inner): запись без урока, загруженная прямо в материалы группы,
+    // остаётся в списке с lesson = null, а не выпадает из выборки.
+    .select("*, group:groups!inner(name, subject), lesson:lessons(id, title, topic, starts_at)")
     .order("created_at", { ascending: false })
     .then(unwrap)
     .then((rows) => rows as unknown as import("../types").MaterialWithGroup[]);

@@ -8,6 +8,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { insertMaterial } from "@snr/core";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
+import { buildFilterOptions, matchesFilters } from "@/lib/material-filters";
 import { getMaterialUrl, getMaterialSlides, deleteMaterial as deleteMaterialAction } from "@/app/actions/materials";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
@@ -420,6 +421,10 @@ export function TeacherMaterialsView({
   const [toast, setToast] = useState<string | null>(null);
   const [filterSubject, setFilterSubject] = useState("all");
   const [filterGroup, setFilterGroup] = useState("all");
+  // 07.08.2026 — фильтры по дате урока и уроку. Правила общие с ученическим
+  // экраном (lib/material-filters.ts), UI у каждого свой.
+  const [filterDate, setFilterDate] = useState("all");
+  const [filterLesson, setFilterLesson] = useState("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -475,16 +480,25 @@ export function TeacherMaterialsView({
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     return materials.filter((m) => {
-      const matchSubject =
-        filterSubject === "all" || (m.subject ?? m.group.subject) === filterSubject;
+      // 07.08.2026 — предмет, дата урока и урок считаются общим модулем,
+      // тем же, что у ученика. Фолбэк на m.group.subject убран: это
+      // устаревшее единое поле группы, одинаковое у всех трёх групп, и оно
+      // ломало сужение по предмету. У самой записи предмет заполнен всегда.
+      const matchSubject = matchesFilters(m, { date: "all", lesson: "all", subject: filterSubject });
+      const matchLessonDate = matchesFilters(m, { date: filterDate, lesson: filterLesson, subject: "all" });
       const matchGroup = filterGroup === "all" || m.group_id === filterGroup;
       const matchQuery =
         !q ||
         m.title.toLowerCase().includes(q) ||
         (m.description ?? "").toLowerCase().includes(q);
-      return matchSubject && matchGroup && matchQuery;
+      return matchSubject && matchLessonDate && matchGroup && matchQuery;
     });
-  }, [materials, filterSubject, filterGroup, query]);
+  }, [materials, filterSubject, filterGroup, filterDate, filterLesson, query]);
+
+  const filterOptions = useMemo(
+    () => buildFilterOptions(materials, filterDate),
+    [materials, filterDate],
+  );
 
   function handleUploadSuccess(info: { title: string; groupName: string }) {
     setShowUpload(false);
@@ -652,6 +666,33 @@ export function TeacherMaterialsView({
             />
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           </div>
+          {/* 07.08.2026 — дата урока и урок, те же правила что у ученика.
+              Список уроков сужается выбранной датой; при смене даты выбор
+              урока сбрасывается, иначе остался бы урок другого дня. */}
+          {filterOptions.dates.length > 1 && (
+            <select
+              value={filterDate}
+              onChange={(e) => { setFilterDate(e.target.value); setFilterLesson("all"); }}
+              className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
+            >
+              <option value="all">Все даты</option>
+              {filterOptions.dates.map((d) => (
+                <option key={d.key} value={d.key}>{d.label} ({d.count})</option>
+              ))}
+            </select>
+          )}
+          {filterOptions.lessons.length > 1 && (
+            <select
+              value={filterLesson}
+              onChange={(e) => setFilterLesson(e.target.value)}
+              className="max-w-[280px] rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
+            >
+              <option value="all">Все уроки</option>
+              {filterOptions.lessons.map((l) => (
+                <option key={l.id} value={l.id}>{l.label} ({l.count})</option>
+              ))}
+            </select>
+          )}
           <select
             value={filterSubject}
             onChange={(e) => setFilterSubject(e.target.value)}
