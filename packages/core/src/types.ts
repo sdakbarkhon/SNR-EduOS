@@ -48,6 +48,26 @@ export type Group = {
   created_at: string;
 };
 
+/** Z.2.1 — справочник предметов школы (таблица school_subjects, миграция 171).
+ *  Это ОПРЕДЕЛЕНИЕ предмета: название/иконка/цвет, одна запись на школу.
+ *  Учителя здесь намеренно НЕТ: один предмет школы могут вести разные
+ *  учителя в разных группах, поэтому учитель живёт на строке назначения
+ *  (Subject.teacher_id ниже). is_active=false — предмет скрыт из выпадающих
+ *  списков, но не удалён. */
+export type SchoolSubject = {
+  id: string;
+  school_id: string;
+  name: string;
+  icon: string;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** НАЗНАЧЕНИЕ «предмет × группа × учитель» (таблица subjects), а не
+ *  справочник — см. SchoolSubject выше. Одна строка на группу, поэтому один
+ *  предмет школы существует как N строк с N разными id. */
 export type Subject = {
   id: string;
   name: string;
@@ -55,6 +75,9 @@ export type Subject = {
   teacher_id: string | null;
   icon: string;
   color: string;
+  /** Z.2.1: ссылка на запись справочника. Optional — колонка nullable, и
+   *  часть вызывающих мест не выбирает её из БД. */
+  catalog_id?: string | null;
   created_at: string;
   updated_at: string;
 };
