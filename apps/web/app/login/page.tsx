@@ -18,45 +18,47 @@ const montserrat = Montserrat({
 export default function LoginPage() {
   const { locale } = useLocale();
 
+  // 07.08.2026 — зонированный layout: верх / центр / низ, все три зоны В
+  // ПОТОКЕ одной flex-колонки высотой ровно во вьюпорт.
+  //
+  // Было: сетка `min-h-screen` в потоке, а переключатель языка и BottomBar —
+  // `fixed`, то есть вне потока. Фиксированные блоки не резервируют под себя
+  // места, поэтому места им никто и не оставлял: на экранах меньшей высоты
+  // карточка входа доезжала до нижней кромки и кнопки сторов наезжали на блок
+  // «Или войдите через», а переключатель языка садился на верх карточки.
+  // Внутри самого BottomBar копирайт был `absolute left-1/2 top-1/2` — он
+  // пересекался с карточкой «Безопасно» и кнопками по той же причине.
+  //
+  // Теперь верх и низ — обычные `shrink-0` строки, центр — `flex-1 min-h-0`.
+  // Наложение стало структурно невозможным: каждая зона занимает своё место,
+  // а сжимается только центральная. `h-screen overflow-hidden` на корне
+  // гарантирует отсутствие скролла страницы, о чём просили отдельно.
   return (
-    <div className={`${montserrat.className} relative min-h-screen w-full overflow-x-hidden`}>
+    <div className={`${montserrat.className} relative flex h-screen w-full flex-col overflow-hidden`}>
       <BackgroundArt />
 
-      {/* Переключатель языка — правый верхний угол страницы, НАД карточкой
-          формы (которая вертикально центрирована в своей колонке, так что
-          верх экрана обычно свободен). fixed + свой z-40 (карточка формы —
-          z-30), выпадающее меню теперь раскрывается ВНИЗ (см.
-          LanguageSelector.tsx) — уместно для триггера у верха экрана. */}
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-end px-4 sm:top-6 sm:px-6 lg:top-8 lg:px-16">
-        <div className="pointer-events-auto">
-          <LanguageSelector />
-        </div>
+      {/* ВЕРХ — переключатель языка. z-40 выше карточки формы (z-30), меню
+          раскрывается вниз (см. LanguageSelector.tsx). */}
+      <div className="relative z-40 flex shrink-0 justify-end px-4 pt-4 [@media(max-height:760px)]:pt-2 sm:px-6 sm:pt-5 lg:px-16">
+        <LanguageSelector />
       </div>
 
-      {/* min-h-screen (не h-screen) + без overflow-hidden — на планшете 768
-          карточка логина иногда выше 100vh; фиксированной высотой её обрезало
-          бы. Блок установки приложения (раньше отдельная секция В ПОТОКЕ
-          документа ниже этого грида, добавлявшая высоту сверх 100vh и
-          вызывавшая скролл) переехал в BottomBar — MobileAppsButtons внутри
-          неё, BottomBar как и раньше fixed и не участвует в потоке, так что
-          сам по себе грид снова ровно 100vh на обычных десктопных
-          разрешениях, без лишнего скролла. */}
-      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
-        <div className="hidden flex-col justify-center overflow-hidden px-16 py-12 lg:flex">
+      {/* ЦЕНТР — единственная сжимаемая зона. min-h-0 обязателен: без него
+          flex-элемент не может стать меньше своего содержимого и низ уехал бы
+          за кромку ровно как раньше. */}
+      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
+        <div className="hidden min-h-0 flex-col justify-center overflow-hidden px-16 lg:flex">
           <BrandingColumn locale={locale} />
         </div>
 
-        {/* Промт 6.2.3: pt-10 (40px) вместо p-6's 24px — минимальный "воздух"
-            над вынесенным логотипом даже в худшем случае (короткий
-            viewport, где items-center-центрирование почти не даёт запаса
-            сверху сверх самого padding). */}
-        <div className="flex items-center justify-center px-6 pt-10 pb-28 lg:p-12">
+        <div className="flex min-h-0 items-center justify-center overflow-y-auto px-6 py-2 [@media(max-height:760px)]:py-0 lg:px-12">
           <Suspense fallback={null}>
             <LoginForm locale={locale} />
           </Suspense>
         </div>
       </div>
 
+      {/* НИЗ */}
       <BottomBar locale={locale} />
     </div>
   );

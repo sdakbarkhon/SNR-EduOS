@@ -284,9 +284,16 @@ export function PreLessonView({
     // ВНУТРИ обычного каркаса (сайдбар/топбар/паддинги), как остальные
     // страницы ученика — min-h-screen здесь задваивал бы высоту (100vh
     // экрана поверх уже занятой топбаром) и создавал лишний скролл;
-    // min-h-[600px] + rounded-2xl — карточка нормальной высоты по контенту,
-    // тот же паттерн, что и у остальных карточек в каркасе.
-    <div className="relative min-h-[600px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
+    // rounded-2xl — карточка в каркасе.
+    //
+    // 07.08.2026: было min-h-[600px] — на обычных мониторах карточка
+    // заканчивалась заметно выше нижней кромки и под ней оставалась пустая
+    // полоса. Теперь высота считается от вьюпорта за вычетом паддингов
+    // каркаса и топбара (замерено: 152px при 900px вьюпорта), то есть экран урока
+    // действительно занимает экран. min-h, а не h: на коротком вьюпорте
+    // содержимое (план урока из многих этапов) по-прежнему может быть выше и
+    // прокрутится в <main>, а не обрежется.
+    <div className="relative min-h-[calc(100vh-10rem)] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
       {/* Back link */}
       <Link
         href="/schedule"
@@ -297,7 +304,7 @@ export function PreLessonView({
       </Link>
 
       {/* 2-column grid */}
-      <div className="grid min-h-[600px] grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
+      <div className="grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
 
         {/* LEFT: Info */}
         <div className="flex flex-col">

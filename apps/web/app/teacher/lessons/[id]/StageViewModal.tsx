@@ -130,7 +130,10 @@ export function StageViewModal({
 
           {stage.slides && stage.slides.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-slate-100">
-              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} />
+              {/* 07.08.2026 — презентация этапа открывается во весь экран,
+                  симметрично ученику (StudentPresentationViewer). Выход —
+                  Esc и кнопка закрытия, см. SlideViewer.tsx. */}
+              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} autoFullscreen />
             </div>
           )}
 

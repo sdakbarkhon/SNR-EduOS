@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronLeft, ChevronRight, Download, Maximize2, X } from "lucide-react";
 import { getDictionary, setCurrentSlide } from "@snr/core";
 import type { Locale, LessonSlide } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -25,6 +26,7 @@ export function SlideViewer({
   lessonStatus,
   viewerOnly = false,
   chromeAbovePx,
+  autoFullscreen = false,
 }: {
   slides: LessonSlide[];
   onExportPptx: () => void;
@@ -53,6 +55,19 @@ export function SlideViewer({
    *  задан — прежнее поведение (во всю ширину колонки, высота от
    *  aspect-ratio), для обычных (не во весь экран) мест использования. */
   chromeAbovePx?: number;
+  /** 07.08.2026 — открывать презентацию сразу во весь экран. Ставится только
+   *  там, где слайды И ЕСТЬ содержимое экрана: презентация этапа урока у
+   *  ученика (StudentPresentationViewer) и у учителя (StageViewModal). Для
+   *  инлайновых мест (материалы, превью в списке этапов) не ставится — там
+   *  слайд лишь часть страницы.
+   *
+   *  Режим ВСЕГДА обратим — Esc и кнопка закрытия в правом верхнем углу. Это
+   *  принципиально: до 06.08 презентация у ученика была `fixed inset-0
+   *  z-[9999]` БЕЗ выхода, из-за чего ученик оказывался заперт в ней, пока
+   *  учитель не переключит этап (см. StudentPresentationViewer.tsx). Тогда
+   *  полноэкранный режим убрали целиком; теперь он вернулся вместе с выходом,
+   *  которого не хватало. */
+  autoFullscreen?: boolean;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.slides;
@@ -106,13 +121,40 @@ export function SlideViewer({
     return () => window.removeEventListener("keydown", handler);
   }, [canNavigate, current, goTo]);
 
+  // 07.08.2026 — полноэкранный показ. Живёт здесь, а не в обёртках, чтобы
+  // учитель и ученик получили ровно один и тот же режим: обёртки у них разные
+  // (StudentPresentationViewer / StageViewModal), а SlideViewer — общий.
+  const [isFull, setIsFull] = useState(autoFullscreen);
+
+  useEffect(() => {
+    if (!isFull) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFull(false); };
+    window.addEventListener("keydown", onKey);
+    // Пока слайд во весь экран, страница под ним скроллиться не должна.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isFull]);
+
   const slide = slides[current];
   if (!slide) return null;
 
-  const frameMaxHeight = chromeAbovePx != null ? `calc(100vh - ${chromeAbovePx + NAV_BAR_PX}px)` : undefined;
+  // Во весь экран бюджет высоты считается от вьюпорта целиком: над кадром
+  // ничего нет, поэтому chromeAbovePx (высота шапки урока в обычном режиме)
+  // здесь не применяется — иначе кадр остался бы меньше, чем мог быть.
+  const frameMaxHeight = isFull
+    ? `calc(100vh - ${NAV_BAR_PX}px)`
+    : chromeAbovePx != null ? `calc(100vh - ${chromeAbovePx + NAV_BAR_PX}px)` : undefined;
 
-  return (
-    <div className="flex w-full flex-col overflow-hidden rounded-2xl shadow-xl">
+  const body = (
+    <div
+      className={cn(
+        "flex w-full flex-col overflow-hidden shadow-xl",
+        isFull ? "h-full justify-center rounded-none" : "rounded-2xl",
+      )}>
       {/* Slide body — fixed 16:9 frame, SlideBody scales its content to fit
           (never scroll — the whole slide should be visible at once).
           chromeAbovePx задан: кадр вписывается в доступную высоту (ширина
@@ -193,5 +235,44 @@ export function SlideViewer({
         </div>
       </div>
     </div>
+  );
+
+  if (!isFull) {
+    return (
+      <div className="relative">
+        {body}
+        {/* Кнопка «во весь экран» — в кадре, поверх слайда. Доступна везде и
+            одинаково у учителя и ученика, включая места, где презентация
+            открывается инлайново. */}
+        <button
+          onClick={() => setIsFull(true)}
+          title={t.fullscreen}
+          aria-label={t.fullscreen}
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg bg-black/40 text-white opacity-0 backdrop-blur-sm transition hover:bg-black/60 focus-visible:opacity-100 group-hover:opacity-100 [.relative:hover>&]:opacity-100"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  if (typeof document === "undefined") return body;
+
+  // Портал в <body>: иначе кадр остался бы внутри своего контейнера (модалка
+  // этапа у учителя, колонка урока у ученика) и никакой z-index не вывел бы
+  // его поверх — у предков есть и overflow-hidden, и свои stacking-контексты.
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-900">
+      <button
+        onClick={() => setIsFull(false)}
+        title={t.exitFullscreen}
+        aria-label={t.exitFullscreen}
+        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <div className="flex min-h-0 flex-1 flex-col justify-center">{body}</div>
+    </div>,
+    document.body,
   );
 }

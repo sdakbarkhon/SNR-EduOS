@@ -1550,6 +1550,8 @@ export interface Dictionary {
       empty: string;
       slideOf: string;
       teacherOnly: string;
+      fullscreen: string;
+      exitFullscreen: string;
       fullscreenTitle: string; // header shown in the auto-fullscreen student presentation overlay
     };
     contentSource: {

@@ -1510,6 +1510,8 @@ export const ru: Dictionary = {
       empty: "Контент этапа не подготовлен",
       slideOf: "Слайд {current} из {total}",
       teacherOnly: "Только учитель может переключать слайды",
+      fullscreen: "Во весь экран",
+      exitFullscreen: "Выйти из полноэкранного режима (Esc)",
       fullscreenTitle: "Презентация",
     },
     contentSource: {

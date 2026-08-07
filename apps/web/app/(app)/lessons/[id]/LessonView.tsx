@@ -78,8 +78,14 @@ export function LessonView({ lesson, materialUrls, studentId, linkedHomework }: 
     // 3 состояния урока, хотя fullscreen задумывался только под живой урок
     // (см. fullscreen-lesson-context.tsx). Контент упирался прямо в край
     // экрана. Теперь — нормальный каркас, как у остальных страниц ученика:
-    // max-w-[1600px] (тот же предел, что даёт сам AppShell) + свой px-паддинг.
-    <div className="mx-auto max-w-[1600px] space-y-6 px-4 sm:px-6 lg:px-8 text-[#1D1D1F]">
+    // свой px-паддинг.
+    //
+    // 07.08.2026: убран `mx-auto max-w-[1600px]`. Комментарий выше называл
+    // 1600px «тем же пределом, что даёт сам AppShell», но AppShell ширину
+    // давно не капает — PageContainer.tsx прямо об этом пишет: ширину задаёт
+    // холст ScaleWrapper. Предел остался в одиночку и на широких мониторах
+    // резал экран урока, оставляя пустые поля по бокам.
+    <div className="w-full space-y-6 px-4 sm:px-6 lg:px-8 text-[#1D1D1F]">
       {/* Back */}
       <Link
         href="/schedule"

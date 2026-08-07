@@ -135,16 +135,16 @@ export function LoginForm({ locale }: { locale: Locale }) {
         {/* Промт 6.2: раньше carta была capped на calc(100vh-8rem) и обрезала
             контент на планшете 768 — теперь высота card естественная,
             скроллится вся страница (page.tsx: min-h-screen). */}
-        <div className="p-6">
-          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
+        <div className="p-6 [@media(max-height:760px)]:p-4">
+          <div className="mb-4 [@media(max-height:760px)]:mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
             <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
           </div>
 
-          <h1 className="mb-4 text-2xl font-bold leading-tight tracking-tight text-slate-900">
+          <h1 className="mb-4 [@media(max-height:760px)]:mb-2 text-2xl font-bold leading-tight tracking-tight text-slate-900">
             {t.title}
           </h1>
 
-          <form onSubmit={onSubmit} className="flex flex-col gap-3">
+          <form onSubmit={onSubmit} className="flex flex-col gap-3 [@media(max-height:760px)]:gap-2">
             {/* Логин */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700">{t.usernameLabel}</label>
@@ -224,7 +224,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
             </button>
           </form>
 
-          <div className="mt-3 text-center">
+          <div className="mt-3 [@media(max-height:760px)]:mt-1.5 text-center">
             <button
               type="button"
               onClick={() => showNotice(t.comingSoon)}
@@ -234,7 +234,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
             </button>
           </div>
 
-          <div className="my-4 flex items-center gap-3">
+          <div className="my-4 [@media(max-height:760px)]:my-2 flex items-center gap-3">
             <div className="h-px flex-1 bg-white/40" />
             <span className="text-xs font-medium text-slate-600">{t.orLoginWith}</span>
             <div className="h-px flex-1 bg-white/40" />

@@ -1510,6 +1510,8 @@ export const en: Dictionary = {
       empty: "Stage content is not ready yet",
       slideOf: "Slide {current} of {total}",
       teacherOnly: "Only the teacher can switch slides",
+      fullscreen: "Fullscreen",
+      exitFullscreen: "Exit fullscreen (Esc)",
       fullscreenTitle: "Presentation",
     },
     contentSource: {

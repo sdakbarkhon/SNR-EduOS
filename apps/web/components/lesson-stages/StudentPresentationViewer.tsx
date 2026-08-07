@@ -55,6 +55,12 @@ export function StudentPresentationViewer({
         lessonStatus={lessonStatus}
         chromeAbovePx={chromeAbovePx}
         viewerOnly={viewerOnly}
+        // 07.08.2026 — презентация этапа открывается сразу во весь экран.
+        // Это возврат к тому, что было до 06.08, но уже С ВЫХОДОМ: Esc и
+        // кнопка закрытия в SlideViewer. Именно отсутствие выхода было
+        // причиной, по которой полноэкранный режим тогда убрали (см.
+        // комментарий к компоненту выше) — теперь ученик не заперт.
+        autoFullscreen
       />
     </div>
   );

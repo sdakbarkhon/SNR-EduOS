@@ -1510,6 +1510,8 @@ export const uz: Dictionary = {
       empty: "Bosqich kontenti hali tayyor emas",
       slideOf: "Slayd {current} / {total}",
       teacherOnly: "Faqat o'qituvchi slaydlarni almashtira oladi",
+      fullscreen: "Butun ekran",
+      exitFullscreen: "Butun ekrandan chiqish (Esc)",
       fullscreenTitle: "Taqdimot",
     },
     contentSource: {
