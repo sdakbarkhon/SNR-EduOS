@@ -2080,6 +2080,7 @@ export const uz: Dictionary = {
     libraryVideoUrlPlaceholder: "YouTube yoki RuTube havolasini kiriting",
     libraryErrVideoUrlRequired: "Video havolasini kiriting",
     libraryErrVideoUrlInvalid: "Havola aniqlanmadi — YouTube va RuTube qo'llab-quvvatlanadi",
+    libraryErrVideoMp4Link: "To'g'ridan-to'g'ri .mp4 havolasini bu yerga qo'shib bo'lmaydi — faylni «Yuklash» tugmasi orqali yuklang",
     libraryVideoBadge: "Video",
     navLessons: "Darslar",
     navCurriculumPlans: "O'quv rejalari",

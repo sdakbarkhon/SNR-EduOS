@@ -372,6 +372,15 @@ export function LibraryVideoLinkModal({
     if (!urlInput.trim()) { setError(dt.libraryErrVideoUrlRequired); return; }
     const p = parseVideoUrl(urlInput.trim());
     if (!p) { setError(dt.libraryErrVideoUrlInvalid); return; }
+    // 07.08.2026 — прямая .mp4-ссылка сюда не проходит, и это НЕ забытая
+    // ветка. parseVideoUrl отдаёт для неё platform "mp4", а тернарник ниже
+    // знает только youtube/rutube — то есть .mp4-ссылка молча сохранялась
+    // как content_type='video_rutube' с mp4-адресом в external_url. Ошибки
+    // не возникало: CHECK teacher_library_materials_content_shape_chk
+    // проверяет только «оба url не пусты». Хранить её честно негде — у
+    // ветки video_mp4 в том же CHECK обязателен storage_path, то есть
+    // загруженный файл. Поэтому явный отказ с подсказкой загрузить файлом.
+    if (p.platform === "mp4") { setError(dt.libraryErrVideoMp4Link); return; }
 
     setError(null);
     setSaving(true);

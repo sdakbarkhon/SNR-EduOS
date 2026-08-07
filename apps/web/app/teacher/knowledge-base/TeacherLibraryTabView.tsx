@@ -219,8 +219,17 @@ export function TeacherLibraryTabView({
   }
 
   async function handleOpen(m: LibraryMaterialWithDetails) {
+    // 07.08.2026 — YouTube/RuTube показываем тем же inline-плеером, что и
+    // загруженный .mp4 строкой ниже. Раньше здесь был window.open: видео
+    // уходило в новую вкладку (а при включённом блокировщике всплывающих
+    // окон — никуда), и это единственная вкладка «Базы знаний», где реально
+    // лежат видео-ссылки. Именно так выглядело «в базе знаний видео не
+    // работает». VideoEmbedPlayer уже импортирован здесь и уже умеет обе
+    // площадки — своей ветки рендера не заводим.
     if (m.content_type === "video_youtube" || m.content_type === "video_rutube") {
-      if (m.external_url) window.open(m.external_url, "_blank", "noopener,noreferrer");
+      if (!m.external_url) { setError(dt.libraryErrUploadFailed); return; }
+      setSelectedId(null);
+      setVideoPlayer({ url: m.external_url, title: m.title });
       return;
     }
     if (m.content_type === "video_mp4") {

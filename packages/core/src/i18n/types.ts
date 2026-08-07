@@ -2156,6 +2156,8 @@ export interface Dictionary {
     libraryVideoUrlPlaceholder: string;
     libraryErrVideoUrlRequired: string;
     libraryErrVideoUrlInvalid: string;
+    /** Прямая .mp4-ссылка: хранить негде, нужен загруженный файл. */
+    libraryErrVideoMp4Link: string;
     libraryVideoBadge: string;
     navLessons: string;
     navCurriculumPlans: string;

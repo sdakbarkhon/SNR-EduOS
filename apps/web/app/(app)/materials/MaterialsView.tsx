@@ -185,9 +185,14 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
         }
         return;
       }
-      // K.1, 05.08.2026 — загруженный .mp4-файл (не ссылка): FileViewerModal
-      // не умеет .mp4 (нет такой ветки в resolveFileViewerKind), поэтому
-      // тем же videoPlayer-состоянием, что и для видео-ссылок выше.
+      // K.1, 05.08.2026 — загруженный .mp4-файл (не ссылка) показываем тем же
+      // videoPlayer-состоянием, что и видео-ссылки выше.
+      //
+      // 07.08.2026 — оговорка «FileViewerModal не умеет .mp4» снята: теперь
+      // умеет (классифицирует через demoKind, kind='video'). Ветка ниже
+      // оставлена как есть — она работает и открывает ровно тот же
+      // VideoEmbedPlayer, просто без обвязки просмотрщика; менять рабочий
+      // путь ради единообразия здесь незачем.
       if (mat.storage_path && resolveType(mat) === "video") {
         setVideoPlayer({ url, title: mat.title });
         return;

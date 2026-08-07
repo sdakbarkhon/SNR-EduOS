@@ -72,9 +72,13 @@ export function parseVideoUrl(raw: string): ParsedVideoUrl | null {
 
 /** K.3 — true если ссылка распознана как видео (YouTube/RuTube/.mp4). Для
  *  клиентской валидации форм — намеренно НЕ трогает isVideoEmbedUrl ниже
- *  (та классифицирует уже-embed-домены для FileViewerModal/lesson_materials,
- *  которую просили не трогать; расширять её на .mp4 нельзя — resolveFileViewerKind
- *  рендерит kind='embed' как <iframe>, что сломало бы <video>-случай). */
+ *  (та классифицирует уже-embed-домены; расширять её на .mp4 нельзя —
+ *  kind='embed' рендерится как <iframe>, что сломало бы <video>-случай).
+ *
+ *  07.08.2026: раньше здесь стояла оговорка «FileViewerModal просили не
+ *  трогать» и вывод, что .mp4 туда не доедет. Просмотрщик с тех пор поправлен
+ *  — он классифицирует через demoKind и знает kind='video'. Разделение
+ *  isVideoUrl/isVideoEmbedUrl при этом остаётся в силе по причине выше. */
 export function isVideoUrl(url: string): boolean {
   return parseVideoUrl(url) !== null;
 }

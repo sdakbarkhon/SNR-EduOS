@@ -2080,6 +2080,7 @@ export const ru: Dictionary = {
     libraryVideoUrlPlaceholder: "Вставьте ссылку YouTube или RuTube",
     libraryErrVideoUrlRequired: "Вставьте ссылку на видео",
     libraryErrVideoUrlInvalid: "Ссылка не распознана — поддерживаются YouTube и RuTube",
+    libraryErrVideoMp4Link: "Прямую ссылку на .mp4 сюда добавить нельзя — загрузите файл кнопкой «Загрузить»",
     libraryVideoBadge: "Видео",
     navLessons: "Уроки",
     navCurriculumPlans: "Учебные планы",

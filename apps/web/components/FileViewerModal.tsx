@@ -7,7 +7,8 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { PdfViewer } from "@/components/PdfViewer";
-import { isVideoEmbedUrl } from "@/lib/video-url";
+import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
+import { demoKind } from "@/lib/material-kind";
 
 // Shared in-app viewer for Knowledge Base files (Библиотека + Материалы
 // группы, student and teacher sides) — routes by file type instead of
@@ -32,32 +33,31 @@ import { isVideoEmbedUrl } from "@/lib/video-url";
 //   - text: зум не применяется (не входит в "PDF/изображения/презентации"
 //     из ТЗ) — тулбар зума для этого типа скрыт.
 
-export type FileViewerKind = "pdf" | "image" | "office" | "text" | "embed";
+export type FileViewerKind = "pdf" | "image" | "office" | "text" | "video" | "embed";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
 
-function extOf(s: string): string {
-  return (s.split(".").pop() ?? "").toLowerCase();
-}
-
-const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif", "avif"];
-const OFFICE_EXTS = ["pptx", "docx", "ppt", "doc", "xlsx", "xls"];
-
+// 07.08.2026 — классификатор больше не свой, а тот же demoKind из
+// lib/material-kind.ts. Копий было две, и комментарий выше честно называл
+// эту «зеркалом» первой — только зеркало отстало: у demoKind ветка "video"
+// (mp4/webm/ogg/mov/m4v) есть с самого начала, а здесь её не было. Из-за
+// этого .mp4 не проваливался «в никуда», а доезжал до финального
+// `return "text"`, и TextPreview честно делал fetch().text() на бинарном
+// видео и печатал его байты. Ровно это и означало «в базе знаний видео не
+// работает»: во всех местах, которые открывают материал этим
+// просмотрщиком (Библиотека, книги, материалы группы с неожиданным
+// file_type, материалы завершённого урока).
+//
+// Расхождение копий в этом проекте случалось уже трижды (резолв ссылок на
+// материал, бакеты, набор markdown-плагинов) — поэтому не «добавил ветку
+// сюда тоже», а убрал вторую копию совсем.
 export function resolveFileViewerKind(name: string, url?: string | null): FileViewerKind {
-  // Пачка 4 — ссылка на YouTube/RuTube (уже нормализованный embed-URL,
-  // содержит распознаваемый хост) — определяется до расширения-эвристики,
-  // у таких ссылок расширения нет вовсе.
-  if (isVideoEmbedUrl(url)) return "embed";
-  const exts = [extOf(name)];
-  if (url) {
-    try { exts.push(extOf(new URL(url).pathname)); } catch { /* not absolute — ignore */ }
-  }
-  if (exts.includes("pdf")) return "pdf";
-  if (exts.some((e) => IMAGE_EXTS.includes(e))) return "image";
-  if (exts.some((e) => OFFICE_EXTS.includes(e))) return "office";
-  return "text";
+  const kind = demoKind(name, url);
+  // У demoKind терминальное значение — "other" (формат не распознан), здесь
+  // исторически "text": просмотрщик всё равно пробует показать как текст.
+  return kind === "other" ? "text" : kind;
 }
 
 function clampZoom(z: number): number {
@@ -108,7 +108,9 @@ export function FileViewerModal({
   const kind = resolveFileViewerKind(fileName || title, url);
   // embed (YouTube/RuTube iframe) — свои встроенные плеер-контролы, зум
   // поверх них не нужен и не входил в ТЗ ("PDF/изображения/презентации").
-  const zoomable = kind !== "text" && kind !== "embed";
+  // video — свой контрол воспроизведения, зум/панорамирование поверх него
+  // только мешали бы попасть по ползунку (как и у embed/text).
+  const zoomable = kind !== "text" && kind !== "embed" && kind !== "video";
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -261,6 +263,12 @@ export function FileViewerModal({
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
+        )}
+        {/* Загруженный .mp4 и прямая .mp4-ссылка. Тот же VideoEmbedPlayer,
+            что и в остальных местах показа видео, — пятого рендера видео в
+            проекте не заводим. */}
+        {kind === "video" && (
+          <VideoEmbedPlayer url={url} className="max-h-[calc(100vh-6rem)] max-w-[calc(100vw-2rem)]" />
         )}
         {kind === "text" && <TextPreview url={url} />}
       </div>

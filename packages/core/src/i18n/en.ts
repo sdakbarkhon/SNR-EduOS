@@ -2080,6 +2080,7 @@ export const en: Dictionary = {
     libraryVideoUrlPlaceholder: "Paste a YouTube or RuTube link",
     libraryErrVideoUrlRequired: "Paste a video link",
     libraryErrVideoUrlInvalid: "Link not recognized — YouTube and RuTube are supported",
+    libraryErrVideoMp4Link: "A direct .mp4 link cannot be added here — upload the file with the “Upload” button",
     libraryVideoBadge: "Video",
     navLessons: "Lessons",
     navCurriculumPlans: "Curriculum Plans",
