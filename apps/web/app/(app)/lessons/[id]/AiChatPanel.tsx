@@ -3,10 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
-import { Bot, X, Send, Loader2 } from "lucide-react";
+import { Bot, X, Send, Sparkles } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+// 07.08.2026 — тот же набор плагинов, что у остальных рендеров (коммит
+// b2012ca). Раньше этот чат звал ReactMarkdown без плагинов вовсе, поэтому
+// формулы и GFM-разметка в ответах помощника внутри урока не работали, хотя
+// в общем помощнике работали.
+import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "@/components/markdown-plugins";
 
 const DAILY_LIMIT = 10;
 const OPEN_KEY = "ai_chat_open";
@@ -146,14 +151,21 @@ export function AiChatPanel({
     .replace("{total}", String(DAILY_LIMIT));
 
   // ── Collapsed state: floating button ────────────────────────────────────────
+  //
+  // 07.08.2026 — кнопка приведена к общей: та же иконка Sparkles, тот же
+  // оранжево-жёлтый градиент, размер и положение, что у AiFloatingButton на
+  // остальных страницах. Раньше здесь был синий робот 56×56 в другом углу, и
+  // ученик видел в уроке «другого» помощника. Почему компоненты вообще
+  // разные — см. комментарий к панели ниже.
   if (!open) {
     return createPortal(
       <button
         onClick={toggle}
         title={t.expand}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg transition hover:shadow-xl hover:scale-105 active:scale-95"
+        aria-label={t.expand}
+        className="fixed bottom-20 right-4 z-40 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-400 shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-4"
       >
-        <Bot className="h-6 w-6" />
+        <Sparkles className="h-6 w-6 text-white" strokeWidth={2} />
       </button>,
       document.body,
     );
@@ -162,41 +174,52 @@ export function AiChatPanel({
   // ── Expanded panel ───────────────────────────────────────────────────────────
   const isEmpty = !loading && messages.length === 0 && historyLoaded;
 
+  // 07.08.2026 — геометрия и оформление панели приведены к общему помощнику
+  // (components/AiFloatingButton.tsx + AiFloatingChat.tsx): плавающая карточка
+  // ~400×600 над кнопкой в правом нижнем углу вместо боковой полосы 320px во
+  // всю высоту экрана.
+  //
+  // Почему компоненты остаются РАЗНЫМИ. Различие не косметическое: этот чат
+  // ходит в /api/ai/chat с lesson_id/stage_id (контекст урока + RAG-поиск по
+  // материалам), историю держит на сервере (/api/ai/chat/history) и считает
+  // дневной лимит; общий помощник шлёт server action callAiChat без контекста
+  // и хранит историю в sessionStorage. Это два разных транспорта, две модели
+  // истории и две модели лимита — сведение в один компонент означало бы
+  // переписать обе, что заметно больше задачи «сделать одинаково». Поэтому
+  // унифицирован ВИД и поведение, а начинка урок-чата сохранена целиком.
   return createPortal(
     <div
-      className="fixed bottom-0 right-0 top-0 z-50 flex flex-col"
-      style={{ width: 320 }}
+      className="fixed bottom-36 right-4 z-50 w-[calc(100vw-2rem)] max-w-[400px] md:bottom-20"
+      style={{ height: "min(600px, calc(100vh - 180px))" }}
     >
-      {/* Semi-transparent backdrop strip (decorative, not blocking) */}
-      <div className="flex flex-1 flex-col overflow-hidden rounded-none border-l border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 dark:border-slate-700 dark:from-slate-800 dark:to-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-              <Bot className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t.title}</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">{remainingLabel}</p>
-            </div>
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-[20px] bg-white shadow-2xl ring-1 ring-black/5 dark:bg-slate-900">
+        {/* Шапка — градиентная полоса, как у общего помощника. Строка остатка
+            лимита оставлена: у урок-чата лимит свой (DAILY_LIMIT), и без неё
+            ученик не поймёт, почему помощник вдруг перестал отвечать. */}
+        <div className="flex shrink-0 items-center gap-3 rounded-t-[20px] bg-gradient-to-br from-violet-500 to-indigo-600 px-4 py-3.5 text-white">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-extrabold">{t.title}</p>
+            <p className="text-[11px] font-semibold text-white/85">{remainingLabel}</p>
           </div>
           <button
             onClick={toggle}
             title={t.collapse}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+            aria-label={t.collapse}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-white/15 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3.5 py-4">
           {isEmpty && (
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-slate-800">
-                <Bot className="h-6 w-6" />
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">
+            <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t.title}</p>
+              <p className="max-w-[280px] text-xs text-slate-500 dark:text-slate-400">
                 {t.welcomeMessage}
               </p>
             </div>
@@ -205,25 +228,25 @@ export function AiChatPanel({
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              className={`flex ${msg.role === "user" ? "justify-end" : "items-end gap-2"}`}
             >
               {msg.role === "assistant" && (
-                <div className="mr-1.5 mt-0.5 flex-shrink-0">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-                    <Bot className="h-3 w-3" />
-                  </div>
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
+                  <Bot className="h-3.5 w-3.5" />
                 </div>
               )}
               <div
-                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                className={`max-w-[82%] rounded-[16px] px-3.5 py-2.5 text-[13px] leading-relaxed ${
                   msg.role === "user"
-                    ? "rounded-tr-sm bg-blue-600 text-white"
-                    : "rounded-tl-sm bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+                    ? "rounded-tr-md bg-gradient-to-br from-violet-500 to-indigo-600 font-medium text-white shadow-sm"
+                    : "rounded-tl-md bg-[#F3F1FB] text-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 }`}
               >
                 {msg.role === "assistant" ? (
-                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-0.5 prose-ul:my-1 prose-li:my-0">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0 [&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
+                    <ReactMarkdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={MARKDOWN_REHYPE_PLUGINS as never}>
+                      {msg.content}
+                    </ReactMarkdown>
                   </div>
                 ) : (
                   msg.content
@@ -233,17 +256,15 @@ export function AiChatPanel({
           ))}
 
           {loading && (
-            <div className="flex justify-start">
-              <div className="mr-1.5 mt-0.5 flex-shrink-0">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-                  <Bot className="h-3 w-3" />
-                </div>
+            <div className="flex items-end gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
+                <Bot className="h-3.5 w-3.5" />
               </div>
-              <div className="rounded-2xl rounded-tl-sm bg-slate-100 px-3 py-2 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>{t.loading}</span>
-                </div>
+              {/* Три точки вместо спиннера — как в общем помощнике. */}
+              <div className="flex items-center gap-1.5 rounded-[16px] rounded-tl-md bg-[#F3F1FB] px-3.5 py-3.5 dark:bg-slate-800">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
               </div>
             </div>
           )}
@@ -252,24 +273,26 @@ export function AiChatPanel({
         </div>
 
         {/* Input */}
-        <div className="border-t border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+        <div className="shrink-0 border-t border-slate-100 px-3 py-3 dark:border-slate-700">
           {remaining <= 0 ? (
-            <p className="text-center text-xs text-slate-400 py-2">{t.limitReached}</p>
+            <p className="py-2 text-center text-xs text-slate-400">{t.limitReached}</p>
           ) : (
-            <div className="flex items-end gap-2">
+            <div className="flex items-center gap-2">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 placeholder={t.placeholder}
-                rows={2}
-                className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                rows={1}
+                disabled={loading}
+                className="flex-1 resize-none rounded-xl bg-[#F4F2FC] px-3.5 py-2.5 text-[13px] text-slate-700 placeholder-slate-400 focus:outline-none disabled:opacity-50 dark:bg-slate-800 dark:text-slate-100"
+                style={{ maxHeight: "96px" }}
               />
               <button
                 onClick={() => void send()}
                 disabled={loading || !input.trim()}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:opacity-40"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm transition-all hover:-translate-y-0.5 disabled:opacity-40"
                 title={t.send}
               >
                 <Send className="h-4 w-4" />
