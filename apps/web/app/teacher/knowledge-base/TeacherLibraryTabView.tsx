@@ -62,6 +62,9 @@ const MATERIAL_TYPE_STYLES: Record<string, { label: string; className: string }>
   "методичка": { label: "Методичка", className: "bg-purple-100 text-purple-700" },
   "учебник": { label: "Учебник", className: "bg-slate-200 text-slate-700" },
   "презентация": { label: "Презентация", className: "bg-pink-100 text-pink-700" },
+  // 08.08.2026 — вид «видео» добавлен в CHECK миграцией 178. Ролик заметно
+  // отличается от документа, поэтому и цвет отдельный.
+  "видео": { label: "Видео", className: "bg-red-100 text-red-700" },
 };
 function materialTypeStyle(materialType: string) {
   return MATERIAL_TYPE_STYLES[materialType] ?? { label: materialType, className: "bg-slate-100 text-slate-600" };
