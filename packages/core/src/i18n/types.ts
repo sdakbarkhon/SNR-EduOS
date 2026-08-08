@@ -158,7 +158,9 @@ export interface Dictionary {
     nextReward: string;        // "До следующей награды"
     // Iter5 P9 — CD dashboard v2 redesign
     streakTitle: string;       // "Серия успехов"
-    streakDays: string;        // "{n} дней подряд!"
+    streakDays: string;
+    /** Подпись под числом серии — «не разорви цепочку». */
+    streakKeepGoing: string;        // "{n} дней подряд!"
     goalsTitle: string;        // "Ты на пути к новым вершинам!"
     goalsSubtitle: string;     // "Ещё немного, и ты получишь новую награду 🏆"
     viewGoals: string;         // "Смотреть цели" (stub)

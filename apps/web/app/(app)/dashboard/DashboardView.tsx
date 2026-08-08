@@ -66,24 +66,6 @@ function ringColors(pct: number): { from: string; to: string; glow: string } {
   return { from: "#FB6B4A", to: "#FF9F45", glow: "rgba(251,107,74,0.34)" };
 }
 
-// Иллюстрация «Факта дня» по теме (ЧАСТЬ 2): факт генерит ИИ на лету, картинка
-// подбирается на фронте по ключевым словам темы. Не распознали — null →
-// дефолтная пчела (текущая). Порядок важен: более специфичные категории выше.
-const FACT_CATEGORIES: Array<{ emoji: string; kw: string[] }> = [
-  { emoji: "🪐", kw: ["марс", "планет", "космос", "звезд", "звёзд", "галакт", "солнц", "луна", "луны", "венер", "юпитер", "сатурн", "орбит", "астероид", "ракет", "метеор", "вселенн", "комет"] },
-  { emoji: "🐙", kw: ["осьминог", "кит", "жираф", "акул", "улитк", "собак", "кошк", "кошек", "животн", "птиц", "рыб", "насеком", "пчел", "слон", "лев", "тигр", "муравь", "паук", "зме", "лягуш", "дельфин"] },
-  { emoji: "🌿", kw: ["растен", "дерев", "лес", "цвет", "банан", "клубник", "ягод", "океан", "мор", "гор ", "пустын", "антарктид", "вулкан", "лёд", "лед", "погод", "дожд", "радуг"] },
-  { emoji: "💻", kw: ["компьютер", "вирус", "интернет", "робот", "телефон", "технолог", "двигател", "электрич", "алгоритм", "программ", "данн", "сеть", "чип"] },
-  { emoji: "🏛️", kw: ["древн", "век", "истори", "импери", "пирамид", "археолог", "средневеков", "война", "цивилизац", "фараон", "рыцар"] },
-  { emoji: "🔬", kw: ["ген", "молекул", "атом", "хими", "физик", "температур", "энерги", "свет", "градус", "эксперимент", "формул", "кислот", "металл", "медь", "железо", "мозг", "нейрон"] },
-  { emoji: "🧠", kw: ["человек", "тел", "серд", "кров", "кост", "позвонк", "язык", "отпечат", "палец", "пальц", "мышц", "глаз", "зуб", "сон", "мёд", "мед"] },
-];
-function factEmojiFor(text: string | null): string | null {
-  if (!text) return null;
-  const t = text.toLowerCase();
-  for (const c of FACT_CATEGORIES) if (c.kw.some((k) => t.includes(k))) return c.emoji;
-  return null;
-}
 
 export function DashboardView({
   student,
@@ -187,7 +169,6 @@ export function DashboardView({
   }
   const classLabel = getClassLabel(groups);
   const greeting = t.greetings[dayOfYear(now ?? getDemoNow()) % t.greetings.length];
-  const factEmoji = factEmojiFor(aiFactText);
 
   // Today's lessons — only computed client-side once `now` is set, for the
   // same hydration-safety reason above.
@@ -328,36 +309,6 @@ export function DashboardView({
     return out;
   })();
 
-  // Накопительный график посещаемости за последние 21 день (пришёл +1 / нет −1).
-  const graphPoints = (() => {
-    if (!todayKey) return [] as number[];
-    const pts: number[] = [];
-    let acc = 0;
-    for (let i = 20; i >= 0; i--) {
-      const ok = daySuccessful(dayKeyBack(todayKey, i));
-      if (ok === null) continue;
-      acc += ok ? 1 : -1;
-      pts.push(acc);
-    }
-    return pts;
-  })();
-  const hasGraph = graphPoints.length >= 2;
-  const graphPath = (() => {
-    if (!hasGraph) return null;
-    const minY = Math.min(...graphPoints);
-    const maxY = Math.max(...graphPoints);
-    const span = Math.max(1, maxY - minY);
-    const W = 320, H = 110, PAD = 8;
-    const stepX = (W - PAD * 2) / (graphPoints.length - 1);
-    const coords = graphPoints.map((v, i) => {
-      const x = PAD + i * stepX;
-      const y = PAD + (H - PAD * 2) * (1 - (v - minY) / span);
-      return [x, y] as const;
-    });
-    const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-    const area = `${line} L${coords[coords.length - 1]![0].toFixed(1)},${H} L${coords[0]![0].toFixed(1)},${H} Z`;
-    return { line, area };
-  })();
 
   return (
     <div className="flex flex-col gap-6">
@@ -390,18 +341,16 @@ export function DashboardView({
                 <span className="animate-twinkle absolute left-1/2 top-[38px] text-[13px] text-white/90">✦</span>
                 <span className="animate-twinkle absolute left-[44%] top-[74px] text-[10px] text-white/75" style={{ animationDelay: ".9s" }}>✦</span>
                 <span className="animate-twinkle absolute right-9 top-6 text-[11px] text-[#FFE08A]" style={{ animationDelay: ".4s" }}>✦</span>
-                {/* Иллюстрация по теме факта (ЧАСТЬ 2): при распознанной теме —
-                    тематический эмодзи; иначе дефолт — пчела + цветок. */}
-                {/* Маскот уменьшен под новую высоту карточки: 64/68px в кадре
-                    150px упирался в верхний край и обрезался снизу. */}
-                {factEmoji ? (
-                  <div className="animate-float-slow absolute -bottom-1 right-2 text-[52px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">{factEmoji}</div>
-                ) : (
-                  <>
-                    <div className="animate-float-medium absolute bottom-3 right-9 text-[30px] leading-none">🌸</div>
-                    <div className="animate-float-slow absolute -bottom-1 right-2 text-[54px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">🐝</div>
-                  </>
-                )}
+                {/* 07.08.2026 — маскот нейтральный и один для всех фактов.
+                    Раньше он подбирался по ключевым словам факта, и на факте
+                    про муравьёв рисовался осьминог: «муравь» стояло в списке
+                    ключей ОДНОЙ категории вместе с осьминогом, китом и акулой,
+                    то есть один эмодзи отвечал за всех животных сразу. Такой
+                    подбор промахивается по построению, поэтому убран целиком,
+                    а не дополнен ключами. Лампочка подходит любому факту и
+                    держит тему «узнал новое» вместе с ✦ и иконкой в
+                    заголовке; животных нет. */}
+                <div className="animate-float-slow absolute -bottom-1 right-2 text-[52px] leading-none drop-shadow-[0_8px_12px_rgba(50,20,100,0.32)]">💡</div>
               </div>
 
               <div className="relative flex items-center gap-1.5 text-[14px] font-extrabold">
@@ -436,38 +385,28 @@ export function DashboardView({
               <div className="flex items-center gap-1.5 text-[14px] font-extrabold text-[#2A2A45]">
                 <Flame className="h-[18px] w-[18px] text-[#FF7A2E]" /> {t.streakTitle}
               </div>
-              {/* 07.08.2026: раньше число, график и дни шли тремя ярусами, а
-                  график стоял на `flex-1` — то есть съедал всю оставшуюся
-                  высоту и тянул карточку вверх. Теперь число и график в одной
-                  строке, у графика явная высота: карточка встаёт в габарит
-                  плитки «Моё задание» и график перестал зависеть от свободного
-                  места. Данные и расчёт стрика не тронуты. */}
-              <div className="mt-1.5 flex items-end gap-3">
-                <div className="flex shrink-0 items-baseline gap-1.5">
-                  <span className="text-[28px] font-black leading-none text-[#7C5CFF]">{streak}</span>
-                  <span className="text-[12px] font-bold text-[#8E8EA9]">{t.streakDays.replace("{n}", "").trim()}</span>
+              {/* 07.08.2026 — график убран совсем. Он рисовал накопительную
+                  сумму «пришёл +1 / нет −1» за 21 день: у любого, кто ходит на
+                  уроки, это просто линия вверх, одинаковая у всех и ничего не
+                  говорящая, а места занимала больше всех в карточке.
+                  Вместо него — крупное число с огоньком и ряд дней недели:
+                  видно и текущую серию, и что её можно разорвать.
+                  РАСЧЁТ СТРИКА НЕ ТРОНУТ — streak и weekDayStates считаются
+                  ровно как раньше, изменился только их показ. */}
+              <div className="mt-2 flex items-center gap-2.5">
+                <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FFB23E] to-[#FF7A2E] shadow-[0_6px_14px_rgba(255,122,46,.34)]">
+                  <Flame className="h-[22px] w-[22px] text-white" strokeWidth={2.4} />
                 </div>
-                <div className="relative h-[34px] min-w-0 flex-1">
-                  {hasGraph && graphPath ? (
-                    <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="none" className="block overflow-visible">
-                      <defs>
-                        <linearGradient id="streakLine" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0" stopColor="#FFD36E" />
-                          <stop offset="1" stopColor="#FF9F2E" />
-                        </linearGradient>
-                        <linearGradient id="streakFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0" stopColor="rgba(255,183,62,.26)" />
-                          <stop offset="1" stopColor="rgba(255,183,62,0)" />
-                        </linearGradient>
-                      </defs>
-                      <path d={graphPath.area} fill="url(#streakFill)" stroke="none" />
-                      <path d={graphPath.line} fill="none" stroke="url(#streakLine)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                    </svg>
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-center text-[12px] font-semibold text-[#B7B7CE]">{t.streakEmpty}</p>
-                    </div>
-                  )}
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[34px] font-black leading-none text-[#2A2A45]">{streak}</span>
+                    <span className="text-[12px] font-bold text-[#8E8EA9]">
+                      {t.streakDays.replace("{n}", "").trim()}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-bold text-[#FF7A2E]">
+                    {streak > 0 ? t.streakKeepGoing : t.streakEmpty}
+                  </p>
                 </div>
               </div>
               {/* mt-auto прижимает ряд дней к низу: если «Факт дня» вырастет на

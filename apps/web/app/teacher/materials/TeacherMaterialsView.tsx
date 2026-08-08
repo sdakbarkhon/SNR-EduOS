@@ -9,7 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { insertMaterial } from "@snr/core";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
-import { buildFilterOptions, matchesFilters } from "@/lib/material-filters";
+import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
 import {
   filterSelectClass, withCount, FILTER_ICON, FILTER_CHEVRON, FILTER_RESET,
 } from "@/components/material-filter-styles";
@@ -951,8 +951,21 @@ export function TeacherMaterialsView({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((mat) => {
+          // 07.08.2026 — группировка по дате урока, тот же groupByDay, что и у
+          // ученика. Разметка карточки не менялась: каждая группа получает ТУ
+          // ЖЕ сетку, поэтому раскладка не поехала.
+          <div className="space-y-8">
+            {groupByDay(filtered).map((group) => (
+              <section key={group.key}>
+                <div className="mb-3 flex items-center gap-2.5">
+                  <h2 className="text-[15px] font-extrabold text-slate-700">{group.label}</h2>
+                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold text-slate-500 shadow-sm backdrop-blur-md">
+                    {group.items.length}
+                  </span>
+                  <div className="h-px flex-1 bg-slate-200/70" />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {group.items.map((mat) => {
               const dtype = resolveType(mat);
               const Icon = TYPE_ICON[dtype];
               const isDeleting = deleting === mat.id;
@@ -1010,6 +1023,9 @@ export function TeacherMaterialsView({
                 </div>
               );
             })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </div>

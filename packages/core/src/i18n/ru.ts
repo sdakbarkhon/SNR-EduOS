@@ -168,6 +168,7 @@ export const ru: Dictionary = {
     nextReward: "До следующей награды",
     streakTitle: "Серия успехов",
     streakDays: "{n} дней подряд!",
+    streakKeepGoing: "Не разорви цепочку!",
     goalsTitle: "Ты на пути к новым вершинам!",
     goalsSubtitle: "Ещё немного, и ты получишь новую награду 🏆",
     viewGoals: "Смотреть цели",

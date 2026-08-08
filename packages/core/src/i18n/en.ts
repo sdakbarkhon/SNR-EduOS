@@ -168,6 +168,7 @@ export const en: Dictionary = {
     nextReward: "Until next reward",
     streakTitle: "Winning streak",
     streakDays: "{n} days in a row!",
+    streakKeepGoing: "Don't break the chain!",
     goalsTitle: "You're on your way to new heights!",
     goalsSubtitle: "Just a bit more and you'll earn a new reward 🏆",
     viewGoals: "View goals",

@@ -6,7 +6,7 @@ import {
   Video, FileImage, File, FolderOpen, X, CalendarDays, ChevronDown,
 } from "lucide-react";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
-import { buildFilterOptions, matchesFilters } from "@/lib/material-filters";
+import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
 import {
   filterSelectClass, withCount, FILTER_ICON, FILTER_CHEVRON, FILTER_RESET,
 } from "@/components/material-filter-styles";
@@ -397,8 +397,24 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((mat) => {
+        // 07.08.2026 — группировка по дате урока. groupByDay была написана и
+        // типизирована ещё в 4746c93, но ни один экран её не звал: обе сетки
+        // рисовали плоский список. Свежие дни сверху, внутри дня — по времени
+        // урока, записи без урока уезжают в «Общие материалы» последней
+        // группой. Разметка карточки не менялась ни на символ — каждая группа
+        // получает ТУ ЖЕ сетку, поэтому раскладка не поехала.
+        <div className="space-y-8">
+          {groupByDay(filtered).map((group) => (
+            <section key={group.key}>
+              <div className="mb-3 flex items-center gap-2.5">
+                <h2 className="text-[15px] font-extrabold text-slate-700">{group.label}</h2>
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold text-slate-500 shadow-sm backdrop-blur-md">
+                  {group.items.length}
+                </span>
+                <div className="h-px flex-1 bg-slate-200/70" />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {group.items.map((mat) => {
             const Icon = TYPE_ICON[mat._type];
             const isOpening = openingId === mat.id;
             return (
@@ -432,6 +448,9 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
               </button>
             );
           })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>
