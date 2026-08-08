@@ -1,11 +1,11 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { HelpCircle, Image as ImageIcon, Quote as QuoteIcon } from "lucide-react";
+import { Image as ImageIcon, Quote as QuoteIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "@/components/markdown-plugins";
 import { MarkdownInline } from "@/components/markdown-plugins";
-import type { LessonSlide, LessonSlideMiniQuiz } from "@snr/core";
+import type { LessonSlide } from "@snr/core";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { markdownCodeComponents } from "./markdownCode";
 import { SyntaxHighlighter, oneDark } from "./highlighter";
@@ -117,10 +117,14 @@ function SlideContent({ slide, current, total, stageImageUrl }: { slide: LessonS
   // 08.08.2026 — картинка этапа встаёт ВНУТРЬ слайда, справа от текста.
   // Раньше StageMedia рисовал её отдельным блоком НАД слайдом, и на экране
   // получались два несвязанных куска: картинка, потом отдельно слайд с
-  // текстом. Своя картинка слайда (slide.image_url, макет "split") имеет
-  // приоритет — этапную подставляем только когда у слайда своей нет.
-  // На узких экранах колонка уезжает под текст (grid-cols-1 до lg).
-  const asideImage = slide.image_url ?? stageImageUrl ?? null;
+  // текстом. На узких экранах колонка уезжает под текст (grid-cols-1 до lg).
+  //
+  // Картинка ЭТАПА рисуется только на ПЕРВОМ слайде: она одна на весь этап,
+  // а слайдов бывает шесть, и раньше одна и та же картинка повторялась на
+  // каждом — выглядело как ошибка вёрстки. Своя картинка слайда
+  // (slide.image_url, макет "split") приоритетнее и показывается на своём
+  // слайде независимо от его номера.
+  const asideImage = slide.image_url ?? (current === 0 ? stageImageUrl ?? null : null);
   return (
     <div className="w-full p-8 md:p-12">
       <div className="mb-6 flex items-center gap-3">
@@ -151,44 +155,6 @@ function SlideContent({ slide, current, total, stageImageUrl }: { slide: LessonS
             className="mx-auto max-h-[300px] w-full rounded-2xl border border-slate-200 object-contain shadow-sm dark:border-slate-700"
           />
         )}
-      </div>
-      {slide.mini_quiz && <MiniQuiz quiz={slide.mini_quiz} />}
-    </div>
-  );
-}
-
-function MiniQuiz({ quiz }: { quiz: LessonSlideMiniQuiz }) {
-  const [selected, setSelected] = useState<number | null>(null);
-
-  return (
-    <div className="mt-8 rounded-2xl border border-violet-200 bg-violet-50/60 p-6 dark:border-violet-500/30 dark:bg-violet-500/10">
-      <p className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100 md:text-lg">
-        <HelpCircle className="h-5 w-5 shrink-0 text-violet-500" />
-        <MarkdownInline text={quiz.question} />
-      </p>
-      <div className="flex flex-col gap-2">
-        {quiz.options.map((option, i) => {
-          const showState = selected !== null;
-          const isCorrect = i === quiz.correct;
-          const isSelected = selected === i;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setSelected(i)}
-              disabled={showState}
-              className={`rounded-xl border px-4 py-2.5 text-left text-sm transition md:text-base ${
-                showState && isCorrect
-                  ? "border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
-                  : showState && isSelected
-                    ? "border-rose-400 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              }`}
-            >
-              <MarkdownInline text={option} />
-            </button>
-          );
-        })}
       </div>
     </div>
   );

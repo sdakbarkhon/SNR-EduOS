@@ -252,7 +252,10 @@ async function main() {
         title_font: "fancy",
         icon,
       };
-      if (miniQuiz && si === slides.length - 1) enriched.mini_quiz = miniQuiz;
+      // 08.08.2026 — мини-опрос на последнем слайде больше не ставится:
+      // решение заказчика убрать их из презентаций совсем. Строка оставлена
+      // закомментированной как след того, откуда они брались.
+      // if (miniQuiz && si === slides.length - 1) enriched.mini_quiz = miniQuiz;
       return enriched;
     });
 

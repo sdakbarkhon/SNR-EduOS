@@ -222,12 +222,6 @@ export type LessonSlideQuote = {
 // картинок — Pollinations.ai нестабилен). Все поля опциональны и
 // добавляются ПОВЕРХ существующих (merge, не replace) — старые слайды без
 // этих полей рендерятся как раньше.
-export type LessonSlideMiniQuiz = {
-  question: string;
-  options: string[];
-  correct: number; // 0-based индекс в options
-};
-
 /** Слайд презентации (этап теории). Хранится в lesson_stages.slides (jsonb). */
 export type LessonSlide = {
   layout?: LessonSlideLayout;
@@ -240,7 +234,6 @@ export type LessonSlide = {
   background_color?: string;
   title_font?: "fancy" | "regular";
   icon?: string; // имя иконки lucide-react, напр. "BookOpen"
-  mini_quiz?: LessonSlideMiniQuiz;
 };
 
 export type LessonStageProgress = {

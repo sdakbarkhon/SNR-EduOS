@@ -134,28 +134,6 @@ function TaskStubModal({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).lesson;
 
-  const contentName = stage.content_type
-    ? {
-        presentation:   d.stageContentPresentation,
-        code:           d.stageContentCode,
-        wokwi:          d.stageContentWokwi,
-        codesandbox:    d.stageContentCodesandbox,
-        quiz_qia:       d.stageContentQuizQia,
-        quiz_kahoot:    d.stageContentQuizKahoot,
-        geogebra:       d.stageContentGeogebra,
-        phet:           d.stageContentPhet,
-        desmos:         d.stageContentDesmos,
-        blockly_games:  d.stageContentBlocklyGames,
-        visualgo:       d.stageContentVisualgo,
-        p5js:           d.stageContentP5js,
-        excalidraw:     d.stageContentExcalidraw,
-        learningapps:   d.stageContentLearningapps,
-        sqlonline:      d.stageContentSqlonline,
-        typerun:        d.stageContentTyperun,
-        scratch:        d.stageContentScratch,
-        code_completion: d.stageContentCodeCompletion,
-      }[stage.content_type] ?? stage.content_type
-    : null;
 
   const isSubmitted = !!stage.progress?.submission_data;
   const isGraded = stage.progress?.grade != null;
@@ -189,10 +167,15 @@ function TaskStubModal({
           </div>
         )}
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-          {d.stageTaskStubPrefix}
-          {contentName ? ` ${contentName}` : ""}
-        </div>
+        {/* 08.08.2026 — вместо заглушки «Здесь будет: <тип>» честный текст, и
+            только когда показывать действительно нечего. Плашка появлялась
+            ВСЕГДА, в том числе поверх нормального описания этапа, и не давала
+            ни ученику, ни учителю ничего. */}
+        {!stage.description && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+            {d.stageNoContent}
+          </div>
+        )}
 
         {isGraded && (
           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
@@ -1437,7 +1420,14 @@ export function LessonWorkspaceView({
                       <div className="mb-3">
                         <MarkdownContent text={stage.description} className="text-sm text-slate-600 dark:text-slate-300" />
                       </div>
-                    ) : null
+                    ) : (
+                      // 08.08.2026 — этап без слайдов, без файла презентации и без
+                      // описания раньше не показывал НИЧЕГО, а ниже висела кнопка
+                      // «Здесь будет: Презентация». Теперь говорим прямо.
+                      <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                        {dl.stageNoContent}
+                      </div>
+                    )
                   )}
 
 
@@ -1516,7 +1506,7 @@ export function LessonWorkspaceView({
                       ) : (
                         !isGraded && !isSubmitted && !readOnly && mounted && studentId && (
                           <StageActionButton onClick={() => setOpenTaskStageId(stage.id)}>
-                            {dl.stageTaskStubPrefix}
+                            {dl.stageOpenBtn}
                           </StageActionButton>
                         )
                       )}
