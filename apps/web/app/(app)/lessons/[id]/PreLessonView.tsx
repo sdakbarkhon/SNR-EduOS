@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Play,
@@ -100,6 +101,27 @@ export function PreLessonView({
   // duration_min), fetched separately from `lesson.stages` so we never ship
   // config/slides/quiz data to the client before the lesson actually starts.
   const [stages, setStages] = useState<LessonStagePreview[] | null>(null);
+
+  // 08.08.2026 — экран ожидания стал полноэкранным слоем через портал в body
+  // (см. развёрнутый комментарий у return). Портал нельзя строить на сервере,
+  // а ветвление "на сервере одно дерево, на клиенте другое" в этом проекте
+  // уже приводило к React #418/#310 (подробности в ScaleWrapper.tsx). Поэтому
+  // до монтирования компонент отдаёт null И на сервере, И в первом клиентском
+  // рендере — разметка совпадает, гидратация чистая, слой появляется кадром
+  // позже. Данные экрана всё равно клиентские (часы, план этапов).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Пока слой открыт, страница под ним скроллиться не должна — тот же приём,
+  // что в SlideViewer. Трогаем именно overflowY, а не сокращение overflow:
+  // ScaleWrapper на вьюпортах шире 1920px держит собственный overflowX:hidden
+  // на body, и восстановление сокращения снесло бы его (его эффект на наш
+  // размонтаж не пересрабатывает — зависимости другие).
+  useEffect(() => {
+    const prev = document.body.style.overflowY;
+    document.body.style.overflowY = "hidden";
+    return () => { document.body.style.overflowY = prev; };
+  }, []);
 
   useEffect(() => {
     // createClient() must run only in the browser (accesses document.cookie)
@@ -311,41 +333,46 @@ export function PreLessonView({
     ? dl.planStagesSummary.replace("{count}", String((stages ?? []).length)).replace("{minutes}", String(totalStageMinutes))
     : dl.planStagesSummaryNoDuration.replace("{count}", String((stages ?? []).length));
 
-  return (
-    // Раньше этот экран рендерился в fullscreen-режиме AppShell (без каркаса),
-    // min-h-screen там был к месту. Теперь (fix isFullscreenLesson — только
-    // in_progress, см. fullscreen-lesson-context.tsx) PreLessonView рендерится
-    // ВНУТРИ обычного каркаса (сайдбар/топбар/паддинги), как остальные
-    // страницы ученика — min-h-screen здесь задваивал бы высоту (100vh
-    // экрана поверх уже занятой топбаром) и создавал лишний скролл;
-    // rounded-2xl — карточка в каркасе.
-    //
-    // 07.08.2026: было min-h-[600px] — на обычных мониторах карточка
-    // заканчивалась заметно выше нижней кромки и под ней оставалась пустая
-    // полоса. Теперь высота считается от вьюпорта за вычетом паддингов
-    // каркаса и топбара (замерено: 152px при 900px вьюпорта), то есть экран урока
-    // действительно занимает экран. min-h, а не h: на коротком вьюпорте
-    // содержимое (план урока из многих этапов) по-прежнему может быть выше и
-    // прокрутится в <main>, а не обрежется.
-    // 08.08.2026 — ширина и лишняя прокрутка.
-    // Правка e629b1e ширину ЭТОГО экрана не чинила: она сняла max-w-[1600px]
-    // в LessonView, а до той строки дело не доходит — при status="scheduled"
-    // LessonView возвращает PreLessonView РАНЬШЕ. Карточка и до, и после
-    // была w-full, менять было нечего.
-    // Полоса справа складывалась из двух вещей: у правой колонки AppShell
-    // паддинг был несимметричным (24px слева против 30px справа) и <main> с
-    // overflow-y-auto рисовал полосу прокрутки ВНУТРИ своей ширины, отъедая
-    // ещё ~15px. Паддинг выровнен в AppShell, а прокрутка убрана здесь:
-    // 10rem были заниженной оценкой высоты каркаса — реально он занимает
-    // ~156px без демо-баннера и ~196px с ним, то есть карточка была ВЫШЕ
-    // доступного места и main прокручивался всегда. 13rem (208px) покрывают
-    // худший случай. Дубль той же высоты на внутренней сетке снят — минимум
-    // задаёт карточка.
-    <div className="relative min-h-[calc(100vh-13rem)] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
-      {/* Back link */}
+  // 08.08.2026 — НАСТОЯЩИЙ полноэкранный режим.
+  //
+  // Предыдущие два захода (e629b1e, 11e9cb9) требование поняли неверно: они
+  // растягивали КАРТОЧКУ внутри области контента — сначала сняв max-w в
+  // LessonView, потом подгоняя min-h под высоту каркаса. Карточка при этом
+  // оставалась внутри сайдбара, топбара и <main> с прокруткой, то есть
+  // «на весь экран» она не становилась в принципе, сколько ни считай отступы.
+  //
+  // Приём взят у полноэкранной презентации (SlideViewer.tsx, e629b1e):
+  // портал в <body> плюс fixed inset-0 z-[9999]. Портал здесь обязателен, а не
+  // косметика — у предков есть и overflow-hidden, и собственные
+  // stacking-контексты, из-под них никакой z-index карточку не поднимет.
+  // z-[9999] выбран не наугад: он перекрывает всё, что позиционируется
+  // отдельно от потока — LessonStartBanner (z-[9998]), DemoBanner (z-[100]),
+  // кнопку помощника (z-40/z-50). Сайдбар, топбар и BottomNav лежат в потоке
+  // и накрываются самим слоем.
+  //
+  // Каркас AppShell НЕ переключается в свой fullscreen-режим
+  // (useRegisterFullscreenLesson): тот задуман для живого урока
+  // (fullscreen-lesson-context.tsx), меняет дерево целиком и к экрану ожидания
+  // отношения не имеет. Слоя поверх достаточно, а дерево страницы остаётся
+  // нетронутым.
+  //
+  // overflow-y-auto на самом слое, а не overflow-hidden: план урока из многих
+  // этапов на коротком вьюпорте выше 100vh, и без прокрутки внутри слоя кнопка
+  // «Начать урок» оказалась бы недостижимой. Прокрутка страницы при этом
+  // заблокирована эффектом выше — скроллится только содержимое слоя.
+  //
+  // Ученика здесь НЕ запираем (в отличие от презентации, d8162ad): «Назад к
+  // расписанию» — обычная ссылка, работает всегда и без удержания.
+  const body = (
+    <div className="fixed inset-0 z-[9999] overflow-y-auto overflow-x-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
+      {/* Единственный выход со слоя, поэтому fixed, а не absolute: слой
+          прокручивается внутри себя, и absolute-кнопка уехала бы вверх вместе
+          с содержимым на коротком вьюпорте. Портал лежит в body, вне
+          ScaleWrapper, так что трансформированного предка над ней нет и fixed
+          привязывается к вьюпорту на любой ширине. */}
       <Link
         href="/schedule"
-        className="absolute left-6 top-6 z-10 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white/80 backdrop-blur-md transition hover:bg-white/20"
+        className="fixed left-6 top-6 z-10 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white/80 backdrop-blur-md transition hover:bg-white/20"
       >
         <ChevronLeft className="h-4 w-4" />
         {dl.back}
@@ -592,4 +619,9 @@ export function PreLessonView({
       )}
     </div>
   );
+
+  // До монтирования — null и на сервере, и в первом клиентском рендере, иначе
+  // деревья разойдутся (см. комментарий к `mounted`).
+  if (!mounted) return null;
+  return createPortal(body, document.body);
 }
