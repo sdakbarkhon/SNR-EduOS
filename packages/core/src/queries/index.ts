@@ -3150,6 +3150,18 @@ export const addLessonStage = async (
       body: JSON.stringify({ stageId: (data as LessonStage).id }),
       keepalive: true,
     }).catch(() => {});
+
+    // 08.08.2026 — тем же приёмом разбирается очередь эмбеддингов для
+    // помощника ИИ. Раньше это делал крон /api/cron/rag-process-queue, снятый
+    // вместе с ещё двумя: бесплатный тариф Vercel даёт два крона на проект, а
+    // их было пять. Событие покрывает НОВЫЕ этапы; накопившиеся 424 записи
+    // старой очереди этим не разгребаются — это отдельная разовая задача.
+    fetch("/api/rag/process-stage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stageId: (data as LessonStage).id }),
+      keepalive: true,
+    }).catch(() => {});
   }
 
   return data as LessonStage;

@@ -5,7 +5,19 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["GEMINI_API_KEY"]
+      // 08.08.2026 — сборка предупреждала на каждый прогон, что эти
+      // переменные используются кодом, но turbo их не пробрасывает.
+      // SUPABASE_SERVICE_ROLE_KEY нужен createAdminClient (lib/supabase/
+      // admin.ts) — на нём работают все server actions с сервисным доступом,
+      // включая восстановление формы уроков при входе в демо.
+      // CRON_SECRET проверяет роут крона. ANTHROPIC_API_KEY из того же
+      // предупреждения НЕ добавлен намеренно: проект на Gemini, ключ Anthropic
+      // нигде не читается.
+      "env": [
+        "GEMINI_API_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "CRON_SECRET"
+      ]
     },
     "lint": {
       "dependsOn": ["^build"]

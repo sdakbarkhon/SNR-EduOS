@@ -1,7 +1,26 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "// ПУТИ": [
+    "Root Directory проекта на Vercel = apps/web, и ВСЕ пути здесь считаются",
+    "от неё. Отсюда падение деплоя 11e9cb9: файл появился, путей в нём не было,",
+    "Vercel взял их из настроек проекта (outputDirectory 'apps/web/.next',",
+    "написанный когда-то от корня монорепо) и получил",
+    "apps/web/apps/web/.next — 'output directory was not found'.",
+    "Ровно этот же набор из трёх полей работает у соседнего apps/h5p."
+  ],
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=web",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory": ".next",
+
+  "// КРОНЫ": [
+    "Тариф hobby разрешает ДВА крона на проект. Осталcя один:",
+    "restore-demo-lesson-shape — подстраховка к восстановлению формы уроков,",
+    "основное восстановление идёт при входе в демо (demoLogin, 11e9cb9).",
+    "Остальные четыре сняты 08.08.2026 по решению заказчика и переведены на",
+    "события/кнопки — см. resheniya_2.md."
+  ],
   "crons": [
-    { "path": "/api/cron/close-past-lessons", "schedule": "0 19 * * *" },
     { "path": "/api/cron/restore-demo-lesson-shape", "schedule": "15 19 * * *" }
   ]
 }
