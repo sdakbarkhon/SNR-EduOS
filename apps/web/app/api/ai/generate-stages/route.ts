@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
+import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
 
 // Hard cap on Imagen calls per generation (keeps us within maxDuration).
 const MAX_SLIDE_IMAGES = 6;
@@ -15,11 +16,22 @@ const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
   "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
+  // 08.08.2026 — Scratch как практика для младших. В промпте он предлагается
+  // для 1-5 классов; без него в этом списке нормализация молча подменила бы
+  // тип на presentation, то есть ровно на то, что мы и чиним.
+  "scratch",
 ];
 const EXTERNAL = [
   "wokwi", "codesandbox",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
+  "scratch",
 ];
+
+/** Scratch и Blockly как тип этапа — только младшим классам (то же правило,
+ *  что в форме учителя, см. lib/group-grade.ts). Для старших модель иногда
+ *  предлагает их «за компанию»; вместо отклонения всего плана переводим этап
+ *  в code — деятельностный характер сохраняется, а это и было целью. */
+const JUNIOR_ONLY_CONTENT = new Set(["scratch", "blockly_games"]);
 
 type AttachedMaterial = { title: string; text: string };
 
@@ -111,12 +123,6 @@ interface GenResult {
   recommendedSearches?: string[];
   classGrade?: number;
   notes?: string;
-}
-
-function gradeFromGroupName(name: string | null | undefined, fallback: number): number {
-  const m = (name ?? "").match(/(\d{1,2})/);
-  const g = m ? parseInt(m[1]!, 10) : NaN;
-  return Number.isFinite(g) && g >= 1 && g <= 12 ? g : fallback;
 }
 
 /** 07.08.2026 — почти-попадания Gemini по content_type. Раньше любое из них
@@ -251,7 +257,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const grade = gradeFromGroupName(group.name, body.grade ?? 7);
+  const grade = gradeFromGroupName(group.name) ?? body.grade ?? 7;
   const subject = group.subject ?? "—";
   const durationMin = Math.max(5, Math.min(240, body.duration_min ?? 45));
   const overallDifficulty = ["easy", "medium", "hard"].includes(body.overall_difficulty ?? "")
@@ -344,7 +350,12 @@ export async function POST(req: NextRequest) {
     const rawStages = Array.isArray(parsed.stages) ? parsed.stages : [];
     const stages = rawStages
       .map((s) => normalizeStage(s, overallDifficulty))
-      .filter((s): s is GenStage => s !== null);
+      .filter((s): s is GenStage => s !== null)
+      .map((st) =>
+        JUNIOR_ONLY_CONTENT.has(st.content_type ?? "") && grade > JUNIOR_GRADE_MAX
+          ? { ...st, content_type: "code" }
+          : st,
+      );
     if (stages.length === 0) {
       lastError = "Generated stages failed validation";
       continue;
@@ -359,12 +370,36 @@ export async function POST(req: NextRequest) {
     const hasQuiz = stages.some((s) => s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot");
     const distinctTypes = new Set(stages.map((s) => s.content_type)).size;
     const needQuiz = durationMin >= 20;
-    if (attempt < 2 && ((needQuiz && !hasQuiz) || distinctTypes < 2)) {
+
+    // 08.08.2026 — тип этапа обязан соответствовать его РОЛИ. Модель ставила
+    // "presentation" этапам с названием «Практическая работа»: на живых данных
+    // так вышло у 107 этапов из 126 уроков. Ученик открывал практику и видел
+    // слайды, а если слайдов не сгенерилось — пустой этап.
+    //
+    // Проверяем две вещи, обе однозначные и не требующие догадок:
+    //   1) презентация без слайдов — показывать нечего;
+    //   2) этап, названный практикой/заданием, с типом "presentation" —
+    //      деятельность подменена показом.
+    // Правило про квиз рядом (07.08.2026) устроено так же: текст в промпте без
+    // проверки на выходе не работает, модель его игнорирует.
+    const PRACTICE_TITLE = /практич|практика|задани|упражнен|лаборатор/i;
+    const emptyPresentations = stages.filter(
+      (s) => s.content_type === "presentation" && (!Array.isArray(s.slides) || s.slides.length === 0),
+    );
+    const practiceAsPresentation = stages.filter(
+      (s) => s.content_type === "presentation" && PRACTICE_TITLE.test(s.title ?? ""),
+    );
+
+    if (
+      attempt < 2 &&
+      ((needQuiz && !hasQuiz) || distinctTypes < 2 || emptyPresentations.length > 0 || practiceAsPresentation.length > 0)
+    ) {
       console.warn(
-        `[ai-generate] attempt ${attempt}: план отклонён — квиз=${hasQuiz}, разных типов=${distinctTypes};`,
+        `[ai-generate] attempt ${attempt}: план отклонён — квиз=${hasQuiz}, разных типов=${distinctTypes},`,
+        `презентаций без слайдов=${emptyPresentations.length}, практик как презентация=${practiceAsPresentation.length};`,
         "типы:", stages.map((s) => s.content_type).join(","),
       );
-      lastError = "Plan has no quiz stage or too little variety";
+      lastError = "Plan rejected: missing quiz, too little variety, slideless presentation or practice typed as presentation";
       continue;
     }
     result = {
