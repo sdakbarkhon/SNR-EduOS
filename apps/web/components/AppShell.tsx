@@ -87,7 +87,7 @@ export function AppShell({
           className={cn(
             isFullscreenLesson
               ? "contents"
-              : "relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:pl-[24px] md:pr-[30px]",
+              : "relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden py-3 pl-3 pr-3 md:gap-6 md:py-[26px] md:px-[24px]",
           )}
         >
           {!isFullscreenLesson && (

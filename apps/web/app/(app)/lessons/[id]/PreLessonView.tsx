@@ -327,7 +327,21 @@ export function PreLessonView({
     // действительно занимает экран. min-h, а не h: на коротком вьюпорте
     // содержимое (план урока из многих этапов) по-прежнему может быть выше и
     // прокрутится в <main>, а не обрежется.
-    <div className="relative min-h-[calc(100vh-10rem)] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
+    // 08.08.2026 — ширина и лишняя прокрутка.
+    // Правка e629b1e ширину ЭТОГО экрана не чинила: она сняла max-w-[1600px]
+    // в LessonView, а до той строки дело не доходит — при status="scheduled"
+    // LessonView возвращает PreLessonView РАНЬШЕ. Карточка и до, и после
+    // была w-full, менять было нечего.
+    // Полоса справа складывалась из двух вещей: у правой колонки AppShell
+    // паддинг был несимметричным (24px слева против 30px справа) и <main> с
+    // overflow-y-auto рисовал полосу прокрутки ВНУТРИ своей ширины, отъедая
+    // ещё ~15px. Паддинг выровнен в AppShell, а прокрутка убрана здесь:
+    // 10rem были заниженной оценкой высоты каркаса — реально он занимает
+    // ~156px без демо-баннера и ~196px с ним, то есть карточка была ВЫШЕ
+    // доступного места и main прокручивался всегда. 13rem (208px) покрывают
+    // худший случай. Дубль той же высоты на внутренней сетке снят — минимум
+    // задаёт карточка.
+    <div className="relative min-h-[calc(100vh-13rem)] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 text-white">
       {/* Back link */}
       <Link
         href="/schedule"
@@ -338,7 +352,7 @@ export function PreLessonView({
       </Link>
 
       {/* 2-column grid */}
-      <div className="grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
+      <div className="grid grid-cols-1 gap-10 px-6 pb-16 pt-24 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-16 lg:py-16">
 
         {/* LEFT: Info */}
         <div className="flex flex-col">

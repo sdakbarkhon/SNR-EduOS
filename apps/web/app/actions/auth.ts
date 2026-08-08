@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { signInWithUsername } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { restoreDemoLessonShape } from "@/app/api/cron/_lib/restore-demo-shape";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 import { registerSession } from "@/lib/register-session";
 import { getDemoNow } from "@/lib/demo-date";
@@ -167,6 +168,31 @@ export async function demoLogin(
     userId: data.user.id,
     accessToken: data.session.access_token,
   });
+
+  // 08.08.2026 — ЭТАЛОННАЯ ФОРМА УРОКОВ ВОССТАНАВЛИВАЕТСЯ ЗДЕСЬ, при входе в
+  // демо. Это основная защита; ночной крон — только подстраховка.
+  //
+  // Почему не крон. Форма расползается закономерно, а не от поломки: чтобы
+  // показать «начать урок вручную», посетитель стартует 3-й слот, и триггер
+  // trg_close_other_in_progress_lessons честно закрывает 2-й. То есть демо
+  // САМО ломает форму — вопрос лишь в том, как быстро она вернётся. Раз в
+  // сутки для этого мало: заказчик показывает клиентам среди дня.
+  //
+  // Почему именно вход. Это единственный момент, когда форма ТОЧНО должна
+  // быть эталонной, и он же — начало каждого показа. Восстановление на
+  // рендере расписания пришлось бы делать записью во время GET; запрет
+  // ученику завершать урок убил бы саму демонстрируемую функцию.
+  //
+  // Ошибку глушим намеренно: невозможность починить демо-данные не повод не
+  // пустить человека в демо.
+  try {
+    const res = await restoreDemoLessonShape(admin);
+    if (res.changed > 0) {
+      console.log(`[demoLogin] форма уроков восстановлена: ${res.changed} правок`, res.byPhase);
+    }
+  } catch (e) {
+    console.error("[demoLogin] restoreDemoLessonShape failed:", (e as Error)?.message ?? e);
+  }
 
   // 3) ставим демо-cookie с session_token — используется useIsDemoSession,
   // DemoBanner, DemoHeartbeat и endpoint'ами heartbeat/release.
