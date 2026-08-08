@@ -88,6 +88,21 @@ const LIB_ALLOWED_MIME = [
 ];
 const LIB_MAX_SIZE = 52428800; // 50 МБ — совпадает с лимитом бакета "materials"
 
+/** MIME книги по расширению файла. Миграция 175 разрешила в бакете books не
+ *  только PDF, поэтому прежний хардкод «application/pdf» стал бы враньём:
+ *  прикреплённый к уроку .mp4 или .docx приехал бы туда как PDF. */
+function bookMimeOf(storagePath: string): string {
+  const ext = (storagePath.split(".").pop() ?? "").toLowerCase();
+  if (ext === "mp4") return "video/mp4";
+  if (ext === "docx") return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (ext === "pptx") return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  if (ext === "xlsx") return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  return "application/pdf";
+}
+
 function formatLibSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
@@ -372,21 +387,17 @@ export function LibraryVideoLinkModal({
     if (!urlInput.trim()) { setError(dt.libraryErrVideoUrlRequired); return; }
     const p = parseVideoUrl(urlInput.trim());
     if (!p) { setError(dt.libraryErrVideoUrlInvalid); return; }
-    // 07.08.2026 — прямая .mp4-ссылка сюда не проходит, и это НЕ забытая
-    // ветка. parseVideoUrl отдаёт для неё platform "mp4", а тернарник ниже
-    // знает только youtube/rutube — то есть .mp4-ссылка молча сохранялась
-    // как content_type='video_rutube' с mp4-адресом в external_url. Ошибки
-    // не возникало: CHECK teacher_library_materials_content_shape_chk
-    // проверяет только «оба url не пусты». Хранить её честно негде — у
-    // ветки video_mp4 в том же CHECK обязателен storage_path, то есть
-    // загруженный файл. Поэтому явный отказ с подсказкой загрузить файлом.
-    if (p.platform === "mp4") { setError(dt.libraryErrVideoMp4Link); return; }
-
     setError(null);
     setSaving(true);
     try {
       await createLibraryMaterial(createClient(), {
-        contentType: p.platform === "youtube" ? "video_youtube" : "video_rutube",
+        // Миграция 175 — прямая .mp4-ссылка наконец сохраняется. До неё ветка
+        // video_mp4 в CHECK требовала storage_path, и .mp4-ссылку хранить было
+        // негде: сначала она молча ложилась как video_rutube (порча данных),
+        // потом честно отклонялась (4fe7585). Теперь у неё свой честный вид.
+        contentType:
+          p.platform === "youtube" ? "video_youtube" :
+          p.platform === "rutube" ? "video_rutube" : "video_mp4",
         title: title.trim(),
         externalUrl: p.embedUrl,
         sourceUrl: urlInput.trim(),
@@ -686,7 +697,12 @@ export function KnowledgeBaseFilePicker({
     [materials, query],
   );
   const filteredBooks = useMemo(
-    () => books.filter((b) => b.title.toLowerCase().includes(query.toLowerCase())),
+    // Миграция 175 — в «Библиотеке» появились книги-видеоссылки без файла в
+    // Storage. Этот пикер прикрепляет материалы к УРОКУ/ЗАДАНИЮ, а туда
+    // кладётся storagePath — у ссылки его нет, и прикреплённая строка вела бы
+    // в никуда. Поэтому книги-ссылки здесь не показываем: ограничение пикера,
+    // а не вкладки (в самой Библиотеке они видны и играют).
+    () => books.filter((b) => !!b.file_storage_path && b.title.toLowerCase().includes(query.toLowerCase())),
     [books, query],
   );
   const filteredLibraryFiles = useMemo(
@@ -727,7 +743,11 @@ export function KnowledgeBaseFilePicker({
           key: `book:${b.id}`,
           title: b.title,
           hasLink: false,
-          picked: { source: "book", id: b.id, title: b.title, storagePath: b.file_storage_path, fileType: "application/pdf", sizeBytes: b.file_size_bytes },
+          // storagePath уже гарантированно не null — filteredBooks отсеял
+          // книги-ссылки выше. fileType больше не захардкожен «application/pdf»:
+          // миграция 175 разрешила в бакете books документы, картинки и .mp4,
+          // и врать о типе прикрепляемого файла теперь нельзя.
+          picked: { source: "book", id: b.id, title: b.title, storagePath: b.file_storage_path!, fileType: bookMimeOf(b.file_storage_path!), sizeBytes: b.file_size_bytes },
         }))
       : tab === "teacherLibrary"
       ? filteredLibraryFiles.map((m) => ({

@@ -190,6 +190,10 @@ export function AiGenerateStagesModal({
       .from("books")
       .select("id, title, file_storage_path, file_size_bytes")
       .eq("subject", slug)
+      // Миграция 175 — в «Библиотеке» появились книги-видеоссылки без файла.
+      // Сюда идёт storagePath, поэтому берём только книги-файлы: иначе к уроку
+      // молча прикрепился бы материал с пустым путём.
+      .not("file_storage_path", "is", null)
       .order("created_at", { ascending: true })
       .limit(3);
     if (!books?.length) return;

@@ -112,7 +112,13 @@ export type CreateLibraryMaterialInput =
       // стороне apps/web/lib/video-url.ts — парсинг URL сюда не тащим, тем
       // же принципом, что addLessonMaterialVideo в index.ts). sourceUrl —
       // то, что вставил учитель, для показа "откуда" видео.
-      contentType: "video_youtube" | "video_rutube";
+      // Миграция 175 — сюда добавился video_mp4: ПРЯМАЯ .mp4-ссылка (не
+      // загруженный файл, тот ниже). Раньше ветка video_mp4 в CHECK требовала
+      // storage_path, поэтому такую ссылку сохранить было нельзя — и до
+      // 4fe7585 она молча ложилась как video_rutube. Теперь video_mp4 значит
+      // «mp4 либо файлом, либо ссылкой», а какой это случай — видно по тому,
+      // заполнен storage_path или external_url.
+      contentType: "video_youtube" | "video_rutube" | "video_mp4";
       title: string;
       externalUrl: string;
       sourceUrl: string;

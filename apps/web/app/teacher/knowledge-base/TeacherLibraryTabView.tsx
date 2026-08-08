@@ -233,9 +233,14 @@ export function TeacherLibraryTabView({
       return;
     }
     if (m.content_type === "video_mp4") {
-      if (!m.url) { setError(dt.libraryErrUploadFailed); return; }
+      // Миграция 175 — video_mp4 теперь бывает двух видов: загруженный файл
+      // (есть storage_path, getLibraryMaterials подписал его в m.url) и
+      // прямая ссылка (storage_path пуст, подписывать нечего — адрес лежит в
+      // external_url). Плеер один и тот же.
+      const url = m.url ?? m.external_url;
+      if (!url) { setError(dt.libraryErrUploadFailed); return; }
       setSelectedId(null);
-      setVideoPlayer({ url: m.url, title: m.title });
+      setVideoPlayer({ url, title: m.title });
       return;
     }
     if (!m.url) { setError(dt.libraryErrUploadFailed); return; }

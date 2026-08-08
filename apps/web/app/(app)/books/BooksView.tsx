@@ -362,7 +362,10 @@ export function BooksView({
         if (!url) { setToast("Не удалось получить ссылку на файл"); return; }
         const book = books.find((b) => b.id === bookId);
         if (!book) return;
-        const fileName = book.file_storage_path.split("/").pop() || "book.pdf";
+        // Миграция 175 — у книги-видеоссылки файла нет. Имя нужно только
+        // классификатору просмотрщика (он смотрит и на имя, и на путь url);
+        // для ссылки его роль берёт на себя сам url.
+        const fileName = book.file_storage_path?.split("/").pop() || book.title;
         setSelectedBookId(null);
         setViewerBook({ url, title: book.title, fileName });
       } catch {

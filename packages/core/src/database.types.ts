@@ -461,8 +461,9 @@ export type Database = {
           cover_storage_path: string | null
           created_at: string
           description: string | null
+          external_url: string | null
           file_size_bytes: number | null
-          file_storage_path: string
+          file_storage_path: string | null
           id: string
           school_id: string
           subject: string
@@ -475,8 +476,9 @@ export type Database = {
           cover_storage_path?: string | null
           created_at?: string
           description?: string | null
+          external_url?: string | null
           file_size_bytes?: number | null
-          file_storage_path: string
+          file_storage_path?: string | null
           id?: string
           school_id?: string
           subject: string
@@ -489,8 +491,9 @@ export type Database = {
           cover_storage_path?: string | null
           created_at?: string
           description?: string | null
+          external_url?: string | null
           file_size_bytes?: number | null
-          file_storage_path?: string
+          file_storage_path?: string | null
           id?: string
           school_id?: string
           subject?: string

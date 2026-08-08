@@ -1048,8 +1048,14 @@ export type Book = {
   book_type: BookType;
   description: string | null;
   cover_storage_path: string | null;
-  file_storage_path: string;
+  /** Миграция 175 — стал nullable: у книги-видеоссылки файла в Storage нет.
+   *  CHECK books_content_shape_chk гарантирует «либо файл, либо ссылка». */
+  file_storage_path: string | null;
   file_size_bytes: number | null;
+  /** Миграция 175 — видео-ссылка вместо файла (YouTube/RuTube/прямой .mp4).
+   *  Отдельной колонки content_type здесь нет намеренно: тип определяется
+   *  общим классификатором по url/расширению (lib/material-kind.ts). */
+  external_url: string | null;
   uploaded_by: string | null;
   created_at: string;
 };

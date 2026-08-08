@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  BookOpen, Plus, MoreHorizontal, Trash2, X, Upload, Check, Library, Search,
+  BookOpen, Plus, MoreHorizontal, Trash2, X, Upload, Check, Library, Search, Video,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertBook, getSubjectStyle, subjects as subjectConfig } from "@snr/core";
@@ -11,6 +11,7 @@ import { getBookFileUrl, deleteBook as deleteBookAction } from "@/app/actions/bo
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
+import { parseVideoUrl } from "@/lib/video-url";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -196,6 +197,145 @@ function Toast({ msg, onClose }: { msg: string; onClose: () => void }) {
   );
 }
 
+// ── Book video link modal ─────────────────────────────────────────────
+//
+// 07.08.2026, миграция 175 — «Библиотека» принимала ТОЛЬКО PDF и только
+// файлом: форма стояла на accept=".pdf", а бакет books в allowed_mime_types
+// держал pdf/jpeg/png/webp, то есть видео отвергал сам Storage. Теперь
+// вкладка умеет то же, что остальные: файл (документы, картинки, .mp4) и
+// видео-ссылку.
+//
+// Ссылка живёт в books.external_url, файла у такой строки нет — CHECK
+// books_content_shape_chk требует ровно одно из двух. Отдельной колонки
+// content_type здесь нет намеренно: тип определяется общим классификатором
+// по url/расширению (lib/material-kind.ts), тем же, что и везде.
+function BookVideoLinkModal({
+  teacherId,
+  onClose,
+  onSuccess,
+}: {
+  teacherId: string;
+  onClose: () => void;
+  onSuccess: (title: string) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [subject, setSubject] = useState<string>(BOOK_SUBJECT_KEYS[0]);
+  const [bookType, setBookType] = useState<typeof BOOK_TYPES[number]>("Учебник");
+  const [description, setDescription] = useState("");
+  const [url, setUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError("Введите название"); return; }
+    const parsed = parseVideoUrl(url.trim());
+    if (!parsed) { setError("Ссылка не распознана — поддерживаются YouTube, RuTube и прямые .mp4"); return; }
+    if (!teacherId) { setError("Не удалось определить учителя — обновите страницу"); return; }
+
+    setError(null);
+    setSaving(true);
+    try {
+      await insertBook(createClient(), {
+        title: title.trim(),
+        author: author.trim() || null,
+        subject,
+        book_type: bookType,
+        description: description.trim() || null,
+        cover_storage_path: null,
+        // Файловых полей нет — это и есть «ссылка вместо файла».
+        external_url: parsed.embedUrl,
+        uploaded_by: teacherId,
+      });
+      onSuccess(title.trim());
+    } catch (err) {
+      console.error("[books] video link error:", err);
+      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+      setSaving(false);
+    }
+  }
+
+  const field = "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/40 bg-white/90 p-8 shadow-2xl backdrop-blur-xl">
+        <button
+          onClick={onClose}
+          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить видео-ссылку</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Название <span className="text-red-500">*</span>
+            </label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder="Например: Видеокурс по алгоритмам" disabled={saving} className={field} />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Автор</label>
+            <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Необязательно" disabled={saving} className={field} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Предмет</label>
+              <select value={subject} onChange={(e) => setSubject(e.target.value)} disabled={saving} className={field}>
+                {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Тип</label>
+              <select value={bookType} onChange={(e) => setBookType(e.target.value as typeof BOOK_TYPES[number])}
+                disabled={saving} className={field}>
+                {BOOK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Краткое описание (необязательно)" rows={2} disabled={saving}
+              className={`${field} resize-none`} />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Ссылка на видео <span className="text-red-500">*</span>
+            </label>
+            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://youtu.be/… , https://rutube.ru/video/… или прямая .mp4"
+              disabled={saving} className={field} />
+            <p className="mt-1.5 text-xs text-slate-500">YouTube, RuTube или прямая ссылка на .mp4</p>
+          </div>
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} disabled={saving}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">
+              Отмена
+            </button>
+            <button type="submit" disabled={saving || !title.trim() || !url.trim()}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60">
+              {saving ? "Сохраняем…" : "Добавить"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Success Modal ─────────────────────────────────────────────────────
 
 function SuccessModal({
@@ -286,7 +426,7 @@ function UploadModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError("Введите название"); return; }
-    if (!pdfFile) { setError("Прикрепите PDF-файл"); return; }
+    if (!pdfFile) { setError("Прикрепите файл"); return; }
     if (pdfFile.size > 52428800) { setError("Файл слишком большой (макс 50 МБ)"); return; }
     if (!teacherId) { setError("Не удалось определить учителя — обновите страницу"); return; }
 
@@ -303,9 +443,12 @@ function UploadModal({
       const ramp = setInterval(() => setProgress((p) => Math.min(p + 4, 80)), 300);
 
       // Upload PDF
+      // Миграция 175 — бакет books принимает не только PDF, поэтому тип
+      // берём у самого файла, а не подставляем «application/pdf» вслепую:
+      // иначе Storage записал бы .mp4 с PDF-заголовком и плеер бы его не взял.
       const { error: pdfErr } = await sb.storage
         .from("books")
-        .upload(pdfPath, pdfFile, { contentType: "application/pdf", upsert: false });
+        .upload(pdfPath, pdfFile, { contentType: pdfFile.type || undefined, upsert: false });
       if (pdfErr) throw pdfErr;
 
       setProgress(82);
@@ -452,14 +595,14 @@ function UploadModal({
                   <p className="text-sm text-slate-600">
                     Перетащите PDF или <span className="text-blue-600 underline">выберите</span>
                   </p>
-                  <p className="text-xs text-slate-400">Только PDF — макс. 50 МБ</p>
+                  <p className="text-xs text-slate-400">PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 — макс. 50 МБ</p>
                 </>
               )}
             </div>
             <input
               ref={pdfRef}
               type="file"
-              accept=".pdf,application/pdf"
+              accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp,.mp4"
               className="hidden"
               onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
             />
@@ -547,6 +690,7 @@ export function TeacherBooksView({
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
   const [showUpload, setShowUpload] = useState(false);
+  const [showVideoLink, setShowVideoLink] = useState(false);
   const [successTitle, setSuccessTitle] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -594,7 +738,8 @@ export function TeacherBooksView({
       if (!book) return;
       const url = await getBookFileUrl(bookId);
       if (!url) { setToast("Не удалось получить ссылку"); return; }
-      const fileName = book.file_storage_path.split("/").pop() || "book.pdf";
+      // Миграция 175 — у книги-видеоссылки файла нет (см. BooksView).
+      const fileName = book.file_storage_path?.split("/").pop() || book.title;
       setSelectedBookId(null);
       setViewerBook({ url, title: book.title, fileName });
     } catch {
@@ -679,19 +824,37 @@ export function TeacherBooksView({
           onSuccess={handleUploadSuccess}
         />
       )}
+      {showVideoLink && (
+        <BookVideoLinkModal
+          teacherId={initialTeacherId}
+          onClose={() => setShowVideoLink(false)}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
 
       <div className="text-slate-800">
         {/* Header — omitted when hosted under the Knowledge Base tab
             switcher (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2). */}
         <div className="mb-6 flex items-center justify-between">
           {!hideHeading && <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">Библиотека</h1>}
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            Добавить книгу
-          </button>
+          {/* Две кнопки — как у «Материалов группы» и «Материалов кафедры».
+              Одинаковый набор возможностей во всех вкладках Базы знаний. */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowVideoLink(true)}
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
+            >
+              <Video className="h-4 w-4" />
+              Видео-ссылка
+            </button>
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить книгу
+            </button>
+          </div>
         </div>
 
         {/* Search + filter */}

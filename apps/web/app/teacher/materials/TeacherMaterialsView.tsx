@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { SlidesViewerModal } from "@/components/SlidesViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
-import { isVideoUrl } from "@/lib/video-url";
+import { isVideoUrl, parseVideoUrl } from "@/lib/video-url";
 
 // ── File type helpers (same as student view) ──────────────────────────
 
@@ -326,6 +326,173 @@ function UploadModal({
   );
 }
 
+// ── Video link modal ──────────────────────────────────────────────────
+//
+// 07.08.2026 — «Материалы группы» научились принимать видео-ССЫЛКУ, а не
+// только файл. Раньше формы не было вовсе, и — что важнее — `link_url` не
+// писала НИ ОДНА строка кода в проекте: все обращения были на чтение,
+// единственным писателем была SQL-функция автопубликации из миграции 174.
+// Поэтому до ученика, который видит только эту вкладку, видео по ссылке не
+// доходило в принципе.
+//
+// Миграция для этого не понадобилась: CHECK-ограничений на course_materials
+// нет вовсе, link_url есть с первой миграции, storage_path и так nullable.
+// Барьер был чисто типовой — в insertMaterial файловые поля были
+// обязательными.
+//
+// Вид намеренно повторяет UploadModal рядом и LibraryVideoLinkModal у
+// «Материалов кафедры»: те же поля, тот же порядок, те же классы — чтобы
+// вкладки отличались доступом, а не формами.
+function VideoLinkModal({
+  groups,
+  teacherId,
+  onClose,
+  onSuccess,
+}: {
+  groups: TeacherGroup[];
+  teacherId: string;
+  onClose: () => void;
+  onSuccess: (info: { title: string; groupName: string }) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [groupId, setGroupId] = useState(groups[0]?.id ?? "");
+  const [url, setUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedGroup = groups.find((g) => g.id === groupId);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError("Введите название"); return; }
+    if (!groupId) { setError("Выберите группу"); return; }
+    const parsed = parseVideoUrl(url.trim());
+    if (!parsed) { setError("Ссылка не распознана — поддерживаются YouTube, RuTube и прямые .mp4"); return; }
+    if (!teacherId) { setError("Не удалось определить учителя — обновите страницу"); return; }
+
+    setError(null);
+    setSaving(true);
+    try {
+      await insertMaterial(createClient(), {
+        group_id: groupId,
+        title: title.trim(),
+        description: description.trim() || null,
+        subject: selectedGroup?.subject ?? "",
+        lesson_id: null,
+        // Строка-ссылка: файловых полей нет намеренно. getMaterialUrl отдаёт
+        // link_url ПЕРЕД storage_path, поэтому запись с обоими полями сделала
+        // бы файл недостижимым навсегда.
+        link_url: parsed.embedUrl,
+        uploaded_by: teacherId,
+        // 'video' — то же значение, что пишет автопубликация (миграция 174),
+        // поэтому resolveType вернёт "video" и материал получит и правильную
+        // иконку, и инлайн-плеер без единой правки в рендере.
+        type: "video",
+      });
+      onSuccess({ title: title.trim(), groupName: selectedGroup?.name ?? groupId });
+    } catch (err) {
+      console.error("[materials] video link error:", err);
+      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="relative w-full max-w-lg rounded-3xl border border-white/40 bg-white p-8 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <h2 className="mb-6 text-xl font-bold text-slate-900">Добавить видео-ссылку</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Название <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Например: Разбор задачи на цикл for"
+              disabled={saving}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Описание</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Краткое описание (необязательно)"
+              rows={2}
+              disabled={saving}
+              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Группа <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              disabled={saving}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Ссылка на видео <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://youtu.be/… , https://rutube.ru/video/… или прямая .mp4"
+              disabled={saving}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            />
+            <p className="mt-1.5 text-xs text-slate-500">YouTube, RuTube или прямая ссылка на .mp4</p>
+          </div>
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !title.trim() || !groupId || !url.trim()}
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? "Сохраняем…" : "Добавить"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Success Modal ─────────────────────────────────────────────────────
 
 function SuccessModal({
@@ -417,6 +584,7 @@ export function TeacherMaterialsView({
   const router = useRouter();
   const [materials, setMaterials] = useState(initialMaterials);
   const [showUpload, setShowUpload] = useState(false);
+  const [showVideoLink, setShowVideoLink] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ title: string; groupName: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [filterSubject, setFilterSubject] = useState("all");
@@ -638,19 +806,39 @@ export function TeacherMaterialsView({
           onSuccess={handleUploadSuccess}
         />
       )}
+      {showVideoLink && teacherId && (
+        <VideoLinkModal
+          groups={groups}
+          teacherId={teacherId}
+          onClose={() => setShowVideoLink(false)}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
 
       <div className="text-slate-800">
         {/* Header — omitted when hosted under the Knowledge Base tab
             switcher (БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 3.2). */}
         <div className="mb-6 flex items-center justify-between">
           {!hideHeading && <h1 className="text-[22px] font-bold text-gray-900 md:text-[26px]">Мои материалы</h1>}
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            Загрузить материал
-          </button>
+          {/* Две кнопки, как у «Материалов кафедры» — файл и видео-ссылка.
+              Именно этим приёмом вкладки приведены к одному виду: приём уже
+              существовал, третий вариант формы не изобретаем. */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowVideoLink(true)}
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
+            >
+              <Video className="h-4 w-4" />
+              Видео-ссылка
+            </button>
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 rounded-2xl bg-[#185AF7] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+              Загрузить материал
+            </button>
+          </div>
         </div>
 
         {/* Filters */}

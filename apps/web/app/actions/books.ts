@@ -11,11 +11,19 @@ export async function getBookFileUrl(bookId: string): Promise<string | null> {
 
   const { data, error } = await supabase
     .from("books")
-    .select("id, file_storage_path, title")
+    .select("id, file_storage_path, external_url, title")
     .eq("id", bookId)
     .maybeSingle();
 
   if (error || !data) return null;
+
+  // Миграция 175 — книга бывает ссылкой (видео), тогда подписывать нечего.
+  // Порядок тот же, что у getMaterialUrl для материалов группы: сначала
+  // внешняя ссылка, потом Storage. CHECK books_content_shape_chk гарантирует,
+  // что заполнено ровно одно из двух, так что порядок ни на что не влияет —
+  // он выбран ради единообразия с соседней вкладкой.
+  if (data.external_url) return data.external_url as string;
+  if (!data.file_storage_path) return null;
 
   try {
     // No downloadAs — opens inline in the viewer instead of forcing a download.

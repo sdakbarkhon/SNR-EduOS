@@ -714,9 +714,18 @@ export const insertMaterial = async (
     description: string | null;
     subject: string;
     lesson_id: string | null;
-    file_type: string;
-    storage_path: string;
-    file_size_bytes: number;
+    /** Миграция 175 не нужна — CHECK-ограничений на course_materials нет
+     *  вовсе, а link_url есть с первой миграции. Файловые поля стали
+     *  необязательными только в TS: это и был единственный барьер, из-за
+     *  которого видео-ССЫЛКУ в материалы группы нельзя было добавить
+     *  (БД её приняла бы всегда). Строка — либо файл, либо ссылка:
+     *  getMaterialUrl отдаёт link_url ПЕРЕД storage_path, поэтому запись с
+     *  обоими полями сделала бы файл недостижимым навсегда. Гарантирует это
+     *  форма, а не CHECK — единственный писатель тут один. */
+    file_type?: string | null;
+    storage_path?: string | null;
+    file_size_bytes?: number | null;
+    link_url?: string | null;
     uploaded_by: string;
     type: string;
   },
@@ -4035,8 +4044,11 @@ export const insertBook = async (
     book_type: string;
     description: string | null;
     cover_storage_path: string | null;
-    file_storage_path: string;
-    file_size_bytes: number;
+    /** Миграция 175 — книга-видеоссылка файла не имеет. Ровно одно из двух
+     *  полей заполнено, это же требует CHECK books_content_shape_chk. */
+    file_storage_path?: string | null;
+    file_size_bytes?: number | null;
+    external_url?: string | null;
     uploaded_by: string;
   },
 ): Promise<Book> => {
