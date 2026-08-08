@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
+import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
@@ -1521,6 +1521,49 @@ export const getTeacherAiPendingReviews = (db: Db) =>
     .eq("ai_review_status", "ai_reviewed_pending_teacher")
     .order("submitted_at", { ascending: true })
     .then(unwrap) as Promise<TeacherAiPendingReview[]>;
+
+/** 08.08.2026 — строка списка запуска AI-проверки. Расширяет
+ *  TeacherAiPendingReview ровно тем, что нужно экрану запуска: статусом
+ *  проверки, оценкой учителя (если она уже стоит) и предметом/группой для
+ *  фильтров. Совместима по форме с TeacherAiPendingReview, поэтому строку
+ *  можно передать в AiReviewModal без перекладывания полей. */
+export type TeacherSubmissionForReview = TeacherAiPendingReview & {
+  ai_review_status: AiReviewStatus | null;
+  grade: number | null;
+  subject_name: string | null;
+  group_id: string;
+};
+
+/** Все сдачи по группам учителя — источник списка запуска AI-проверки.
+ *  Сужается RLS-политикой "teacher reads submissions in own groups"
+ *  (is_my_teacher_group), как и getTeacherAiPendingReviews выше: явного
+ *  фильтра по teacher_id здесь нет намеренно.
+ *
+ *  Предмет берётся через homework.subject_id -> subjects.name. НЕ через
+ *  groups.subject: там захардкоженная placeholder-константа (миграция 97),
+ *  та же ловушка, что уже описана в process-homework-review-queue.ts. */
+export const getTeacherHomeworkSubmissions = (db: Db, limit = 1000) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (db as any)
+    .from("homework_submissions")
+    .select(
+      "id, homework_id, answer_text, code_text, submitted_at, ai_grade, ai_feedback, " +
+      "ai_review_status, grade, " +
+      "student:students!inner(id, full_name, avatar_url), " +
+      "homework:homework!inner(id, title, content_type, group_id, " +
+      "subject:subjects(name), group:groups!inner(name, subject))",
+    )
+    .order("submitted_at", { ascending: false })
+    .limit(limit)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .then((res: any) => {
+      const rows = unwrap(res) as any[];
+      return rows.map((r) => ({
+        ...r,
+        subject_name: r.homework?.subject?.name ?? null,
+        group_id: r.homework?.group_id ?? "",
+      }));
+    }) as Promise<TeacherSubmissionForReview[]>;
 
 async function finalizeAiHomeworkReview(
   db: Db,

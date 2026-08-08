@@ -19,6 +19,72 @@ function gradeFromGroupName(name: string | null | undefined, fallback = 7): numb
   return Number.isFinite(g) && g >= 1 && g <= 12 ? g : fallback;
 }
 
+/** 08.08.2026 — проверка ОДНОЙ сдачи. Тело целиком вынесено из цикла ниже
+ *  БЕЗ изменений: те же запросы, тот же вызов reviewHomework(), те же
+ *  записываемые колонки. Понадобилось потому, что крон снят (лимит кронов
+ *  бесплатного тарифа) и учитель запускает проверку сам, выбирая конкретные
+ *  работы — а батч-обработчик берёт из очереди СТАРЕЙШИЕ N, что для
+ *  произвольной выборки не годится.
+ *
+ *  Бухгалтерия очереди (удалить запись / увеличить attempts) СЮДА не
+ *  переехала: при ручном запуске записи в очереди может не быть вовсе.
+ *  Ею по-прежнему занимается батч-обёртка ниже.
+ *
+ *  ЛОГИКА ПРОВЕРКИ И ПРОМПТЫ НЕ МЕНЯЛИСЬ — менялся только способ запуска. */
+export async function reviewOneSubmission(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  submissionId: string,
+): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  const { data: submission, error: subErr } = await db
+    .from("homework_submissions")
+    .select("id, homework_id, answer_text, code_text")
+    .eq("id", submissionId)
+    .single();
+  if (subErr || !submission) return { ok: false, skipped: true, error: "submission not found" };
+
+  const { data: homework, error: hwErr } = await db
+    .from("homework")
+    .select("title, description, subject_id, group:groups!inner(name)")
+    .eq("id", submission.homework_id)
+    .single();
+  if (hwErr || !homework) return { ok: false, skipped: true, error: "homework not found" };
+
+  // homework.group.subject — захардкоженная placeholder-константа, НЕ реальный
+  // предмет. Реальный — subjects.name через homework.subject_id.
+  let subjectName = "Предмет";
+  if (homework.subject_id) {
+    const { data: subjectRow } = await db
+      .from("subjects")
+      .select("name")
+      .eq("id", homework.subject_id)
+      .maybeSingle();
+    if (subjectRow?.name) subjectName = subjectRow.name;
+  }
+
+  const answerText: string = submission.answer_text || submission.code_text || "";
+  const review = await reviewHomework({
+    homework_title: homework.title,
+    homework_description: homework.description ?? "",
+    subject_name: subjectName,
+    answer_text: answerText,
+    group_grade: gradeFromGroupName(homework.group?.name),
+  });
+
+  const { error: updateErr } = await db
+    .from("homework_submissions")
+    .update({
+      ai_grade: review.grade,
+      ai_feedback: review.feedback,
+      ai_review_status: "ai_reviewed_pending_teacher",
+      ai_reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", submissionId);
+  if (updateErr) throw new Error(updateErr.message);
+
+  return { ok: true };
+}
+
 /** Обрабатывает один батч (до batchLimit записей) из
  *  ai_homework_review_queue: reviewHomework() + запись
  *  ai_grade/ai_feedback/ai_review_status='ai_reviewed_pending_teacher' на
