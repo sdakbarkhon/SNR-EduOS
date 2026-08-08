@@ -1,0 +1,71 @@
+diff --git a/src/containers/library-item.jsx b/src/containers/library-item.jsx
+index 51e1050..e596860 100644
+--- a/src/containers/library-item.jsx
++++ b/src/containers/library-item.jsx
+@@ -106,7 +106,7 @@ class LibraryItem extends React.PureComponent {
+     render () {
+         const iconMd5 = this.curIconMd5();
+         const iconURL = iconMd5 ?
+-            `https://cdn.assets.scratch.mit.edu/internalapi/asset/${iconMd5}/get/` :
++            `/static/library-assets/${iconMd5}` :
+             this.props.iconRawURL;
+         return (
+             <LibraryItemComponent
+diff --git a/src/lib/project-fetcher-hoc.jsx b/src/lib/project-fetcher-hoc.jsx
+index 11d16a7..e46b9a8 100644
+--- a/src/lib/project-fetcher-hoc.jsx
++++ b/src/lib/project-fetcher-hoc.jsx
+@@ -135,7 +135,9 @@ const ProjectFetcherHOC = function (WrappedComponent) {
+         setProjectId: PropTypes.func
+     };
+     ProjectFetcherComponent.defaultProps = {
+-        assetHost: 'https://assets.scratch.mit.edu',
++        // SNR EduOS: относительный путь вместо CDN Scratch — медиа раздаётся
++        // с того же домена, что и сама сборка.
++        assetHost: '/static',
+         projectHost: 'https://projects.scratch.mit.edu'
+     };
+ 
+diff --git a/src/lib/storage.js b/src/lib/storage.js
+index 0fc0516..ead3442 100644
+--- a/src/lib/storage.js
++++ b/src/lib/storage.js
+@@ -59,7 +59,11 @@ class Storage extends ScratchStorage {
+         this.assetHost = assetHost;
+     }
+     getAssetGetConfig (asset) {
+-        return `${this.assetHost}/internalapi/asset/${asset.assetId}.${asset.dataFormat}/get/`;
++        // SNR EduOS: медиа библиотек лежит рядом со сборкой
++        // (static/library-assets), а не на cdn.assets.scratch.mit.edu.
++        // Путь плоский: статика Vercel не умеет отдавать адрес с хвостовым
++        // слэшем вида /internalapi/asset/<md5>.<ext>/get/.
++        return `${this.assetHost}/library-assets/${asset.assetId}.${asset.dataFormat}`;
+     }
+     getAssetCreateConfig (asset) {
+         return {
+diff --git a/src/playground/index.ejs b/src/playground/index.ejs
+index abbd5d8..353d10d 100644
+--- a/src/playground/index.ejs
++++ b/src/playground/index.ejs
+@@ -23,5 +23,21 @@
+       <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<%- htmlWebpackPlugin.options.gtm_id %><%= htmlWebpackPlugin.options.gtm_env_auth %>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+       <!-- End Google Tag Manager (noscript) -->
+     <% } %>
++    <!-- SNR EduOS: AGPL-3.0 обязывает предоставлять исходный код при
++         размещении по сети. Сборка неизменённая по существу (правки: адрес
++         медиа и эта ссылка), поэтому ссылаемся на официальный репозиторий. -->
++    <a id="snr-source-link"
++       href="https://github.com/scratchfoundation/scratch-gui"
++       target="_blank" rel="noopener noreferrer">Scratch — открытый проект, исходный код</a>
++    <style>
++      #snr-source-link {
++        position: fixed; left: 6px; bottom: 4px; z-index: 2147483000;
++        font: 500 10px/1.2 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
++        color: #575e75; opacity: .6; text-decoration: none;
++        background: rgba(255,255,255,.82); padding: 2px 6px; border-radius: 6px;
++        pointer-events: auto;
++      }
++      #snr-source-link:hover { opacity: 1; text-decoration: underline; }
++    </style>
+   </body>
+ </html>
