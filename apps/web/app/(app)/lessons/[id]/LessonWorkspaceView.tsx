@@ -1325,6 +1325,7 @@ export function LessonWorkspaceView({
               const isStudied = stage.progress?.is_completed;
               const isSubmitted = !!stage.progress?.submission_data;
               const isGraded = stage.progress?.grade != null;
+              const hasSlidesForMedia = !!stage.slides && stage.slides.length > 0;
               const isCodeOrExternal = stage.content_type === "code" || isExternalService(stage.content_type)
                 || stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot"
                 || stage.content_type === "code_completion";
@@ -1382,7 +1383,11 @@ export function LessonWorkspaceView({
                   )}
 
                   <StageMedia
-                    image_url={(stage as { image_url?: string | null }).image_url ?? null}
+                    // 08.08.2026 — если у этапа есть слайды, картинка рисуется ВНУТРИ
+                    // слайда справа от текста (SlideViewer -> SlideBody), а здесь
+                    // подавляется: иначе она была бы показана дважды. Схема mermaid
+                    // остаётся здесь — она широкая и под текстом читается лучше.
+                    image_url={hasSlidesForMedia ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
                     mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
                     media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
                     media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
@@ -1408,6 +1413,7 @@ export function LessonWorkspaceView({
                         chromeAbovePx={PRESENTATION_CHROME_ABOVE_PX}
                         viewerOnly={lesson.isThirdLessonViewer}
                         locked={presentationLocked}
+                        stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null}
                       />
                     ) : stage.stage_type === "theory" && stage.slides && stage.slides.length > 0 ? (
                       <div className="mb-3">
@@ -1420,6 +1426,7 @@ export function LessonWorkspaceView({
                           initialSlide={stage.current_slide_index ?? 0}
                           lessonStatus={lesson.status}
                           viewerOnly={lesson.isThirdLessonViewer}
+                          stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null}
                         />
                       </div>
                     ) : (stage.config as { presentation_file?: { storagePath: string; filename: string; sizeBytes: number } })?.presentation_file ? (

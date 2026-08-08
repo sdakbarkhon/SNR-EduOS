@@ -38,6 +38,7 @@ export function StageViewModal({
   const db = createClient();
 
   const isQuizType = stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot";
+  const hasSlidesHere = !!stage.slides && stage.slides.length > 0;
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loadingQuiz, setLoadingQuiz] = useState(isQuizType);
   const [scores, setScores] = useState<QuizLeaderboardEntry[]>([]);
@@ -129,8 +130,9 @@ export function StageViewModal({
 
         {/* Body */}
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
+          {/* 08.08.2026 — при наличии слайдов картинка внутри слайда, здесь подавлена. */}
           <StageMedia
-            image_url={(stage as { image_url?: string | null }).image_url ?? null}
+            image_url={hasSlidesHere ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
             mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
             media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
             media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
@@ -150,7 +152,7 @@ export function StageViewModal({
                   дальше первого слайда. Трансляции отсюда нет и не было —
                   stageId не передаётся, значит ни записи current_slide_index,
                   ни подписки: этот модал целиком локальный просмотр. */}
-              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} isTeacher autoFullscreen />
+              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} isTeacher autoFullscreen stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null} />
             </div>
           )}
 

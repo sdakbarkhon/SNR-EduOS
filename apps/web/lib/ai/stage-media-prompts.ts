@@ -52,8 +52,23 @@ export async function decideStageMedia(
 
 Если этап явно текстовый/обсуждение без визуальных концептов — оба false.
 
+ТРЕБОВАНИЯ К image_prompt (08.08.2026 — прежняя формулировка давала абстракцию:
+на этапе «Что такое ЖК-дисплей» рисовался размытый прямоугольник с жёлтыми
+палками вместо дисплея):
+- НАЧНИ с конкретного существительного — что именно на картинке. Не «концепция
+  отображения информации», а «16x2 character LCD display module».
+- Опиши узнаваемые детали предмета: форма, из чего состоит, что видно.
+- Робототехника: называй реальные компоненты — Arduino Uno board, HC-SR04
+  ultrasonic sensor, servo motor, breadboard with jumper wires, LCD module,
+  DC motor with wheel.
+- Программирование: называй схему или интерфейс — flowchart of a loop, code
+  editor window, array of boxes with indices, nested folder tree.
+- ЗАПРЕЩЕНО: слова abstract, conceptual, symbolic, artistic, futuristic,
+  glowing, ethereal и любые метафоры вместо предмета.
+- Один предмет крупным планом, не коллаж из нескольких сцен.
+
 Верни ТОЛЬКО JSON без markdown, ровно такой формы (пустая строка "" вместо null, если соответствующее need_* — false):
-{ "need_image": boolean, "image_prompt": "англ. промпт для генерации картинки, детальный, стиль минималистичная образовательная иллюстрация с чистым фоном, без текста на картинке", "need_mermaid": boolean, "mermaid_prompt": "русский текст описывающий что должна показывать блок-схема" }`;
+{ "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше", "need_mermaid": boolean, "mermaid_prompt": "русский текст описывающий что должна показывать блок-схема" }`;
 
   const { data, error } = await generateJSON<{
     need_image?: boolean;
@@ -134,7 +149,7 @@ export async function generateStageImage(image_prompt: string): Promise<StageIma
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY missing on server");
 
-  const styledPrompt = `Academic educational illustration, minimalist clean style, soft colors, no text labels, no watermark. ${image_prompt.trim()}`;
+  const styledPrompt = `Clear, realistic educational illustration of a single concrete subject, drawn accurately and recognisably, correct proportions, sharp well-defined edges, plain light neutral background, subject centred and filling most of the frame, no text, no letters, no numbers, no labels, no watermark, no abstract shapes, no decorative blobs. Subject: ${image_prompt.trim()}`;
 
   let lastError = "generateStageImage failed";
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {

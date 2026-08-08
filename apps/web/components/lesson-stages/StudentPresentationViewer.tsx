@@ -31,6 +31,7 @@ import { SlideViewer } from "./SlideViewer";
 export function StudentPresentationViewer({
   slides, stageId, initialSlide, lessonStatus, onExportPptx, chromeAbovePx, viewerOnly = false,
   locked = false,
+  stageImageUrl,
 }: {
   slides: LessonSlide[];
   stageId: string;
@@ -43,6 +44,8 @@ export function StudentPresentationViewer({
   /** Выход только удержанием Esc, пока этап активен (07.08.2026). Считает
    *  родитель — см. LessonWorkspaceView.tsx, presentationLocked. */
   locked?: boolean;
+  /** 08.08.2026 — картинка этапа внутрь слайда, см. SlideBody. */
+  stageImageUrl?: string | null;
 }) {
   return (
     <div
@@ -73,6 +76,7 @@ export function StudentPresentationViewer({
         // resheniya_2.md. Не «доделывать до конца» — это вернёт ловушку,
         // из-за которой полноэкранный режим уже убирали.
         lockedUntilStageEnds={locked}
+        stageImageUrl={stageImageUrl}
       />
     </div>
   );

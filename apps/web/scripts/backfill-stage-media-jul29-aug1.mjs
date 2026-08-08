@@ -19,6 +19,19 @@ import { makeServiceRoleClient, loadEnvLocal } from "./_backfill-shared.mjs";
 
 const RETRY_FAILED = process.argv.includes("--retry-failed");
 
+// 08.08.2026 — принудительная ПЕРЕгенерация. Обычный прогон пропускает всё,
+// что уже media_status=generated, поэтому улучшенный промпт (см. ниже) сам по
+// себе ничего бы не переделал. --force снимает этот пропуск, но ТОЛЬКО внутри
+// узкого окна --only-day: скоуп задачи — один день, чужие картинки не трогаем.
+// Без --only-day флаг --force не работает: слишком легко переписать всё.
+const FORCE = process.argv.includes("--force");
+const onlyDayArg = process.argv.find((a) => a.startsWith("--only-day="));
+const ONLY_DAY = onlyDayArg ? onlyDayArg.split("=")[1] : null;
+if (FORCE && !ONLY_DAY) {
+  console.error("!!! --force требует --only-day=YYYY-MM-DD (защита от переписывания всех дней)");
+  process.exit(1);
+}
+
 const db = makeServiceRoleClient();
 function fail(msg) { console.error(`\n!!! ОСТАНОВЛЕНО: ${msg}`); process.exit(1); }
 
@@ -88,7 +101,22 @@ async function decideStageMedia(stage, lessonContext) {
 Если этап явно текстовый/обсуждение без визуальных концептов — оба false.
 
 Верни ТОЛЬКО JSON без markdown, ровно такой формы (пустая строка "" вместо null, если соответствующее need_* — false):
-{ "need_image": boolean, "image_prompt": "англ. промпт для генерации картинки, детальный, стиль минималистичная образовательная иллюстрация с чистым фоном, без текста на картинке", "need_mermaid": boolean, "mermaid_prompt": "русский текст описывающий что должна показывать блок-схема" }`;
+ТРЕБОВАНИЯ К image_prompt (08.08.2026 — прежняя формулировка давала абстракцию:
+на этапе «Что такое ЖК-дисплей» рисовался размытый прямоугольник с жёлтыми
+палками вместо дисплея). Зеркало требований из lib/ai/stage-media-prompts.ts —
+расходиться не должны:
+- НАЧНИ с конкретного существительного: не «концепция отображения информации»,
+  а «16x2 character LCD display module».
+- Опиши узнаваемые детали: форма, из чего состоит, что видно.
+- Робототехника: Arduino Uno board, HC-SR04 ultrasonic sensor, servo motor,
+  breadboard with jumper wires, LCD module, DC motor with wheel.
+- Программирование: flowchart of a loop, code editor window, array of boxes
+  with indices, nested folder tree.
+- ЗАПРЕЩЕНО: abstract, conceptual, symbolic, artistic, futuristic, glowing,
+  ethereal и любые метафоры вместо предмета.
+- Один предмет крупным планом, не коллаж.
+
+{ "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше", "need_mermaid": boolean, "mermaid_prompt": "русский текст описывающий что должна показывать блок-схема" }`;
 
   try {
     await throttle();
@@ -151,7 +179,7 @@ async function tryPollinationsImage(styledPrompt) {
 // image словил устойчивый HTTP 503 "high demand" во время реального прогона,
 // см. resheniya_2.md). Возвращает { buffer, source }. ──
 async function generateStageImage(imagePrompt) {
-  const styledPrompt = `Academic educational illustration, minimalist clean style, soft colors, no text labels, no watermark. ${imagePrompt.trim()}`;
+  const styledPrompt = `Clear, realistic educational illustration of a single concrete subject, drawn accurately and recognisably, correct proportions, sharp well-defined edges, plain light neutral background, subject centred and filling most of the frame, no text, no letters, no numbers, no labels, no watermark, no abstract shapes, no decorative blobs. Subject: ${imagePrompt.trim()}`;
   let lastError = "generateStageImage failed";
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -242,8 +270,8 @@ async function main() {
     .from("lessons")
     .select("id, title, subject_id, group:groups(name)")
     .in("subject_id", [...subjectNameById.keys()])
-    .gte("starts_at", RANGE_FROM)
-    .lt("starts_at", RANGE_TO);
+    .gte("starts_at", ONLY_DAY ? `${ONLY_DAY}T00:00:00+05:00` : RANGE_FROM)
+    .lt("starts_at", ONLY_DAY ? `${ONLY_DAY}T23:59:59+05:00` : RANGE_TO);
   if (lesErr) fail(`lessons: ${lesErr.message}`);
   console.log(`Уроков Programming+Robotics в диапазоне: ${lessons.length}`);
 
@@ -263,8 +291,9 @@ async function main() {
   if (stErr) fail(`lesson_stages: ${stErr.message}`);
 
   const todo = allStages.filter((s) => {
-    if (s.media_status === "generated") return false;
-    if (s.media_status === "failed" && !RETRY_FAILED) return false;
+    // --force: перегенерировать даже уже готовые (см. комментарий у флага).
+    if (s.media_status === "generated" && !FORCE) return false;
+    if (s.media_status === "failed" && !RETRY_FAILED && !FORCE) return false;
     return true;
   });
   console.log(`Этапов (без "Старт"): ${allStages.length}. К обработке: ${todo.length}${RETRY_FAILED ? " (включая ранее failed)" : ""}.\n`);

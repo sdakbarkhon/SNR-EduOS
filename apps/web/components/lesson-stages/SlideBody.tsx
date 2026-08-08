@@ -32,7 +32,7 @@ const LAYOUT_BG: Record<string, string> = {
 
 // Inner content, natural (unscaled) size — the outer <SlideBody> wrapper
 // measures this against the fixed 16:9 frame and scales it down to fit.
-function SlideContent({ slide, current, total }: { slide: LessonSlide; current: number; total: number }) {
+function SlideContent({ slide, current, total, stageImageUrl }: { slide: LessonSlide; current: number; total: number; stageImageUrl?: string | null }) {
   const layout = slide.layout ?? "default";
 
   if (layout === "title") {
@@ -114,6 +114,13 @@ function SlideContent({ slide, current, total }: { slide: LessonSlide; current: 
 
   // default
   const Icon = slide.icon ? LUCIDE_ICONS[slide.icon] : undefined;
+  // 08.08.2026 — картинка этапа встаёт ВНУТРЬ слайда, справа от текста.
+  // Раньше StageMedia рисовал её отдельным блоком НАД слайдом, и на экране
+  // получались два несвязанных куска: картинка, потом отдельно слайд с
+  // текстом. Своя картинка слайда (slide.image_url, макет "split") имеет
+  // приоритет — этапную подставляем только когда у слайда своей нет.
+  // На узких экранах колонка уезжает под текст (grid-cols-1 до lg).
+  const asideImage = slide.image_url ?? stageImageUrl ?? null;
   return (
     <div className="w-full p-8 md:p-12">
       <div className="mb-6 flex items-center gap-3">
@@ -126,8 +133,18 @@ function SlideContent({ slide, current, total }: { slide: LessonSlide; current: 
           {slide.title}
         </h2>
       </div>
-      <div className="prose prose-slate max-w-none text-base leading-relaxed dark:prose-invert md:text-lg">
-        <Md>{slide.content}</Md>
+      <div className={asideImage ? "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start lg:gap-10" : ""}>
+        <div className="prose prose-slate max-w-none text-base leading-relaxed dark:prose-invert md:text-lg">
+          <Md>{slide.content}</Md>
+        </div>
+        {asideImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={asideImage}
+            alt=""
+            className="w-full rounded-2xl border border-slate-200 object-contain shadow-sm dark:border-slate-700"
+          />
+        )}
       </div>
       {slide.mini_quiz && <MiniQuiz quiz={slide.mini_quiz} />}
     </div>
@@ -186,7 +203,7 @@ const MIN_SCALE = 0.2;
  *  always fits within the frame without requiring scroll — clamped to
  *  MIN_SCALE (20%, see comment above) as a floor against pathological
  *  content, not as a "prefer cropping over shrinking" trade-off. */
-export function SlideBody({ slide, current, total }: { slide: LessonSlide; current: number; total: number }) {
+export function SlideBody({ slide, current, total, stageImageUrl }: { slide: LessonSlide; current: number; total: number; stageImageUrl?: string | null }) {
   const layout = slide.layout ?? "default";
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -220,7 +237,7 @@ export function SlideBody({ slide, current, total }: { slide: LessonSlide; curre
       style={slide.background_color ? { backgroundColor: slide.background_color } : undefined}
     >
       <div ref={innerRef} style={{ transform: `scale(${scale})`, transformOrigin: "center" }} className="w-full">
-        <SlideContent slide={slide} current={current} total={total} />
+        <SlideContent slide={slide} current={current} total={total} stageImageUrl={stageImageUrl} />
       </div>
     </div>
   );

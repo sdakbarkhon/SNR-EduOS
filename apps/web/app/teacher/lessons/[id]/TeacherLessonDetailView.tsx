@@ -1788,7 +1788,9 @@ export function TeacherLessonDetailView({
               {isActive && (
                 <div className="border-x border-b border-violet-300 bg-white p-3 dark:border-violet-500/40">
                   <StageMedia
-                    image_url={(stage as { image_url?: string | null }).image_url ?? null}
+                    // 08.08.2026 — при наличии слайдов картинка рисуется ВНУТРИ слайда
+                    // (SlideViewer -> SlideBody), здесь подавляется, чтобы не дублировать.
+                    image_url={hasSlides ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
                     mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
                     media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
                     media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
@@ -1806,6 +1808,7 @@ export function TeacherLessonDetailView({
                     isTeacher
                     stageId={stage.id}
                     initialSlide={stage.current_slide_index ?? 0}
+                    stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null}
                   />
                 </div>
               )}

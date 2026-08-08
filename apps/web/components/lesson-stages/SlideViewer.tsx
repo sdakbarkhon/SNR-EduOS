@@ -37,6 +37,7 @@ export function SlideViewer({
   chromeAbovePx,
   autoFullscreen = false,
   lockedUntilStageEnds = false,
+  stageImageUrl,
 }: {
   slides: LessonSlide[];
   onExportPptx: () => void;
@@ -95,6 +96,10 @@ export function SlideViewer({
    *  Удержание закрывает просьбу заказчика (случайно не выйдешь, посреди
    *  объяснения не «отщёлкнешься»), но ловушку сделать не даёт. */
   lockedUntilStageEnds?: boolean;
+  /** 08.08.2026 — картинка ЭТАПА, показывается внутри слайда справа от
+   *  текста (см. SlideBody). Раньше её рисовал StageMedia отдельным блоком
+   *  над слайдом, и слайд читался как два куска. */
+  stageImageUrl?: string | null;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).lesson.slides;
@@ -282,7 +287,7 @@ export function SlideViewer({
         className={cn("mx-auto aspect-video overflow-hidden", !frameMaxHeight && "w-full")}
         style={frameMaxHeight ? { maxHeight: frameMaxHeight, width: `min(100%, calc(${frameMaxHeight} * 16 / 9))` } : undefined}
       >
-        <SlideBody slide={slide} current={current} total={slides.length} />
+        <SlideBody slide={slide} current={current} total={slides.length} stageImageUrl={stageImageUrl} />
       </div>
 
       {/* Navigation */}
