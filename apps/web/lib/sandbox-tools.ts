@@ -5,13 +5,14 @@
 
 import {
   CircuitBoard, Code2, Terminal, Ruler, FlaskConical, LineChart, Puzzle,
-  Shuffle, Palette, PenTool, Brain, Database, Keyboard, type LucideIcon,
+  Shuffle, Palette, PenTool, Brain, Database, Keyboard, Blocks, type LucideIcon,
 } from "lucide-react";
 
 export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
-  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "typerun";
+  | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "typerun"
+  | "scratch";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -116,5 +117,15 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://typerun.top/#rus_basic",
     Icon: Keyboard,
     gradient: "from-red-500 to-rose-600",
+  },
+  {
+    // 08.08.2026 — Scratch на своём хостинге (подробности в
+    // lib/external-services.ts). В ПЕСОЧНИЦЕ доступен ВСЕМ классам;
+    // ограничение «только 1-5» относится лишь к типу этапа урока.
+    id: "scratch",
+    kind: "iframe",
+    embedUrl: "https://snr-scratch.vercel.app",
+    Icon: Blocks,
+    gradient: "from-amber-400 to-orange-500",
   },
 ];

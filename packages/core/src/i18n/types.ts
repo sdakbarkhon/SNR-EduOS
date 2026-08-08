@@ -1233,6 +1233,7 @@ export interface Dictionary {
       learningapps: { name: string; description: string };
       sqlonline: { name: string; description: string };
       typerun: { name: string; description: string };
+      scratch: { name: string; description: string };
     };
     // migration 118 — Промт 5Б: автосохранение + именованные проекты
     // (только CodeSandbox — python/cpp, единственный режим с реальным
@@ -1677,6 +1678,7 @@ export interface Dictionary {
     stageContentLearningapps: string;  // "Learning Apps"
     stageContentSqlonline: string;     // "SQL Online"
     stageContentTyperun: string;       // "TypeRun"
+    stageContentScratch: string;       // "Scratch"
     stageContentCodeCompletion: string; // "Код с пропусками"
     stageContentQuizQia: string;       // "Тест (QIA)"
     stageContentQuizKahoot: string;    // "Квиз-игра (Kahoot)"

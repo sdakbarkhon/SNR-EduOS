@@ -143,6 +143,8 @@ export type LessonContentType =
   | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
   | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'typerun'
+  // 08.08.2026 — Scratch на своём хостинге, см. ExternalServiceType ниже.
+  | 'scratch'
   | 'quiz_qia' | 'quiz_kahoot' | 'code_completion';
 
 // Большой фикс, Блок 6.5 — Drag & Drop заполнение пропусков в коде.
@@ -286,7 +288,12 @@ export type CodeSubmission = {
 export type ExternalServiceType =
   | 'wokwi' | 'codesandbox'
   | 'geogebra' | 'phet' | 'desmos' | 'blockly_games' | 'visualgo'
-  | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'typerun';
+  | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'typerun'
+  // 08.08.2026 — Scratch на своём хостинге (snr-scratch.vercel.app).
+  // scratch.mit.edu встроить нельзя: их сервер запрещает показ в рамке на
+  // чужом домене — из-за этого Scratch в проекте уже переименовывали в
+  // TurboWarp (миграции 68, 69), а потом удалили совсем (миграция 90).
+  | 'scratch';
 
 /** Stored in lesson_stages.config for external-service stages. */
 export interface ExternalServiceConfig {

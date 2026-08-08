@@ -1211,6 +1211,7 @@ export const ru: Dictionary = {
       learningapps: { name: "Learning Apps", description: "Интерактивные упражнения и мини-игры для уроков" },
       sqlonline: { name: "SQL Online", description: "SQL-запросы в браузере (SQLite) — для старших классов" },
       typerun: { name: "Тренажёр печати", description: "Улучшай скорость и точность печати" },
+      scratch: { name: "Scratch", description: "Программирование из блоков: игры, мультфильмы, истории" },
     },
     projects: {
       myProjects: "Мои проекты",
@@ -1625,6 +1626,7 @@ export const ru: Dictionary = {
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
     stageContentTyperun: "TypeRun",
+    stageContentScratch: "Scratch",
     stageContentCodeCompletion: "Код с пропусками",
     stageContentQuizQia: "Тест (QIA)",
     stageContentQuizKahoot: "Квиз-игра (Kahoot)",

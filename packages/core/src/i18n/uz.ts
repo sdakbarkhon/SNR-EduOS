@@ -1211,6 +1211,7 @@ export const uz: Dictionary = {
       learningapps: { name: "Learning Apps", description: "Darslar uchun interaktiv mashqlar va mini-o'yinlar" },
       sqlonline: { name: "SQL Online", description: "Brauzerda SQL so'rovlari (SQLite) — yuqori sinflar uchun" },
       typerun: { name: "Klaviatura trenajyori", description: "Yozish tezligi va aniqligini oshiring" },
+      scratch: { name: "Scratch", description: "Bloklardan dasturlash: o'yinlar, multfilmlar, hikoyalar" },
     },
     projects: {
       myProjects: "Loyihalarim",
@@ -1625,6 +1626,7 @@ export const uz: Dictionary = {
     stageContentLearningapps: "Learning Apps",
     stageContentSqlonline: "SQL Online",
     stageContentTyperun: "TypeRun",
+    stageContentScratch: "Scratch",
     stageContentCodeCompletion: "Bo'sh joyli kod",
     stageContentQuizQia: "Test (QIA)",
     stageContentQuizKahoot: "Kviz o'yini (Kahoot)",

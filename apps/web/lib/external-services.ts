@@ -180,6 +180,29 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
     errorMsg: "Неверная ссылка. Ожидается ссылка на TypeRun (typerun.top)",
     description: "Тренажёр скорости и точности печати",
   },
+
+  // 08.08.2026 — Scratch на СВОЁМ хостинге. scratch.mit.edu встроить нельзя:
+  // их сервер запрещает показ в рамке на чужом домене, из-за чего Scratch в
+  // этом проекте уже переименовывали в TurboWarp (миграции 68, 69), а потом
+  // убрали совсем (миграция 90). Здесь развёрнута официальная сборка
+  // scratch-gui (AGPL-3.0) отдельным проектом Vercel — тот же редактор, те же
+  // блоки, спрайты и звуки: медиа тянется с cdn.assets.scratch.mit.edu, он
+  // отдаёт Access-Control-Allow-Origin: * (проверено). Не работают только
+  // галерея чужих проектов и вход в аккаунт scratch.mit.edu — они на
+  // серверах Scratch.
+  //
+  // Своего «проекта по ссылке» у сборки нет: сохранение работ мы не делаем,
+  // ребёнок скачивает файл себе. Поэтому паттерн подтверждает домен, а не
+  // путь — тот же приём, что у typerun выше.
+  scratch: {
+    name: "Scratch",
+    embedSupported: true,
+    urlPattern: /^https?:\/\/([\w-]+\.)?snr-scratch\.vercel\.app(\/.*)?$/i,
+    extractEmbedUrl: (url) => url.trim(),
+    placeholder: "https://snr-scratch.vercel.app",
+    errorMsg: "Неверная ссылка. Ожидается ссылка на наш Scratch (snr-scratch.vercel.app)",
+    description: "Программирование из блоков: игры, мультфильмы, истории",
+  },
 };
 
 // Used when a teacher didn't attach a specific project URL (lesson stage,
@@ -198,12 +221,14 @@ export const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   learningapps: "https://learningapps.org/",
   sqlonline: "https://sqlime.org/",
   typerun: "https://typerun.top/#rus_basic",
+  scratch: "https://snr-scratch.vercel.app",
 };
 
 // Canonical display order for the 12 services (teacher-facing type pickers).
 export const EXTERNAL_SERVICE_ORDER: ExternalServiceType[] = [
   "wokwi", "codesandbox", "geogebra", "phet", "desmos", "blockly_games",
   "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline", "typerun",
+  "scratch",
 ];
 
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — filters the 12-service picker by subject

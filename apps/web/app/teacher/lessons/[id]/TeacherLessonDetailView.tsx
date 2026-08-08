@@ -30,6 +30,7 @@ import type {
   QuizQuestionInput, QuizConfigForStage, CodeCompletionPayload, CodeCompletionGap,
 } from "@snr/core";
 import { SERVICE_CONFIG, validateServiceUrl, isExternalService, getServicesForSubject } from "@/lib/external-services";
+import { isJuniorGroup } from "@/lib/group-grade";
 import { uploadVideoFile } from "@/lib/video-storage";
 import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
@@ -84,6 +85,7 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   learningapps:   <Brain className="h-4 w-4" />,
   sqlonline:      <Database className="h-4 w-4" />,
   typerun:        <Keyboard className="h-4 w-4" />,
+  scratch:        <Blocks className="h-4 w-4" />,
   code_completion: <Blocks className="h-4 w-4" />,
 };
 
@@ -113,6 +115,10 @@ const TASK_CONTENT_TYPES: LessonContentType[] = [
   "code", "wokwi", "codesandbox", "quiz_qia", "quiz_kahoot",
   "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
   "typerun",
+  // 08.08.2026 — Scratch. В списке он есть всегда, но ниже отсеивается для
+  // старших классов: заказчик просил давать его как тип этапа только 1-5.
+  // В песочнице такого ограничения нет — там он открыт всем.
+  "scratch",
   // Drag & Drop «код с пропусками». Раньше этап такого типа можно было
   // создать только скриптом — в форме учителя пункта не было вовсе.
   "code_completion",
@@ -126,6 +132,7 @@ function StageModal({
   db,
   groupId,
   groupSubject,
+  groupName,
   subjectName,
   teacherId,
 }: {
@@ -148,6 +155,7 @@ function StageModal({
   db: any;
   groupId: string;
   groupSubject: string;
+  groupName: string | null;
   subjectName: string | null;
   teacherId: string;
 }) {
@@ -270,8 +278,12 @@ function StageModal({
   // lesson's subject (code/quiz types are never subject-restricted).
   const allowedServices = new Set(getServicesForSubject(subjectName));
   const rawContentTypes = stageType === "theory" ? THEORY_CONTENT_TYPES : stageType === "task" ? TASK_CONTENT_TYPES : [];
+  // 08.08.2026 — Scratch как ТИП ЭТАПА только для младших классов (1-5),
+  // решение заказчика. Класс берём из названия группы: колонки с номером
+  // класса в таблице groups нет вовсе (см. lib/group-grade.ts).
+  const junior = isJuniorGroup(groupName);
   const availableContentTypes = rawContentTypes.filter(
-    (ct) => !isExternalService(ct) || allowedServices.has(ct),
+    (ct) => (ct !== "scratch" || junior) && (!isExternalService(ct) || allowedServices.has(ct)),
   );
 
   function handleNext() {
@@ -1292,6 +1304,7 @@ export function TeacherLessonDetailView({
       learningapps:   dl.stageContentLearningapps,
       sqlonline:      dl.stageContentSqlonline,
       typerun:        dl.stageContentTyperun,
+      scratch:        dl.stageContentScratch,
       code_completion: dl.stageContentCodeCompletion,
     };
     return map[ct] ?? ct;
@@ -2050,6 +2063,7 @@ export function TeacherLessonDetailView({
           db={db}
           groupId={lesson.group_id}
           groupSubject={lesson.group.subject}
+          groupName={lesson.group.name}
           subjectName={lesson.subjectName}
           teacherId={teacher.id}
         />
