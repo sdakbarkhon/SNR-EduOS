@@ -10,6 +10,7 @@ import type {
   Locale, LessonStageWithProgress, LessonStageProgress, QuizQuestion, QuizAttempt, QuizConfigForStage,
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { useToast } from "@/components/Toast";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { createClient } from "@/lib/supabase/client";
@@ -19,17 +20,39 @@ const GRADE_COLORS: Record<number, string> = {
   5: "text-emerald-600", 4: "text-blue-600", 3: "text-yellow-600", 2: "text-orange-600", 1: "text-red-600",
 };
 
-/** Renders as a dark monospace block when the question text looks like code
- * (multi-line) — no fake syntax highlighting, just real question content in
- * the visual treatment the Claude Design mock uses for code snippets. */
+/** 08.08.2026 — эвристика «тёмный блок кода» сужена.
+ *
+ * Раньше условием было ПРОСТО наличие переноса строки. Вопрос с
+ * markdown-списком или с формулой в отдельной строке тоже многострочный —
+ * и целиком уезжал в тёмный <pre>, где разметка не рендерится вовсе.
+ * Теперь блок кода достаётся только тексту, который на код действительно
+ * похож: строки с отступом, скобки/точка с запятой в конце строки или
+ * ключевые слова языков, которые здесь преподают. Всё остальное идёт через
+ * MarkdownInline — а он огороженные блоки кода и сам покажет как код. */
+const CODE_HINT =
+  /(^|\n)[ \t]{2,}\S|(^|\n)\s*(def|class|for|while|if|else|elif|return|import|from|print|function|const|let|var|public|void|int |#include)\b|[{};]\s*$/;
+
+function looksLikeCode(text: string): boolean {
+  if (!text.includes("\n")) return false;
+  // Тройные кавычки markdown разберёт сам — это НЕ повод уводить в <pre>
+  // весь вопрос вместе с формулировкой.
+  if (text.includes("```")) return false;
+  return CODE_HINT.test(text);
+}
+
 function QuestionText({ text }: { text: string }) {
-  if (!text.includes("\n")) {
-    return <h2 className="mt-3.5 text-center text-[22px] font-black leading-snug text-[#232A45] md:text-[27px]">{text}</h2>;
+  if (looksLikeCode(text)) {
+    return (
+      <div className="mt-4 rounded-2xl bg-[#0F1629] px-5 py-4">
+        <pre className="whitespace-pre-wrap font-mono text-[14px] leading-relaxed text-[#C7CCE0]">{text}</pre>
+      </div>
+    );
   }
   return (
-    <div className="mt-4 rounded-2xl bg-[#0F1629] px-5 py-4">
-      <pre className="whitespace-pre-wrap font-mono text-[14px] leading-relaxed text-[#C7CCE0]">{text}</pre>
-    </div>
+    <MarkdownInline
+      text={text}
+      className="mt-3.5 block text-center text-[22px] font-black leading-snug text-[#232A45] md:text-[27px]"
+    />
   );
 }
 
@@ -208,7 +231,7 @@ export function QiaQuizModal({
                   }`}>
                     {letter}
                   </span>
-                  <span className="flex-1 text-[#2B3149]">{opt}</span>
+                  <MarkdownInline text={opt} className="flex-1 text-[#2B3149]" />
                   {sel && (
                     <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#6A4FE6] text-white">
                       <Check className="h-3.5 w-3.5" strokeWidth={3} />
@@ -332,7 +355,7 @@ function ResultView({
               {ok ? (
                 <span className="text-emerald-700">{dq.correctLabel}</span>
               ) : (
-                <span className="text-red-700">{dq.correctAnswerWas} «{q.options[q.correct_option_index]}»</span>
+                <span className="text-red-700">{dq.correctAnswerWas} «<MarkdownInline text={q.options[q.correct_option_index] ?? ""} />»</span>
               )}
             </li>
           );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { Plus, Trash2, ChevronUp, ChevronDown, Check, Triangle, Diamond, Circle, Square } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale, QuizQuestionInput } from "@snr/core";
@@ -80,7 +81,7 @@ export function QuizBuilder({
               >
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-100 text-[11px] font-bold text-violet-700">{i + 1}</span>
                 <span className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {q.question_text.trim() || dq.question.replace("{n}", String(i + 1))}
+                  {q.question_text.trim() ? <MarkdownInline text={q.question_text.trim()} /> : dq.question.replace("{n}", String(i + 1))}
                 </span>
               </button>
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30">

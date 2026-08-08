@@ -24,6 +24,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard, Modal, useLocale } from "@/components";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { useToast } from "@/components/Toast";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
@@ -166,7 +167,7 @@ function TestSubtaskEditor({
         {questions.map((q, qi) => (
           <div key={qi}>
             <p className="mb-2 text-sm font-semibold text-brand-ink">
-              {qi + 1}. {q.question}
+              {qi + 1}. <MarkdownInline text={q.question} />
             </p>
             <div className="flex flex-col gap-1.5">
               {q.options.map((opt, oi) => {
@@ -191,7 +192,7 @@ function TestSubtaskEditor({
                     <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2", selected ? "border-brand-blue" : "border-slate-300")}>
                       {selected && <span className="h-2 w-2 rounded-full bg-brand-blue" />}
                     </span>
-                    {opt}
+                    <MarkdownInline text={opt} />
                   </label>
                 );
               })}

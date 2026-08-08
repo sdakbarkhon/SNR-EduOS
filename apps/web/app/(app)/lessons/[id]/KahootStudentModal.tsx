@@ -11,6 +11,7 @@ import type {
   QuizAttempt, QuizLeaderboardEntry,
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 
@@ -206,7 +207,7 @@ export function KahootStudentModal({
               <span className="mt-0.5 text-[11px] font-bold opacity-90">{dq.timeLabel.toLowerCase()}</span>
             </div>
             <div className="max-w-[560px] flex-1 rounded-[20px] bg-white px-6 py-4" style={{ boxShadow: "0 16px 40px -12px rgba(70,23,143,.22)" }}>
-              <p className="text-center text-[19px] font-black text-[#232A45]">{currentQ.question_text}</p>
+              <MarkdownInline text={currentQ.question_text} className="block text-center text-[19px] font-black text-[#232A45]" />
             </div>
             <div className="flex h-[78px] w-[78px] shrink-0 flex-col items-center justify-center rounded-full bg-white" style={{ boxShadow: "0 10px 26px -8px rgba(70,23,143,.2)" }}>
               <span className="text-[24px] font-black leading-none text-[#242A45]">{qIdx + 1}</span>
@@ -227,7 +228,7 @@ export function KahootStudentModal({
                   style={{ background: c.bg, boxShadow: `inset 0 -5px 0 rgba(0,0,0,.18), 0 8px 18px -8px ${c.shadow}` }}
                 >
                   <Icon className="h-5 w-5 shrink-0" fill="currentColor" />
-                  <span className="flex-1 text-left text-[16px] font-bold">{o}</span>
+                  <MarkdownInline text={o} className="flex-1 text-left text-[16px] font-bold [&_code]:bg-white/25" />
                 </button>
               );
             })}
@@ -263,7 +264,7 @@ export function KahootStudentModal({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[24px] border border-[#ECEDF4] bg-white p-10 text-center shadow-sm">
         <p className="text-sm font-extrabold uppercase tracking-widest text-[#9CA0B4]">{dq.correctAnswer}</p>
-        <p className="text-2xl font-black text-emerald-700">{currentQ.options[currentQ.correct_option_index]}</p>
+        <MarkdownInline text={currentQ.options[currentQ.correct_option_index] ?? ""} className="block text-2xl font-black text-emerald-700" />
         {myAns ? (
           myAns.correct ? (
             <p className="text-lg font-extrabold text-emerald-600">{dq.correctPlus.replace("{n}", String(myAns.score))}</p>

@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { QuizReviewList } from "@/components/quiz/QuizReviewList";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
 
 const LIVE_SCORES_POLL_MS = 12000;
@@ -245,27 +247,20 @@ export function StageViewModal({
               ) : questions.length === 0 ? (
                 <p className="text-sm text-slate-400">—</p>
               ) : (
-                <ol className="space-y-3">
-                  {questions.map((q, i) => (
-                    <li key={q.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-800">{i + 1}. {q.question_text}</p>
-                      <ul className="mt-2 space-y-1">
-                        {q.options.map((opt, oi) => (
-                          <li
-                            key={oi}
-                            className={`rounded-lg px-3 py-1.5 text-sm ${
-                              oi === q.correct_option_index
-                                ? "bg-emerald-100 font-semibold text-emerald-800"
-                                : "bg-white text-slate-600"
-                            }`}
-                          >
-                            {opt}
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ol>
+                // 08.08.2026 — общий вид разбора (QuizReviewList): карточка на
+                // вопрос с крупным номером, варианты плитками, правильный со
+                // значком. Раньше тут был свой список — такой же, как ещё в
+                // трёх местах, и расходиться ему было делом времени.
+                <QuizReviewList
+                  questions={questions.map((q) => ({
+                    key: q.id,
+                    text: q.question_text,
+                    options: q.options.map((opt, oi) => ({
+                      text: opt,
+                      correct: oi === q.correct_option_index,
+                    })),
+                  }))}
+                />
               )}
 
               {lessonStatus === "in_progress" && (

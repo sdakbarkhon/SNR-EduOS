@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GlassCard, useLocale } from "@/components";
 import { cn } from "@/lib/cn";
 import { QuizChoiceTile, QuizChoiceGrid, OPTION_LETTERS } from "@/components/quiz/QuizChoiceTile";
+import { MarkdownInline } from "@/components/markdown-plugins";
 
 const sb = createClient();
 
@@ -118,7 +119,7 @@ function Results({
                   <div key={q.id} className="rounded-xl border border-slate-100 bg-white/80 p-4">
                     <div className="mb-3 flex items-start gap-2">
                       <span className="mt-0.5 shrink-0 text-xs font-bold text-slate-400">{idx + 1}.</span>
-                      <p className="text-sm font-semibold text-slate-700">{q.question_text}</p>
+                      <p className="text-sm font-semibold text-slate-700"><MarkdownInline text={q.question_text} /></p>
                     </div>
                     {q.question_type === "single_choice" && (
                       <QuizChoiceGrid>
@@ -131,7 +132,7 @@ function Results({
                             <div key={opt.id} className="flex flex-col items-center gap-1">
                               <QuizChoiceTile
                                 index={oi}
-                                label={opt.option_text}
+                                label={<MarkdownInline text={opt.option_text} />}
                                 optionLetter={OPTION_LETTERS[oi]}
                                 state={tileState}
                               />
@@ -147,7 +148,7 @@ function Results({
                         {ans?.open_text && (
                           <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <span className="mr-1 text-xs font-semibold text-slate-400">{t.yourAnswer}:</span>
-                            {ans.open_text}
+                            <MarkdownInline text={ans.open_text} />
                           </div>
                         )}
                         <span className="text-xs font-semibold text-amber-600">{d.homework.testReview}</span>
@@ -314,7 +315,7 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
           <div key={q.id}>
             <p className="mb-3 text-sm font-semibold text-slate-700">
               <span className="mr-1 text-slate-400">{idx + 1}.</span>
-              {q.question_text}
+              <MarkdownInline text={q.question_text} />
             </p>
             {q.question_type === "single_choice" && (
               <QuizChoiceGrid>
@@ -324,7 +325,7 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
                     <QuizChoiceTile
                       key={opt.id}
                       index={oi}
-                      label={opt.option_text}
+                      label={<MarkdownInline text={opt.option_text} />}
                       optionLetter={OPTION_LETTERS[oi]}
                       state={selected ? "selected" : "idle"}
                       onClick={() => setOption(q.id, opt.id)}

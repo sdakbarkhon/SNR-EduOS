@@ -10,6 +10,7 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { useLocale } from "@/components/LocaleProvider";
 import { getDemoNow } from "@/lib/demo-date";
 
@@ -375,7 +376,7 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                 <div className="space-y-2">
                   {classwork.questions.map((q, i) => (
                     <div key={q.id} className="text-sm text-[var(--text-2)] pl-2">
-                      {i + 1}. {q.question_text}
+                      {i + 1}. <MarkdownInline text={q.question_text} />
                     </div>
                   ))}
                 </div>

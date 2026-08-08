@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { QuizReviewList } from "@/components/quiz/QuizReviewList";
+import { MarkdownInline } from "@/components/markdown-plugins";
 
 // Read-only review of a lesson stage after the lesson has completed —
 // student-side equivalent of teacher/lessons/[id]/StageViewModal.tsx (not
@@ -182,41 +184,26 @@ export function StudentStageReviewModal({
               ) : questions.length === 0 ? (
                 <p className="text-sm text-slate-400">—</p>
               ) : (
-                <ol className="space-y-3">
-                  {questions.map((q, i) => {
+                // 08.08.2026 — общий вид разбора (QuizReviewList), тот же, что у
+                // учителя в StageViewModal: карточка на вопрос с крупным
+                // номером, варианты плитками, правильный со значком, свой
+                // неверный выбор — красным. Разметка была скопирована между
+                // экранами почти дословно; теперь она одна.
+                <QuizReviewList
+                  pickedLabel={dl.quiz.yourAnswer}
+                  questions={questions.map((q) => {
                     const mine = myAnswers.get(q.id);
-                    return (
-                      <li key={q.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                        <p className="text-sm font-semibold text-slate-800">{i + 1}. {q.question_text}</p>
-                        <ul className="mt-2 space-y-1">
-                          {q.options.map((opt, oi) => {
-                            const isCorrectOpt = oi === q.correct_option_index;
-                            const isMyPick = mine?.selected_option_index === oi;
-                            return (
-                              <li
-                                key={oi}
-                                className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm ${
-                                  isCorrectOpt
-                                    ? "bg-emerald-100 font-semibold text-emerald-800"
-                                    : isMyPick
-                                      ? "bg-red-100 font-semibold text-red-700"
-                                      : "bg-white text-slate-600"
-                                }`}
-                              >
-                                <span>{opt}</span>
-                                {isMyPick && (
-                                  <span className="ml-2 shrink-0 text-[11px] font-bold uppercase tracking-wide opacity-70">
-                                    {dl.quiz.yourAnswer}
-                                  </span>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </li>
-                    );
+                    return {
+                      key: q.id,
+                      text: q.question_text,
+                      options: q.options.map((opt, oi) => ({
+                        text: opt,
+                        correct: oi === q.correct_option_index,
+                        picked: mine?.selected_option_index === oi,
+                      })),
+                    };
                   })}
-                </ol>
+                />
               )}
             </div>
           )}

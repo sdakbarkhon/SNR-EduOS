@@ -10,6 +10,7 @@ import {
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { Download, Link as LinkIcon, Paperclip, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
@@ -286,7 +287,7 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
               const ans = getAnswerForQuestion(q.id);
               return (
                 <div key={q.id} className="rounded-[14px] bg-slate-50 p-3 space-y-2">
-                  <div className="text-[13px] font-semibold text-brand-ink">{i + 1}. {q.question_text}</div>
+                  <div className="text-[13px] font-semibold text-brand-ink">{i + 1}. <MarkdownInline text={q.question_text} /></div>
                   {q.question_type === "single_choice" && (
                     <div className="space-y-1">
                       {q.options.map((opt) => {
@@ -300,7 +301,7 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
                             <span className={cn("h-3 w-3 rounded-full border-2 shrink-0",
                               opt.is_correct ? "border-emerald-500 bg-emerald-500" :
                                 studentChose ? "border-red-400 bg-red-400" : "border-slate-300")} />
-                            {opt.option_text}
+                            <MarkdownInline text={opt.option_text} />
                             {opt.is_correct && <span className="ml-auto text-[10px] text-emerald-600">{d.teacher.reviewCorrect}</span>}
                             {studentChose && !opt.is_correct && <span className="ml-auto text-[10px] text-red-500">Ответ ученика</span>}
                             {studentChose && opt.is_correct && <span className="ml-auto mr-1 text-[10px] text-emerald-600">Ответ ученика</span>}
@@ -312,7 +313,7 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
                   {q.question_type === "open" && (
                     <div className="space-y-1.5">
                       <div className="rounded-[10px] border border-slate-200 bg-white p-2.5 text-[13px] text-brand-ink min-h-[48px]">
-                        {ans?.open_text || <span className="text-brand-ink-muted italic">Нет ответа</span>}
+                        {ans?.open_text ? <MarkdownInline text={ans.open_text} /> : <span className="text-brand-ink-muted italic">Нет ответа</span>}
                       </div>
                       <label className="flex items-center gap-2 text-[12px] text-brand-ink-muted">
                         Зачтено (0 или 1):

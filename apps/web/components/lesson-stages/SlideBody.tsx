@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { HelpCircle, Image as ImageIcon, Quote as QuoteIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "@/components/markdown-plugins";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import type { LessonSlide, LessonSlideMiniQuiz } from "@snr/core";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { markdownCodeComponents } from "./markdownCode";
@@ -140,7 +141,7 @@ function MiniQuiz({ quiz }: { quiz: LessonSlideMiniQuiz }) {
     <div className="mt-8 rounded-2xl border border-violet-200 bg-violet-50/60 p-6 dark:border-violet-500/30 dark:bg-violet-500/10">
       <p className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100 md:text-lg">
         <HelpCircle className="h-5 w-5 shrink-0 text-violet-500" />
-        {quiz.question}
+        <MarkdownInline text={quiz.question} />
       </p>
       <div className="flex flex-col gap-2">
         {quiz.options.map((option, i) => {
@@ -161,7 +162,7 @@ function MiniQuiz({ quiz }: { quiz: LessonSlideMiniQuiz }) {
                     : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               }`}
             >
-              {option}
+              <MarkdownInline text={option} />
             </button>
           );
         })}

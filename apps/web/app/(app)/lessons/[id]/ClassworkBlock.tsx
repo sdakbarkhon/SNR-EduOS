@@ -8,6 +8,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { QuizChoiceTile, QuizChoiceGrid, OPTION_LETTERS } from "@/components/quiz/QuizChoiceTile";
+import { MarkdownInline } from "@/components/markdown-plugins";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -234,14 +235,14 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
             {classwork.questions.map((q: ClassworkQuestion, qi: number) => (
               <div key={q.id} className="space-y-2">
                 <p className="text-sm font-medium text-[var(--text-1)]">
-                  {qi + 1}. {q.question_text}
+                  {qi + 1}. <MarkdownInline text={q.question_text} />
                 </p>
                 <QuizChoiceGrid>
                   {q.options.map((opt: string, oi: number) => (
                     <QuizChoiceTile
                       key={oi}
                       index={oi}
-                      label={opt}
+                      label={<MarkdownInline text={opt} />}
                       optionLetter={OPTION_LETTERS[oi]}
                       state={testAnswers[qi] === oi ? "selected" : "idle"}
                       onClick={() => setTestAnswers((prev) => prev.map((a, i) => (i === qi ? oi : a)))}

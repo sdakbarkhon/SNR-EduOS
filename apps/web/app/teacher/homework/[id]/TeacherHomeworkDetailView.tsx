@@ -19,6 +19,7 @@ import type { Locale, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { ChevronLeft, Download, FileText, Paperclip, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
@@ -460,7 +461,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
           <h2 className="text-[15px] font-bold text-brand-ink">Вопросы ({questions.length})</h2>
           {questions.map((q, i) => (
             <div key={q.id} className="rounded-[14px] bg-slate-50 p-3 space-y-2">
-              <div className="text-[13px] font-semibold text-brand-ink">{i + 1}. {q.question_text}</div>
+              <div className="text-[13px] font-semibold text-brand-ink">{i + 1}. <MarkdownInline text={q.question_text} /></div>
               {q.question_type === "single_choice" && (
                 <div className="space-y-1">
                   {q.options.map((o) => (
@@ -468,7 +469,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
                       o.is_correct ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-brand-ink-muted")}>
                       <span className={cn("h-3 w-3 rounded-full border-2 shrink-0",
                         o.is_correct ? "border-emerald-500 bg-emerald-500" : "border-slate-300")} />
-                      {o.option_text}
+                      <MarkdownInline text={o.option_text} />
                       {o.is_correct && <span className="ml-auto text-[10px] font-bold text-emerald-600">{d.teacher.reviewCorrect}</span>}
                     </div>
                   ))}

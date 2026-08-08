@@ -25,7 +25,10 @@ export function QuizChoiceTile({
   onClick,
 }: {
   index: number;
-  label: string;
+  // 08.08.2026 — было string. Стало ReactNode, чтобы можно было передать уже
+  // отрендеренную разметку (MarkdownInline): в вариантах ответа встречаются
+  // и формулы, и инлайн-код, и без этого они показывались сырыми.
+  label: React.ReactNode;
   optionLetter?: string;
   state: QuizChoiceTileState;
   onClick?: () => void;
@@ -53,7 +56,7 @@ export function QuizChoiceTile({
           {optionLetter}
         </span>
       )}
-      <span className="px-2">{label}</span>
+      <span className="px-2 [&_code]:bg-white/25 [&_code]:text-white">{label}</span>
     </button>
   );
 }

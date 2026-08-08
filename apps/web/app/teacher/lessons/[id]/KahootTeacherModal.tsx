@@ -10,6 +10,7 @@ import {
 } from "@snr/core";
 import type { Locale, LessonStage, QuizQuestion, KahootSession, QuizLeaderboardEntry } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { createClient } from "@/lib/supabase/client";
 
 const OPT = [
@@ -180,13 +181,13 @@ export function KahootTeacherModal({
                   <Clock className="h-5 w-5" /> 0:{String(secsLeft ?? 0).padStart(2, "0")}
                 </span>
               </div>
-              <h2 className="mb-6 text-center text-2xl font-extrabold text-slate-800">{currentQ.question_text}</h2>
+              <MarkdownInline text={currentQ.question_text} className="mb-6 block text-center text-2xl font-extrabold text-slate-800" />
               <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {currentQ.options.map((o, oi) => {
                   const OptIcon = OPT[oi]?.Icon;
                   return o ? (
                     <div key={oi} className={`flex items-center gap-3 rounded-2xl px-5 py-4 text-base font-bold text-white ${OPT[oi]?.cls}`}>
-                      {OptIcon && <OptIcon className="h-5 w-5 shrink-0" />} {o}
+                      {OptIcon && <OptIcon className="h-5 w-5 shrink-0" />} <MarkdownInline text={o} className="[&_code]:bg-white/25" />
                     </div>
                   ) : null;
                 })}
@@ -209,7 +210,7 @@ export function KahootTeacherModal({
                 <p className="text-sm font-bold uppercase tracking-widest text-emerald-600">{dq.correctAnswer}</p>
                 <p className="flex items-center justify-center gap-2 mt-1 text-2xl font-extrabold text-emerald-700">
                   {(() => { const CorrectIcon = OPT[currentQ.correct_option_index]?.Icon; return CorrectIcon ? <CorrectIcon className="h-6 w-6" /> : null; })()}
-                  {currentQ.options[currentQ.correct_option_index]}
+                  <MarkdownInline text={currentQ.options[currentQ.correct_option_index] ?? ""} />
                 </p>
               </div>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{dq.topThree}</h3>

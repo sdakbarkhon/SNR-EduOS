@@ -11,6 +11,7 @@ import {
 import type { Locale, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
+import { MarkdownInline } from "@/components/markdown-plugins";
 import { CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { X, Check } from "lucide-react";
@@ -83,7 +84,7 @@ function SubtaskAnswer({
             const picked = answers.find((a) => a.questionIndex === qi)?.selectedIndex;
             return (
               <div key={qi} className="space-y-1 rounded-[10px] bg-slate-50 p-2.5">
-                <div className="text-[12px] font-semibold text-brand-ink">{qi + 1}. {q.question}</div>
+                <div className="text-[12px] font-semibold text-brand-ink">{qi + 1}. <MarkdownInline text={q.question} /></div>
                 <div className="space-y-1">
                   {q.options.map((opt, oi) => (
                     <div
@@ -93,7 +94,7 @@ function SubtaskAnswer({
                         picked === oi ? "bg-brand-blue/10 font-semibold text-brand-blue" : "text-brand-ink-muted",
                       )}
                     >
-                      {opt}
+                      <MarkdownInline text={opt} />
                     </div>
                   ))}
                 </div>
