@@ -1386,10 +1386,8 @@ export function LessonWorkspaceView({
                   <StageMedia
                     // 08.08.2026 — если у этапа есть слайды, картинка рисуется ВНУТРИ
                     // слайда справа от текста (SlideViewer -> SlideBody), а здесь
-                    // подавляется: иначе она была бы показана дважды. Схема mermaid
-                    // остаётся здесь — она широкая и под текстом читается лучше.
+                    // подавляется: иначе она была бы показана дважды.
                     image_url={hasSlidesForMedia ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
-                    mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
                     media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
                     media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
                   />

@@ -133,7 +133,6 @@ export function StageViewModal({
           {/* 08.08.2026 — при наличии слайдов картинка внутри слайда, здесь подавлена. */}
           <StageMedia
             image_url={hasSlidesHere ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
-            mermaid_code={(stage as { mermaid_code?: string | null }).mermaid_code ?? null}
             media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
             media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
             isTeacher

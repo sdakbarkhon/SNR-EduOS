@@ -138,11 +138,17 @@ function SlideContent({ slide, current, total, stageImageUrl }: { slide: LessonS
           <Md>{slide.content}</Md>
         </div>
         {asideImage && (
+          // 08.08.2026 — высота ограничена. Без max-h картинка занимала
+          // столько, сколько давал её собственный размер, слайд становился
+          // вдвое выше, и авто-масштаб дожимал остальное: на слайде с
+          // мини-опросом четвёртый вариант ответа уходил за нижний край
+          // кадра. Ширина колонки и так задана сеткой, высоту ограничиваем
+          // отдельно — object-contain сохраняет пропорции.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={asideImage}
             alt=""
-            className="w-full rounded-2xl border border-slate-200 object-contain shadow-sm dark:border-slate-700"
+            className="mx-auto max-h-[300px] w-full rounded-2xl border border-slate-200 object-contain shadow-sm dark:border-slate-700"
           />
         )}
       </div>
@@ -227,7 +233,19 @@ export function SlideBody({ slide, current, total, stageImageUrl }: { slide: Les
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     ro.observe(inner);
-    return () => ro.disconnect();
+
+    // 08.08.2026 — пересчёт после загрузки картинки. До загрузки <img> имеет
+    // нулевую высоту, масштаб считался по «слайду без картинки» и оставался
+    // единицей; когда картинка приходила, содержимое становилось выше кадра
+    // и низ (мини-опрос) обрезался рамкой с overflow-hidden. Событие load у
+    // картинок НЕ всплывает — ловим его на фазе перехвата.
+    const onLoad = (e: Event) => { if ((e.target as HTMLElement)?.tagName === "IMG") measure(); };
+    inner.addEventListener("load", onLoad, true);
+
+    return () => {
+      ro.disconnect();
+      inner.removeEventListener("load", onLoad, true);
+    };
   }, [slide]);
 
   return (

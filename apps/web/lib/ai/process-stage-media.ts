@@ -1,6 +1,6 @@
 // K.2, 05.08.2026 — общая логика обработки ОДНОГО этапа (в отличие от
 // stage-media-prompts.ts, где живут только сами Gemini-примитивы). Решает,
-// нужна ли этапу картинка/mermaid (только Programming/Robotics — остальные
+// нужна ли этапу картинка (только Programming/Robotics — остальные
 // предметы молча помечаются media_status='generated' и пропускаются),
 // генерирует, пишет в lesson_stages.
 //
@@ -15,7 +15,7 @@
 // JS-копия той же логики (.mjs не может импортировать .ts). Эта функция —
 // для НОВЫХ этапов, создаваемых после этой задачи.
 
-import { decideStageMedia, generateStageImage, generateMermaidCode, uploadStageImageToStorage } from "./stage-media-prompts";
+import { decideStageMedia, generateStageImage, uploadStageImageToStorage } from "./stage-media-prompts";
 
 // Те же 2 строки, что backfill-stage-media-jul29-aug1.mjs::SUBJECT_NAMES —
 // subjects.name (RU), НЕ groups.subject (захардкоженная placeholder-
@@ -30,7 +30,7 @@ function gradeFromGroupName(name: string | null | undefined, fallback = 7): numb
 
 export type ProcessStageMediaResult =
   | { status: "skipped"; reason: "stage_not_found" | "lesson_not_found" | "already_processed" | "subject_not_in_scope" }
-  | { status: "generated"; hadImage: boolean; hadMermaid: boolean }
+  | { status: "generated"; hadImage: boolean }
   | { status: "failed"; error: string };
 
 /** db — admin/service-role клиент (media_status/media_queued_at и др. колонки
@@ -115,7 +115,6 @@ export async function processStageMediaForStage(
 
   let errorText: string | null = null;
   let hadImage = false;
-  let hadMermaid = false;
 
   if (decision.need_image && decision.image_prompt) {
     try {
@@ -128,31 +127,24 @@ export async function processStageMediaForStage(
     }
   }
 
-  // Ревью K.2: mermaid больше не гейтится "!errorText" — картинка и mermaid
-  // независимые деливерэблы, провал одного не должен блокировать попытку
-  // другого.
-  if (decision.need_mermaid && decision.mermaid_prompt) {
-    try {
-      const code = await generateMermaidCode(decision.mermaid_prompt, { grade });
-      await db.from("lesson_stages").update({ mermaid_code: code }).eq("id", stageId);
-      hadMermaid = true;
-    } catch (e) {
-      const mermaidError = `mermaid: ${((e as Error)?.message ?? String(e)).slice(0, 500)}`;
-      errorText = errorText ? `${errorText} | ${mermaidError}` : mermaidError;
-    }
-  }
+  // 08.08.2026 — генерация mermaid-схем снята целиком. Генератор системно
+  // выдавал невалидный синтаксис (кавычки внутри подписей узлов, слово
+  // `end` как имя узла), и ученик видел на экране бомбу «Syntax error»
+  // вместо диаграммы. Решение заказчика — схемы убрать. Колонка
+  // lesson_stages.mermaid_code оставлена в базе на случай возврата, но
+  // больше не заполняется и не показывается.
 
   // Ревью K.2: 'failed' только если за этот прогон НИЧЕГО полезного не
-  // произвели. Раньше любая ошибка (даже только в mermaid, при уже успешно
+  // произвели. Раньше любая ошибка (даже только в схеме, при уже успешно
   // загруженной и оплаченной картинке) помечала весь этап 'failed' —
   // 'failed' в этом модуле считается already_processed, так что уже готовая
   // картинка навсегда переставала быть доступной для повторной обработки.
   // Частичный успех теперь — 'generated' с диагностикой в media_error.
-  if (errorText && !hadImage && !hadMermaid) {
+  if (errorText && !hadImage) {
     await db.from("lesson_stages").update({ media_status: "failed", media_error: errorText }).eq("id", stageId);
     return { status: "failed", error: errorText };
   }
 
   await db.from("lesson_stages").update({ media_status: "generated", media_error: errorText }).eq("id", stageId);
-  return { status: "generated", hadImage, hadMermaid };
+  return { status: "generated", hadImage };
 }

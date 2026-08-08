@@ -1,17 +1,20 @@
 "use client";
 
-// Часть 5, StageMedia backfill (05.08.2026) — рендер AI-медиа этапа
-// (картинка Gemini 2.5 Flash Image и/или mermaid-схема алгоритма).
+// Часть 5, StageMedia backfill (05.08.2026) — рендер AI-картинки этапа.
+//
+// 08.08.2026 — рендер mermaid-схем удалён. Генератор системно выдавал
+// невалидный синтаксис, и mermaid при разборе САМ вставляет в DOM свою
+// картинку с бомбой и надписью «Syntax error» — до того, как выбросит
+// исключение. Наш catch прятал только собственный контейнер, бомба
+// оставалась на экране у ученика. Убрано целиком, вместе с зависимостью.
 // Подключается между заголовком этапа и его содержимым в StageViewModal,
 // LessonWorkspaceView (ученик), TeacherLessonDetailView (учитель).
-import { useEffect, useId, useState } from "react";
 import { ImageOff, Loader2, RotateCcw } from "lucide-react";
 
 export type StageMediaStatus = "pending" | "generated" | "failed" | null;
 
 export type StageMediaProps = {
   image_url: string | null;
-  mermaid_code: string | null;
   media_status: StageMediaStatus;
   /** Кнопка "Перезапустить" при failed видна только учителю. Пока без
    *  обработчика (TODO) — по спеке backfill'а это просто заглушка кнопки. */
@@ -23,52 +26,7 @@ export type StageMediaProps = {
   media_queued_at?: string | null;
 };
 
-function MermaidDiagram({ code }: { code: string }) {
-  const id = useId().replace(/:/g, "");
-  const [svg, setSvg] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setSvg(null);
-    setFailed(false);
-    // Динамический импорт — mermaid трогает DOM/window при инициализации,
-    // на SSR это падает.
-    import("mermaid").then(async (mod) => {
-      const mermaid = mod.default;
-      mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict" });
-      try {
-        const { svg: rendered } = await mermaid.render(`stage-mermaid-${id}`, code);
-        if (!cancelled) setSvg(rendered);
-      } catch (e) {
-        console.warn("[StageMedia] mermaid render failed:", (e as Error)?.message);
-        if (!cancelled) setFailed(true);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [code, id]);
-
-  if (failed) return null;
-  if (!svg) {
-    return (
-      <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-8 dark:border-slate-700 dark:bg-slate-800/50">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="flex justify-center overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 [&_svg]:mx-auto"
-      // mermaid.securityLevel="strict" уже санитизирует вывод перед тем, как
-      // он сюда попадает.
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  );
-}
-
-export function StageMedia({ image_url, mermaid_code, media_status, isTeacher, media_queued_at }: StageMediaProps) {
+export function StageMedia({ image_url, media_status, isTeacher, media_queued_at }: StageMediaProps) {
   if (media_status === "pending") {
     // Осиротевший маркер: статус pending, но в очередь этап так и не попал.
     // Такой остался в демо-школе от прерванного backfill'а (этап
@@ -107,7 +65,7 @@ export function StageMedia({ image_url, mermaid_code, media_status, isTeacher, m
     );
   }
 
-  if (!image_url && !mermaid_code) return null;
+  if (!image_url) return null;
 
   return (
     <div className="mb-3 flex flex-col gap-3">
@@ -119,7 +77,6 @@ export function StageMedia({ image_url, mermaid_code, media_status, isTeacher, m
           className="mx-auto max-h-[400px] w-auto rounded-xl border border-slate-200 object-contain dark:border-slate-700"
         />
       )}
-      {mermaid_code && <MermaidDiagram code={mermaid_code} />}
     </div>
   );
 }

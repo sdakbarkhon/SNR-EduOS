@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-// Заказчик 05.08.2026 — AI-медиа (картинки Gemini 2.5 Flash Image + mermaid-
+// Заказчик 05.08.2026 — AI-картинки для этапов (Gemini 2.5 Flash Image).
+// 08.08.2026 — генерация mermaid-схем из скрипта удалена вместе с остальным
+// кодом схем: генератор системно выдавал невалидный синтаксис, и ученик
+// видел бомбу «Syntax error». Колонка mermaid_code в базе осталась, но не
+// заполняется. Прежний заголовок:
+// (картинки Gemini 2.5 Flash Image + mermaid-
 // схемы) для этапов уроков Programming/Robotics за 29.07-01.08.2026.
 // Разовый backfill СУЩЕСТВУЮЩИХ этапов — автогенерация на новые этапы не
 // подключена (отдельная будущая задача, см. resheniya_2.md).
@@ -79,12 +84,6 @@ async function pickWorkingTextModel() {
 function stripFences(text) {
   return text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
 }
-function stripMermaidFences(text) {
-  return text.replace(/^```mermaid\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-}
-
-let geminiCallCount = 0;
-
 // ── decideStageMedia (текстовый Gemini-вызов, без retry-обёртки сверху — при
 // провале безопасный дефолт "медиа не нужно", не считается failed-этапом) ──
 async function decideStageMedia(stage, lessonContext) {
@@ -96,7 +95,6 @@ async function decideStageMedia(stage, lessonContext) {
 
 Реши нужна ли этому этапу картинка и/или блок-схема алгоритма:
 - Картинка нужна если этап описывает физический объект (робот, компонент, устройство), визуальный концепт (архитектура системы, интерфейс), или демонстрирует результат (собранная схема, работающая программа)
-- Блок-схема mermaid нужна если этап описывает алгоритм, последовательность шагов, условную логику, цикл
 
 Если этап явно текстовый/обсуждение без визуальных концептов — оба false.
 
@@ -116,7 +114,7 @@ async function decideStageMedia(stage, lessonContext) {
   ethereal и любые метафоры вместо предмета.
 - Один предмет крупным планом, не коллаж.
 
-{ "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше", "need_mermaid": boolean, "mermaid_prompt": "русский текст описывающий что должна показывать блок-схема" }`;
+{ "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше" }`;
 
   try {
     await throttle();
@@ -130,12 +128,10 @@ async function decideStageMedia(stage, lessonContext) {
     return {
       need_image: parsed.need_image === true && !!parsed.image_prompt?.trim(),
       image_prompt: parsed.image_prompt?.trim() || null,
-      need_mermaid: parsed.need_mermaid === true && !!parsed.mermaid_prompt?.trim(),
-      mermaid_prompt: parsed.mermaid_prompt?.trim() || null,
     };
   } catch (e) {
     console.warn(`    decideStageMedia failed, defaulting to no media: ${(e.message ?? "").split("\n")[0]}`);
-    return { need_image: false, image_prompt: null, need_mermaid: false, mermaid_prompt: null };
+    return { need_image: false, image_prompt: null };
   }
 }
 
@@ -203,40 +199,6 @@ async function generateStageImage(imagePrompt) {
   }
 }
 
-// ── generateMermaidCode: Gemini 2.5 Flash text-only, 3 попытки ──
-async function generateMermaidCode(mermaidPrompt, grade) {
-  const prompt = `Сгенерируй код блок-схемы mermaid для образовательной цели.
-Контекст: ${mermaidPrompt}
-Класс: ${grade}
-
-Требования:
-- Только валидный mermaid flowchart-синтаксис (graph TD или graph LR)
-- Не больше 8 узлов
-- Все подписи на русском
-- Никаких других объяснений — только код mermaid, начинающийся с "graph TD" или "graph LR"`;
-
-  let lastError = "generateMermaidCode failed";
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await throttle();
-      geminiCallCount++;
-      const model = genAI.getGenerativeModel({ model: textModelName });
-      const result = await model.generateContent(prompt);
-      const code = stripMermaidFences(result.response.text().trim());
-      if (/^graph (TD|LR)\b/.test(code)) return code;
-      throw new Error(`Invalid mermaid output: ${code.slice(0, 200)}`);
-    } catch (e) {
-      lastError = e.message ?? lastError;
-      if (attempt < 2) {
-        const delay = 2000 * 2 ** attempt;
-        console.warn(`    generateMermaidCode попытка ${attempt + 1}/3 провалилась, retry через ${delay}ms: ${lastError.split("\n")[0]}`);
-        await sleep(delay);
-      }
-    }
-  }
-  throw new Error(lastError);
-}
-
 const SIGNED_URL_TTL_SECONDS = 10 * 365 * 24 * 60 * 60; // 10 лет
 
 async function uploadStageImageToStorage(imageBuffer, stageId) {
@@ -302,7 +264,7 @@ async function main() {
   textModelName = await pickWorkingTextModel();
   if (!textModelName) fail("Ни одна текстовая модель Gemini не доступна.");
 
-  let generated = 0, failed = 0, skipped = 0, imagesOk = 0, mermaidOk = 0, viaGemini = 0, viaPollinations = 0;
+  let generated = 0, failed = 0, skipped = 0, imagesOk = 0, viaGemini = 0, viaPollinations = 0;
 
   for (let i = 0; i < todo.length; i++) {
     const stage = todo[i];
@@ -316,7 +278,7 @@ async function main() {
 
     const decision = await decideStageMedia(stage, { subject, grade, lesson_title: lesson.title });
 
-    let imageOk = false, imageSource = null, mermaidOkThis = false, errorText = null;
+    let imageOk = false, imageSource = null, errorText = null;
 
     if (decision.need_image) {
       try {
@@ -332,27 +294,16 @@ async function main() {
       }
     }
 
-    if (decision.need_mermaid && !errorText) {
-      try {
-        const code = await generateMermaidCode(decision.mermaid_prompt, grade);
-        await db.from("lesson_stages").update({ mermaid_code: code }).eq("id", stage.id);
-        mermaidOkThis = true;
-        mermaidOk++;
-      } catch (e) {
-        errorText = `mermaid: ${(e.message ?? String(e)).slice(0, 500)}`;
-      }
-    }
-
     if (errorText) {
       await db.from("lesson_stages").update({ media_status: "failed", media_error: errorText }).eq("id", stage.id);
       failed++;
-      console.log(`${label} — image:${decision.need_image ? "yes" : "no"} mermaid:${decision.need_mermaid ? "yes" : "no"} status:failed (${errorText.slice(0, 120)})`);
+      console.log(`${label} — image:${decision.need_image ? "yes" : "no"} status:failed (${errorText.slice(0, 120)})`);
     } else {
       await db.from("lesson_stages").update({ media_status: "generated", media_error: null }).eq("id", stage.id);
-      if (!decision.need_image && !decision.need_mermaid) skipped++;
+      if (!decision.need_image) skipped++;
       generated++;
       const imageLabel = imageOk ? `yes(${imageSource})` : "no";
-      console.log(`${label} — image:${imageLabel} mermaid:${mermaidOkThis ? "yes" : "no"} status:generated`);
+      console.log(`${label} — image:${imageLabel} status:generated`);
     }
 
     // Стоп-условие заказчика: >50% провалов после разумной выборки.
@@ -363,7 +314,7 @@ async function main() {
     }
   }
 
-  console.log(`\nГотово: обработано ${generated + failed}/${todo.length}. generated=${generated} (картинок=${imagesOk} [gemini=${viaGemini}, pollinations=${viaPollinations}], схем=${mermaidOk}, без медиа=${skipped}), failed=${failed}. Вызовов Gemini: ${geminiCallCount}.`);
+  console.log(`\nГотово: обработано ${generated + failed}/${todo.length}. generated=${generated} (картинок=${imagesOk} [gemini=${viaGemini}, pollinations=${viaPollinations}], без медиа=${skipped}), failed=${failed}. Вызовов Gemini: ${geminiCallCount}.`);
   console.log(`Ориентировочная стоимость картинок через Gemini: ~$${(viaGemini * 0.039).toFixed(2)} (${viaGemini} × $0.039). Pollinations — бесплатно (${viaPollinations} шт).`);
 }
 

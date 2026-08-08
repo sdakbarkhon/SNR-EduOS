@@ -13,9 +13,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export type StageMediaDecision = {
   need_image: boolean;
   image_prompt: string | null;
-  need_mermaid: boolean;
-  mermaid_prompt: string | null;
 };
+
+// 08.08.2026 — картинка ставится ТОЛЬКО на этапы-объяснения. Раньше решение
+// принимал Gemini по описанию, и картинки расползлись по практике, заданиям,
+// тестам и внешним сервисам — там они не нужны и только отвлекают. На живых
+// данных так было у 45 этапов из 125 с картинками.
+//
+// Тип-объяснение в проекте ровно один — 'presentation' (слайды). Проверено
+// живым SELECT по lesson_stages: остальные content_type это wokwi, quiz_qia,
+// quiz_kahoot, code, code_completion, excalidraw, visualgo, typerun — все
+// практические.
+const EXPLANATION_CONTENT_TYPES = new Set(["presentation"]);
 
 export type LessonContextForMedia = {
   subject: string;
@@ -30,7 +39,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** decideStageMedia: нужна ли этапу картинка и/или mermaid-схема — решает
+/** decideStageMedia: нужна ли этапу картинка — решает
  *  сам Gemini (text-only). При сбое (сеть/парсинг) — безопасный дефолт
  *  "ничего не нужно", НЕ ретраится и НЕ считается провалом backfill'а (это
  *  разведка перед генерацией, а не сама генерация — ретраи 3x по спеке
@@ -40,17 +49,22 @@ export async function decideStageMedia(
   stage: Pick<LessonStage, "title" | "description" | "content_type">,
   lessonContext: LessonContextForMedia,
 ): Promise<StageMediaDecision> {
+  // Не объяснение — картинка не нужна, Gemini даже не спрашиваем: это
+  // экономит вызов и делает правило жёстким, а не «как решит модель».
+  if (!EXPLANATION_CONTENT_TYPES.has(stage.content_type ?? "")) {
+    return { need_image: false, image_prompt: null };
+  }
+
   const prompt = `Урок: ${lessonContext.subject} для ${lessonContext.grade} класса
 Тема урока: ${lessonContext.lesson_title}
 Название этапа: ${stage.title}
 Описание этапа: ${stage.description ?? "—"}
 Тип этапа: ${stage.content_type ?? "—"}
 
-Реши нужна ли этому этапу картинка и/или блок-схема алгоритма:
+Реши нужна ли этому этапу картинка:
 - Картинка нужна если этап описывает физический объект (робот, компонент, устройство), визуальный концепт (архитектура системы, интерфейс), или демонстрирует результат (собранная схема, работающая программа)
-- Блок-схема mermaid нужна если этап описывает алгоритм, последовательность шагов, условную логику, цикл
 
-Если этап явно текстовый/обсуждение без визуальных концептов — оба false.
+Если этап явно текстовый/обсуждение без визуальных концептов — false.
 
 ТРЕБОВАНИЯ К image_prompt (08.08.2026 — прежняя формулировка давала абстракцию:
 на этапе «Что такое ЖК-дисплей» рисовался размытый прямоугольник с жёлтыми
@@ -67,26 +81,22 @@ export async function decideStageMedia(
   glowing, ethereal и любые метафоры вместо предмета.
 - Один предмет крупным планом, не коллаж из нескольких сцен.
 
-Верни ТОЛЬКО JSON без markdown, ровно такой формы (пустая строка "" вместо null, если соответствующее need_* — false):
-{ "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше", "need_mermaid": boolean, "mermaid_prompt": "русский текст описывающий что должна показывать блок-схема" }`;
+Верни ТОЛЬКО JSON без markdown, ровно такой формы (пустая строка "" вместо null, если need_image — false):
+{ "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше" }`;
 
   const { data, error } = await generateJSON<{
     need_image?: boolean;
     image_prompt?: string;
-    need_mermaid?: boolean;
-    mermaid_prompt?: string;
   }>(prompt, null, { temperature: 0.4 });
 
   if (error || !data) {
     console.warn("[stage-media-prompts] decideStageMedia failed, defaulting to no media:", error);
-    return { need_image: false, image_prompt: null, need_mermaid: false, mermaid_prompt: null };
+    return { need_image: false, image_prompt: null };
   }
 
   return {
     need_image: data.need_image === true && !!data.image_prompt?.trim(),
     image_prompt: data.image_prompt?.trim() || null,
-    need_mermaid: data.need_mermaid === true && !!data.mermaid_prompt?.trim(),
-    mermaid_prompt: data.mermaid_prompt?.trim() || null,
   };
 }
 
@@ -173,48 +183,6 @@ export async function generateStageImage(image_prompt: string): Promise<StageIma
   } catch (e) {
     throw new Error(`${lastError} | pollinations: ${(e as Error)?.message}`);
   }
-}
-
-function stripMermaidFences(text: string): string {
-  return text.replace(/^```mermaid\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-}
-
-/** generateMermaidCode: Gemini 2.5 Flash text-only (через gemini-client.ts —
- *  тот же resolveModel() всегда возвращает Flash). Собственный retry-цикл
- *  ловит именно "модель ответила, но не валидным mermaid" — отдельный класс
- *  ошибки от транспортных 429/5xx, которые уже ретраит withRetry() внутри
- *  generateText(). 3 попытки — по спеке 3.3. */
-export async function generateMermaidCode(
-  mermaid_prompt: string,
-  stage_context: { grade: number },
-): Promise<string> {
-  const prompt = `Сгенерируй код блок-схемы mermaid для образовательной цели.
-Контекст: ${mermaid_prompt}
-Класс: ${stage_context.grade}
-
-Требования:
-- Только валидный mermaid flowchart-синтаксис (graph TD или graph LR)
-- Не больше 8 узлов
-- Все подписи на русском
-- Никаких других объяснений — только код mermaid, начинающийся с "graph TD" или "graph LR"`;
-
-  let lastError = "generateMermaidCode failed";
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const { text, error } = await generateText(prompt, { temperature: 0.4 });
-    if (!error && text.trim()) {
-      const code = stripMermaidFences(text.trim());
-      if (/^graph (TD|LR)\b/.test(code)) return code;
-      lastError = `Invalid mermaid output: ${code.slice(0, 200)}`;
-    } else {
-      lastError = error || "empty response";
-    }
-    if (attempt < MAX_RETRIES - 1) {
-      const delay = IMAGE_BASE_DELAY_MS * 2 ** attempt;
-      console.warn(`[stage-media-prompts] generateMermaidCode attempt ${attempt + 1}/${MAX_RETRIES} failed, retrying in ${delay}ms:`, lastError);
-      await sleep(delay);
-    }
-  }
-  throw new Error(lastError);
 }
 
 // Signed URL практически навсегда (bucket приватный — обычный publicUrl не
