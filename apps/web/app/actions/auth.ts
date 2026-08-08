@@ -19,7 +19,11 @@ import { getDemoNow } from "@/lib/demo-date";
 
 type LoginResult =
   | { ok: true; dest: string; isDemo: boolean }
-  | { ok: false; error: "invalid" | "failed" | "all_busy" };
+  // reason — машиночитаемая причина для лога на клиенте. Раньше сюда не
+  // доезжало ничего: server action возвращает объект, а не бросает, поэтому
+  // catch с console.error на клиенте был недостижим и консоль оставалась
+  // пустой при видимой пользователю ошибке (07.08.2026).
+  | { ok: false; error: "invalid" | "failed" | "all_busy"; reason?: string };
 
 interface ClaimSlotRow {
   username: string | null;
@@ -86,36 +90,78 @@ export async function demoLogin(
   // ученик берётся ТОЛЬКО из этого класса (миграция 135, students.grade).
   const gradeLevel = target.kind === "student" ? target.gradeLevel ?? null : null;
 
-  // 1) claim slot через RPC (миграции 133/135).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: claimed, error: claimError } = await (admin.rpc as any)("claim_demo_slot", {
-    p_role: role,
-    p_subject_slug: subjectSlug,
-    p_grade_level: gradeLevel,
-  });
-  if (claimError) {
-    const msg = claimError.message ?? "";
-    if (msg.includes("no_available_slot")) {
-      return { ok: false, error: "all_busy" };
-    }
-    console.error("[demoLogin] claim rpc error:", claimError);
-    return { ok: false, error: "failed" };
-  }
-  const row = (claimed as ClaimSlotRow[] | null)?.[0];
-  if (!row) return { ok: false, error: "all_busy" };
+  // 07.08.2026 — повтор с ДРУГИМ слотом вместо ошибки на первой попытке.
+  //
+  // Симптом заказчика: «иногда пишет "не удалось войти в демо-режим", со
+  // второго раза заходит», в консоли браузера пусто. Механизм виден прямо в
+  // demo_leases: часть аккаунтов пула откатывается через доли секунды после
+  // выдачи и НИКОГДА не даёт рабочую сессию (у одного 3 аренды из 3 такие),
+  // а следующий клик берёт другой аккаунт и заходит. То есть claim проходит,
+  // а signInWithPassword под выданной учёткой не проходит — функция
+  // claim_demo_slot возвращает пароль литералом и не проверяет, что аккаунт
+  // им действительно открывается.
+  //
+  // Пустая консоль объясняется отдельно: server action не бросает, а
+  // ВОЗВРАЩАЕТ { ok: false } — единственный console.error на клиенте лежит в
+  // catch, который на этом пути недостижим. Диагностика уходила только в лог
+  // сервера, поэтому «в консоли пусто».
+  //
+  // Чинить сам пароль отсюда нельзя (это правка учётных данных в проде, шаг
+  // заказчика — см. отчёт). Но пользователю видеть эту ошибку незачем:
+  // берём следующий слот. Плохой аккаунт при этом уже освобождён, а выбор
+  // ученика идёт ORDER BY random(), так что повтор почти всегда попадает в
+  // другой.
+  const ATTEMPTS = 3;
+  let row: ClaimSlotRow | null = null;
+  let signedIn: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"] | null = null;
+  let lastReason = "";
 
-  // 2) signIn под этим email — Supabase server client ставит auth cookies.
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: row.email,
-    password: row.password,
-  });
-  if (error || !data.session) {
-    // Rollback lease чтобы не залипло на 15 мин.
+  for (let attempt = 0; attempt < ATTEMPTS && !signedIn; attempt++) {
+    // 1) claim slot через RPC (миграции 133/135).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (admin.rpc as any)("release_demo_slot", { p_session_token: row.session_token });
-    console.error("[demoLogin] signIn error:", error?.message);
-    return { ok: false, error: "failed" };
+    const { data: claimed, error: claimError } = await (admin.rpc as any)("claim_demo_slot", {
+      p_role: role,
+      p_subject_slug: subjectSlug,
+      p_grade_level: gradeLevel,
+    });
+    if (claimError) {
+      const msg = claimError.message ?? "";
+      if (msg.includes("no_available_slot")) {
+        // Свободных слотов нет — повторять бессмысленно, ответ честный.
+        return { ok: false, error: "all_busy" };
+      }
+      console.error("[demoLogin] claim rpc error:", claimError);
+      return { ok: false, error: "failed", reason: "claim_failed" };
+    }
+    const candidate = (claimed as ClaimSlotRow[] | null)?.[0];
+    if (!candidate) return { ok: false, error: "all_busy" };
+
+    // 2) signIn под этим email — Supabase server client ставит auth cookies.
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: candidate.email,
+      password: candidate.password,
+    });
+    if (error || !data.session) {
+      // Rollback lease чтобы не залипло на 15 мин И чтобы следующая попытка
+      // не считала этот аккаунт занятым.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin.rpc as any)("release_demo_slot", { p_session_token: candidate.session_token });
+      lastReason = "signin_rejected";
+      console.error(
+        `[demoLogin] попытка ${attempt + 1}/${ATTEMPTS}: аккаунт ${candidate.username} не пускает —`,
+        error?.message ?? "нет сессии",
+      );
+      continue;
+    }
+    row = candidate;
+    signedIn = data;
   }
+
+  if (!row || !signedIn) {
+    console.error(`[demoLogin] все ${ATTEMPTS} попытки исчерпаны, причина: ${lastReason}`);
+    return { ok: false, error: "failed", reason: lastReason || "signin_rejected" };
+  }
+  const data = signedIn;
 
   await registerSession({
     userId: data.user.id,

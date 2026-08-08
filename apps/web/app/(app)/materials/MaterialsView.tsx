@@ -3,10 +3,13 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, FileText, BookOpen, Link as LinkIcon,
-  Video, FileImage, File, FolderOpen, X,
+  Video, FileImage, File, FolderOpen, X, CalendarDays, ChevronDown,
 } from "lucide-react";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
 import { buildFilterOptions, matchesFilters } from "@/lib/material-filters";
+import {
+  filterSelectClass, withCount, FILTER_ICON, FILTER_CHEVRON, FILTER_RESET,
+} from "@/components/material-filter-styles";
 import { getMaterialUrl, getMaterialSlides } from "@/app/actions/materials";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { SlidesViewerModal } from "@/components/SlidesViewerModal";
@@ -274,41 +277,53 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
             урока сбрасывается — иначе остался бы урок из другого дня и список
             молча опустел бы. */}
         {filterOptions.dates.length > 1 && (
-          <select
-            value={filterDate}
-            onChange={(e) => { setFilterDate(e.target.value); setFilterLesson("all"); }}
-            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
-          >
-            <option value="all">Все даты</option>
-            {filterOptions.dates.map((d) => (
-              <option key={d.key} value={d.key}>{d.label} ({d.count})</option>
-            ))}
-          </select>
+          <div className="relative">
+            <CalendarDays className={`${FILTER_ICON} ${filterDate !== "all" ? "text-blue-500" : "text-slate-400"}`} />
+            <select
+              value={filterDate}
+              onChange={(e) => { setFilterDate(e.target.value); setFilterLesson("all"); }}
+              className={filterSelectClass(filterDate !== "all")}
+            >
+              <option value="all">Все даты</option>
+              {filterOptions.dates.map((d) => (
+                <option key={d.key} value={d.key}>{withCount(d.label, d.count)}</option>
+              ))}
+            </select>
+            <ChevronDown className={`${FILTER_CHEVRON} ${filterDate !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+          </div>
         )}
         {filterOptions.lessons.length > 1 && (
-          <select
-            value={filterLesson}
-            onChange={(e) => setFilterLesson(e.target.value)}
-            className="max-w-[280px] rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
-          >
-            <option value="all">Все уроки</option>
-            {filterOptions.lessons.map((l) => (
-              <option key={l.id} value={l.id}>{l.label} ({l.count})</option>
-            ))}
-          </select>
+          <div className="relative">
+            <BookOpen className={`${FILTER_ICON} ${filterLesson !== "all" ? "text-blue-500" : "text-slate-400"}`} />
+            <select
+              value={filterLesson}
+              onChange={(e) => setFilterLesson(e.target.value)}
+              className={filterSelectClass(filterLesson !== "all", "max-w-[280px]")}
+            >
+              <option value="all">Все уроки</option>
+              {filterOptions.lessons.map((l) => (
+                <option key={l.id} value={l.id}>{withCount(l.label, l.count)}</option>
+              ))}
+            </select>
+            <ChevronDown className={`${FILTER_CHEVRON} ${filterLesson !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+          </div>
         )}
         {/* Subject dropdown */}
         {subjects.length > 1 && (
-          <select
-            value={filterSubject}
-            onChange={(e) => setFilterSubject(e.target.value)}
-            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
-          >
-            <option value="all">Все предметы</option>
-            {subjects.map((s) => (
-              <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <FolderOpen className={`${FILTER_ICON} ${filterSubject !== "all" ? "text-blue-500" : "text-slate-400"}`} />
+            <select
+              value={filterSubject}
+              onChange={(e) => setFilterSubject(e.target.value)}
+              className={filterSelectClass(filterSubject !== "all")}
+            >
+              <option value="all">Все предметы</option>
+              {subjects.map((s) => (
+                <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+              ))}
+            </select>
+            <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+          </div>
         )}
         {/* Type tabs */}
         {FILTER_TABS.map(({ key, label }) => (
@@ -324,6 +339,19 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
             {label}
           </button>
         ))}
+
+        {/* Сброс — появляется только когда есть что сбрасывать, иначе занимал
+            бы место и мигал бы при каждом клике. Логику отбора не трогает,
+            просто возвращает все четыре контрола в исходное состояние. */}
+        {(filterDate !== "all" || filterLesson !== "all" || filterSubject !== "all" || activeType !== "all") && (
+          <button
+            onClick={() => { setFilterDate("all"); setFilterLesson("all"); setFilterSubject("all"); setActiveType("all"); }}
+            className={FILTER_RESET}
+          >
+            <X className="h-4 w-4" />
+            Сбросить
+          </button>
+        )}
       </div>
 
       {/* Recently opened */}

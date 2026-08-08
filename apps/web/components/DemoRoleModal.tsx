@@ -103,6 +103,9 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           setOccupiedGrades((prev) => new Set([...prev, gradeLevel]));
           setError(d.allBusy);
         } else {
+          // Сервер-экшен не бросает, а возвращает — поэтому catch ниже сюда
+          // не доходил и в консоли браузера было пусто при видимой ошибке.
+          console.error("[demo-login] отказ сервера:", result.reason ?? result.error);
           setError(d.loginFailed);
         }
         setLoading(null);
@@ -131,6 +134,9 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           setOccupiedSubjects((prev) => new Set([...prev, slug]));
           setError(d.allBusy);
         } else {
+          // Сервер-экшен не бросает, а возвращает — поэтому catch ниже сюда
+          // не доходил и в консоли браузера было пусто при видимой ошибке.
+          console.error("[demo-login] отказ сервера:", result.reason ?? result.error);
           setError(d.loginFailed);
         }
         setLoading(null);

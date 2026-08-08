@@ -4,11 +4,15 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   FolderOpen, Plus, FileText, Video, FileImage, File, BookOpen,
   Link as LinkIcon, MoreHorizontal, Trash2, X, Upload, Check, Search,
+  CalendarDays, ChevronDown, Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { insertMaterial } from "@snr/core";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
 import { buildFilterOptions, matchesFilters } from "@/lib/material-filters";
+import {
+  filterSelectClass, withCount, FILTER_ICON, FILTER_CHEVRON, FILTER_RESET,
+} from "@/components/material-filter-styles";
 import { getMaterialUrl, getMaterialSlides, deleteMaterial as deleteMaterialAction } from "@/app/actions/materials";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
@@ -858,49 +862,76 @@ export function TeacherMaterialsView({
               Список уроков сужается выбранной датой; при смене даты выбор
               урока сбрасывается, иначе остался бы урок другого дня. */}
           {filterOptions.dates.length > 1 && (
-            <select
-              value={filterDate}
-              onChange={(e) => { setFilterDate(e.target.value); setFilterLesson("all"); }}
-              className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
-            >
-              <option value="all">Все даты</option>
-              {filterOptions.dates.map((d) => (
-                <option key={d.key} value={d.key}>{d.label} ({d.count})</option>
-              ))}
-            </select>
+            <div className="relative">
+              <CalendarDays className={`${FILTER_ICON} ${filterDate !== "all" ? "text-blue-500" : "text-slate-400"}`} />
+              <select
+                value={filterDate}
+                onChange={(e) => { setFilterDate(e.target.value); setFilterLesson("all"); }}
+                className={filterSelectClass(filterDate !== "all")}
+              >
+                <option value="all">Все даты</option>
+                {filterOptions.dates.map((d) => (
+                  <option key={d.key} value={d.key}>{withCount(d.label, d.count)}</option>
+                ))}
+              </select>
+              <ChevronDown className={`${FILTER_CHEVRON} ${filterDate !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+            </div>
           )}
           {filterOptions.lessons.length > 1 && (
+            <div className="relative">
+              <BookOpen className={`${FILTER_ICON} ${filterLesson !== "all" ? "text-blue-500" : "text-slate-400"}`} />
+              <select
+                value={filterLesson}
+                onChange={(e) => setFilterLesson(e.target.value)}
+                className={filterSelectClass(filterLesson !== "all", "max-w-[280px]")}
+              >
+                <option value="all">Все уроки</option>
+                {filterOptions.lessons.map((l) => (
+                  <option key={l.id} value={l.id}>{withCount(l.label, l.count)}</option>
+                ))}
+              </select>
+              <ChevronDown className={`${FILTER_CHEVRON} ${filterLesson !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+            </div>
+          )}
+          <div className="relative">
+            <FolderOpen className={`${FILTER_ICON} ${filterSubject !== "all" ? "text-blue-500" : "text-slate-400"}`} />
             <select
-              value={filterLesson}
-              onChange={(e) => setFilterLesson(e.target.value)}
-              className="max-w-[280px] rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
+              value={filterSubject}
+              onChange={(e) => setFilterSubject(e.target.value)}
+              className={filterSelectClass(filterSubject !== "all")}
             >
-              <option value="all">Все уроки</option>
-              {filterOptions.lessons.map((l) => (
-                <option key={l.id} value={l.id}>{l.label} ({l.count})</option>
+              <option value="all">Все предметы</option>
+              {subjects.map((s) => (
+                <option key={s} value={s}>{subjectLabel[s] ?? s}</option>
               ))}
             </select>
+            <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+          </div>
+          <div className="relative">
+            <Users className={`${FILTER_ICON} ${filterGroup !== "all" ? "text-blue-500" : "text-slate-400"}`} />
+            <select
+              value={filterGroup}
+              onChange={(e) => setFilterGroup(e.target.value)}
+              className={filterSelectClass(filterGroup !== "all")}
+            >
+              <option value="all">Все группы</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+            <ChevronDown className={`${FILTER_CHEVRON} ${filterGroup !== "all" ? "text-blue-400" : "text-slate-400"}`} />
+          </div>
+
+          {/* Сброс — только когда есть что сбрасывать. */}
+          {(filterDate !== "all" || filterLesson !== "all" || filterSubject !== "all" || filterGroup !== "all") && (
+            <button
+              onClick={() => { setFilterDate("all"); setFilterLesson("all"); setFilterSubject("all"); setFilterGroup("all"); }}
+              className={FILTER_RESET}
+            >
+              <X className="h-4 w-4" />
+              Сбросить
+            </button>
           )}
-          <select
-            value={filterSubject}
-            onChange={(e) => setFilterSubject(e.target.value)}
-            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
-          >
-            <option value="all">Все предметы</option>
-            {subjects.map((s) => (
-              <option key={s} value={s}>{subjectLabel[s] ?? s}</option>
-            ))}
-          </select>
-          <select
-            value={filterGroup}
-            onChange={(e) => setFilterGroup(e.target.value)}
-            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-md focus:outline-none"
-          >
-            <option value="all">Все группы</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
         </div>
 
         {/* Grid */}

@@ -119,15 +119,50 @@ function gradeFromGroupName(name: string | null | undefined, fallback: number): 
   return Number.isFinite(g) && g >= 1 && g <= 12 ? g : fallback;
 }
 
-function normalizeStage(s: GenStage): GenStage | null {
+/** 07.08.2026 — почти-попадания Gemini по content_type. Раньше любое из них
+ *  молча превращалось в "presentation" (см. ниже), а слайдов у такого этапа
+ *  нет — в уроке появлялась пустая презентация вместо квиза. Это и выглядело
+ *  как «ИИ перестал делать Kahoot и тесты». */
+/** Русские и разнорегистровые варианты уровня — см. комментарий в normalizeStage. */
+const DIFFICULTY_ALIASES: Record<string, string> = {
+  "лёгкий": "easy", "легкий": "easy", "простой": "easy",
+  "средний": "medium", "обычный": "medium",
+  "сложный": "hard", "трудный": "hard", "продвинутый": "hard",
+};
+
+const CONTENT_ALIASES: Record<string, string> = {
+  quiz: "quiz_qia",
+  qia: "quiz_qia",
+  test: "quiz_qia",
+  "quiz-qia": "quiz_qia",
+  kahoot: "quiz_kahoot",
+  "quiz-kahoot": "quiz_kahoot",
+  quizkahoot: "quiz_kahoot",
+};
+
+function normalizeStage(s: GenStage, overallDifficulty: string): GenStage | null {
   if (!s || typeof s.title !== "string" || !s.title.trim()) return null;
-  let ct = String(s.content_type ?? "presentation");
-  if (!ALLOWED_CONTENT.includes(ct)) ct = "presentation";
+  let ct = String(s.content_type ?? "presentation").trim().toLowerCase();
+  if (!ALLOWED_CONTENT.includes(ct) && CONTENT_ALIASES[ct]) ct = CONTENT_ALIASES[ct]!;
+  if (!ALLOWED_CONTENT.includes(ct)) {
+    // Логируем ПЕРЕД подменой: раньше подмена была немой, и отличить
+    // «модель не предложила квиз» от «предложила, но мы её не поняли» в
+    // проде было невозможно.
+    console.warn("[ai-generate] неизвестный content_type:", JSON.stringify(s.content_type), "→ presentation");
+    ct = "presentation";
+  }
   // Honour stage_type from AI (theory/task), fallback to ct-based
   const stage_type = ["theory", "task"].includes(String(s.stage_type ?? ""))
     ? s.stage_type
     : ct === "presentation" ? "theory" : "task";
-  const difficulty = ["easy", "medium", "hard"].includes(String(s.difficulty)) ? s.difficulty : "medium";
+  // 07.08.2026 — учитель выбирал «Лёгкий», а в БД ложилось medium. Причин две,
+  // обе здесь: (1) запасным значением была ЛИТЕРАЛЬНАЯ "medium", а не то, что
+  // выбрал учитель; (2) проверка регистрозависимая и только по-английски, а
+  // весь промпт русский при temperature 0.85 — «Лёгкий», «легкий», «Easy»
+  // одинаково не проходили и падали в ту же "medium".
+  const rawDiff = String(s.difficulty ?? "").trim().toLowerCase();
+  const mapped = DIFFICULTY_ALIASES[rawDiff] ?? rawDiff;
+  const difficulty = ["easy", "medium", "hard"].includes(mapped) ? mapped : overallDifficulty;
   // Clamp per-stage duration to 5–60 min; default 10
   const raw = Number(s.duration_min);
   const duration_min = Number.isFinite(raw) && raw > 0
@@ -308,10 +343,28 @@ export async function POST(req: NextRequest) {
 
     const rawStages = Array.isArray(parsed.stages) ? parsed.stages : [];
     const stages = rawStages
-      .map(normalizeStage)
+      .map((s) => normalizeStage(s, overallDifficulty))
       .filter((s): s is GenStage => s !== null);
     if (stages.length === 0) {
       lastError = "Generated stages failed validation";
+      continue;
+    }
+
+    // 07.08.2026 — правило «в каждом уроке обязан быть квиз» и требование
+    // разнообразия типов до сих пор существовали ТОЛЬКО как текст в промпте.
+    // Цикл повторов рядом уже был, но срабатывал лишь на нечитаемый JSON —
+    // план из четырёх презентаций проходил насквозь. Теперь план без квиза
+    // считается неудачной попыткой и генерируется заново; на последней
+    // попытке принимаем что есть, чтобы учитель не остался вообще без плана.
+    const hasQuiz = stages.some((s) => s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot");
+    const distinctTypes = new Set(stages.map((s) => s.content_type)).size;
+    const needQuiz = durationMin >= 20;
+    if (attempt < 2 && ((needQuiz && !hasQuiz) || distinctTypes < 2)) {
+      console.warn(
+        `[ai-generate] attempt ${attempt}: план отклонён — квиз=${hasQuiz}, разных типов=${distinctTypes};`,
+        "типы:", stages.map((s) => s.content_type).join(","),
+      );
+      lastError = "Plan has no quiz stage or too little variety";
       continue;
     }
     result = {
