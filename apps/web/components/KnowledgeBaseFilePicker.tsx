@@ -88,10 +88,24 @@ const LIB_ALLOWED_MIME = [
 ];
 const LIB_MAX_SIZE = 52428800; // 50 МБ — совпадает с лимитом бакета "materials"
 
-/** MIME книги по расширению файла. Миграция 175 разрешила в бакете books не
- *  только PDF, поэтому прежний хардкод «application/pdf» стал бы враньём:
- *  прикреплённый к уроку .mp4 или .docx приехал бы туда как PDF. */
-function bookMimeOf(storagePath: string): string {
+/** 08.08.2026 — MIME по РАСШИРЕНИЮ пути, с откатом на то, что записано в базе.
+ *
+ *  Из-за отсутствия этого отката вкладка «Материалы группы» была пустой.
+ *  Разбор: страница урока передаёт пикеру acceptedTypes=["application/pdf"],
+ *  фильтр ниже сравнивает с ним picked.fileType на точное совпадение. У книг
+ *  MIME и так считался по расширению (bookMimeOf), у библиотеки учителей в
+ *  базе лежит настоящий "application/pdf" — обе вкладки проходили. А у
+ *  course_materials в file_type записано "application/octet-stream" при
+ *  реальном .pdf (30 записей на живых данных), и все они молча отсеивались.
+ *
+ *  Данные не чиним: octet-stream — честное «сервер не распознал тип при
+ *  загрузке», а расширение пути известно наверняка. Считать тип на чтении
+ *  надёжнее, чем полагаться на то, что записал загрузчик.
+ *
+ *  Прежний комментарий: миграция 175 разрешила в бакете books не только PDF,
+ *  поэтому хардкод «application/pdf» стал бы враньём — прикреплённый к уроку
+ *  .mp4 или .docx приехал бы туда как PDF. */
+function bookMimeOf(storagePath: string, fallback?: string | null): string {
   const ext = (storagePath.split(".").pop() ?? "").toLowerCase();
   if (ext === "mp4") return "video/mp4";
   if (ext === "docx") return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -100,6 +114,12 @@ function bookMimeOf(storagePath: string): string {
   if (ext === "png") return "image/png";
   if (ext === "webp") return "image/webp";
   if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "pdf") return "application/pdf";
+  // Расширение не узнали. Если в базе записан осмысленный тип — берём его;
+  // "application/octet-stream" осмысленным не считается, это заглушка
+  // загрузчика. Иначе остаётся прежнее поведение книг: считать PDF (бакет
+  // books до миграции 175 ничего другого и не содержал).
+  if (fallback && fallback !== "application/octet-stream") return fallback;
   return "application/pdf";
 }
 
@@ -783,7 +803,15 @@ export function KnowledgeBaseFilePicker({
           key: `material:${m.id}`,
           title: m.title,
           hasLink: !!m.link_url && !m.storage_path,
-          picked: { source: "material", id: m.id, title: m.title, storagePath: m.storage_path ?? m.link_url ?? "", fileType: m.file_type, sizeBytes: m.file_size_bytes },
+          picked: {
+            source: "material", id: m.id, title: m.title,
+            storagePath: m.storage_path ?? m.link_url ?? "",
+            // Тип считаем по расширению пути (см. bookMimeOf выше) — в базе у
+            // этих записей лежит "application/octet-stream", и фильтр
+            // acceptedTypes отсеивал настоящие PDF.
+            fileType: m.storage_path ? bookMimeOf(m.storage_path, m.file_type) : m.file_type,
+            sizeBytes: m.file_size_bytes,
+          },
         }));
 
   // acceptedTypes is opt-in per call site (undefined = show everything, e.g.
