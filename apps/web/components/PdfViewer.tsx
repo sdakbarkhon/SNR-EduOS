@@ -5,6 +5,9 @@
 // as CodeEditor.tsx's Monaco loading).
 import dynamic from "next/dynamic";
 
+// Пропы прокидываются как есть — next/dynamic сохраняет сигнатуру
+// PdfViewerInner (page/onPageChange/readOnly добавлены 08.08.2026 ради
+// синхронного листания на показе материала классу).
 export const PdfViewer = dynamic(
   () => import("./PdfViewerInner").then((m) => m.PdfViewerInner),
   {

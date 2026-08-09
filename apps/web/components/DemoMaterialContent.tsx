@@ -6,6 +6,9 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { PdfViewer } from "@/components/PdfViewer";
+import {
+  loadYouTubeApi, withJsApi, isYouTubeEmbed, YT_STATE, type YouTubePlayer,
+} from "@/lib/youtube-iframe-api";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -48,6 +51,11 @@ type VideoSyncPayload = {
   position: number;
   timestamp: number;
 };
+
+/** 08.08.2026 — листание PDF классу. Едет тем же broadcast-каналом, что и
+ *  видео, но ОТДЕЛЬНЫМ событием: смешивать их в одном payload значило бы
+ *  заводить необязательные поля и проверять их на каждом сообщении. */
+type PageSyncPayload = { page: number; timestamp: number };
 
 export function DemoMaterialContent({
   url, title, kind, lessonId, canControl = false, isDemoSchool = false,
@@ -94,7 +102,15 @@ export function DemoMaterialContent({
    * иначе учитель, догоняющий чужую позицию, ретранслировал бы её обратно. */
   const applyingRef = useRef(false);
 
-  const syncEnabled = kind === "video" && Boolean(lessonId);
+  // YouTube синхронизируется через свой IFrame API (lib/youtube-iframe-api.ts),
+  // обычный файл — напрямую через <video>, PDF — по номеру страницы.
+  const isYouTube = kind === "embed" && isYouTubeEmbed(url);
+  const syncEnabled = Boolean(lessonId) && (kind === "video" || kind === "pdf" || isYouTube);
+
+  const ytRef = useRef<YouTubePlayer | null>(null);
+  const ytHostRef = useRef<HTMLIFrameElement | null>(null);
+  /** Страница PDF, пришедшая от учителя. У самого учителя не используется. */
+  const [remotePage, setRemotePage] = useState<number | null>(null);
 
   useEffect(() => {
     if (!syncEnabled || !lessonId) return;
@@ -112,20 +128,41 @@ export function DemoMaterialContent({
         // Учитель — источник; собственные события применять не нужно.
         if (canControl) return;
         const p = msg.payload;
+        if (!p) return;
         const el = videoRef.current;
-        if (!p || !el) return;
+        const yt = ytRef.current;
+        if (!el && !yt) return;
         applyingRef.current = true;
         try {
-          if (typeof p.position === "number" && Math.abs(el.currentTime - p.position) > VIDEO_SYNC_THRESHOLD_S) {
-            el.currentTime = p.position;
+          if (yt) {
+            // Порог тот же, что у обычного видео: дёргать позицию на каждом
+            // сообщении значит подвешивать плеер рывками.
+            if (typeof p.position === "number" && Math.abs(yt.getCurrentTime() - p.position) > VIDEO_SYNC_THRESHOLD_S) {
+              yt.seekTo(p.position, true);
+            }
+            if (p.action === "play") yt.playVideo();
+            else if (p.action === "pause") yt.pauseVideo();
+          } else if (el) {
+            if (typeof p.position === "number" && Math.abs(el.currentTime - p.position) > VIDEO_SYNC_THRESHOLD_S) {
+              el.currentTime = p.position;
+            }
+            if (p.action === "play") void el.play().catch(() => null);
+            else if (p.action === "pause") el.pause();
           }
-          if (p.action === "play") void el.play().catch(() => null);
-          else if (p.action === "pause") el.pause();
         } finally {
           // play/pause прилетает асинхронно после вызова — снимаем флаг
           // следующим тиком, а не сразу.
           setTimeout(() => { applyingRef.current = false; }, 0);
         }
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "page" },
+        (msg: { payload?: Partial<PageSyncPayload> }) => {
+          if (canControl) return;
+          const n = msg.payload?.page;
+          if (typeof n === "number" && n >= 1) setRemotePage(n);
         },
       )
       .subscribe();
@@ -139,14 +176,64 @@ export function DemoMaterialContent({
 
   const broadcast = useCallback((action: VideoSyncPayload["action"]) => {
     if (!canControl || applyingRef.current) return;
-    const el = videoRef.current;
-    if (!el) return;
+    // Позицию берём у того плеера, который на экране: YouTube отвечает через
+    // свой API, обычный файл — через <video>.
+    const position = ytRef.current ? ytRef.current.getCurrentTime() : videoRef.current?.currentTime;
+    if (typeof position !== "number") return;
     void channelRef.current?.send({
       type: "broadcast",
       event: "video",
-      payload: { action, position: el.currentTime, timestamp: Date.now() } satisfies VideoSyncPayload,
+      payload: { action, position, timestamp: Date.now() } satisfies VideoSyncPayload,
     });
   }, [canControl]);
+
+  /** Учитель пролистал PDF — отправляем номер страницы классу. */
+  const broadcastPage = useCallback((page: number) => {
+    if (!canControl) return;
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "page",
+      payload: { page, timestamp: Date.now() } satisfies PageSyncPayload,
+    });
+  }, [canControl]);
+
+  /* YouTube: поднимаем плеер и слушаем его состояние.
+   *
+   * Скрипт грузится ТОЛЬКО здесь и только когда на экране реально YouTube —
+   * обоснование в lib/youtube-iframe-api.ts. Учитель шлёт play/pause и
+   * перемотку, ученик ничего не шлёт: события применяются ему выше. */
+  useEffect(() => {
+    if (!isYouTube || !lessonId) return;
+    let cancelled = false;
+    let player: YouTubePlayer | null = null;
+    let lastState = -1;
+
+    loadYouTubeApi()
+      .then((YT) => {
+        if (cancelled || !ytHostRef.current) return;
+        player = new YT.Player(ytHostRef.current, {
+          events: {
+            onStateChange: (e) => {
+              if (!canControl || applyingRef.current) return;
+              // Отдельного события перемотки YouTube не даёт: она видна как
+              // BUFFERING, а следом снова PLAYING. Позицию всё равно шлём в
+              // каждом сообщении, и ученик сверяет её с порогом.
+              if (e.data === YT_STATE.PLAYING) broadcast(lastState === YT_STATE.BUFFERING ? "seek" : "play");
+              else if (e.data === YT_STATE.PAUSED) broadcast("pause");
+              lastState = e.data;
+            },
+          },
+        });
+        ytRef.current = player;
+      })
+      .catch((err) => console.warn("[DemoMaterialContent] YouTube API:", (err as Error)?.message));
+
+    return () => {
+      cancelled = true;
+      try { player?.destroy(); } catch { /* плеер мог не успеть создаться */ }
+      ytRef.current = null;
+    };
+  }, [isYouTube, lessonId, canControl, broadcast]);
 
   // Ученик реальной школы смотрит без контролов; в демо-школе контролы
   // остаются — он может поставить на паузу, но это чисто локально.
@@ -245,7 +332,18 @@ export function DemoMaterialContent({
         onMouseLeave={endDrag}
         style={dragEnabled ? { cursor: isDragging ? "grabbing" : "grab" } : undefined}
       >
-        {kind === "pdf" && <PdfViewer url={url} title={title} scale={zoom} />}
+        {kind === "pdf" && (
+          <PdfViewer
+            url={url}
+            title={title}
+            scale={zoom}
+            // Ученику страницу диктует учитель, и листать самому нельзя, пока
+            // идёт показ — иначе выйдет драка за страницу.
+            page={!canControl && syncEnabled ? remotePage ?? undefined : undefined}
+            readOnly={!canControl && syncEnabled}
+            onPageChange={canControl ? broadcastPage : undefined}
+          />
+        )}
         {kind === "video" && (
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video
@@ -260,7 +358,11 @@ export function DemoMaterialContent({
         )}
         {kind === "embed" && (
           <iframe
-            src={url}
+            ref={ytHostRef}
+            // enablejsapi дописывается НА РЕНДЕРЕ: адреса в базе
+            // (lesson_materials.external_url) не переписываются, поэтому уже
+            // сохранённые ролики начинают синхронизироваться сами собой.
+            src={isYouTube ? withJsApi(url) : url}
             title={title}
             className="h-full w-full border-0 bg-black"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

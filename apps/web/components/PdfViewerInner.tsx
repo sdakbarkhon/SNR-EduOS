@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -23,12 +23,40 @@ pdfjs.GlobalWorkerOptions.workerSrc =
 // рендере страницы (react-pdf: "If you define width and scale at the same
 // time, the width will be multiplied by a given factor") — управляется
 // зум-контролами FileViewerModal через Ctrl+Scroll/+/-/100%.
-export function PdfViewerInner({ url, title, scale = 1 }: { url: string; title?: string; scale?: number }) {
+export function PdfViewerInner({
+  url, title, scale = 1, page, onPageChange, readOnly = false,
+}: {
+  url: string;
+  title?: string;
+  scale?: number;
+  /** 08.08.2026 — страница снаружи. Задана — просмотрщик подчиняется ей
+   *  (ученик во время показа), не задана — листает сам, как раньше. */
+  page?: number;
+  /** Сообщает наружу текущую страницу — учитель по этому событию рассылает
+   *  её классу. */
+  onPageChange?: (page: number) => void;
+  /** Прячет кнопки и глушит стрелки: пока учитель показывает документ, ученик
+   *  не должен листать сам — иначе выйдет драка за страницу. */
+  readOnly?: boolean;
+}) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).demo;
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
+
+  // Внешняя страница главнее локальной: пришла — показываем её.
+  useEffect(() => {
+    if (typeof page === "number" && page >= 1) setPageNumber(page);
+  }, [page]);
   const [pageWidth, setPageWidth] = useState(800);
+
+  // Наружу сообщаем ТОЛЬКО когда листает сам пользователь (readOnly=false):
+  // иначе ученик, применивший чужую страницу, отправил бы её обратно, и
+  // получился бы цикл «применил → отправил → применил».
+  const notifyPage = useCallback((next: number) => {
+    setPageNumber(next);
+    if (!readOnly) onPageChange?.(next);
+  }, [readOnly, onPageChange]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,12 +73,13 @@ export function PdfViewerInner({ url, title, scale = 1 }: { url: string; title?:
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") setPageNumber((p) => Math.max(1, p - 1));
-      if (e.key === "ArrowRight") setPageNumber((p) => Math.min(numPages, p + 1));
+      if (readOnly) return;
+      if (e.key === "ArrowLeft") notifyPage(Math.max(1, pageNumber - 1));
+      if (e.key === "ArrowRight") notifyPage(Math.min(numPages, pageNumber + 1));
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [numPages]);
+  }, [numPages, readOnly, pageNumber, notifyPage]);
 
   return (
     // w-full — без него контейнер (flex-ребёнок в items-center justify-center
@@ -77,8 +106,8 @@ export function PdfViewerInner({ url, title, scale = 1 }: { url: string; title?:
         // короткой высоте модалки (планшет) — всегда видна внизу.
         <div className="flex w-full shrink-0 items-center justify-center gap-4 border-t border-slate-200 bg-white p-4">
           <button
-            onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-            disabled={pageNumber <= 1}
+            onClick={() => notifyPage(Math.max(1, pageNumber - 1))}
+            disabled={readOnly || pageNumber <= 1}
             className="rounded-lg bg-slate-200 p-2 hover:bg-slate-300 disabled:opacity-40"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -89,8 +118,8 @@ export function PdfViewerInner({ url, title, scale = 1 }: { url: string; title?:
           </span>
 
           <button
-            onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
-            disabled={pageNumber >= numPages}
+            onClick={() => notifyPage(Math.min(numPages, pageNumber + 1))}
+            disabled={readOnly || pageNumber >= numPages}
             className="rounded-lg bg-violet-600 p-2 text-white hover:bg-violet-700 disabled:opacity-40"
           >
             <ChevronRight className="h-5 w-5" />
