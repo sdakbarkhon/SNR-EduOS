@@ -122,17 +122,53 @@ async function purgeNonBaseline(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyDb = db as any;
 
-  const { data: baseline, error: baseErr } = await anyDb
+  // 08.08.2026, АВАРИЯ И ФИКС. Здесь был обычный .select() без пагинации —
+  // и он молча вернул 1000 строк из 1217: PostgREST режет выдачу на
+  // db-max-rows. Недостающие 217 идентификаторов механизм счёл «лишними» и
+  // удалил: 49 эталонных уроков и 75 материалов, а с ними каскадом этапы,
+  // посещаемость и оценки. Предохранитель «лишнего больше эталонного» не
+  // сработал — 50 удаляемых против ~800 уцелевших в усечённом списке
+  // выглядели правдоподобно.
+  //
+  // Отсюда два правила, оба обязательные:
+  //   1) снимок читается ПОСТРАНИЧНО, а не одним select;
+  //   2) прочитанное сверяется с точным count — расхождение означает, что
+  //      список неполон, и тогда НЕ УДАЛЯЕТСЯ НИЧЕГО. Неполный список
+  //      неотличим от «этих записей нет в эталоне», а цена ошибки — снос
+  //      живых данных.
+  const PAGE = 1000;
+  const { count: baselineCount, error: countErr } = await anyDb
     .from("demo_baseline")
-    .select("entity_type, entity_id")
+    .select("entity_id", { count: "exact", head: true })
     .eq("school_id", DEMO_SCHOOL_ID);
-  if (baseErr) {
-    result.errors.push("baseline read: " + baseErr.message);
+  if (countErr) {
+    result.errors.push("baseline count: " + countErr.message);
     return;
   }
 
-  const rows = (baseline ?? []) as Array<{ entity_type: string; entity_id: string }>;
-  // 1220 записей на 08.08.2026. Порог грубый намеренно: он ловит «снимок
+  const rows: Array<{ entity_type: string; entity_id: string }> = [];
+  for (let from = 0; from < (baselineCount ?? 0); from += PAGE) {
+    const { data, error } = await anyDb
+      .from("demo_baseline")
+      .select("entity_type, entity_id")
+      .eq("school_id", DEMO_SCHOOL_ID)
+      .order("entity_id")
+      .range(from, from + PAGE - 1);
+    if (error) {
+      result.errors.push("baseline read: " + error.message);
+      return;
+    }
+    rows.push(...((data ?? []) as Array<{ entity_type: string; entity_id: string }>));
+  }
+
+  if (rows.length !== (baselineCount ?? -1)) {
+    result.errors.push(
+      "baseline incomplete: got " + rows.length + " of " + baselineCount + " — purge skipped",
+    );
+    return;
+  }
+
+  // 1217 записей на 08.08.2026. Порог грубый намеренно: он ловит «снимок
   // потерян», а не «снимок чуть устарел».
   if (rows.length < 500) {
     result.errors.push("baseline too small (" + rows.length + ") — purge skipped");
