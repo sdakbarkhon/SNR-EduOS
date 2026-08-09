@@ -591,6 +591,7 @@ export function KnowledgeBaseFilePicker({
   acceptedTypes,
   allowVideoLinks = false,
   initialTab,
+  hideGroupMaterials = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -616,12 +617,26 @@ export function KnowledgeBaseFilePicker({
    *  вовсе (отдельная будущая миграция), поэтому его форма явно передаёт
    *  false, чтобы учитель не выбрал то, что физически не прикрепится. */
   allowVideoLinks?: boolean;
+  /** 08.08.2026 — скрыть вкладку «Материалы группы». Решение заказчика после
+   *  двух заходов починки: при прикреплении к УРОКУ она убрана, учитель
+   *  берёт материалы из библиотеки и из кафедры.
+   *
+   *  Проп, а не удаление вкладки насовсем: второй вызывающий — форма
+   *  домашнего задания (CreateHomeworkForm.tsx) — вкладку использует, фильтр
+   *  типов не передаёт и показывает всё. Убери мы её из компонента, задание
+   *  потеряло бы источник материалов заодно с уроком.
+   *
+   *  Когда скрыта: вкладка не рисуется, запрос к course_materials не
+   *  выполняется вовсе (лишний запрос на каждое открытие пикера ни к чему), и
+   *  стартовой становится «Библиотека». Сам раздел «Материалы группы» в базе
+   *  знаний живёт отдельно и не затронут. */
+  hideGroupMaterials?: boolean;
 }) {
   const { locale } = useLocale();
   const dict = getDictionary(locale as Locale);
   const d = dict.knowledgeBase;
   const dt = dict.teacher;
-  const [tab, setTab] = useState<Tab>("materials");
+  const [tab, setTab] = useState<Tab>(hideGroupMaterials ? "library" : "materials");
   const [query, setQuery] = useState("");
   const [materials, setMaterials] = useState<MaterialWithGroup[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
@@ -666,7 +681,7 @@ export function KnowledgeBaseFilePicker({
 
   useEffect(() => {
     if (!open) return;
-    setTab(initialTab ?? "materials");
+    setTab(hideGroupMaterials ? (initialTab === "materials" ? "library" : initialTab ?? "library") : initialTab ?? "materials");
     setSelected(new Map());
     setQuery("");
     setTabError({ library: null, materials: null, teacherLibrary: null });
@@ -676,8 +691,11 @@ export function KnowledgeBaseFilePicker({
     const sb = createClient();
     Promise.allSettled([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"])
-        .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
+      hideGroupMaterials
+        ? Promise.resolve([])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : (sb as any).from("course_materials").select("*, group:groups(name, subject)").in("group_id", groupIds.length ? groupIds : ["__none__"])
+            .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sb as any).from("books").select("*")
         .then((res: { data: unknown; error: unknown }) => { if (res.error) throw res.error; return res.data; }),
@@ -877,12 +895,14 @@ export function KnowledgeBaseFilePicker({
 
         {/* Tabs — порядок: Материалы группы → Библиотека → Библиотека учителей */}
         <div className="flex gap-2 border-b border-slate-100 px-6 pt-3">
-          <button
-            onClick={() => setTab("materials")}
-            className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "materials" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            {d.tabGroupMaterials}
-          </button>
+          {!hideGroupMaterials && (
+            <button
+              onClick={() => setTab("materials")}
+              className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "materials" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              {d.tabGroupMaterials}
+            </button>
+          )}
           <button
             onClick={() => setTab("library")}
             className={`rounded-t-xl px-4 py-2 text-sm font-bold transition ${tab === "library" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}

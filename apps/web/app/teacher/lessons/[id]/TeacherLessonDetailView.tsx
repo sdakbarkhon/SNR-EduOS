@@ -839,7 +839,9 @@ export function TeacherLessonDetailView({
   // вместо дефолтной "Материалы группы" — сама возможность прикрепить
   // существовала и раньше через общую кнопку "Обзор базы знаний" (эта
   // вкладка уже была одной из трёх), это просто более короткий путь.
-  const [kbPickerInitialTab, setKbPickerInitialTab] = useState<"materials" | "library" | "teacherLibrary">("materials");
+  // 08.08.2026 — вкладка «Материалы группы» в прикреплении к уроку скрыта
+  // (hideGroupMaterials ниже), поэтому стартовая теперь «Библиотека».
+  const [kbPickerInitialTab, setKbPickerInitialTab] = useState<"materials" | "library" | "teacherLibrary">("library");
   // Пачка 4 — третий взаимоисключающий вариант: ссылка на YouTube/RuTube
   // вместо файла. Валидность — производное значение (parseVideoUrl), не
   // отдельный кусок state, чтобы не рассинхронизировалось с полем ввода.
@@ -1973,7 +1975,7 @@ export function TeacherLessonDetailView({
                 <div className={hasFileChoice || hasVideoChoice ? "pointer-events-none opacity-40" : undefined}>
                   <button
                     type="button"
-                    onClick={() => { setKbPickerInitialTab("materials"); setShowKBPicker(true); }}
+                    onClick={() => { setKbPickerInitialTab("library"); setShowKBPicker(true); }}
                     disabled={hasFileChoice || hasVideoChoice}
                     className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500"
                   >
@@ -2033,6 +2035,7 @@ export function TeacherLessonDetailView({
         groupIds={[lesson.group_id]}
         multiSelect={false}
         acceptedTypes={LESSON_ATTACH_MIME}
+        hideGroupMaterials
         initialTab={kbPickerInitialTab}
         // 6А, Заход D3 — урок уже умеет video_* материалы (миграция 138,
         // addLessonMaterialVideo ниже в handleUpload) — библиотечные
