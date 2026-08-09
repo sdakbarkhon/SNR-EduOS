@@ -111,10 +111,19 @@ export async function createStudent(data: {
     throw stuErr ?? new Error("Student insert failed");
   }
 
+  // Z.2.7 — откат третьего шага. У первых двух он был, у этого нет: при сбое
+  // привязки ученик оставался в базе без группы, а логин — занятым навсегда,
+  // потому что учётная запись уже создана и username уникален. Админ видел
+  // ошибку, повторял с тем же логином и получал «логин занят» от собственной
+  // неудачной попытки.
   const { error: sgErr } = await sb
     .from("student_groups")
     .insert({ student_id: (student as { id: string }).id, group_id: data.group_id, school_id: data.school_id });
-  if (sgErr) throw sgErr;
+  if (sgErr) {
+    await sb.from("students").delete().eq("id", (student as { id: string }).id);
+    await sb.auth.admin.deleteUser(userId);
+    throw sgErr;
+  }
 
   return { userId, studentId: (student as { id: string }).id };
 }
@@ -135,13 +144,54 @@ export async function updateStudent(
     .eq("id", studentId);
   if (error) throw error;
 
-  if (data.group_id && data.old_group_id && data.group_id !== data.old_group_id) {
-    // Adversarial review (Заход 1): assertSameSchool above only confirmed the
-    // STUDENT belongs to the caller's school — without this, an admin could
-    // move their own student into a group belonging to a different school.
-    await assertSameSchool(sb, "groups", data.group_id, callerSchoolId, callerIsSuperAdmin);
-    await sb.from("student_groups").delete().eq("student_id", studentId).eq("group_id", data.old_group_id);
-    await sb.from("student_groups").insert({ student_id: studentId, group_id: data.group_id, school_id: callerSchoolId });
+  // Z.2.7 — смена группы. Раньше здесь стояло
+  //   if (group_id && old_group_id && group_id !== old_group_id)
+  // и оба «И» делали операцию молчаливой пустышкой в двух случаях:
+  //   • у ученика группы НЕ БЫЛО (old_group_id пуст) — назначить не удавалось;
+  //   • группу УБИРАЮТ (group_id пуст) — исключить не удавалось.
+  // Форма при этом рапортовала успех: ошибки нет, значит сохранилось.
+  //
+  // Теперь состав читается из базы, а не берётся из скрытого поля формы:
+  // именно это поле и врало. old_group_id больше не нужен, параметр оставлен
+  // ради совместимости вызовов.
+  //
+  // UI работает ровно с одной группой (решение заказчика 6.5), поэтому
+  // приводим состав к одной строке; схема при этом остаётся способной на
+  // несколько — PK у student_groups стоит на паре, ничего не сужаем.
+  //
+  // На student_groups висит trg_student_group_added_direct_chats: вставка
+  // заводит личные чаты РЕАЛЬНОГО ученика с учителями группы. Здесь это одна
+  // строка на действие админа — штатно.
+  if (data.group_id !== undefined) {
+    const desired = data.group_id.trim() || null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anySb = sb as any;
+    const { data: current, error: curErr } = await anySb
+      .from("student_groups").select("group_id").eq("student_id", studentId);
+    if (curErr) throw curErr;
+    const currentIds = ((current ?? []) as Array<{ group_id: string }>).map((r) => r.group_id);
+
+    if (desired === null) {
+      if (currentIds.length > 0) {
+        const { error: delErr } = await anySb.from("student_groups").delete().eq("student_id", studentId);
+        if (delErr) throw delErr;
+      }
+    } else if (!(currentIds.length === 1 && currentIds[0] === desired)) {
+      // Заход 1: assertSameSchool выше подтвердил школу УЧЕНИКА; без этой
+      // проверки админ мог бы перевести своего ученика в группу чужой школы.
+      await assertSameSchool(sb, "groups", desired, callerSchoolId, callerIsSuperAdmin);
+      const stale = currentIds.filter((id) => id !== desired);
+      if (stale.length > 0) {
+        const { error: delErr } = await anySb
+          .from("student_groups").delete().eq("student_id", studentId).in("group_id", stale);
+        if (delErr) throw delErr;
+      }
+      if (!currentIds.includes(desired)) {
+        const { error: insErr } = await anySb
+          .from("student_groups").insert({ student_id: studentId, group_id: desired, school_id: callerSchoolId });
+        if (insErr) throw insErr;
+      }
+    }
   }
 
   // Update email if username changed
@@ -386,28 +436,44 @@ export async function deleteTeacher(
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
 
+// Z.2.6 — куратор (`groups.teacher_id`) стал НЕОБЯЗАТЕЛЬНЫМ: в реальных школах
+// такой роли нет вовсе (решение заказчика 6.1), форма поле не показывает и
+// присылает null. В демо-школе поле осталось и работает как раньше. Колонка
+// nullable и была — схему не трогаем. Разделение ПРАВ куратора — это Z.4;
+// здесь только форма.
+
 export async function createGroup(data: {
   name: string;
   subject: string;
-  teacher_id: string;
+  teacher_id: string | null;
   school_id: string;
 }): Promise<string> {
   const sb = getServiceClient();
-  const { data: group, error } = await sb.from("groups").insert(data).select("id").single();
+  const { data: group, error } = await sb
+    .from("groups")
+    .insert({ ...data, teacher_id: data.teacher_id || null })
+    .select("id")
+    .single();
   if (error || !group) throw error ?? new Error("Group insert failed");
   return (group as { id: string }).id;
 }
 
 export async function updateGroup(
   groupId: string,
-  data: { name: string; subject: string; teacher_id: string },
+  data: { name: string; subject: string; teacher_id?: string | null },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "groups", groupId, callerSchoolId, callerIsSuperAdmin);
 
-  const { error } = await sb.from("groups").update(data).eq("id", groupId);
+  // teacher_id пишется, только если форма его прислала. Для реальных школ
+  // поля в форме нет — и существующий куратор (если он там откуда-то есть)
+  // не должен молча обнуляться при переименовании группы.
+  const patch: Record<string, unknown> = { name: data.name, subject: data.subject };
+  if (data.teacher_id !== undefined) patch.teacher_id = data.teacher_id || null;
+
+  const { error } = await sb.from("groups").update(patch).eq("id", groupId);
   if (error) throw error;
 }
 
@@ -731,7 +797,10 @@ export async function deleteSchoolSubject(
 //     сузить ему права на живой демонстрации. В реальных школах слаг
 //     проставляется при первом назначении и только если он ещё пуст.
 
-const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+/** Демо-школа. Отличается от реальных двумя вещами, важными для админки:
+ *  в ней есть роль куратора группы (в реальных школах её нет, решение 6.1) и
+ *  в ней НЕ трогается teachers.subject_slug. */
+export const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
 
 export type TeacherBinding = {
   assignmentId: string;

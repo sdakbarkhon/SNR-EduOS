@@ -88,6 +88,7 @@ function GroupForm({
   defaultValues,
   teachers,
   catalog,
+  showCurator,
   isPending,
   t,
   onClose,
@@ -97,6 +98,8 @@ function GroupForm({
   defaultValues?: Partial<Group>;
   teachers: Teacher[];
   catalog: CatalogItem[];
+  /** Z.2.6 — поле куратора показывается только демо-школе. */
+  showCurator: boolean;
   isPending: boolean;
   t: AdminDict;
   onClose: () => void;
@@ -138,14 +141,19 @@ function GroupForm({
           ))}
         </Select>
       </Field>
-      <Field label={t.fieldTeacher}>
-        <Select name="teacher_id" required defaultValue={defaultValues?.teacher_id ?? undefined}>
-          <option value="" disabled>{t.selectTeacherPlaceholder}</option>
-          {teachers.map((tc) => (
-            <option key={tc.id} value={tc.id}>{tc.full_name}</option>
-          ))}
-        </Select>
-      </Field>
+      {/* Z.2.6 — куратор только в демо-школе. В реальных школах роли нет, и
+          поле не просто скрыто: его нет в FormData, поэтому server action
+          вообще не трогает groups.teacher_id. */}
+      {showCurator && (
+        <Field label={t.fieldTeacher}>
+          <Select name="teacher_id" defaultValue={defaultValues?.teacher_id ?? ""}>
+            <option value="">{t.noCuratorOption}</option>
+            {teachers.map((tc) => (
+              <option key={tc.id} value={tc.id}>{tc.full_name}</option>
+            ))}
+          </Select>
+        </Field>
+      )}
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
         <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60">
@@ -160,11 +168,14 @@ export function GroupsView({
   groups,
   teachers,
   catalog,
+  showCurator,
   defaultOpenAdd,
 }: {
   groups: Group[];
   teachers: Teacher[];
   catalog: CatalogItem[];
+  /** Z.2.6 — куратор есть только в демо-школе. */
+  showCurator: boolean;
   defaultOpenAdd?: boolean;
 }) {
   const { locale } = useLocale();
@@ -277,6 +288,7 @@ export function GroupsView({
             <GroupForm
               teachers={teachers}
               catalog={catalog}
+              showCurator={showCurator}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
@@ -302,6 +314,7 @@ export function GroupsView({
               defaultValues={modal.group}
               teachers={teachers}
               catalog={catalog}
+              showCurator={showCurator}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}

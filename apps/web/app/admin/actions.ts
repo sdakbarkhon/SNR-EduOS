@@ -154,13 +154,23 @@ async function resolveGroupSubject(formData: FormData, schoolId: string): Promis
   return getSubjectKeyByLabel(row.name) ?? row.name;
 }
 
+/** Z.2.6 — куратора в форме реальных школ нет, поле просто не приходит.
+ *  `null` означает «не прислали»: обновление такое поле не трогает, создание
+ *  оставляет группу без куратора. Пустая строка от демо-формы — это
+ *  осознанное «без куратора» и тоже даёт null. */
+function readCuratorId(formData: FormData): string | null | undefined {
+  if (!formData.has("teacher_id")) return undefined;
+  return String(formData.get("teacher_id") ?? "").trim() || null;
+}
+
 export async function actionCreateGroup(formData: FormData) {
   const { schoolId } = await verifyAdmin();
   const name = String(formData.get("name") ?? "").trim();
-  const teacher_id = String(formData.get("teacher_id") ?? "").trim();
-  if (!name || !teacher_id) throw new Error("Missing fields");
+  if (!name) throw new Error("Missing fields");
   const subject = await resolveGroupSubject(formData, schoolId);
-  const id = await createGroup({ name, subject, teacher_id, school_id: schoolId });
+  const id = await createGroup({
+    name, subject, teacher_id: readCuratorId(formData) ?? null, school_id: schoolId,
+  });
   revalidatePath("/admin/groups");
   revalidatePath("/admin");
   return id;
@@ -170,9 +180,8 @@ export async function actionUpdateGroup(formData: FormData) {
   const { schoolId, isSuperAdmin } = await verifyAdmin();
   const group_id = String(formData.get("group_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const teacher_id = String(formData.get("teacher_id") ?? "").trim();
   const subject = await resolveGroupSubject(formData, schoolId);
-  await updateGroup(group_id, { name, subject, teacher_id }, schoolId, isSuperAdmin);
+  await updateGroup(group_id, { name, subject, teacher_id: readCuratorId(formData) }, schoolId, isSuperAdmin);
   revalidatePath("/admin/groups");
 }
 

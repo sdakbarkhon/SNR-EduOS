@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { DEMO_SCHOOL_ID } from "@/lib/admin-api";
 import { GroupsView } from "./GroupsView";
 
 export default async function AdminGroupsPage({
@@ -30,11 +31,22 @@ export default async function AdminGroupsPage({
   if (teachersError) console.error("[AdminGroupsPage] teachers query failed:", teachersError.message);
   if (catalogError) console.error("[AdminGroupsPage] catalog query failed:", catalogError.message);
 
+  // Z.2.6 — куратор группы есть только в демо-школе (решение заказчика 6.1).
+  // В реальных школах поля в форме нет; ПРАВА куратора при этом не меняются —
+  // их разделение отложено в Z.4, потому что is_curator_teacher() не знает
+  // про школу и входит в SELECT-политику уроков.
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: admin } = user
+    ? await sbAny.from("admins").select("school_id").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isDemoSchool = admin?.school_id === DEMO_SCHOOL_ID;
+
   return (
     <GroupsView
       groups={groups ?? []}
       teachers={teachers ?? []}
       catalog={catalog ?? []}
+      showCurator={isDemoSchool}
       defaultOpenAdd={action === "add"}
     />
   );

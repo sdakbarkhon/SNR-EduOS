@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { gradeFromGroupName } from "@/lib/group-grade";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import {
   actionCreateStudent,
@@ -115,6 +116,7 @@ export function StudentsView({
                 <th className="px-4 py-3">{t.tableFullName}</th>
                 <th className="px-4 py-3">{t.tableUsername}</th>
                 <th className="px-4 py-3">{t.tableGroup}</th>
+                <th className="px-4 py-3">{t.tableGrade}</th>
                 <th className="px-4 py-3">{t.tableCreated}</th>
                 <th className="px-4 py-3 text-right">{t.tableActions}</th>
               </tr>
@@ -122,18 +124,24 @@ export function StudentsView({
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                     {t.noResults}
                   </td>
                 </tr>
               ) : (
                 filtered.map((s) => {
                   const groupName = s.student_groups[0]?.groups?.name ?? "—";
+                  // Z.2.7 — класс выводится из группы (решение заказчика 6.6).
+                  // Отдельного поля в форме нет и не появится; колонка
+                  // students.grade остаётся нетронутой — на её значениях
+                  // работает подбор демо-слотов (claim_demo_slot).
+                  const grade = gradeFromGroupName(s.student_groups[0]?.groups?.name);
                   return (
                     <tr key={s.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-3 font-medium text-gray-800">{s.full_name}</td>
                       <td className="px-4 py-3 text-gray-500">@{s.username}</td>
                       <td className="px-4 py-3 text-gray-500">{groupName}</td>
+                      <td className="px-4 py-3 text-gray-500">{grade ?? t.gradeFromGroupUnknown}</td>
                       <td className="px-4 py-3 text-gray-400">
                         {new Date(s.created_at).toLocaleDateString("ru-RU")}
                       </td>

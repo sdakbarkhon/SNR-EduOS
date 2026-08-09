@@ -400,6 +400,11 @@ export interface Dictionary {
     seesGroupNo: string;
     unassignBtn: string;
     lessonsCount: string;             // "{n}"
+    /** Z.2.6 — куратор только в демо-школе, поле необязательное. */
+    noCuratorOption: string;
+    /** Z.2.7 — класс ученика в списке, выводится из группы. */
+    tableGrade: string;
+    gradeFromGroupUnknown: string;
     catalogSubjectDeleteTitle: string;
     catalogSubjectDeleteClean: string;
     catalogSubjectInUseHint: string;  // "{assignments} {lessons} {homework} {plans}"
