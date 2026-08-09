@@ -79,6 +79,30 @@ function iconFor(fileType: string | null, hasLink: boolean) {
 // ── Библиотека учителей: загрузка/видео-ссылка/удаление (порт из снесённой
 // apps/web/app/teacher/library/TeacherLibraryView.tsx, 1:1) ────────────────
 
+/** 08.08.2026 — что можно прикрепить к уроку. Раньше страница урока
+ *  передавала пикеру только ["application/pdf"], и учитель видел в выборе
+ *  одни книги: презентации, документы, картинки и видео отсеивались, хотя
+ *  миграция 175 разрешила их в базе знаний, а прикрепление поддерживает.
+ *
+ *  Набор сверен с бакетами: lesson-materials принимает любые типы (лимит
+ *  50 МБ), books и materials — ровно этот список. Один экспорт на пикер и на
+ *  прямую загрузку файла в форме урока: раньше два места знали свой набор и
+ *  разъезжались (подпись обещала «PDF или .mp4», фильтр пропускал только PDF). */
+export const LESSON_ATTACH_MIME = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+];
+
+/** Расширения для атрибута accept у <input type="file"> — тот же набор. */
+export const LESSON_ATTACH_ACCEPT =
+  ".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.webp,.mp4," + LESSON_ATTACH_MIME.join(",");
+
 const LIB_ALLOWED_MIME = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",

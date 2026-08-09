@@ -10,7 +10,7 @@ import {
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Hand, Play, Link2,
-  Keyboard, GraduationCap, Blocks,
+  Keyboard, Blocks,
 } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
@@ -64,7 +64,7 @@ import { KahootTeacherModal } from "./KahootTeacherModal";
 import { QuizResultsModal } from "./QuizResultsModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
-import { KnowledgeBaseFilePicker, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
+import { KnowledgeBaseFilePicker, LESSON_ATTACH_MIME, LESSON_ATTACH_ACCEPT, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
@@ -877,10 +877,16 @@ export function TeacherLessonDetailView({
   function handleMaterialFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     if (!f) { setUploadFile(null); setUploadFileError(""); return; }
-    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-    const isMp4 = f.type === "video/mp4" || f.name.toLowerCase().endsWith(".mp4");
-    if (!isPdf && !isMp4) {
-      setUploadFileError("Разрешены только PDF или .mp4 файлы");
+    // 08.08.2026 — принимаем весь набор LESSON_ATTACH_MIME, а не только
+    // PDF и .mp4. Проверяем MIME И расширение: браузер не всегда проставляет
+    // тип (у .docx из некоторых архиваторов он пустой), а расширение известно
+    // всегда — тот же приём, что в bookMimeOf.
+    const ext = (f.name.split(".").pop() ?? "").toLowerCase();
+    const byMime = LESSON_ATTACH_MIME.includes(f.type);
+    const byExt = ["pdf", "docx", "pptx", "xlsx", "jpg", "jpeg", "png", "webp", "mp4"].includes(ext);
+    const isMp4 = f.type === "video/mp4" || ext === "mp4";
+    if (!byMime && !byExt) {
+      setUploadFileError("Разрешены PDF, Word, PowerPoint, Excel, картинки и .mp4");
       setUploadFile(null);
       e.target.value = "";
       return;
@@ -1917,11 +1923,11 @@ export function TeacherLessonDetailView({
 
               {/* Блок 1 — файл */}
               <div className={hasVideoChoice || hasKBChoice ? "pointer-events-none opacity-40" : undefined}>
-                <input ref={fileRef} type="file" accept=".pdf,application/pdf,.mp4,video/mp4" className="hidden" onChange={handleMaterialFileChange} disabled={hasVideoChoice || hasKBChoice} />
+                <input ref={fileRef} type="file" accept={LESSON_ATTACH_ACCEPT} className="hidden" onChange={handleMaterialFileChange} disabled={hasVideoChoice || hasKBChoice} />
                 <button onClick={() => fileRef.current?.click()} disabled={hasVideoChoice || hasKBChoice}
                   className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
                   <Upload className="h-5 w-5" />
-                  {uploadFile ? uploadFile.name : "Выбрать PDF или .mp4 файл (макс. 50 МБ)"}
+                  {uploadFile ? uploadFile.name : "Выбрать файл: PDF, Word, PowerPoint, Excel, картинка или .mp4 (макс. 50 МБ)"}
                 </button>
                 {uploadFileError && <p className="text-center text-[12px] text-red-500">{uploadFileError}</p>}
               </div>
@@ -1974,19 +1980,11 @@ export function TeacherLessonDetailView({
                     <FolderSearch className="h-5 w-5" />
                     {d.knowledgeBase.browse}
                   </button>
-                  {/* Этап 12 финал, Фикс 2 — прямой шорткат на вкладку
-                      "Материалы кафедры" (тот же пикер, та же вкладка, что
-                      уже была доступна через кнопку выше — просто в один
-                      клик, без выбора вкладки вручную). */}
-                  <button
-                    type="button"
-                    onClick={() => { setKbPickerInitialTab("teacherLibrary"); setShowKBPicker(true); }}
-                    disabled={hasFileChoice || hasVideoChoice}
-                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2 text-xs font-semibold text-gray-500 hover:border-blue-300 hover:text-blue-600"
-                  >
-                    <GraduationCap className="h-3.5 w-3.5" />
-                    + Прикрепить из Кафедры
-                  </button>
+                  {/* 08.08.2026 — кнопка-шорткат «+ Прикрепить из Кафедры»
+                      убрана: она открывала ТОТ ЖЕ пикер на вкладке «Материалы
+                      кафедры», которая и так одна из трёх в кнопке выше.
+                      Два входа в одно место сбивали с толку. Вкладка на
+                      месте, доступ к материалам кафедры не изменился. */}
                 </div>
               )}
 
@@ -2034,7 +2032,7 @@ export function TeacherLessonDetailView({
         }}
         groupIds={[lesson.group_id]}
         multiSelect={false}
-        acceptedTypes={["application/pdf"]}
+        acceptedTypes={LESSON_ATTACH_MIME}
         initialTab={kbPickerInitialTab}
         // 6А, Заход D3 — урок уже умеет video_* материалы (миграция 138,
         // addLessonMaterialVideo ниже в handleUpload) — библиотечные
