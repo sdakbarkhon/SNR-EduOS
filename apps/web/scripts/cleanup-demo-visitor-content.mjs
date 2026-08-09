@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 // 08.08.2026 — разовая ручная чистка демо-школы перед снятием снимка эталона.
 //
-// Удаляет то, что заказчик опознал как ручные проверки посетителей и наши
-// собственные тесты механики. Это ОДИН раз: дальше эталон фиксируется
-// снимком, и ночной откат сверяется с ним, а не с датами создания.
+// Правило заказчика в окончательном виде: удаляется ВСЁ, созданное в окне
+// 05-07.08 включительно, без исключений, плюс уроки вне эталонной недели
+// 27.07-02.08. Работа от 08.08 (этапы «Визуализация алгоритма» и Kahoot из
+// коммита 856f445) — плановая, остаётся.
 //
-// Почему не по дате создания. Эталон создавался двумя заходами (29.07 и
-// 30.07), а в окне 05-08.08 лежат вперемешку и мусор посетителей, и наша
-// плановая работа из коммита 856f445 — отличить их по created_at нельзя.
-// Поэтому здесь всё перечислено ЯВНО, по меткам времени.
+// Почему окно, а не «всё после эталона». Эталон создавался двумя заходами
+// (29.07 и 30.07), а 08.08 добавлялась плановая работа — по created_at она
+// неотличима от ручных проверок. Границы окна заданы явно, ровно по решению
+// заказчика; дальше эталон фиксируется снимком (demo_baseline, миграция 179),
+// и ночной откат сверяется уже с ним, а не с датами.
+//
+// Идемпотентен: повторный прогон найдёт ноль записей.
 //
 // ЗАПУСК (из apps/web):
 //   node scripts/cleanup-demo-visitor-content.mjs           # прогон, ROLLBACK
 //   node scripts/cleanup-demo-visitor-content.mjs --apply   # запись
+//
+// ПОСЛЕ ПРИМЕНЕНИЯ обязательно переснять снимок:
+//   node scripts/snapshot-demo-baseline.mjs --apply
 
 import fs from "node:fs";
 import path from "node:path";
@@ -31,22 +38,15 @@ const APPLY = process.argv.includes("--apply");
 const DEMO_SCHOOL = "a0a0a0a0-0000-0000-0000-000000000001";
 const WEEK_FROM = "2026-07-27T00:00:00+05";
 const WEEK_TO = "2026-08-03T00:00:00+05";
-
-/** Этапы ручных проверок. Перечислены окнами времени создания, а не «всё до
- *  08.08»: пять этапов от 08.08 (визуализация алгоритма и Kahoot, коммит
- *  856f445) — плановая работа, их оставляем. */
-const STAGE_WINDOWS = [
-  ["2026-08-05T00:00:00+05", "2026-08-06T00:00:00+05"], // «Код с пропусками» ×2
-  ["2026-08-07T12:15:00+05", "2026-08-07T12:30:00+05"], // блок 10-А из 4 этапов
-  ["2026-08-07T20:25:00+05", "2026-08-07T20:35:00+05"], // Kahoot 7-А
-];
-
-/** Материалы-мусор — по точным названиям, а не по дате. */
-const JUNK_MATERIAL_TITLES = ["1", "1234", "123", "You Tube"];
+/** Окно ручных проверок. Верхняя граница — начало 08.08: плановая работа
+ *  этого дня остаётся. */
+const JUNK_FROM = "2026-08-05T00:00:00+05";
+const JUNK_TO = "2026-08-08T00:00:00+05";
 
 const client = new pg.Client({
   connectionString: env.SUPABASE_DB_URL,
   ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 20000,
 });
 await client.connect();
 
@@ -57,86 +57,86 @@ function fail(msg) {
 
 console.log(`Режим: ${APPLY ? "--apply (запись)" : "ХОЛОСТОЙ ПРОГОН, изменения откатываются"}\n`);
 
-// ── 1. Уроки вне эталонной недели ───────────────────────────────────────────
+// ── 1. Уроки: вне эталонной недели ИЛИ созданные в окне ─────────────────────
 const lessons = (
   await client.query(
     `SELECT l.id, g.name AS grp, COALESCE(l.title, l.topic, '—') AS title,
             to_char(l.starts_at + interval '5 hours', 'DD.MM.YYYY HH24:MI') AS when_,
+            to_char(l.created_at + interval '5 hours', 'DD.MM HH24:MI') AS created,
             (SELECT count(*)::int FROM lesson_stages x WHERE x.lesson_id = l.id) AS stages,
-            (SELECT count(*)::int FROM lesson_materials x WHERE x.lesson_id = l.id) AS materials,
             (SELECT count(*)::int FROM attendance x WHERE x.lesson_id = l.id) AS attendance,
             (SELECT count(*)::int FROM lesson_grades x WHERE x.lesson_id = l.id) AS grades
        FROM lessons l JOIN groups g ON g.id = l.group_id
-      WHERE l.school_id = $1 AND NOT (l.starts_at >= $2 AND l.starts_at < $3)
+      WHERE l.school_id = $1
+        AND (NOT (l.starts_at >= $2 AND l.starts_at < $3)
+             OR (l.created_at >= $4 AND l.created_at < $5))
       ORDER BY l.starts_at`,
-    [DEMO_SCHOOL, WEEK_FROM, WEEK_TO],
+    [DEMO_SCHOOL, WEEK_FROM, WEEK_TO, JUNK_FROM, JUNK_TO],
   )
 ).rows;
-console.log("── 1. УРОКИ ВНЕ ЭТАЛОННОЙ НЕДЕЛИ (удаляются целиком, каскадом) ──");
+console.log("── 1. УРОКИ (вне эталонной недели или созданные 05-07.08) ──");
 console.table(lessons.map((l) => ({
-  когда: l.when_, группа: l.grp, урок: l.title.slice(0, 34),
-  этапов: l.stages, материалов: l.materials, посещаемость: l.attendance, оценок: l.grades,
+  когда: l.when_, создан: l.created, группа: l.grp, урок: l.title.slice(0, 30),
+  этапов: l.stages, посещаемость: l.attendance, оценок: l.grades,
 })));
 
-// ── 2. Этапы ручных проверок внутри эталонной недели ────────────────────────
-const stageRows = [];
-for (const [from, to] of STAGE_WINDOWS) {
-  const r = (
-    await client.query(
-      `SELECT st.id, st.title, COALESCE(st.content_type, '—') AS ct, g.name AS grp,
-              to_char(st.created_at + interval '5 hours', 'DD.MM HH24:MI') AS created,
-              to_char(l.starts_at + interval '5 hours', 'DD.MM') AS lesson_day
-         FROM lesson_stages st
-         JOIN lessons l ON l.id = st.lesson_id
-         JOIN groups g ON g.id = l.group_id
-        WHERE l.school_id = $1 AND l.starts_at >= $2 AND l.starts_at < $3
-          AND st.created_at >= $4 AND st.created_at < $5
-        ORDER BY st.created_at`,
-      [DEMO_SCHOOL, WEEK_FROM, WEEK_TO, from, to],
-    )
-  ).rows;
-  stageRows.push(...r);
-}
-console.log("\n── 2. ЭТАПЫ РУЧНЫХ ПРОВЕРОК (внутри эталонной недели) ──");
-console.table(stageRows.map((s) => ({
+// ── 2. Этапы, созданные в окне ──────────────────────────────────────────────
+const stages = (
+  await client.query(
+    `SELECT st.id, st.title, COALESCE(st.content_type, '—') AS ct, g.name AS grp,
+            to_char(st.created_at + interval '5 hours', 'DD.MM HH24:MI') AS created,
+            to_char(l.starts_at + interval '5 hours', 'DD.MM') AS lesson_day
+       FROM lesson_stages st JOIN lessons l ON l.id = st.lesson_id JOIN groups g ON g.id = l.group_id
+      WHERE l.school_id = $1 AND st.created_at >= $2 AND st.created_at < $3
+      ORDER BY st.created_at`,
+    [DEMO_SCHOOL, JUNK_FROM, JUNK_TO],
+  )
+).rows;
+console.log("\n── 2. ЭТАПЫ, созданные 05-07.08 ──");
+console.table(stages.map((s) => ({
   создан: s.created, группа: s.grp, урок_на: s.lesson_day, этап: s.title.slice(0, 32), тип: s.ct,
 })));
 
-// Соседи по окну, которые НЕ удаляются, — чтобы было видно, что осталось.
-const keptLate = (
+// ── 3. Материалы, созданные в окне ──────────────────────────────────────────
+const materials = (
   await client.query(
-    `SELECT to_char(st.created_at + interval '5 hours', 'DD.MM HH24:MI') AS created,
-            g.name AS grp, st.title, COALESCE(st.content_type,'—') AS ct
-       FROM lesson_stages st JOIN lessons l ON l.id = st.lesson_id JOIN groups g ON g.id = l.group_id
-      WHERE l.school_id = $1 AND l.starts_at >= $2 AND l.starts_at < $3
-        AND st.created_at >= '2026-08-01' AND st.id <> ALL($4::uuid[])
-      ORDER BY st.created_at`,
-    [DEMO_SCHOOL, WEEK_FROM, WEEK_TO, stageRows.map((s) => s.id)],
-  )
-).rows;
-console.log("\n   ОСТАЮТСЯ (созданы в том же окне, но это плановая работа):");
-console.table(keptLate.map((s) => ({ создан: s.created, группа: s.grp, этап: s.title.slice(0, 34), тип: s.ct })));
-
-// ── 3. Материалы-мусор ──────────────────────────────────────────────────────
-const junk = (
-  await client.query(
-    `SELECT m.id, m.title, COALESCE(m.content_type,'—') AS ct, g.name AS grp,
+    `SELECT m.id, m.title, COALESCE(m.content_type, '—') AS ct, g.name AS grp,
             to_char(m.created_at + interval '5 hours', 'DD.MM HH24:MI') AS created
-       FROM lesson_materials m
-       JOIN lessons l ON l.id = m.lesson_id
-       JOIN groups g ON g.id = l.group_id
-      WHERE l.school_id = $1 AND m.title = ANY($2::text[])
+       FROM lesson_materials m JOIN lessons l ON l.id = m.lesson_id JOIN groups g ON g.id = l.group_id
+      WHERE l.school_id = $1 AND m.created_at >= $2 AND m.created_at < $3
       ORDER BY m.created_at`,
-    [DEMO_SCHOOL, JUNK_MATERIAL_TITLES],
+    [DEMO_SCHOOL, JUNK_FROM, JUNK_TO],
   )
 ).rows;
-console.log("\n── 3. МАТЕРИАЛЫ-МУСОР ──");
-console.table(junk.map((m) => ({ создан: m.created, группа: m.grp, материал: m.title, тип: m.ct })));
+console.log("\n── 3. МАТЕРИАЛЫ, созданные 05-07.08 ──");
+console.table(materials.map((m) => ({ создан: m.created, группа: m.grp, материал: m.title.slice(0, 32), тип: m.ct })));
+
+// ── 4. Домашние задания, созданные в окне ───────────────────────────────────
+// Сдачи учеников уходят каскадом (homework_submissions ON DELETE CASCADE).
+// Заказчик решил так же, как с тестовым уроком: задание тестовое — значит и
+// сдачи на нём тестовые. Числа показываем явно, чтобы решение было видимым.
+const homework = (
+  await client.query(
+    `SELECT h.id, h.title, to_char(h.created_at + interval '5 hours', 'DD.MM HH24:MI') AS created,
+            (h.lesson_id IS NULL) AS no_lesson,
+            (SELECT count(*)::int FROM homework_submissions s WHERE s.homework_id = h.id) AS subs,
+            (SELECT count(*)::int FROM homework_submissions s WHERE s.homework_id = h.id AND s.grade IS NOT NULL) AS graded
+       FROM homework h
+      WHERE h.school_id = $1 AND h.created_at >= $2 AND h.created_at < $3
+      ORDER BY h.created_at`,
+    [DEMO_SCHOOL, JUNK_FROM, JUNK_TO],
+  )
+).rows;
+console.log("\n── 4. ДОМАШНИЕ ЗАДАНИЯ, созданные 05-07.08 ──");
+console.table(homework.map((h) => ({
+  создан: h.created, дз: h.title.slice(0, 36), без_урока: h.no_lesson, сдач: h.subs, с_оценкой: h.graded,
+})));
 
 // ── Стоп-условия ────────────────────────────────────────────────────────────
-if (lessons.length > 5) fail(`уроков к удалению ${lessons.length} — ожидалось не больше 5, разбирайся вручную`);
-if (stageRows.length > 15) fail(`этапов к удалению ${stageRows.length} — слишком много, проверь окна`);
-if (junk.length > 10) fail(`материалов к удалению ${junk.length} — слишком много, проверь названия`);
+if (lessons.length > 5) fail(`уроков к удалению ${lessons.length} — ожидалось не больше 5`);
+if (stages.length > 15) fail(`этапов к удалению ${stages.length} — слишком много, проверь окно`);
+if (materials.length > 15) fail(`материалов к удалению ${materials.length} — слишком много`);
+if (homework.length > 10) fail(`заданий к удалению ${homework.length} — слишком много`);
 
 const beforeWeek = (
   await client.query(
@@ -144,7 +144,7 @@ const beforeWeek = (
     [DEMO_SCHOOL, WEEK_FROM, WEEK_TO],
   )
 ).rows[0].n;
-if (beforeWeek !== 126) fail(`в эталонной неделе ${beforeWeek} уроков вместо 126 — состояние не то, чего ожидаем`);
+if (beforeWeek !== 126) fail(`в эталонной неделе ${beforeWeek} уроков вместо 126 — состояние не то`);
 
 const otherSchools = (
   await client.query(`SELECT count(*)::int AS n FROM lessons WHERE school_id <> $1`, [DEMO_SCHOOL])
@@ -153,28 +153,23 @@ console.log(`\nУроков в ДРУГИХ школах: ${otherSchools} — и
 
 await client.query("BEGIN");
 
-const delLessons = lessons.length
-  ? (await client.query(`DELETE FROM lessons WHERE id = ANY($1::uuid[])`, [lessons.map((l) => l.id)])).rowCount
-  : 0;
-const delStages = stageRows.length
-  ? (await client.query(`DELETE FROM lesson_stages WHERE id = ANY($1::uuid[])`, [stageRows.map((s) => s.id)])).rowCount
-  : 0;
-const delJunk = junk.length
-  ? (await client.query(`DELETE FROM lesson_materials WHERE id = ANY($1::uuid[])`, [junk.map((m) => m.id)])).rowCount
-  : 0;
+const del = async (table, ids) =>
+  ids.length ? (await client.query(`DELETE FROM ${table} WHERE id = ANY($1::uuid[])`, [ids])).rowCount : 0;
 
-console.log(`\nУдалено: уроков ${delLessons}, этапов ${delStages}, материалов ${delJunk}`);
+const delLessons = await del("lessons", lessons.map((r) => r.id));
+const delStages = await del("lesson_stages", stages.map((r) => r.id));
+const delMaterials = await del("lesson_materials", materials.map((r) => r.id));
+const delHomework = await del("homework", homework.map((r) => r.id));
 
-// ── Проверка после удаления, внутри той же транзакции ───────────────────────
+console.log(`\nУдалено: уроков ${delLessons}, этапов ${delStages}, материалов ${delMaterials}, заданий ${delHomework}`);
+
 const after = (
   await client.query(
     `SELECT
        (SELECT count(*)::int FROM lessons WHERE school_id = $1 AND starts_at >= $2 AND starts_at < $3) AS уроков_недели,
-       (SELECT count(*)::int FROM lessons WHERE school_id = $1) AS уроков_всего,
-       (SELECT count(*)::int FROM lesson_stages st JOIN lessons l ON l.id = st.lesson_id
-         WHERE l.school_id = $1) AS этапов,
-       (SELECT count(*)::int FROM lesson_materials m JOIN lessons l ON l.id = m.lesson_id
-         WHERE l.school_id = $1) AS материалов,
+       (SELECT count(*)::int FROM lesson_stages st JOIN lessons l ON l.id = st.lesson_id WHERE l.school_id = $1) AS этапов,
+       (SELECT count(*)::int FROM lesson_materials m JOIN lessons l ON l.id = m.lesson_id WHERE l.school_id = $1) AS материалов,
+       (SELECT count(*)::int FROM homework WHERE school_id = $1) AS заданий,
        (SELECT count(*)::int FROM lessons WHERE school_id <> $1) AS уроков_других_школ`,
     [DEMO_SCHOOL, WEEK_FROM, WEEK_TO],
   )
@@ -192,7 +187,7 @@ if (after.уроков_других_школ !== otherSchools) {
 
 if (APPLY) {
   await client.query("COMMIT");
-  console.log("\nПРИМЕНЕНО.");
+  console.log("\nПРИМЕНЕНО. Не забудь переснять снимок: node scripts/snapshot-demo-baseline.mjs --apply");
 } else {
   await client.query("ROLLBACK");
   console.log("\nХолостой прогон, изменения откачены. Запуск с --apply запишет их.");
