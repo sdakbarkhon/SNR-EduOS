@@ -77,7 +77,116 @@ export type RestoreResult = {
   unchanged: number;
   byPhase: Record<string, number>;
   errors: string[];
+  /** Сколько записей удалено как добавленные сверх эталона, по видам. */
+  purged: Record<string, number>;
 };
+
+/** Виды записей в снимке эталона (demo_baseline, миграция 179). Уроки идут
+ *  ПЕРВЫМИ: на lessons висит каскад (lesson_stages, lesson_materials,
+ *  attendance и другие), поэтому удаление урока само уносит его содержимое,
+ *  и следующим видам остаётся меньше работы. */
+const PURGE_ORDER = ["lesson", "lesson_stage", "lesson_material", "homework"] as const;
+
+const PURGE_TABLE: Record<string, string> = {
+  lesson: "lessons",
+  lesson_stage: "lesson_stages",
+  lesson_material: "lesson_materials",
+  homework: "homework",
+};
+
+/**
+ * Удаляет из демо-школы всё, чего нет в снимке эталона.
+ *
+ * Зачем. Посетители за день добавляют уроки, этапы и материалы через
+ * интерфейс — к утру демо захламлено. Изменения в существующих записях НЕ
+ * откатываются (решение заказчика), удаляется только добавленное.
+ *
+ * Почему по снимку, а не по дате создания: эталон создавался двумя заходами
+ * (29.07 и 30.07), а позже в те же дни добавлялись и плановая работа, и
+ * ручные проверки — по created_at они неотличимы. Разбор в миграции 179.
+ *
+ * БЕЗОПАСНОСТЬ. Пустой снимок означал бы «эталона нет», и удаление снесло бы
+ * демо целиком — поэтому при пустом или подозрительно маленьком снимке не
+ * удаляется НИЧЕГО. Ошибка на любом виде прекращает удаление: следующие виды
+ * не трогаются. Лучше не удалить, чем снести лишнее.
+ *
+ * Результаты учеников, оценки, посещаемость и чаты на ЭТАЛОННЫХ уроках не
+ * трогаются — их видов в перечне нет. На чужих уроках они уходят каскадом
+ * вместе с уроком: урок тестовый, значит и результаты на нём тестовые.
+ */
+async function purgeNonBaseline(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: SupabaseClient<any, any, any>,
+  result: RestoreResult,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyDb = db as any;
+
+  const { data: baseline, error: baseErr } = await anyDb
+    .from("demo_baseline")
+    .select("entity_type, entity_id")
+    .eq("school_id", DEMO_SCHOOL_ID);
+  if (baseErr) {
+    result.errors.push("baseline read: " + baseErr.message);
+    return;
+  }
+
+  const rows = (baseline ?? []) as Array<{ entity_type: string; entity_id: string }>;
+  // 1220 записей на 08.08.2026. Порог грубый намеренно: он ловит «снимок
+  // потерян», а не «снимок чуть устарел».
+  if (rows.length < 500) {
+    result.errors.push("baseline too small (" + rows.length + ") — purge skipped");
+    return;
+  }
+
+  const byType = new Map<string, Set<string>>();
+  for (const t of PURGE_ORDER) byType.set(t, new Set<string>());
+  for (const r of rows) byType.get(r.entity_type)?.add(r.entity_id);
+
+  // Уроки демо-школы нужны дважды: сами по себе и как родители этапов и
+  // материалов (своей school_id у тех может не быть заполнено).
+  const { data: lessonRows, error: lessonErr } = await anyDb
+    .from("lessons").select("id").eq("school_id", DEMO_SCHOOL_ID);
+  if (lessonErr) {
+    result.errors.push("purge lessons read: " + lessonErr.message);
+    return;
+  }
+  const lessonIds = (lessonRows ?? []).map((l: { id: string }) => l.id);
+
+  for (const type of PURGE_ORDER) {
+    const keep = byType.get(type)!;
+    let present: Array<{ id: string }> = [];
+
+    if (type === "lesson") {
+      present = lessonRows ?? [];
+    } else if (type === "homework") {
+      const { data, error } = await anyDb.from("homework").select("id").eq("school_id", DEMO_SCHOOL_ID);
+      if (error) { result.errors.push("purge homework read: " + error.message); return; }
+      present = data ?? [];
+    } else {
+      if (lessonIds.length === 0) { result.purged[type] = 0; continue; }
+      const { data, error } = await anyDb
+        .from(PURGE_TABLE[type]!).select("id").in("lesson_id", lessonIds);
+      if (error) { result.errors.push("purge " + type + " read: " + error.message); return; }
+      present = data ?? [];
+    }
+
+    const extra = present.map((r) => r.id).filter((id) => !keep.has(id));
+    if (extra.length === 0) { result.purged[type] = 0; continue; }
+
+    // Второй предохранитель: если «лишнего» больше, чем эталонного, снимок
+    // почти наверняка не тот — не удаляем и говорим об этом.
+    if (extra.length > keep.size) {
+      result.errors.push("purge " + type + ": " + extra.length + " extra vs " + keep.size + " in baseline — skipped");
+      return;
+    }
+
+    const { error: delErr } = await anyDb.from(PURGE_TABLE[type]!).delete().in("id", extra);
+    if (delErr) { result.errors.push("purge " + type + " delete: " + delErr.message); return; }
+    result.purged[type] = extra.length;
+    console.log("[restore-demo-shape] purged " + extra.length + " " + type);
+  }
+}
 
 /**
  * Приводит уроки демо-школы за неделю 27.07-02.08.2026 к эталонной форме.
@@ -87,7 +196,14 @@ export async function restoreDemoLessonShape(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: SupabaseClient<any, any, any>,
 ): Promise<RestoreResult> {
-  const result: RestoreResult = { changed: 0, unchanged: 0, byPhase: {}, errors: [] };
+  const result: RestoreResult = { changed: 0, unchanged: 0, byPhase: {}, errors: [], purged: {} };
+
+  // 08.08.2026 — сначала УДАЛЕНИЕ добавленного за день, только потом форма.
+  // Порядок обязателен: форма считается по позиции урока внутри дня (слот 1
+  // -> completed, слот 2 -> in_progress, дальше scheduled), и лишний урок,
+  // вставленный посетителем в середину дня, сдвинул бы нумерацию — форма
+  // встала бы не на те уроки.
+  await purgeNonBaseline(db, result);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
