@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Library, Plus, Pencil, X, Check, Loader2, Eye, EyeOff } from "lucide-react";
+import { Library, Plus, Pencil, X, Check, Loader2, Eye, EyeOff, Trash2 } from "lucide-react";
 import { getDictionary, SUBJECT_DEFAULTS } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -12,11 +12,16 @@ import {
   actionCreateSchoolSubject,
   actionUpdateSchoolSubject,
   actionSetSchoolSubjectActive,
+  actionSchoolSubjectImpact,
+  actionDeleteSchoolSubject,
 } from "../actions";
 
 // Z.2.2 — справочник предметов школы. Ни групп, ни учителей: «кто что где
-// ведёт» живёт на /admin/subject-assignments. Удаления здесь намеренно нет —
-// только скрытие (решение заказчика); гварды удаления — Z.2.3.
+// ведёт» живёт на /admin/subject-assignments.
+//
+// Z.2.3 — удаление появилось, но только для пустого предмета: если он хоть
+// где-то назначен, кнопки нет, а остаётся скрытие. Заведённый по ошибке
+// предмет иначе оставался бы в списке навсегда выключенным.
 
 export type CatalogRow = {
   id: string;
@@ -111,6 +116,30 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
     });
   }
 
+  /** Z.2.3 — удаление предмета справочника. Счётчик назначений на карточке
+   *  может отставать от базы (кто-то назначил предмет в соседней вкладке),
+   *  поэтому перед удалением спрашиваем сервер заново и показываем, что
+   *  именно мешает. Отказ сервера — вторая линия, а не единственная. */
+  function removeSubject(row: CatalogRow) {
+    startTransition(async () => {
+      try {
+        const impact = await actionSchoolSubjectImpact(row.id);
+        if (impact.blocked) {
+          alert(d.catalogSubjectInUseHint
+            .replace("{assignments}", String(impact.assignments))
+            .replace("{lessons}", String(impact.lessons))
+            .replace("{homework}", String(impact.homework))
+            .replace("{plans}", String(impact.plans)));
+          return;
+        }
+        if (!confirm(`${d.catalogSubjectDeleteTitle}: «${row.name}». ${d.catalogSubjectDeleteClean}`)) return;
+        await actionDeleteSchoolSubject(row.id);
+      } catch (e) {
+        alert(humanizeAdminError(e, locale as Locale));
+      }
+    });
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
       {/* Header */}
@@ -193,6 +222,20 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
                   >
                     {s.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
+                  {/* Z.2.3 — удаление только для действительно пустого
+                      предмета. Кнопки нет вовсе, если он где-то назначен:
+                      сначала предлагаем скрытие, и это честнее отказа после
+                      нажатия. Сервер проверяет то же самое сам. */}
+                  {s.assignments === 0 && (
+                    <button
+                      onClick={() => removeSubject(s)}
+                      disabled={isPending}
+                      className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      title={d.deleteBtn}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

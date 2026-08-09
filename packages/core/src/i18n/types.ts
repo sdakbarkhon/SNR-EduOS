@@ -384,6 +384,26 @@ export interface Dictionary {
     deleteTeacherTitle: string;
     deleteTeacherConfirm: string;
     deleteTeacherBlocked: string;
+    /** Z.2.3 — честное подтверждение удаления: что мешает и что уйдёт следом. */
+    impactLoading: string;
+    teacherHasLessonsShort: string;   // "{count}"
+    teacherHasGradesShort: string;    // "{count}"
+    teacherDeleteBindings: string;    // "{assignments} {groups} {curator}"
+    teacherDeleteCascade: string;     // "{plans} {announcements}"
+    teacherDeleteAccount: string;
+    teacherDeleteClean: string;
+    /** Z.2.4 — вкладка «Предметы и группы» на карточке учителя. */
+    subjectsAndGroupsTitle: string;
+    subjectsAndGroupsEmpty: string;
+    subjectsAndGroupsHint: string;
+    curatorBadge: string;
+    seesGroupNo: string;
+    unassignBtn: string;
+    lessonsCount: string;             // "{n}"
+    catalogSubjectDeleteTitle: string;
+    catalogSubjectDeleteClean: string;
+    catalogSubjectInUseHint: string;  // "{assignments} {lessons} {homework} {plans}"
+    hideInsteadBtn: string;
     // groups
     groupsTitle: string;
     addGroupTitle: string;
@@ -577,6 +597,12 @@ export interface Dictionary {
     requiredField: string;   // "Обязательное поле: {field}"
     invalidCredentials: string;
     rateLimited: string;
+    /** Z.2.3 — гварды удаления. Причина отказа с числами вместо сырой
+     *  ошибки внешнего ключа. */
+    teacherHasLessons: string;      // "{count}"
+    teacherHasGrades: string;       // "{count}"
+    subjectInUse: string;           // "{lessons} {homework} {plans}"
+    catalogSubjectInUse: string;    // "{assignments} {lessons} {homework} {plans}"
     genericPrefix: string;   // "Ошибка: "
   };
   parentUi: {

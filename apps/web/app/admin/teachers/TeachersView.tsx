@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
@@ -11,7 +11,80 @@ import {
   actionUpdateTeacher,
   actionResetTeacherPassword,
   actionDeleteTeacher,
+  actionTeacherDeletionImpact,
+  actionSetAssignmentTeacher,
 } from "../actions";
+import type { TeacherDeletionImpact } from "@/lib/admin-api";
+
+/**
+ * Честное подтверждение удаления. Z.2.3: раньше здесь стояли две
+ * захардкоженные фразы — «удалить?» и «нельзя, если есть группы» — обе не
+ * зависели от того, что у учителя на самом деле есть. Теперь диалог сначала
+ * спрашивает сервер и показывает числа: что помешает и что уйдёт следом.
+ */
+function DeleteTeacherImpact({
+  teacherId, t, onLoaded,
+}: {
+  teacherId: string;
+  t: AdminDict;
+  onLoaded: (impact: TeacherDeletionImpact | null) => void;
+}) {
+  const [impact, setImpact] = useState<TeacherDeletionImpact | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    onLoaded(null);
+    actionTeacherDeletionImpact(teacherId)
+      .then((res) => { if (alive) { setImpact(res); onLoaded(res); } })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+    // onLoaded — сеттер из useState родителя, стабилен между рендерами
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherId]);
+
+  if (failed) return <p className="mb-4 text-xs text-gray-500">{t.deleteWarning}</p>;
+  if (!impact) return <p className="mb-4 text-xs text-gray-500">{t.impactLoading}</p>;
+
+  const bindings = impact.assignments + impact.groupLinks + impact.curatorOf;
+  const cascade = impact.curriculumPlans + impact.announcements;
+
+  return (
+    <div className="mb-4 space-y-2">
+      {impact.lessons > 0 && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+          {t.teacherHasLessonsShort
+            .replace("{count}", String(impact.lessons))}
+          {impact.lessonGroups.length > 0 && <><br />{impact.lessonGroups.slice(0, 4).join("; ")}</>}
+        </p>
+      )}
+      {impact.gradedRecords > 0 && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+          {t.teacherHasGradesShort.replace("{count}", String(impact.gradedRecords))}
+        </p>
+      )}
+      {!impact.blocked && bindings === 0 && cascade === 0 && (
+        <p className="text-xs text-gray-500">{t.teacherDeleteClean}</p>
+      )}
+      {!impact.blocked && bindings > 0 && (
+        <p className="text-xs text-gray-600">
+          {t.teacherDeleteBindings
+            .replace("{assignments}", String(impact.assignments))
+            .replace("{groups}", String(impact.groupLinks))
+            .replace("{curator}", String(impact.curatorOf))}
+        </p>
+      )}
+      {!impact.blocked && cascade > 0 && (
+        <p className="text-xs text-amber-700">
+          {t.teacherDeleteCascade
+            .replace("{plans}", String(impact.curriculumPlans))
+            .replace("{announcements}", String(impact.announcements))}
+        </p>
+      )}
+      {!impact.blocked && <p className="text-xs text-gray-600">{t.teacherDeleteAccount}</p>}
+    </div>
+  );
+}
 
 type Teacher = {
   id: string;
@@ -20,6 +93,60 @@ type Teacher = {
   username: string | null;
   created_at: string;
 };
+
+/** Z.2.4 — строка «предмет × группа», где учитель назначен. */
+export type TeacherBindingRow = {
+  assignmentId: string;
+  subjectName: string;
+  groupName: string;
+  isCurator: boolean;
+  /** Есть ли строка в group_teachers. Пусто — учитель не видит группу, и это
+   *  ровно тот рассинхрон, ради которого делался Z.2.4. */
+  seesGroup: boolean;
+  lessons: number;
+};
+
+/** Что учитель ведёт и где. Снятие идёт тем же единым действием, что и
+ *  назначение: `subjects.teacher_id` плюс `group_teachers`. Доступ к группе
+ *  снимается, только если учитель в ней больше ничего не ведёт и не куратор —
+ *  иначе снятие одного предмета отобрало бы всю группу. */
+function TeacherBindings({
+  rows, t, disabled, onUnassign,
+}: {
+  rows: TeacherBindingRow[];
+  t: AdminDict;
+  disabled: boolean;
+  onUnassign: (assignmentId: string) => void;
+}) {
+  if (rows.length === 0) {
+    return <p className="mt-1 text-xs font-normal text-gray-400">{t.subjectsAndGroupsEmpty}</p>;
+  }
+  return (
+    <ul className="mt-1.5 space-y-1">
+      {rows.map((r) => (
+        <li key={r.assignmentId} className="flex items-center gap-1.5 text-xs font-normal">
+          <span className="text-gray-600">{r.groupName} · {r.subjectName}</span>
+          {r.isCurator && (
+            <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">{t.curatorBadge}</span>
+          )}
+          {!r.seesGroup && (
+            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">{t.seesGroupNo}</span>
+          )}
+          {r.lessons > 0 && (
+            <span className="text-[10px] text-gray-400">{t.lessonsCount.replace("{n}", String(r.lessons))}</span>
+          )}
+          <button
+            onClick={() => onUnassign(r.assignmentId)}
+            disabled={disabled}
+            className="rounded px-1 text-[10px] text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          >
+            {t.unassignBtn}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 type Modal =
   | { kind: "add" }
@@ -77,9 +204,12 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export function TeachersView({
   teachers,
+  bindings,
   defaultOpenAdd,
 }: {
   teachers: Teacher[];
+  /** Z.2.4 — что каждый ведёт, ключ = teacher.id. Считается на сервере. */
+  bindings: Record<string, TeacherBindingRow[]>;
   defaultOpenAdd?: boolean;
 }) {
   const { locale } = useLocale();
@@ -87,6 +217,9 @@ export function TeachersView({
   const t = d.admin;
 
   const [modal, setModal] = useState<Modal | null>(defaultOpenAdd ? { kind: "add" } : null);
+  /** Что удаление затронет — приходит из DeleteTeacherImpact; кнопка
+   *  «Удалить» гаснет, пока не посчитано, и остаётся погашенной, если нельзя. */
+  const [impact, setImpact] = useState<TeacherDeletionImpact | null>(null);
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -146,8 +279,23 @@ export function TeachersView({
                 </tr>
               ) : (
                 filtered.map((tc) => (
-                  <tr key={tc.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-3 font-medium text-gray-800">{tc.full_name}</td>
+                  <tr key={tc.id} className="align-top hover:bg-gray-50/60">
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {tc.full_name}
+                      <TeacherBindings
+                        rows={bindings[tc.id] ?? []}
+                        t={t}
+                        disabled={isPending}
+                        onUnassign={(assignmentId) => startTransition(async () => {
+                          try {
+                            await actionSetAssignmentTeacher(assignmentId, null);
+                            flash(t.teacherUpdatedMsg);
+                          } catch (e) {
+                            flash(humanizeAdminError(e, locale as Locale));
+                          }
+                        })}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-gray-500">@{tc.username ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-400">
                       {new Date(tc.created_at).toLocaleDateString("ru-RU")}
@@ -264,24 +412,22 @@ export function TeachersView({
       {modal?.kind === "delete" && (
         <Backdrop onClose={() => setModal(null)}>
           <ModalCard title={t.deleteTeacherTitle} onClose={() => setModal(null)}>
-            <p className="mb-2 text-sm text-gray-600">{t.deleteTeacherConfirm.replace("{name}", modal.teacher.full_name)}</p>
-            <p className="mb-2 text-xs text-amber-600">{t.deleteTeacherBlocked}</p>
+            <p className="mb-3 text-sm text-gray-600">{t.deleteTeacherConfirm.replace("{name}", modal.teacher.full_name)}</p>
+            <DeleteTeacherImpact teacherId={modal.teacher.id} t={t} onLoaded={setImpact} />
             <p className="mb-6 text-xs font-semibold text-red-600">{t.deleteWarning}</p>
             <div className="flex gap-3">
               <button onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    if (!modal.teacher.user_id) throw new Error("No user_id");
-                    await actionDeleteTeacher(modal.teacher.id, modal.teacher.user_id);
+                    await actionDeleteTeacher(modal.teacher.id, modal.teacher.user_id ?? "");
                     flash(t.teacherDeletedMsg);
                     setModal(null);
                   } catch (e) {
-                    const msg = (e as Error).message;
-                    flash(msg.includes("BLOCKED") ? t.deleteTeacherBlocked : humanizeAdminError(e, locale as Locale));
+                    flash(humanizeAdminError(e, locale as Locale));
                   }
                 })}
-                disabled={isPending}
+                disabled={isPending || impact?.blocked === true}
                 className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
               >
                 {isPending ? t.deleting : t.confirmDeleteBtn}

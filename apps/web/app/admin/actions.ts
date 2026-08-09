@@ -6,6 +6,11 @@ import {
   createGroup, updateGroup, deleteGroup,
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
   createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
+  deleteSchoolSubject, getSchoolSubjectImpact, getSubjectAssignmentImpact,
+  getTeacherDeletionImpact, setAssignmentTeacher,
+} from "@/lib/admin-api";
+import type {
+  SchoolSubjectDeletionImpact, SubjectDeletionImpact, TeacherDeletionImpact,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
 import { getSubjectKeyByLabel } from "@snr/core";
@@ -103,11 +108,29 @@ export async function actionResetTeacherPassword(userId: string) {
   return newPassword;
 }
 
+/** Что удаление затронет — для честного текста в подтверждении. Z.2.3. */
+export async function actionTeacherDeletionImpact(teacherId: string): Promise<TeacherDeletionImpact> {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  return getTeacherDeletionImpact(teacherId, schoolId, isSuperAdmin);
+}
+
 export async function actionDeleteTeacher(teacherId: string, userId: string) {
   const { schoolId, isSuperAdmin } = await verifyAdmin();
   await deleteTeacher(teacherId, userId, schoolId, isSuperAdmin);
   revalidatePath("/admin/teachers");
+  revalidatePath("/admin/subject-assignments");
+  revalidatePath("/admin/groups");
   revalidatePath("/admin");
+}
+
+/** Z.2.4 — назначить или снять учителя одним действием: subjects.teacher_id,
+ *  group_teachers и (в реальных школах) subject_slug. */
+export async function actionSetAssignmentTeacher(assignmentId: string, teacherId: string | null) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  const result = await setAssignmentTeacher(assignmentId, teacherId, schoolId, isSuperAdmin);
+  revalidatePath("/admin/teachers");
+  revalidatePath("/admin/subject-assignments");
+  return result;
 }
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
@@ -199,6 +222,19 @@ export async function actionSetSchoolSubjectActive(id: string, isActive: boolean
   revalidateSubjects();
 }
 
+/** Z.2.3 — что мешает удалить предмет справочника. Питает диалог, который
+ *  вместо «вы уверены» показывает числа и предлагает скрыть. */
+export async function actionSchoolSubjectImpact(id: string): Promise<SchoolSubjectDeletionImpact> {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  return getSchoolSubjectImpact(id, schoolId, isSuperAdmin);
+}
+
+export async function actionDeleteSchoolSubject(id: string) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  await deleteSchoolSubject(id, schoolId, isSuperAdmin);
+  revalidateSubjects();
+}
+
 // ── SUBJECT ASSIGNMENTS: предмет × группа × учитель (Z.2.2) ──────────────────
 // Назначение учителя будит trg_subject_teacher_direct_chats — личные чаты со
 // всеми учениками группы. Это штатно, но по одной строке за раз; в UI об этом
@@ -228,6 +264,11 @@ export async function actionUpdateSubjectAssignment(formData: FormData) {
     id, { catalog_id, group_id, teacher_id: teacher_id || null }, schoolId, isSuperAdmin,
   );
   revalidateSubjects();
+}
+
+export async function actionSubjectAssignmentImpact(id: string): Promise<SubjectDeletionImpact> {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  return getSubjectAssignmentImpact(id, schoolId, isSuperAdmin);
 }
 
 export async function actionDeleteSubjectAssignment(id: string) {

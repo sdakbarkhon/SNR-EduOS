@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSubjectKeyByLabel } from "@snr/core";
 import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 function getServiceClient() {
@@ -234,6 +235,114 @@ export async function resetTeacherPassword(
   return newPassword;
 }
 
+/** Что удаление учителя затронет. Считается ДО показа диалога, чтобы
+ *  подтверждение говорило правду, а не «вы уверены». Z.2.3. */
+export type TeacherDeletionImpact = {
+  /** Уроки, которые он ведёт. Есть уроки — удалять нельзя. */
+  lessons: number;
+  /** Оценки и решения, на которые он подписан. ON DELETE NO ACTION —
+   *  удаление упало бы сырой ошибкой базы, поэтому блокируем осознанно. */
+  gradedRecords: number;
+  /** Три поверхности привязки: назначения предметов, строки group_teachers,
+   *  кураторство над группами. Снимаются вместе с учителем. */
+  assignments: number;
+  groupLinks: number;
+  curatorOf: number;
+  /** Уходит каскадом вместе с учителем — об этом надо предупредить. */
+  curriculumPlans: number;
+  announcements: number;
+  /** Где именно он ведёт уроки — для честного текста отказа. */
+  lessonGroups: string[];
+  blocked: boolean;
+};
+
+export async function getTeacherDeletionImpact(
+  teacherId: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<TeacherDeletionImpact> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  const { data: subjectRows } = await anySb
+    .from("subjects").select("id, group_id, name, group:groups(name)").eq("teacher_id", teacherId);
+  const subjects = (subjectRows ?? []) as Array<{ id: string; name: string; group: { name: string } | null }>;
+  const subjectIds = subjects.map((s) => s.id);
+
+  // Считаем ПО ТОЙ ЖЕ колонке, по которой фильтруем, а не по "id": у
+  // group_teachers своего id нет вовсе (первичный ключ составной,
+  // group_id + teacher_id), и select("id") там молча возвращал ноль —
+  // привязки к группам выглядели пустыми, хотя строки есть.
+  const countOf = async (table: string, column: string, value: string | string[]) => {
+    if (Array.isArray(value) && value.length === 0) return 0;
+    let q = anySb.from(table).select(column, { count: "exact", head: true });
+    q = Array.isArray(value) ? q.in(column, value) : q.eq(column, value);
+    const { count, error } = await q;
+    if (error) throw error;
+    return count ?? 0;
+  };
+
+  const [lessons, plansBySubject, groupLinks, curatorOf, plansByTeacher, announcements,
+    lessonGrades, hwApproved, leaveDecided, stageGraded] = await Promise.all([
+    countOf("lessons", "subject_id", subjectIds),
+    countOf("curriculum_plans", "subject_id", subjectIds),
+    countOf("group_teachers", "teacher_id", teacherId),
+    countOf("groups", "teacher_id", teacherId),
+    countOf("curriculum_plans", "teacher_id", teacherId),
+    countOf("announcements", "created_by", teacherId),
+    countOf("lesson_grades", "graded_by", teacherId),
+    countOf("homework_submissions", "teacher_approved_by", teacherId),
+    countOf("leave_requests", "decided_by", teacherId),
+    countOf("lesson_stage_progress", "graded_by", teacherId),
+  ]);
+
+  // Уроки ищем по subject_id учителя; названия групп берём из тех же строк.
+  const lessonGroups = lessons > 0
+    ? [...new Set(subjects.map((s) => `${s.group?.name ?? "—"} · ${s.name}`))]
+    : [];
+
+  const gradedRecords = lessonGrades + hwApproved + leaveDecided + stageGraded;
+
+  return {
+    lessons, gradedRecords,
+    assignments: subjects.length, groupLinks, curatorOf,
+    curriculumPlans: Math.max(plansByTeacher, plansBySubject),
+    announcements, lessonGroups,
+    blocked: lessons > 0 || gradedRecords > 0,
+  };
+}
+
+/**
+ * Удаляет учителя вместе с привязками и учётной записью. Z.2.3.
+ *
+ * Раньше здесь была одна проверка — «есть ли у него группы» — и один вызов
+ * `auth.admin.deleteUser`. Оба места неверны:
+ *   1. Кураторство (`groups.teacher_id`) — лишь ОДНА из трёх поверхностей
+ *      привязки. Учитель мог вести десяток предметов, не будучи куратором
+ *      ни одной группы, и удалялся без единого предупреждения.
+ *   2. `teachers.user_id` → `auth.users` стоит ON DELETE **SET NULL**
+ *      (проверено на живой базе), а не CASCADE. То есть удаление учётной
+ *      записи оставляло строку учителя сиротой: он пропадал из входа, но
+ *      оставался в списках, назначениях и фильтрах.
+ *
+ * Запрет вместо удаления, если учитель ведёт уроки или подписан под
+ * оценками: `lesson_grades.graded_by`, `homework_submissions
+ * .teacher_approved_by`, `leave_requests.decided_by`,
+ * `lesson_stage_progress.graded_by` — все четыре ON DELETE NO ACTION, то
+ * есть удаление всё равно упало бы, только сырой ошибкой внешнего ключа.
+ *
+ * Если уроков нет, снимаем привязки явно и по одной:
+ *   - `subjects.teacher_id → NULL` — назначение предмета группе остаётся,
+ *     просто без учителя. Строку не удаляем: на `subjects.id` висят ДЗ
+ *     (SET NULL) и учебные планы (CASCADE), а терять план из-за увольнения
+ *     учителя никто не просил.
+ *   - строки `group_teachers` — удаляются;
+ *   - `groups.teacher_id → NULL` — кураторство снимается.
+ * Формально первое и третье сделал бы сам FK (оба SET NULL), но явный шаг
+ * оставляет след в логе и не зависит от того, что кто-то поменяет правило.
+ */
 export async function deleteTeacher(
   teacherId: string,
   userId: string,
@@ -242,12 +351,37 @@ export async function deleteTeacher(
 ) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
 
-  // Check if teacher has groups
-  const { data: groups } = await sb.from("groups").select("id").eq("teacher_id", teacherId).limit(1);
-  if (groups && groups.length > 0) throw new Error("BLOCKED: teacher has groups");
-  const { error } = await sb.auth.admin.deleteUser(userId);
-  if (error) throw error;
+  const impact = await getTeacherDeletionImpact(teacherId, callerSchoolId, callerIsSuperAdmin);
+  if (impact.lessons > 0) {
+    throw new Error(`BLOCKED_TEACHER_LESSONS:${impact.lessons}:${impact.lessonGroups.slice(0, 5).join("; ")}`);
+  }
+  if (impact.gradedRecords > 0) {
+    throw new Error(`BLOCKED_TEACHER_GRADES:${impact.gradedRecords}`);
+  }
+
+  const { error: unassignErr } = await anySb
+    .from("subjects").update({ teacher_id: null }).eq("teacher_id", teacherId);
+  if (unassignErr) throw unassignErr;
+
+  const { error: linkErr } = await anySb.from("group_teachers").delete().eq("teacher_id", teacherId);
+  if (linkErr) throw linkErr;
+
+  const { error: curatorErr } = await anySb
+    .from("groups").update({ teacher_id: null }).eq("teacher_id", teacherId);
+  if (curatorErr) throw curatorErr;
+
+  // Учётная запись — чтобы уволенный не продолжал входить. user_id может
+  // быть пустым у заведённых до Z.1 строк, поэтому шаг необязательный.
+  if (userId) {
+    const { error } = await sb.auth.admin.deleteUser(userId);
+    if (error && !/not found/i.test(error.message)) throw error;
+  }
+
+  const { error: rowErr } = await anySb.from("teachers").delete().eq("id", teacherId);
+  if (rowErr) throw rowErr;
 }
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
@@ -396,6 +530,15 @@ export async function createSubjectAssignment(data: {
     .select("id")
     .single();
   if (error || !row) throw error ?? new Error("Assignment insert failed");
+
+  // Z.2.4 — вторая и третья поверхности привязки. Без этого назначенный
+  // здесь учитель получал право писать уроки, но не видел саму группу.
+  if (data.teacher_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anySb = sb as any;
+    await linkTeacherToGroup(anySb, data.group_id, data.teacher_id, data.school_id);
+    await ensureSubjectSlug(anySb, data.teacher_id, cat.name as string, data.school_id);
+  }
   return (row as { id: string }).id;
 }
 
@@ -420,7 +563,17 @@ export async function updateSubjectAssignment(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (sb as any)
+  const anySb = sb as any;
+  // Прежние значения нужны, чтобы понять, что именно поменялось: снятого
+  // учителя надо отвязать от группы, а при переезде назначения в другую
+  // группу — отвязать от старой.
+  const { data: before } = await anySb
+    .from("subjects").select("teacher_id, group_id, school_id").eq("id", id).maybeSingle();
+  const prevTeacher = (before?.teacher_id as string | null) ?? null;
+  const prevGroup = (before?.group_id as string | null) ?? null;
+  const schoolId = (before?.school_id as string) ?? callerSchoolId;
+
+  const { error } = await anySb
     .from("subjects")
     .update({
       catalog_id: cat.id,
@@ -432,6 +585,49 @@ export async function updateSubjectAssignment(
     })
     .eq("id", id);
   if (error) throw error;
+
+  // Z.2.4 — приводим остальные поверхности в соответствие. Порядок важен:
+  // сперва добавляем новое, потом снимаем ставшее лишним, иначе учитель,
+  // который просто переехал с одной группы на другую, на мгновение теряет
+  // доступ к обеим.
+  if (data.teacher_id) {
+    await linkTeacherToGroup(anySb, data.group_id, data.teacher_id, schoolId);
+    await ensureSubjectSlug(anySb, data.teacher_id, cat.name as string, schoolId);
+  }
+  if (prevTeacher && (prevTeacher !== data.teacher_id || prevGroup !== data.group_id)) {
+    await unlinkTeacherFromGroupIfUnused(anySb, prevGroup ?? data.group_id, prevTeacher);
+  }
+}
+
+/** Что удалится вместе с назначением. Z.2.3. Уроки и ДЗ отвяжутся
+ *  (ON DELETE SET NULL), а учебные планы уйдут насовсем (CASCADE) — поэтому
+ *  считаем всё три и при ненулевом счётчике удалять не даём. */
+export type SubjectDeletionImpact = { lessons: number; homework: number; plans: number; blocked: boolean };
+
+async function subjectImpact(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  subjectIds: string[],
+): Promise<SubjectDeletionImpact> {
+  if (subjectIds.length === 0) return { lessons: 0, homework: 0, plans: 0, blocked: false };
+  const countOf = async (table: string) => {
+    const { count } = await sb.from(table).select("id", { count: "exact", head: true }).in("subject_id", subjectIds);
+    return count ?? 0;
+  };
+  const [lessons, homework, plans] = await Promise.all([
+    countOf("lessons"), countOf("homework"), countOf("curriculum_plans"),
+  ]);
+  return { lessons, homework, plans, blocked: lessons + homework + plans > 0 };
+}
+
+export async function getSubjectAssignmentImpact(
+  id: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<SubjectDeletionImpact> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "subjects", id, callerSchoolId, callerIsSuperAdmin);
+  return subjectImpact(sb, [id]);
 }
 
 export async function deleteSubjectAssignment(
@@ -441,12 +637,263 @@ export async function deleteSubjectAssignment(
 ) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "subjects", id, callerSchoolId, callerIsSuperAdmin);
+
+  // Z.2.3 — гвард. Раньше удаление шло без единой проверки: уроки и ДЗ
+  // теряли предмет (SET NULL), а учебный план исчезал целиком (CASCADE).
+  const impact = await subjectImpact(sb, [id]);
+  if (impact.blocked) {
+    throw new Error(`BLOCKED_SUBJECT_IN_USE:${impact.lessons}:${impact.homework}:${impact.plans}`);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (sb as any).from("subjects").delete().eq("id", id);
   if (error) throw error;
 }
 
-// ── SUPER ADMIN: демо-школа вне зоны видимости ───────────────────────────────
+/** Что мешает удалить предмет из справочника школы. Z.2.3. */
+export type SchoolSubjectDeletionImpact = SubjectDeletionImpact & { assignments: number };
+
+export async function getSchoolSubjectImpact(
+  id: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<SchoolSubjectDeletionImpact> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "school_subjects", id, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const { data: rows } = await anySb.from("subjects").select("id").eq("catalog_id", id);
+  const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+  const impact = await subjectImpact(anySb, ids);
+  return { ...impact, assignments: ids.length, blocked: impact.blocked || ids.length > 0 };
+}
+
+/**
+ * Удаляет предмет из справочника школы. Z.2.3.
+ *
+ * До этого шага удаления не было вовсе — только «скрыть» (`is_active`), и это
+ * правильное поведение для предмета, который где-то используется. Но пустой
+ * предмет, заведённый по ошибке, скрывать бессмысленно: он навсегда остаётся
+ * в списке выключенным. Поэтому удаление есть, но только для действительно
+ * пустого: ни одного назначения в группах, а значит ни уроков, ни ДЗ, ни
+ * планов. Во всех остальных случаях — отказ с числами и предложением скрыть.
+ */
+export async function deleteSchoolSubject(
+  id: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+) {
+  const sb = getServiceClient();
+  const impact = await getSchoolSubjectImpact(id, callerSchoolId, callerIsSuperAdmin);
+  if (impact.blocked) {
+    throw new Error(
+      `BLOCKED_CATALOG_IN_USE:${impact.assignments}:${impact.lessons}:${impact.homework}:${impact.plans}`,
+    );
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any).from("school_subjects").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ── Z.2.4: ЕДИНАЯ ПРИВЯЗКА УЧИТЕЛЯ ───────────────────────────────────────────
+//
+// Связь «учитель ведёт предмет в группе» жила в трёх независимых местах, и
+// админка писала только первое:
+//   1. `subjects.teacher_id`   — кто ведёт. Предикат is_subject_owner(),
+//                                гейтит ЗАПИСЬ уроков.
+//   2. `group_teachers`        — какие группы видит. Предикат
+//                                is_my_teacher_group(), гейтит ЧТЕНИЕ.
+//                                В неё не писал никто, отсюда и симптом:
+//                                заведённый через админку учитель не видел
+//                                ни одной своей группы.
+//   3. `teachers.subject_slug` — предметник или куратор. Предикат
+//                                is_curator_teacher() (буквально
+//                                `subject_slug IS NULL`), входит в
+//                                SELECT-политику уроков и гейтит библиотеку
+//                                кафедры (миграция 154).
+//
+// Функции ниже пишут все три за одно действие. Три правила, каждое оплачено
+// разведкой:
+//
+//   • `group_teachers.school_id` — NOT NULL DEFAULT current_school_id(), а под
+//     service-role клиентом auth.uid() пуст и дефолт даёт NULL. Школу
+//     передаём явно, иначе вставка падает.
+//
+//   • На `subjects` висит trg_subject_teacher_direct_chats (AFTER UPDATE OF
+//     teacher_id): смена учителя заводит личные чаты со всеми РЕАЛЬНЫМИ
+//     учениками группы (у кого логин не начинается на `demo_`). Поэтому
+//     только по одному назначению за раз и никаких массовых UPDATE. Если
+//     учитель тот же — триггер сам замыкается накоротко и ничего не делает.
+//
+//   • `subject_slug` в ДЕМО-ШКОЛЕ не трогаем вообще. У teacher_karim слаг
+//     пуст при 13 назначениях: пустой слаг делает его куратором и открывает
+//     чтение всех уроков своих групп. Проставить слаг «по логике» — молча
+//     сузить ему права на живой демонстрации. В реальных школах слаг
+//     проставляется при первом назначении и только если он ещё пуст.
+
+const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+
+export type TeacherBinding = {
+  assignmentId: string;
+  subjectName: string;
+  groupId: string;
+  groupName: string;
+  /** Куратор группы — отдельная роль, показывается рядом для полноты картины. */
+  isCurator: boolean;
+  /** Есть ли строка в group_teachers, то есть видит ли он группу. */
+  seesGroup: boolean;
+  lessons: number;
+};
+
+/** Всё, что учитель ведёт: предмет, группа, видит ли он её, сколько уроков.
+ *  Питает вкладку «Предметы и группы». Z.2.4. */
+export async function getTeacherBindings(
+  teacherId: string,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<TeacherBinding[]> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  const { data: rows, error } = await anySb
+    .from("subjects")
+    .select("id, name, group_id, group:groups(id, name, teacher_id)")
+    .eq("teacher_id", teacherId)
+    .order("name");
+  if (error) throw error;
+  const assignments = (rows ?? []) as Array<{
+    id: string; name: string; group_id: string;
+    group: { id: string; name: string; teacher_id: string | null } | null;
+  }>;
+  if (assignments.length === 0) return [];
+
+  const { data: links } = await anySb
+    .from("group_teachers").select("group_id").eq("teacher_id", teacherId);
+  const seen = new Set(((links ?? []) as Array<{ group_id: string }>).map((l) => l.group_id));
+
+  const { data: lessonRows } = await anySb
+    .from("lessons").select("subject_id").in("subject_id", assignments.map((a) => a.id));
+  const lessonsBy = new Map<string, number>();
+  for (const l of (lessonRows ?? []) as Array<{ subject_id: string }>) {
+    lessonsBy.set(l.subject_id, (lessonsBy.get(l.subject_id) ?? 0) + 1);
+  }
+
+  return assignments.map((a) => ({
+    assignmentId: a.id,
+    subjectName: a.name,
+    groupId: a.group_id,
+    groupName: a.group?.name ?? "—",
+    isCurator: a.group?.teacher_id === teacherId,
+    seesGroup: seen.has(a.group_id),
+    lessons: lessonsBy.get(a.id) ?? 0,
+  }));
+}
+
+/** Ставит строку group_teachers, если её ещё нет. school_id — явно, дефолт
+ *  под service-role даёт NULL. PK (group_id, teacher_id) делает повтор
+ *  безвредным, триггеров на таблице нет. */
+async function linkTeacherToGroup(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  groupId: string,
+  teacherId: string,
+  schoolId: string,
+) {
+  const { error } = await sb
+    .from("group_teachers")
+    .upsert({ group_id: groupId, teacher_id: teacherId, school_id: schoolId }, { onConflict: "group_id,teacher_id" });
+  if (error) throw error;
+}
+
+/** Снимает строку group_teachers, но только если учитель больше ничем с этой
+ *  группой не связан — не ведёт в ней других предметов и не куратор.
+ *  Иначе снятие одного предмета отобрало бы доступ ко всей группе. */
+async function unlinkTeacherFromGroupIfUnused(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  groupId: string,
+  teacherId: string,
+) {
+  const { count: others } = await sb
+    .from("subjects").select("id", { count: "exact", head: true })
+    .eq("group_id", groupId).eq("teacher_id", teacherId);
+  if ((others ?? 0) > 0) return;
+
+  const { data: group } = await sb.from("groups").select("teacher_id").eq("id", groupId).maybeSingle();
+  if (group?.teacher_id === teacherId) return;
+
+  const { error } = await sb
+    .from("group_teachers").delete().eq("group_id", groupId).eq("teacher_id", teacherId);
+  if (error) throw error;
+}
+
+/** Проставляет subject_slug при первом назначении — только в реальных школах
+ *  и только поверх пустого значения. Разбор почему так — в шапке блока. */
+async function ensureSubjectSlug(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  teacherId: string,
+  subjectName: string,
+  schoolId: string,
+) {
+  if (schoolId === DEMO_SCHOOL_ID) return;
+  const slug = getSubjectKeyByLabel(subjectName);
+  if (!slug) return;
+  const { data: teacher } = await sb
+    .from("teachers").select("subject_slug").eq("id", teacherId).maybeSingle();
+  if (!teacher || teacher.subject_slug) return;
+  const { error } = await sb.from("teachers").update({ subject_slug: slug }).eq("id", teacherId);
+  if (error) throw error;
+}
+
+/**
+ * Назначает (или снимает) учителя на одно назначение предмета — и приводит в
+ * порядок все поверхности привязки разом. Z.2.4, ядро шага.
+ *
+ * Одна строка `subjects` за вызов: на ней чат-триггер. Существующие связи
+ * дополняются, а не затираются — снятие учителя с одного предмета не рвёт
+ * его доступ к группе, если он ведёт там что-то ещё или он её куратор.
+ */
+export async function setAssignmentTeacher(
+  assignmentId: string,
+  teacherId: string | null,
+  callerSchoolId: string,
+  callerIsSuperAdmin: boolean,
+): Promise<{ changed: boolean; groupId: string }> {
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "subjects", assignmentId, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  const { data: row, error: readErr } = await anySb
+    .from("subjects").select("id, name, group_id, teacher_id, school_id").eq("id", assignmentId).maybeSingle();
+  if (readErr) throw readErr;
+  if (!row) throw new Error("Назначение не найдено");
+
+  const schoolId = (row.school_id as string) ?? callerSchoolId;
+  const previous = (row.teacher_id as string | null) ?? null;
+  if (previous === teacherId) return { changed: false, groupId: row.group_id as string };
+
+  if (teacherId) {
+    await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
+  }
+
+  const { error: upErr } = await anySb
+    .from("subjects").update({ teacher_id: teacherId }).eq("id", assignmentId);
+  if (upErr) throw upErr;
+
+  if (teacherId) {
+    await linkTeacherToGroup(anySb, row.group_id as string, teacherId, schoolId);
+    await ensureSubjectSlug(anySb, teacherId, row.name as string, schoolId);
+  }
+  if (previous) {
+    await unlinkTeacherFromGroupIfUnused(anySb, row.group_id as string, previous);
+  }
+
+  return { changed: true, groupId: row.group_id as string };
+}
 // Z.1, 06.08.2026. Суперадмин управляет только НЕ-демо школами. Фильтра в UI
 // для этого мало: все четыре write-действия ниже принимают school_id/userId
 // прямо из FormData, идут service-role клиентом (RLS не применяется вовсе), а
@@ -677,10 +1124,36 @@ export async function regenerateParentInviteCode(
   throw new Error("Failed to generate invite code");
 }
 
+/**
+ * Удаляет родителя вместе с учётной записью. Z.2.3.
+ *
+ * Раньше удалялась только строка `parents`, а учётная запись оставалась жить
+ * и продолжала пускать в систему — «удалённый» родитель входил как ни в чём
+ * не бывало. `parents.user_id` → `auth.users` стоит ON DELETE **CASCADE**
+ * (проверено на живой базе), поэтому правильный порядок обратный: удаляем
+ * пользователя, а строка родителя уходит сама, вместе с `parent_students` и
+ * `parent_invites` (обе CASCADE от parents).
+ *
+ * Дети не затрагиваются: `parent_students` — таблица связи, каскад забирает
+ * только её строки, `students` там ни при чём.
+ */
 export async function deleteParent(parentId: string, callerSchoolId: string, callerIsSuperAdmin: boolean) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "parents", parentId, callerSchoolId, callerIsSuperAdmin);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
 
+  const { data: parent, error: readErr } = await anySb
+    .from("parents").select("user_id").eq("id", parentId).maybeSingle();
+  if (readErr) throw readErr;
+
+  if (parent?.user_id) {
+    const { error } = await sb.auth.admin.deleteUser(parent.user_id as string);
+    if (error && !/not found/i.test(error.message)) throw error;
+  }
+
+  // Каскад срабатывает только если user_id был заполнен; у заведённых до
+  // Z.1 строк его нет, поэтому добиваем явно. Повторное удаление безвредно.
   const { error } = await sb.from("parents").delete().eq("id", parentId);
   if (error) throw error;
 }

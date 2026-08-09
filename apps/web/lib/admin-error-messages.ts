@@ -18,6 +18,36 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
 
   if (PASSTHROUGH_MESSAGES.has(raw)) return raw;
 
+  // Z.2.3 — гварды удаления. Причина отказа приходит из admin-api.ts кодом с
+  // числами; собираем из них фразу, объясняющую ЧТО мешает, вместо «нельзя».
+  const blocked = raw.match(/^BLOCKED_([A-Z_]+):(.*)$/);
+  if (blocked) {
+    const [kind, rest] = [blocked[1]!, blocked[2]!];
+    const parts = rest.split(":");
+    const num = (i: number) => Number(parts[i] ?? 0) || 0;
+    if (kind === "TEACHER_LESSONS") {
+      const where = parts.slice(1).join(":").trim();
+      return t.teacherHasLessons.replace("{count}", String(num(0)))
+        + (where ? ` (${where})` : "");
+    }
+    if (kind === "TEACHER_GRADES") {
+      return t.teacherHasGrades.replace("{count}", String(num(0)));
+    }
+    if (kind === "SUBJECT_IN_USE") {
+      return t.subjectInUse
+        .replace("{lessons}", String(num(0)))
+        .replace("{homework}", String(num(1)))
+        .replace("{plans}", String(num(2)));
+    }
+    if (kind === "CATALOG_IN_USE") {
+      return t.catalogSubjectInUse
+        .replace("{assignments}", String(num(0)))
+        .replace("{lessons}", String(num(1)))
+        .replace("{homework}", String(num(2)))
+        .replace("{plans}", String(num(3)));
+    }
+  }
+
   if (/duplicate key.*students_username_key/i.test(raw) || /duplicate key.*teachers_username_key/i.test(raw)) {
     return t.usernameTaken;
   }
