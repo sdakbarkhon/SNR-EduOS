@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Clock, Check, FileText, FileCode2, File, ChevronsLeft, ChevronsRight,
   Image as ImageIcon, BookOpen, ListChecks, Lock, X, Download, Users, Hash,
-  Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play, CheckCircle2,
+  Maximize2, Minimize2, Bot, RefreshCw, LogOut, Play, CheckCircle2, Loader2,
 } from "lucide-react";
 import {
   getSubjectStyle, formatTime, getDictionary,
@@ -341,6 +341,12 @@ export function LessonWorkspaceView({
   // «видео работает, файлы нет».
   const [demoMat, setDemoMat] = useState<LessonMaterial | null>(null);
   const [demoUrl, setDemoUrl] = useState<string | null>(null);
+  // 08.08.2026 — «резолв закончился». Материал и ссылка приезжают асинхронно
+  // (эффект ниже), а разметка показа выбирала между содержимым и ошибкой
+  // сразу: пока mat/url были null, ученик секунду видел «Этот формат не
+  // поддерживается», и только потом появлялось видео. Ошибку показываем
+  // ТОЛЬКО когда резолв завершился и формат правда не поддержан.
+  const [demoResolved, setDemoResolved] = useState(false);
   const [stageChangedBanner, setStageChangedBanner] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [openTaskStageId, setOpenTaskStageId] = useState<string | null>(null);
@@ -357,7 +363,8 @@ export function LessonWorkspaceView({
   // учитель (lib/material-url.ts) — раньше эти правила жили в трёх местах и
   // разъехались, см. коммит 4220653.
   useEffect(() => {
-    if (!demoMaterialId) { setDemoMat(null); setDemoUrl(null); return; }
+    if (!demoMaterialId) { setDemoMat(null); setDemoUrl(null); setDemoResolved(true); return; }
+    setDemoResolved(false);
     let cancelled = false;
     (async () => {
       let mat = lesson.materials.find((m) => m.id === demoMaterialId) ?? null;
@@ -373,7 +380,8 @@ export function LessonWorkspaceView({
       if (cancelled) return;
       setDemoMat(mat);
       setDemoUrl(mat ? await resolveMaterialUrl(db, mat) : null);
-    })().catch(() => { if (!cancelled) { setDemoMat(null); setDemoUrl(null); } });
+      if (!cancelled) setDemoResolved(true);
+    })().catch(() => { if (!cancelled) { setDemoMat(null); setDemoUrl(null); setDemoResolved(true); } });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoMaterialId]);
@@ -1184,7 +1192,11 @@ export function LessonWorkspaceView({
               <span className="ml-auto shrink-0 text-xs text-white/60">{d.demo.onlyTeacherCanClose}</span>
             </div>
             <div className="flex-1 overflow-auto bg-white">
-              {mat && url && kind !== "other" ? (
+              {!demoResolved ? (
+                <div className="flex h-full items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                </div>
+              ) : mat && url && kind !== "other" ? (
                 <DemoMaterialContent url={url} title={mat.title} kind={kind} lessonId={lesson.id} isDemoSchool={isDemoSchool} />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1 px-6 py-12 text-center">

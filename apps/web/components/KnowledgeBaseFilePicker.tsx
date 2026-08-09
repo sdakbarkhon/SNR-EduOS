@@ -585,7 +585,12 @@ export function KnowledgeBaseFilePicker({
   const [loading, setLoading] = useState(false);
   // Промт 6А/C — per-source, не общий: одна вкладка может упасть, пока
   // остальные две загрузились нормально; не путать реальный сбой с "пусто".
-  const [tabError, setTabError] = useState<Record<Tab, boolean>>({ library: false, materials: false, teacherLibrary: false });
+  // 08.08.2026 — храним ТЕКСТ ошибки, а не факт. Раньше причина уходила
+  // только в console.error, а наружу вкладка выглядела просто пустой: понять,
+  // «материалов нет» или «запрос упал», было нельзя ни учителю, ни нам —
+  // именно из-за этого разбор пустой вкладки «Материалы группы» пришлось
+  // вести вслепую по коду.
+  const [tabError, setTabError] = useState<Record<Tab, string | null>>({ library: null, materials: null, teacherLibrary: null });
   const [selected, setSelected] = useState<Map<string, PickedKnowledgeBaseFile>>(new Map());
 
   // Уборка (после Захода 2) — учитель+его группы резолвятся здесь же
@@ -620,7 +625,7 @@ export function KnowledgeBaseFilePicker({
     setTab(initialTab ?? "materials");
     setSelected(new Map());
     setQuery("");
-    setTabError({ library: false, materials: false, teacherLibrary: false });
+    setTabError({ library: null, materials: null, teacherLibrary: null });
     setDeleteError(null);
     let cancelled = false;
     setLoading(true);
@@ -651,10 +656,14 @@ export function KnowledgeBaseFilePicker({
       }
       if (groupsRes.status === "fulfilled") setMyGroups(groupsRes.value as unknown as Array<{ id: string; name: string }>);
       else console.error("[KnowledgeBaseFilePicker] failed to load teacher groups:", groupsRes.reason);
+      const reasonOf = (r: PromiseSettledResult<unknown>) =>
+        r.status === "rejected"
+          ? ((r.reason as { message?: string })?.message ?? String(r.reason)).slice(0, 200)
+          : null;
       setTabError({
-        materials: m.status === "rejected",
-        library: b.status === "rejected",
-        teacherLibrary: lib.status === "rejected",
+        materials: reasonOf(m),
+        library: reasonOf(b),
+        teacherLibrary: reasonOf(lib),
       });
       setLoading(false);
     });
@@ -794,6 +803,8 @@ export function KnowledgeBaseFilePicker({
     : allItems;
 
   const canManageLibrary = tab === "teacherLibrary" && !!myTeacher && !isCurator;
+  const sourceCountForTab =
+    tab === "materials" ? materials.length : tab === "library" ? books.length : libraryFiles.length;
 
   return (
     // z-index above 9999 — the app's other full-screen modals (e.g. "Прикрепить
@@ -885,12 +896,33 @@ export function KnowledgeBaseFilePicker({
 
         {/* Grid */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {/* сколько записей во вкладке ДО поиска — нужно, чтобы отличить
+              «источник пуст» от «поиск ничего не нашёл» */}
           {loading ? (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">…</div>
           ) : tabError[tab] ? (
-            <div className="flex h-full items-center justify-center text-sm font-medium text-red-600">{d.loadError}</div>
+            <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
+              <p className="text-sm font-medium text-red-600">{d.loadError}</p>
+              <p className="max-w-md break-words text-xs text-slate-400">{tabError[tab]}</p>
+            </div>
           ) : items.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">{d.noResults}</div>
+            // Пусто по-разному: в источнике ничего нет или поиск всё отфильтровал.
+            // Молчаливое «ничего не найдено» на обе ситуации и мешало понять,
+            // что происходит с вкладкой «Материалы группы».
+            <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
+              <p className="text-sm text-slate-400">
+                {sourceCountForTab === 0
+                  ? tab === "materials"
+                    ? "У этой группы пока нет материалов"
+                    : tab === "library"
+                      ? "В библиотеке пока нет книг"
+                      : "В библиотеке учителей пока нет файлов"
+                  : d.noResults}
+              </p>
+              {sourceCountForTab > 0 && query.trim() && (
+                <p className="text-xs text-slate-400">Всего на вкладке: {sourceCountForTab}</p>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {items.map((it) => {
