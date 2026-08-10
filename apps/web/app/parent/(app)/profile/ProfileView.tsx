@@ -147,7 +147,7 @@ export function ProfileView({
   // оверлей — opacity .28s (строка 4027).
   const [modalMounted, setModalMounted] = useState(false);
   const [modalEntered, setModalEntered] = useState(false);
-  const { loggingOut, logout } = useLogout();
+  const { loggingOut, logout } = useLogout("/parent");
 
   useEffect(() => {
     if (logoutOpen) {

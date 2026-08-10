@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDictionary, type Locale } from "@snr/core";
-import { loginParentByPhone } from "@/app/actions/parentPhoneAuth";
+import { demoParentLogin } from "@/app/actions/parentPhoneAuth";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { GlassButton } from "@/components/parent/glass/GlassButton";
@@ -31,10 +31,6 @@ import {
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
 import { LangButton } from "./LangButton";
-
-/** Единственный демо-родитель: Исмаилов Бахтиёр (ребёнок — Шерзод, 10-А).
- *  Тот же номер, что в packages/core PARENT_PHONE_ACCOUNTS. */
-const DEMO_PARENT_PHONE = "912345678";
 
 /**
  * Плитка 34×34 под логотипом соцвхода — ЖЁСТКИЙ белый в обеих темах: это
@@ -90,12 +86,13 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
   const noticeTimer = useRef<number | null>(null);
 
   // Демо-вход родителя: ОДНА кнопка → сразу заходим под Исмаиловым
-  // Бахтиёром (телефон 91 234 56 78, ребёнок — Исмаилов Шерзод, 10-А).
-  // Раньше кнопка открывала шит с ВЫБОРОМ из трёх родителей
-  // (Исмаилов/Рахимов/Каримов) — по решению заказчика демо сведено к
-  // одной семье, выбор убран. Вход идёт тем же server action, что и
-  // обычный флоу «номер + SMS» (код не проверяется по-настоящему,
-  // сверяется только формат), поэтому экран SMS можно пропустить.
+  // Бахтиёром (ребёнок — Исмаилов Шерзод, 10-А).
+  //
+  // Раньше кнопка звала общий loginParentByPhone с кодом-заглушкой "0000" —
+  // это работало, пока код не проверялся. После ec41048 он проверяется
+  // по-настоящему, и демо-вход перестал пускать внутрь. Теперь у демо своё
+  // действие (demoParentLogin), а общий путь остался строгим: подделывать
+  // код на нём нельзя, это вход в настоящий кабинет.
   const router = useRouter();
   const [demoBusy, setDemoBusy] = useState(false);
   const demoBusyRef = useRef(false);
@@ -104,7 +101,7 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
     if (demoBusyRef.current) return;
     demoBusyRef.current = true;
     setDemoBusy(true);
-    const result = await loginParentByPhone(DEMO_PARENT_PHONE, "0000");
+    const result = await demoParentLogin();
     if (!result.ok) {
       demoBusyRef.current = false;
       setDemoBusy(false);

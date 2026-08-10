@@ -27,13 +27,15 @@ import { signOut } from "@/app/actions/auth";
  * в Next.js работает через throw как управляющий сигнал, это тот же паттерн,
  * что уже проверен в DemoBanner.tsx.
  */
-export function useLogout() {
+/** Параметр dest — куда вернуться после выхода. Родительские экраны
+ *  передают "/parent": их вход отдельный, по телефону и коду. */
+export function useLogout(dest?: string) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const logout = useCallback(async () => {
     setLoggingOut(true);
-    await signOut();
-  }, []);
+    await signOut(dest);
+  }, [dest]);
 
   return { loggingOut, logout };
 }

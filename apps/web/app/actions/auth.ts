@@ -323,7 +323,15 @@ export async function demoLogin(
   return { ok: true, dest, isDemo: true };
 }
 
-export async function signOut() {
+/**
+ * Выход. Параметр dest — куда вернуть пользователя.
+ *
+ * По умолчанию ученический /login, но у родителя СВОЙ экран входа (телефон
+ * и код): выходя из родительского кабинета, он попадал на форму с логином,
+ * паролем, кнопкой демо и значками Google/Microsoft — чужую дверь.
+ * Параметр необязательный, поэтому все прежние вызовы работают как раньше.
+ */
+export async function signOut(dest: string = "/login") {
   const supabase = await createClient();
   const {
     data: { session },
@@ -352,5 +360,5 @@ export async function signOut() {
   // которая только что вытеснила эту.
   await supabase.auth.signOut({ scope: "local" });
   cookieStore.delete(DEMO_SESSION_COOKIE);
-  redirect("/login");
+  redirect(dest);
 }

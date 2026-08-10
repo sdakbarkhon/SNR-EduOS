@@ -44,6 +44,62 @@ export type PhoneLoginResult =
   | { ok: true; dest: string }
   | { ok: false; error: "invalid_phone" | "invalid_code" | "not_found" | "failed" };
 
+/** Телефон демо-родителя (Исмаилов Бахтиёр, ребёнок — Шерзод, 10-А). */
+const DEMO_PARENT_PHONE = "+998912345678";
+
+/**
+ * Демо-вход родителя на вебе — кнопка «Посмотреть демо» на /parent.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНОЕ ДЕЙСТВИЕ. Кнопка звала обычный loginParentByPhone с
+ * кодом-заглушкой "0000": до ec41048 код не проверялся вовсе, и это
+ * работало. После ec41048 код проверяется по-настоящему, "0000" стал
+ * отвечать `no_code`, и демо-вход перестал пускать внутрь — заказчик
+ * упирался в это на eduos.snruz.uz/parent.
+ *
+ * Чинить подделкой кода нельзя: любой обход проверки на общем пути — это
+ * дыра, ведущая в настоящий кабинет. Поэтому демо получает свой вход,
+ * жёстко привязанный к ОДНОМУ номеру, и общий путь остаётся строгим.
+ *
+ * Сессия выдаётся тем же приёмом, что и после кода: одноразовый token_hash
+ * от служебного клиента, обмен через verifyOtp. Пароль не участвует.
+ */
+export async function demoParentLogin(): Promise<PhoneLoginResult> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, error: "failed" };
+  const admin = createServiceClient(url, key, { auth: { persistSession: false } });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: parent } = await (admin as any)
+    .from("parents").select("user_id").eq("phone", DEMO_PARENT_PHONE).maybeSingle();
+  const userId = (parent?.user_id as string | null) ?? null;
+  if (!userId) return { ok: false, error: "not_found" };
+
+  const { data: authUser } = await admin.auth.admin.getUserById(userId);
+  const email = authUser?.user?.email;
+  if (!email) return { ok: false, error: "failed" };
+
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "magiclink", email,
+  });
+  const tokenHash = link?.properties?.hashed_token;
+  if (linkErr || !tokenHash) return { ok: false, error: "failed" };
+
+  const supabase = await createClient();
+  const { data: session, error: otpErr } = await supabase.auth.verifyOtp({
+    type: "email", token_hash: tokenHash,
+  });
+  if (otpErr || !session.user || !session.session) return { ok: false, error: "failed" };
+
+  await registerSession({
+    userId: session.user.id,
+    accessToken: session.session.access_token,
+  });
+  (await cookies()).delete(DEMO_SESSION_COOKIE);
+
+  return { ok: true, dest: "/parent/home" };
+}
+
 export async function loginParentByPhone(
   nationalDigits: string,
   code: string,

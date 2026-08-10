@@ -55,10 +55,16 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
+  // Куда уводить незалогиненного: у родителя СВОЙ экран входа (телефон +
+  // код), и отправлять его на ученический /login с логином, паролем и
+  // кнопкой демо — значит показывать чужую дверь. Проверяется по маршруту,
+  // потому что роль в этот момент ещё неизвестна: сессии нет.
+  const loginPathFor = (path: string) => (path.startsWith("/parent") ? "/parent" : "/login");
+
   // Unauthenticated → login
   if (!user && !isAuthPage) {
     const target = request.nextUrl.clone();
-    target.pathname = "/login";
+    target.pathname = loginPathFor(pathname);
     return NextResponse.redirect(target);
   }
 
@@ -99,7 +105,8 @@ export async function updateSession(request: NextRequest) {
     if (sessionStatus !== "ok") {
       await supabase.auth.signOut({ scope: "local" });
       const target = request.nextUrl.clone();
-      target.pathname = "/login";
+      // Вытеснение сессии у родителя — тоже на родительский вход.
+      target.pathname = loginPathFor(pathname);
       target.search = sessionStatus === "replaced" ? "?reason=session_replaced" : "";
       const redirectResponse = NextResponse.redirect(target);
       // signOut записал удаление auth-cookie в `response` через setAll —
