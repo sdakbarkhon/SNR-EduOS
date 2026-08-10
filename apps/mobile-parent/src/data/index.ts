@@ -185,12 +185,31 @@ export * from "./types";
 
 // ─── Семья ───────────────────────────────────────────────────────────────────
 
+/**
+ * Настоящие дети родителя, положенные сюда после входа
+ * (ParentDataContext → setRealChildren). Пока их нет — работают фикстуры.
+ *
+ * Зачем через реестр, а не пропсами. Имена детей читают 23 экрана, включая
+ * все шесть экранов оплат, и почти все зовут getChildren()/getChildById()
+ * напрямую. Одна точка подмены делает имена настоящими везде сразу; тащить
+ * контекст в каждый экран ради одного поля значило бы переписать их все.
+ *
+ * Настоящими становятся ИМЯ, класс и id. Презентационные поля (градиент
+ * аватара, статус «в школе/дома», род для падежей) в базе не хранятся —
+ * их по-прежнему даёт toChildRow (lib/realChild.ts).
+ */
+let REAL_CHILDREN: ChildRow[] | null = null;
+
+export function setRealChildren(rows: ChildRow[] | null): void {
+  REAL_CHILDREN = rows && rows.length > 0 ? rows : null;
+}
+
 export function getChildren(): ChildRow[] {
-  return CHILDREN;
+  return REAL_CHILDREN ?? CHILDREN;
 }
 
 export function getChildById(childId: string): ChildRow | undefined {
-  return CHILDREN.find((c) => c.id === childId);
+  return getChildren().find((c) => c.id === childId);
 }
 
 function resolveChild(childId?: string): ChildRow {

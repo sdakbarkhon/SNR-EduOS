@@ -64,6 +64,7 @@ export function LoginSmsScreen() {
     smsCode,
     setSmsCode,
     verifyCode,
+    resendCode,
     setPhase,
     smsError,
     authBusy,
@@ -144,7 +145,13 @@ export function LoginSmsScreen() {
   // Заход 1: цвет ошибки — существующий семантический токен status.red
   // (уже используется для просроченных ДЗ и т.п.), новых цветов не вводим.
   const errorColor = tokens.status.red.text;
-  const smsErrorText = smsError ? t[smsError] : null;
+  const SMS_ERROR_TEXT: Record<string, string> = {
+    wrongCode: t.codeWrong,
+    expired: t.codeExpired,
+    tooMany: t.codeTooMany,
+    loginFailed: t.loginFailed,
+  };
+  const smsErrorText = smsError ? (SMS_ERROR_TEXT[smsError] ?? t.loginFailed) : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -279,6 +286,33 @@ export function LoginSmsScreen() {
             {smsErrorText}
           </Text>
         ) : null}
+
+        {/* SMS пока не отправляются — провайдера нет. Честно говорим об этом
+            и даём запросить код заново; сервер сам не даст чаще раза в
+            минуту. Строка уйдёт вместе с заглушкой доставки. */}
+        <Text
+          style={{
+            fontFamily: fonts.manrope600,
+            fontSize: 10.5,
+            color: tokens.ink3,
+            textAlign: "center",
+          }}
+        >
+          {t.codeFromSchool}
+        </Text>
+        <Pressable onPress={() => { void resendCode(); }} disabled={authBusy}>
+          <Text
+            style={{
+              fontFamily: fonts.manrope700,
+              fontSize: 11,
+              color: authBusy ? tokens.ink3 : tokens.ink2,
+              textAlign: "center",
+              textDecorationLine: "underline",
+            }}
+          >
+            {t.resendCode}
+          </Text>
+        </Pressable>
 
         {/* ── БЛОК 5: Security-стрип (щит + текст двумя строками) ───────── */}
         <GlassCard

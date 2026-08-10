@@ -2816,11 +2816,30 @@ export const uz: Dictionary = {
       smsResend: "Qayta yuborish",
       smsSecurity: "Ma'lumotlaringiz xavfsizligiga\ng'amxo'rlik qilamiz",
       phoneNotFound: "Raqam topilmadi",
+
+      phoneInvalid: "Raqamning 9 ta raqamini kiriting",
+
+      phoneTooSoon: "Kod allaqachon yuborilgan. Bir daqiqadan keyin urinib ko'ring",
+
+      phoneNoAccount: "Bu raqam uchun kirish hali ochilmagan. Maktabga murojaat qiling",
+
+      networkError: "Server bilan aloqa yo'q. Internetni tekshiring",
+
+      configError: "Ilova server manzilisiz yig'ilgan. Yangi yig'ish kerak",
+
+      codeWrong: "Kod mos kelmadi",
+
+      codeExpired: "Kod muddati tugagan. Yangisini so'rang",
+
+      codeTooMany: "Juda ko'p urinish. Yangi kod so'rang",
+
+      codeFromSchool: "SMS hozircha yuborilmaydi — kodni maktabdan so'rang",
+
+      resendCode: "Kodni qayta yuborish",
       wrongCode: "Kod noto'g'ri",
 
       codeTooSoon: "Kod allaqachon yuborilgan. Bir daqiqadan so'ng qayta urinib ko'ring",
 
-      resendCode: "Kodni qayta yuborish",
       loginFailed: "Kirib bo'lmadi. Qayta urinib ko'ring",
       a4Sub: "Ishni boshlash uchun\nfarzandingiz profilini tanlang",
       a4SecurityTitle: "Ma'lumotlaringiz himoyalangan",

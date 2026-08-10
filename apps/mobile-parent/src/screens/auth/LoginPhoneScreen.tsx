@@ -44,7 +44,6 @@ import {
   UzFlagIcon,
 } from "../../ui/auth/icons";
 import { AuthHelpSheet } from "./sheets/AuthHelpSheet";
-import { AuthDemoPickerSheet } from "./sheets/AuthDemoPickerSheet";
 import { LangThemeButtons } from "./LangThemeButtons";
 
 /** Формат «90 123 45 67» — соответствует phoneFmt макета. */
@@ -54,7 +53,7 @@ function formatPhone(digits: string): string {
   return [m[1], m[2], m[3], m[4]].filter(Boolean).join(" ");
 }
 
-type SheetKey = null | "help" | "demo";
+type SheetKey = null | "help";
 
 export function LoginPhoneScreen() {
   const { d } = useAppLocale();
@@ -80,7 +79,17 @@ export function LoginPhoneScreen() {
   // (фикстурный вход не мог провалиться) — переиспользуем семантический
   // токен status.red, как и на LoginSmsScreen.
   const errorColor = tokens.status.red.text;
-  const phoneErrorText = phoneError ? t[phoneError] : null;
+  // Причина приходит машинным кодом с сервера — переводим её в фразу здесь,
+  // чтобы в словаре не заводить ключи со снейк-кейсом.
+  const PHONE_ERROR_TEXT: Record<string, string> = {
+    not_found: t.phoneNotFound,
+    invalidPhone: t.phoneInvalid,
+    too_soon: t.phoneTooSoon,
+    no_account: t.phoneNoAccount,
+    config_error: t.configError,
+    network_error: t.networkError,
+  };
+  const phoneErrorText = phoneError ? (PHONE_ERROR_TEXT[phoneError] ?? t.networkError) : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -308,68 +317,6 @@ export function LoginPhoneScreen() {
           />
         </View>
 
-        {/* 6. Демо-CTA — фиолетовая рамка rgba(124,58,237,.5) (макет 2003–2007). */}
-        <GlassCard
-          radius={16}
-          contentStyle={{
-            padding: 13,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 11,
-            borderWidth: 1.5,
-            borderColor: "rgba(124,58,237,0.5)",
-          }}
-          onPress={() => setSheet("demo")}
-        >
-          <View
-            style={[
-              shadowStyle({
-                x: 0,
-                y: 6,
-                blur: 14,
-                color: "rgba(124,58,237,0.35)",
-              }),
-              { borderRadius: 11 },
-            ]}
-          >
-            <LinearGradient
-              colors={["#7C3AED", "#4F6DF5"]}
-              {...gradPoints(135)}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 11,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <SparkleIcon size={16} color="#FFFFFF" />
-            </LinearGradient>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontFamily: fonts.manrope800,
-                fontSize: 12.5,
-                color: tokens.ink1,
-              }}
-            >
-              {t.demoCtaTitle}
-            </Text>
-            <Text
-              style={{
-                fontFamily: fonts.manrope600,
-                fontSize: 9.5,
-                color: tokens.ink2,
-                marginTop: 2,
-              }}
-            >
-              {t.demoCtaSub}
-            </Text>
-          </View>
-          <ChevronRightIcon size={15} color={tokens.ink3} />
-        </GlassCard>
-
         {/* 7. CTA «Войти через Google» (макет 2008–2011). */}
         <GlassCard
           radius={16}
@@ -472,10 +419,6 @@ export function LoginPhoneScreen() {
       </ScrollView>
 
       <AuthHelpSheet visible={sheet === "help"} onClose={() => setSheet(null)} />
-      <AuthDemoPickerSheet
-        visible={sheet === "demo"}
-        onClose={() => setSheet(null)}
-      />
     </View>
   );
 }

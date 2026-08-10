@@ -2928,6 +2928,16 @@ export interface Dictionary {
       // телефона/кода; существовавших раньше просто не было, т.к. фикстурный
       // вход никогда не мог провалиться.
       phoneNotFound: string;
+      /** Вход по телефону с настоящим кодом: причины отказа. */
+      phoneInvalid: string;
+      phoneTooSoon: string;
+      phoneNoAccount: string;
+      networkError: string;
+      configError: string;
+      codeWrong: string;
+      codeExpired: string;
+      codeTooMany: string;
+      codeFromSchool: string;
       wrongCode: string;
     /** Z.2.8 — настоящий код: срок жизни и защита от частых запросов. */
     codeTooSoon: string;

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { getParentContext, type ParentContext as ParentContextData } from "@snr/core";
 import { getSupabase } from "../lib/supabase";
 import { useAsyncData } from "../hooks/useAsyncData";
+import { setRealChildren } from "../data";
+import { toChildRow } from "../lib/realChild";
 
 type Ctx = {
   data: ParentContextData | null;
@@ -27,6 +29,12 @@ const ParentDataContext = createContext<Ctx | null>(null);
 export function ParentDataProvider({ children }: { children: ReactNode }) {
   const state = useAsyncData(() => getParentContext(getSupabase()), []);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+
+  // Настоящие дети — в слой данных, чтобы имена стали настоящими на всех
+  // экранах сразу, включая оплаты (см. setRealChildren в data/index.ts).
+  useEffect(() => {
+    setRealChildren(state.data ? state.data.children.map(toChildRow) : null);
+  }, [state.data]);
 
   useEffect(() => {
     if (state.data && state.data.children.length > 0 && !selectedChildId) {

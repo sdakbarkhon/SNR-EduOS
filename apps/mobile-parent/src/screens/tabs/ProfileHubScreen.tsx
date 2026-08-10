@@ -29,7 +29,6 @@ import Constants from "expo-constants";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow, REAL_CHILD_PALETTE } from "../../lib/realChild";
-import { findPhoneForUsername } from "../../lib/testAccounts";
 import {
   Avatar,
   CenterModalFrame,
@@ -92,11 +91,11 @@ export default function ProfileHubScreen() {
   // Заход 2, шаг 2: карточка родителя и «Мои дети» — реальные для
   // phone-login/демо-тапа (оба теперь real-flow, demoParentId не
   // выставляется ни при том, ни при другом). parents.phone в базе NULL —
-  // показываем номер, которым реально вошли (по pendingUsername, работает
-  // одинаково для входа по цифрам и по карточке модалки).
+  // Номер показываем из НАСТОЯЩЕГО профиля родителя (parents.phone), а не из
+  // карты тестовых номеров — карты больше нет.
   const { data: parentData, selectedChildId, selectChild } = useParentData();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
-  const loginPhone = isRealFlow && session.pendingUsername ? findPhoneForUsername(session.pendingUsername) : null;
+  const loginPhone = isRealFlow ? (parentData?.parentPhone ?? null) : null;
 
   const parent = getParent();
   const children = getChildren();

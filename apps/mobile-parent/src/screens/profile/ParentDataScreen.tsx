@@ -38,6 +38,7 @@ import {
 import { AppBackground, fonts, useTheme } from "../../theme";
 import { useAppLocale } from "../../i18n";
 import { getParent, getParentProfile } from "../../data";
+import { useParentData } from "../../context/ParentDataContext";
 import type { MainStackParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -55,6 +56,13 @@ export default function ParentDataScreen() {
 
   const parent = getParent();
   const profile = getParentProfile();
+  // Настоящие ФИО и телефон родителя — из parents (getParentContext).
+  // Остальные поля карточки (дата рождения, пол, семейное положение, адрес,
+  // место работы) в базе не хранятся вовсе — колонок под них нет, поэтому
+  // они остаются фикстурой; заводить таблицы ради них никто не просил.
+  const { data: parentData } = useParentData();
+  const realName = parentData?.parentName ?? null;
+  const realPhone = parentData?.parentPhone ?? null;
 
   const goBack = () => navigation.goBack();
   // Kebab → универсальный profile-menu stub (согласовано с CardDetailsScreen).
@@ -69,7 +77,7 @@ export default function ParentDataScreen() {
   const SECTION_CONTACT = "Связь";
 
   const personalRows: KVRow[] = [
-    { key: "ФИО", value: profile.full_name_official },
+    { key: "ФИО", value: realName ?? profile.full_name_official },
     { key: "Дата рождения", value: profile.birth_date_label },
     { key: "Пол", value: profile.gender_label },
     { key: "Семейное положение", value: profile.marital_status_label },
@@ -146,7 +154,7 @@ export default function ParentDataScreen() {
             </View>
             <View style={{ flex: 1, gap: 1 }}>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 14.5, color: tokens.ink1 }}>
-                {parent.full_name}
+                {realName ?? parent.full_name}
               </Text>
               <Text
                 style={{
@@ -164,7 +172,7 @@ export default function ParentDataScreen() {
                 {parent.email}
               </Text>
               <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink2 }}>
-                {parent.phone}
+                {realPhone ?? parent.phone}
               </Text>
             </View>
           </View>

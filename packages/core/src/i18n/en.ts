@@ -2815,11 +2815,30 @@ export const en: Dictionary = {
       smsResend: "Resend code",
       smsSecurity: "We keep your data\nsecure",
       phoneNotFound: "Number not found",
+
+      phoneInvalid: "Enter the 9 digits of the number",
+
+      phoneTooSoon: "A code was already sent. Try again in a minute",
+
+      phoneNoAccount: "No login has been set up for this number yet. Contact the school",
+
+      networkError: "No connection to the server. Check your internet",
+
+      configError: "The app was built without a server address. A new build is needed",
+
+      codeWrong: "The code did not match",
+
+      codeExpired: "The code has expired. Request a new one",
+
+      codeTooMany: "Too many attempts. Request a new code",
+
+      codeFromSchool: "SMS are not being sent yet — ask the school for the code",
+
+      resendCode: "Send the code again",
       wrongCode: "Wrong code",
 
       codeTooSoon: "A code was already sent. Try again in a minute",
 
-      resendCode: "Send the code again",
       loginFailed: "Couldn't sign in. Please try again",
       a4Sub: "Pick a child's profile\nto get started",
       a4SecurityTitle: "Your data is protected",

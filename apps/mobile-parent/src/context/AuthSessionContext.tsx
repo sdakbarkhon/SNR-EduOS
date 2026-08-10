@@ -1,32 +1,29 @@
 /**
  * AuthSessionContext — состояние потока входа (A1→A2→A3→A4→Main).
  *
- * ЗАХОД 1 (реальный вход): submitPhone/verifyCode для phone-flow (не демо)
- * больше не чистая фикстура — резолвят один из 3 тестовых номеров
- * (src/lib/testAccounts.ts) в реальный parent-аккаунт и реально логинят
- * через loginAsParent() (lib/auth.ts, "осиротевшая" после Захода 4 v2-
- * редизайна обвязка — теперь снова в деле). Настоящая Supabase-сессия
- * живёт в expo-secure-store (lib/supabase.ts), эта сессия — просто UI-
- * состояние потока экранов, никакого persist не требует.
+ * НАСТОЯЩИЙ ВХОД ПО ТЕЛЕФОНУ. До этого захода поток был декоративным: номер
+ * искался в карте трёх тестовых номеров (lib/testAccounts.ts), пароль у всех
+ * был один и лежал открытым текстом, а код из SMS не проверялся — подходили
+ * ЛЮБЫЕ четыре цифры. Знание девяти цифр давало вход в чужой кабинет.
  *
- * ЗАХОД 5x (правка 3): жёлтый DemoBannerGlass поверх шапки заменён на
- * one-shot центр-модалку `DemoNoticeModal` (см. RootNavigator + src/ui).
- * Прежние `bannerClosed`/`closeDemoBanner` переименованы в
- * `demoNoticeSeen`/`dismissDemoNotice`. Флаг session-scoped — сбрасывается
- * в false при демо-тапе (performLogin(isDemoTap=true)) и в signOut (сброс
- * всей сессии). При phone-flow (не демо) модалка не показывается никогда.
+ * Теперь submitPhone просит сервер выслать код на номер, а verifyCode
+ * проверяет его по-настоящему (срок жизни, лимит попыток, одноразовость) —
+ * тот же механизм, что на вебе после ec41048, через /api/parent/*.
  *
- * Долги, проход 1: pickDemoParent()/DEMO_PARENTS/getChildrenForDemoParent
- * удалены — были мёртвым кодом (не вызывались ни из одного UI-пути с
- * Захода 2, шаг 2, когда AuthDemoPickerSheet переписали на реальный
- * loginAsTestAccount()). Поле demoParentId в состоянии осталось — на него
- * по-прежнему завязан isRealFlow-гейт во всех data-экранах.
+ * ДЕМО-ВХОД УДАЛЁН целиком (решение заказчика): приложение только для
+ * настоящих родителей. Вместе с ним ушли AuthDemoPickerSheet,
+ * loginAsTestAccount и карта номеров. Поле isDemo осталось константой false
+ * — на него завязан RootNavigator, и убирать его отсюда значило бы трогать
+ * навигацию ради мёртвой ветки.
+ *
+ * Дети берутся из настоящей привязки родителя (getParentContext через
+ * ParentDataContext), а не из фикстурного набора, подобранного по количеству.
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
-import { loginAsParent } from "../lib/auth";
 import { getSupabase } from "../lib/supabase";
-import { findTestAccount, TEST_ACCOUNT_PASSWORD, type TestAccount } from "../lib/testAccounts";
+import { NotParentError } from "../lib/auth";
+import { PhoneLoginFailure, requestPhoneCode, verifyPhoneCode, type PhoneLoginError } from "../lib/parentPhoneLogin";
 import { useParentData } from "./ParentDataContext";
 
 export type AuthPhase = "onboarding" | "phone" | "sms" | "childPicker" | "app";
@@ -64,21 +61,23 @@ export interface AuthSessionState {
   currentChildId: string | null;
   /** Заход 1: ошибка на экране телефона — ключ в d.parentApp.auth, не
    *  готовая строка (иначе не переживёт смену языка на лету). */
-  phoneError: "phoneNotFound" | null;
+  /** Причина отказа на шаге номера. Пришла с сервера (кроме invalidPhone —
+   *  это локальная проверка длины). */
+  phoneError: PhoneLoginError | "invalidPhone" | null;
   /** Заход 1: ошибка на экране кода — ключ в d.parentApp.auth. Заход 2, шаг
    *  2: "wrongCode" больше не встречается (код не проверяется), но тип
    *  оставлен на будущее — оставлен только "loginFailed". */
-  smsError: "loginFailed" | null;
+  smsError: "loginFailed" | "wrongCode" | "expired" | "tooMany" | null;
   /** Заход 1: идёт реальный сетевой логин (signInWithPassword) — блокирует
    *  повторный сабмит кода, пока первый запрос ещё в полёте. */
   authBusy: boolean;
   /** Заход 1: username реального аккаунта, найденного submitPhone по номеру —
    *  используется verifyCode() после совпадения кода. null вне phone-flow. */
-  pendingUsername: string | null;
-  /** Заход 1: фикстурные id детей (lib/testAccounts.ts) — подставляются как
-   *  currentChildId после реального логина, т.к. остальные (пока фикстурные)
-   *  экраны данных ещё не понимают настоящие student_id из Supabase. */
-  pendingFixtureChildIds: string[] | null;
+  /** Номер, на который выслан код (девять цифр). null вне phone-flow. */
+  pendingPhone: string | null;
+  /** Дошла ли доставка. Пока провайдера нет — всегда false, и экран кода
+   *  честно говорит, что код надо взять у школы. */
+  codeDelivered: boolean;
 }
 
 export interface AuthSessionCtx extends AuthSessionState {
@@ -87,11 +86,11 @@ export interface AuthSessionCtx extends AuthSessionState {
   setPhone(digits: string): void;
   setSmsCode(code: string): void;
   setAuthSel(i: number): void;
-  submitPhone(): void;
+  /** Просит сервер выслать код на введённый номер. */
+  submitPhone(): Promise<boolean>;
+  /** Повторная выдача кода — сервер сам не даёт чаще раза в минуту. */
+  resendCode(): Promise<boolean>;
   verifyCode(): Promise<"picker" | "app" | "error">;
-  /** Заход 2, шаг 2: демо-модалка — тап по карточке родителя сразу делает
-   *  реальный вход этим аккаунтом (без экрана кода). */
-  loginAsTestAccount(account: TestAccount): Promise<"picker" | "app" | "error">;
   pickChildIndex(i: number): void;
   enterApp(childIndex: number): void;
   /** ЗАХОД 5x (правка 3): закрыть one-shot центр-модалку «Демо-режим». */
@@ -115,8 +114,8 @@ const INITIAL_STATE: AuthSessionState = {
   phoneError: null,
   smsError: null,
   authBusy: false,
-  pendingUsername: null,
-  pendingFixtureChildIds: null,
+  pendingPhone: null,
+  codeDelivered: false,
 };
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
@@ -143,7 +142,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   // сессия/parentData не гарантированно от одного и того же аккаунта.
   // Найдено адверсариальной проверкой. Ref читается/пишется синхронно —
   // второй вызов в том же тике гарантированно увидит true.
-  const performLoginBusyRef = useRef(false);
+  const verifyBusyRef = useRef(false);
 
   const setPhase = useCallback((next: AuthPhase) => {
     setState((s) => ({ ...s, phase: next }));
@@ -167,126 +166,96 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, authSel: i }));
   }, []);
 
-  const submitPhone = useCallback(() => {
-    setState((s) => {
-      const account = findTestAccount(s.phone);
-      if (!account) {
-        return { ...s, phoneError: "phoneNotFound" };
-      }
-      return {
-        ...s,
-        phase: "sms",
-        smsCode: "",
-        smsError: null,
-        phoneError: null,
-        isDemo: false,
-        demoParentId: null,
-        kidsCount: account.fixtureChildIds.length,
-        authSel: DEFAULT_SEL_BY_KIDS[account.fixtureChildIds.length] ?? 0,
-        pendingUsername: account.username,
-        pendingFixtureChildIds: account.fixtureChildIds,
-      };
-    });
+  /** Просит сервер выслать код. Номер, которого нет в базе, честно получает
+   *  «не найден»: родителей заводит админ, это не публичная регистрация. */
+  const requestFor = useCallback(async (digits: string): Promise<boolean> => {
+    setState((s) => ({ ...s, authBusy: true, phoneError: null, smsError: null }));
+    try {
+      const { delivered } = await requestPhoneCode(digits);
+      setState((s) => ({ ...s, authBusy: false, pendingPhone: digits, codeDelivered: delivered }));
+      return true;
+    } catch (e) {
+      const reason = e instanceof PhoneLoginFailure ? e.reason : "network_error";
+      setState((s) => ({ ...s, authBusy: false, phoneError: reason }));
+      return false;
+    }
   }, []);
 
+  const submitPhone = useCallback(async (): Promise<boolean> => {
+    const digits = stateRef.current.phone;
+    if (digits.length !== 9) {
+      setState((s) => ({ ...s, phoneError: "invalidPhone" }));
+      return false;
+    }
+    const ok = await requestFor(digits);
+    if (ok) setState((s) => ({ ...s, phase: "sms", smsCode: "", smsError: null }));
+    return ok;
+  }, [requestFor]);
+
+  const resendCode = useCallback(async (): Promise<boolean> => {
+    const digits = stateRef.current.pendingPhone ?? stateRef.current.phone;
+    return digits.length === 9 ? requestFor(digits) : false;
+  }, [requestFor]);
+
+  /** Выбор ребёнка в picker. Дети — НАСТОЯЩИЕ (getParentContext через
+   *  ParentDataContext), а не фикстурный набор, подобранный по количеству:
+   *  раньше индекс из реального picker-экрана маппился на фикстуру и мог
+   *  указать на чужого ребёнка. Фикстуры остались запасным вариантом на
+   *  случай, когда привязок нет вовсе. */
   const enterApp = useCallback((childIndex: number) => {
+    const real = parentDataRef.current?.children ?? [];
     setState((s) => {
-      // Заход 1: реальный phone-login — фикстурный набор, подобранный по
-      // количеству под этот тестовый аккаунт (lib/testAccounts.ts), НЕ
-      // общий пул getChildren() (иначе индекс из РЕАЛЬНОГО picker'а
-      // указывал бы на случайного ребёнка из всех 6 фикстурных). Пустой
-      // pendingFixtureChildIds — безусловный fallback на getChildren() (не
-      // должно происходить в норме, оставлен только как защита от
-      // несогласованного состояния).
-      const kids = s.pendingFixtureChildIds && s.pendingFixtureChildIds.length > 0
-        ? s.pendingFixtureChildIds.map((id) => getChildren().find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c)
-        : getChildren();
-      const bound = Math.max(1, kids.length);
-      const idx = Math.max(0, Math.min(childIndex, bound - 1));
-      const childId = kids[idx]?.id ?? kids[0]?.id ?? null;
-      return { ...s, phase: "app", currentChildId: childId };
+      const ids = real.length > 0 ? real.map((c) => c.id) : getChildren().map((c) => c.id);
+      const idx = Math.max(0, Math.min(childIndex, Math.max(0, ids.length - 1)));
+      return { ...s, phase: "app", currentChildId: ids[idx] ?? null };
     });
   }, []);
 
-  // Заход 2, шаг 2: ядро реального логина, общее для двух входов — экран
-  // кода (после ЛЮБЫХ 4 цифр, код больше не сверяется) и тап по карточке
-  // демо-модалки (сразу, без экрана кода вообще). isDemoTap только влияет
-  // на демо-специфичные косметические поля (isDemo/demoNoticeSeen для
-  // one-shot центр-модалки «Демо-режим») — сам логин, RLS и дальнейшее
-  // ветвление picker/app идентичны для обоих входов.
-  const performLogin = useCallback(
-    async (username: string, fixtureChildIds: string[], isDemoTap: boolean): Promise<"picker" | "app" | "error"> => {
-      if (performLoginBusyRef.current) return "error";
-      performLoginBusyRef.current = true;
-      try {
-        setState((s) => ({
-          ...s,
-          smsError: null,
-          authBusy: true,
-          isDemo: isDemoTap,
-          demoNoticeSeen: isDemoTap ? false : s.demoNoticeSeen,
-          demoParentId: null,
-          pendingUsername: username,
-          pendingFixtureChildIds: fixtureChildIds,
-          kidsCount: fixtureChildIds.length,
-          authSel: DEFAULT_SEL_BY_KIDS[fixtureChildIds.length] ?? 0,
-        }));
-        try {
-          await loginAsParent(username, TEST_ACCOUNT_PASSWORD);
-        } catch (e) {
-          console.error("[AuthSessionContext] performLogin: loginAsParent failed:", e);
-          setState((s) => ({ ...s, authBusy: false, smsError: "loginFailed" }));
-          return "error";
-        }
-        // Настоящая Supabase-сессия установлена — ParentDataProvider должен
-        // перезапросить getParentContext() (он смонтирован выше в дереве и на
-        // самом первом, ещё неавторизованном рендере получил data:null). Ждём
-        // здесь (не fire-and-forget), чтобы childPicker монтировался УЖЕ с
-        // реальным списком детей — без секундного мелькания старых фикстур,
-        // пока запрос в полёте.
-        await refreshParentData();
-        // Diagnostic-only: fixtureChildIds в testAccounts.ts подобраны под
-        // РЕАЛЬНОЕ сегодняшнее число детей каждой тестовой семьи вручную —
-        // если база уйдёт вперёд (админ добавит/уберёт ребёнка одному из 3
-        // тестовых родителей), enterApp() ниже по коду молча смаппит выбранного
-        // в picker'е (реального) ребёнка на неверный фикстурный индекс. Не
-        // фиксим здесь (это будущая работа над data-экранами), просто не даём
-        // такому расхождению проходить незамеченным.
-        const realCount = parentDataRef.current?.children.length;
-        if (realCount != null && realCount !== fixtureChildIds.length) {
-          console.warn(
-            `[AuthSessionContext] performLogin: реальное число детей (${realCount}) не совпадает с testAccounts.ts (${fixtureChildIds.length}) для ${username} — childPicker покажет реальных детей, но выбор смаппится на фикстуры неверно.`,
-          );
-        }
-        if (fixtureChildIds.length <= 1) {
-          setState((s) => ({ ...s, authBusy: false, phase: "app", currentChildId: fixtureChildIds[0] ?? null }));
-          return "app";
-        }
-        setState((s) => ({ ...s, authBusy: false, phase: "childPicker" }));
-        return "picker";
-      } finally {
-        performLoginBusyRef.current = false;
-      }
-    },
-    [refreshParentData],
-  );
-
+  /** Проверяет код по-настоящему и входит. Раньше здесь ЛЮБЫЕ четыре цифры
+   *  вели к логину под общим паролем — код не сверялся вовсе. */
   const verifyCode = useCallback(async (): Promise<"picker" | "app" | "error"> => {
-    // Заход 2, шаг 2: конкретный код больше не проверяется — ЛЮБЫЕ 4 цифры
-    // ведут к реальному логину. Мягкая валидация длины дублирует то, что
-    // уже гарантирует вызывающая сторона (LoginSmsScreen вызывает verifyCode
-    // только при smsCode.length===SMS_LEN) — оставлена как defensive-guard,
-    // без отдельного сообщения об ошибке (его больше нет по смыслу).
-    const { smsCode, pendingUsername, pendingFixtureChildIds } = stateRef.current;
-    if (smsCode.length !== 4 || !pendingUsername) return "error";
-    return performLogin(pendingUsername, pendingFixtureChildIds ?? [], false);
-  }, [performLogin]);
-
-  const loginAsTestAccount = useCallback(
-    (account: TestAccount): Promise<"picker" | "app" | "error"> =>
-      performLogin(account.username, account.fixtureChildIds, true),
-    [performLogin],
-  );
+    const { smsCode, pendingPhone } = stateRef.current;
+    if (smsCode.length !== 4 || !pendingPhone) return "error";
+    if (verifyBusyRef.current) return "error";
+    verifyBusyRef.current = true;
+    setState((s) => ({ ...s, authBusy: true, smsError: null }));
+    try {
+      try {
+        await verifyPhoneCode(pendingPhone, smsCode);
+      } catch (e) {
+        const reason = e instanceof PhoneLoginFailure ? e.reason : null;
+        const smsError =
+          reason === "wrong_code" ? ("wrongCode" as const)
+            : reason === "expired" ? ("expired" as const)
+              : reason === "too_many" ? ("tooMany" as const)
+                : ("loginFailed" as const);
+        if (!(e instanceof PhoneLoginFailure) && !(e instanceof NotParentError)) {
+          console.error("[AuthSessionContext] verifyCode: неожиданная ошибка:", e);
+        }
+        setState((s) => ({ ...s, authBusy: false, smsError }));
+        return "error";
+      }
+      // Сессия установлена — ParentDataProvider должен перезапросить
+      // getParentContext(): picker обязан смонтироваться уже с настоящими
+      // детьми, без мелькания старых данных.
+      await refreshParentData();
+      const kids = parentDataRef.current?.children ?? [];
+      setState((s) => ({
+        ...s,
+        authBusy: false,
+        kidsCount: kids.length,
+        authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? 0,
+      }));
+      if (kids.length <= 1) {
+        setState((s) => ({ ...s, phase: "app", currentChildId: kids[0]?.id ?? null }));
+        return "app";
+      }
+      setState((s) => ({ ...s, phase: "childPicker" }));
+      return "picker";
+    } finally {
+      verifyBusyRef.current = false;
+    }
+  }, [refreshParentData]);
 
   const pickChildIndex = useCallback((i: number) => {
     setState((s) => ({ ...s, authSel: i }));
@@ -326,8 +295,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       setSmsCode,
       setAuthSel,
       submitPhone,
+      resendCode,
       verifyCode,
-      loginAsTestAccount,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,
@@ -341,8 +310,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       setSmsCode,
       setAuthSel,
       submitPhone,
+      resendCode,
       verifyCode,
-      loginAsTestAccount,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,
