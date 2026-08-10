@@ -1336,6 +1336,7 @@ export const en: Dictionary = {
     sectionTeachers: "Teachers",
     allBusy: "All demo accounts are busy, please try again in a few minutes",
     loginFailed: "Demo sign-in failed, please try again",
+    demoUnavailable: "Demo mode is currently unavailable, please try again later",
     cannotEditRealData: "Real data cannot be edited in demo mode",
     modalSectionStudents: "Students",
     modalCardGrade3: "Grade 3",

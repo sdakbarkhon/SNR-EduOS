@@ -29,7 +29,26 @@ export async function GET() {
   const admin = createAdminClient();
 
   const [studentsRes, leasesRes] = await Promise.all([
-    admin.from("students").select("user_id, grade").eq("status", "active"),
+    // 10.08.2026 (миграция 183) — считаем ТОЛЬКО учеников демо-школы.
+    // Раньше запрос брал активных учеников всех школ: пока настоящая школа
+    // пуста, разницы не было, но после её наполнения модалка показывала бы
+    // занятость по чужим ученикам.
+    //
+    // Школа определяется флагом schools.is_demo (миграция 170), а не
+    // вписанным идентификатором — тем же признаком, по которому отбирает
+    // claim_demo_slot.
+    //
+    // `!inner` обязателен: без него фильтр по колонке связанной таблицы
+    // PostgREST отвергает (проверено живым запросом — обычный select с
+    // .eq("schools.is_demo", ...) возвращает ошибку, а не отфильтрованный
+    // список). Побочно фильтр делает выборку меньше прежней, а не больше:
+    // читаются только ученики демо-школы, их 30.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any)
+      .from("students")
+      .select("user_id, grade, schools!inner(is_demo)")
+      .eq("status", "active")
+      .eq("schools.is_demo", true),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any)
       .from("demo_leases")

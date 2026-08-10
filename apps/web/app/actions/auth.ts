@@ -11,12 +11,16 @@ import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 import { registerSession } from "@/lib/register-session";
 import { getDemoNow } from "@/lib/demo-date";
 
-// P2 (пачка 2) — переработка демо-режима. Демо-логика теперь живёт в
-// endpoints apps/web/app/api/demo/*, но demoLogin остаётся как «серверный
-// wrapper» для DemoRoleModal (там уже был контракт server action —
-// сохраняем для минимальных изменений в UI). Внутри он ровно то же,
-// что делает /api/demo/claim: RPC claim_demo_slot → signInWithPassword →
-// cookies.
+// P2 (пачка 2) — переработка демо-режима. demoLogin — «серверный wrapper»
+// для DemoRoleModal: RPC claim_demo_slot → signInWithPassword → cookies.
+//
+// 10.08.2026 — ЭТО ЕДИНСТВЕННЫЙ ПУТЬ ВЫДАЧИ ДЕМО-СЛОТА. Публичный
+// POST /api/demo/claim удалён: он был открыт без всякой авторизации и
+// возвращал в теле ответа адрес и пароль выданного аккаунта текстом. Живых
+// вызовов у него не было — мобильная обёртка claimDemoSlot ниоткуда не
+// импортировалась. Соседние /api/demo/heartbeat и /api/demo/release
+// оставлены: их зовёт мобильное приложение, и доступа они не выдают —
+// работают по ключу уже существующей аренды.
 
 type LoginResult =
   | { ok: true; dest: string; isDemo: boolean }
@@ -24,7 +28,11 @@ type LoginResult =
   // доезжало ничего: server action возвращает объект, а не бросает, поэтому
   // catch с console.error на клиенте был недостижим и консоль оставалась
   // пустой при видимой пользователю ошибке (07.08.2026).
-  | { ok: false; error: "invalid" | "failed" | "all_busy"; reason?: string }
+  // demo_unavailable — миграция 183: демо-школа не настроена (флаг is_demo
+  // не стоит ни на одной школе или стоит сразу на двух). Отделён от
+  // all_busy намеренно: «мест нет, зайдите позже» и «демо сломано» — разные
+  // сообщения, и смешивать их значит врать посетителю про причину.
+  | { ok: false; error: "invalid" | "failed" | "all_busy" | "demo_unavailable"; reason?: string }
   // Z.2.10 — один логин в нескольких школах: спрашиваем, в какую входить.
   // reason здесь не используется, но объявлен: DemoRoleModal читает
   // result.reason на всём объединении, и без него сужение по error ломается.
@@ -141,8 +149,8 @@ export async function loginWithUsername(
   const result = await signInWithUsername(supabase, username, password);
   if (!result.error && result.data?.user && result.data.session) {
     // Обычный логин — не демо. Cookie DEMO_SESSION_COOKIE ставится ТОЛЬКО
-    // при demoLogin (или endpoint /api/demo/claim). Здесь защитно снимаем
-    // если она осталась от предыдущей демо-сессии этого же браузера.
+    // при demoLogin. Здесь защитно снимаем, если она осталась от предыдущей
+    // демо-сессии этого же браузера.
     return finishLogin(supabase, result.data.user, result.data.session.access_token);
   }
 
@@ -242,6 +250,16 @@ export async function demoLogin(
       if (msg.includes("no_available_slot")) {
         // Свободных слотов нет — повторять бессмысленно, ответ честный.
         return { ok: false, error: "all_busy" };
+      }
+      // Миграция 183: демо-школ не одна (ноль или больше одной). Функция в
+      // этом случае принципиально не берёт «первую попавшуюся» — иначе
+      // фильтр по школе не давал бы никакой гарантии. Повтор так же
+      // бессмыслен, как и при занятости пула: состояние не изменится само.
+      if (msg.includes("demo_school_not_configured")) {
+        console.error(
+          "[demoLogin] демо-школа не настроена: schools.is_demo=true должен стоять ровно у одной школы",
+        );
+        return { ok: false, error: "demo_unavailable" };
       }
       console.error("[demoLogin] claim rpc error:", claimError);
       return { ok: false, error: "failed", reason: "claim_failed" };

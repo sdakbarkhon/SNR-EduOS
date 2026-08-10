@@ -1336,6 +1336,7 @@ export const ru: Dictionary = {
     sectionTeachers: "Учителя",
     allBusy: "Все демо-аккаунты заняты, попробуйте через несколько минут",
     loginFailed: "Не удалось войти в демо-режим, попробуйте ещё раз",
+    demoUnavailable: "Демо-режим сейчас недоступен, попробуйте позже",
     cannotEditRealData: "В демо-режиме нельзя редактировать реальные данные",
     modalSectionStudents: "Ученики",
     modalCardGrade3: "3-й класс",

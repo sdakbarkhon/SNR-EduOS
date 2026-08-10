@@ -1336,6 +1336,7 @@ export const uz: Dictionary = {
     sectionTeachers: "O'qituvchilar",
     allBusy: "Barcha demo hisoblar band, bir necha daqiqadan so'ng qayta urinib ko'ring",
     loginFailed: "Demo rejimga kirish amalga oshmadi, qayta urinib ko'ring",
+    demoUnavailable: "Demo rejim hozircha mavjud emas, keyinroq urinib ko'ring",
     cannotEditRealData: "Demo rejimda haqiqiy ma'lumotlarni tahrirlab bo'lmaydi",
     modalSectionStudents: "O'quvchilar",
     modalCardGrade3: "3-sinf",

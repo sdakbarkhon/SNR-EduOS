@@ -102,6 +102,10 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           // Race: между рендером и кликом класс успели полностью занять.
           setOccupiedGrades((prev) => new Set([...prev, gradeLevel]));
           setError(d.allBusy);
+        } else if (result.error === "demo_unavailable") {
+          // Миграция 183: демо-школа не настроена. Это не занятость пула —
+          // класс серым не помечаем, повтор через минуту не поможет.
+          setError(d.demoUnavailable);
         } else {
           // Сервер-экшен не бросает, а возвращает — поэтому catch ниже сюда
           // не доходил и в консоли браузера было пусто при видимой ошибке.
@@ -133,6 +137,10 @@ export function DemoRoleModal({ onClose }: { onClose: () => void }) {
           // Race: между рендером и кликом кто-то занял этот слот.
           setOccupiedSubjects((prev) => new Set([...prev, slug]));
           setError(d.allBusy);
+        } else if (result.error === "demo_unavailable") {
+          // Миграция 183: демо-школа не настроена. Предмет занятым не
+          // помечаем — дело не в занятости.
+          setError(d.demoUnavailable);
         } else {
           // Сервер-экшен не бросает, а возвращает — поэтому catch ниже сюда
           // не доходил и в консоли браузера было пусто при видимой ошибке.
