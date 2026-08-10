@@ -9,6 +9,7 @@
 import type { LessonStage } from "@snr/core";
 import { generateJSON, generateText } from "./gemini-client";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { stageAllowsMedia } from "@/lib/lesson-stage-media";
 
 export type StageMediaDecision = {
   need_image: boolean;
@@ -20,11 +21,10 @@ export type StageMediaDecision = {
 // тестам и внешним сервисам — там они не нужны и только отвлекают. На живых
 // данных так было у 45 этапов из 125 с картинками.
 //
-// Тип-объяснение в проекте ровно один — 'presentation' (слайды). Проверено
-// живым SELECT по lesson_stages: остальные content_type это wokwi, quiz_qia,
-// quiz_kahoot, code, code_completion, excalidraw, visualgo, typerun — все
-// практические.
-const EXPLANATION_CONTENT_TYPES = new Set(["presentation"]);
+// 10.08.2026 — правило переехало в lib/lesson-stage-media.ts и теперь общее с
+// РЕНДЕРОМ. Пока оно жило только здесь, оно останавливало новые картинки, но
+// ничего не говорило про уже существующие: показ выводил всё, что лежит в
+// image_url, и практический этап получал картинку во весь экран.
 
 export type LessonContextForMedia = {
   subject: string;
@@ -51,7 +51,7 @@ export async function decideStageMedia(
 ): Promise<StageMediaDecision> {
   // Не объяснение — картинка не нужна, Gemini даже не спрашиваем: это
   // экономит вызов и делает правило жёстким, а не «как решит модель».
-  if (!EXPLANATION_CONTENT_TYPES.has(stage.content_type ?? "")) {
+  if (!stageAllowsMedia(stage.content_type)) {
     return { need_image: false, image_prompt: null };
   }
 

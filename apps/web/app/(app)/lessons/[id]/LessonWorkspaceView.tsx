@@ -25,6 +25,7 @@ import { AiChatPanel } from "./AiChatPanel";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { StudentPresentationViewer } from "@/components/lesson-stages/StudentPresentationViewer";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
+import { stageAllowsMedia } from "@/lib/lesson-stage-media";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
 import { CodeCompletionStageView } from "./CodeCompletionStageView";
@@ -1378,14 +1379,23 @@ export function LessonWorkspaceView({
                     </div>
                   )}
 
-                  <StageMedia
-                    // 08.08.2026 — если у этапа есть слайды, картинка рисуется ВНУТРИ
-                    // слайда справа от текста (SlideViewer -> SlideBody), а здесь
-                    // подавляется: иначе она была бы показана дважды.
-                    image_url={hasSlidesForMedia ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
-                    media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
-                    media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
-                  />
+                  {/* 10.08.2026 — картинка только у объяснительных этапов, правило
+                      общее с генератором (lib/lesson-stage-media.ts). Раньше блок
+                      рисовался безусловно, и на практическом этапе картинка высотой
+                      до 400px съедала карточку: у внешних сервисов и кода карточка
+                      имеет ФИКСИРОВАННУЮ высоту h-[78vh], поэтому редактор получал
+                      остаток и превращался в узкую полосу с прокруткой. Это была
+                      одна причина двух симптомов, а не два разных бага. */}
+                  {stageAllowsMedia(stage.content_type) && (
+                    <StageMedia
+                      // 08.08.2026 — если у этапа есть слайды, картинка рисуется ВНУТРИ
+                      // слайда справа от текста (SlideViewer -> SlideBody), а здесь
+                      // подавляется: иначе она была бы показана дважды.
+                      image_url={hasSlidesForMedia ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
+                      media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
+                      media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
+                    />
+                  )}
 
                   {/* Theory: full presentation (slides) when generated, else plain text.
                       While in_progress, student AND teacher both drive navigation —

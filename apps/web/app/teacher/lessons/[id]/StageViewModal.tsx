@@ -13,6 +13,7 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { QuizReviewList } from "@/components/quiz/QuizReviewList";
 import { MarkdownInline } from "@/components/markdown-plugins";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
+import { stageAllowsMedia } from "@/lib/lesson-stage-media";
 
 const LIVE_SCORES_POLL_MS = 12000;
 
@@ -130,13 +131,17 @@ export function StageViewModal({
 
         {/* Body */}
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
-          {/* 08.08.2026 — при наличии слайдов картинка внутри слайда, здесь подавлена. */}
-          <StageMedia
-            image_url={hasSlidesHere ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
-            media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
-            media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
-            isTeacher
-          />
+          {/* 08.08.2026 — при наличии слайдов картинка внутри слайда, здесь подавлена.
+              10.08.2026 — плюс общее правило: картинка только у объяснительных
+              этапов (lib/lesson-stage-media.ts). */}
+          {stageAllowsMedia(stage.content_type) && (
+            <StageMedia
+              image_url={hasSlidesHere ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
+              media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
+              media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
+              isTeacher
+            />
+          )}
 
           {stage.description && <MarkdownContent text={stage.description} className="text-sm text-slate-700" />}
 

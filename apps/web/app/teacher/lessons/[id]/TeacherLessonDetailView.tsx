@@ -66,6 +66,7 @@ import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
 import { KnowledgeBaseFilePicker, LESSON_ATTACH_MIME, LESSON_ATTACH_ACCEPT, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
+import { stageAllowsMedia } from "@/lib/lesson-stage-media";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -1813,7 +1814,11 @@ export function TeacherLessonDetailView({
                   синхронизацией слайдов (канал stage-slide-<id>) и панель
                   live-кода. Логика и пропсы не менялись, переехала только
                   точка вставки. */}
-              {isActive && (
+              {/* 10.08.2026 — то же правило, что у ученика: картинка только у
+                  объяснительных этапов (lib/lesson-stage-media.ts). Учителю
+                  показываем ровно то же, что видит класс, иначе он не поймёт
+                  жалобу «у меня картинка, а у них нет». */}
+              {isActive && stageAllowsMedia(stage.content_type) && (
                 <div className="border-x border-b border-violet-300 bg-white p-3 dark:border-violet-500/40">
                   <StageMedia
                     // 08.08.2026 — при наличии слайдов картинка рисуется ВНУТРИ слайда
