@@ -309,13 +309,22 @@ export function getServicesForSubject(subjectName: string | null | undefined): E
   return [...mapped, ...UNIVERSAL_SERVICES];
 }
 
+/**
+ * Проверка «это внешний сервис».
+ *
+ * 10.08.2026 — переписана на единый источник. Раньше здесь была цепочка
+ * сравнений, набранная руками, и она знала 12 типов из 14: не знала
+ * `scratch` и `google_docs`. Следствие было видимым — этап урока с таким
+ * типом не попадал в `ExternalStageModal` и уходил в общую ветку рендера,
+ * то есть открывался не тем окном.
+ *
+ * Теперь список берётся из EXTERNAL_SERVICE_ORDER — того же массива, который
+ * перебирают форма этапа, форма домашнего задания и набор типов подзадач.
+ * Добавление сервиса в справочник автоматически учитывается здесь, и
+ * разойтись эти два места больше не могут.
+ */
 export function isExternalService(ct: string | null | undefined): ct is ExternalServiceType {
-  return (
-    ct === "wokwi" || ct === "codesandbox" ||
-    ct === "geogebra" || ct === "phet" || ct === "desmos" || ct === "blockly_games" ||
-    ct === "visualgo" || ct === "p5js" || ct === "excalidraw" || ct === "learningapps" ||
-    ct === "sqlonline" || ct === "typerun"
-  );
+  return !!ct && (EXTERNAL_SERVICE_ORDER as readonly string[]).includes(ct);
 }
 
 export function validateServiceUrl(

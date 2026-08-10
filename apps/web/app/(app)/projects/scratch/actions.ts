@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { MAX_SB3_BYTES } from "@/lib/scratch-bridge";
+import { MAX_SB3_BYTES, SCRATCH_PROJECT_LIMIT } from "@/lib/scratch-bridge";
 
 /**
  * Работы Scratch: сохранение, список, открытие, удаление. Z-Scratch, 10.08.2026.
@@ -21,10 +21,6 @@ import { MAX_SB3_BYTES } from "@/lib/scratch-bridge";
 
 const BUCKET = "scratch-projects";
 const SERVICE_ID = "scratch";
-/** Столько работ ученик держит одновременно. Как у остальных сервисов
- *  песочницы (SANDBOX_PROJECT_LIMIT в packages/core), но своим числом: там
- *  текст кода, здесь мегабайтные файлы. */
-const PROJECT_LIMIT = 20;
 
 export type ScratchProject = {
   id: string;
@@ -32,7 +28,10 @@ export type ScratchProject = {
   origin: "sandbox" | "lesson" | "homework";
   sharedWithClass: boolean;
   updatedAt: string;
-  sizeLabel: string | null;
+  /** Размер файла в байтах. Именно байты, а не готовая подпись: единицы
+   *  измерения — видимый пользователю текст, а он обязан быть на трёх
+   *  языках, поэтому подпись собирается на экране из словаря. */
+  sizeBytes: number | null;
 };
 
 /** Текущий ученик. null — вошёл не ученик (учитель, админ, родитель). */
@@ -88,7 +87,7 @@ export async function saveScratchProject(fd: FormData): Promise<SaveResult> {
     const { count } = await anyAdmin
       .from("sandbox_projects").select("id", { count: "exact", head: true })
       .eq("student_id", student.id).eq("service_id", SERVICE_ID).eq("is_autosave", false);
-    if ((count ?? 0) >= PROJECT_LIMIT) return { ok: false, error: "limit" };
+    if ((count ?? 0) >= SCRATCH_PROJECT_LIMIT) return { ok: false, error: "limit" };
 
     const { data: created, error: insErr } = await anyAdmin
       .from("sandbox_projects")
@@ -120,13 +119,6 @@ export async function saveScratchProject(fd: FormData): Promise<SaveResult> {
 
   revalidatePath("/projects");
   return { ok: true, id: rowId! };
-}
-
-function sizeLabel(bytes: number | null | undefined): string | null {
-  if (!bytes && bytes !== 0) return null;
-  return bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} КБ`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
 /** Свои работы Scratch, свежие сверху. */
@@ -164,7 +156,7 @@ export async function listScratchProjects(): Promise<ScratchProject[]> {
     origin: r.origin,
     sharedWithClass: r.shared_with_class,
     updatedAt: r.updated_at,
-    sizeLabel: sizeLabel(sizeByName.get(`${r.id}.sb3`)),
+    sizeBytes: sizeByName.get(`${r.id}.sb3`) ?? null,
   }));
 }
 

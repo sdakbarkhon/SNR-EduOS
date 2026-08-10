@@ -1306,6 +1306,42 @@ export interface Dictionary {
       saveBtn: string;          // "Сохранить"
       limitReached: string;     // "Достигнут лимит проектов (20)"
     };
+    // Z-Scratch, 10.08.2026 — экраны работ Scratch. Родные кнопки редактора
+    // («Файл → Сохранить», «Поделиться», «Мои работы») переведены на нашу
+    // платформу, поэтому все подписи вокруг них наши.
+    scratch: {
+      myWorks: string;          // кнопка на панели над редактором
+      worksTitle: string;       // заголовок панели со списком
+      closePanel: string;
+      countLabel: string;       // "{n} из {limit}"
+      emptyTitle: string;       // работ ещё нет
+      emptyBody: string;        // как их получить — без этого экран немой
+      openBtn: string;
+      deleteBtn: string;
+      deleteConfirm: string;    // "{name}"
+      cancelBtn: string;
+      originSandbox: string;
+      originLesson: string;
+      originHomework: string;
+      sharedBadge: string;      // работа показана классу
+      unitKb: string;           // "{n} КБ"
+      unitMb: string;           // "{n} МБ"
+      saving: string;
+      opening: string;
+      savedOk: string;
+      sharedOk: string;
+      openedOk: string;
+      deletedOk: string;
+      notReady: string;         // редактор ещё не прислал «готов»
+      // Тексты отказов. server action возвращает машинный код, человеку
+      // нужен смысл: раньше он видел молчание.
+      errNotStudent: string;
+      errTooBig: string;
+      errLimit: string;
+      errFailed: string;
+      errOpenFailed: string;
+      errDeleteFailed: string;
+    };
   };
   // Iter5 P10 — standalone /ai-assistant page (Claude Design redesign);
   // separate from `ai.chat` above, which is the in-lesson "Робокот" panel.

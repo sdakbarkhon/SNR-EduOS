@@ -18,6 +18,7 @@ import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
 import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
+import { ScratchSandbox } from "./scratch/ScratchSandbox";
 import { CodeEditor } from "@/components/CodeEditor";
 import { StdinInput } from "@/components/StdinInput";
 import { pyodideReady } from "@/lib/pyodide";
@@ -65,8 +66,19 @@ function SandboxFullscreen({
   );
 }
 
-// ── Iframe tool (geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline/wokwi/codesandbox) ───
-function IframeSandbox({ tool, name }: { tool: SandboxTool; name: string }) {
+// ── Iframe tool (geogebra/phet/desmos/blockly_games/visualgo/p5js/excalidraw/learningapps/sqlonline/wokwi/codesandbox/scratch) ───
+//
+// frameRef — необязательная ссылка на саму рамку. Нужна только Scratch:
+// платформа шлёт в редактор сохранённую работу через postMessage, и для
+// этого нужен доступ к contentWindow. Остальные инструменты её не передают
+// и ведут себя ровно как раньше.
+function IframeSandbox({
+  tool, name, frameRef,
+}: {
+  tool: SandboxTool;
+  name: string;
+  frameRef?: React.RefObject<HTMLIFrameElement | null>;
+}) {
   const { locale } = useLocale();
   const dx = getDictionary(locale as Locale).lesson.external;
   const url = tool.embedUrl ?? "";
@@ -101,6 +113,7 @@ function IframeSandbox({ tool, name }: { tool: SandboxTool; name: string }) {
         </div>
       )}
       <iframe
+        ref={frameRef}
         src={url}
         title={name}
         onLoad={() => setState("ok")}
@@ -534,6 +547,9 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Ссылка на рамку Scratch: обёртка шлёт в неё сохранённую работу.
+  const scratchFrameRef = useRef<HTMLIFrameElement | null>(null);
+
   const toolMeta = (id: SandboxToolId) => t.tools[id];
 
   // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — subject filter above the tool grid.
@@ -601,9 +617,18 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
           backLabel={t.backToMenu}
           onClose={() => setActive(null)}
         >
-          {active.kind === "code"
-            ? <CodeSandbox />
-            : <IframeSandbox tool={active} name={toolMeta(active.id).name} />}
+          {active.kind === "code" ? (
+            <CodeSandbox />
+          ) : active.id === "scratch" ? (
+            // Scratch отличается от остальных рамок только обвязкой: своя
+            // панель, список работ и мост сообщений. Сама рамка — та же
+            // IframeSandbox, второй копии нет.
+            <ScratchSandbox frameRef={scratchFrameRef}>
+              <IframeSandbox tool={active} name={toolMeta(active.id).name} frameRef={scratchFrameRef} />
+            </ScratchSandbox>
+          ) : (
+            <IframeSandbox tool={active} name={toolMeta(active.id).name} />
+          )}
         </SandboxFullscreen>
       )}
     </div>
