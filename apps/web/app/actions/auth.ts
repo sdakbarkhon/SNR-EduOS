@@ -24,7 +24,86 @@ type LoginResult =
   // доезжало ничего: server action возвращает объект, а не бросает, поэтому
   // catch с console.error на клиенте был недостижим и консоль оставалась
   // пустой при видимой пользователю ошибке (07.08.2026).
-  | { ok: false; error: "invalid" | "failed" | "all_busy"; reason?: string };
+  | { ok: false; error: "invalid" | "failed" | "all_busy"; reason?: string }
+  // Z.2.10 — один логин в нескольких школах: спрашиваем, в какую входить.
+  // reason здесь не используется, но объявлен: DemoRoleModal читает
+  // result.reason на всём объединении, и без него сужение по error ломается.
+  | { ok: false; error: "pick_school"; schools: Array<{ id: string; name: string }>; reason?: string };
+
+/**
+ * Z.2.10 — резолвер «логин → в каких школах он есть».
+ *
+ * Зачем. Логин превращается в служебный адрес без участия школы, а адреса
+ * уникальны глобально. С Z.2.10 второй одноимённый аккаунт получает адрес со
+ * школьным кодом (`ivanov.snr-real@…`, см. createSchoolScopedUser в
+ * admin-api.ts), и обычная попытка по простому адресу для него не сработает.
+ *
+ * Живёт на сервере и ходит служебным клиентом НАМЕРЕННО: адрес учётной
+ * записи наружу не отдаётся, в браузер уходит только список школ. Поэтому
+ * никакой RPC и никакой миграции — резолвер это обычный запрос под
+ * service-role.
+ *
+ * Существующие адреса не мигрированы: у кого простой адрес, тот и найдётся
+ * по нему первым же шагом, сюда дело не дойдёт.
+ */
+async function resolveLoginCandidates(
+  username: string,
+): Promise<Array<{ schoolId: string; schoolName: string; email: string }>> {
+  const login = username.trim().toLowerCase();
+  if (!login || login.includes("@")) return [];
+
+  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyAdmin = admin as any;
+
+  const [students, teachers, admins] = await Promise.all([
+    anyAdmin.from("students").select("user_id, school_id").ilike("username", login),
+    anyAdmin.from("teachers").select("user_id, school_id").ilike("username", login),
+    // У админов своего username нет — он живёт только в адресе учётной
+    // записи, поэтому их находим по школам ниже, через сам адрес.
+    Promise.resolve({ data: [] as Array<{ user_id: string; school_id: string }> }),
+  ]);
+
+  const rows = [
+    ...((students.data ?? []) as Array<{ user_id: string | null; school_id: string }>),
+    ...((teachers.data ?? []) as Array<{ user_id: string | null; school_id: string }>),
+    ...((admins.data ?? []) as Array<{ user_id: string | null; school_id: string }>),
+  ].filter((r) => r.user_id);
+  if (rows.length === 0) return [];
+
+  const { data: schools } = await anyAdmin.from("schools").select("id, name");
+  const schoolName = new Map(
+    ((schools ?? []) as Array<{ id: string; name: string }>).map((s) => [s.id, s.name]),
+  );
+
+  const resolved = await Promise.all(rows.map(async (r) => {
+    const { data } = await admin.auth.admin.getUserById(r.user_id!);
+    const email = data?.user?.email;
+    return email
+      ? { schoolId: r.school_id, schoolName: schoolName.get(r.school_id) ?? "—", email }
+      : null;
+  }));
+
+  // Один и тот же адрес не должен встретиться дважды (ученик и учитель с
+  // одним user_id — невозможно, но подстрахуемся).
+  const seen = new Set<string>();
+  return resolved.filter((c): c is NonNullable<typeof c> => {
+    if (!c || seen.has(c.email)) return false;
+    seen.add(c.email);
+    return true;
+  });
+}
+
+/** Общий хвост успешного входа: сессия, снятие демо-куки, адрес назначения. */
+async function finishLogin(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string },
+  accessToken: string,
+): Promise<LoginResult> {
+  await registerSession({ userId: user.id, accessToken });
+  (await cookies()).delete(DEMO_SESSION_COOKIE);
+  return { ok: true, dest: await resolveDest(supabase, user.id), isDemo: false };
+}
 
 interface ClaimSlotRow {
   username: string | null;
@@ -57,23 +136,56 @@ export async function loginWithUsername(
   password: string,
 ): Promise<LoginResult> {
   const supabase = await createClient();
+  // Обычный путь — как был. Сегодня он закрывает 100% случаев, потому что
+  // школьный адрес получают только одноимённые аккаунты второй школы.
   const result = await signInWithUsername(supabase, username, password);
-  if (result.error || !result.data?.user || !result.data.session) {
-    return { ok: false, error: "invalid" };
+  if (!result.error && result.data?.user && result.data.session) {
+    // Обычный логин — не демо. Cookie DEMO_SESSION_COOKIE ставится ТОЛЬКО
+    // при demoLogin (или endpoint /api/demo/claim). Здесь защитно снимаем
+    // если она осталась от предыдущей демо-сессии этого же браузера.
+    return finishLogin(supabase, result.data.user, result.data.session.access_token);
   }
 
-  const user = result.data.user;
-  await registerSession({
-    userId: user.id,
-    accessToken: result.data.session.access_token,
-  });
+  // Z.2.10 — не вышло по простому адресу: возможно, логин живёт во второй
+  // школе со школьным адресом.
+  const candidates = await resolveLoginCandidates(username);
+  if (candidates.length === 0) return { ok: false, error: "invalid" };
 
-  // Обычный логин — не демо. Cookie DEMO_SESSION_COOKIE ставится ТОЛЬКО
-  // при demoLogin (или endpoint /api/demo/claim). Здесь защитно снимаем
-  // если она осталась от предыдущей демо-сессии этого же браузера.
-  (await cookies()).delete(DEMO_SESSION_COOKIE);
+  if (candidates.length === 1) {
+    const only = candidates[0]!;
+    const single = await supabase.auth.signInWithPassword({ email: only.email, password });
+    if (single.error || !single.data.user || !single.data.session) {
+      return { ok: false, error: "invalid" };
+    }
+    return finishLogin(supabase, single.data.user, single.data.session.access_token);
+  }
 
-  return { ok: true, dest: await resolveDest(supabase, user.id), isDemo: false };
+  // Настоящая коллизия: логин есть в нескольких школах. Пароль здесь НЕ
+  // проверяем — иначе форма превратилась бы в способ узнать, в какой школе
+  // он подходит. Спрашиваем школу и проверяем пароль уже под неё.
+  return {
+    ok: false,
+    error: "pick_school",
+    schools: candidates.map((c) => ({ id: c.schoolId, name: c.schoolName })),
+  };
+}
+
+/** Z.2.10 — второй шаг входа: школа выбрана, адрес известен серверу. */
+export async function loginWithUsernameInSchool(
+  username: string,
+  password: string,
+  schoolId: string,
+): Promise<LoginResult> {
+  const supabase = await createClient();
+  const candidates = await resolveLoginCandidates(username);
+  const match = candidates.find((c) => c.schoolId === schoolId);
+  if (!match) return { ok: false, error: "invalid" };
+
+  const signed = await supabase.auth.signInWithPassword({ email: match.email, password });
+  if (signed.error || !signed.data.user || !signed.data.session) {
+    return { ok: false, error: "invalid" };
+  }
+  return finishLogin(supabase, signed.data.user, signed.data.session.access_token);
 }
 
 export async function demoLogin(

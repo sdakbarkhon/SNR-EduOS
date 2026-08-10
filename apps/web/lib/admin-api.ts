@@ -81,6 +81,51 @@ async function assertStudentsInSchool(
   }
 }
 
+/**
+ * Z.2.10 — учётная запись со школьным адресом, если простой уже занят.
+ *
+ * ЧТО БЫЛО. Логин превращается в служебный адрес `ivanov@students.snr.local`
+ * БЕЗ участия школы, а `auth.users.email` уникален глобально. В базе
+ * уникальность правильная — `UNIQUE(school_id, username)`, — но завести
+ * «ivanov» во второй школе было нельзя: адрес уже занят первой.
+ *
+ * КАК СТАЛО. Сначала пробуем простой адрес: сегодня он свободен в 100%
+ * случаев, и ничего не меняется. Если занят — дописываем код школы:
+ * `ivanov.snr-real@students.snr.local`. Существующие адреса при этом НЕ
+ * мигрируются: школьный компонент получают только новые записи, и только
+ * те, кому иначе не хватило бы места.
+ *
+ * Вход разбирается в app/actions/auth.ts: обычная попытка по простому
+ * адресу, а если не вышла — резолвер по имени пользователя.
+ */
+async function createSchoolScopedUser(
+  sb: ReturnType<typeof getServiceClient>,
+  data: { username: string; password: string; domain: string; school_id: string },
+): Promise<{ userId: string; email: string }> {
+  const login = data.username.trim().toLowerCase();
+  const plain = `${login}@${data.domain}`;
+
+  const first = await sb.auth.admin.createUser({
+    email: plain, password: data.password, email_confirm: true,
+  });
+  if (first.data?.user) return { userId: first.data.user.id, email: plain };
+
+  const taken = /already.*(registered|exists)|email_exists|duplicate/i.test(first.error?.message ?? "");
+  if (!taken) throw first.error ?? new Error("Auth user creation failed");
+
+  const { data: school } = await sb.from("schools").select("code").eq("id", data.school_id).maybeSingle();
+  const code = String((school as { code?: string } | null)?.code ?? "")
+    .toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (!code) throw first.error ?? new Error("Auth user creation failed");
+
+  const scoped = `${login}.${code}@${data.domain}`;
+  const second = await sb.auth.admin.createUser({
+    email: scoped, password: data.password, email_confirm: true,
+  });
+  if (!second.data?.user) throw second.error ?? new Error("Auth user creation failed");
+  return { userId: second.data.user.id, email: scoped };
+}
+
 // ── STUDENTS ─────────────────────────────────────────────────────────────────
 
 export async function createStudent(data: {
@@ -91,16 +136,11 @@ export async function createStudent(data: {
   school_id: string;
 }): Promise<{ userId: string; studentId: string }> {
   const sb = getServiceClient();
-  const email = `${data.username.trim().toLowerCase()}@students.snr.local`;
-
-  const { data: authUser, error: authErr } = await sb.auth.admin.createUser({
-    email,
-    password: data.password,
-    email_confirm: true,
+  // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
+  const { userId } = await createSchoolScopedUser(sb, {
+    username: data.username, password: data.password,
+    domain: "students.snr.local", school_id: data.school_id,
   });
-  if (authErr || !authUser.user) throw authErr ?? new Error("Auth user creation failed");
-
-  const userId = authUser.user.id;
   const { data: student, error: stuErr } = await sb
     .from("students")
     .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id })
@@ -231,16 +271,11 @@ export async function createTeacher(data: {
   school_id: string;
 }): Promise<{ userId: string; teacherId: string }> {
   const sb = getServiceClient();
-  const email = `${data.username.trim().toLowerCase()}@teachers.snr.local`;
-
-  const { data: authUser, error: authErr } = await sb.auth.admin.createUser({
-    email,
-    password: data.password,
-    email_confirm: true,
+  // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
+  const { userId } = await createSchoolScopedUser(sb, {
+    username: data.username, password: data.password,
+    domain: "teachers.snr.local", school_id: data.school_id,
   });
-  if (authErr || !authUser.user) throw authErr ?? new Error("Auth user creation failed");
-
-  const userId = authUser.user.id;
   const { data: teacher, error: tErr } = await sb
     .from("teachers")
     .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id })
@@ -1059,16 +1094,11 @@ export async function createSchoolAdmin(data: {
   school_id: string;
 }): Promise<{ userId: string; adminId: string }> {
   const sb = getServiceClient();
-  const email = `${data.username.trim().toLowerCase()}@admins.snr.local`;
-
-  const { data: authUser, error: authErr } = await sb.auth.admin.createUser({
-    email,
-    password: data.password,
-    email_confirm: true,
+  // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
+  const { userId } = await createSchoolScopedUser(sb, {
+    username: data.username, password: data.password,
+    domain: "admins.snr.local", school_id: data.school_id,
   });
-  if (authErr || !authUser.user) throw authErr ?? new Error("Auth user creation failed");
-
-  const userId = authUser.user.id;
   const { data: admin, error: aErr } = await sb
     .from("admins")
     .insert({ user_id: userId, full_name: data.full_name, school_id: data.school_id })

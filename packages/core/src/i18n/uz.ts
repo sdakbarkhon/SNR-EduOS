@@ -92,6 +92,10 @@ export const uz: Dictionary = {
     forgot: "Parolni unutdingizmi?",
     invalid: "Login yoki parol noto‘g‘ri",
     sessionReplaced: "Boshqa qurilmadan tizimga kirildi",
+
+    pickSchoolTitle: "Bu login bir nechta maktabda mavjud. O'zingiznikini tanlang:",
+
+    backBtn: "Orqaga",
     tagline: "Kelajaging platformasi",
     signingIn: "Kirilmoqda...",
     enteringApp: "Kirilyapti...",

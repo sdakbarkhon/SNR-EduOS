@@ -92,6 +92,10 @@ export const en: Dictionary = {
     forgot: "Forgot password?",
     invalid: "Invalid username or password",
     sessionReplaced: "You have been signed in from another device",
+
+    pickSchoolTitle: "This login exists in several schools. Pick yours:",
+
+    backBtn: "Back",
     tagline: "The platform of your future",
     signingIn: "Signing in...",
     enteringApp: "Signing in...",

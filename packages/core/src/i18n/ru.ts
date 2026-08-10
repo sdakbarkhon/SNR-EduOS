@@ -92,6 +92,10 @@ export const ru: Dictionary = {
     forgot: "Забыли пароль?",
     invalid: "Неверный логин или пароль",
     sessionReplaced: "Вход выполнен с другого устройства",
+
+    pickSchoolTitle: "Этот логин есть в нескольких школах. Выберите свою:",
+
+    backBtn: "Назад",
     tagline: "Платформа твоего будущего",
     signingIn: "Вход...",
     enteringApp: "Входим...",

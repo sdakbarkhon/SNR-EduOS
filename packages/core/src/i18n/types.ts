@@ -86,7 +86,10 @@ export interface Dictionary {
     submit: string;
     forgot: string;
     invalid: string;
-    sessionReplaced: string; // single-session: «Вход выполнен с другого устройства»
+    sessionReplaced: string;
+    /** Z.2.10 — выбор школы при совпадении логина. */
+    pickSchoolTitle: string;
+    backBtn: string; // single-session: «Вход выполнен с другого устройства»
     tagline: string;
     // Iter5 P1 — Stitch login redesign
     signingIn: string;    // "Вход..."

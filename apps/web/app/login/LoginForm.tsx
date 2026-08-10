@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
-import { loginWithUsername } from "@/app/actions/auth";
+import { loginWithUsername, loginWithUsernameInSchool } from "@/app/actions/auth";
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 import { Logo } from "@/components/Logo";
 
@@ -47,6 +47,9 @@ export function LoginForm({ locale }: { locale: Locale }) {
   const [loading, setLoading] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Z.2.10 — второй шаг появляется ТОЛЬКО при настоящей коллизии: один логин
+  // заведён в нескольких школах. Пока населена одна школа, он недостижим.
+  const [schoolChoices, setSchoolChoices] = useState<Array<{ id: string; name: string }> | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -74,6 +77,31 @@ export function LoginForm({ locale }: { locale: Locale }) {
     noticeTimer.current = setTimeout(() => setNotice(null), 2500);
   }
 
+  /** Z.2.10 — школа выбрана: пароль проверяется уже под её учётную запись. */
+  async function onPickSchool(schoolId: string) {
+    setLoading(true);
+    setError(null);
+    let result: Awaited<ReturnType<typeof loginWithUsernameInSchool>>;
+    try {
+      result = await loginWithUsernameInSchool(username, password, schoolId);
+    } catch {
+      setLoading(false);
+      setError(t.invalid);
+      return;
+    }
+    if (!result.ok) {
+      setLoading(false);
+      setSchoolChoices(null);
+      setError(t.invalid);
+      return;
+    }
+    const dest = result.dest;
+    startTransition(() => {
+      router.replace(dest);
+      router.refresh();
+    });
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -92,6 +120,10 @@ export function LoginForm({ locale }: { locale: Locale }) {
     }
     if (!result.ok) {
       setLoading(false);
+      if (result.error === "pick_school") {
+        setSchoolChoices(result.schools);
+        return;
+      }
       setError(t.invalid);
       return;
     }
@@ -144,6 +176,35 @@ export function LoginForm({ locale }: { locale: Locale }) {
             {t.title}
           </h1>
 
+          {/* Z.2.10 — один логин заведён в нескольких школах: спрашиваем, в
+              какую входить. Пароль проверяется уже под выбранную школу,
+              поэтому форма не подсказывает, где он подходит. */}
+          {schoolChoices ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-slate-700">{t.pickSchoolTitle}</p>
+              {schoolChoices.map((sc) => (
+                <button
+                  key={sc.id}
+                  type="button"
+                  onClick={() => onPickSchool(sc.id)}
+                  disabled={loading}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {sc.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => { setSchoolChoices(null); setError(null); }}
+                className="text-xs text-slate-500 underline"
+              >
+                {t.backBtn}
+              </button>
+              {error && (
+                <p className="text-sm font-medium text-red-600">{error}</p>
+              )}
+            </div>
+          ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-3 [@media(max-height:760px)]:gap-2">
             {/* Логин */}
             <div className="flex flex-col gap-1.5">
@@ -223,6 +284,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
               </span>
             </button>
           </form>
+          )}
 
           <div className="mt-3 [@media(max-height:760px)]:mt-1.5 text-center">
             <button
