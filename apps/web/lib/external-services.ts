@@ -13,6 +13,10 @@ type ServiceMeta = {
   placeholder: string;
   errorMsg: string;
   description?: string;
+  /** Требование к доступу, которое сервис накладывает на ссылку учителя.
+   *  Показывается под полем ссылки — и в форме этапа урока, и в форме ДЗ.
+   *  Есть не у всех: большинству сервисов достаточно публичной ссылки. */
+  accessHint?: string;
 };
 
 export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
@@ -203,6 +207,42 @@ export const SERVICE_CONFIG: Record<ExternalServiceType, ServiceMeta> = {
     errorMsg: "Неверная ссылка. Ожидается ссылка на наш Scratch (snr-scratch.vercel.app)",
     description: "Программирование из блоков: игры, мультфильмы, истории",
   },
+
+  // 10.08.2026 — Google Документы, Таблицы и Презентации.
+  //
+  // ВСТРАИВАНИЕ. Официальный способ — параметр rm=embedded: он убирает
+  // шапку Google и оставляет чистый редактор. Проверено живьём на всех трёх
+  // видах: ни X-Frame-Options, ни frame-ancestors Google не присылает, то
+  // есть показ в рамке разрешён. Вход в аккаунт не нужен — при доступе
+  // «все по ссылке» правка идёт анонимно (документ синхронизируется под
+  // ANONYMOUS_..., проверено в сетевых запросах).
+  //
+  // ОДИН ТИП НА ТРИ ВИДА. Превращение ссылки одинаковое, вид читается из
+  // самого адреса, и учитель не может ошибиться, выбрав «Таблицы» и вставив
+  // документ. Три карточки есть только в песочнице — там создаётся новый
+  // файл конкретного вида.
+  //
+  // Ссылка из адресной строки приходит с /edit?usp=sharing, а иногда с
+  // /view, /preview или #heading=... — приводим к /edit?rm=embedded,
+  // отбрасывая чужие параметры и якорь.
+  google_docs: {
+    name: "Google Документы",
+    embedSupported: true,
+    urlPattern:
+      /^https?:\/\/docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]{10,})/i,
+    extractEmbedUrl: (url) => {
+      const m = url.trim().match(
+        /^https?:\/\/docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]{10,})/i,
+      );
+      return m ? `https://docs.google.com/${m[1]!.toLowerCase()}/d/${m[2]!}/edit?rm=embedded` : null;
+    },
+    placeholder: "https://docs.google.com/document/d/.../edit?usp=sharing",
+    errorMsg:
+      "Неверная ссылка. Ожидается ссылка на Google Документ, Таблицу или Презентацию (docs.google.com/document|spreadsheets|presentation/d/...)",
+    description: "Документы, таблицы и презентации — совместная работа в браузере",
+    accessHint:
+      "Откройте доступ к файлу: «Настройки доступа» → «Все, у кого есть ссылка» → права «Редактор». Иначе ученик увидит файл, но не сможет в нём работать.",
+  },
 };
 
 // Used when a teacher didn't attach a specific project URL (lesson stage,
@@ -222,13 +262,17 @@ export const DEFAULT_EXTERNAL_URLS: Record<ExternalServiceType, string> = {
   sqlonline: "https://sqlime.org/",
   typerun: "https://typerun.top/#rus_basic",
   scratch: "https://snr-scratch.vercel.app",
+  // Общий документ школы. НЕ /document/create: создание нового файла требует
+  // входа в аккаунт Google (302 на accounts.google.com, проверено), и учитель,
+  // не приложивший свою ссылку, показал бы классу форму входа.
+  google_docs: "https://docs.google.com/document/d/1oh1KTjQX7Yv_-dn-KwgHuX72X8t88FDPPs3BBPvM1uU/edit?rm=embedded",
 };
 
 // Canonical display order for the 12 services (teacher-facing type pickers).
 export const EXTERNAL_SERVICE_ORDER: ExternalServiceType[] = [
   "wokwi", "codesandbox", "geogebra", "phet", "desmos", "blockly_games",
   "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline", "typerun",
-  "scratch",
+  "scratch", "google_docs",
 ];
 
 // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 5.4 — filters the 12-service picker by subject
@@ -249,7 +293,7 @@ export const SUBJECT_SERVICE_MAP: Record<string, ExternalServiceType[]> = {
 // Always offered regardless of subject (§5.3: "универсальные, можно
 // вставлять любому предмету где уместно"). typerun (Пачка 6.1) —
 // печать полезна на любом предмете, не привязана к конкретному.
-const UNIVERSAL_SERVICES: ExternalServiceType[] = ["excalidraw", "typerun"];
+const UNIVERSAL_SERVICES: ExternalServiceType[] = ["excalidraw", "typerun", "google_docs"];
 // PhET is science-flavored (§5.3: "больше для естественных наук") — offered
 // for stub science subjects that have no dedicated mapping above, used
 // sparingly rather than added to every subject.

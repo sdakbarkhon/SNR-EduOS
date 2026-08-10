@@ -5,14 +5,16 @@
 
 import {
   CircuitBoard, Code2, Terminal, Ruler, FlaskConical, LineChart, Puzzle,
-  Shuffle, Palette, PenTool, Brain, Database, Keyboard, Blocks, type LucideIcon,
+  Shuffle, Palette, PenTool, Brain, Database, Keyboard, Blocks,
+  FileText, Table, Presentation, type LucideIcon,
 } from "lucide-react";
 
 export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
   | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "typerun"
-  | "scratch";
+  | "scratch"
+  | "google_docs" | "google_sheets" | "google_slides";
 
 export type SandboxTool = {
   id: SandboxToolId;
@@ -127,5 +129,38 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://snr-scratch.vercel.app",
     Icon: Blocks,
     gradient: "from-amber-400 to-orange-500",
+  },
+  {
+    // 10.08.2026 — Google Документы. В песочнице ТРИ карточки, а тип этапа
+    // урока один: здесь вид файла выбирается до открытия.
+    //
+    // ВЕДУТ НА ОБЩИЕ ФАЙЛЫ ШКОЛЫ, а не на создание нового. Адреса вида
+    // docs.google.com/document/create требуют входа в аккаунт Google: все три
+    // отвечают 302 на accounts.google.com (проверено), и в рамке ученик
+    // увидел бы форму входа вместо редактора. Файлы ниже открыты «всем по
+    // ссылке на редактирование» и правятся анонимно.
+    //
+    // Следствие, которое надо знать: файл ОДИН на всех — это песочница этапа
+    // показа. Свой файл каждому появится вместе с раздачей прав, которая
+    // вынесена в отдельную задачу.
+    id: "google_docs",
+    kind: "iframe",
+    embedUrl: "https://docs.google.com/document/d/1oh1KTjQX7Yv_-dn-KwgHuX72X8t88FDPPs3BBPvM1uU/edit?rm=embedded",
+    Icon: FileText,
+    gradient: "from-blue-500 to-sky-600",
+  },
+  {
+    id: "google_sheets",
+    kind: "iframe",
+    embedUrl: "https://docs.google.com/spreadsheets/d/1gK_LwoiYV7ivSpE71l5IJmLEPTwiToOH9efhiykzYog/edit?rm=embedded",
+    Icon: Table,
+    gradient: "from-emerald-500 to-green-600",
+  },
+  {
+    id: "google_slides",
+    kind: "iframe",
+    embedUrl: "https://docs.google.com/presentation/d/1bTOZtVPs9IMjvMmEo9vrHB3ix9hgQamShl3i4VgQUQA/edit?rm=embedded",
+    Icon: Presentation,
+    gradient: "from-amber-500 to-yellow-600",
   },
 ];

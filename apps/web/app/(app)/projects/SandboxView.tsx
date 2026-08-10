@@ -541,10 +541,19 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
   // shows every tool, unchanged from before this filter existed.
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const subjectOptions = Object.keys(SUBJECT_SERVICE_MAP);
+  // Фильтр по предмету касается только карточек, которые ЕСТЬ в справочнике
+  // сервисов. «Код» — встроенный редактор, а три карточки Google отвечают
+  // одному типу этапа (google_docs) и универсальны: они показываются всегда.
+  // Сравниваем через множество строк, чтобы не приводить SandboxToolId к
+  // ExternalServiceType — это разные перечисления, пересекающиеся лишь частью.
+  const allowedServices = new Set<string>(getServicesForSubject(subjectFilter));
+  const ALWAYS_SHOWN: string[] = ["google_docs", "google_sheets", "google_slides"];
   const visibleTools = subjectFilter === "all"
     ? SANDBOX_TOOLS
     : SANDBOX_TOOLS.filter((tool) =>
-        tool.id === "code" ? subjectFilter === "Программирование" : getServicesForSubject(subjectFilter).includes(tool.id),
+        tool.id === "code"
+          ? subjectFilter === "Программирование"
+          : ALWAYS_SHOWN.includes(tool.id) || allowedServices.has(tool.id),
       );
 
   return (

@@ -145,6 +145,8 @@ export type LessonContentType =
   | 'p5js' | 'excalidraw' | 'learningapps' | 'sqlonline' | 'typerun'
   // 08.08.2026 — Scratch на своём хостинге, см. ExternalServiceType ниже.
   | 'scratch'
+  // 10.08.2026 — Google Документы, Таблицы и Презентации одним типом.
+  | 'google_docs'
   | 'quiz_qia' | 'quiz_kahoot' | 'code_completion';
 
 // Большой фикс, Блок 6.5 — Drag & Drop заполнение пропусков в коде.
@@ -286,7 +288,14 @@ export type ExternalServiceType =
   // scratch.mit.edu встроить нельзя: их сервер запрещает показ в рамке на
   // чужом домене — из-за этого Scratch в проекте уже переименовывали в
   // TurboWarp (миграции 68, 69), а потом удалили совсем (миграция 90).
-  | 'scratch';
+  | 'scratch'
+  // 10.08.2026 — Google Документы. ОДИН тип на все три вида файла
+  // (документ, таблица, презентация), а не три отдельных: превращение ссылки
+  // во встраиваемую у них одинаковое (параметр rm=embedded), вид однозначно
+  // читается из самого адреса (/document/, /spreadsheets/, /presentation/), и
+  // учитель не может ошибиться, выбрав «Таблицы» и вставив документ. В
+  // песочнице карточек всё же три — там ученик создаёт НОВЫЙ файл вида.
+  | 'google_docs';
 
 /** Stored in lesson_stages.config for external-service stages. */
 export interface ExternalServiceConfig {

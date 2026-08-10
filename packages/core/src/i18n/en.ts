@@ -1253,6 +1253,9 @@ export const en: Dictionary = {
       sqlonline: { name: "SQL Online", description: "SQL queries in the browser (SQLite) — for older students" },
       typerun: { name: "Typing Trainer", description: "Improve your typing speed and accuracy" },
       scratch: { name: "Scratch", description: "Block-based coding: games, animations and stories" },
+      google_docs: { name: "Google Docs", description: "A text document: reports, essays, notes" },
+      google_sheets: { name: "Google Sheets", description: "Tables and calculations: data, charts, formulas" },
+      google_slides: { name: "Google Slides", description: "Slides for a talk or a project defence" },
     },
     projects: {
       myProjects: "My projects",
@@ -1668,6 +1671,7 @@ export const en: Dictionary = {
     stageContentSqlonline: "SQL Online",
     stageContentTyperun: "TypeRun",
     stageContentScratch: "Scratch",
+    stageContentGoogleDocs: "Google Docs",
     stageContentCodeCompletion: "Fill-in-the-blank code",
     stageContentQuizQia: "Quiz (QIA)",
     stageContentQuizKahoot: "Quiz game (Kahoot)",

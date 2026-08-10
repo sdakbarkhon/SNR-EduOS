@@ -1253,6 +1253,9 @@ export const uz: Dictionary = {
       sqlonline: { name: "SQL Online", description: "Brauzerda SQL so'rovlari (SQLite) — yuqori sinflar uchun" },
       typerun: { name: "Klaviatura trenajyori", description: "Yozish tezligi va aniqligini oshiring" },
       scratch: { name: "Scratch", description: "Bloklardan dasturlash: o'yinlar, multfilmlar, hikoyalar" },
+      google_docs: { name: "Google Hujjatlar", description: "Matnli hujjat: ma'ruza, insho, konspekt" },
+      google_sheets: { name: "Google Jadvallar", description: "Jadval va hisob-kitob: ma'lumot, grafik, formula" },
+      google_slides: { name: "Google Taqdimotlar", description: "Chiqish va loyiha himoyasi uchun slaydlar" },
     },
     projects: {
       myProjects: "Loyihalarim",
@@ -1668,6 +1671,7 @@ export const uz: Dictionary = {
     stageContentSqlonline: "SQL Online",
     stageContentTyperun: "TypeRun",
     stageContentScratch: "Scratch",
+    stageContentGoogleDocs: "Google Hujjatlar",
     stageContentCodeCompletion: "Bo'sh joyli kod",
     stageContentQuizQia: "Test (QIA)",
     stageContentQuizKahoot: "Kviz o'yini (Kahoot)",

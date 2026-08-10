@@ -1253,6 +1253,9 @@ export const ru: Dictionary = {
       sqlonline: { name: "SQL Online", description: "SQL-запросы в браузере (SQLite) — для старших классов" },
       typerun: { name: "Тренажёр печати", description: "Улучшай скорость и точность печати" },
       scratch: { name: "Scratch", description: "Программирование из блоков: игры, мультфильмы, истории" },
+      google_docs: { name: "Google Документы", description: "Текстовый документ: доклады, сочинения, конспекты" },
+      google_sheets: { name: "Google Таблицы", description: "Таблицы и расчёты: данные, графики, формулы" },
+      google_slides: { name: "Google Презентации", description: "Слайды для выступления и защиты проекта" },
     },
     projects: {
       myProjects: "Мои проекты",
@@ -1668,6 +1671,7 @@ export const ru: Dictionary = {
     stageContentSqlonline: "SQL Online",
     stageContentTyperun: "TypeRun",
     stageContentScratch: "Scratch",
+    stageContentGoogleDocs: "Google Документы",
     stageContentCodeCompletion: "Код с пропусками",
     stageContentQuizQia: "Тест (QIA)",
     stageContentQuizKahoot: "Квиз-игра (Kahoot)",

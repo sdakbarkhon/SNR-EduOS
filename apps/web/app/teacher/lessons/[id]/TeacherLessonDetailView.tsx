@@ -86,6 +86,7 @@ const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
   sqlonline:      <Database className="h-4 w-4" />,
   typerun:        <Keyboard className="h-4 w-4" />,
   scratch:        <Blocks className="h-4 w-4" />,
+  google_docs:    <FileText className="h-4 w-4" />,
   code_completion: <Blocks className="h-4 w-4" />,
 };
 
@@ -490,6 +491,11 @@ function StageModal({
                     <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-400">
                       {d.external.projectLink}
                     </label>
+                    {externalMeta.accessHint && (
+                      <p className="mb-1.5 text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+                        {externalMeta.accessHint}
+                      </p>
+                    )}
                     <div className="relative">
                       <input
                         type="url"
@@ -1313,6 +1319,7 @@ export function TeacherLessonDetailView({
       sqlonline:      dl.stageContentSqlonline,
       typerun:        dl.stageContentTyperun,
       scratch:        dl.stageContentScratch,
+      google_docs:    dl.stageContentGoogleDocs,
       code_completion: dl.stageContentCodeCompletion,
     };
     return map[ct] ?? ct;

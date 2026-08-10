@@ -666,6 +666,11 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
             <span className="text-[13px] font-medium text-brand-ink-muted">
               {d.lesson.external.projectLink} <span className="text-slate-400 font-normal">(опционально) — {SERVICE_CONFIG[format].description}</span>
             </span>
+            {SERVICE_CONFIG[format].accessHint && (
+              <span className="text-[11px] leading-snug text-amber-600">
+                {SERVICE_CONFIG[format].accessHint}
+              </span>
+            )}
             <input
               value={externalUrl}
               onChange={(e) => { setExternalUrl(e.target.value); setExternalUrlError(null); }}
