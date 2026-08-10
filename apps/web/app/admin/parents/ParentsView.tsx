@@ -8,7 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
-import { actionRegenerateInviteCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
+import { actionParentPendingCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
 
 type ParentRow = {
   id: string;
@@ -234,43 +234,33 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                     <td className="px-4 py-3 text-gray-500">{p.children.join(", ") || "—"}</td>
                     <td className="px-4 py-3">
                       {p.isRegistered ? (
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                          {t.statusRegistered}
-                        </span>
-                      ) : p.inviteCode && !p.inviteExpired ? (
                         <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                            {t.statusPending}
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                            {t.statusRegistered}
                           </span>
-                          <button
-                            onClick={() => copyCode(p.inviteCode!)}
-                            title={t.copyCodeBtn}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 ring-1 ring-red-200">
-                            {t.statusExpired}
-                          </span>
+                          {/* Z.2.8 — временно, пока нет SMS-провайдера: админ
+                              смотрит действующий код и диктует его родителю.
+                              Снимается вместе с заглушкой доставки. */}
                           <button
                             onClick={() => startTransition(async () => {
                               try {
-                                await actionRegenerateInviteCode(p.id);
-                                flash(t.regenerateCodeBtn + " ✓");
+                                const code = await actionParentPendingCode(p.id);
+                                flash(code ? `${t.codeLabel}: ${code.code}` : t.codeNone);
                               } catch (err) {
                                 flash(humanizeAdminError(err, locale as Locale));
                               }
                             })}
                             disabled={isPending}
-                            title={t.regenerateCodeBtn}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600"
+                            title={t.showCodeBtn}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600"
                           >
                             <RefreshCw className="h-3.5 w-3.5" />
                           </button>
                         </div>
+                      ) : (
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                          {t.statusPending}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
@@ -278,15 +268,6 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {!p.isRegistered && p.inviteCode && !p.inviteExpired && (
-                          <button
-                            onClick={() => copyLink(p.inviteCode!)}
-                            title={t.copyLink}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                        )}
                         <button
                           onClick={() => setModal({ kind: "edit", parent: p })}
                           title={t.editBtn}

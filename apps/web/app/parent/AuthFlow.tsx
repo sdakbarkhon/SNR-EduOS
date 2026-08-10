@@ -7,7 +7,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { GlassButton } from "@/components/parent/glass/GlassButton";
 import { GlassInput } from "@/components/parent/glass/GlassInput";
-import { loginParentByPhone } from "@/app/actions/parentPhoneAuth";
+import { loginParentByPhone, requestParentCode } from "@/app/actions/parentPhoneAuth";
 import { ink1, ink2 } from "@/lib/parent/glass-tokens";
 import { status } from "@/app/parent/(app)/v2/tokens";
 import { OnboardingCarousel } from "./OnboardingCarousel";
@@ -39,10 +39,34 @@ export function AuthFlow() {
     setCode(raw.replace(/\D/g, "").slice(0, 4));
   }
 
+  /** Z.2.8 — код теперь настоящий, поэтому его надо СПРОСИТЬ, а не просто
+   *  перелистнуть экран. Раньше переход на второй шаг ничего не запрашивал:
+   *  кода не существовало, и подходили любые четыре цифры. */
   function submitPhone() {
     setError(null);
     if (phone.length !== 9) return;
-    setStep("code");
+    startTransition(async () => {
+      const result = await requestParentCode(phone);
+      if (!result.ok) {
+        setError(
+          result.error === "too_soon" ? d.codeTooSoon
+            : result.error === "failed" ? d.loginFailed
+            : d.phoneNotFound,
+        );
+        return;
+      }
+      setCode("");
+      setStep("code");
+    });
+  }
+
+  /** Повторная выдача кода — та же защита «не чаще раза в минуту». */
+  function resendCode() {
+    setError(null);
+    startTransition(async () => {
+      const result = await requestParentCode(phone);
+      if (!result.ok) setError(result.error === "too_soon" ? d.codeTooSoon : d.loginFailed);
+    });
   }
 
   function submitCode() {
@@ -107,6 +131,16 @@ export function AuthFlow() {
           <GlassButton onClick={submitCode} disabled={code.length !== 4 || isPending}>
             {d.continue}
           </GlassButton>
+          {/* Z.2.8 — код живёт пять минут; если не дошёл, его надо запросить
+              заново, а не гадать. Повтор не чаще раза в минуту. */}
+          <button
+            onClick={resendCode}
+            disabled={isPending}
+            className="text-xs underline disabled:opacity-50"
+            style={{ color: ink2 }}
+          >
+            {d.resendCode}
+          </button>
         </div>
       </GlassCard>
     </div>

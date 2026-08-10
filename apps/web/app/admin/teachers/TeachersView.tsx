@@ -6,6 +6,7 @@ import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
   actionCreateTeacher,
   actionUpdateTeacher,
@@ -223,6 +224,8 @@ export function TeachersView({
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Z.2.9 — второй клик до перерисовки больше не создаёт вторую запись.
+  const guard = useSubmitGuard();
 
   function flash(msg: string) {
     setFlashMsg(msg);
@@ -329,7 +332,7 @@ export function TeachersView({
               t={t}
               onClose={() => setModal(null)}
               onSubmit={(fd) => {
-                startTransition(async () => {
+                guard(() => startTransition(async () => {
                   try {
                     await actionCreateTeacher(fd);
                     flash(
@@ -341,7 +344,7 @@ export function TeachersView({
                   } catch (e) {
                     flash(humanizeAdminError(e, locale as Locale));
                   }
-                });
+                }));
               }}
             />
           </ModalCard>

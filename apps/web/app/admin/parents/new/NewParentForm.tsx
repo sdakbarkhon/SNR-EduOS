@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { useSubmitGuard } from "@/lib/use-submit-guard";
 import { actionCreateParent } from "../actions";
 
 type Student = { id: string; full_name: string; username: string };
@@ -24,8 +25,9 @@ export function NewParentForm({ students }: { students: Student[] }) {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ inviteCode: string } | null>(null);
+  const [result, setResult] = useState<{ password: string; phone: string } | null>(null);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const guard = useSubmitGuard();
 
   const filteredStudents = students.filter((s) =>
     s.full_name.toLowerCase().includes(search.toLowerCase()) || s.username.toLowerCase().includes(search.toLowerCase()),
@@ -38,22 +40,23 @@ export function NewParentForm({ students }: { students: Student[] }) {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!fullName.trim() || selectedIds.length === 0) {
-      setError(t.fieldFullName + " / " + t.selectChildren);
+    // Z.2.8 — телефон обязателен: он ключ входа.
+    if (!fullName.trim() || !phone.trim() || selectedIds.length === 0) {
+      setError(t.parentPhoneRequired);
       return;
     }
-    startTransition(async () => {
+    guard(() => startTransition(async () => {
       try {
         const fd = new FormData();
         fd.set("full_name", fullName.trim());
         fd.set("phone", phone.trim());
         selectedIds.forEach((id) => fd.append("student_ids", id));
         const res = await actionCreateParent(fd);
-        setResult(res);
+        setResult({ password: res.password, phone: phone.trim() });
       } catch (err) {
         setError(humanizeAdminError(err, locale as Locale));
       }
-    });
+    }));
   }
 
   function copy(text: string, kind: "code" | "link") {
@@ -63,31 +66,29 @@ export function NewParentForm({ students }: { students: Student[] }) {
     });
   }
 
+  // Z.2.8 — приглашений больше нет. Родитель входит телефоном и одноразовым
+  // кодом, а пароль нужен мобильному приложению и как запасной путь. Пароль
+  // показывается ОДИН раз, как для админов школ: в базе он хешируется, и
+  // восстановить его потом нельзя — только сбросить.
   if (result) {
-    const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/parent/join?code=${result.inviteCode}` : "";
     return (
       <div className="mx-auto max-w-md space-y-6">
-        <h1 className="text-2xl font-bold text-gray-800">{t.inviteCreatedTitle}</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t.parentCreatedTitle}</h1>
         <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-black/5">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{t.inviteCodeLabel}</p>
-          <p className="mb-4 text-3xl font-bold tracking-widest text-violet-700">{result.inviteCode}</p>
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => copy(result.inviteCode, "code")}
-              className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700"
-            >
-              {copied === "code" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {t.copyCode}
-            </button>
-            <button
-              onClick={() => copy(joinUrl, "link")}
-              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {t.copyLink}
-            </button>
-          </div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPhone}</p>
+          <p className="mb-4 text-xl font-bold text-gray-800">{result.phone}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPassword}</p>
+          <p className="mb-4 text-3xl font-bold tracking-widest text-violet-700">{result.password}</p>
+          <p className="mb-4 text-xs text-amber-600">{t.passwordShownOnce}</p>
+          <button
+            onClick={() => copy(`${result.phone} / ${result.password}`, "code")}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700"
+          >
+            {copied === "code" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {t.copyCode}
+          </button>
         </div>
+        <p className="text-center text-xs text-gray-500">{t.parentLoginHint}</p>
         <button
           onClick={() => router.push("/admin/parents")}
           className="w-full rounded-xl bg-gray-800 py-2.5 text-sm font-medium text-white hover:bg-gray-900"
@@ -128,6 +129,9 @@ export function NewParentForm({ students }: { students: Student[] }) {
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            required
+            inputMode="tel"
+            placeholder="+998 90 123 45 67"
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
           />
         </div>

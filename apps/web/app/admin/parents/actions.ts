@@ -1,6 +1,7 @@
 "use server";
 
-import { createParent, regenerateParentInviteCode, deleteParent, updateParent, resetParentPassword } from "@/lib/admin-api";
+import { createParent, deleteParent, updateParent, resetParentPassword } from "@/lib/admin-api";
+import { pendingCodeFor } from "@/lib/parent-sms";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -26,10 +27,11 @@ export async function actionCreateParent(formData: FormData) {
   const full_name = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const student_ids = formData.getAll("student_ids").map((v) => String(v));
-  if (!full_name || student_ids.length === 0) throw new Error("Missing fields");
+  // Z.2.8 — телефон стал ключом входа, поэтому обязателен.
+  if (!full_name || !phone || student_ids.length === 0) throw new Error("Missing fields");
   const result = await createParent({
     full_name,
-    phone: phone || undefined,
+    phone,
     student_ids,
     school_id: schoolId,
     created_by: userId,
@@ -38,11 +40,19 @@ export async function actionCreateParent(formData: FormData) {
   return result;
 }
 
-export async function actionRegenerateInviteCode(parentId: string) {
-  const { schoolId, userId } = await verifyAdmin();
-  const code = await regenerateParentInviteCode(parentId, schoolId, userId);
-  revalidatePath("/admin/parents");
-  return code;
+/** Z.2.8 — действующий код входа, чтобы админ мог продиктовать его родителю.
+ *  Временно, пока нет SMS-провайдера; снимается вместе с заглушкой доставки.
+ *  Школа проверяется здесь: таблица кодов закрыта от браузера (RLS без
+ *  политик), и без этой проверки админ одной школы увидел бы код чужой. */
+export async function actionParentPendingCode(parentId: string) {
+  const { schoolId, isSuperAdmin } = await verifyAdmin();
+  const sb = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: parent } = await (sb as any)
+    .from("parents").select("phone, school_id").eq("id", parentId).maybeSingle();
+  if (!parent) return null;
+  if (!isSuperAdmin && parent.school_id !== schoolId) return null;
+  return pendingCodeFor(parent.phone as string);
 }
 
 export async function actionDeleteParent(parentId: string) {

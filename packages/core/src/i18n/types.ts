@@ -563,6 +563,15 @@ export interface Dictionary {
     createBtn: string;
     creating: string;
     cancelBtn: string;
+    /** Z.2.8 — приглашения заменены телефоном и паролем. */
+    parentCreatedTitle: string;
+    fieldPassword: string;
+    passwordShownOnce: string;
+    parentLoginHint: string;
+    parentPhoneRequired: string;
+    showCodeBtn: string;
+    codeLabel: string;
+    codeNone: string;
     inviteCreatedTitle: string;
     inviteCodeLabel: string;
     copyCode: string;
@@ -604,6 +613,11 @@ export interface Dictionary {
     rateLimited: string;
     /** Z.2.3 — гварды удаления. Причина отказа с числами вместо сырой
      *  ошибки внешнего ключа. */
+    /** Z.2.9 — имена ограничений сверены с живой базой. */
+    subjectNameTaken: string;
+    assignmentExists: string;
+    phoneInvalid: string;
+    groupNameTaken: string;
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"
@@ -2912,6 +2926,9 @@ export interface Dictionary {
       // вход никогда не мог провалиться.
       phoneNotFound: string;
       wrongCode: string;
+    /** Z.2.8 — настоящий код: срок жизни и защита от частых запросов. */
+    codeTooSoon: string;
+    resendCode: string;
       loginFailed: string;
       a4Sub: string;
       a4SecurityTitle: string;

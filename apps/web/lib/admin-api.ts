@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSubjectKeyByLabel } from "@snr/core";
+import { getSubjectKeyByLabel, normalizeUzPhone, parentAuthEmail } from "@snr/core";
 import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 function getServiceClient() {
@@ -442,6 +442,27 @@ export async function deleteTeacher(
 // nullable и была — схему не трогаем. Разделение ПРАВ куратора — это Z.4;
 // здесь только форма.
 
+/** Z.2.9 — две группы с одинаковым именем в школе неразличимы в каждом
+ *  выпадающем списке приложения: расписание, назначения, перевод ученика.
+ *  Ограничения в базе нет (добавление UNIQUE — отдельная миграция, здесь не
+ *  делается: номер 180 уже занят родителями), поэтому проверяем в коде.
+ *  Сравнение без учёта регистра и краевых пробелов — «7-А» и «7-а » для
+ *  человека одно и то же. */
+async function assertGroupNameFree(
+  sb: ReturnType<typeof getServiceClient>,
+  name: string,
+  schoolId: string,
+  exceptId?: string,
+): Promise<void> {
+  const { data, error } = await sb.from("groups").select("id, name").eq("school_id", schoolId);
+  if (error) throw error;
+  const needle = name.trim().toLowerCase();
+  const clash = (data ?? []).some(
+    (g) => g.id !== exceptId && (g.name ?? "").trim().toLowerCase() === needle,
+  );
+  if (clash) throw new Error("GROUP_NAME_TAKEN");
+}
+
 export async function createGroup(data: {
   name: string;
   subject: string;
@@ -449,6 +470,7 @@ export async function createGroup(data: {
   school_id: string;
 }): Promise<string> {
   const sb = getServiceClient();
+  await assertGroupNameFree(sb, data.name, data.school_id);
   const { data: group, error } = await sb
     .from("groups")
     .insert({ ...data, teacher_id: data.teacher_id || null })
@@ -466,6 +488,7 @@ export async function updateGroup(
 ) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "groups", groupId, callerSchoolId, callerIsSuperAdmin);
+  await assertGroupNameFree(sb, data.name, callerSchoolId, groupId);
 
   // teacher_id пишется, только если форма его прислала. Для реальных школ
   // поля в форме нет — и существующий куратор (если он там откуда-то есть)
@@ -1111,39 +1134,78 @@ export async function getUserEmails(userIds: string[]): Promise<Record<string, s
 
 // ── ADMIN: PARENTS ────────────────────────────────────────────────────────────
 
-function generateInviteCode(length = 8): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I — avoids visual ambiguity
-  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-}
-
-/** Creates a parents row with no user_id yet (the parent claims it later via
- *  /parent/join), links the chosen children, and issues a one-time invite code. */
+/**
+ * Заводит родителя вместе с учётной записью. Z.2.8.
+ *
+ * ЧТО БЫЛО. Строка `parents` с `user_id = NULL` и одноразовый код в
+ * `parent_invites`, который родитель должен был погасить на странице
+ * `/parent/join`. Страницы не существует, `verifyParentInvite` и
+ * `completeParentJoin` имели ноль вызовов, в базе ноль приглашений — поток
+ * был мёртв целиком. Приглашения больше не выдаются, мёртвый код удалён.
+ *
+ * КАК СТАЛО. Телефон обязателен и уникален (миграция 180) — это ключ входа.
+ * Сразу создаётся учётная запись с паролем: он нужен мобильному приложению
+ * и как запасной путь, а на вебе родитель входит телефоном и одноразовым
+ * кодом. Пароль возвращается вызывающему и показывается админу один раз, как
+ * это уже сделано для админов школ.
+ *
+ * Порядок обратный прежнему — сначала пользователь, потом строка: у
+ * `parents.phone` теперь UNIQUE, и при занятом номере лучше упасть до
+ * создания учётной записи, чем откатывать её следом.
+ */
 export async function createParent(data: {
   full_name: string;
-  phone?: string;
+  phone: string;
   student_ids: string[];
   school_id: string;
   created_by: string;
-}): Promise<{ parentId: string; inviteCode: string }> {
+}): Promise<{ parentId: string; userId: string; password: string }> {
   const sb = getServiceClient();
+
+  const phone = normalizeUzPhone(data.phone);
+  if (!phone) throw new Error("BAD_PHONE");
+
+  const { data: taken } = await sb.from("parents").select("id").eq("phone", phone).maybeSingle();
+  if (taken) throw new Error("duplicate key value violates unique constraint \"parents_phone_key\"");
+
+  const password = generatePassword();
+  const { data: authUser, error: authErr } = await sb.auth.admin.createUser({
+    email: parentAuthEmail(phone),
+    password,
+    email_confirm: true,
+  });
+  if (authErr || !authUser.user) throw authErr ?? new Error("Auth user creation failed");
+  const userId = authUser.user.id;
+
   const { data: parent, error: pErr } = await sb
     .from("parents")
     .insert({
+      user_id: userId,
       full_name: data.full_name,
-      phone: data.phone || null,
+      phone,
       school_id: data.school_id,
       created_by: data.created_by,
     })
     .select("id")
     .single();
-  if (pErr || !parent) throw pErr ?? new Error("Parent insert failed");
+  if (pErr || !parent) {
+    await sb.auth.admin.deleteUser(userId);
+    throw pErr ?? new Error("Parent insert failed");
+  }
   const parentId = (parent as { id: string }).id;
+
+  // Откат теперь снимает и учётную запись: без неё родитель остался бы с
+  // занятым номером и невозможностью войти.
+  const rollback = async () => {
+    await sb.from("parents").delete().eq("id", parentId);
+    await sb.auth.admin.deleteUser(userId);
+  };
 
   if (data.student_ids.length > 0) {
     try {
       await assertStudentsInSchool(sb, data.student_ids, data.school_id);
     } catch (checkErr) {
-      await sb.from("parents").delete().eq("id", parentId);
+      await rollback();
       throw checkErr;
     }
     const rows = data.student_ids.map((student_id) => ({
@@ -1153,44 +1215,12 @@ export async function createParent(data: {
     }));
     const { error: psErr } = await sb.from("parent_students").insert(rows);
     if (psErr) {
-      await sb.from("parents").delete().eq("id", parentId);
+      await rollback();
       throw psErr;
     }
   }
 
-  let code = generateInviteCode();
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { error: inviteErr } = await sb.from("parent_invites").insert({
-      code,
-      parent_id: parentId,
-      school_id: data.school_id,
-      created_by: data.created_by,
-    });
-    if (!inviteErr) break;
-    if (attempt === 4) throw inviteErr;
-    code = generateInviteCode();
-  }
-
-  return { parentId, inviteCode: code };
-}
-
-/** Issues a fresh invite code for a parent whose previous one expired. */
-export async function regenerateParentInviteCode(
-  parentId: string,
-  schoolId: string,
-  createdBy: string,
-): Promise<string> {
-  const sb = getServiceClient();
-  let code = generateInviteCode();
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { error } = await sb
-      .from("parent_invites")
-      .insert({ code, parent_id: parentId, school_id: schoolId, created_by: createdBy });
-    if (!error) return code;
-    if (attempt === 4) throw error;
-    code = generateInviteCode();
-  }
-  throw new Error("Failed to generate invite code");
+  return { parentId, userId, password };
 }
 
 /**
@@ -1279,84 +1309,3 @@ export async function resetParentPassword(
   return newPassword;
 }
 
-// ── PARENT JOIN (public, unauthenticated invite-claim flow) ───────────────────
-
-export type ParentInviteCheck =
-  | { valid: true; fullName: string; children: { id: string; full_name: string }[] }
-  | { valid: false; reason: "not_found" | "used" | "expired" };
-
-export async function verifyParentInvite(code: string): Promise<ParentInviteCheck> {
-  const sb = getServiceClient();
-  const { data: invite } = await sb
-    .from("parent_invites")
-    .select("id, parent_id, used_at, expires_at")
-    .eq("code", code.trim().toUpperCase())
-    .maybeSingle();
-
-  if (!invite) return { valid: false, reason: "not_found" };
-  if (invite.used_at) return { valid: false, reason: "used" };
-  if (new Date(invite.expires_at).getTime() < getDemoNowMs()) return { valid: false, reason: "expired" };
-
-  const { data: parent } = await sb
-    .from("parents")
-    .select("id, full_name")
-    .eq("id", invite.parent_id)
-    .single();
-  if (!parent) return { valid: false, reason: "not_found" };
-
-  const { data: links } = await sb
-    .from("parent_students")
-    .select("student_id")
-    .eq("parent_id", invite.parent_id);
-  const studentIds = (links ?? []).map((l: { student_id: string }) => l.student_id);
-
-  let children: { id: string; full_name: string }[] = [];
-  if (studentIds.length > 0) {
-    const { data: students } = await sb.from("students").select("id, full_name").in("id", studentIds);
-    children = (students ?? []) as { id: string; full_name: string }[];
-  }
-
-  return { valid: true, fullName: parent.full_name, children };
-}
-
-export type ParentJoinResult =
-  | { success: true }
-  | { success: false; error: "invalid_code" | "username_taken" | "server_error" };
-
-export async function completeParentJoin(data: {
-  code: string;
-  username: string;
-  password: string;
-}): Promise<ParentJoinResult> {
-  const sb = getServiceClient();
-  const { data: invite } = await sb
-    .from("parent_invites")
-    .select("id, parent_id, used_at, expires_at")
-    .eq("code", data.code.trim().toUpperCase())
-    .maybeSingle();
-
-  if (!invite || invite.used_at || new Date(invite.expires_at).getTime() < getDemoNowMs()) {
-    return { success: false, error: "invalid_code" };
-  }
-
-  const email = `${data.username.trim().toLowerCase()}@parents.snr.local`;
-  const { data: authUser, error: authErr } = await sb.auth.admin.createUser({
-    email,
-    password: data.password,
-    email_confirm: true,
-  });
-  if (authErr || !authUser.user) {
-    return { success: false, error: "username_taken" };
-  }
-
-  const userId = authUser.user.id;
-  const { error: updErr } = await sb.from("parents").update({ user_id: userId }).eq("id", invite.parent_id);
-  if (updErr) {
-    await sb.auth.admin.deleteUser(userId);
-    return { success: false, error: "server_error" };
-  }
-
-  await sb.from("parent_invites").update({ used_at: getDemoNow().toISOString() }).eq("id", invite.id);
-
-  return { success: true };
-}

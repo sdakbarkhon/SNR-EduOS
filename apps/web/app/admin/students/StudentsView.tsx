@@ -7,6 +7,7 @@ import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { gradeFromGroupName } from "@/lib/group-grade";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
   actionCreateStudent,
   actionUpdateStudent,
@@ -65,6 +66,8 @@ export function StudentsView({
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Z.2.9 — второй клик до перерисовки больше не создаёт вторую запись.
+  const guard = useSubmitGuard();
 
   function flash(msg: string) {
     setFlashMsg(msg);
@@ -188,7 +191,7 @@ export function StudentsView({
             t={t}
             onClose={() => setModal(null)}
             onSubmit={async (fd) => {
-              startTransition(async () => {
+              guard(() => startTransition(async () => {
                 try {
                   await actionCreateStudent(fd);
                   flash(
@@ -200,7 +203,7 @@ export function StudentsView({
                 } catch (e) {
                   flash(humanizeAdminError(e, locale as Locale));
                 }
-              });
+              }));
             }}
           />
         </Backdrop>

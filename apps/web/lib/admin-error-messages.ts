@@ -48,7 +48,20 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
     }
   }
 
-  if (/duplicate key.*students_username_key/i.test(raw) || /duplicate key.*teachers_username_key/i.test(raw)) {
+  // Z.2.9 — имена ограничений сверены с живой базой. Прежние
+  // `students_username_key` / `teachers_username_key` НЕ СУЩЕСТВУЮТ: реальные
+  // называются `students_school_username_key` и `teachers_school_username_key`
+  // (уникальность в пределах школы). Из-за этого дубль логина проходил мимо
+  // всех веток и показывался сырым английским текстом Postgres.
+  if (/duplicate key.*(students|teachers)_school_username_key/i.test(raw)
+    || /duplicate key.*(students|teachers)_username_key/i.test(raw)) {
+    return t.usernameTaken;
+  }
+  // Логин занят на уровне учётных записей: адрес auth.users уникален
+  // глобально, поэтому один и тот же логин в двух школах упирается сюда
+  // раньше, чем в ограничение таблицы. Снятие этого предела — Z.2.10.
+  if (/already.*registered/i.test(raw) || /email_exists/i.test(raw)
+    || /duplicate key.*users_email/i.test(raw)) {
     return t.usernameTaken;
   }
   if (/duplicate key.*parents_phone_key/i.test(raw)) {
@@ -56,6 +69,18 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   }
   if (/duplicate key.*schools_code_key/i.test(raw)) {
     return t.schoolCodeTaken;
+  }
+  if (/duplicate key.*school_subjects_name_unique/i.test(raw)) {
+    return t.subjectNameTaken;
+  }
+  if (/duplicate key.*subjects_name_group_id_key/i.test(raw)) {
+    return t.assignmentExists;
+  }
+  if (raw === "BAD_PHONE" || /Некорректный номер телефона/.test(raw)) {
+    return t.phoneInvalid;
+  }
+  if (raw === "GROUP_NAME_TAKEN") {
+    return t.groupNameTaken;
   }
   if (/violates foreign key constraint/i.test(raw)) {
     return t.foreignKeyBlocked;

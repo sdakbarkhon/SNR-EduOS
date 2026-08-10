@@ -12,6 +12,7 @@ import { Pencil, Trash2, Plus, X } from "lucide-react";
 import { getDictionary, getSubjectKeyByLabel, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { useSubmitGuard } from "@/lib/use-submit-guard";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
 
 type Teacher = { id: string; full_name: string };
@@ -195,6 +196,8 @@ export function GroupsView({
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Z.2.9 — второй клик до перерисовки больше не создаёт вторую запись.
+  const guard = useSubmitGuard();
 
   function flash(msg: string) {
     setFlashMsg(msg);
@@ -292,7 +295,7 @@ export function GroupsView({
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
-              onSubmit={(fd) => startTransition(async () => {
+              onSubmit={(fd) => guard(() => startTransition(async () => {
                 try {
                   await actionCreateGroup(fd);
                   flash(t.groupCreatedMsg.replace("{name}", String(fd.get("name"))));
@@ -300,7 +303,7 @@ export function GroupsView({
                 } catch (e) {
                   flash(humanizeAdminError(e, locale as Locale));
                 }
-              })}
+              }))}
               submitLabel={t.createBtn}
             />
           </ModalCard>
