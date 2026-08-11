@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSubjectKeyByLabel, normalizeUzPhone, parentAuthEmail } from "@snr/core";
-import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

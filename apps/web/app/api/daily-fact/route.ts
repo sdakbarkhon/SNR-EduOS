@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/lib/ai/gemini-client";
-import { getDemoNow } from "@/lib/demo-date";
 
+/**
+ * «Сегодня» по Ташкенту, НАСТОЯЩИЕ часы. Z.3, заход 4 — решение заказчика.
+ *
+ * Факт дня ОБЩИЙ на все школы: маршрут не имеет ни сессии, ни Bearer (`GET()`
+ * без авторизации вовсе), а кеш `daily_facts` устроен по одной колонке
+ * `fact_date`. Сделать факт школьным — это не смена источника времени, а
+ * ключ кеша со школой плюс авторизация на маршруте, то есть миграция ради
+ * украшения. Решено не делать.
+ *
+ * Расхождения с замороженным демо-днём на экране не видно: карточка «Факт
+ * дня» рисует только текст и кнопку, даты рядом с ним нет (проверено в
+ * DashboardView).
+ */
 function getTashkentDate(): string {
-  return getDemoNow().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" });
 }
 
 // Промт 6.2.1: реальная причина 502 — не сам факт отказа AI-вызова (тот уже
