@@ -3557,7 +3557,22 @@ export const getStudentQuizAttempt = async (
   return (data ?? null) as QuizAttempt | null;
 };
 
-/** Создаёт (или возвращает существующую) попытку прохождения. */
+/**
+ * Создаёт (или возвращает существующую) попытку прохождения.
+ *
+ * 10.08.2026 — ГОНКА. Проверка «уже есть?» и вставка — два отдельных запроса,
+ * между ними окно. Экран квиза зовёт эту функцию ДВАЖДЫ: при монтировании и
+ * когда этап становится активным (QiaQuizModal, KahootStudentModal). Оба
+ * вызова успевали увидеть «попытки нет», оба вставляли, и второй упирался в
+ * `quiz_attempts_stage_id_student_id_key` UNIQUE (stage_id, student_id) —
+ * в консоли это два подряд POST quiz_attempts → 409, а исключение ломало
+ * экран ученику прямо во время урока.
+ *
+ * Ограничение — правильное и остаётся: одна попытка на ученика и этап.
+ * Чиним обработку: проигравший гонку перечитывает и возвращает ту попытку,
+ * которую создал победитель. Предварительная проверка оставлена — она
+ * снимает подавляющее большинство вставок, а не только гонку.
+ */
 export const startQuizAttempt = async (
   db: Db, stageId: string, studentId: string, totalQuestions: number,
 ): Promise<QuizAttempt> => {
@@ -3567,8 +3582,15 @@ export const startQuizAttempt = async (
   const { data, error } = await (db as any).from("quiz_attempts").insert({
     stage_id: stageId, student_id: studentId, total_questions: totalQuestions,
   }).select("*").single();
-  if (error) throw error;
-  return data as QuizAttempt;
+  if (!error) return data as QuizAttempt;
+
+  // 23505 — unique_violation: параллельный вызов успел раньше. Это не сбой,
+  // это ровно тот случай, ради которого ограничение и заведено.
+  if ((error as { code?: string })?.code === "23505") {
+    const raced = await getStudentQuizAttempt(db, stageId, studentId);
+    if (raced) return raced;
+  }
+  throw error;
 };
 
 /** Сохраняет выбранный вариант (мгновенно, чтобы не потерять при обрыве связи). */

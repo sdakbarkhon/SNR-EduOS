@@ -23,6 +23,13 @@ import { EmojiPicker } from "./EmojiPicker";
 
 const POLL_INTERVAL_MS = 5000;
 
+/** Префикс временного идентификатора своего сообщения, показанного до ответа
+ *  сервера. Такой идентификатор не uuid и в базу уходить не должен — см.
+ *  markThreadRead в packages/core. Держим одной константой: раньше префикс
+ *  был вписан в строку при отправке, и место, читавшее «последнее
+ *  сообщение», о нём не знало. */
+const OPTIMISTIC_ID_PREFIX = "optimistic-";
+
 function threadIcon(kind: string) {
   return kind === "group" ? Users : MessageCircle;
 }
@@ -101,13 +108,28 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   }, [activeThreadId]);
 
   // Отмечаем тред прочитанным при открытии/при появлении новых сообщений.
+  //
+  // 10.08.2026 — берём последнее СОХРАНЁННОЕ сообщение, а не просто последнее.
+  // Своё только что отправленное показывается сразу, с временным
+  // идентификатором `optimistic-...` (см. ниже), и он уходил в колонку типа
+  // uuid: Postgres отвечал 22P02, PostgREST — 400. Заодно чинится вторая
+  // половина беды: список зависит от messages.length, а замена
+  // оптимистичного сообщения сохранённым длину не меняет — то есть отметка
+  // по своему сообщению не повторялась и тред оставался «непрочитанным».
+  // Теперь ключ эффекта — идентификатор последнего сохранённого сообщения.
+  const lastPersistedId = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const id = messages[i]?.id;
+      if (id && !id.startsWith(OPTIMISTIC_ID_PREFIX)) return id;
+    }
+    return null;
+  })();
+
   useEffect(() => {
-    if (!activeThreadId || messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    if (!last) return;
-    markThreadRead(db, activeThreadId, last.id).then(() => refreshThreads()).catch(() => null);
+    if (!activeThreadId || !lastPersistedId) return;
+    markThreadRead(db, activeThreadId, lastPersistedId).then(() => refreshThreads()).catch(() => null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeThreadId, messages.length]);
+  }, [activeThreadId, lastPersistedId]);
 
   useRealtimeChannel(
     activeThreadId ? `chat-thread-${activeThreadId}` : null,
@@ -178,7 +200,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
     setSending(true);
     setSendError(false);
     setComposerText("");
-    const optimisticId = `optimistic-${Math.random().toString(36).slice(2)}`;
+    const optimisticId = `${OPTIMISTIC_ID_PREFIX}${Math.random().toString(36).slice(2)}`;
     const optimistic: ChatMessageRow = {
       id: optimisticId,
       thread_id: activeThreadId,

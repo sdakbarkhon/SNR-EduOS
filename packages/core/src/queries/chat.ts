@@ -195,8 +195,28 @@ export async function sendChatMessage(db: Db, threadId: string, body: string): P
   return data;
 }
 
+/** Идентификатор реального сообщения. Оптимистичные («optimistic-xxxx»)
+ *  живут только в памяти экрана и в базу попадать не должны. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Отметить тред прочитанным по последнему сообщению.
+ *
+ * 10.08.2026 — ПОЧЕМУ ЗДЕСЬ ПРОВЕРКА ФОРМАТА. Экран чата показывает своё
+ * только что отправленное сообщение сразу, не дожидаясь сервера, и даёт ему
+ * временный идентификатор `optimistic-<случайное>` (MessagesView). Отметка
+ * прочтения срабатывала на появление этого сообщения и отправляла временный
+ * идентификатор в колонку `last_read_message_id uuid` — Postgres отвечал
+ * 22P02 «invalid input syntax for type uuid», а PostgREST превращал это в
+ * 400 на `chat_read_state?on_conflict=thread_id,user_id`. Ограничение и
+ * схема тут ни при чём: первичный ключ (thread_id, user_id) на месте, и тот
+ * же ON CONFLICT в чистом SQL отрабатывает — проверено прогоном с откатом.
+ *
+ * Вызывающий экран тоже научен не брать оптимистичное сообщение, но проверка
+ * стоит и здесь: функцию зовут из трёх мест, включая родительский чат.
+ */
 export async function markThreadRead(db: Db, threadId: string, lastMessageId: string | null): Promise<void> {
-  if (!lastMessageId) return;
+  if (!lastMessageId || !UUID_RE.test(lastMessageId)) return;
   const sb = db as any;
   const { data: { user } } = await db.auth.getUser();
   if (!user) return;

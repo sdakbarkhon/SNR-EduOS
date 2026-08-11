@@ -10,7 +10,20 @@ import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
 const MAX_SLIDE_IMAGES = 6;
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// 10.08.2026 — было 60, маршрут отваливался в 504 на проде.
+//
+// Столько он честно и работает: ниже цикл делает ДО ТРЁХ попыток
+// generateJSON (модель отдаёт большой план урока, и при негодном ответе
+// попытка повторяется), а следом генерируются картинки слайдов — до
+// MAX_SLIDE_IMAGES штук. Три обращения к модели плюс шесть картинок в
+// шестьдесят секунд не укладываются, и Vercel обрывал запрос.
+//
+// 300 — не «с запасом побольше», а тот же предел, что уже стоит у всех
+// тяжёлых маршрутов проекта: stage-media/generate, rag/process-stage,
+// teacher/homework/ai-review/run, curriculum-plans/[id]/background-parse.
+// Он доступен: Fluid Compute у проекта включён (resourceConfig.fluid=true,
+// подтверждено ответом Vercel API 10.08).
+export const maxDuration = 300;
 
 const ALLOWED_CONTENT = [
   "presentation", "code", "quiz_qia", "quiz_kahoot",
