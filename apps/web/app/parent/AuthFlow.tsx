@@ -57,6 +57,10 @@ export function AuthFlow() {
       }
       setCode("");
       setStep("code");
+      // 11.08.2026 — SMS могла не уйти (провайдер отверг отправку). Код при
+      // этом создан и лежит в карточке админа, поэтому родителя не бросаем в
+      // пустой экран ожидания, а говорим, к кому идти.
+      if (!result.delivered) setError(d.codeSendFailed);
     });
   }
 
@@ -65,7 +69,8 @@ export function AuthFlow() {
     setError(null);
     startTransition(async () => {
       const result = await requestParentCode(phone);
-      if (!result.ok) setError(result.error === "too_soon" ? d.codeTooSoon : d.loginFailed);
+      if (!result.ok) { setError(result.error === "too_soon" ? d.codeTooSoon : d.loginFailed); return; }
+      if (!result.delivered) setError(d.codeSendFailed);
     });
   }
 

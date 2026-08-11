@@ -38,19 +38,157 @@ function hashCode(code: string, phone: string): string {
   return createHash("sha256").update(`${code}:${phone}`).digest("hex");
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// ДОСТАВКА SMS — Eskiz.uz. 11.08.2026.
+//
+// ЕДИНСТВЕННАЯ точка выхода наружу — sendSms() ниже. Всё, что выше и ниже
+// неё (срок жизни кода, лимит попыток, одноразовость, защита от частых
+// запросов), провайдера не знает и при смене провайдера не меняется.
+//
+// ТЕСТОВЫЙ СТАТУС АККАУНТА. Пока аккаунт у Eskiz «Тестовый», он принимает
+// ТОЛЬКО три фразы, буква в букву, — любой другой текст отвергается. Поэтому
+// текст выбирается переключателем ESKIZ_TEST_MODE, а не правкой кода:
+//
+//   ESKIZ_TEST_MODE=true  (или переменная не задана) → уходит «Это тест от Eskiz»
+//   ESKIZ_TEST_MODE=false                            → уходит настоящий текст с кодом
+//
+// По умолчанию — тестовый режим. Это осознанно: незаданная переменная не
+// должна приводить к отправке текста, который провайдер отвергнет. В день
+// перевода аккаунта в «Активный» заказчик ставит false в настройках Vercel —
+// и ничего больше.
+//
+// ЗАПИСЬ КОДА В ЛОГ И В code_plain ОСТАВЛЕНА НАМЕРЕННО: пока статус тестовый,
+// родителю приходит не код, а разрешённая фраза, и продиктовать код из
+// карточки админа — единственный рабочий путь. Снимается отдельной задачей
+// после перевода в «Активный».
+
+const ESKIZ_BASE = "https://notify.eskiz.uz/api";
+/** Разрешённые в тестовом статусе фразы. Русская — наша по умолчанию. */
+const ESKIZ_TEST_TEXT = "Это тест от Eskiz";
+/** Латиница и коротко: одна SMS — 160 символов, кириллица резалась бы на 70. */
+const buildCodeText = (code: string) => `SNR EduOS. Kirish kodi: ${code}. Hech kimga aytmang.`;
+
+/** Токен живёт 30 дней. Держим в памяти процесса и обновляем заранее, чтобы
+ *  не ходить за ним на каждую отправку. */
+let tokenCache: { token: string; expiresAt: number } | null = null;
+const TOKEN_TTL_MS = 25 * 24 * 60 * 60 * 1000;   // 25 дней из 30 — с запасом
+
+export type SmsFailure =
+  | "not_configured"   // нет учётных данных в окружении
+  | "auth_failed"      // почта/пароль не подошли
+  | "no_balance"       // на счету нет денег
+  | "text_rejected"    // текст не из разрешённых (тестовый статус)
+  | "provider_error"   // провайдер ответил ошибкой
+  | "unreachable";     // сеть/таймаут
+
+function eskizCreds(): { email: string; password: string; from: string } | null {
+  const email = process.env.ESKIZ_EMAIL;
+  const password = process.env.ESKIZ_PASSWORD;
+  if (!email || !password) return null;
+  return { email, password, from: process.env.ESKIZ_FROM || "4546" };
+}
+
+/** true, если тестовый режим (по умолчанию — да, см. шапку). */
+export function eskizTestMode(): boolean {
+  return (process.env.ESKIZ_TEST_MODE ?? "true").toLowerCase() !== "false";
+}
+
+async function eskizLogin(force = false): Promise<string | null> {
+  if (!force && tokenCache && tokenCache.expiresAt > Date.now()) return tokenCache.token;
+  const creds = eskizCreds();
+  if (!creds) return null;
+
+  const res = await fetch(`${ESKIZ_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ email: creds.email, password: creds.password }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = (await res.json().catch(() => null)) as { data?: { token?: string }; message?: string } | null;
+  if (!res.ok || !body?.data?.token) {
+    // Учётные данные в лог НЕ попадают — только код ответа и текст ошибки.
+    console.error(`[sms:eskiz] вход не удался: HTTP ${res.status} ${body?.message ?? ""}`);
+    tokenCache = null;
+    return null;
+  }
+  tokenCache = { token: body.data.token, expiresAt: Date.now() + TOKEN_TTL_MS };
+  return tokenCache.token;
+}
+
+/** Разбор отказа провайдера в один из известных случаев — чтобы в логе было
+ *  видно, ЧТО именно случилось, а не «не отправилось». */
+function classify(status: number, message: string): SmsFailure {
+  const m = message.toLowerCase();
+  if (status === 401 || status === 403) return "auth_failed";
+  if (m.includes("balance") || m.includes("баланс") || m.includes("insufficient")) return "no_balance";
+  if (m.includes("не найден") || m.includes("not found") || m.includes("шаблон")
+      || m.includes("template") || m.includes("text") || status === 400) return "text_rejected";
+  return "provider_error";
+}
+
 /**
- * ЕДИНСТВЕННОЕ место, где SMS уходит наружу. Сейчас — заглушка.
+ * ЕДИНСТВЕННОЕ место, где SMS уходит наружу.
  *
- * Провайдера нет, поэтому код попадает в лог сервера и в `code_plain`, чтобы
- * админ мог продиктовать его родителю из карточки. Это осознанный временный
- * компромисс, снимаемый вместе с заглушкой.
- *
- * Подключение Eskiz.uz: заменить тело на HTTP-запрос к их API и вернуть
- * `{ delivered: true }`. Вызывающий код от этого не меняется.
+ * @param phone номер в нашем каноническом виде `+998XXXXXXXXX` (именно так он
+ *   лежит в `parents.phone` — проверено запросом, там 13 символов с плюсом).
+ *   Eskiz ждёт двенадцать цифр без плюса, поэтому здесь и только здесь номер
+ *   приводится к их формату.
+ * @param text настоящий текст с кодом. В тестовом режиме НЕ отправляется:
+ *   вместо него уходит разрешённая фраза, а этот текст остаётся в логе.
  */
-export async function sendSms(phone: string, text: string): Promise<{ delivered: boolean }> {
-  console.log(`[sms:stub] → ${phone}: ${text}`);
-  return { delivered: false };
+export async function sendSms(phone: string, text: string): Promise<{ delivered: boolean; failure?: SmsFailure }> {
+  const digits = phone.replace(/\D/g, "");
+  const testMode = eskizTestMode();
+  const message = testMode ? ESKIZ_TEST_TEXT : text;
+
+  // Страховка тестового статуса: код по-прежнему виден в логе сервера и в
+  // code_plain, чтобы админ мог его продиктовать.
+  console.log(`[sms] → ${phone} (${testMode ? "тестовый режим" : "боевой"}): ${text}`);
+
+  const creds = eskizCreds();
+  if (!creds) {
+    console.error("[sms:eskiz] не настроен: нет ESKIZ_EMAIL/ESKIZ_PASSWORD");
+    return { delivered: false, failure: "not_configured" };
+  }
+
+  try {
+    let token = await eskizLogin();
+    if (!token) return { delivered: false, failure: "auth_failed" };
+
+    const send = async (t: string) =>
+      fetch(`${ESKIZ_BASE}/message/sms/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ mobile_phone: digits, message, from: creds.from }),
+        signal: AbortSignal.timeout(20000),
+      });
+
+    let res = await send(token);
+    // Токен мог протухнуть раньше срока (смена пароля, отзыв) — один раз
+    // логинимся заново и повторяем. Бесконечного цикла нет: повтор ровно один.
+    if (res.status === 401) {
+      token = await eskizLogin(true);
+      if (!token) return { delivered: false, failure: "auth_failed" };
+      res = await send(token);
+    }
+
+    const body = (await res.json().catch(() => null)) as
+      | { id?: string | number; status?: string; message?: string }
+      | null;
+
+    if (!res.ok) {
+      const failure = classify(res.status, String(body?.message ?? ""));
+      console.error(`[sms:eskiz] отказ (${failure}): HTTP ${res.status} ${JSON.stringify(body)}`);
+      return { delivered: false, failure };
+    }
+
+    console.log(`[sms:eskiz] принято: id=${body?.id ?? "—"} status=${body?.status ?? "—"}`);
+    return { delivered: true };
+  } catch (e) {
+    const name = (e as Error)?.name === "TimeoutError" ? "таймаут" : (e as Error)?.message ?? String(e);
+    console.error(`[sms:eskiz] сервис недоступен: ${name}`);
+    return { delivered: false, failure: "unreachable" };
+  }
 }
 
 export type IssueCodeResult =
@@ -99,7 +237,7 @@ export async function issueParentCode(rawPhone: string): Promise<IssueCodeResult
   });
   if (insErr) return { ok: false, error: "failed" };
 
-  const { delivered } = await sendSms(phone, `SNR EduOS: код входа ${code}`);
+  const { delivered } = await sendSms(phone, buildCodeText(code));
   return { ok: true, expiresAt, delivered };
 }
 

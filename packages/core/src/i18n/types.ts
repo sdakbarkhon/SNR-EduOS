@@ -2995,6 +2995,9 @@ export interface Dictionary {
     codeTooSoon: string;
     resendCode: string;
       loginFailed: string;
+      /** 11.08.2026 — SMS не ушла: провайдер отверг отправку. Код при этом
+       *  создан и виден администратору, поэтому текст ведёт к нему. */
+      codeSendFailed: string;
       a4Sub: string;
       a4SecurityTitle: string;
       a4SecuritySub: string;

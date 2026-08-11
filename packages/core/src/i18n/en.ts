@@ -2880,6 +2880,8 @@ export const en: Dictionary = {
       codeTooSoon: "A code was already sent. Try again in a minute",
 
       loginFailed: "Couldn't sign in. Please try again",
+
+      codeSendFailed: "Couldn't send the SMS. Please contact the school administrator",
       a4Sub: "Pick a child's profile\nto get started",
       a4SecurityTitle: "Your data is protected",
       a4SecuritySub: "We use modern encryption to protect information about your family.",

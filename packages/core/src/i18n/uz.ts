@@ -2881,6 +2881,8 @@ export const uz: Dictionary = {
       codeTooSoon: "Kod allaqachon yuborilgan. Bir daqiqadan so'ng qayta urinib ko'ring",
 
       loginFailed: "Kirib bo'lmadi. Qayta urinib ko'ring",
+
+      codeSendFailed: "SMS yuborib bo'lmadi. Maktab administratoriga murojaat qiling",
       a4Sub: "Ishni boshlash uchun\nfarzandingiz profilini tanlang",
       a4SecurityTitle: "Ma'lumotlaringiz himoyalangan",
       a4SecuritySub: "Oilangiz ma'lumotlarini himoya qilish uchun zamonaviy shifrlash texnologiyalaridan foydalanamiz.",
