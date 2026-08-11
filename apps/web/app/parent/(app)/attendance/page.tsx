@@ -35,7 +35,7 @@ const STATUS_LABEL: Record<AttendanceStatus, string> = {
 export default async function ParentAttendancePage() {
   const [child, attendance] = await Promise.all([getSelectedChild(), childAttendanceRecords()]);
 
-  const today = parentToday();
+  const today = await parentToday();
   const yesterday = addDaysKey(today, -1);
 
   const statusByDate: Record<string, AttendanceStatus> = {};

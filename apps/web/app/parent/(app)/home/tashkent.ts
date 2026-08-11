@@ -1,5 +1,4 @@
 import { APP_TIME_ZONE } from "@snr/core";
-import { getDemoNow } from "@/lib/demo-date";
 
 /** ISO-таймстамп → YYYY-MM-DD по Ташкенту. Тот же приём, что уже
  *  используется веб-родителем (dashboard/page.tsx, старый) и мобилкой
@@ -17,8 +16,14 @@ export function tashkentDateKey(iso: string): string {
   return `${y}-${m}-${d}`;
 }
 
-export function tashkentToday(): string {
-  return tashkentDateKey(getDemoNow().toISOString());
+/**
+ * Z.3, заход 2 — «сейчас» приходит параметром. Файл чисто вычислительный,
+ * клиента базы не видит, а школа известна только вызывающей странице.
+ * Вызывающих у этой функции сейчас нет; сигнатура приведена к остальным,
+ * чтобы при первом же использовании школа не потерялась.
+ */
+export function tashkentToday(nowMs: number): string {
+  return tashkentDateKey(new Date(nowMs).toISOString());
 }
 
 /** ISO-таймстамп → «10:20» по Ташкенту. */

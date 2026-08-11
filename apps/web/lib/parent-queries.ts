@@ -50,7 +50,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
 import type { ParentChild } from "@/lib/parent-child";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { getMySchoolNowMs } from "@/lib/school-time-server";
 
 /**
  * Слой данных для серверных компонентов /parent — тот же приём, что в
@@ -80,22 +80,37 @@ import { getDemoNowMs } from "@/lib/demo-date";
 // Демо-«сегодня» заморожено (см. lib/demo-date.ts). Те же вычисления, что в
 // app/(app)/lessons/page.tsx — Asia/Tashkent = UTC+5 без переходов на летнее.
 
-/** «Сегодня» демо-сессии в Ташкенте, YYYY-MM-DD. */
-export function parentToday(): string {
-  return new Date(getDemoNowMs() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+/** «Сейчас» школы родителя в миллисекундах. Z.3, заход 2. */
+export async function parentNowMs(): Promise<number> {
+  const db = await createClient();
+  return getMySchoolNowMs(db);
 }
 
-/** Понедельник недели, в которую попадает демо-«сегодня», YYYY-MM-DD. */
-export function parentWeekMonday(): string {
-  const base = new Date(getDemoNowMs() + 5 * 60 * 60 * 1000);
+/**
+ * «Сегодня» в Ташкенте, YYYY-MM-DD.
+ *
+ * Z.3, заход 2 — стала асинхронной: время берётся у школы родителя, а её
+ * приходится спрашивать у базы. Отсюда `await` у десяти вызывающих страниц.
+ * Поход в базу при этом один на запрос: и `createClient()`, и резолвер школы
+ * обёрнуты в React `cache()`.
+ */
+export async function parentToday(): Promise<string> {
+  const db = await createClient();
+  return new Date((await getMySchoolNowMs(db)) + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** Понедельник недели, в которую попадает «сегодня», YYYY-MM-DD. */
+export async function parentWeekMonday(): Promise<string> {
+  const db = await createClient();
+  const base = new Date((await getMySchoolNowMs(db)) + 5 * 60 * 60 * 1000);
   const dow = base.getUTCDay(); // 0 = воскресенье
   base.setUTCDate(base.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
   return base.toISOString().slice(0, 10);
 }
 
-/** Текущий месяц демо-сессии, YYYY-MM. */
-export function parentMonth(): string {
-  return parentToday().slice(0, 7);
+/** Текущий месяц, YYYY-MM. */
+export async function parentMonth(): Promise<string> {
+  return (await parentToday()).slice(0, 7);
 }
 
 // ── Выбранный ребёнок ────────────────────────────────────────────────────────
@@ -171,7 +186,7 @@ const getCachedScheduleWeek = unstable_cache(
 export const childScheduleWeek = cache(async (weekStart?: string): Promise<LessonWithSubject[]> => {
   const childId = await getSelectedChildId();
   if (!childId) return [];
-  return getCachedScheduleWeek(childId, weekStart ?? parentWeekMonday());
+  return getCachedScheduleWeek(childId, weekStart ?? (await parentWeekMonday()));
 });
 
 /** Уроки выбранного ребёнка за конкретный день (по умолчанию демо-«сегодня»). */
@@ -179,7 +194,7 @@ export const childScheduleDay = cache(async (dateStr?: string): Promise<LessonWi
   const childId = await getSelectedChildId();
   if (!childId) return [];
   const db = await createClient();
-  return getStudentLessonsForDate(db, dateStr ?? parentToday(), childId);
+  return getStudentLessonsForDate(db, dateStr ?? (await parentToday()), childId);
 });
 
 /** Дата ближайшего учебного дня ПОСЛЕ afterDate — для «Выходной, следующий
@@ -188,7 +203,7 @@ export const childNextLessonDate = cache(async (afterDate?: string): Promise<str
   const childId = await getSelectedChildId();
   if (!childId) return null;
   const db = await createClient();
-  return getNextStudentLessonDate(db, afterDate ?? parentToday(), childId);
+  return getNextStudentLessonDate(db, afterDate ?? (await parentToday()), childId);
 });
 
 /** Детали одного урока: посещаемость и сдача ДЗ — именно этого ребёнка. */
@@ -279,7 +294,7 @@ const EMPTY_ATTENDANCE_STATS = { total: 0, present: 0, excused: 0, unexcused: 0,
 /** Посещаемость за месяц (YYYY-MM, по умолчанию текущий демо-месяц) в форме,
  *  удобной для календарной сетки. */
 export const childAttendance = cache(async (month?: string): Promise<ChildAttendanceDetail> => {
-  const resolvedMonth = month ?? parentMonth();
+  const resolvedMonth = month ?? (await parentMonth());
   const childId = await getSelectedChildId();
   if (!childId) return { month: resolvedMonth, stats: { ...EMPTY_ATTENDANCE_STATS }, days: [] };
   const db = await createClient();
@@ -313,7 +328,7 @@ export const childDailyStatus = cache(async (dateStr?: string): Promise<ChildDai
   const childId = await getSelectedChildId();
   if (!childId) return { ...EMPTY_DAILY_STATUS, lessons: [], gradesToday: [] };
   const db = await createClient();
-  return getChildDailyStatus(db, childId, dateStr ?? parentToday());
+  return getChildDailyStatus(db, childId, dateStr ?? (await parentToday()));
 });
 
 /** Короткая сводка дня для главной: во сколько пришёл, уроков, следующий урок. */
@@ -321,7 +336,7 @@ export const childDailyStats = cache(async (dateStr?: string): Promise<ChildDail
   const childId = await getSelectedChildId();
   if (!childId) return { arrivalTime: null, lessonsTotal: 0, lessonsAttended: 0, nextLesson: null };
   const db = await createClient();
-  return getChildDailyStats(db, childId, dateStr ?? parentToday());
+  return getChildDailyStats(db, childId, dateStr ?? (await parentToday()));
 });
 
 // ── Профиль ребёнка ──────────────────────────────────────────────────────────

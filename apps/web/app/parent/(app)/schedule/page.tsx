@@ -30,8 +30,8 @@ import {
 export default async function ParentSchedulePage() {
   const [child, lessons] = await Promise.all([getSelectedChild(), childScheduleWeek()]);
 
-  const weekStart = parentWeekMonday();
-  const today = parentToday();
+  const weekStart = await parentWeekMonday();
+  const today = await parentToday();
 
   const days: ScheduleDay[] = WEEKDAY_SHORT.map((label, i) => {
     const dateKey = addDaysKey(weekStart, i);

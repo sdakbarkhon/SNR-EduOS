@@ -9,7 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { restoreDemoLessonShape } from "@/app/api/cron/_lib/restore-demo-shape";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 import { registerSession } from "@/lib/register-session";
-import { getDemoNow } from "@/lib/demo-date";
+import { schoolNow } from "@/lib/school-time";
+import { getMySchoolFrozenDate } from "@/lib/school-time-server";
 
 // P2 (пачка 2) — переработка демо-режима. demoLogin — «серверный wrapper»
 // для DemoRoleModal: RPC claim_demo_slot → signInWithPassword → cookies.
@@ -359,6 +360,13 @@ export async function signOut(dest: string = "/login") {
   const cookieStore = await cookies();
   const demoToken = cookieStore.get(DEMO_SESSION_COOKIE)?.value ?? null;
 
+  // Z.3, заход 2 — школу узнаём ЗДЕСЬ, пока сессия жива, и уносим значение в
+  // замыкание. Внутри after() это уже невозможно: блок выполняется после
+  // ответа, к тому моменту ниже отработал signOut, и current_school_id()
+  // (он стоит на auth.uid()) вернул бы NULL. Служебный клиент внутри after()
+  // тоже не помог бы — под service-role auth.uid() нет по определению.
+  const frozenDate = userId ? await getMySchoolFrozenDate(supabase) : null;
+
   // Release lease + штамп last_activity — best-effort (не блокируем редирект).
   after(async () => {
     const admin = createAdminClient();
@@ -369,7 +377,7 @@ export async function signOut(dest: string = "/login") {
     if (userId) {
       await admin
         .from("user_sessions")
-        .update({ last_activity: getDemoNow().toISOString() })
+        .update({ last_activity: schoolNow(frozenDate).toISOString() })
         .eq("user_id", userId);
     }
   });

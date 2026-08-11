@@ -6,18 +6,21 @@ import {
 import { getMyStudent } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { getMySchoolNowMs } from "@/lib/school-time-server";
 import { LessonsView } from "./LessonsView";
 
 // ── Tashkent date helpers (UTC+5) ─────────────────────────────────────────────
 
-function getTashkentToday(): string {
-  const tashkentMs = getDemoNowMs() + 5 * 60 * 60 * 1000;
+// Z.3, заход 2 — «сейчас» приходит параметром, а не берётся глобально: эти
+// две функции лежат на уровне модуля и клиента базы не видят, а школа
+// известна только внутри страницы.
+function getTashkentToday(nowMs: number): string {
+  const tashkentMs = nowMs + 5 * 60 * 60 * 1000;
   return new Date(tashkentMs).toISOString().slice(0, 10);
 }
 
-function getTashkentWeekMonday(): string {
-  const base = new Date(getDemoNowMs() + 5 * 60 * 60 * 1000);
+function getTashkentWeekMonday(nowMs: number): string {
+  const base = new Date(nowMs + 5 * 60 * 60 * 1000);
   const dow = base.getUTCDay(); // 0=Sun
   const offset = dow === 0 ? -6 : 1 - dow;
   base.setUTCDate(base.getUTCDate() + offset);
@@ -34,8 +37,9 @@ export default async function LessonsPage() {
   // точки здесь достаточно для расписания.
   try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
-  const today = getTashkentToday();
-  const weekStart = getTashkentWeekMonday();
+  const nowMs = await getMySchoolNowMs(db);
+  const today = getTashkentToday(nowMs);
+  const weekStart = getTashkentWeekMonday(nowMs);
 
   const [student, todayRes, weekRes] = await Promise.all([
     getMyStudent(db),

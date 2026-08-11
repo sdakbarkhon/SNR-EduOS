@@ -9,11 +9,12 @@ import {
   childNextLessonDate,
   childScheduleDay,
   getSelectedChild,
+  parentNowMs,
   parentToday,
   parentUnreadCount,
 } from "@/lib/parent-queries";
 import { findNextLesson } from "@snr/core";
-import { getDemoNowMs } from "@/lib/demo-date";
+
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
 import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
 import { billsCountLabel } from "../payments/mock-data";
@@ -149,8 +150,8 @@ function genitiveName(name: string): string {
 /** Часть суток по Ташкенту — префикс приветствия. UTC+5 без переходов на
  *  летнее время, поэтому сдвиг миллисекундами точен (тот же приём, что в
  *  lib/parent-queries.ts). */
-function greetingPrefix(): string {
-  const hour = new Date(getDemoNowMs() + 5 * 60 * 60 * 1000).getUTCHours();
+function greetingPrefix(nowMs: number): string {
+  const hour = new Date(nowMs + 5 * 60 * 60 * 1000).getUTCHours();
   if (hour < 5) return "Доброй ночи";
   if (hour < 12) return "Доброе утро";
   if (hour < 18) return "Добрый день";
@@ -162,6 +163,9 @@ function greetingPrefix(): string {
 export default async function ParentHomePage() {
   const ctx = await getParentContext();
   const child = await getSelectedChild();
+
+  // Z.3, заход 2 — «сейчас» школы родителя: приветствие по времени суток.
+  const nowMs = await parentNowMs();
 
   const parentFullName = ctx?.parentName ?? "";
   const parentFirstName = givenNameOf(parentFullName);
@@ -185,7 +189,7 @@ export default async function ParentHomePage() {
       child: null,
       childLoadError,
       greeting: {
-        title: `${greetingPrefix()}${parentFirstName ? `, ${parentFirstName}` : ""}!`,
+        title: `${greetingPrefix(nowMs)}${parentFirstName ? `, ${parentFirstName}` : ""}!`,
         subtitle: childLoadError
           ? "Не удалось загрузить данные — попробуйте обновить страницу"
           : "Профиль ученика ещё не привязан к вашему аккаунту",
@@ -201,7 +205,7 @@ export default async function ParentHomePage() {
     return <HomeView data={data} />;
   }
 
-  const today = parentToday();
+  const today = await parentToday();
   const [stats, dayStatus, homework, gradesSummary, bellCount] = await Promise.all([
     childDailyStats(today),
     childDailyStatus(today),
@@ -397,7 +401,7 @@ export default async function ParentHomePage() {
       gradient: [gradient[0], gradient[1]],
     },
     greeting: {
-      title: `${greetingPrefix()}${parentFirstName ? `, ${parentFirstName}` : ""}!`,
+      title: `${greetingPrefix(nowMs)}${parentFirstName ? `, ${parentFirstName}` : ""}!`,
       subtitle: `Вот что происходит у ${genitiveName(childGiven)} сегодня`,
     },
     statusChip,

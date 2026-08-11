@@ -4,7 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { buildParentInsightPrompt, type InsightDataContext } from "@/lib/ai/prompts";
 import { PARENT_INSIGHT_SCHEMA } from "@/lib/ai/schemas";
-import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
+import { schoolNow } from "@/lib/school-time";
+import { getMySchoolNowMs } from "@/lib/school-time-server";
 
 // Промт МОБ-7, ЧАСТЬ 2 — v8 "EduOS Assistant Insight". Вызывается из
 // apps/mobile-parent/src/screens/InsightScreen.tsx — мобильный fetch не
@@ -27,8 +28,10 @@ type AllowedLocale = (typeof ALLOWED_LOCALES)[number];
 
 type InsightPayload = { summary: string; insights: Array<{ title: string; body: string; category: string; sentiment: string }> };
 
-function daysAgoIso(days: number): string {
-  return new Date(getDemoNowMs() - days * 86400000).toISOString();
+// Z.3, заход 2 — «сейчас» приходит параметром: функция лежит на уровне модуля
+// и клиента базы не видит, а школа известна только внутри обработчика.
+function daysAgoIso(days: number, nowMs: number): string {
+  return new Date(nowMs - days * 86400000).toISOString();
 }
 
 export async function POST(req: NextRequest) {
@@ -80,12 +83,17 @@ export async function POST(req: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  if (!force && cached && new Date(cached.generated_at).getTime() >= getDemoNowMs() - CACHE_DAYS * 86400000) {
+  // Z.3, заход 2 — ОБА конца от одной школы: generated_at ниже пишется этим же
+  // временем, и сравнение с ним обязано вестись им же. Рассинхрон дал бы вечно
+  // свежий или вечно протухший кеш.
+  const nowMs = await getMySchoolNowMs(db);
+
+  if (!force && cached && new Date(cached.generated_at).getTime() >= nowMs - CACHE_DAYS * 86400000) {
     return NextResponse.json({ ...(cached.insight_json as InsightPayload), generatedAt: cached.generated_at, cached: true });
   }
 
   // ── 2. Собираем контекст за 30 дней ────────────────────────────────────
-  const since = daysAgoIso(LOOKBACK_DAYS);
+  const since = daysAgoIso(LOOKBACK_DAYS, nowMs);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: attendanceRows } = await (db as any)
@@ -137,7 +145,8 @@ export async function POST(req: NextRequest) {
         .eq("student_id", childId)
         .in("homework_id", homeworkList.map((h) => h.id));
       const submittedByHw = new Map((subRows ?? []).map((s: { homework_id: string; submitted_at: string }) => [s.homework_id, s.submitted_at]));
-      const nowMs = getDemoNowMs();
+      // nowMs — школьное «сейчас», посчитанное выше в этом же обработчике.
+      // Ниже оно сравнивается с due_date из базы: оба конца от одной школы.
       for (const hw of homeworkList) {
         const submittedAt = submittedByHw.get(hw.id) as string | undefined;
         const dueMs = hw.due_date ? new Date(hw.due_date).getTime() : null;
@@ -179,7 +188,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4. Пишем в БД через service_role (RLS не даёт INSERT никому другому) ──
-  const generatedAt = getDemoNow().toISOString();
+  const generatedAt = new Date(nowMs).toISOString();
   try {
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

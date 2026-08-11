@@ -1,11 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { getMySchoolNowMs } from "@/lib/school-time-server";
 import { ParentsView } from "./ParentsView";
 
 export default async function AdminParentsPage() {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
+
+  // Z.3, заход 2 — «истекло ли приглашение» считается от времени школы админа.
+  // Это единственное место в админке, зависящее от даты, и оно же — первый
+  // экран, которым пользуется админ НАСТОЯЩЕЙ школы: под замороженным 29.07
+  // все его приглашения выглядели бы просроченными или, наоборот, вечными.
+  const nowMs = await getMySchoolNowMs(supabase);
 
   const [
     { data: parents, error: parentsError },
@@ -66,7 +72,7 @@ export default async function AdminParentsPage() {
       children: childrenByParent.get(p.id) ?? [],
       childIds: childIdsByParent.get(p.id) ?? [],
       inviteCode: invite?.code ?? null,
-      inviteExpired: invite ? new Date(invite.expires_at).getTime() < getDemoNowMs() : true,
+      inviteExpired: invite ? new Date(invite.expires_at).getTime() < nowMs : true,
     };
   });
 

@@ -29,7 +29,7 @@ import { SERVICE_ICON } from "../services/_service-kit";
 export default async function ParentReviewsPage() {
   const [reviews, child] = await Promise.all([childTeacherReviews(), getSelectedChild()]);
 
-  const today = parentToday();
+  const today = await parentToday();
   const yesterday = previousDay(today);
 
   return (

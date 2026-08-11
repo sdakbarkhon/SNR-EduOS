@@ -4,7 +4,7 @@ import { chat, generateText } from "@/lib/ai/gemini-client";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/auth";
 import { computeEmbedding } from "@/lib/ai/embeddings";
-import { getDemoNow } from "@/lib/demo-date";
+import { getMySchoolNow } from "@/lib/school-time-server";
 
 const RAG_TOP_K = 5;
 // Ниже этого порога совпадение считается нерелевантным — не подмешиваем
@@ -126,7 +126,13 @@ ${rag.contextBlock}`;
 }
 
 export async function getStudyTip(): Promise<{ text: string } | { error: string }> {
-  const today = getDemoNow().toISOString().slice(0, 10);
+  // Z.3, заход 2 — дата в подсказке от времени школы. Дневной лимит ИИ этим
+  // НЕ затрагивается: он считается на стороне базы функцией
+  // get_ai_usage_today() по `now() AT TIME ZONE 'Asia/Tashkent'`, то есть по
+  // настоящим часам Postgres, и смена источника времени в приложении на
+  // счётчики не влияет (проверено чтением определения функции).
+  const supabase = await createClient();
+  const today = (await getMySchoolNow(supabase)).toISOString().slice(0, 10);
   const prompt = `Ты — школьный коуч. Дай один практичный совет по учёбе, концентрации или продуктивности — 1-2 предложения, конкретно и по делу. Только совет, без вводных фраз. Дата: ${today}.\n\nДай совет по учёбе на сегодня.`;
   const { text, error } = await generateText(prompt);
   if (error) return { error };

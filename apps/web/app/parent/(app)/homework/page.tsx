@@ -26,7 +26,7 @@ import { RU, addDaysKey, ruDayMonth, subjectColor, subjectGlyph, tashkentDateKey
 export default async function ParentHomeworkPage() {
   const [child, list] = await Promise.all([getSelectedChild(), childHomework()]);
 
-  const today = parentToday();
+  const today = await parentToday();
   const tomorrow = addDaysKey(today, 1);
 
   const cards: HomeworkCardVM[] = list.map((hw) => {

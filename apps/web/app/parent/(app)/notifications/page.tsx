@@ -23,7 +23,7 @@ const HREF_BY_KIND: Record<string, string> = {
 };
 
 export default async function ParentNotificationsPage() {
-  const today = parentToday();
+  const today = await parentToday();
   const yesterday = previousDay(today);
   const rows = await parentNotifications(50);
 

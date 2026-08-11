@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getDemoNow } from "@/lib/demo-date";
+import { getSchoolFrozenDate, schoolNow } from "@/lib/school-time";
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id: lessonId } = await ctx.params;
@@ -86,9 +86,17 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   //    сюда — тогда UPDATE вернёт 0 строк, и это не ошибка). Триггер
   //    trg_close_other_in_progress_lessons закрывает другие in_progress
   //    уроки той же группы атомарно внутри этого же UPDATE.
+  // Z.3, заход 2 — время старта берётся по школе САМОГО УРОКА, а не по школе
+  // нажавшего. Разницы сегодня нет (RLS выше уже не пустила бы чужого), но
+  // записывается свойство урока, и брать его надо у урока: `lesson.school_id`
+  // прочитан на шаге 2, лишнего запроса нет. Демо-школа получит прежний якорь,
+  // настоящая — настоящие часы. До правки сюда уходило замороженное 29.07
+  // независимо от школы, и это всплыло бы в отчётах через день, а не в момент
+  // клика.
+  const lessonFrozenDate = await getSchoolFrozenDate(admin, (lesson as { school_id: string }).school_id);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: started, error: startErr } = await (admin as any).from("lessons")
-    .update({ status: "in_progress", started_at: getDemoNow().toISOString() })
+    .update({ status: "in_progress", started_at: schoolNow(lessonFrozenDate).toISOString() })
     .eq("id", lessonId)
     .eq("status", "scheduled")
     .select("id");

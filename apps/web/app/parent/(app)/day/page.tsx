@@ -23,7 +23,7 @@ export default async function ParentDayPage() {
     childDailyStats(),
   ]);
 
-  const today = parentToday();
+  const today = await parentToday();
   const weekday = WEEKDAY_FULL[weekdayIndexOfKey(today)] ?? "";
 
   const lessons: DayLessonVM[] = dayStatus.lessons.map((l) => ({

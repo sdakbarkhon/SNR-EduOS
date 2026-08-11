@@ -8,7 +8,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { getMySchoolNowMs } from "@/lib/school-time-server";
 import { DashboardView } from "./DashboardView";
 
 export default async function DashboardPage() {
@@ -16,7 +16,10 @@ export default async function DashboardPage() {
 
   // Посещаемость за последние ~35 дней — для блока «Серия успехов» (ЧАСТЬ 3).
   // Через safeQuery, чтобы сбой посещаемости не рушил весь дашборд (реф 5222b73).
-  const attendanceFrom = new Date(getDemoNowMs() - 35 * 24 * 60 * 60 * 1000).toISOString();
+  // Z.3, заход 2 — окно «последние 35 дней» от времени школы ученика.
+  // Неверное «сейчас» здесь не даёт ошибки: диапазон просто уезжает и экран
+  // молча оказывается пустым.
+  const attendanceFrom = new Date((await getMySchoolNowMs(supabase)) - 35 * 24 * 60 * 60 * 1000).toISOString();
 
   const [student, lessons, homework, submissions, testSubmissions, groups, attRes] = await Promise.all([
     getMyStudent(supabase),

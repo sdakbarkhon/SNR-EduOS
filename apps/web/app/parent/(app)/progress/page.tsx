@@ -148,7 +148,7 @@ export default async function ParentProgressPage() {
     return <ProgressView data={empty} />;
   }
 
-  const today = parentToday();
+  const today = await parentToday();
   const [rawGrades, summary, attendance, weekActivity, reviews, dayStatus] = await Promise.all([
     childGrades(),
     childGradesSummary(),

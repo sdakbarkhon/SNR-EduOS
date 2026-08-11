@@ -30,7 +30,7 @@ export default async function ParentChatPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const today = parentToday();
+  const today = await parentToday();
   const yesterday = previousDay(today);
 
   const threads = await parentThreadVMs(today);

@@ -15,7 +15,7 @@ import { MessagesView, type MessagesAnnouncementItem, type MessagesThreadItem } 
  * привязаны к родителю, а не к ученику.
  */
 export default async function ParentMessagesPage() {
-  const today = parentToday();
+  const today = await parentToday();
   const yesterday = previousDay(today);
 
   const [threads, announcements] = await Promise.all([
