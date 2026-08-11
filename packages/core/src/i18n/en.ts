@@ -1508,6 +1508,10 @@ export const en: Dictionary = {
     openFile: "Open",
     showMore: "Show more",
     noAccess: "File not accessible",
+    openError: "Could not open the file. Please try again",
+    presentationError: "Could not load the presentation. Please try again",
+    presentationEmpty: "This material has no slides: that lesson stage was practical work, not a presentation",
+    noFile: "No file is attached to this material",
   },
   books: {
     title: "Library",

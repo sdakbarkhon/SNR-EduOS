@@ -7,7 +7,8 @@ import {
   CalendarDays, ChevronDown, Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { insertMaterial } from "@snr/core";
+import { insertMaterial, getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
 import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
 import {
@@ -585,6 +586,9 @@ export function TeacherMaterialsView({
   initialTeacherId: string;
   hideHeading?: boolean;
 }) {
+  // 10.08.2026 — тексты отказов при открытии переведены на словарь (три языка).
+  const { locale } = useLocale();
+  const t = getDictionary(locale as Locale).materials;
   const router = useRouter();
   const [materials, setMaterials] = useState(initialMaterials);
   const [showUpload, setShowUpload] = useState(false);
@@ -688,14 +692,19 @@ export function TeacherMaterialsView({
     if (resolveType(mat) === "presentation" && !mat.storage_path && !mat.link_url) {
       setOpeningId(mat.id);
       try {
-        const slides = await getMaterialSlides(mat.id);
-        if (slides && slides.length > 0) {
-          setSlideViewer({ slides, title: mat.title });
+        const res = await getMaterialSlides(mat.id);
+        // 10.08.2026 — три исхода: слайды есть / слайдов нет вовсе (практический
+        // этап, показывать нечего) / не отдалось. Раньше на всё было одно
+        // «не удалось».
+        if (res.status === "ok") {
+          setSlideViewer({ slides: res.slides, title: mat.title });
+        } else if (res.status === "empty") {
+          setToast(t.presentationEmpty);
         } else {
-          setToast("Не удалось загрузить презентацию");
+          setToast(t.presentationError);
         }
       } catch {
-        setToast("Не удалось загрузить презентацию");
+        setToast(t.presentationError);
       } finally {
         setOpeningId(null);
       }
@@ -703,13 +712,13 @@ export function TeacherMaterialsView({
     }
 
     if (!mat.storage_path && !mat.link_url) {
-      setToast("У этого материала нет файла");
+      setToast(t.noFile);
       return;
     }
     setOpeningId(mat.id);
     try {
       const url = await getMaterialUrl(mat.id);
-      if (!url) { setToast("Не удалось открыть файл"); return; }
+      if (!url) { setToast(t.openError); return; }
       if (mat.link_url && !mat.storage_path) {
         if (isVideoUrl(url)) {
           setVideoPlayer({ url, title: mat.title });
@@ -726,7 +735,7 @@ export function TeacherMaterialsView({
       const fileName = mat.storage_path?.split("/").pop() || mat.title || "material";
       setViewer({ url, title: mat.title, fileName });
     } catch {
-      setToast("Не удалось открыть файл");
+      setToast(t.openError);
     } finally {
       setOpeningId(null);
     }

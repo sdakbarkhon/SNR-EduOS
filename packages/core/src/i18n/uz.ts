@@ -1508,6 +1508,10 @@ export const uz: Dictionary = {
     openFile: "Ochish",
     showMore: "Ko'proq ko'rsatish",
     noAccess: "Faylga kirish mumkin emas",
+    openError: "Faylni ochib bo'lmadi. Qayta urinib ko'ring",
+    presentationError: "Taqdimotni yuklab bo'lmadi. Qayta urinib ko'ring",
+    presentationEmpty: "Bu materialda slaydlar yo'q: darsning bu bosqichida taqdimot emas, amaliy ish bo'lgan",
+    noFile: "Bu materialga fayl biriktirilmagan",
   },
   books: {
     title: "Kutubxona",

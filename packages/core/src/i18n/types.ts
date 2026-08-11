@@ -1564,6 +1564,10 @@ export interface Dictionary {
     openFile: string;
     showMore: string;
     noAccess: string;
+    openError: string;          // файл есть, но открыть не вышло
+    presentationError: string;  // презентация есть, но не загрузилась
+    presentationEmpty: string;  // слайдов нет вовсе — практический этап
+    noFile: string;             // к материалу не приложен файл
   };
   books: {
     title: string;

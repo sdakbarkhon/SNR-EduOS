@@ -5,7 +5,8 @@ import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen, X, CalendarDays, ChevronDown,
 } from "lucide-react";
-import type { MaterialWithGroup, LessonSlide } from "@snr/core";
+import { getDictionary, type Locale, type MaterialWithGroup, type LessonSlide } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
 import {
   filterSelectClass, withCount, FILTER_ICON, FILTER_CHEVRON, FILTER_RESET,
@@ -81,6 +82,11 @@ const SUBJECT_LABELS: Record<string, string> = {
 };
 
 export function MaterialsView({ materials, hideHeading }: { materials: MaterialWithGroup[]; hideHeading?: boolean }) {
+  // 10.08.2026 — экран не знал словаря вовсе: сообщения об ошибках открытия
+  // были вписаны по-русски. Подписи карточек ниже пока остаются как были —
+  // это отдельная работа, а тексты отказов обязаны быть на трёх языках.
+  const { locale } = useLocale();
+  const t = getDictionary(locale as Locale).materials;
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [activeType, setActiveType] = useState<DisplayType | "all">("all");
@@ -152,15 +158,21 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
     if (resolveType(mat) === "presentation" && !mat.storage_path && !mat.link_url) {
       setOpeningId(mat.id);
       try {
-        const slides = await getMaterialSlides(mat.id);
-        if (slides && slides.length > 0) {
-          setSlideViewer({ slides, title: mat.title });
+        const res = await getMaterialSlides(mat.id);
+        // 10.08.2026 — три исхода вместо прежнего «есть слайды / нет слайдов».
+        // «Нет слайдов вовсе» — это не сбой: автопубликация завела материал и
+        // для практических этапов, показывать там нечего, и человеку надо
+        // сказать именно это, а не «не удалось».
+        if (res.status === "ok") {
+          setSlideViewer({ slides: res.slides, title: mat.title });
+        } else if (res.status === "empty") {
+          showToast(t.presentationEmpty);
         } else {
-          showToast("Не удалось загрузить презентацию");
+          showToast(t.presentationError);
         }
       } catch (err) {
         console.error("[materials] getMaterialSlides threw:", err);
-        showToast("Не удалось загрузить презентацию");
+        showToast(t.presentationError);
       } finally {
         setOpeningId(null);
       }
@@ -168,14 +180,14 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
     }
 
     if (!mat.storage_path && !mat.link_url) {
-      showToast("У этого материала нет файла");
+      showToast(t.noFile);
       return;
     }
     setOpeningId(mat.id);
     try {
       const url = await getMaterialUrl(mat.id);
       if (!url) {
-        showToast("Не удалось открыть файл");
+        showToast(t.openError);
         return;
       }
       if (mat.link_url && !mat.storage_path) {
@@ -204,7 +216,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
       setViewer({ url, title: mat.title, fileName });
     } catch (err) {
       console.error("[materials] getMaterialUrl threw:", err);
-      showToast("Не удалось открыть файл");
+      showToast(t.openError);
     } finally {
       setOpeningId(null);
     }
