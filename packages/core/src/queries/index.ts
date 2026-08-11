@@ -8,6 +8,7 @@ import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, Atten
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
+import { mySchoolStoragePath } from "../storage/path";
 
 export * from "./projects";
 export * from "./announcements";
@@ -607,7 +608,7 @@ export const uploadAvatar = async (
   { studentId, blob, fileName }: { studentId: string; blob: Blob; fileName: string },
 ): Promise<string> => {
   const ext = fileName.split(".").pop() ?? "jpg";
-  const path = `${studentId}/avatar.${ext}`;
+  const path = await mySchoolStoragePath(db, studentId, `avatar.${ext}`);
   const { error } = await db.storage
     .from("avatars")
     .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
@@ -642,7 +643,7 @@ export const uploadHomeworkFile = async (
   },
 ): Promise<string> => {
   const ext = fileName.split(".").pop() ?? "bin";
-  const path = `${studentId}/${homeworkId}/${Date.now()}.${ext}`;
+  const path = await mySchoolStoragePath(db, studentId, homeworkId, `${Date.now()}.${ext}`);
   const { error } = await db.storage
     .from("homework-submissions")
     .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
@@ -774,7 +775,7 @@ export async function uploadPresentationFile(
   }
 
   const materialId = crypto.randomUUID();
-  const path = `${input.teacherId}/${materialId}.pptx`;
+  const path = await mySchoolStoragePath(db, input.teacherId, `${materialId}.pptx`);
   const { error: uploadErr } = await db.storage
     .from("materials")
     .upload(path, input.file, { contentType: PPTX_MIME_TYPES[0] });
@@ -1815,7 +1816,7 @@ export const uploadTeacherAvatar = async (
   { teacherId, blob, fileName }: { teacherId: string; blob: Blob; fileName: string },
 ): Promise<string> => {
   const ext = fileName.split(".").pop() ?? "jpg";
-  const path = `teachers/${teacherId}/avatar.${ext}`;
+  const path = await mySchoolStoragePath(db, "teachers", teacherId, `avatar.${ext}`);
   const { error } = await db.storage
     .from("avatars")
     .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
@@ -2014,7 +2015,7 @@ export const uploadHomeworkTestsFile = async (
   db: Db,
   { teacherId, homeworkId, fileName, blob }: { teacherId: string; homeworkId: string; fileName: string; blob: Blob },
 ): Promise<{ path: string; sizeByte: number }> => {
-  const path = `${teacherId}/${homeworkId}/tests/${fileName}`;
+  const path = await mySchoolStoragePath(db, teacherId, homeworkId, "tests", fileName);
   const { error } = await db.storage
     .from("homework-tests")
     .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
@@ -2830,9 +2831,8 @@ export const uploadLessonMaterial = async (
   // the `file_original_name` column (used for display + download `downloadAs`).
   const rawExt = input.file.name.includes(".") ? input.file.name.split(".").pop()! : "";
   const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
-  const path = safeExt
-    ? `${input.teacherId}/${input.lessonId}/${materialId}.${safeExt}`
-    : `${input.teacherId}/${input.lessonId}/${materialId}`;
+  const path = await mySchoolStoragePath(db, input.teacherId, input.lessonId,
+    safeExt ? `${materialId}.${safeExt}` : materialId);
   const { error: uploadErr } = await db.storage
     .from("lesson-materials")
     .upload(path, input.file, { contentType: input.file.type || undefined });
@@ -3434,7 +3434,7 @@ export const uploadStageAttachment = async (
   { studentId, stageId, file }: { studentId: string; stageId: string; file: File },
 ): Promise<{ path: string }> => {
   const ext = file.name.split(".").pop() ?? "png";
-  const path = `${studentId}/${stageId}/${Date.now()}.${ext}`;
+  const path = await mySchoolStoragePath(db, studentId, stageId, `${Date.now()}.${ext}`);
   const { error } = await db.storage.from("stage-attachments").upload(path, file, { upsert: true });
   if (error) throw error;
   return { path };
@@ -4186,7 +4186,7 @@ export const uploadHomeworkAttachment = async (
   },
 ): Promise<{ path: string; sizeByte: number }> => {
   const ext = fileName.split(".").pop() ?? "bin";
-  const path = `${teacherId}/${homeworkId}/attachment/${Date.now()}.${ext}`;
+  const path = await mySchoolStoragePath(db, teacherId, homeworkId, "attachment", `${Date.now()}.${ext}`);
   const { error } = await db.storage
     .from("homework-files")
     .upload(path, blob, { upsert: true, contentType: (blob as File).type || undefined });
@@ -4379,7 +4379,7 @@ export const uploadHomeworkHint = async (
   },
 ): Promise<{ path: string; sizeByte: number }> => {
   const ext = fileName.split(".").pop() ?? "bin";
-  const path = `${teacherId}/${homeworkId}/hint/${Date.now()}.${ext}`;
+  const path = await mySchoolStoragePath(db, teacherId, homeworkId, "hint", `${Date.now()}.${ext}`);
   const { error } = await db.storage
     .from("homework-files")
     .upload(path, blob, { upsert: true, contentType: (blob as File).type || undefined });
@@ -4454,7 +4454,7 @@ export const submitHomeworkWithFile = async (
 
   if (file && fileName && teacherId) {
     const ext = fileName.split(".").pop() ?? "bin";
-    fileStoragePath = `${teacherId}/${homeworkId}/submissions/${studentId}/${Date.now()}.${ext}`;
+    fileStoragePath = await mySchoolStoragePath(db, teacherId, homeworkId, "submissions", studentId, `${Date.now()}.${ext}`);
     fileSizeBytes = file.size;
     fileOriginalName = fileName;
     const { error } = await db.storage
@@ -4594,7 +4594,7 @@ export const uploadClassworkAttachment = async (
   { teacherId, classworkId, file }: { teacherId: string; classworkId: string; file: File },
 ): Promise<{ path: string; sizeByte: number }> => {
   const ext = file.name.split(".").pop() ?? "bin";
-  const path = `${teacherId}/${classworkId}/attachment/${Date.now()}.${ext}`;
+  const path = await mySchoolStoragePath(db, teacherId, classworkId, "attachment", `${Date.now()}.${ext}`);
   const { error } = await db.storage.from("classwork-files").upload(path, file, { upsert: true });
   if (error) throw error;
   return { path, sizeByte: file.size };
@@ -4637,7 +4637,7 @@ export const submitClasswork = async (
 
   if (file) {
     const ext = file.name.split(".").pop() ?? "bin";
-    filePath = `submissions/${classworkId}/${studentId}/${Date.now()}.${ext}`;
+    filePath = await mySchoolStoragePath(db, "submissions", classworkId, studentId, `${Date.now()}.${ext}`);
     const { error } = await db.storage.from("classwork-files").upload(filePath, file, { upsert: true });
     if (error) throw error;
     fileName = file.name;

@@ -20,6 +20,7 @@ import { FileViewerModal } from "@/components/FileViewerModal";
 import { SlidesViewerModal } from "@/components/SlidesViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { isVideoUrl, parseVideoUrl } from "@/lib/video-url";
+import { mySchoolStoragePath } from "@snr/core";
 
 // ── File type helpers (same as student view) ──────────────────────────
 
@@ -146,7 +147,7 @@ function UploadModal({
       const ext = file.name.split(".").pop() ?? "bin";
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       // Single source of truth: same path goes to storage.upload AND DB insert.
-      const storagePath = `${teacherId}/${groupId}/${materialId}/${safeName}`;
+      const storagePath = await mySchoolStoragePath(sb, teacherId, groupId, materialId, safeName);
 
       // Hard invariant: every segment must be non-empty, otherwise the path
       // collapses and the file ends up at the bucket root (real bug we saw).

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { parseVideoUrl } from "@/lib/video-url";
+import { mySchoolStoragePath } from "@snr/core";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -438,7 +439,7 @@ function UploadModal({
       const sb = createClient();
       const bookId = crypto.randomUUID();
       const safePdfName = pdfFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const pdfPath = `${teacherId}/${bookId}/${safePdfName}`;
+      const pdfPath = await mySchoolStoragePath(sb, teacherId, bookId, safePdfName);
 
       const ramp = setInterval(() => setProgress((p) => Math.min(p + 4, 80)), 300);
 
@@ -457,7 +458,7 @@ function UploadModal({
       let coverPath: string | null = null;
       if (coverFile) {
         const ext = coverFile.name.split(".").pop() ?? "jpg";
-        coverPath = `${teacherId}/${bookId}/cover.${ext}`;
+        coverPath = await mySchoolStoragePath(sb, teacherId, bookId, `cover.${ext}`);
         const { error: covErr } = await sb.storage
           .from("books")
           .upload(coverPath, coverFile, { contentType: coverFile.type, upsert: false });

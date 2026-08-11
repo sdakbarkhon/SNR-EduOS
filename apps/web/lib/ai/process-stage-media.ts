@@ -38,7 +38,7 @@ export async function processStageMediaForStage(
 ): Promise<ProcessStageMediaResult> {
   const { data: stage, error: stageErr } = await db
     .from("lesson_stages")
-    .select("id, lesson_id, title, description, content_type, media_status")
+    .select("id, lesson_id, title, description, content_type, media_status, school_id")
     .eq("id", stageId)
     .maybeSingle();
   if (stageErr || !stage) return { status: "skipped", reason: "stage_not_found" };
@@ -114,7 +114,7 @@ export async function processStageMediaForStage(
   if (decision.need_image && decision.image_prompt) {
     try {
       const { buffer, source } = await generateStageImage(decision.image_prompt);
-      const url = await uploadStageImageToStorage(buffer, stageId);
+      const url = await uploadStageImageToStorage(buffer, stageId, stage.school_id as string);
       await db.from("lesson_stages").update({ image_url: url, media_source: source }).eq("id", stageId);
       hadImage = true;
     } catch (e) {

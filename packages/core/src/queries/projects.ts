@@ -2,6 +2,7 @@
  * we use `(db as any)` like the other migration-30+ modules. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Db } from "../supabase/factory";
+import { mySchoolStoragePath } from "../storage/path";
 import type {
   Project, ProjectStage, ProjectStageProgress, ProjectAttachment, ProjectSubmission,
   ProjectSubmissionWithStudent, ProjectWithStages, TeacherProjectListItem, StudentProjectListItem,
@@ -201,7 +202,7 @@ export const uploadProjectAttachment = async (
   db: Db,
   { studentId, projectId, submissionId, stageId, file }: { studentId: string; projectId: string; submissionId: string; stageId: string | null; file: File },
 ): Promise<ProjectAttachment> => {
-  const path = `${studentId}/${projectId}/${Date.now()}_${file.name}`;
+  const path = await mySchoolStoragePath(db, studentId, projectId, `${Date.now()}_${file.name}`);
   const { error: upErr } = await db.storage.from("project-files").upload(path, file, { upsert: true, contentType: file.type || undefined });
   if (upErr) throw upErr;
   const { data, error } = await (db as any).from("project_attachments").insert({

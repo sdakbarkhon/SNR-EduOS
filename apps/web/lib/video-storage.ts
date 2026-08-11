@@ -4,6 +4,7 @@
 // lesson_materials, teacher_library_materials, homework.attachment.
 // course_materials — не сюда (там нет отдельного бакета, см. resheniya_2.md).
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { mySchoolStoragePath } from "@snr/core";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50MB — дефолтный лимит бакета lesson-videos, не поднимаем
 
@@ -32,7 +33,7 @@ export async function uploadVideoFile(
   teacherId: string,
   file: File,
 ): Promise<{ storagePath: string; fileName: string; sizeBytes: number }> {
-  const storagePath = `${teacherId}/${crypto.randomUUID()}.mp4`;
+  const storagePath = await mySchoolStoragePath(db, teacherId, `${crypto.randomUUID()}.mp4`);
   const { error } = await db.storage
     .from("lesson-videos")
     .upload(storagePath, file, { contentType: "video/mp4" });

@@ -10,6 +10,7 @@ import type { LessonStage } from "@snr/core";
 import { generateJSON, generateText } from "./gemini-client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { stageAllowsMedia } from "@/lib/lesson-stage-media";
+import { schoolStoragePath } from "@snr/core";
 
 export type StageMediaDecision = {
   need_image: boolean;
@@ -193,9 +194,15 @@ const SIGNED_URL_TTL_SECONDS = 10 * 365 * 24 * 60 * 60; // 10 лет
 
 /** uploadStageImageToStorage: загрузка в приватный bucket lesson-stage-images
  *  (миграция 165), путь `${stageId}.png`, возвращает signed URL. */
-export async function uploadStageImageToStorage(imageBuffer: Buffer, stageId: string): Promise<string> {
+export async function uploadStageImageToStorage(
+  imageBuffer: Buffer,
+  stageId: string,
+  schoolId: string,
+): Promise<string> {
   const admin = createAdminClient();
-  const path = `${stageId}.png`;
+  // Школа передаётся аргументом: под служебным ключом current_school_id()
+  // пуст, а путь обязан начинаться со школы (миграции 188/189).
+  const path = schoolStoragePath(schoolId, `${stageId}.png`);
 
   const { error: upErr } = await admin.storage
     .from("lesson-stage-images")

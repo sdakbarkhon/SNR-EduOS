@@ -5,6 +5,7 @@
 import type { Db } from "../supabase/factory";
 import type { CurriculumPlan, CurriculumPlanTopic, CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "../types";
 import { unwrap } from "./helpers";
+import { mySchoolStoragePath } from "../storage/path";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
@@ -126,9 +127,8 @@ export async function uploadCurriculumPlanFile(
 ): Promise<{ storagePath: string }> {
   const rawExt = input.file.name.includes(".") ? input.file.name.split(".").pop()! : "";
   const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
-  const path = safeExt
-    ? `${input.teacherId}/${crypto.randomUUID()}.${safeExt}`
-    : `${input.teacherId}/${crypto.randomUUID()}`;
+  const id = crypto.randomUUID();
+  const path = await mySchoolStoragePath(db, input.teacherId, safeExt ? `${id}.${safeExt}` : id);
   const { error } = await db.storage
     .from("curriculum-plans")
     .upload(path, input.file, { contentType: input.file.type || undefined });

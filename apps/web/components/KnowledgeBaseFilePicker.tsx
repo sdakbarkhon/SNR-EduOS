@@ -47,6 +47,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { parseVideoUrl } from "@/lib/video-url";
 import { uploadVideoFile } from "@/lib/video-storage";
 import { canUseDepartmentLibrary } from "@/lib/curator";
+import { mySchoolStoragePath } from "@snr/core";
 
 export type PickedKnowledgeBaseFile = {
   source: "material" | "book" | "teacherLibrary";
@@ -225,7 +226,7 @@ export function LibraryUploadModal({
       } else {
         const materialId = crypto.randomUUID();
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const storagePath = `${teacherId}/library/${materialId}/${safeName}`;
+        const storagePath = await mySchoolStoragePath(sb, teacherId, "library", materialId, safeName);
 
         const { error: uploadErr } = await sb.storage
           .from("materials")

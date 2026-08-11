@@ -5,6 +5,7 @@ import { generateJSON } from "@/lib/ai/gemini-client";
 import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
+import { schoolStoragePath } from "@snr/core";
 
 // Hard cap on Imagen calls per generation (keeps us within maxDuration).
 const MAX_SLIDE_IMAGES = 6;
@@ -257,10 +258,13 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("group_id, curriculum_topic_id, subject_id, group:groups!inner(teacher_id, name, subject)")
+    .select("group_id, curriculum_topic_id, subject_id, school_id, group:groups!inner(teacher_id, name, subject)")
     .eq("id", body.lesson_id)
     .single();
   const group = lesson?.group as { teacher_id: string; name: string | null; subject: string | null } | null;
+  // Школа урока — для пути картинок слайдов: они грузятся служебным ключом,
+  // а под ним current_school_id() пуст (миграции 188/189).
+  const lessonSchoolId = (lesson?.school_id as string | undefined) ?? "";
   // No extra teacher_id equality check here — RLS on "lessons" already gates
   // this SELECT on is_my_teacher_group(group_id) (owner, subject-assigned,
   // or co-teacher via group_teachers), so a non-null result already proves
@@ -454,7 +458,7 @@ export async function POST(req: NextRequest) {
             const base64 = await generateSlideImage(slide.image_prompt!);
             if (!base64) return;
             const buffer = Buffer.from(base64, "base64");
-            const filename = `${body.lesson_id}/${Date.now()}-${idx}.png`;
+            const filename = schoolStoragePath(lessonSchoolId, body.lesson_id, `${Date.now()}-${idx}.png`);
             const { error: upErr } = await adminClient.storage
               .from("slide-images")
               .upload(filename, buffer, { contentType: "image/png", upsert: false });

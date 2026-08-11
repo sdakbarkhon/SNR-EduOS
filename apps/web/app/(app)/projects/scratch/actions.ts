@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MAX_SB3_BYTES, SCRATCH_PROJECT_LIMIT } from "@/lib/scratch-bridge";
+import { schoolStoragePath } from "@snr/core";
 
 /**
  * Работы Scratch: сохранение, список, открытие, удаление. Z-Scratch, 10.08.2026.
@@ -101,7 +102,7 @@ export async function saveScratchProject(fd: FormData): Promise<SaveResult> {
     rowId = created.id as string;
   }
 
-  const path = `${student.id}/${rowId}.sb3`;
+  const path = schoolStoragePath(student.schoolId, student.id, `${rowId}.sb3`);
   const { error: upErr } = await admin.storage
     .from(BUCKET)
     .upload(path, file, { contentType: "application/x.scratch.sb3", upsert: true });
