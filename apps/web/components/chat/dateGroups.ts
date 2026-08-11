@@ -1,5 +1,5 @@
 import type { Dictionary } from "@snr/core";
-import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
+
 
 const TZ = "Asia/Tashkent";
 
@@ -13,10 +13,12 @@ export function dayKey(iso: string): string {
 }
 
 /** "Сегодня" / "Вчера" / "14 мая" (short=true → "14.05" для превью в списке тредов). */
-export function dayLabel(iso: string, d: Dictionary, locale: string, short: boolean): string {
+/** Z.3, заход 3 — «сейчас» приходит параметром: файл чисто вычислительный,
+ *  хука тут нет, а школа известна вызывающему компоненту. */
+export function dayLabel(iso: string, d: Dictionary, locale: string, short: boolean, nowMs: number): string {
   const key = isoDayKey(iso);
-  const todayKey = isoDayKey(getDemoNow().toISOString());
-  const yesterdayKey = isoDayKey(new Date(getDemoNowMs() - 86400000).toISOString());
+  const todayKey = isoDayKey(new Date(nowMs).toISOString());
+  const yesterdayKey = isoDayKey(new Date(nowMs - 86400000).toISOString());
 
   if (!short) {
     if (key === todayKey) return d.chat.today;

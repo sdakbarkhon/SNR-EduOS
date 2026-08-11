@@ -10,7 +10,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
 import { PageContainer } from "@/components/PageContainer";
 import { cn } from "@/lib/cn";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { useSchoolNowMs } from "@/components/SchoolTimeProvider";
 import { GradeFilterDropdown } from "./GradeFilterDropdown";
 import { GradeDistributionDonut } from "./GradeDistributionDonut";
 import { GradeDetailModal } from "./GradeDetailModal";
@@ -62,10 +62,11 @@ export const KIND_BADGE: Record<StudentGradeItem["kind"], string> = {
   code_completion: "bg-fuchsia-100 text-fuchsia-700",
 };
 
-function withinPeriod(dateStr: string, period: PeriodFilter): boolean {
+// Z.3, заход 3 — «сейчас» параметром: функция на уровне модуля.
+function withinPeriod(dateStr: string, period: PeriodFilter, nowMs: number): boolean {
   if (period === "all" || !dateStr) return true;
   const days = period === "week" ? 7 : period === "month" ? 30 : 120;
-  return new Date(dateStr).getTime() >= getDemoNowMs() - days * 86400000;
+  return new Date(dateStr).getTime() >= nowMs - days * 86400000;
 }
 
 function sortGrades(items: StudentGradeItem[], sort: SortValue): StudentGradeItem[] {
@@ -142,6 +143,9 @@ export function GradesView({ grades, error = false }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.grades;
+  // Z.3, заход 3 — «сейчас» школы для фильтра «за неделю/месяц/семестр».
+  // Объявлено ДО ранних return'ов: хук обязан вызываться на каждом рендере.
+  const nowMs = useSchoolNowMs();
 
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -210,7 +214,7 @@ export function GradesView({ grades, error = false }: Props) {
     if (categoryFilter !== "all" && gradeCategory(g.sourceTable) !== categoryFilter) return false;
     if (subjectFilter !== "all" && g.subject !== subjectFilter) return false;
     if (typeFilter !== "all" && g.kind !== typeFilter) return false;
-    if (!withinPeriod(g.date, periodFilter)) return false;
+    if (!withinPeriod(g.date, periodFilter, nowMs)) return false;
     return true;
   });
   const sorted = sortGrades(filtered, sortValue);

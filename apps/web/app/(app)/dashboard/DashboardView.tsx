@@ -23,7 +23,7 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 import { useLocale } from "@/components";
 import { useToast } from "@/components/Toast";
 import { getClassLabel } from "@/lib/student-class-label";
@@ -99,12 +99,11 @@ export function DashboardView({
   // when deciding which lessons count as "today" (project-wide rule, see memory).
   // Recomputed every 30s (same pattern as /lessons — LessonsView.tsx) so the
   // "Сейчас"/"Скоро" badges don't get stuck once a lesson's ends_at passes.
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(getDemoNow());
-    const interval = setInterval(() => setNow(getDemoNow()), 30_000);
-    return () => clearInterval(interval);
-  }, []);
+  //
+  // Z.3, заход 3 — таймер теперь внутри useSchoolNow, и у ЗАМОРОЖЕННОЙ школы
+  // он не заводится вовсе: значение остаётся неподвижным, как и было с
+  // константой. У настоящей школы значок обновляется раз в полминуты.
+  const now = useSchoolNow(30_000);
 
   useEffect(() => {
     stableLoadSubjects.current = async () => {
@@ -168,7 +167,7 @@ export function DashboardView({
     setSubjectDetail(list.find((s) => s.id === sub.id) ?? null);
   }
   const classLabel = getClassLabel(groups);
-  const greeting = t.greetings[dayOfYear(now ?? getDemoNow()) % t.greetings.length];
+  const greeting = t.greetings[dayOfYear(now) % t.greetings.length];
 
   // Today's lessons — only computed client-side once `now` is set, for the
   // same hydration-safety reason above.

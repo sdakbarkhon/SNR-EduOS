@@ -18,7 +18,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { RaiseHandButton } from "./RaiseHandButton";
 import { StageActionButton } from "@/components/lesson-stages/StageActionButton";
 import { AiChatPanel } from "./AiChatPanel";
@@ -296,6 +296,8 @@ export function LessonWorkspaceView({
   // Единственное место, где AppShell прячет каркас (сайдбар/топбар/паддинги) —
   // см. fullscreen-lesson-context.tsx.
   useRegisterFullscreenLesson();
+  // Z.3, заход 3 — школьное «сейчас» для обработчиков (в них хук не позвать).
+  const schoolNowMs = useSchoolNowSnapshot();
   // Блок 2, Баг 1 — жёлтая полоса "демо-режим" (DemoBanner.tsx) рендерится
   // fixed top-0 z-[100], высотой ~40px (h-10 спейсер). Компактная полоска
   // кнопок фокус-режима ниже — тоже fixed, top-4 (16px), z-40: при демо-
@@ -460,7 +462,7 @@ export function LessonWorkspaceView({
             stage_id: activeStageId,
             student_id: studentId,
             is_completed: true,
-            completed_at: getDemoNow().toISOString(),
+            completed_at: new Date(schoolNowMs()).toISOString(),
             submission_data: st.progress?.submission_data ?? null,
             grade: st.progress?.grade ?? null,
             teacher_comment: st.progress?.teacher_comment ?? null,
@@ -538,8 +540,12 @@ export function LessonWorkspaceView({
         // дня) длительность считалась бы от НАСТОЯЩИХ часов и росла на сутки
         // в сутки: «123:27:44» вместо «00:27:16». Строка 407 рядом уже
         // использует getDemoNow(), это место просто про неё забыли.
+        // Z.3, заход 3 — ОБА КОНЦА ОТ ОДНОЙ ШКОЛЫ. lesson.started_at пишет
+        // сервер временем школы САМОГО УРОКА (заход 2), «сейчас» здесь —
+        // время школы зрителя, а зритель и урок в одной школе по RLS.
+        // Рассинхрон давал «123:27:44» вместо «00:27:16».
         const duration = lesson.started_at
-          ? getDemoNow().getTime() - new Date(lesson.started_at).getTime()
+          ? schoolNowMs() - new Date(lesson.started_at).getTime()
           : 0;
         if (duration > 60000) {
           setCompletedElapsed(fmtElapsed(duration));

@@ -15,7 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { useSchoolNowMs } from "@/components/SchoolTimeProvider";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -105,7 +105,8 @@ export function NotificationsView({
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialNotifications.length >= PAGE_SIZE);
-  const [nowMs, setNowMs] = useState<number | null>(null);
+  // Z.3, заход 3 — «сейчас» из школы; у замороженной таймер не заводится.
+  const nowMs = useSchoolNowMs(30_000);
   const reloadRef = useRef<() => void>(() => {});
 
   // Tabs
@@ -128,9 +129,6 @@ export function NotificationsView({
     const db = createClient();
     dbRef.current = db;
     db.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null)).catch(() => null);
-    setNowMs(getDemoNowMs());
-    const id = setInterval(() => setNowMs(getDemoNowMs()), 30000);
-    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -13,7 +13,7 @@ import {
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
 import { GradeModal } from "./GradeModal";
@@ -29,6 +29,8 @@ type Props = {
 };
 
 export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused, onStatusChange }: Props) {
+  // Z.3, заход 3 — школьное «сейчас» для обработчика.
+  const schoolNowMs = useSchoolNowSnapshot();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dt = d.teacher;
@@ -83,7 +85,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
     if (readOnly || next === oldStatus) return;
     setRows((prev) =>
       prev.map((r) =>
-        r.student_id === studentId ? { ...r, status: next, marked_at: getDemoNow().toISOString() } : r,
+        r.student_id === studentId ? { ...r, status: next, marked_at: new Date(schoolNowMs()).toISOString() } : r,
       ),
     );
     try {

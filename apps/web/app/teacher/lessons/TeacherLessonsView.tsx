@@ -22,7 +22,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
-import { getDemoNow, getDemoNowMs } from "@/lib/demo-date";
+import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -243,6 +243,10 @@ function DatePickerField({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // Z.3, заход 3 — «сегодня» школы для нижней границы календаря. Свой вызов
+  // хука: это отдельный компонент, до значения из TeacherLessonsView ему не
+  // дотянуться, а провайдер один на всё дерево.
+  const schoolNowMs = useSchoolNowSnapshot();
 
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -293,7 +297,7 @@ function DatePickerField({
               onChange(`${y}-${m}-${day}`);
               setOpen(false);
             }}
-            disabled={minToday ? { before: new Date(getDemoNow().setHours(0, 0, 0, 0)) } : undefined}
+            disabled={minToday ? { before: new Date(new Date(schoolNowMs()).setHours(0, 0, 0, 0)) } : undefined}
           />
         </div>
       )}
@@ -566,7 +570,10 @@ export function TeacherLessonsView({
   const dbRef = useRef(createClient());
   const db = dbRef.current;
 
-  const now = getDemoNow();
+  // Z.3, заход 3 — «сейчас» школы. У замороженной школы таймер не заводится,
+  // значение неподвижно: подсветка «Сейчас» в расписании не уезжает.
+  const now = useSchoolNow(30_000);
+  const schoolNowMs = useSchoolNowSnapshot();
   const todayKey = localDateKey(now);
 
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -674,14 +681,14 @@ export function TeacherLessonsView({
         room: form.room || null, title: form.title || null, description: form.desc || null,
         subjectId: form.subjectId || null,
         curriculumTopicId: form.curriculumTopicId || null,
-      }, getDemoNowMs());
+      }, schoolNowMs());
       setFormModal(null);
       router.push(`/teacher/lessons/${created.id}`);
     } else if (formModal === "edit" && editLesson) {
       await updateLesson(db, editLesson.id, {
         group_id: form.groupId, starts_at: startsAt, duration_minutes: durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
-      }, getDemoNowMs());
+      }, schoolNowMs());
       setFormModal(null);
       await loadMonth(viewYear, viewMonth);
     }

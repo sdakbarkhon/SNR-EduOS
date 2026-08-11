@@ -17,7 +17,7 @@ import {
 import { LessonGradeDetailModal } from "./LessonGradeDetailModal";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 
 type CategoryFilter = "all" | "assignment" | "lesson";
 
@@ -60,6 +60,8 @@ function avgColor(avg: number | null): { bg: string; fg: string } {
 }
 
 export function TeacherGradesView({ groups, stats }: Props) {
+  // Z.3, заход 3 — «сейчас» школы одной строкой на весь компонент.
+  const schoolNowIso = useSchoolNow().toISOString();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const supabase = createClient();
@@ -115,7 +117,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
   }
 
   function cellFor(studentId: string, hw: GradeMatrixData["homework"][number]): { state: CellState; label: string } {
-    const now = getDemoNow().toISOString();
+    const now = schoolNowIso;
     const overdue = !!hw.due_date && hw.due_date < now;
     if (hw.content_type === "test") {
       const t = findTest(studentId, hw.id);

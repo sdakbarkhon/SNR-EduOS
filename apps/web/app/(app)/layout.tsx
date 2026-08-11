@@ -10,7 +10,7 @@ import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { createClient } from "@/lib/supabase/server";
 import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
 import { getClassLabel } from "@/lib/student-class-label";
-import { getSchoolFrozenDate } from "@/lib/school-time";
+import { getSchoolFrozenDate, schoolNowMs } from "@/lib/school-time";
 import { SchoolTimeProvider } from "@/components/SchoolTimeProvider";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 
@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SchoolTimeProvider schoolId={schoolId} frozenDate={frozenDate}>
+    <SchoolTimeProvider schoolId={schoolId} frozenDate={frozenDate} serverNowMs={schoolNowMs(frozenDate)}>
       <FullscreenLessonProvider>
         <ScaleWrapper>
           <DemoWelcomeModal />

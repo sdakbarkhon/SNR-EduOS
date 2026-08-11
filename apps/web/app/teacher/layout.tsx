@@ -12,7 +12,7 @@ import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { CurriculumReadyModal } from "@/components/CurriculumReadyModal";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
-import { getSchoolFrozenDate } from "@/lib/school-time";
+import { getSchoolFrozenDate, schoolNowMs } from "@/lib/school-time";
 import { SchoolTimeProvider } from "@/components/SchoolTimeProvider";
 
 export default async function TeacherLayout({ children }: { children: ReactNode }) {
@@ -39,7 +39,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   const isDemo = (await cookies()).has(DEMO_SESSION_COOKIE);
 
   return (
-    <SchoolTimeProvider schoolId={schoolId} frozenDate={frozenDate}>
+    <SchoolTimeProvider schoolId={schoolId} frozenDate={frozenDate} serverNowMs={schoolNowMs(frozenDate)}>
     <FullscreenLessonProvider>
       <ScaleWrapper>
         <DemoWelcomeModal />

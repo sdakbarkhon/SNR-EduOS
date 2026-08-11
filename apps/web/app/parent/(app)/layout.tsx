@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getParentContext } from "@/lib/parent-context";
 import { createClient } from "@/lib/supabase/server";
-import { getSchoolFrozenDate } from "@/lib/school-time";
+import { getSchoolFrozenDate, schoolNowMs } from "@/lib/school-time";
 import { SchoolTimeProvider } from "@/components/SchoolTimeProvider";
 import { ParentAppShell } from "./ParentAppShell";
 
@@ -22,7 +22,7 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
   const frozenDate = await getSchoolFrozenDate(supabase, ctx.schoolId);
 
   return (
-    <SchoolTimeProvider schoolId={ctx.schoolId} frozenDate={frozenDate}>
+    <SchoolTimeProvider schoolId={ctx.schoolId} frozenDate={frozenDate} serverNowMs={schoolNowMs(frozenDate)}>
       <ParentAppShell>{children}</ParentAppShell>
     </SchoolTimeProvider>
   );

@@ -12,7 +12,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { MarkdownInline } from "@/components/markdown-plugins";
 import { useLocale } from "@/components/LocaleProvider";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -33,6 +33,8 @@ type NewQuestion = { question_text: string; options: string[]; correct_index: nu
 
 export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: Props) {
   const { locale } = useLocale();
+  // Z.3, заход 3 — школьное «сейчас» для обработчика.
+  const schoolNowMs = useSchoolNowSnapshot();
   const d = getDictionary(locale as Locale);
   const db = createClient();
 
@@ -175,7 +177,7 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
       setSubmissions((prev) =>
         prev.map((s) =>
           s.id === submissionId
-            ? { ...s, grade: gradeNum, teacher_comment: g.comment || null, graded_at: getDemoNow().toISOString() }
+            ? { ...s, grade: gradeNum, teacher_comment: g.comment || null, graded_at: new Date(schoolNowMs()).toISOString() }
             : s,
         ),
       );

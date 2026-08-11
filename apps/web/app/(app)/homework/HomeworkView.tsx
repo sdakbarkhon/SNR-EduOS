@@ -22,7 +22,7 @@ import {
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow, useSchoolNowMs } from "@/components/SchoolTimeProvider";
 import { useLocale, useToast } from "@/components";
 import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { HomeworkStatsDonut } from "./HomeworkStatsDonut";
@@ -36,9 +36,9 @@ type TypeFilter = "all" | ContentType;
 type DeadlineFilter = "all" | "overdue" | "soon";
 type SortMode = "deadline" | "deadlineDesc" | "title" | "subject";
 
-function matchesDeadlineFilter(hw: HomeworkWithSubmission, filter: DeadlineFilter): boolean {
+// Z.3, заход 3 — «сейчас» параметром: функция на уровне модуля.
+function matchesDeadlineFilter(hw: HomeworkWithSubmission, filter: DeadlineFilter, nowMs: number): boolean {
   if (filter === "all") return true;
-  const nowMs = getDemoNow().getTime();
   const cat = homeworkCategory(hw, hw.submission, nowMs);
   if (filter === "overdue") return cat === "overdue";
   // "soon": ещё активно (не сдано/не оценено/не просрочено) и дедлайн < 2 дней
@@ -79,7 +79,8 @@ export function HomeworkView({
   const showToast = useToast();
 
   const [rows, setRows] = useState<HomeworkWithSubmission[]>(initialRows);
-  const [now] = useState(() => getDemoNow());
+  const now = useSchoolNow();
+  const nowMsValue = useSchoolNowMs();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>(initialSubject);
@@ -112,7 +113,7 @@ export function HomeworkView({
     let items = rows;
     if (subjectFilter !== "all") items = items.filter((r) => subjectKeyOf(r) === subjectFilter);
     if (typeFilter !== "all") items = items.filter((r) => r.content_type === typeFilter);
-    if (deadlineFilter !== "all") items = items.filter((r) => matchesDeadlineFilter(r, deadlineFilter));
+    if (deadlineFilter !== "all") items = items.filter((r) => matchesDeadlineFilter(r, deadlineFilter, nowMsValue));
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.trim().toLowerCase();
       items = items.filter(

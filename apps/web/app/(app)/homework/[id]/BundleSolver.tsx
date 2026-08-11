@@ -30,7 +30,7 @@ import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { CodeEditor, CodeViewer } from "@/components/CodeEditor";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 
 type TestQuestionConfig = { question: string; options: string[]; correctIndex: number };
 type Dict = ReturnType<typeof getDictionary>;
@@ -335,6 +335,8 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
   const router = useRouter();
   const sb = createClient();
   const { locale } = useLocale();
+  // Z.3, заход 3 — школьное «сейчас» для обработчиков (хук нельзя звать внутри них).
+  const schoolNowMs = useSchoolNowSnapshot();
   const d = getDictionary(locale as Locale);
   const bd = d.homework.bundle;
   // subject_id (migration 107) is the real subject; group.subject is a legacy
@@ -396,8 +398,11 @@ export function BundleSolver({ hw }: { hw: HomeworkWithSubmission }) {
         subtask_id: subtaskId,
         content,
         completed,
-        created_at: existing?.created_at ?? getDemoNow().toISOString(),
-        updated_at: getDemoNow().toISOString(),
+        // Z.3, заход 3 — школьное «сейчас». Это ОПТИМИСТИЧНОЕ состояние: в базу
+        // не пишется, после перезагрузки значение придёт из БД. Оба показа
+        // совпадут, потому что сервер пишет тем же школьным временем.
+        created_at: existing?.created_at ?? new Date(schoolNowMs()).toISOString(),
+        updated_at: new Date(schoolNowMs()).toISOString(),
       });
       return next;
     });

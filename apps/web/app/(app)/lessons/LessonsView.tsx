@@ -19,7 +19,7 @@ import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForW
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
@@ -181,22 +181,26 @@ export function LessonsView({
   const toast = useToast();
 
   const [mode, setMode] = useState<ViewMode>("today");
-  // null до маунта — сервер (UTC) и клиент считают "сейчас" одинаково (гидрация)
-  const [now, setNow] = useState<Date | null>(null);
+  // Z.3, заход 3 — «сейчас» приходит из useSchoolNow ниже. Прежний null-до-маунта
+  // больше не нужен: начальное значение провайдер берёт с сервера одним числом,
+  // поэтому сервер и клиент считают одинаково и без рассинхрона гидратации.
   const [weekStart, setWeekStart] = useState(initialWeekStart);
   const [weekCache, setWeekCache] = useState<Record<string, LessonWithSubject[]>>({
     [initialWeekStart]: initialWeekLessons,
   });
   const [weekLoading, setWeekLoading] = useState(false);
 
+  // Z.3, заход 3 — «сейчас» из школы. Таймер живёт внутри useSchoolNow и у
+  // ЗАМОРОЖЕННОЙ школы не заводится вовсе: подсветка «Сейчас» остаётся
+  // неподвижной, ровно как была с константой. Восстановление режима из
+  // localStorage к времени отношения не имеет и осталось своим эффектом.
+  const now = useSchoolNow(30_000);
+
   useEffect(() => {
-    setNow(getDemoNow());
     try {
       const saved = localStorage.getItem(MODE_KEY);
       if (saved === "week" || saved === "today") setMode(saved);
     } catch { /* blocked */ }
-    const t = setInterval(() => setNow(getDemoNow()), 30_000);
-    return () => clearInterval(t);
   }, []);
 
   function switchMode(m: ViewMode) {

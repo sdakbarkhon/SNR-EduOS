@@ -10,7 +10,7 @@ import type {
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { SERVICE_CONFIG } from "@/lib/external-services";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 
 type Row = LessonStageProgress & {
   student: { id: string; full_name: string; avatar_url: string | null };
@@ -31,6 +31,8 @@ export function ExternalSubmissionsModal({
   onClose: () => void;
 }) {
   const { locale } = useLocale();
+  // Z.3, заход 3 — школьное «сейчас» для обработчика.
+  const schoolNowMs = useSchoolNowSnapshot();
   const dx = getDictionary(locale as Locale).lesson.external;
   const db = createClient();
 
@@ -56,7 +58,7 @@ export function ExternalSubmissionsModal({
   function applyGrade(studentId: string, grade: number, comment: string | null) {
     setRows((prev) => prev.map((r) =>
       r.student_id === studentId
-        ? { ...r, grade, teacher_comment: comment, graded_at: getDemoNow().toISOString(), graded_by: teacherId }
+        ? { ...r, grade, teacher_comment: comment, graded_at: new Date(schoolNowMs()).toISOString(), graded_by: teacherId }
         : r,
     ));
   }

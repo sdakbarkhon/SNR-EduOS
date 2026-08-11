@@ -13,7 +13,7 @@ import {
   type ChatThreadSummary,
   type ChatMessageRow,
 } from "@snr/core";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { useLocale } from "../LocaleProvider";
@@ -59,6 +59,8 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
   const activeThreadId = searchParams.get("thread");
 
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  // Z.3, заход 3 — школьное «сейчас» для обработчика.
+  const schoolNowMs = useSchoolNowSnapshot();
   const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
   const [messages, setMessages] = useState<ChatMessageRow[]>([]);
   const [composerText, setComposerText] = useState("");
@@ -206,7 +208,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
       thread_id: activeThreadId,
       sender_id: myUserId,
       body,
-      created_at: getDemoNow().toISOString(),
+      created_at: new Date(schoolNowMs()).toISOString(),
       edited_at: null,
       deleted_at: null,
     };
@@ -323,7 +325,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
               <span className="truncate">{displayName}</span>
             </span>
             {t.lastMessage && (
-              <span className="shrink-0 text-[11px] text-gray-400">{dayLabel(t.lastMessage.created_at, d, locale, true)}</span>
+              <span className="shrink-0 text-[11px] text-gray-400">{dayLabel(t.lastMessage.created_at, d, locale, true, schoolNowMs())}</span>
             )}
           </div>
           {opts.subtitle && <p className="truncate text-[11px] text-gray-400">{opts.subtitle}</p>}
@@ -486,7 +488,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
                     {showDivider && (
                       <div className="my-3 flex justify-center">
                         <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-500">
-                          {dayLabel(m.created_at, d, locale, false)}
+                          {dayLabel(m.created_at, d, locale, false, schoolNowMs())}
                         </span>
                       </div>
                     )}

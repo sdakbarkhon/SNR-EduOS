@@ -36,7 +36,7 @@ import { CODE_LANGUAGES, CODE_LANGUAGE_LABELS } from "@/lib/code-languages";
 import { QuizBuilder, emptyQuizQuestion, quizQuestionsValid } from "./QuizBuilder";
 import { CodeCompletionBuilder, codeCompletionValid } from "@/components/teacher/CodeCompletionBuilder";
 import { createClient } from "@/lib/supabase/client";
-import { isPastDayLesson } from "@/lib/demo-date";
+import { useIsPastDayLesson } from "@/components/SchoolTimeProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { LessonHeaderBar, LessonHeaderPill } from "@/components/LessonHeaderBar";
@@ -771,6 +771,10 @@ export function TeacherLessonDetailView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
+  // Z.3, заход 3 — зеркало триггера trg_block_past_day_lesson_start по школе
+  // текущего пользователя (см. isPastDayLessonForSchool в lib/school-time.ts).
+  const isPastDay = useIsPastDayLesson();
+
 
   const [stages, setStages] = useState<LessonStage[]>(lesson.stages);
   const [activeStageId, setActiveStageId] = useState<string | null>(lesson.active_stage_id);
@@ -1359,12 +1363,12 @@ export function TeacherLessonDetailView({
                 кнопки показываем причину, чтобы учитель не упирался в сырую
                 ошибку Postgres. Замороженный день и всё, что позже,
                 стартуются как раньше — правило 1/2/3+ не затронуто. */}
-            {status === "scheduled" && !isCurator && isPastDayLesson(lesson.starts_at) && (
+            {status === "scheduled" && !isCurator && isPastDay(lesson.starts_at) && (
               <span className="rounded-[11px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
                 {dl.startBlockedPastDay}
               </span>
             )}
-            {status === "scheduled" && !isCurator && !isPastDayLesson(lesson.starts_at) && (
+            {status === "scheduled" && !isCurator && !isPastDay(lesson.starts_at) && (
               <button
                 onClick={handleStartLesson}
                 disabled={startingLesson}

@@ -12,7 +12,7 @@ import { PageContainer } from "@/components/PageContainer";
 import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 
 type Submission = { id: string; status: string };
 type TestSub = { id: string; student_id: string };
@@ -42,8 +42,8 @@ interface Props {
 type StatusFilter = "all" | "active" | "done";
 type UrgencyFilter = "all" | "this_week" | "next_week" | "later";
 
-function isActive(hw: HomeworkItem): boolean {
-  const now = getDemoNow().toISOString();
+// Z.3, заход 3 — «сейчас» параметром: функция на уровне модуля.
+function isActive(hw: HomeworkItem, now: string): boolean {
   const hasPending = hw.submissions.some((s) => s.status === "submitted");
   return !hw.due_date || hw.due_date > now || hasPending;
 }
@@ -149,8 +149,9 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   // null on server + first client render → no overdue counted until after mount,
   // keeping SSR and hydration identical (avoids React error #418).
-  const [nowIso, setNowIso] = useState<string | null>(null);
-  useEffect(() => { setNowIso(getDemoNow().toISOString()); }, []);
+  // Z.3, заход 3 — прежний null-до-маунта не нужен: провайдер отдаёт начальное
+  // значение с сервера, поэтому гидратация не расходится.
+  const nowIso = useSchoolNow().toISOString();
 
   useEffect(() => {
     const t = setTimeout(() => setQuery(rawQuery), 300);
@@ -159,8 +160,8 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
 
   const filtered = localHW.filter((hw) => {
     if (groupFilter !== "all" && hw.group.id !== groupFilter) return false;
-    if (statusFilter === "active" && !isActive(hw)) return false;
-    if (statusFilter === "done" && isActive(hw)) return false;
+    if (statusFilter === "active" && !isActive(hw, nowIso)) return false;
+    if (statusFilter === "done" && isActive(hw, nowIso)) return false;
     return true;
   });
 
@@ -348,7 +349,7 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
               const total = hw.group.enrolled?.length ?? 0;
               const submitted = hw.submissions.length + hw.test_subs.length;
               const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
-              const active = isActive(hw);
+              const active = isActive(hw, nowIso);
               const busy = busyId === hw.id;
 
               return (

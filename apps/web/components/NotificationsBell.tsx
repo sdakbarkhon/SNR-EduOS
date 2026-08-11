@@ -14,7 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "./LocaleProvider";
 import { cn } from "@/lib/cn";
-import { getDemoNowMs } from "@/lib/demo-date";
+import { useSchoolNowMs } from "@/components/SchoolTimeProvider";
 
 const ICONS: Record<NotificationKind, typeof Bell> = {
   announcement: Megaphone,
@@ -46,7 +46,8 @@ export const NotificationsBell = memo(function NotificationsBell() {
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const [shake, setShake] = useState(false);
-  const [nowMs, setNowMs] = useState<number | null>(null);
+  // Z.3, заход 3 — «сейчас» из школы; у замороженной таймер не заводится.
+  const nowMs = useSchoolNowMs(30_000);
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 64, right: 16 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -65,13 +66,10 @@ export const NotificationsBell = memo(function NotificationsBell() {
   }
   reloadRef.current = reload;
 
-  // Resolve auth uid + initial load + clock (once)
+  // Resolve auth uid + initial load (once). Часы переехали в useSchoolNowMs.
   useEffect(() => {
     db.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
     reload();
-    setNowMs(getDemoNowMs());
-    const id = setInterval(() => setNowMs(getDemoNowMs()), 30000);
-    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

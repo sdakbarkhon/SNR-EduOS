@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { isSchoolFrozen, schoolNow, schoolNowMs } from "@/lib/school-time";
+import { isPastDayLessonForSchool, isSchoolFrozen, schoolNow, schoolNowMs } from "@/lib/school-time";
 
 /**
  * Школа текущего пользователя и её заморозка — на клиенте. Z.3, заход 1.
@@ -28,17 +28,34 @@ export type SchoolTimeValue = {
   schoolId: string | null;
   /** `schools.frozen_date`: «2026-07-29» или null у обычной школы. */
   frozenDate: string | null;
+  /**
+   * «Сейчас» школы на момент серверного рендера. Z.3, заход 3.
+   *
+   * ЗАЧЕМ ОТДЕЛЬНЫМ ПОЛЕМ, А НЕ ВЫЧИСЛЯТЬ НА МЕСТЕ. У замороженной школы
+   * значение и так одинаково с обеих сторон, а у настоящей `new Date()` на
+   * сервере и в браузере РАЗНЫЕ — начальное состояние разъехалось бы, и React
+   * ругался бы на рассинхрон гидратации. Экраны решали это тем, что держали
+   * «сейчас» как null до монтирования; чтобы не тащить null через два десятка
+   * мест, начальное значение приходит с сервера одним числом, а живые часы
+   * подхватываются уже в браузере.
+   */
+  serverNowMs: number;
 };
 
-const SchoolTimeContext = createContext<SchoolTimeValue>({ schoolId: null, frozenDate: null });
+const SchoolTimeContext = createContext<SchoolTimeValue>({
+  schoolId: null,
+  frozenDate: null,
+  serverNowMs: 0,
+});
 
 export function SchoolTimeProvider({
   schoolId,
   frozenDate,
+  serverNowMs,
   children,
 }: SchoolTimeValue & { children: ReactNode }) {
   return (
-    <SchoolTimeContext.Provider value={{ schoolId, frozenDate }}>
+    <SchoolTimeContext.Provider value={{ schoolId, frozenDate, serverNowMs }}>
       {children}
     </SchoolTimeContext.Provider>
   );
@@ -64,12 +81,13 @@ export function useSchoolTime(): SchoolTimeValue {
  * (`Date.now()`), см. шапку `lib/school-time.ts`.
  */
 export function useSchoolNow(tickMs = 30_000): Date {
-  const { frozenDate } = useSchoolTime();
-  const [now, setNow] = useState<Date>(() => schoolNow(frozenDate));
+  const { frozenDate, serverNowMs } = useSchoolTime();
+  // Начальное значение — серверное: одно и то же по обе стороны гидратации.
+  const [now, setNow] = useState<Date>(() => new Date(serverNowMs));
 
   useEffect(() => {
     if (isSchoolFrozen(frozenDate)) {
-      // Заморожено: выставляем один раз и не тикаем.
+      // Заморожено: выставляем один раз и НЕ тикаем.
       setNow(schoolNow(frozenDate));
       return;
     }
@@ -90,4 +108,17 @@ export function useSchoolNowMs(tickMs = 30_000): number {
 export function useSchoolNowSnapshot(): () => number {
   const { frozenDate } = useSchoolTime();
   return () => schoolNowMs(frozenDate);
+}
+
+/**
+ * Предикат «урок за прошедший день, стартовать нельзя» для школы текущего
+ * пользователя. Z.3, заход 3.
+ *
+ * Отдаётся хуком, а не тремя обращениями к `frozenDate` в трёх файлах:
+ * условие обязано совпадать с триггером базы, и место, где оно записано,
+ * должно быть одно (см. isPastDayLessonForSchool в lib/school-time.ts).
+ */
+export function useIsPastDayLesson(): (startsAtIso: string) => boolean {
+  const { frozenDate } = useSchoolTime();
+  return (startsAtIso: string) => isPastDayLessonForSchool(startsAtIso, frozenDate);
 }

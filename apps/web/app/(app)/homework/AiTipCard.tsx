@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { getStudyTip } from "@/app/actions/ai";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 
 function RobotMascot() {
   return (
@@ -121,12 +121,14 @@ function RobotMascot() {
 }
 
 export function AiTipCard({ tipLabel }: { tipLabel: string }) {
+  // Z.3, заход 3 — школьное «сейчас» для обработчика (хук нельзя звать внутри).
+  const schoolNowMs = useSchoolNowSnapshot();
   const [tip, setTip] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
-    const today = getDemoNow().toISOString().slice(0, 10);
+    const today = new Date(schoolNowMs()).toISOString().slice(0, 10);
     const key = `study_tip_${today}`;
     const cached = typeof window !== "undefined" ? localStorage.getItem(key) : null;
     if (cached) { setTip(cached); setLoading(false); return; }

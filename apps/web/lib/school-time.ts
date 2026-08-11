@@ -70,6 +70,39 @@ export function schoolNowMs(frozenDate: string | null | undefined): number {
   return schoolNow(frozenDate).getTime();
 }
 
+/** Ташкентская дата (YYYY-MM-DD) для ISO-момента. */
+function tashkentDay(iso: string): string {
+  return new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * Урок лежит в дне СТРОГО РАНЬШЕ замороженного дня школы — значит начать его
+ * нельзя. Z.3, заход 3.
+ *
+ * ТОЧНОЕ ЗЕРКАЛО ТРИГГЕРА `trg_block_past_day_lesson_start` (миграция 173),
+ * сверено по его исходнику:
+ *   * `frozen_date IS NULL` → триггер делает RETURN NEW, ограничения нет
+ *     вовсе. Здесь — `false`, то есть кнопка старта доступна всегда;
+ *   * иначе сравнивается ДЕНЬ УРОКА ПО ТАШКЕНТУ с `frozen_date`, строго
+ *     меньше — отказ. Здесь та же пара и тот же знак.
+ *
+ * Источник истины — база: она отдаёт P0001 «Нельзя начать урок за прошедший
+ * день» независимо от того, что показал интерфейс. Эта функция нужна лишь
+ * чтобы не рисовать заведомо нерабочую кнопку и не ронять человека в сырую
+ * ошибку Postgres. Разъедутся — получим либо кнопку, падающую в сырую
+ * ошибку, либо её отсутствие там, где старт разрешён.
+ *
+ * Сам замороженный день и всё, что позже, начинать МОЖНО: заказчик
+ * показывает клиентам, что уроки запускаются наперёд.
+ */
+export function isPastDayLessonForSchool(
+  startsAtIso: string,
+  frozenDate: string | null | undefined,
+): boolean {
+  if (!frozenDate) return false;
+  return tashkentDay(startsAtIso) < frozenDate;
+}
+
 /**
  * Читает `frozen_date` школы. Отдельным запросом, потому что школа у
  * вызывающего уже есть (layout'ы получают `school_id` из тех запросов, что и

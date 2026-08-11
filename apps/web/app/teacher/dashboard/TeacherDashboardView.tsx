@@ -8,7 +8,7 @@ import {
 import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime } from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 import { Avatar } from "@/components/Avatar";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
@@ -265,12 +265,8 @@ export function TeacherDashboardView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
 
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(getDemoNow());
-    const id = setInterval(() => setNow(getDemoNow()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  // Z.3, заход 3 — «сейчас» из школы; у замороженной таймер не заводится.
+  const now = useSchoolNow(60_000);
 
   // KPI
   const studentIds = new Set<string>();

@@ -8,7 +8,7 @@ import {
   type AttendanceWithLesson,
 } from "@snr/core";
 import { colors } from "@snr/ui-tokens";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 
 const DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -53,11 +53,10 @@ export function AttendanceCalendar({
   const d = getDictionary(defaultLocale);
   // "" on server + first client render → no "today" highlight, set after mount to
   // avoid hydration error #418 (server UTC date vs client local date can differ).
-  const [todayKey, setTodayKey] = useState<string>("");
-  useEffect(() => {
-    const t = getDemoNow();
-    setTodayKey(`${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`);
-  }, []);
+  // Z.3, заход 3 — «сегодня» из школы. Прежний null-до-маунта не нужен:
+  // начальное значение приходит с сервера, гидратация не расходится.
+  const schoolNowDate = useSchoolNow();
+  const todayKey = `${schoolNowDate.getFullYear()}-${schoolNowDate.getMonth()}-${schoolNowDate.getDate()}`;
 
   const days = useMemo(() => getCalendarDays(year, month), [year, month]);
 

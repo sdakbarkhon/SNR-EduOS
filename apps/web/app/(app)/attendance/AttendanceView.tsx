@@ -12,7 +12,7 @@ import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon, useLocale } from "@/components";
 import { cn } from "@/lib/cn";
-import { getDemoNow } from "@/lib/demo-date";
+import { useSchoolNow } from "@/components/SchoolTimeProvider";
 
 type AttendanceRecord = {
   id: string;
@@ -97,9 +97,10 @@ function dayTextClass(status: "present" | "excused" | "unexcused" | "none", inMo
   return "text-[12px] font-medium text-slate-400";
 }
 
-function getMonthOptions(n: number): Array<{ value: string; label: string }> {
+// Z.3, заход 3 — «сейчас» приходит параметром: функция на уровне модуля, хук
+// внутри неё вызвать нельзя.
+function getMonthOptions(n: number, now: Date): Array<{ value: string; label: string }> {
   const opts: Array<{ value: string; label: string }> = [];
-  const now = getDemoNow();
   for (let i = 0; i < n; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -157,17 +158,17 @@ export function AttendanceView({
     return Array.from(set).sort();
   }, [initialRecords]);
 
-  const calYear = month ? parseInt(month.slice(0, 4)) : getDemoNow().getFullYear();
-  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : getDemoNow().getMonth();
+  // Z.3, заход 3 — «сейчас» из школы одним значением на весь компонент.
+  const schoolNowDate = useSchoolNow();
+  const calYear = month ? parseInt(month.slice(0, 4)) : schoolNowDate.getFullYear();
+  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : schoolNowDate.getMonth();
   const calendarDays = useMemo(() => getCalendarDays(calYear, calMonth), [calYear, calMonth]);
 
-  const [todayKey, setTodayKey] = useState("");
-  useEffect(() => {
-    const t = getDemoNow();
-    setTodayKey(t.toISOString().slice(0, 10));
-  }, []);
+  // Прежний null-до-маунта больше не нужен: начальное значение провайдер
+  // берёт с сервера, поэтому гидратация не расходится.
+  const todayKey = schoolNowDate.toISOString().slice(0, 10);
 
-  const monthOptions = useMemo(() => getMonthOptions(12), []);
+  const monthOptions = useMemo(() => getMonthOptions(12, schoolNowDate), [schoolNowDate]);
 
   const kpiCards = [
     { label: d.attendance.kpiTotal, value: allStats.total, color: "#6366f1" },

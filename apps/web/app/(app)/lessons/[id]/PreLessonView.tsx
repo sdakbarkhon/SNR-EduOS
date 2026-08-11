@@ -10,7 +10,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
 import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
-import { isPastDayLesson } from "@/lib/demo-date";
+import { useIsPastDayLesson } from "@/components/SchoolTimeProvider";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
 } from "@snr/core";
@@ -76,6 +76,9 @@ export function PreLessonView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
+  // Z.3, заход 3 — зеркало триггера trg_block_past_day_lesson_start по школе
+  // текущего пользователя (см. isPastDayLessonForSchool в lib/school-time.ts).
+  const isPastDay = useIsPastDayLesson();
   const showToast = useToast();
   const dbRef = useRef<ReturnType<typeof createClient> | null>(null);
   const style = getSubjectStyle(lesson.group.subject);
@@ -534,7 +537,7 @@ export function PreLessonView({
               по-прежнему стартуется — включая 3-й урок и дальше, то есть
               правило 1/2/3+ не затронуто. */}
           {!lesson.schoolAutostartEnabled && (
-            isPastDayLesson(lesson.starts_at) ? (
+            isPastDay(lesson.starts_at) ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/60 backdrop-blur-md">
                 {dl.startBlockedPastDay}
               </span>
