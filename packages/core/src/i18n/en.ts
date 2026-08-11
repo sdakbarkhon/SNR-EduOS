@@ -338,6 +338,7 @@ export const en: Dictionary = {
     assignmentsDeleteConfirm: "Delete {name} from group {group}?",
     assignmentsDeleteWarning: "Linked lessons will lose their subject.",
     role: "Administrator",
+    profileSchool: "School",
     statStudents: "Students",
     statTeachers: "Teachers",
     statGroups: "Groups",

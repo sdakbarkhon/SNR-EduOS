@@ -67,6 +67,7 @@ import { StageViewModal } from "./StageViewModal";
 import { KnowledgeBaseFilePicker, LESSON_ATTACH_MIME, LESSON_ATTACH_ACCEPT, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
 import { stageAllowsMedia } from "@/lib/lesson-stage-media";
+import { lessonContentTypeLabel } from "@/lib/lesson-content-type";
 
 // ── Content type metadata ─────────────────────────────────────────────────────
 const CONTENT_ICONS: Record<LessonContentType, React.ReactNode> = {
@@ -1305,29 +1306,10 @@ export function TeacherLessonDetailView({
   const startPassed = isLessonCompleted || Boolean(startStage?.is_completed);
   const summaryPassed = isLessonCompleted || Boolean(summaryStage?.is_completed);
 
+  // 11.08.2026 — таблица подписей уехала в lib/lesson-content-type.ts: ровно
+  // эта же нужна ученику (PreLessonView), а тамошняя копия отстала на три типа.
   function contentLabel(ct: LessonContentType): string {
-    const map: Record<LessonContentType, string> = {
-      presentation:   dl.stageContentPresentation,
-      code:           dl.stageContentCode,
-      wokwi:          dl.stageContentWokwi,
-      codesandbox:    dl.stageContentCodesandbox,
-      quiz_qia:       dl.stageContentQuizQia,
-      quiz_kahoot:    dl.stageContentQuizKahoot,
-      geogebra:       dl.stageContentGeogebra,
-      phet:           dl.stageContentPhet,
-      desmos:         dl.stageContentDesmos,
-      blockly_games:  dl.stageContentBlocklyGames,
-      visualgo:       dl.stageContentVisualgo,
-      p5js:           dl.stageContentP5js,
-      excalidraw:     dl.stageContentExcalidraw,
-      learningapps:   dl.stageContentLearningapps,
-      sqlonline:      dl.stageContentSqlonline,
-      typerun:        dl.stageContentTyperun,
-      scratch:        dl.stageContentScratch,
-      google_docs:    dl.stageContentGoogleDocs,
-      code_completion: dl.stageContentCodeCompletion,
-    };
-    return map[ct] ?? ct;
+    return lessonContentTypeLabel(ct, dl);
   }
 
   if (!mounted) {

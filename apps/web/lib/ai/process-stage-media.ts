@@ -16,17 +16,12 @@
 // для НОВЫХ этапов, создаваемых после этой задачи.
 
 import { decideStageMedia, generateStageImage, uploadStageImageToStorage } from "./stage-media-prompts";
+import { AI_FALLBACK_GRADE, gradeFromGroupName } from "@/lib/group-grade";
 
 // Те же 2 строки, что backfill-stage-media-jul29-aug1.mjs::SUBJECT_NAMES —
 // subjects.name (RU), НЕ groups.subject (захардкоженная placeholder-
 // константа 'programming' для всех групп, миграция 97 full reset).
 const IN_SCOPE_SUBJECTS = ["Программирование", "Робототехника"];
-
-function gradeFromGroupName(name: string | null | undefined, fallback = 7): number {
-  const m = (name ?? "").match(/(\d{1,2})/);
-  const g = m ? parseInt(m[1]!, 10) : NaN;
-  return Number.isFinite(g) && g >= 1 && g <= 12 ? g : fallback;
-}
 
 export type ProcessStageMediaResult =
   | { status: "skipped"; reason: "stage_not_found" | "lesson_not_found" | "already_processed" | "subject_not_in_scope" }
@@ -86,7 +81,7 @@ export async function processStageMediaForStage(
     return { status: "skipped", reason: "subject_not_in_scope" };
   }
 
-  const grade = gradeFromGroupName(lesson.group?.name);
+  const grade = gradeFromGroupName(lesson.group?.name) ?? AI_FALLBACK_GRADE;
 
   // Ревью K.2: атомарный claim — UPDATE условен на ТОМ ЖЕ media_status, что
   // мы только что прочитали (null или уже 'pending' при повторном подборе

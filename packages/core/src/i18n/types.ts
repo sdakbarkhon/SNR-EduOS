@@ -336,6 +336,7 @@ export interface Dictionary {
     assignmentsDeleteConfirm: string;
     assignmentsDeleteWarning: string;
     role: string;
+    profileSchool: string;
     // dashboard
     statStudents: string;
     statTeachers: string;

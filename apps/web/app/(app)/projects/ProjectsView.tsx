@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Calculator, Code2, Cpu, FlaskConical, Globe, FlaskRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, Code2, Cpu, Globe, FlaskRound, type LucideIcon } from "lucide-react";
 import { getDictionary, type Locale, type StudentProjectListItem } from "@snr/core";
 import { useLocale } from "@/components";
 import { cn } from "@/lib/cn";
 import { SandboxView } from "./SandboxView";
-import type { SandboxToolId } from "@/lib/sandbox-tools";
+import { sandboxToolById, type SandboxToolId } from "@/lib/sandbox-tools";
 
 type Mode = "projects" | "sandbox";
-type ExternalTool = "wokwi" | "geogebra" | "phet";
+// Extract, а не свой список строк: если инструмент когда-нибудь уедет из
+// песочницы, ошибка вылезет здесь при сборке, а не пустой карточкой у ученика.
+type ExternalTool = Extract<SandboxToolId, "wokwi" | "geogebra" | "phet">;
 type ExternalProject = { title: string; description: string; tool: ExternalTool };
 
 // "Внешние" проекты не имеют БД-бэкинга вообще (содержимое живёт на стороннем
@@ -34,12 +36,6 @@ const EXTERNAL_PROJECTS_BY_CLASS: Record<string, ExternalProject[]> = {
   ],
 };
 const DEFAULT_EXTERNAL_PROJECTS: ExternalProject[] = EXTERNAL_PROJECTS_BY_CLASS["3-А класс"] ?? [];
-
-const TOOL_STYLE: Record<ExternalTool, { sandboxTool: SandboxToolId; gradient: string; Icon: LucideIcon }> = {
-  wokwi: { sandboxTool: "wokwi", gradient: "from-sky-400 to-blue-500", Icon: Cpu },
-  geogebra: { sandboxTool: "geogebra", gradient: "from-green-500 to-emerald-600", Icon: Calculator },
-  phet: { sandboxTool: "phet", gradient: "from-blue-500 to-indigo-600", Icon: FlaskConical },
-};
 
 // Иконка "своего" проекта — по ключевым словам в заголовке (нет отдельного
 // поля "тип" на строке БД, см. отчёт по схеме — не заводим лишнюю колонку
@@ -157,17 +153,18 @@ export function ProjectsView({
           <h2 className="mt-8 text-lg font-bold text-slate-900">{t.externalProjectsSection}</h2>
           <div className="mt-4 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
             {externalProjects.map((p) => {
-              const style = TOOL_STYLE[p.tool];
+              const tool = sandboxToolById(p.tool);
+              if (!tool) return null;
               return (
                 <button
                   key={p.title}
                   type="button"
-                  onClick={() => openSandbox(style.sandboxTool)}
+                  onClick={() => openSandbox(p.tool)}
                   className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 text-left shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm", style.gradient)}>
-                      <style.Icon className="h-5 w-5" />
+                    <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm", tool.gradient)}>
+                      <tool.Icon className="h-5 w-5" />
                     </div>
                     <h3 className="font-bold text-slate-900">{p.title}</h3>
                   </div>

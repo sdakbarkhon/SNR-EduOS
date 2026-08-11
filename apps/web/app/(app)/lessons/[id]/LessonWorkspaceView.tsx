@@ -26,6 +26,7 @@ import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
 import { StudentPresentationViewer } from "@/components/lesson-stages/StudentPresentationViewer";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
 import { stageAllowsMedia } from "@/lib/lesson-stage-media";
+import { lessonContentTypeLabel } from "@/lib/lesson-content-type";
 import { exportSlidesToPptx } from "@/lib/export-slides-to-pptx";
 import { CodeStageView } from "./CodeStageView";
 import { CodeCompletionStageView } from "./CodeCompletionStageView";
@@ -1371,9 +1372,9 @@ export function LessonWorkspaceView({
                         <h3 className="text-[15px] font-bold text-slate-800 dark:text-slate-100">{stage.title}</h3>
                         {stage.content_type && (
                           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {dl.stageContentPresentation && stage.content_type === "presentation"
-                              ? dl.stageContentPresentation
-                              : stage.content_type}
+                            {/* 11.08.2026 — раньше знало один тип, для остальных
+                                печатало системное имя ("google_docs"). */}
+                            {lessonContentTypeLabel(stage.content_type, dl)}
                           </span>
                         )}
                       </div>

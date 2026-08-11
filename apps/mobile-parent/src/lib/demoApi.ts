@@ -1,9 +1,11 @@
-// P2: мобильные вызовы /api/demo/* — вне webApi.ts, потому что демо-claim
-// делается ДО входа в Supabase (у webApi обязательный Bearer). Endpoint
-// /api/demo/claim принимает role='parent' и возвращает { username, email,
-// password, session_token }, чтобы мобилка сама залогинилась через
-// signInWithPassword и сохранила session_token в SecureStore для heartbeat/
-// release.
+// P2: мобильные вызовы /api/demo/* — вне webApi.ts, потому что демо-сессия
+// заводится ДО входа в Supabase (у webApi обязательный Bearer).
+//
+// 11.08.2026 — отсюда удалены claimDemoSlot() и DemoClaimResult: публичный
+// endpoint /api/demo/claim закрыт (он отдавал e-mail и пароль демо-аккаунта
+// кому угодно без авторизации), а вызывающих мест у функции в мобильном
+// приложении не было ни одного. heartbeatDemoSlot/releaseDemoSlot остаются —
+// они живые и их endpoint'ы на месте.
 
 import Constants from "expo-constants";
 
@@ -13,29 +15,6 @@ function baseUrl(): string {
   const extra = Constants.expoConfig?.extra as ExpoExtra | undefined;
   if (!extra?.webApiBaseUrl) throw new Error("webApiBaseUrl отсутствует (app.json expo.extra)");
   return extra.webApiBaseUrl;
-}
-
-export interface DemoClaimResult {
-  role: "student" | "teacher" | "parent";
-  redirect_to: string;
-  username: string | null;
-  email: string;
-  password: string;
-  session_token: string;
-}
-
-export async function claimDemoSlot(role: "parent" | "student" | "teacher", subjectSlug?: string): Promise<DemoClaimResult> {
-  const res = await fetch(`${baseUrl()}/api/demo/claim`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, subject_slug: subjectSlug ?? null }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = (json as { error?: string }).error;
-    throw new Error(err ?? `demo_claim_failed_${res.status}`);
-  }
-  return json as DemoClaimResult;
 }
 
 export async function heartbeatDemoSlot(sessionToken: string): Promise<boolean> {

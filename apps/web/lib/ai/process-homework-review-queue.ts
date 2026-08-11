@@ -5,6 +5,7 @@
 // оба вызывающих места новые, дублировать нечего.
 
 import { reviewHomework } from "@/lib/ai/homework-review";
+import { AI_FALLBACK_GRADE, gradeFromGroupName } from "@/lib/group-grade";
 
 export const HOMEWORK_QUEUE_MAX_ATTEMPTS = 3;
 
@@ -12,12 +13,6 @@ export type ProcessHomeworkQueueBatchResult = {
   processed: number;
   errors: number;
 };
-
-function gradeFromGroupName(name: string | null | undefined, fallback = 7): number {
-  const m = (name ?? "").match(/(\d{1,2})/);
-  const g = m ? parseInt(m[1]!, 10) : NaN;
-  return Number.isFinite(g) && g >= 1 && g <= 12 ? g : fallback;
-}
 
 /** 08.08.2026 — проверка ОДНОЙ сдачи. Тело целиком вынесено из цикла ниже
  *  БЕЗ изменений: те же запросы, тот же вызов reviewHomework(), те же
@@ -68,7 +63,7 @@ export async function reviewOneSubmission(
     homework_description: homework.description ?? "",
     subject_name: subjectName,
     answer_text: answerText,
-    group_grade: gradeFromGroupName(homework.group?.name),
+    group_grade: gradeFromGroupName(homework.group?.name) ?? AI_FALLBACK_GRADE,
   });
 
   const { error: updateErr } = await db
@@ -154,7 +149,7 @@ export async function processHomeworkReviewQueueBatch(
         homework_description: homework.description ?? "",
         subject_name: subjectName,
         answer_text: answerText,
-        group_grade: gradeFromGroupName(homework.group?.name),
+        group_grade: gradeFromGroupName(homework.group?.name) ?? AI_FALLBACK_GRADE,
       });
       console.log("[batch] AI call end:", row.submission_id);
 

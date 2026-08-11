@@ -338,6 +338,7 @@ export const uz: Dictionary = {
     assignmentsDeleteConfirm: "{name} {group} guruhidan o‘chirilsinmi?",
     assignmentsDeleteWarning: "Bog‘liq darslar fanini yo‘qotadi.",
     role: "Administrator",
+    profileSchool: "Maktab",
     statStudents: "O’quvchilar",
     statTeachers: "O’qituvchilar",
     statGroups: "Guruhlar",

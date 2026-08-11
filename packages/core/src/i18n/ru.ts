@@ -338,6 +338,7 @@ export const ru: Dictionary = {
     assignmentsDeleteConfirm: "Удалить {name} из группы {group}?",
     assignmentsDeleteWarning: "У связанных уроков пропадёт предмет.",
     role: "Администратор",
+    profileSchool: "Школа",
     statStudents: "Учеников",
     statTeachers: "Учителей",
     statGroups: "Групп",

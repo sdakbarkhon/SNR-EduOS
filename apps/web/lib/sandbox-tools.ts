@@ -164,3 +164,11 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     gradient: "from-amber-500 to-yellow-600",
   },
 ];
+
+/** Инструмент по id. Единственный источник иконки и градиента: списки
+ *  вроде «внешних проектов» на /projects обязаны брать оформление отсюда,
+ *  а не заводить свою табличку — расхождение уже случалось (у wokwi было
+ *  два разных значка, у geogebra — тоже). */
+export function sandboxToolById(id: SandboxToolId): SandboxTool | null {
+  return SANDBOX_TOOLS.find((tool) => tool.id === id) ?? null;
+}

@@ -4,12 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
-  ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Play,
-  Presentation, Code2, ClipboardCheck, Trophy, Puzzle, BookOpen,
+  ChevronLeft, MapPin, Clock, CalendarX, Calendar, X, ListChecks, Play, BookOpen,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { getSubjectStyle, formatTime, formatDate, getDictionary } from "@snr/core";
-import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview, LessonContentType } from "@snr/core";
+import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview } from "@snr/core";
 import { useIsPastDayLesson } from "@/components/SchoolTimeProvider";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
@@ -19,6 +17,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useToast } from "@/components/Toast";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
+import { lessonContentTypeIcon, lessonContentTypeLabel } from "@/lib/lesson-content-type";
 
 // Ташкентское смещение (UTC+5, фиксированное — не полагаемся на системный TZ
 // сервера/браузера). Совпадает с TZ_MS в apps/web/app/api/cron/*.
@@ -29,42 +28,9 @@ function SubjectHeroIcon({ icon, className }: { icon: string | null; className?:
   return <Icon className={className} strokeWidth={2.2} />;
 }
 
-function stageTypeIcon(ct: LessonContentType | null): LucideIcon {
-  switch (ct) {
-    case "presentation": return Presentation;
-    case "code": return Code2;
-    case "quiz_qia": return ClipboardCheck;
-    case "quiz_kahoot": return Trophy;
-    case "wokwi": case "codesandbox":
-    case "geogebra": case "phet": case "desmos": case "blockly_games": case "visualgo":
-    case "p5js": case "excalidraw": case "learningapps": case "sqlonline":
-    case "code_completion":
-      return Puzzle;
-    default: return BookOpen;
-  }
-}
-
-function stageTypeLabel(ct: LessonContentType | null, dl: ReturnType<typeof getDictionary>["lesson"]): string {
-  switch (ct) {
-    case "presentation": return dl.stageContentPresentation;
-    case "code": return dl.stageContentCode;
-    case "quiz_qia": return dl.stageContentQuizQia;
-    case "quiz_kahoot": return dl.stageContentQuizKahoot;
-    case "wokwi": return dl.stageContentWokwi;
-    case "codesandbox": return dl.stageContentCodesandbox;
-    case "geogebra": return dl.stageContentGeogebra;
-    case "phet": return dl.stageContentPhet;
-    case "desmos": return dl.stageContentDesmos;
-    case "blockly_games": return dl.stageContentBlocklyGames;
-    case "visualgo": return dl.stageContentVisualgo;
-    case "p5js": return dl.stageContentP5js;
-    case "excalidraw": return dl.stageContentExcalidraw;
-    case "learningapps": return dl.stageContentLearningapps;
-    case "sqlonline": return dl.stageContentSqlonline;
-    case "code_completion": return dl.stageContentCodeCompletion;
-    default: return "";
-  }
-}
+// 11.08.2026 — свои switch'и с подписями и значками отсюда убраны: они
+// отставали от списка типов на scratch, typerun и google_docs (ученик видел
+// пустую подпись). Теперь общий источник — lib/lesson-content-type.ts.
 
 export function PreLessonView({
   lesson,
@@ -451,7 +417,7 @@ export function PreLessonView({
                 <>
                   <div className="flex flex-col gap-4">
                     {stages.map((stage) => {
-                      const Icon = stageTypeIcon(stage.content_type);
+                      const Icon = lessonContentTypeIcon(stage.content_type, BookOpen);
                       return (
                         <div key={stage.id} className="flex items-center gap-3.5">
                           <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] bg-orange-400/20 text-orange-200">
@@ -460,7 +426,7 @@ export function PreLessonView({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[17px] font-extrabold text-white">{stage.title}</p>
                             <p className="text-[13px] font-semibold text-white/55">
-                              {stageTypeLabel(stage.content_type, dl)}
+                              {lessonContentTypeLabel(stage.content_type, dl)}
                               {stage.duration_min ? ` · ~${stage.duration_min} ${d.schedule.minShort}` : ""}
                             </p>
                           </div>
