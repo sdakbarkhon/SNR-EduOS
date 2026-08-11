@@ -48,8 +48,25 @@ const APPLY = process.argv.includes("--apply");
 const LIMIT_ARG = process.argv.find((a) => a.startsWith("--limit="));
 const LIMIT = LIMIT_ARG ? parseInt(LIMIT_ARG.slice("--limit=".length), 10) : Infinity;
 
+// 11.08.2026 — РЕЖИМ ДОБОРА (--fill-thin).
+//
+// После четырёх заходов уборки шаблонных заготовок у части уроков демо-школы
+// осталось 1-2 содержательных этапа вместо четырёх: заготовки составляли их
+// почти целиком. Мусор убран правильно, но на его месте дыра, и заказчик
+// увидит на показе урок из одного этапа.
+//
+// Второй генератор ради этого не заводим — берём ЭТОТ, он уже делает ровно
+// тот профиль, что у уцелевших уроков (замерено заново 11.08 и совпало со
+// снятым в шапке). Отличий от обычного режима два:
+//   • цель — не список из .restored-lessons.json, а уроки демо-школы с 1-3
+//     содержательными этапами;
+//   • создаются ТОЛЬКО недостающие позиции. Существующие этапы, их вопросы и
+//     работы учеников не трогаются вовсе.
+const FILL_THIN = process.argv.includes("--fill-thin");
+
 const IDS_PATH = new URL("./.restored-lessons.json", import.meta.url);
-const LOG_PATH = path.resolve(process.cwd(), "scripts/.restore-stages-progress.json");
+const LOG_PATH = path.resolve(process.cwd(),
+  FILL_THIN ? "scripts/.fill-thin-progress.json" : "scripts/.restore-stages-progress.json");
 
 function fail(msg) { console.error(`\n!!! ОСТАНОВЛЕНО: ${msg}`); process.exit(1); }
 
@@ -273,26 +290,79 @@ const saveLog = (log) => fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2)
 // ── основная часть ──────────────────────────────────────────────────────────
 console.log(`Режим: ${APPLY ? "--apply (ЗАПИСЬ)" : "ХОЛОСТОЙ ПРОГОН, Gemini не вызывается, в базу не пишется"}\n`);
 
-const restoredIds = JSON.parse(fs.readFileSync(IDS_PATH, "utf8")).map((r) => r.id);
-if (restoredIds.length !== 49) fail(`в списке восстановленных ${restoredIds.length} уроков вместо 49`);
+let lessons, targetIds, existingByLesson = new Map();
 
-const { data: lessons, error: lErr } = await db
-  .from("lessons")
-  .select("id, topic, title, starts_at, group:groups(name), subject:subjects(name)")
-  .in("id", restoredIds).order("starts_at");
-if (lErr) fail(`чтение уроков: ${lErr.message}`);
-if (lessons.length !== 49) fail(`в базе нашлось ${lessons.length} из 49 восстановленных уроков`);
+if (FILL_THIN) {
+  // Все уроки школы читаем разом и считаем этапы на стороне скрипта: уроков
+  // сотня с небольшим, постранично тут нечего листать, но счётчик всё равно
+  // сверяем — правило про 1000 строк.
+  const { count: lessonCount, error: cErr } = await db
+    .from("lessons").select("id", { count: "exact", head: true }).eq("school_id", SCHOOL_ID);
+  if (cErr) fail(`счёт уроков: ${cErr.message}`);
+  const { data: allLessons, error: alErr } = await db
+    .from("lessons").select("id, topic, title, starts_at, group:groups(name), subject:subjects(name)")
+    .eq("school_id", SCHOOL_ID).order("starts_at");
+  if (alErr) fail(`чтение уроков: ${alErr.message}`);
+  if (allLessons.length !== lessonCount) fail(`уроков прочитано ${allLessons.length} из ${lessonCount}`);
 
-const { data: middleRows, error: mErr } = await db
-  .from("lesson_stages").select("lesson_id").in("lesson_id", restoredIds).eq("stage_role", "middle");
-if (mErr) fail(`проверка существующих этапов: ${mErr.message}`);
-const hasMiddle = new Set(middleRows.map((r) => r.lesson_id));
+  const { count: stageCount, error: scErr } = await db
+    .from("lesson_stages").select("id", { count: "exact", head: true }).eq("school_id", SCHOOL_ID);
+  if (scErr) fail(`счёт этапов: ${scErr.message}`);
+  const { data: allStages, error: asErr } = await db
+    .from("lesson_stages").select("lesson_id, position, title, stage_role, content_type, slides")
+    .eq("school_id", SCHOOL_ID);
+  if (asErr) fail(`чтение этапов: ${asErr.message}`);
+  if (allStages.length !== stageCount) fail(`этапов прочитано ${allStages.length} из ${stageCount}`);
+
+  for (const s of allStages) {
+    if (!existingByLesson.has(s.lesson_id)) existingByLesson.set(s.lesson_id, []);
+    existingByLesson.get(s.lesson_id).push(s);
+  }
+  lessons = allLessons.filter((l) => {
+    const mid = (existingByLesson.get(l.id) ?? []).filter((s) => s.stage_role === "middle").length;
+    return mid >= 1 && mid <= 3;
+  });
+  targetIds = lessons.map((l) => l.id);
+  console.log(`Уроков в школе: ${allLessons.length}; из них тонких (1-3 содержательных этапа): ${lessons.length}\n`);
+} else {
+  const restoredIds = JSON.parse(fs.readFileSync(IDS_PATH, "utf8")).map((r) => r.id);
+  if (restoredIds.length !== 49) fail(`в списке восстановленных ${restoredIds.length} уроков вместо 49`);
+
+  const { data: rows, error: lErr } = await db
+    .from("lessons")
+    .select("id, topic, title, starts_at, group:groups(name), subject:subjects(name)")
+    .in("id", restoredIds).order("starts_at");
+  if (lErr) fail(`чтение уроков: ${lErr.message}`);
+  if (rows.length !== 49) fail(`в базе нашлось ${rows.length} из 49 восстановленных уроков`);
+  lessons = rows;
+  targetIds = restoredIds;
+
+  const { data: middleRows, error: mErr } = await db
+    .from("lesson_stages").select("lesson_id").in("lesson_id", restoredIds).eq("stage_role", "middle");
+  if (mErr) fail(`проверка существующих этапов: ${mErr.message}`);
+  const hasMiddle = new Set(middleRows.map((r) => r.lesson_id));
+  lessons = lessons.filter((l) => !hasMiddle.has(l.id));
+}
+
+/** Какие позиции скелета у урока уже заняты. В режиме добора создаём только
+ *  недостающие; позиция 4 (квиз с вопросами) занята у всех тонких уроков и
+ *  не трогается никогда. */
+function missingPositions(lessonId) {
+  const have = new Set((existingByLesson.get(lessonId) ?? [])
+    .filter((s) => s.stage_role === "middle").map((s) => s.position));
+  return [1, 2, 3, 4].filter((p) => !have.has(p));
+}
+/** Пустой ли «Итог» — заполняем только пустой, содержательный не перетираем. */
+function summaryIsEmpty(lessonId) {
+  const sum = (existingByLesson.get(lessonId) ?? []).find((s) => s.stage_role === "summary");
+  return !!sum && !(Array.isArray(sum.slides) && sum.slides.length > 0);
+}
 
 const log = loadLog();
-const queued = lessons.filter((l) => !hasMiddle.has(l.id) && !log.done[l.id]);
+const queued = lessons.filter((l) => !log.done[l.id]);
 const pending = queued.slice(0, LIMIT);
 
-console.log(`Уроков в списке: ${lessons.length}; уже с этапами (пропуск): ${hasMiddle.size}; в очереди: ${queued.length}; в этом запуске: ${pending.length}\n`);
+console.log(`В очереди: ${queued.length}; в этом запуске: ${pending.length}\n`);
 if (pending.length === 0) { console.log("Нечего делать."); process.exit(0); }
 
 // ── холостой прогон ─────────────────────────────────────────────────────────
@@ -315,14 +385,22 @@ if (!APPLY) {
   console.log("   code — Программирование, wokwi — Робототехника, slides — «Разбор примеров» у остальных");
 
   console.log("\n── УРОКИ В ОЧЕРЕДИ ──");
+  let newStages = 0, newQuizzes = 0, summaries = 0;
   for (const [i, l] of pending.entries()) {
-    console.log(`   ${String(i + 1).padStart(2)}. ${l.starts_at.slice(0, 10)} ${l.group?.name?.replace(" класс", "").padEnd(4)} · ${(l.subject?.name ?? "—").padEnd(16)} ${l.topic}`);
+    const miss = FILL_THIN ? missingPositions(l.id) : [1, 2, 3, 4];
+    const sum = FILL_THIN ? summaryIsEmpty(l.id) : true;
+    newStages += miss.length;
+    if (miss.includes(4)) newQuizzes++;
+    if (sum) summaries++;
+    const missLabel = FILL_THIN ? `  создаём позиции: ${miss.join(",") || "—"}${sum ? " + Итог" : ""}` : "";
+    console.log(`   ${String(i + 1).padStart(2)}. ${l.starts_at.slice(0, 10)} ${l.group?.name?.replace(" класс", "").padEnd(4)} · ${(l.subject?.name ?? "—").padEnd(16)} ${l.topic}${missLabel}`);
   }
   const calls = pending.length;
   console.log(`\nВызовов Gemini: ${calls} (по одному на урок, модель 2.5-flash).`);
   console.log(`Оценка стоимости: ~$${(calls * 0.011).toFixed(2)} — порог в $5 не достигается.`);
   console.log(`Ожидаемое время: ~${Math.ceil((calls * 6.5) / 60)} мин (троттлинг 6.5 с между вызовами).`);
-  console.log(`\nБудет создано этапов: ${calls * 4}, обновлено «Итогов»: ${calls}, вопросов: ~${calls * 4}.`);
+  console.log(`\nБудет создано этапов: ${newStages}, наборов вопросов: ${newQuizzes}, заполнено «Итогов»: ${summaries}.`);
+  if (FILL_THIN) console.log("Существующие этапы, их вопросы и работы учеников не трогаются.");
   console.log("\nХолостой прогон. Запуск с --apply начнёт генерацию.");
   process.exit(0);
 }
@@ -359,11 +437,15 @@ for (const [i, lesson] of pending.entries()) {
   if (!v) { errors++; continue; }
 
   const stages = buildStages(v, practiceKind, programmingLanguage);
+  // Форму проверяем на ПОЛНОМ скелете — это то, каким урок станет, — а
+  // записываем только недостающие позиции.
   const problems = checkShape(stages);
   if (problems.length) fail(`урок «${topic}» дал неверную форму: ${problems.join("; ")}`);
+  const wanted = FILL_THIN ? new Set(missingPositions(lesson.id)) : new Set([1, 2, 3, 4]);
+  const toInsert = stages.filter((s) => wanted.has(s.position));
 
   let quizStageId = null, writeOk = true;
-  for (const stage of stages) {
+  for (const stage of toInsert) {
     const { data: ins, error: insErr } = await db
       .from("lesson_stages").insert({ lesson_id: lesson.id, school_id: SCHOOL_ID, ...stage })
       .select("id, content_type").single();
@@ -380,11 +462,15 @@ for (const [i, lesson] of pending.entries()) {
     if (qErr) { console.error(`  !! вопросы: ${qErr.message}`); writeOk = false; }
   }
 
-  const { error: sumErr } = await db.from("lesson_stages").update({
-    title: "Итог урока", content_type: "presentation", stage_type: "theory",
-    slides: [{ layout: "default", title: "Итог урока", content: v.keyPoints.map((p) => `- ${p}`).join("\n") }],
-  }).eq("lesson_id", lesson.id).eq("position", 9999);
-  if (sumErr) { console.error(`  !! Итог: ${sumErr.message}`); writeOk = false; }
+  // «Итог» заполняем только пустой: содержательный, написанный под конкретный
+  // урок, перетирать нельзя.
+  if (!FILL_THIN || summaryIsEmpty(lesson.id)) {
+    const { error: sumErr } = await db.from("lesson_stages").update({
+      title: "Итог урока", content_type: "presentation", stage_type: "theory",
+      slides: [{ layout: "default", title: "Итог урока", content: v.keyPoints.map((p) => `- ${p}`).join("\n") }],
+    }).eq("lesson_id", lesson.id).eq("position", 9999);
+    if (sumErr) { console.error(`  !! Итог: ${sumErr.message}`); writeOk = false; }
+  }
 
   log.done[lesson.id] = true;
   saveLog(log);
@@ -396,12 +482,12 @@ console.log(`\nСгенерировано уроков: ${done}, с ошибко
 
 // ── проверка после записи ───────────────────────────────────────────────────
 const { count: stagesNow } = await db.from("lesson_stages")
-  .select("id", { count: "exact", head: true }).in("lesson_id", restoredIds);
+  .select("id", { count: "exact", head: true }).in("lesson_id", targetIds);
 const { data: midNow } = await db.from("lesson_stages")
-  .select("lesson_id").in("lesson_id", restoredIds).eq("stage_role", "middle");
+  .select("lesson_id").in("lesson_id", targetIds).eq("stage_role", "middle");
 const perLesson = {};
 for (const r of midNow ?? []) perLesson[r.lesson_id] = (perLesson[r.lesson_id] ?? 0) + 1;
 const dist = {};
-for (const id of restoredIds) dist[perLesson[id] ?? 0] = (dist[perLesson[id] ?? 0] ?? 0) + 1;
-console.log(`Этапов у 49 уроков: ${stagesNow}; средних этапов на урок: ${JSON.stringify(dist)}`);
-console.log(`Готовых уроков (4 средних этапа): ${dist[4] ?? 0} из 49.`);
+for (const id of targetIds) dist[perLesson[id] ?? 0] = (dist[perLesson[id] ?? 0] ?? 0) + 1;
+console.log(`Этапов у ${targetIds.length} целевых уроков: ${stagesNow}; содержательных на урок: ${JSON.stringify(dist)}`);
+console.log(`Готовых уроков (4 содержательных этапа и больше): ${Object.entries(dist).filter(([k]) => Number(k) >= 4).reduce((a, [, v]) => a + v, 0)} из ${targetIds.length}.`);
