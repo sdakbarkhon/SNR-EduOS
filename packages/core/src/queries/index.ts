@@ -3126,6 +3126,30 @@ export const addLessonStage = async (
 ): Promise<LessonStage> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+
+  // 11.08.2026 — этап-презентация без содержимого не создаётся вовсе.
+  //
+  // Решение заказчика: «либо этап несёт настоящее содержимое, либо его нет».
+  // До этого сохранить презентацию без единого слайда и без файла было
+  // можно — получался этап, который ученику показывает пустую карточку, а в
+  // «Материалах группы» либо не появляется вовсе, либо появляется пустым.
+  // Ровно из такой пустоты и выросли шаблонные заглушки, которые пришлось
+  // вычищать вручную (63 штуки, 11.08).
+  //
+  // Содержимое презентации бывает ДВУХ видов, и оба здесь законны:
+  //   • slides — сгенерированные слайды (путь ИИ-генерации);
+  //   • config.presentation_file — загруженный учителем PPTX (ручной путь,
+  //     см. форму этапа в TeacherLessonDetailView).
+  // Нет ни того, ни другого — отказываем с понятным текстом, а не создаём
+  // пустышку.
+  if (input.contentType === "presentation") {
+    const hasSlides = Array.isArray(input.slides) && input.slides.length > 0;
+    const hasFile = Boolean((input.config as { presentation_file?: unknown } | undefined)?.presentation_file);
+    if (!hasSlides && !hasFile) {
+      throw new Error("Презентация без слайдов и без файла не создаётся — добавьте содержимое");
+    }
+  }
+
   // Найти максимальную позицию среди middle-этапов
   const { data: existing } = await db2
     .from("lesson_stages")
