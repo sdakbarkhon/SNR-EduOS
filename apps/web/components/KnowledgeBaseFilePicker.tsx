@@ -46,6 +46,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { parseVideoUrl } from "@/lib/video-url";
 import { uploadVideoFile } from "@/lib/video-storage";
+import { canUseDepartmentLibrary } from "@/lib/curator";
 
 export type PickedKnowledgeBaseFile = {
   source: "material" | "book" | "teacherLibrary";
@@ -660,7 +661,9 @@ export function KnowledgeBaseFilePicker({
   // что была на снесённой странице /teacher/library.
   const [myTeacher, setMyTeacher] = useState<{ id: string; subject_slug: string | null } | null>(null);
   const [myGroups, setMyGroups] = useState<Array<{ id: string; name: string }>>([]);
-  const isCurator = !myTeacher?.subject_slug;
+  // Не «куратор», а «есть ли у меня кафедра»: правило библиотеки — свой
+  // непустой предмет, см. lib/curator.ts и политику вставки.
+  const hasDepartment = canUseDepartmentLibrary(myTeacher?.subject_slug);
   const [showLibUpload, setShowLibUpload] = useState(false);
   const [showLibVideo, setShowLibVideo] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -872,7 +875,7 @@ export function KnowledgeBaseFilePicker({
     ? allItems.filter((it) => isVideoItem(it) || (it.picked.fileType && acceptedTypes.includes(it.picked.fileType)))
     : allItems;
 
-  const canManageLibrary = tab === "teacherLibrary" && !!myTeacher && !isCurator;
+  const canManageLibrary = tab === "teacherLibrary" && !!myTeacher && hasDepartment;
   const sourceCountForTab =
     tab === "materials" ? materials.length : tab === "library" ? books.length : libraryFiles.length;
 
@@ -958,7 +961,7 @@ export function KnowledgeBaseFilePicker({
             {deleteError && <span className="text-xs font-medium text-red-600">{deleteError}</span>}
           </div>
         )}
-        {tab === "teacherLibrary" && isCurator && myTeacher && (
+        {tab === "teacherLibrary" && !hasDepartment && myTeacher && (
           <div className="border-b border-slate-100 px-6 py-3">
             <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
               {dt.libraryCuratorNotice}
@@ -1052,7 +1055,7 @@ export function KnowledgeBaseFilePicker({
         </div>
       </div>
 
-      {showLibUpload && myTeacher && !isCurator && (
+      {showLibUpload && myTeacher && hasDepartment && (
         <LibraryUploadModal
           groups={myGroups}
           teacherId={myTeacher.id}
@@ -1062,7 +1065,7 @@ export function KnowledgeBaseFilePicker({
           onSuccess={() => { setShowLibUpload(false); refetchLibrary(); }}
         />
       )}
-      {showLibVideo && myTeacher && !isCurator && (
+      {showLibVideo && myTeacher && hasDepartment && (
         <LibraryVideoLinkModal
           groups={myGroups}
           subjectSlug={myTeacher.subject_slug ?? ""}

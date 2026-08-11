@@ -34,6 +34,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { LibraryUploadModal, LibraryVideoLinkModal } from "@/components/KnowledgeBaseFilePicker";
+import { canUseDepartmentLibrary } from "@/lib/curator";
 
 function iconFor(fileType: string | null, isVideo: boolean) {
   if (isVideo) return Video;
@@ -194,7 +195,8 @@ export function TeacherLibraryTabView({
     return () => clearTimeout(t);
   }, [rawQuery]);
 
-  const isCurator = !initialSubjectSlug;
+  // Не «куратор», а «есть ли у меня кафедра» — см. lib/curator.ts.
+  const hasDepartment = canUseDepartmentLibrary(initialSubjectSlug);
 
   const subjectsPresent = useMemo(() => {
     const set = new Set(materials.map((m) => m.subject_slug).filter(Boolean));
@@ -328,7 +330,7 @@ export function TeacherLibraryTabView({
       )}
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        {!isCurator ? (
+        {hasDepartment ? (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

@@ -4,6 +4,7 @@ import { getMyTeacher } from "@/lib/cached-queries";
 import { notFound, redirect } from "next/navigation";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { TeacherLessonDetailView } from "./TeacherLessonDetailView";
+import { isCuratorTeacher } from "@/lib/curator";
 
 export default async function TeacherLessonDetailPage({
   params,
@@ -22,12 +23,13 @@ export default async function TeacherLessonDetailPage({
   // Промт 6: раньше оба catch(() => null) сливались в один notFound() —
   // реальный сбой запроса (throw) неотличим от "урока правда нет", 404
   // вводит в заблуждение. Не глушим здесь — пусть бросает дальше.
-  const [lesson, teacher] = await Promise.all([
+  const [lesson, teacher, isCurator] = await Promise.all([
     getTeacherLessonView(db, id),
     getMyTeacher(db),
+    isCuratorTeacher(db),
   ]);
 
   if (!lesson || !teacher) notFound();
 
-  return <TeacherLessonDetailView lesson={lesson} teacher={teacher} />;
+  return <TeacherLessonDetailView lesson={lesson} teacher={teacher} isCurator={isCurator} />;
 }

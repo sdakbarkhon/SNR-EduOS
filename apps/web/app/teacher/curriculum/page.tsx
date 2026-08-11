@@ -4,6 +4,7 @@ import { getMyTeacher } from "@/lib/cached-queries";
 import { redirect } from "next/navigation";
 import { safeQuery } from "@/lib/safe-query";
 import { CurriculumPlansView } from "./CurriculumPlansView";
+import { isCuratorTeacher } from "@/lib/curator";
 
 export default async function TeacherCurriculumPage() {
   const db = await createClient();
@@ -40,10 +41,10 @@ export default async function TeacherCurriculumPage() {
     : { data: [], error: null };
   if (subjectsErr) console.error("[TeacherCurriculumPage.subjects] failed:", subjectsErr.message);
 
-  // Куратор (subject_slug=NULL, напр. teacher_karim) планирует по всем
+  // Куратор (только в демо-школе, см. lib/curator.ts) планирует по всем
   // предметам своих групп; предметный учитель — только по своему предмету
   // (subjects.teacher_id), как и в расписании/уроках (getTeacherLessons*).
-  const isCurator = !teacher.subject_slug;
+  const isCurator = await isCuratorTeacher(db);
   const subjects = (
     (subjectsRaw ?? []) as Array<{ id: string; name: string; group_id: string; teacher_id: string | null }>
   ).filter((s) => isCurator || s.teacher_id === teacher.id);

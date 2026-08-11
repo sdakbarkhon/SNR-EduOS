@@ -765,9 +765,13 @@ function isQuizType(ct: string | null | undefined): boolean {
 export function TeacherLessonDetailView({
   lesson,
   teacher,
+  isCurator = false,
 }: {
   lesson: TeacherLessonView;
   teacher: Teacher;
+  /** Наблюдатель ли зритель. Считает СЕРВЕР одним помощником на весь
+   *  проект (lib/curator.ts) — здесь своей формулы больше нет. */
+  isCurator?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -1283,11 +1287,10 @@ export function TeacherLessonDetailView({
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const isLessonCompleted = status === "completed";
-  // Куратор (teachers.subject_slug=NULL, teacher_karim) — наблюдательная роль:
-  // видит уроки всех своих групп, но не редактирует. UI скрывает мутирующие
+  // Куратор — наблюдательная роль и только в демо-школе (правило одно на
+  // проект, см. lib/curator.ts и миграцию 187). UI скрывает мутирующие
   // контролы тем же способом, что для завершённого урока; настоящий
   // enforcement — subject-scope RLS (миграция 131).
-  const isCurator = !teacher.subject_slug;
   const readOnly = isLessonCompleted || isCurator;
   const style = getSubjectStyle(lesson.group.subject);
   const timeRange = lesson.ends_at

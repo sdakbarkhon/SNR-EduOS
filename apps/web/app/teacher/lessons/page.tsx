@@ -4,6 +4,7 @@ import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { getMySchoolNow } from "@/lib/school-time-server";
+import { isCuratorTeacher } from "@/lib/curator";
 import { TeacherLessonsView } from "./TeacherLessonsView";
 import { redirect } from "next/navigation";
 
@@ -16,11 +17,11 @@ export default async function TeacherLessonsPage() {
   // См. apps/web/app/(app)/lessons/[id]/page.tsx.
   try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
-  // Куратор (subject_slug=NULL, teacher_karim) — наблюдательная роль: без
-  // создания/редактирования уроков (RLS 131 это же enforce'ит на БД).
-  // getMyTeacher request-scoped (layout уже дёргал) — доп. запроса нет.
+  // Куратор — наблюдательная роль и только в демо-школе (lib/curator.ts,
+  // то же правило, что в RLS 131/187). getMyTeacher request-scoped (layout
+  // уже дёргал) — доп. запроса нет.
   const teacher = await getMyTeacher(db);
-  const isCurator = !teacher?.subject_slug;
+  const isCurator = await isCuratorTeacher(db);
 
   // Промт "презентации/skeleton" — TeacherLessonsView only ever uses the
   // initial `lessons` prop to seed the CURRENT month's view (see its
