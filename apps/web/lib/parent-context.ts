@@ -45,6 +45,15 @@ export { SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-child"
 export const getParentContext = cache(async (): Promise<{
   parentId: string;
   parentName: string;
+  /**
+   * Школа родителя. Z.3, заход 1 — единственное место, где школы в выборке
+   * не было: у ученика и учителя она приходит сама (`select("*")` в
+   * getMyStudent/getMyTeacher), здесь список колонок перечислен явно.
+   * Нужна, чтобы узнать `schools.frozen_date` и отдать клиенту правильное
+   * «сейчас». Лишнего запроса не добавляет — это ещё одна колонка в том же
+   * вложенном select.
+   */
+  schoolId: string | null;
   children: ParentChild[];
   /**
    * true, если запрос ниже РЕАЛЬНО упал (сеть/RLS/что угодно), а не просто
@@ -84,7 +93,7 @@ export const getParentContext = cache(async (): Promise<{
   const { data: parent, error: parentErr } = await sb
     .from("parents")
     .select(
-      "id, full_name, parent_students(student_id, created_at, students(id, full_name, student_groups(groups(name))))",
+      "id, full_name, school_id, parent_students(student_id, created_at, students(id, full_name, student_groups(groups(name))))",
     )
     .eq("user_id", user.id)
     .single();
@@ -116,5 +125,11 @@ export const getParentContext = cache(async (): Promise<{
     })
     .filter((c): c is ParentChild => c !== null);
 
-  return { parentId: parent.id, parentName: parent.full_name, children, hadError };
+  return {
+    parentId: parent.id,
+    parentName: parent.full_name,
+    schoolId: (parent as { school_id?: string | null }).school_id ?? null,
+    children,
+    hadError,
+  };
 });

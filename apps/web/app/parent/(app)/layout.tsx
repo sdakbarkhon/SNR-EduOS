@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getParentContext } from "@/lib/parent-context";
+import { createClient } from "@/lib/supabase/server";
+import { getSchoolFrozenDate } from "@/lib/school-time";
+import { SchoolTimeProvider } from "@/components/SchoolTimeProvider";
 import { ParentAppShell } from "./ParentAppShell";
 
 /**
@@ -13,5 +16,14 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
   const ctx = await getParentContext();
   if (!ctx) redirect("/parent");
 
-  return <ParentAppShell>{children}</ParentAppShell>;
+  // Z.3, заход 1 — школа родителя и её заморозка для SchoolTimeProvider.
+  // getParentContext закеширован на запрос, повторного обращения нет.
+  const supabase = await createClient();
+  const frozenDate = await getSchoolFrozenDate(supabase, ctx.schoolId);
+
+  return (
+    <SchoolTimeProvider schoolId={ctx.schoolId} frozenDate={frozenDate}>
+      <ParentAppShell>{children}</ParentAppShell>
+    </SchoolTimeProvider>
+  );
 }

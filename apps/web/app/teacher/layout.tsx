@@ -12,6 +12,8 @@ import { DemoWelcomeModal } from "@/components/DemoWelcomeModal";
 import { CurriculumReadyModal } from "@/components/CurriculumReadyModal";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
+import { getSchoolFrozenDate } from "@/lib/school-time";
+import { SchoolTimeProvider } from "@/components/SchoolTimeProvider";
 
 export default async function TeacherLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -23,15 +25,21 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   // defense-in-depth re-check, not the primary gate, so a single targeted
   // query is enough (same pattern app/admin/layout.tsx already uses).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Z.3, заход 1 — к тому же запросу добавлен school_id: нужен
+  // SchoolTimeProvider, а лишнего round-trip это не стоит.
   const { data: teacher } = await (supabase as any)
-    .from("teachers").select("id").eq("user_id", user.id).maybeSingle();
+    .from("teachers").select("id, school_id").eq("user_id", user.id).maybeSingle();
   if (!teacher) redirect("/login");
+
+  const schoolId = (teacher as { school_id?: string | null }).school_id ?? null;
+  const frozenDate = await getSchoolFrozenDate(supabase, schoolId);
 
   // Демо-режим — свойство СЕССИИ, не аккаунта: под teacher_math может сидеть
   // и реальный учитель, и демо-гость. Кука ставится server action'ом demoLogin.
   const isDemo = (await cookies()).has(DEMO_SESSION_COOKIE);
 
   return (
+    <SchoolTimeProvider schoolId={schoolId} frozenDate={frozenDate}>
     <FullscreenLessonProvider>
       <ScaleWrapper>
         <DemoWelcomeModal />
@@ -49,5 +57,6 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
         </TeacherShell>
       </ScaleWrapper>
     </FullscreenLessonProvider>
+    </SchoolTimeProvider>
   );
 }

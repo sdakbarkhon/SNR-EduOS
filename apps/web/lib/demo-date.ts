@@ -32,13 +32,26 @@
 //     Статусы уроков в БД при этом НЕ трогали: они уже правильные
 //     (3 completed / 3 in_progress / 12 scheduled на 29.07, коммит 554c411).
 //
+import { FROZEN_TIME_OF_DAY_TASHKENT, TASHKENT_UTC_OFFSET } from "./school-time";
+
 // getDemoNow()/getDemoNowMs() безопасны и в клиентских, и в серверных
 // компонентах (чистая константа, без window/document) — используются
 // только в UI-слое (компоненты фронтенда) и SSR/server actions/API routes,
 // куда их явно прокинули (см. resheniya_2.md) — НЕ в БД (updated_at/
 // created_at пишутся реальным Postgres now()).
 
-const FROZEN_AT_ISO = "2026-07-29T10:15:00+05:00"; // = 2026-07-29T05:15:00.000Z
+// 10.08.2026, Z.3 заход 1 — время суток якоря и смещение Ташкента переехали в
+// lib/school-time.ts и берутся ОТТУДА. Значение константы не изменилось ни на
+// миллисекунду: сборка даёт ту же строку "2026-07-29T10:15:00+05:00", то есть
+// 2026-07-29T05:15:00.000Z. Направление зависимости выбрано так намеренно —
+// school-time.ts это будущий дом, а этот файл уходит в заходе 4; при обратной
+// зависимости пришлось бы переносить константу ещё раз.
+//
+// День остался здесь литералом СОЗНАТЕЛЬНО: getDemoNow() глобальна и про школу
+// не знает, подменять ей день из базы значило бы начать заходы 2-3 раньше
+// срока. У школо-зависимого источника день берётся из schools.frozen_date.
+const FROZEN_DAY_TASHKENT = "2026-07-29";
+const FROZEN_AT_ISO = `${FROZEN_DAY_TASHKENT}T${FROZEN_TIME_OF_DAY_TASHKENT}:00${TASHKENT_UTC_OFFSET}`;
 
 export function getDemoNow(): Date {
   return new Date(FROZEN_AT_ISO);
