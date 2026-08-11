@@ -1697,8 +1697,9 @@ export interface Dictionary {
     // урока), чтобы не терялась привязка ко времени в расписании.
     plannedStart: string;         // "Плановое начало"
     autoOpen: string;             // "Урок откроется, когда его начнёт учитель"
-    planStagesSummary: string;    // "{count} этапов · {minutes} мин"
-    planStagesSummaryNoDuration: string; // "{count} этапов" (no duration_min set)
+    /** 11.08.2026 — только число этапов. Минуты убраны из подписи: сумма
+     *  длительностей этапов и длительность урока — независимые величины. */
+    planStagesSummary: string;    // "{count} этапов"
     planTopicPrefix: string;      // "Тема ·"
     planEmptyPlaceholder: string; // "Учитель ещё не добавил план урока" (Iter5 hotfix P14.1)
     excuse: {

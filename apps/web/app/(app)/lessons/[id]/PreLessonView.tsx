@@ -297,10 +297,15 @@ export function PreLessonView({
 
   const plannedStartLabel = formatTime(lesson.starts_at);
 
-  const totalStageMinutes = (stages ?? []).reduce((sum, s) => sum + (s.duration_min ?? 0), 0);
-  const planSummary = totalStageMinutes > 0
-    ? dl.planStagesSummary.replace("{count}", String((stages ?? []).length)).replace("{minutes}", String(totalStageMinutes))
-    : dl.planStagesSummaryNoDuration.replace("{count}", String((stages ?? []).length));
+  // 11.08.2026 — в подписи осталось ТОЛЬКО число этапов, минуты убраны
+  // (решение заказчика). Сумма длительностей этапов и длительность урока —
+  // независимые величины: урок длится lessons.duration_minutes (из неё
+  // триггер fn_compute_lesson_end считает ends_at), а duration_min у этапов
+  // проставляет генератор и он ничем не связан с уроком. После уборки
+  // шаблонных этапов сумма у части уроков стала меньше 45, и подпись
+  // «~23 мин» под 45-минутным уроком читалась как ошибка. Само поле
+  // длительности не трогаем: оно осталось на карточке каждого этапа.
+  const planSummary = dl.planStagesSummary.replace("{count}", String((stages ?? []).length));
 
   // 08.08.2026 — НАСТОЯЩИЙ полноэкранный режим.
   //

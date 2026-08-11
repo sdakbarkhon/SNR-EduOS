@@ -1631,8 +1631,7 @@ export const en: Dictionary = {
     untilStart: "until start",
     plannedStart: "Scheduled start",
     autoOpen: "The lesson will open once the teacher starts it",
-    planStagesSummary: "{count} stages · {minutes} min",
-    planStagesSummaryNoDuration: "{count} stages",
+    planStagesSummary: "{count} stages",
     planTopicPrefix: "Topic ·",
     planEmptyPlaceholder: "The teacher hasn't added a lesson plan yet",
     excuse: {

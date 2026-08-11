@@ -1631,8 +1631,7 @@ export const uz: Dictionary = {
     untilStart: "boshlanishiga",
     plannedStart: "Rejalashtirilgan boshlanish",
     autoOpen: "Dars o'qituvchi boshlaganda ochiladi",
-    planStagesSummary: "{count} bosqich · {minutes} daq",
-    planStagesSummaryNoDuration: "{count} bosqich",
+    planStagesSummary: "{count} bosqich",
     planTopicPrefix: "Mavzu ·",
     planEmptyPlaceholder: "O'qituvchi hali dars rejasini qo'shmagan",
     excuse: {

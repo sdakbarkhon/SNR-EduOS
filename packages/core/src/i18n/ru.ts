@@ -1634,8 +1634,7 @@ export const ru: Dictionary = {
     untilStart: "до начала",
     plannedStart: "Плановое начало",
     autoOpen: "Урок откроется, когда его начнёт учитель",
-    planStagesSummary: "{count} этапов · {minutes} мин",
-    planStagesSummaryNoDuration: "{count} этапов",
+    planStagesSummary: "{count} этапов",
     planTopicPrefix: "Тема ·",
     planEmptyPlaceholder: "Учитель ещё не добавил план урока",
     excuse: {
