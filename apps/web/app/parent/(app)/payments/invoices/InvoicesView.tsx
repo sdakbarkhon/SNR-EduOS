@@ -44,7 +44,7 @@ import {
   formatMoney,
   unpaidGroupNote,
   type ReceiptRow,
-} from "../mock-data";
+} from "../../_demo/demo-data";
 import { PAY_GLYPH, NoticeBanner, SoonNote } from "../parts";
 
 const TABS = ["Чеки", "Счета"] as const;

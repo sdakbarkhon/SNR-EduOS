@@ -38,7 +38,7 @@ import {
   rowNote,
   type HistoryCategory,
   type HistoryRow,
-} from "../mock-data";
+} from "../../_demo/demo-data";
 
 /** Порядок важен: индекс SegmentPills → категория. */
 const FILTERS: readonly { key: HistoryCategory | "all"; label: string }[] = [

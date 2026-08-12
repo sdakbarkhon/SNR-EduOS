@@ -79,7 +79,7 @@ import {
   rowNote,
   walletTitleOf,
   whoLabel,
-} from "./mock-data";
+} from "../_demo/demo-data";
 import { SoonNote } from "./parts";
 
 /* ===== Тексты (ru, дословно из словаря мобилки packages/core/src/i18n/ru.ts,
@@ -859,9 +859,9 @@ export function PaymentsView({
           />
         </div>
 
-        {/* 8. Кошелёк ребёнка. Шеврон ведёт на «Пополнение баланса» — тот же
-            кошелёк, тот же баланс (общий аксессор getSelectedChildContext).
-            Экран деталей кошелька (d22) в веб не портирован. */}
+        {/* 8. Кошелёк ребёнка. 12.08.2026 — экран деталей кошелька появился,
+            поэтому карточка ведёт на него, а не сразу на пополнение: оттуда
+            доступны и пополнение, и перевод, и лимиты, и все операции. */}
         <AccentCard
           gradient={["#7c3aed", "#a855f7"]}
           angle={135}
@@ -869,7 +869,7 @@ export function PaymentsView({
           radius={20}
           contentStyle={{ padding: 14 }}
         >
-          <Link href="/parent/payments/top-up" className="flex items-center" style={{ gap: 12 }}>
+          <Link href="/parent/payments/wallet" className="flex items-center" style={{ gap: 12 }}>
             <span
               className="flex shrink-0 items-center justify-center"
               style={{

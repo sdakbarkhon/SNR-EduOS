@@ -26,7 +26,7 @@ import { useState } from "react";
 import { GlassCard } from "../../v2/GlassCard";
 import { DIVIDER, Glyph, ScreenScroll, SectionCap, WHITE } from "../../_ui/screen-kit";
 import { glass2, ink1, ink2, status } from "../../v2/tokens";
-import { MAIN_CARD, OTHER_CARDS, OTHER_METHODS, SOON_PAYMENTS } from "../mock-data";
+import { MAIN_CARD, OTHER_CARDS, OTHER_METHODS, SOON_PAYMENTS } from "../../_demo/demo-data";
 import { BrandChip, NoticeBanner, PAY_GLYPH, SoonNote } from "../parts";
 
 /** Строка стеклянного списка: бренд-плашка + название + подпись. */

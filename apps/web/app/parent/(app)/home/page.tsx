@@ -17,7 +17,7 @@ import { findNextLesson } from "@snr/core";
 
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
 import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
-import { billsCountLabel } from "../payments/mock-data";
+import { billsCountLabel } from "../_demo/demo-data";
 import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
 
 /**

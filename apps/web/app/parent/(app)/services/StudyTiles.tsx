@@ -73,6 +73,14 @@ export function StudyTiles() {
       shadowRgb: "99,102,241",
       paths: ICON.info,
     },
+    /* 12.08.2026 — «Навыки» считаются из настоящих оценок и посещаемости. */
+    {
+      label: d.scr.skills,
+      href: "/parent/skills",
+      gradient: ["#f472b6", "#db2777"] as const,
+      shadowRgb: "219,39,119",
+      paths: ICON.user,
+    },
   ];
 
   return (

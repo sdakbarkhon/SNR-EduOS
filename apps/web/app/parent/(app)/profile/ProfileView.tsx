@@ -121,11 +121,14 @@ const SETTINGS_ITEMS: HubMenuItem[] = [
 ];
 
 const SUPPORT_ITEMS: HubMenuItem[] = [
+  /* 12.08.2026 — ведёт на экран «Поддержка», а не в чат: тред поддержки в
+     базе не заведён, и /parent/chat/support показывал пустоту. На новом
+     экране видно, как выглядит переписка, и есть форма обращения. */
   {
     key: "support",
     title: "Помощь и поддержка",
-    subtitle: "Чат с поддержкой школы",
-    href: "/parent/chat/support",
+    subtitle: "Обращения в поддержку школы",
+    href: "/parent/support",
     gradient: ["#f472b6", "#db2777"],
     paths: ICON.help,
   },

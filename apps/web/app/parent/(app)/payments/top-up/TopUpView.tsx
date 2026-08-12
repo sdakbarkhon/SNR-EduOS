@@ -37,7 +37,7 @@ import {
   givenNameOf,
   walletTitleOf,
   SOON_PAYMENTS,
-} from "../mock-data";
+} from "../../_demo/demo-data";
 import { BrandChip, NoticeBanner, PAY_GLYPH, SoonNote } from "../parts";
 
 const MAX_DIGITS = 9;

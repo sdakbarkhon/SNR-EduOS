@@ -7,7 +7,7 @@ import { TopUpView } from "./TopUpView";
  * apps/mobile-parent/src/screens/payments/TopUpScreen.tsx.
  *
  * Ребёнок — настоящий (имя и класс из parent-queries), суммы — мок:
- * платёжного провайдера в проекте нет (см. payments/mock-data.ts).
+ * платёжного провайдера в проекте нет (см. _demo/demo-data.ts).
  * Авторизация и редирект — на уровне layout.tsx сегмента.
  */
 export default async function ParentTopUpPage() {

@@ -806,3 +806,121 @@ export const childInsight = cache(async (locale: string): Promise<ParentInsight 
     generatedAt: data.generated_at as string,
   };
 });
+
+// ── Навыки (12.08.2026) ──────────────────────────────────────────────────────
+
+export type ChildSkill = {
+  /** Ключ навыка — по нему берётся название и пояснение из словаря. */
+  key: "knowledge" | "thinking" | "communication" | "independence" | "discipline";
+  /** 0..100. */
+  pct: number;
+  /** Из чего сложился именно этот процент — подставляется в подпись. */
+  basis: { average?: number | null; subjects?: string[]; attendancePct?: number; submittedPct?: number };
+};
+
+export type ChildSkills = {
+  skills: ChildSkill[];
+  /** Средний уровень по четырём навыкам, 0..100. */
+  overall: number;
+  /** Предметы с их средним баллом — нижний список экрана. */
+  subjects: Array<{ name: string; average: number; count: number; color: string | null }>;
+  /** Числа, на которых всё построено, — для подписи внизу экрана. */
+  source: {
+    gradeCount: number;
+    average: number | null;
+    attendancePresent: number;
+    attendanceTotal: number;
+    homeworkSubmitted: number;
+    homeworkTotal: number;
+  };
+};
+
+/**
+ * Предметы, которые считаем «точными» и «языковыми».
+ *
+ * Матчим по названию, а не по ключу: в `subjects` названия свободные, ключа
+ * палитры у них нет (см. home/page.tsx — там та же беда решается так же).
+ * Незнакомый предмет не попадает ни в одну группу и влияет только на «Знания».
+ */
+const EXACT_RE = /матем|алгебр|геометр|физик|информат|програм|робот|хими|matemat|fizika|dastur|robot|math|physic|program|robot|chemis|informat/i;
+const HUMANITIES_RE = /язык|литерат|истор|общество|англ|русск|til|adabiyot|tarix|ingliz|rus|langua|literat|histor|social/i;
+
+function avgOf(values: number[]): number | null {
+  return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
+function pctOf5(avg: number | null): number {
+  return avg == null ? 0 : Math.round((avg / 5) * 100);
+}
+
+/**
+ * Уровни навыков ребёнка — считаются ИЗ НАСТОЯЩИХ ДАННЫХ, без единой
+ * выдуманной цифры. Формула нарочно простая: её видно на самом экране.
+ *
+ *  • Знания      = средний балл по всем предметам / 5;
+ *  • Мышление    = средний балл по точным предметам / 5;
+ *  • Общение     = средний балл по языковым и гуманитарным / 5;
+ *  • Самостоятельность = доля сданных работ;
+ *  • Дисциплина  = посещаемость.
+ *
+ * Если у ребёнка нет предметов какой-то группы, соответствующий навык
+ * считается по всем предметам сразу — иначе экран показал бы честный, но
+ * бессмысленный ноль.
+ */
+export const childSkills = cache(async (): Promise<ChildSkills> => {
+  const [summary, attendance, homework] = await Promise.all([
+    childGradesSummary(),
+    childAttendanceRecords(),
+    childHomework(),
+  ]);
+
+  const subjects = summary.subjects;
+  const allAvg = avgOf(subjects.map((s) => s.average));
+
+  const exact = subjects.filter((s) => EXACT_RE.test(s.subjectName));
+  const humanities = subjects.filter((s) => HUMANITIES_RE.test(s.subjectName));
+  const exactAvg = avgOf(exact.map((s) => s.average)) ?? allAvg;
+  const humanitiesAvg = avgOf(humanities.map((s) => s.average)) ?? allAvg;
+
+  const attTotal = attendance.stats.total;
+  const attPct = attTotal > 0 ? Math.round((attendance.stats.present / attTotal) * 100) : 0;
+
+  const hwTotal = homework.length;
+  const hwSubmitted = homework.filter((h) => h.submission != null || h.test_submission != null).length;
+  const hwPct = hwTotal > 0 ? Math.round((hwSubmitted / hwTotal) * 100) : 0;
+
+  // Дисциплина и самостоятельность — не про оценки, поэтому это доли, а не
+  // баллы, и считаются они по отдельности: дойти до урока и сдать работу —
+  // разные вещи, и одно усреднённое число прятало бы, что именно проседает.
+
+  const skills: ChildSkill[] = [
+    { key: "knowledge", pct: pctOf5(allAvg), basis: { average: allAvg } },
+    { key: "thinking", pct: pctOf5(exactAvg), basis: { average: exactAvg, subjects: exact.map((s) => s.subjectName) } },
+    {
+      key: "communication",
+      pct: pctOf5(humanitiesAvg),
+      basis: { average: humanitiesAvg, subjects: humanities.map((s) => s.subjectName) },
+    },
+    { key: "independence", pct: hwPct, basis: { submittedPct: hwPct } },
+    { key: "discipline", pct: attPct, basis: { attendancePct: attPct } },
+  ];
+
+  return {
+    skills,
+    overall: Math.round(skills.reduce((a, b) => a + b.pct, 0) / skills.length),
+    subjects: subjects.map((s) => ({
+      name: s.subjectName,
+      average: s.average,
+      count: s.count,
+      color: s.color,
+    })),
+    source: {
+      gradeCount: subjects.reduce((a, b) => a + b.count, 0),
+      average: allAvg,
+      attendancePresent: attendance.stats.present,
+      attendanceTotal: attTotal,
+      homeworkSubmitted: hwSubmitted,
+      homeworkTotal: hwTotal,
+    },
+  };
+});

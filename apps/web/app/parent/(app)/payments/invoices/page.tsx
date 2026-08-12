@@ -6,7 +6,7 @@ import { InvoicesView } from "./InvoicesView";
  * apps/mobile-parent/src/screens/payments/ReceiptsScreen.tsx.
  *
  * Данных с сервера экрану не нужно: чеков и счетов в БД нет вовсе, весь
- * список — мок из payments/mock-data.ts, согласованный по суммам и датам
+ * список — мок из _demo/demo-data.ts, согласованный по суммам и датам
  * с /parent/payments и /parent/payments/history. Имя ребёнка в строках не
  * фигурирует (в макете его там тоже нет — только предмет счёта и номер).
  */
