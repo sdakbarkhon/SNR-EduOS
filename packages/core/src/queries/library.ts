@@ -95,7 +95,7 @@ export async function getLibraryMaterials(
   );
 }
 
-export type CreateLibraryMaterialInput =
+export type CreateLibraryMaterialInput = (
   | {
       contentType?: "file";
       title: string;
@@ -133,17 +133,27 @@ export type CreateLibraryMaterialInput =
       storagePath: string;
       fileSizeBytes: number;
       groupIds: string[];
-    };
+    }
+) & {
+  /**
+   * Предмет кафедры, выбранный автором. Не задан — берётся с карточки
+   * учителя, как было раньше. Общее поле для всех видов материала: предмет
+   * от вида не зависит.
+   */
+  subjectSlug?: string;
+};
 
 /** Вставляет строку библиотеки (файл ИЛИ видео-ссылка — по contentType) +
  *  строки junction по groupIds. school_id НЕ передаём — берётся из DEFAULT
  *  current_school_id() (миграция 147/72), корректно резолвится для
- *  настоящей учительской сессии (auth.uid() заполнен). subject_slug тоже
- *  НЕ принимаем аргументом — резолвим здесь из роли текущего учителя: и
- *  для UX (RLS insert требует точного совпадения subject_slug с ролью
- *  автора — подставлять его на клиенте вручную было бы дублированием
- *  источника истины), и чтобы curator/не-учитель получили понятную ошибку
- *  ДО похода в БД, а не голый 42501 от RLS. Fail closed: ошибка резолва
+ *  настоящей учительской сессии (auth.uid() заполнен). subject_slug принимаем
+ *  необязательным аргументом (12.08.2026): у учителя может быть несколько
+ *  предметов, и форма загрузки даёт выбрать, в какую кафедру кладём. Не
+ *  передали — берём с карточки, как было. Принадлежность выбранного предмета
+ *  проверяет политика вставки через fn_my_subject_slugs (миграции 190/191),
+ *  дублировать это правило на клиенте не нужно; проверка «учитель ли ты и не
+ *  куратор ли» осталась здесь, чтобы такой пользователь получил понятную
+ *  ошибку ДО похода в БД, а не голый 42501 от RLS. Fail closed: ошибка резолва
  *  учителя — throw, не silent-null (тот же принцип, что
  *  getTeacherSubjectFilter в index.ts). Саму загрузку файла в Storage эта
  *  функция не делает — storagePath уже готов (Заход B); видео тоже не
@@ -168,10 +178,23 @@ export async function createLibraryMaterial(
     throw new Error("Куратор (без привязки к предмету) не может загружать материалы в библиотеку");
   }
 
+  /**
+   * Предмет материала. Раньше он ВСЕГДА брался с карточки учителя — а карточка
+   * заполняется первым назначением и больше не меняется, поэтому учитель двух
+   * предметов не мог положить материал во вторую кафедру.
+   *
+   * Теперь вызывающий может передать выбранный предмет явно (форма загрузки
+   * показывает выбор, если предметов больше одного). Проверять принадлежность
+   * здесь не нужно и не следует: её проверяет политика вставки через
+   * fn_my_subject_slugs (миграции 190/191) — единственное место, где живёт
+   * правило «мой предмет». Чужой слаг просто получит отказ от базы.
+   */
+  const subjectSlug = input.subjectSlug ?? (teacher.subject_slug as string);
+
   const insertRow = "externalUrl" in input
     ? {
         uploaded_by: teacher.id,
-        subject_slug: teacher.subject_slug,
+        subject_slug: subjectSlug,
         title: input.title,
         content_type: input.contentType,
         external_url: input.externalUrl,
@@ -180,7 +203,7 @@ export async function createLibraryMaterial(
     : input.contentType === "video_mp4"
     ? {
         uploaded_by: teacher.id,
-        subject_slug: teacher.subject_slug,
+        subject_slug: subjectSlug,
         title: input.title,
         content_type: "video_mp4" as const,
         storage_path: input.storagePath,
@@ -188,7 +211,7 @@ export async function createLibraryMaterial(
       }
     : {
         uploaded_by: teacher.id,
-        subject_slug: teacher.subject_slug,
+        subject_slug: subjectSlug,
         title: input.title,
         content_type: "file" as const,
         storage_path: input.storagePath,

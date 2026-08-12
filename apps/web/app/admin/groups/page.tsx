@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { DEMO_SCHOOL_ID } from "@/lib/admin-api";
+import { isDemoSchool as resolveIsDemoSchool } from "@/lib/admin-api";
 import { GroupsView } from "./GroupsView";
 
 export default async function AdminGroupsPage({
@@ -39,7 +39,9 @@ export default async function AdminGroupsPage({
   const { data: admin } = user
     ? await sbAny.from("admins").select("school_id").eq("user_id", user.id).maybeSingle()
     : { data: null };
-  const isDemoSchool = admin?.school_id === DEMO_SCHOOL_ID;
+  // Признак демо-школы — из schools.is_demo (служебным клиентом внутри
+  // resolveIsDemoSchool), а не сравнением с вписанным идентификатором.
+  const isDemoSchool = admin?.school_id ? await resolveIsDemoSchool(admin.school_id) : false;
 
   return (
     <GroupsView

@@ -16,7 +16,22 @@ export default async function TeacherKnowledgeBasePage() {
         .then((r) => r.data as { id: string; subject_slug: string | null } | null)
     : null;
   const teacherId = teacherRow?.id ?? "";
-  const subjectSlug = teacherRow?.subject_slug ?? null;
+
+  /**
+   * Предметы кафедры — ВСЕ, а не один из карточки.
+   *
+   * teachers.subject_slug заполняется при ПЕРВОМ назначении и больше не
+   * меняется, поэтому учитель двух предметов видел кафедру только первого.
+   * Список приходит из fn_my_subject_slugs() (миграции 190/191) — той же
+   * функции, на которую опираются политики доступа к библиотеке, так что
+   * интерфейс и база отвечают на вопрос «мои предметы» одинаково.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: slugRows } = await (supabase as any).rpc("fn_my_subject_slugs");
+  const subjectSlugs = ((slugRows ?? []) as Array<{ subject_slug: string } | string>)
+    .map((r) => (typeof r === "string" ? r : r.subject_slug))
+    .filter((s): s is string => Boolean(s));
+  const subjectSlug = subjectSlugs[0] ?? teacherRow?.subject_slug ?? null;
 
   const [materialsRes, groupsRes, booksRes, libraryRes] = await Promise.all([
     safeQuery(getMaterials(supabase), [], "TeacherKnowledgeBasePage.materials"),
@@ -51,6 +66,7 @@ export default async function TeacherKnowledgeBasePage() {
       coverUrls={coverUrls}
       libraryMaterials={libraryMaterials}
       initialSubjectSlug={subjectSlug}
+      subjectSlugs={subjectSlugs}
     />
   );
 }

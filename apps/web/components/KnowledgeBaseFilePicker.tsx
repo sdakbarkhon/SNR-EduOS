@@ -158,6 +158,7 @@ export function LibraryUploadModal({
   groups,
   teacherId,
   subjectSlug,
+  subjectSlugs,
   dt,
   onClose,
   onSuccess,
@@ -165,6 +166,8 @@ export function LibraryUploadModal({
   groups: Array<{ id: string; name: string }>;
   teacherId: string;
   subjectSlug: string;
+  /** Все предметы учителя; при длине > 1 в форме появляется выбор. */
+  subjectSlugs?: string[];
   dt: ReturnType<typeof getDictionary>["teacher"];
   onClose: () => void;
   onSuccess: () => void;
@@ -178,7 +181,8 @@ export function LibraryUploadModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const subjectLabel = getSubjectStyle(subjectSlug).label;
+  const slugs = subjectSlugs && subjectSlugs.length > 0 ? subjectSlugs : [subjectSlug];
+  const [activeSlug, setActiveSlug] = useState(slugs[0] ?? subjectSlug);
   const allClasses = selectedGroupIds.size === 0;
 
   function toggleGroup(id: string) {
@@ -217,6 +221,7 @@ export function LibraryUploadModal({
         clearInterval(ramp);
         setProgress(95);
         await createLibraryMaterial(sb, {
+          subjectSlug: activeSlug,
           contentType: "video_mp4",
           title: title.trim(),
           storagePath: uploaded.storagePath,
@@ -237,6 +242,7 @@ export function LibraryUploadModal({
         setProgress(95);
 
         await createLibraryMaterial(sb, {
+          subjectSlug: activeSlug,
           title: title.trim(),
           storagePath,
           fileType: file.type || null,
@@ -282,13 +288,41 @@ export function LibraryUploadModal({
             />
           </div>
 
-          {/* Предмет — read-only, из роли учителя, не из формы. */}
+          {/* Предмет. У однопредметного учителя — просто подпись, как было.
+              У многопредметного — выбор: он ведёт несколько кафедр, и материал
+              обязан попасть в ту, которую он назовёт сам. Список приходит из
+              fn_my_subject_slugs — той же функции, что стоит в политике
+              вставки, поэтому «выбрал в интерфейсе, а база отказала» тут
+              невозможно. */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-              <SubjectIcon subject={subjectSlug} size={22} />
-              {subjectLabel}
-            </div>
+            {slugs.length > 1 ? (
+              <div className="flex flex-wrap gap-2">
+                {slugs.map((s) => {
+                  const active = s === activeSlug;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setActiveSlug(s)}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                        active
+                          ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <SubjectIcon subject={s} size={18} />
+                      {getSubjectStyle(s).label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+                <SubjectIcon subject={activeSlug} size={22} />
+                {getSubjectStyle(activeSlug).label}
+              </div>
+            )}
           </div>
 
           {/* Классы — мультиселект + "Все классы" (пусто = все, ничего в junction не создаём). */}
@@ -397,12 +431,15 @@ export function LibraryUploadModal({
 export function LibraryVideoLinkModal({
   groups,
   subjectSlug,
+  subjectSlugs,
   dt,
   onClose,
   onSuccess,
 }: {
   groups: Array<{ id: string; name: string }>;
   subjectSlug: string;
+  /** Все предметы учителя; при длине > 1 в форме появляется выбор. */
+  subjectSlugs?: string[];
   dt: ReturnType<typeof getDictionary>["teacher"];
   onClose: () => void;
   onSuccess: () => void;
@@ -413,7 +450,8 @@ export function LibraryVideoLinkModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const subjectLabel = getSubjectStyle(subjectSlug).label;
+  const slugs = subjectSlugs && subjectSlugs.length > 0 ? subjectSlugs : [subjectSlug];
+  const [activeSlug, setActiveSlug] = useState(slugs[0] ?? subjectSlug);
   const allClasses = selectedGroupIds.size === 0;
   // Клиентский парсинг — тот же parseVideoUrl, что уже используют материалы
   // урока (Пачка 4); никакого серверного oEmbed-запроса, без CORS.
@@ -437,6 +475,7 @@ export function LibraryVideoLinkModal({
     setSaving(true);
     try {
       await createLibraryMaterial(createClient(), {
+        subjectSlug: activeSlug,
         // Миграция 175 — прямая .mp4-ссылка наконец сохраняется. До неё ветка
         // video_mp4 в CHECK требовала storage_path, и .mp4-ссылку хранить было
         // негде: сначала она молча ложилась как video_rutube (порча данных),
@@ -484,12 +523,37 @@ export function LibraryVideoLinkModal({
             />
           </div>
 
+          {/* Предмет: у многопредметного учителя — выбор, у остальных подпись.
+              Пояснение — у такого же блока выше. */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-slate-700">{dt.librarySubjectLabel}</label>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-              <SubjectIcon subject={subjectSlug} size={22} />
-              {subjectLabel}
-            </div>
+            {slugs.length > 1 ? (
+              <div className="flex flex-wrap gap-2">
+                {slugs.map((s) => {
+                  const active = s === activeSlug;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setActiveSlug(s)}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                        active
+                          ? "border-blue-400 bg-blue-50 font-semibold text-blue-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <SubjectIcon subject={s} size={18} />
+                      {getSubjectStyle(s).label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+                <SubjectIcon subject={activeSlug} size={22} />
+                {getSubjectStyle(activeSlug).label}
+              </div>
+            )}
           </div>
 
           <div>

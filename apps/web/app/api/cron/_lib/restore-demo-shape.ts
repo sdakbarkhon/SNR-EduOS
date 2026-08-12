@@ -28,8 +28,30 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Демо-школа. Тот же id, что в scripts/_backfill-shared.mjs. */
-export const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+/**
+ * Демо-школа определяется признаком `schools.is_demo`, а не вписанным
+ * идентификатором: признак в проекте один, и второй его копии быть не должно.
+ *
+ * ОСТОРОЖНО С КЛИЕНТОМ. Крон ходит без пользователя, поэтому `db` здесь —
+ * СЛУЖЕБНЫЙ клиент (createAdminClient в route.ts). Под ним RLS не
+ * применяется, и запрос к `schools` отдаёт строку демо-школы даже после
+ * сужения политики чтения (миграция 190). Если сюда когда-нибудь передадут
+ * пользовательский клиент, функция не «починит не ту школу», а честно
+ * упадёт: демо-школа обязана найтись ровно одна.
+ */
+async function resolveDemoSchoolId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: SupabaseClient<any, any, any>,
+): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).from("schools").select("id").eq("is_demo", true);
+  if (error) throw new Error(`resolve demo school: ${error.message}`);
+  const rows = (data ?? []) as Array<{ id: string }>;
+  if (rows.length !== 1) {
+    throw new Error(`resolve demo school: ожидалась одна демо-школа, найдено ${rows.length}`);
+  }
+  return rows[0]!.id;
+}
 
 const WEEK_FROM = "2026-07-27T00:00:00+05:00";
 const WEEK_TO = "2026-08-03T00:00:00+05:00"; // exclusive
@@ -118,6 +140,7 @@ async function purgeNonBaseline(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: SupabaseClient<any, any, any>,
   result: RestoreResult,
+  demoSchoolId: string,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyDb = db as any;
@@ -140,7 +163,7 @@ async function purgeNonBaseline(
   const { count: baselineCount, error: countErr } = await anyDb
     .from("demo_baseline")
     .select("entity_id", { count: "exact", head: true })
-    .eq("school_id", DEMO_SCHOOL_ID);
+    .eq("school_id", demoSchoolId);
   if (countErr) {
     result.errors.push("baseline count: " + countErr.message);
     return;
@@ -151,7 +174,7 @@ async function purgeNonBaseline(
     const { data, error } = await anyDb
       .from("demo_baseline")
       .select("entity_type, entity_id")
-      .eq("school_id", DEMO_SCHOOL_ID)
+      .eq("school_id", demoSchoolId)
       .order("entity_id")
       .range(from, from + PAGE - 1);
     if (error) {
@@ -182,7 +205,7 @@ async function purgeNonBaseline(
   // Уроки демо-школы нужны дважды: сами по себе и как родители этапов и
   // материалов (своей school_id у тех может не быть заполнено).
   const { data: lessonRows, error: lessonErr } = await anyDb
-    .from("lessons").select("id").eq("school_id", DEMO_SCHOOL_ID);
+    .from("lessons").select("id").eq("school_id", demoSchoolId);
   if (lessonErr) {
     result.errors.push("purge lessons read: " + lessonErr.message);
     return;
@@ -196,7 +219,7 @@ async function purgeNonBaseline(
     if (type === "lesson") {
       present = lessonRows ?? [];
     } else if (type === "homework") {
-      const { data, error } = await anyDb.from("homework").select("id").eq("school_id", DEMO_SCHOOL_ID);
+      const { data, error } = await anyDb.from("homework").select("id").eq("school_id", demoSchoolId);
       if (error) { result.errors.push("purge homework read: " + error.message); return; }
       present = data ?? [];
     } else {
@@ -239,13 +262,17 @@ export async function restoreDemoLessonShape(
   // -> completed, слот 2 -> in_progress, дальше scheduled), и лишний урок,
   // вставленный посетителем в середину дня, сдвинул бы нумерацию — форма
   // встала бы не на те уроки.
-  await purgeNonBaseline(db, result);
+  // Школа резолвится ОДИН раз и передаётся вниз: два разных резолва в одном
+  // проходе — это два шанса починить разные школы.
+  const demoSchoolId = await resolveDemoSchoolId(db);
+
+  await purgeNonBaseline(db, result, demoSchoolId);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
     .from("lessons")
     .select("id, group_id, starts_at, ends_at, status, started_at, ended_at")
-    .eq("school_id", DEMO_SCHOOL_ID)
+    .eq("school_id", demoSchoolId)
     .gte("starts_at", WEEK_FROM)
     .lt("starts_at", WEEK_TO)
     .order("starts_at");

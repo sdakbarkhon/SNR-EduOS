@@ -857,7 +857,25 @@ export async function deleteSchoolSubject(
 /** Демо-школа. Отличается от реальных двумя вещами, важными для админки:
  *  в ней есть роль куратора группы (в реальных школах её нет, решение 6.1) и
  *  в ней НЕ трогается teachers.subject_slug. */
-export const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+/**
+ * Демо ли школа — по признаку `schools.is_demo`, а не по вписанному
+ * идентификатору. Признак в проекте один; вписанный номер молча разошёлся бы
+ * со второй демо-школой или с переездом идентификатора.
+ *
+ * Читает служебным клиентом: вызывается из серверных действий админки, где
+ * пользовательский клиент видит только свою школу (миграция 190).
+ */
+export async function isDemoSchool(schoolId: string): Promise<boolean> {
+  const sb = getServiceClient();
+  const { data, error } = await sb
+    .from("schools")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select("is_demo" as any)
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean((data as { is_demo: boolean } | null)?.is_demo);
+}
 
 export type TeacherBinding = {
   assignmentId: string;
@@ -964,7 +982,7 @@ async function ensureSubjectSlug(
   subjectName: string,
   schoolId: string,
 ) {
-  if (schoolId === DEMO_SCHOOL_ID) return;
+  if (await isDemoSchool(schoolId)) return;
   const slug = getSubjectKeyByLabel(subjectName);
   if (!slug) return;
   const { data: teacher } = await sb

@@ -2480,15 +2480,21 @@ export const getStudentLessonView = async (
     : db3.from("subjects").select(SUBJECT_WITH_TEACHER).eq("group_id", lesson.group_id).limit(1).maybeSingle();
   // П.2: schools.autostart_enabled школы этого урока — гейтит рендер кнопок
   // "Начать урок"/"Закончить урок" (см. StudentLessonView.schoolAutostartEnabled).
-  const schoolQuery = db3.from("schools").select("autostart_enabled").eq("id", lesson.school_id).maybeSingle();
+  const schoolQuery = db3
+    .from("schools")
+    .select("autostart_enabled, is_demo")
+    .eq("id", lesson.school_id)
+    .maybeSingle();
   // Большой фикс, Блок 3 — правило 3-го урока действует ТОЛЬКО в демо-школе
-  // (см. StudentLessonView.isThirdLessonViewer), поэтому fn_lesson_day_index
-  // (миграция 157) вызывается только для неё — не гоняем лишний RPC для
-  // реальной школы, где это правило никогда не применяется.
-  const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
-  const dayIndexQuery = lesson.school_id === DEMO_SCHOOL_ID
-    ? db3.rpc("fn_lesson_day_index", { p_lesson_id: lessonId })
-    : Promise.resolve({ data: null, error: null });
+  // (см. StudentLessonView.isThirdLessonViewer). Раньше «демо ли школа»
+  // решалось вписанным идентификатором прямо здесь; теперь признак один на
+  // проект — schools.is_demo, он приходит соседним запросом выше.
+  //
+  // Порядковый номер дня спрашиваем ВСЕГДА, а не только у демо-школы: узнать
+  // признак до запуска Promise.all нельзя, не разбив параллельность, а
+  // fn_lesson_day_index — один дешёвый вызов. Результат применяется ниже
+  // только если школа демо, поэтому поведение реальных школ не меняется.
+  const dayIndexQuery = db3.rpc("fn_lesson_day_index", { p_lesson_id: lessonId });
 
   const [curatorRes, materialsRes, stagesRaw, subjectRes, schoolRes, dayIndexRes] = await Promise.all([
     curatorId
@@ -2521,7 +2527,10 @@ export const getStudentLessonView = async (
   const { teacher_id: _tid, ...groupData } = lesson.group;
   const materialsTyped = materialsRes as { data: unknown[] | null; error: { message: string } | null };
   const stagesTyped = stagesRaw as { data: unknown[] | null; error: { message: string } | null };
-  const schoolTyped = schoolRes as { data: { autostart_enabled: boolean } | null; error: { message: string } | null };
+  const schoolTyped = schoolRes as {
+    data: { autostart_enabled: boolean; is_demo: boolean } | null;
+    error: { message: string } | null;
+  };
   if (schoolTyped.error) console.error("[getStudentLessonView] schools query failed:", schoolTyped.error.message);
   const dayIndexTyped = dayIndexRes as { data: number | null; error: { message: string } | null };
   if (dayIndexTyped.error) console.error("[getStudentLessonView] fn_lesson_day_index rpc failed:", dayIndexTyped.error.message);
@@ -2562,7 +2571,8 @@ export const getStudentLessonView = async (
     materials: (materialsTyped.data ?? []) as LessonMaterial[],
     stages: stagesWithProgress as LessonStageWithProgress[],
     schoolAutostartEnabled: schoolTyped.data?.autostart_enabled ?? false,
-    isThirdLessonViewer: lesson.school_id === DEMO_SCHOOL_ID && (dayIndexTyped.data ?? 1) >= 3,
+    // Демо ли школа — из признака schools.is_demo, а не из вписанного номера.
+    isThirdLessonViewer: Boolean(schoolTyped.data?.is_demo) && (dayIndexTyped.data ?? 1) >= 3,
   };
 };
 

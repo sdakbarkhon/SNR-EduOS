@@ -165,11 +165,14 @@ export function TeacherLibraryTabView({
   groups,
   initialTeacherId,
   initialSubjectSlug,
+  subjectSlugs,
 }: {
   initialMaterials: LibraryMaterialWithDetails[];
   groups: Array<{ id: string; name: string }>;
   initialTeacherId: string;
   initialSubjectSlug: string | null;
+  /** Все предметы учителя (fn_my_subject_slugs). */
+  subjectSlugs: string[];
 }) {
   const router = useRouter();
   const { locale } = useLocale();
@@ -314,6 +317,7 @@ export function TeacherLibraryTabView({
           groups={groups}
           teacherId={initialTeacherId}
           subjectSlug={initialSubjectSlug ?? ""}
+          subjectSlugs={subjectSlugs}
           dt={dt}
           onClose={() => setShowUpload(false)}
           onSuccess={handleUploadSuccess}
@@ -323,6 +327,7 @@ export function TeacherLibraryTabView({
         <LibraryVideoLinkModal
           groups={groups}
           subjectSlug={initialSubjectSlug ?? ""}
+          subjectSlugs={subjectSlugs}
           dt={dt}
           onClose={() => setShowVideo(false)}
           onSuccess={handleVideoSuccess}

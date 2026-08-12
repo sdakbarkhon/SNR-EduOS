@@ -20,6 +20,7 @@ export function TeacherKnowledgeBaseView({
   coverUrls,
   libraryMaterials,
   initialSubjectSlug,
+  subjectSlugs,
 }: {
   materials: MaterialWithGroup[];
   groups: TeacherGroup[];
@@ -28,6 +29,8 @@ export function TeacherKnowledgeBaseView({
   coverUrls: Record<string, string>;
   libraryMaterials: LibraryMaterialWithDetails[];
   initialSubjectSlug: string | null;
+  /** Все предметы учителя (fn_my_subject_slugs). */
+  subjectSlugs: string[];
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).knowledgeBase;
@@ -74,6 +77,7 @@ export function TeacherKnowledgeBaseView({
           groups={groups}
           initialTeacherId={initialTeacherId}
           initialSubjectSlug={initialSubjectSlug}
+          subjectSlugs={subjectSlugs}
         />
       </div>
     </div>
