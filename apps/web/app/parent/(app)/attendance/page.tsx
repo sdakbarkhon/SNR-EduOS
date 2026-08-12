@@ -1,8 +1,7 @@
-import { formatTime } from "@snr/core";
 import type { AttendanceStatus } from "@snr/core";
 import { childAttendanceRecords, getSelectedChild, parentToday } from "@/lib/parent-queries";
 import { AttendanceView, type AttendanceLastDay } from "./AttendanceView";
-import { RU, addDaysKey, ruDayMonth, tashkentDateKey } from "../_study/util";
+import { addDaysKey, tashkentDateKey } from "../_ui/format";
 
 /**
  * Экран #14 «Посещаемость» — веб-порт apps/mobile-parent/src/screens/study/
@@ -36,7 +35,6 @@ export default async function ParentAttendancePage() {
   const [child, attendance] = await Promise.all([getSelectedChild(), childAttendanceRecords()]);
 
   const today = await parentToday();
-  const yesterday = addDaysKey(today, -1);
 
   const statusByDate: Record<string, AttendanceStatus> = {};
   for (const r of attendance.records) {
@@ -45,18 +43,16 @@ export default async function ParentAttendancePage() {
     if (!prev || STATUS_PRIORITY[r.status] > STATUS_PRIORITY[prev]) statusByDate[key] = r.status;
   }
 
-  const lastDays: AttendanceLastDay[] = attendance.records.slice(0, 5).map((r) => {
-    const key = tashkentDateKey(r.lesson_date);
-    const plain = ruDayMonth(key);
-    return {
-      id: r.id,
-      dateLabel: key === today ? `Сегодня, ${plain}` : key === yesterday ? `Вчера, ${plain}` : plain,
-      subject: r.lesson_title,
-      statusLabel: STATUS_LABEL[r.status],
-      status: r.status,
-      arrivedLabel: r.status === "present" && r.marked_at ? formatTime(r.marked_at, RU) : null,
-    };
-  });
+  // Подписи «Сегодня, 3 августа» и время отметки собираются в клиенте: они
+  // зависят от языка (см. _ui/dates.tsx). Отсюда уезжают ключ дня и ISO.
+  const lastDays: AttendanceLastDay[] = attendance.records.slice(0, 5).map((r) => ({
+    id: r.id,
+    dateKey: tashkentDateKey(r.lesson_date),
+    subject: r.lesson_title,
+    statusLabel: STATUS_LABEL[r.status],
+    status: r.status,
+    arrivedAt: r.status === "present" ? r.marked_at : null,
+  }));
 
   return (
     <AttendanceView

@@ -3,7 +3,6 @@ import { GlassCircleButton, Glyph, InnerHeader, ScreenScroll } from "../_ui/scre
 // Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
 // а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
 import { ICON } from "../_ui/screen-tokens";
-import { formatDateLong } from "../_ui/format";
 import { ink1 } from "../v2/tokens";
 import { AnnouncementsView, type AnnouncementItem } from "./AnnouncementsView";
 
@@ -19,7 +18,7 @@ export default async function ParentAnnouncementsPage() {
     id: a.id,
     title: a.title,
     body: a.body,
-    dateLabel: formatDateLong(a.created_at),
+    createdAt: a.created_at,
     authorName: a.authorName,
     isFromAdmin: a.isFromAdmin,
     isPinned: a.is_pinned,

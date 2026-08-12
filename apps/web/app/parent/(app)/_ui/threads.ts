@@ -2,7 +2,7 @@ import { cache } from "react";
 import type { ChatThreadKind, ChatThreadSummary } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { parentThreads } from "@/lib/parent-queries";
-import { avatarGradient, initialsOf, previewOf, previousDay, relativeStamp } from "./format";
+import { avatarGradient, initialsOf, previewOf } from "./format";
 
 /**
  * Приведение реальных чатов (`chat_threads`) к виду, который рисует экран
@@ -27,7 +27,9 @@ export type ParentThreadVM = {
   roleLabel: string | null;
   /** Предмет direct-треда, если известен (используется в шапке чата). */
   subjectLabel: string | null;
-  timeLabel: string;
+  /** Сырой ISO последнего сообщения. Готовой строкой время отсюда больше не
+   *  уезжает: подпись зависит от языка, а язык знает только клиент. */
+  stampIso: string;
   preview: string;
   unread: number;
   initials: string;
@@ -65,7 +67,7 @@ function roleLabelOf(s: ChatThreadSummary): string | null {
   return null;
 }
 
-function toVM(s: ChatThreadSummary, myUserId: string | null, today: string, yesterday: string): ParentThreadVM {
+function toVM(s: ChatThreadSummary, myUserId: string | null): ParentThreadVM {
   const support = isSupportThread(s);
   const name =
     s.kind === "direct"
@@ -80,7 +82,7 @@ function toVM(s: ChatThreadSummary, myUserId: string | null, today: string, yest
     name,
     roleLabel: roleLabelOf(s),
     subjectLabel: s.directSubjectName ?? null,
-    timeLabel: relativeStamp(stampSource, today, yesterday),
+    stampIso: stampSource,
     preview: s.lastMessage ? previewOf(s.lastMessage.body) : "Сообщений пока нет",
     unread: s.unreadCount,
     initials: initialsOf(name),
@@ -90,10 +92,9 @@ function toVM(s: ChatThreadSummary, myUserId: string | null, today: string, yest
 }
 
 /** Все треды родителя в порядке свежести (как их отдаёт core: updated_at DESC). */
-export const parentThreadVMs = cache(async (todayStr: string): Promise<ParentThreadVM[]> => {
+export const parentThreadVMs = cache(async (): Promise<ParentThreadVM[]> => {
   const [summaries, myUserId] = await Promise.all([parentThreads(), getAuthUserId()]);
-  const yesterday = previousDay(todayStr);
-  return summaries.map((s) => toVM(s, myUserId, todayStr, yesterday));
+  return summaries.map((s) => toVM(s, myUserId));
 });
 
 /**

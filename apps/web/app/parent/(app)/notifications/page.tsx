@@ -3,7 +3,7 @@ import { GlassCircleButton, Glyph, InnerHeader, ScreenScroll } from "../_ui/scre
 // Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
 // а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
 import { ICON } from "../_ui/screen-tokens";
-import { previousDay, relativeStamp, tashkentDay } from "../_ui/format";
+import { previousDay, tashkentDay } from "../_ui/format";
 import { ink1 } from "../v2/tokens";
 import { NotificationsView, type NotificationItem } from "./NotificationsView";
 
@@ -33,7 +33,7 @@ export default async function ParentNotificationsPage() {
       id: n.id,
       title: n.title,
       body: n.body,
-      timeLabel: relativeStamp(n.created_at, today, yesterday),
+      createdAt: n.created_at,
       isRead: n.is_read,
       kind: n.kind,
       href: HREF_BY_KIND[n.kind] ?? null,
@@ -53,7 +53,7 @@ export default async function ParentNotificationsPage() {
         }
       />
       <ScreenScroll gap={11}>
-        <NotificationsView items={items} />
+        <NotificationsView items={items} today={today} />
       </ScreenScroll>
     </div>
   );

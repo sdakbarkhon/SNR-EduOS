@@ -21,6 +21,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { getDictionary } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { useDates } from "../_ui/dates";
 import { GlassCard } from "../v2/GlassCard";
 import { EmptyState, ICON, IconTile, SectionCap, SegmentPills } from "../_ui/screen-kit";
 import { accentGrad, ink1, ink2, ink3 } from "../v2/tokens";
@@ -29,7 +32,8 @@ export type NotificationItem = {
   id: string;
   title: string;
   body: string | null;
-  timeLabel: string;
+  /** Сырой ISO: подпись времени собирается здесь, на языке пользователя. */
+  createdAt: string;
   isRead: boolean;
   /** `notifications.kind` — определяет иконку и переход. */
   kind: string;
@@ -61,14 +65,15 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "unread", label: "Непрочитанные" },
 ];
 
-const BUCKET_LABEL: Record<NotificationItem["bucket"], string> = {
-  today: "Сегодня",
-  yesterday: "Вчера",
-  earlier: "Ранее",
-};
-
-export function NotificationsView({ items }: { items: NotificationItem[] }) {
+export function NotificationsView({ items, today }: { items: NotificationItem[]; today: string }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const { locale } = useLocale();
+  const dd = getDictionary(locale).parentApp.date;
+  const bucketLabel: Record<NotificationItem["bucket"], string> = {
+    today: dd.today,
+    yesterday: dd.yesterday,
+    earlier: dd.earlier,
+  };
 
   const shown = useMemo(
     () => (filter === "unread" ? items.filter((n) => !n.isRead) : items),
@@ -109,9 +114,9 @@ export function NotificationsView({ items }: { items: NotificationItem[] }) {
 
       {sections.map((s) => (
         <div key={s.bucket} className="flex flex-col" style={{ gap: 11 }}>
-          <SectionCap label={BUCKET_LABEL[s.bucket]} tone="ink3" />
+          <SectionCap label={bucketLabel[s.bucket]} tone="ink3" />
           {s.rows.map((n) => (
-            <NotificationCard key={n.id} row={n} />
+            <NotificationCard key={n.id} row={n} today={today} />
           ))}
         </div>
       ))}
@@ -119,8 +124,9 @@ export function NotificationsView({ items }: { items: NotificationItem[] }) {
   );
 }
 
-function NotificationCard({ row }: { row: NotificationItem }) {
+function NotificationCard({ row, today }: { row: NotificationItem; today: string }) {
   const style = KIND_STYLE[row.kind] ?? FALLBACK_STYLE;
+  const dt = useDates();
 
   const card = (
     <GlassCard
@@ -135,7 +141,7 @@ function NotificationCard({ row }: { row: NotificationItem }) {
             {row.title}
           </span>
           <span className="shrink-0" style={{ fontSize: 9, fontWeight: 700, color: ink3 }}>
-            {row.timeLabel}
+            {dt.stamp(row.createdAt, today)}
           </span>
         </div>
         {row.body ? (

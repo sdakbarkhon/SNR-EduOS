@@ -17,7 +17,7 @@ import {
   StatusChip,
 } from "../_ui/screen-kit";
 import { DIVIDER } from "../_ui/screen-tokens";
-import { previousDay, relativeStamp } from "../_ui/format";
+import { useDates } from "../_ui/dates";
 import { ink1, ink2, ink3 } from "../v2/tokens";
 
 /** Градиент плитки — не по устройству, а по «текущая / прежняя». */
@@ -75,7 +75,7 @@ export function SessionsView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).parentApp;
   const m = d.more;
-  const yesterday = previousDay(today);
+  const dt = useDates();
 
   return (
     <div className="mx-auto w-full max-w-[430px]">
@@ -113,11 +113,11 @@ export function SessionsView({
                     </div>
 
                     <span style={{ fontSize: 9.5, fontWeight: 600, color: ink2 }}>
-                      {m.sessionsEntered.replace("{when}", relativeStamp(s.createdAt, today, yesterday))}
+                      {m.sessionsEntered.replace("{when}", dt.stamp(s.createdAt, today))}
                     </span>
                     {s.lastActivity ? (
                       <span style={{ fontSize: 9.5, fontWeight: 600, color: ink2 }}>
-                        {m.sessionsActivity.replace("{when}", relativeStamp(s.lastActivity, today, yesterday))}
+                        {m.sessionsActivity.replace("{when}", dt.stamp(s.lastActivity, today))}
                       </span>
                     ) : null}
                   </div>

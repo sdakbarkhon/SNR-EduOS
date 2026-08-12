@@ -35,6 +35,7 @@ import {
   SectionLink,
 } from "../_study/parts";
 import { chip, fontDisplay, ink1, ink2, ink3, status } from "../v2/tokens";
+import { DateText } from "../_ui/dates";
 
 /** Незакрашенный трек кольца и точка «урок ещё не отмечен»: в светлой теме —
  *  ink-налёт, в тёмной — белый той же плотности (см. parent-theme.css). */
@@ -43,8 +44,9 @@ const DOT_IDLE = "var(--p-dot-idle, rgba(23,18,67,0.18))";
 
 export type DayLessonVM = {
   id: string;
-  timeStart: string;
-  timeEnd: string | null;
+  /** Сырой ISO: время подписывается на языке экрана. */
+  startsAt: string;
+  endsAt: string | null;
   title: string;
   room: string | null;
   teacherName: string | null;
@@ -180,34 +182,35 @@ function AttendanceMark({ attendance }: { attendance: AttendanceStatus | null })
 export function DayStatusView({
   childName,
   childClass,
-  dateLabel,
+  todayKey,
   isDayOff,
   lessons,
   totalLessons,
   present,
   excused,
   unexcused,
-  arrivalLabel,
+  arrivalAt,
   nextLesson,
   gradesToday,
   homeworkAssignedToday,
 }: {
   childName: string;
   childClass: string | null;
-  dateLabel: string;
+  /** Ключ дня «YYYY-MM-DD» — подпись «Понедельник, 30 июля» собирает клиент. */
+  todayKey: string;
   isDayOff: boolean;
   lessons: DayLessonVM[];
   totalLessons: number;
   present: number;
   excused: number;
   unexcused: number;
-  arrivalLabel: string | null;
-  nextLesson: { subjectName: string; timeLabel: string } | null;
+  arrivalAt: string | null;
+  nextLesson: { subjectName: string; startsAt: string } | null;
   gradesToday: { subjectName: string; grade: number }[];
   homeworkAssignedToday: number;
 }) {
   const firstName = childName.split(/\s+/)[1] ?? childName.split(/\s+/)[0] ?? childName;
-  const inSchool = arrivalLabel != null;
+  const inSchool = arrivalAt != null;
 
   return (
     <>
@@ -260,10 +263,10 @@ export function DayStatusView({
             </span>
             <span className="truncate" style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>
               {inSchool
-                ? `Отмечен в ${arrivalLabel} · ${dateLabel}`
+                ? <>Отмечен в <DateText kind="time" iso={arrivalAt} /> · <DateText kind="weekdayDay" dateKey={todayKey} /></>
                 : nextLesson
-                  ? `Следующий урок: ${nextLesson.subjectName} в ${nextLesson.timeLabel}`
-                  : dateLabel}
+                  ? <>Следующий урок: {nextLesson.subjectName} в <DateText kind="time" iso={nextLesson.startsAt} /></>
+                  : <DateText kind="weekdayDay" dateKey={todayKey} />}
             </span>
           </span>
         </div>
@@ -314,7 +317,7 @@ export function DayStatusView({
         {lessons.length === 0 ? (
           <GlassPanel radius={20}>
             <p className="text-center" style={{ padding: 18, fontSize: 12, fontWeight: 700, color: ink2 }}>
-              {dateLabel} — учебных занятий нет
+              <DateText kind="weekdayDay" dateKey={todayKey} /> — учебных занятий нет
             </p>
           </GlassPanel>
         ) : (
@@ -334,7 +337,7 @@ export function DayStatusView({
                     className="shrink-0"
                     style={{ width: 40, fontSize: 11, fontWeight: 800, color: ink2 }}
                   >
-                    {l.timeStart}
+                    <DateText kind="time" iso={l.startsAt} />
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>

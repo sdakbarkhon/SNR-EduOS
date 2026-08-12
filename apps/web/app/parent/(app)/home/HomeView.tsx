@@ -35,6 +35,9 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getDictionary } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { useDates } from "../_ui/dates";
 import { GlassCard } from "../v2/GlassCard";
 import { RootHeader } from "../v2/RootHeader";
 import { CHEVRON, DIVIDER, SECTION_CAP } from "../_ui/screen-tokens";
@@ -55,9 +58,20 @@ import {
 
 export type Gradient = [string, string];
 
+/** Срок задания: что показать в чипе. Сама подпись («Срок 3 августа»)
+ *  собирается здесь, в клиенте, потому что зависит от языка. */
+export type HomeDue =
+  | { kind: "none" }
+  | { kind: "overdue" }
+  | { kind: "today" }
+  | { kind: "day"; dateKey: string };
+
 export type HomeBadge =
   | { kind: "grade"; value: number }
-  | { kind: "chip"; label: string; tone: StatusKey };
+  /** Готовая подпись, не зависящая от даты («Сдано»). */
+  | { kind: "chip"; label: string; tone: StatusKey }
+  /** Срок задания: подпись собирается на языке экрана. */
+  | { kind: "due"; due: HomeDue; tone: StatusKey };
 
 export interface HomeFeedRow {
   id: string;
@@ -81,19 +95,31 @@ export interface HomeViewData {
   greeting: { title: string; subtitle: string };
   statusChip: { label: string; tone: StatusKey } | null;
   metrics: {
-    atSchoolSince: string;
+    /** ISO момента отметки или null — время подписывается на языке экрана. */
+    atSchoolSince: string | null;
     lessonsTotal: string;
     attended: string;
     homework: string;
     walletLabel: string;
   };
-  nextLesson: { subjectName: string; metaLabel: string; glyph: string; gradient: Gradient } | null;
+  nextLesson: {
+    subjectName: string;
+    /** Ключ дня и ISO начала — подпись «завтра · 10:20» собирает клиент. */
+    dateKey: string;
+    startsAt: string;
+    /** Хвост подписи после дня и времени: кабинет, учитель. */
+    metaTail: string[];
+    glyph: string;
+    gradient: Gradient;
+  } | null;
   /** Мок: платёжного бэкенда нет (см. page.tsx). */
   due: { amountLabel: string; subtitle: string };
   /** Мок: сервиса питания нет (см. page.tsx). */
   meals: { statusLabel: string; untilLabel: string };
   assistantText: string;
   feed: HomeFeedRow[];
+  /** «Сегодня» школы, YYYY-MM-DD — опора для «завтра» и сроков заданий. */
+  today: string;
 }
 
 /* ─── Маршруты (создаются соседними экранами родителя) ────────────────────── */
@@ -647,7 +673,29 @@ function EmptyBlock({ title, hint }: { title: string; hint?: string }) {
 
 export function HomeView({ data }: { data: HomeViewData }) {
   const router = useRouter();
+  const dt = useDates();
+  const { locale } = useLocale();
+  const dict = getDictionary(locale);
   const { parent, child, childLoadError } = data;
+
+  /** Подпись чипа срока. Слова берутся из уже существующих ключей словаря
+   *  (`parentUi.dueDate`, `status.overdue`, `parentMobile.hwDetailNoDeadline`),
+   *  дата — из `dt`; своих русских литералов здесь не остаётся. */
+  const dueLabel = (due: HomeDue): string => {
+    switch (due.kind) {
+      case "overdue":
+        return dict.status.overdue;
+      case "today":
+        return dict.parentUi.dueDate.replace("{date}", dt.words.today.toLowerCase());
+      case "day":
+        return dict.parentUi.dueDate.replace(
+          "{date}",
+          dt.relativeDay(due.dateKey, data.today) ?? dt.dayMonth(due.dateKey),
+        );
+      default:
+        return dict.parentMobile.hwDetailNoDeadline;
+    }
+  };
 
   // RootHeader принимает колбэки, а не href — prefetch делаем руками, чтобы
   // переход был таким же мгновенным, как по next/link.
@@ -658,7 +706,7 @@ export function HomeView({ data }: { data: HomeViewData }) {
 
   // 5 колонок метрики-сплит (макет 230–240).
   const metricCells: MetricCell[] = [
-    { label: T.atSchoolSince, value: data.metrics.atSchoolSince },
+    { label: T.atSchoolSince, value: data.metrics.atSchoolSince ? dt.time(data.metrics.atSchoolSince) : "—" },
     { label: T.lessons, value: data.metrics.lessonsTotal },
     { label: T.attended, value: data.metrics.attended, valueColor: status.green.text },
     { label: T.hw, value: data.metrics.homework, valueColor: status.orange.text },
@@ -788,11 +836,17 @@ export function HomeView({ data }: { data: HomeViewData }) {
                   <span style={{ fontSize: 15.5, fontWeight: 800, color: "#FFFFFF" }}>
                     {data.nextLesson.subjectName}
                   </span>
-                  {data.nextLesson.metaLabel ? (
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
-                      {data.nextLesson.metaLabel}
-                    </span>
-                  ) : null}
+                  {/* «завтра · 10:20 · каб. 101 · Учитель» — день и время
+                      подписываются здесь, на языке экрана. */}
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
+                    {[
+                      dt.relativeDay(data.nextLesson.dateKey, data.today),
+                      dt.time(data.nextLesson.startsAt),
+                      ...data.nextLesson.metaTail,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </span>
                 <AccentGlyphTile gradient={data.nextLesson.gradient} glyph={data.nextLesson.glyph} />
               </AccentCard>
@@ -906,7 +960,7 @@ export function HomeView({ data }: { data: HomeViewData }) {
             </div>
 
             {/* Лента «Сегодня» (264–269). */}
-            <SectionHeader title={T.todaySection} linkLabel={`${T.viewAll} ›`} linkHref={R.day} />
+            <SectionHeader title={dt.words.today} linkLabel={`${T.viewAll} ›`} linkHref={R.day} />
             <GlassCard radius={22} style={{ paddingLeft: 14, paddingRight: 14 }}>
               {data.feed.length === 0 ? (
                 <EmptyBlock title={T.emptyFeed} hint={T.emptyFeedHint} />
@@ -922,7 +976,10 @@ export function HomeView({ data }: { data: HomeViewData }) {
                       row.badge.kind === "grade" ? (
                         <GradeBadge value={row.badge.value} />
                       ) : (
-                        <StatusChip label={row.badge.label} family={row.badge.tone} />
+                        <StatusChip
+                          label={row.badge.kind === "due" ? dueLabel(row.badge.due) : row.badge.label}
+                          family={row.badge.tone}
+                        />
                       )
                     }
                     divider={idx > 0}

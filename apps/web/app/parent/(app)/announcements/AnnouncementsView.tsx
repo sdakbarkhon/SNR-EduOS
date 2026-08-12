@@ -14,21 +14,31 @@
  *    рисовать выдуманные числа на реальном экране нельзя;
  *  • картинок-обложек — вложений у объявления нет, поэтому hero остаётся
  *    декоративным градиентом (как и в макете, где это был плейсхолдер);
- *  • фильтры теперь по РЕАЛЬНОЙ колонке `category`, а не по выдуманному
- *    набору «Важные / Мероприятия / Информация».
+ *  • фильтры по РЕАЛЬНОЙ колонке `category`, а не по выдуманному набору.
+ *
+ * 12.08.2026 — подписи категорий, фильтров и пустых состояний переехали в
+ * словарь (`parentApp.ann`), дата собирается на языке экрана (`_ui/dates`).
+ * До этого экран был русским при любом выбранном языке, и из-за этого
+ * «Новости школы» пришлось рисовать упрощённой карточкой. Теперь карточка
+ * одна на два экрана — `AnnouncementCard` экспортируется.
  */
 
 import { useMemo, useState } from "react";
+import type { Locale } from "@snr/core";
+import { getDictionary } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "../v2/GlassCard";
 import { EmptyState, Glyph, ICON, SegmentPills, StatusChip, grad135 } from "../_ui/screen-kit";
 import { DIVIDER } from "../_ui/screen-tokens";
+import { useDates } from "../_ui/dates";
 import { glassBorder, ink1, ink2, ink3, type StatusKey } from "../v2/tokens";
 
 export type AnnouncementItem = {
   id: string;
   title: string;
   body: string;
-  dateLabel: string;
+  /** Сырой ISO: подпись даты зависит от языка, а язык знает только клиент. */
+  createdAt: string;
   authorName: string | null;
   isFromAdmin: boolean;
   isPinned: boolean;
@@ -36,53 +46,57 @@ export type AnnouncementItem = {
   category: string;
 };
 
-/** category → подпись бэджа + семейство статус-цветов токенов. */
-const CATEGORY_META: Record<string, { label: string; family: StatusKey; hero: [string, string] }> = {
-  urgent: { label: "Срочно", family: "red", hero: ["rgba(244,63,94,0.24)", "rgba(251,146,60,0.24)"] },
-  event: { label: "Мероприятие", family: "green", hero: ["rgba(16,185,129,0.22)", "rgba(14,165,233,0.22)"] },
-  academic: { label: "Учёба", family: "blue", hero: ["rgba(59,130,246,0.22)", "rgba(34,211,238,0.22)"] },
-  reminder: { label: "Напоминание", family: "orange", hero: ["rgba(251,191,36,0.24)", "rgba(249,115,22,0.22)"] },
-  general: { label: "Информация", family: "violet", hero: ["rgba(124,58,237,0.22)", "rgba(34,211,238,0.22)"] },
+type AnnDict = ReturnType<typeof getDictionary>["parentApp"]["ann"];
+
+/** category → ключ подписи в словаре + семейство статус-цветов токенов.
+ *  Цвета остаются здесь (это оформление), подписи — в словаре. */
+const CATEGORY_META: Record<
+  string,
+  { key: keyof AnnDict; family: StatusKey; hero: [string, string] }
+> = {
+  urgent: { key: "catUrgent", family: "red", hero: ["rgba(244,63,94,0.24)", "rgba(251,146,60,0.24)"] },
+  event: { key: "catEvent", family: "green", hero: ["rgba(16,185,129,0.22)", "rgba(14,165,233,0.22)"] },
+  academic: { key: "catAcademic", family: "blue", hero: ["rgba(59,130,246,0.22)", "rgba(34,211,238,0.22)"] },
+  reminder: { key: "catReminder", family: "orange", hero: ["rgba(251,191,36,0.24)", "rgba(249,115,22,0.22)"] },
+  general: { key: "catGeneral", family: "violet", hero: ["rgba(124,58,237,0.22)", "rgba(34,211,238,0.22)"] },
 };
 
 const FALLBACK_META = CATEGORY_META.general!;
 
 type Filter = "all" | "urgent" | "event" | "academic";
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "urgent", label: "Срочные" },
-  { key: "event", label: "События" },
-  { key: "academic", label: "Учёба" },
+const FILTER_KEYS: { key: Filter; label: keyof AnnDict }[] = [
+  { key: "all", label: "filterAll" },
+  { key: "urgent", label: "filterUrgent" },
+  { key: "event", label: "filterEvent" },
+  { key: "academic", label: "filterAcademic" },
 ];
 
 export function AnnouncementsView({ items }: { items: AnnouncementItem[] }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const { locale } = useLocale();
+  const ann = getDictionary(locale as Locale).parentApp.ann;
 
   const shown = useMemo(
     () => (filter === "all" ? items : items.filter((a) => a.category === filter)),
     [filter, items],
   );
 
-  const activeIndex = Math.max(0, FILTERS.findIndex((f) => f.key === filter));
+  const activeIndex = Math.max(0, FILTER_KEYS.findIndex((f) => f.key === filter));
 
   return (
     <div className="flex flex-col" style={{ gap: 11 }}>
       <SegmentPills
-        items={FILTERS.map((f) => f.label)}
+        items={FILTER_KEYS.map((f) => ann[f.label])}
         activeIndex={activeIndex}
-        onChange={(i) => setFilter(FILTERS[i]?.key ?? "all")}
+        onChange={(i) => setFilter(FILTER_KEYS[i]?.key ?? "all")}
       />
 
       {shown.length === 0 ? (
         <GlassCard>
           <EmptyState
-            title={items.length === 0 ? "Объявлений пока нет" : "В этой категории пусто"}
-            text={
-              items.length === 0
-                ? "Здесь появятся новости школы и класса вашего ребёнка."
-                : "Попробуйте другую вкладку."
-            }
+            title={items.length === 0 ? ann.emptyTitle : ann.emptyFilterTitle}
+            text={items.length === 0 ? ann.emptyText : ann.emptyFilterText}
             paths={ICON.mega}
           />
         </GlassCard>
@@ -95,7 +109,16 @@ export function AnnouncementsView({ items }: { items: AnnouncementItem[] }) {
   );
 }
 
-function AnnouncementCard({ row }: { row: AnnouncementItem }) {
+/**
+ * Карточка объявления — общая для «Объявлений» и «Новостей от администрации».
+ * Экспортируется намеренно: второй экран показывает те же записи, только
+ * отфильтрованные по автору, и своя копия карточки там разошлась бы с этой.
+ */
+export function AnnouncementCard({ row }: { row: AnnouncementItem }) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale).parentApp;
+  const ann = d.ann;
+  const dt = useDates();
   const meta = CATEGORY_META[row.category] ?? FALLBACK_META;
 
   return (
@@ -103,10 +126,10 @@ function AnnouncementCard({ row }: { row: AnnouncementItem }) {
       {/* Бэдж-тип + дата. */}
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5">
-          <StatusChip label={meta.label} family={meta.family} />
-          {row.isPinned ? <StatusChip label="Закреплено" family="orange" fontSize={8.5} /> : null}
+          <StatusChip label={ann[meta.key]} family={meta.family} />
+          {row.isPinned ? <StatusChip label={d.more.newsPinned} family="orange" fontSize={8.5} /> : null}
         </span>
-        <span style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>{row.dateLabel}</span>
+        <span style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>{dt.long(row.createdAt)}</span>
       </div>
 
       {/* Hero — декоративный градиент 104h. */}
@@ -136,9 +159,9 @@ function AnnouncementCard({ row }: { row: AnnouncementItem }) {
         style={{ paddingTop: 6, borderTop: `1px solid ${DIVIDER}` }}
       >
         <span className="min-w-0 flex-1 truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
-          {row.authorName ?? (row.isFromAdmin ? "Администрация школы" : "Школа")}
+          {row.authorName ?? (row.isFromAdmin ? d.more.newsAuthorFallback : ann.authorSchool)}
         </span>
-        {row.isFromAdmin ? <StatusChip label="Администрация" family="gray" fontSize={8.5} /> : null}
+        {row.isFromAdmin ? <StatusChip label={ann.adminChip} family="gray" fontSize={8.5} /> : null}
       </div>
     </GlassCard>
   );

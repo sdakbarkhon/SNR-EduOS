@@ -3102,6 +3102,23 @@ export interface Dictionary {
       prog: string;
       robo: string;
     };
+    ann: {
+      catUrgent: string;
+      catEvent: string;
+      catAcademic: string;
+      catReminder: string;
+      catGeneral: string;
+      filterAll: string;
+      filterUrgent: string;
+      filterEvent: string;
+      filterAcademic: string;
+      emptyTitle: string;
+      emptyText: string;
+      emptyFilterTitle: string;
+      emptyFilterText: string;
+      adminChip: string;
+      authorSchool: string;
+    };
     date: {
       mon: string;
       tue: string;
@@ -3116,6 +3133,24 @@ export interface Dictionary {
       today: string;
       yesterday: string;
       tomorrow: string;
+      earlier: string;
+      /** «21 {month}»: в ru — родительный падеж («июля»). */
+      monthsGen: string[];
+      /** Месяц отдельным словом: «Июль». */
+      monthsNom: string[];
+      /** Короткая метка: «июл». */
+      monthsShort: string[];
+      /** Порядок слов языка: ru «{d} {month}», en «{month} {d}». */
+      patDayMonth: string;
+      patDayMonthYear: string;
+      patMonthYear: string;
+      /** Месяц в форме для фразы «…чем в {month}»: ru — предложный падеж. */
+      monthsIn: string[];
+      deltaSame: string;
+      deltaUp: string;
+      deltaDown: string;
+      periodAll: string;
+      periodAllPrev: string;
       minAgo: string;
       hAgo: string;
       dAgo: string;

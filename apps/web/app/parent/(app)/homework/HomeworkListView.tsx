@@ -35,7 +35,38 @@ import {
   SubjectSquare,
 } from "../_study/parts";
 import { DIVIDER, PILL_INACTIVE_BG, PILL_INACTIVE_TEXT } from "../_ui/screen-tokens";
+import { getDictionary } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import { useDates } from "../_ui/dates";
 import { ink1, ink2, ink3, status, type StatusKey } from "../v2/tokens";
+
+/** Вид срока задания. Строку («Срок: завтра, 14:00») собирает `useDueLabel`
+ *  здесь, в клиенте: и слова, и дата зависят от языка. */
+export type HomeworkDue =
+  | { kind: "none" }
+  | { kind: "today"; at: string }
+  | { kind: "tomorrow"; at: string }
+  | { kind: "day"; dateKey: string };
+
+/** Подпись срока из уже существующих ключей словаря плюс дата с языком. */
+function useDueLabel(): (due: HomeworkDue) => string {
+  const dt = useDates();
+  const { locale } = useLocale();
+  const dict = getDictionary(locale);
+  return (due) => {
+    const tpl = dict.parentUi.dueDate;
+    switch (due.kind) {
+      case "today":
+        return tpl.replace("{date}", `${dt.words.today.toLowerCase()}, ${dt.time(due.at)}`);
+      case "tomorrow":
+        return tpl.replace("{date}", `${dt.words.tomorrow.toLowerCase()}, ${dt.time(due.at)}`);
+      case "day":
+        return tpl.replace("{date}", dt.dayMonth(due.dateKey));
+      default:
+        return dict.parentMobile.hwDetailNoDeadline;
+    }
+  };
+}
 
 export type HomeworkCardVM = {
   id: string;
@@ -43,7 +74,8 @@ export type HomeworkCardVM = {
   subjectGlyph: string;
   color: string;
   title: string;
-  dueLabel: string;
+  /** Что показать в подписи срока — сама строка собирается в клиенте. */
+  due: HomeworkDue;
   statusLabel: string;
   family: StatusKey;
   progress: number | "hourglass" | null;
@@ -56,9 +88,11 @@ export type HomeworkCardVM = {
 
 type FilterKey = "all" | "today" | "late" | "done";
 
-const FILTERS: { key: FilterKey; label: string }[] = [
+const FILTERS: { key: FilterKey; label: string | null }[] = [
   { key: "all", label: "Все" },
-  { key: "today", label: "Сегодня" },
+  // Подпись «Сегодня» — из словаря дат: это то же слово, что и в подписи
+  // срока рядом, и оно обязано меняться вместе с языком.
+  { key: "today", label: null },
   { key: "late", label: "Просрочено" },
   { key: "done", label: "Выполнено" },
 ];
@@ -98,6 +132,7 @@ function FilterChip({
 }
 
 function HomeworkCard({ card }: { card: HomeworkCardVM }) {
+  const dueLabel = useDueLabel();
   const st = status[card.family];
   const emphasize = card.family === "orange" || card.family === "red";
   const metaColor = emphasize ? st.text : ink3;
@@ -135,7 +170,7 @@ function HomeworkCard({ card }: { card: HomeworkCardVM }) {
               className="truncate"
               style={{ fontSize: 9.5, fontWeight: emphasize ? 800 : 700, color: metaColor }}
             >
-              {card.dueLabel}
+              {dueLabel(card.due)}
             </span>
           </span>
         </span>
@@ -164,6 +199,7 @@ export function HomeworkListView({
   cards: HomeworkCardVM[];
 }) {
   const [filter, setFilter] = useState<FilterKey>("all");
+  const dueWords = useDates().words;
 
   const counts: Record<FilterKey, number> = {
     all: cards.length,
@@ -199,7 +235,7 @@ export function HomeworkListView({
           {FILTERS.map((f) => (
             <FilterChip
               key={f.key}
-              label={f.label}
+              label={f.label ?? dueWords.today}
               count={counts[f.key]}
               active={filter === f.key}
               onSelect={() => setFilter(f.key)}

@@ -14,7 +14,7 @@ import type { ChildTestItem } from "@/lib/parent-queries";
 import { GlassCard } from "../v2/GlassCard";
 import { EmptyState, ICON, InnerHeader, ScreenScroll, SectionCap, StatusChip } from "../_ui/screen-kit";
 import { DIVIDER } from "../_ui/screen-tokens";
-import { previousDay, relativeStamp } from "../_ui/format";
+import { useDates } from "../_ui/dates";
 import { ink1, ink2, ink3 } from "../v2/tokens";
 
 export function TestsView({
@@ -29,7 +29,7 @@ export function TestsView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).parentApp;
   const m = d.more;
-  const yesterday = previousDay(today);
+  const dt = useDates();
 
   return (
     <div className="mx-auto w-full max-w-[430px]">
@@ -68,7 +68,7 @@ export function TestsView({
                           {t.title}
                         </span>
                         <span className="block" style={{ fontSize: 10, fontWeight: 600, color: ink2, marginTop: 3 }}>
-                          {[t.subjectName, t.submittedAt ? relativeStamp(t.submittedAt, today, yesterday) : null]
+                          {[t.subjectName, t.submittedAt ? dt.stamp(t.submittedAt, today) : null]
                             .filter(Boolean)
                             .join(" · ")}
                         </span>

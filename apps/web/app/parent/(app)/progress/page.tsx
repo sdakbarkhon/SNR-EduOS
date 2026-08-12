@@ -25,8 +25,6 @@ import {
   avatarGradient,
   givenNameLetter,
   initialsOf,
-  previousDay,
-  relativeStamp,
   tashkentDay,
 } from "../_ui/format";
 import type { SubjectKey } from "../v2/tokens";
@@ -83,34 +81,11 @@ function subjectKeyOf(name: string): SubjectKey {
   return SUBJECT_KEYS[hash % SUBJECT_KEYS.length] ?? "prog";
 }
 
-/* ─── Месяцы ──────────────────────────────────────────────────────────────── */
-
-const MONTHS_NOM = [
-  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
-] as const;
-
-const MONTHS_PREP = [
-  "январе", "феврале", "марте", "апреле", "мае", "июне",
-  "июле", "августе", "сентябре", "октябре", "ноябре", "декабре",
-] as const;
-
-const MONTHS_SHORT = [
-  "янв", "фев", "мар", "апр", "май", "июн",
-  "июл", "авг", "сен", "окт", "ноя", "дек",
-] as const;
-
-/** «2026-07» → индекс месяца 0..11. */
-function monthIndex(monthKey: string): number {
-  const n = Number(monthKey.slice(5, 7));
-  return Number.isFinite(n) && n >= 1 && n <= 12 ? n - 1 : 0;
-}
-
-function monthLabel(monthKey: string, currentYear: string): string {
-  const name = MONTHS_NOM[monthIndex(monthKey)] ?? monthKey;
-  const year = monthKey.slice(0, 4);
-  return year === currentYear ? name : `${name} ${year}`;
-}
+/* ─── Месяцы ──────────────────────────────────────────────────────────────
+ * Своих таблиц названий здесь больше нет: три русских массива (именительный,
+ * предложный, сокращённый) печатали русские месяцы на любом языке. Подписи
+ * собирает ProgressView через `useDates()`; сюда уезжает только ключ «YYYY-MM».
+ */
 
 function averageOf(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -129,6 +104,9 @@ export default async function ParentProgressPage() {
   const bellCount = await parentUnreadCount();
 
   const parentInitials = ctx?.parentName ? initialsOf(ctx.parentName) : "?";
+  // «Сегодня» школы нужен обеим веткам: в пустой — чтобы ProgressView не
+  // остался без опоры для подписей дат.
+  const today = await parentToday();
 
   if (!child) {
     const empty: ProgressViewData = {
@@ -144,11 +122,11 @@ export default async function ParentProgressPage() {
       weekActivity: { thisWeek: 0, lastWeek: 0, deltaPct: null },
       reviews: [],
       dynamics: [],
+      today,
     };
     return <ProgressView data={empty} />;
   }
 
-  const today = await parentToday();
   const [rawGrades, summary, attendance, weekActivity, reviews, dayStatus] = await Promise.all([
     childGrades(),
     childGradesSummary(),
@@ -194,10 +172,11 @@ export default async function ParentProgressPage() {
 
   const periods: ProgressPeriod[] = monthsDesc.slice(0, 6).map((m) => ({
     id: m,
-    label: monthLabel(m, currentYear),
-    prepLabel: MONTHS_PREP[monthIndex(m)] ?? m,
+    monthKey: m,
+    /** Год дописывается к подписи, только если он не текущий. */
+    withYear: m.slice(0, 4) !== currentYear,
   }));
-  periods.push({ id: "all", label: "Всё время", prepLabel: "прошлом периоде" });
+  periods.push({ id: "all", monthKey: null, withYear: false });
 
   const defaultPeriod = monthsDesc[0] ?? "all";
 
@@ -208,13 +187,11 @@ export default async function ParentProgressPage() {
     .reverse()
     .map((m) => ({
       monthKey: m,
-      label: MONTHS_SHORT[monthIndex(m)] ?? m,
       avg: averageOf(grades.filter((g) => g.month === m).map((g) => g.grade5)) ?? 0,
     }));
 
   /* ── Отзывы учителей ────────────────────────────────────────────────────── */
 
-  const yesterday = previousDay(today);
   const reviewItems: ProgressReview[] = reviews.map((r) => {
     const teacherName = r.teacherName ?? "Учитель";
     return {
@@ -224,7 +201,7 @@ export default async function ParentProgressPage() {
       teacherGradient: toGradient(avatarGradient(teacherName)),
       subjectName: r.subjectName ?? "",
       subjectId: r.subjectName ? idByName.get(r.subjectName) ?? null : null,
-      timeLabel: relativeStamp(r.gradedAt, today, yesterday),
+      gradedAt: r.gradedAt,
       comment: r.comment,
     };
   });
@@ -268,6 +245,7 @@ export default async function ParentProgressPage() {
     weekActivity,
     reviews: reviewItems,
     dynamics,
+    today,
   };
 
   return <ProgressView data={data} />;

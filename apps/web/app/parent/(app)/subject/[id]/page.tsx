@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import { formatDate, formatDateTime } from "@snr/core";
 import { childSubjectDetail, getSelectedChild } from "@/lib/parent-queries";
 import { SubjectDetailView } from "./SubjectDetailView";
-import { RU, initials, subjectColor, subjectGlyph } from "../../_study/util";
+import { initials, subjectColor, subjectGlyph } from "../../_study/util";
 
 /**
  * Экран #11 «Детали предмета» — веб-порт apps/mobile-parent/src/screens/study/
@@ -49,9 +48,7 @@ export default async function ParentSubjectDetailPage({
               id: detail.lastGradedHomework.id,
               title: detail.lastGradedHomework.title,
               grade: detail.lastGradedHomework.grade,
-              dateLabel: detail.lastGradedHomework.gradedAt
-                ? formatDate(detail.lastGradedHomework.gradedAt, RU)
-                : "—",
+              gradedAt: detail.lastGradedHomework.gradedAt,
             }
           : null
       }
@@ -59,7 +56,7 @@ export default async function ParentSubjectDetailPage({
         detail.upcomingQuizLesson
           ? {
               title: detail.upcomingQuizLesson.title,
-              dateLabel: formatDateTime(detail.upcomingQuizLesson.startsAt, RU),
+              startsAt: detail.upcomingQuizLesson.startsAt,
             }
           : null
       }
@@ -67,9 +64,7 @@ export default async function ParentSubjectDetailPage({
         detail.lastTeacherComment
           ? {
               text: detail.lastTeacherComment.comment,
-              dateLabel: detail.lastTeacherComment.gradedAt
-                ? formatDateTime(detail.lastTeacherComment.gradedAt, RU)
-                : "—",
+              gradedAt: detail.lastTeacherComment.gradedAt,
             }
           : null
       }

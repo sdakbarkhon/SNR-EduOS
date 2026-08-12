@@ -1,7 +1,5 @@
-import { formatTime } from "@snr/core";
 import { childDailyStats, childDailyStatus, getSelectedChild, parentToday } from "@/lib/parent-queries";
 import { DayStatusView, type DayLessonVM } from "./DayStatusView";
-import { RU, WEEKDAY_FULL, ruDayMonth, weekdayIndexOfKey } from "../_study/util";
 
 /**
  * Экран d6 «Статус дня» — веб-порт apps/mobile-parent/src/screens/study/
@@ -24,12 +22,11 @@ export default async function ParentDayPage() {
   ]);
 
   const today = await parentToday();
-  const weekday = WEEKDAY_FULL[weekdayIndexOfKey(today)] ?? "";
 
   const lessons: DayLessonVM[] = dayStatus.lessons.map((l) => ({
     id: l.id,
-    timeStart: formatTime(l.startsAt, RU),
-    timeEnd: l.endsAt ? formatTime(l.endsAt, RU) : null,
+    startsAt: l.startsAt,
+    endsAt: l.endsAt,
     title: l.subjectName ?? l.title ?? "Урок",
     room: l.room,
     teacherName: l.teacherName,
@@ -44,19 +41,19 @@ export default async function ParentDayPage() {
     <DayStatusView
       childName={child?.full_name ?? "Ребёнок"}
       childClass={child?.className ?? null}
-      dateLabel={`${weekday}, ${ruDayMonth(today)}`}
+      todayKey={today}
       isDayOff={dayStatus.isDayOff}
       lessons={lessons}
       totalLessons={dayStatus.totalLessons}
       present={present}
       excused={excused}
       unexcused={unexcused}
-      arrivalLabel={stats.arrivalTime ? formatTime(stats.arrivalTime, RU) : null}
+      arrivalAt={stats.arrivalTime}
       nextLesson={
         stats.nextLesson
           ? {
               subjectName: stats.nextLesson.subjectName,
-              timeLabel: formatTime(stats.nextLesson.startsAt, RU),
+              startsAt: stats.nextLesson.startsAt,
             }
           : null
       }

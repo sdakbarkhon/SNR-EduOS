@@ -4,7 +4,9 @@ import { Avatar, EmptyState, InnerHeader, ScreenScroll, SectionCap } from "../_u
 // Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
 // а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
 import { DIVIDER } from "../_ui/screen-tokens";
-import { avatarGradient, initialsOf, previousDay, relativeStamp } from "../_ui/format";
+import { avatarGradient, initialsOf } from "../_ui/format";
+// Дата — клиентской границей: язык раздела живёт в браузере (см. _ui/dates.tsx).
+import { DateText } from "../_ui/dates";
 import { ink1, ink2, ink3 } from "../v2/tokens";
 import { SERVICE_ICON } from "../services/_service-kit";
 
@@ -30,7 +32,6 @@ export default async function ParentReviewsPage() {
   const [reviews, child] = await Promise.all([childTeacherReviews(), getSelectedChild()]);
 
   const today = await parentToday();
-  const yesterday = previousDay(today);
 
   return (
     <div className="mx-auto w-full max-w-[430px]">
@@ -82,7 +83,7 @@ export default async function ParentReviewsPage() {
                           {heading}
                         </span>
                         <span className="shrink-0" style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>
-                          {relativeStamp(r.gradedAt, today, yesterday)}
+                          <DateText kind="stamp" iso={r.gradedAt} today={today} />
                         </span>
                       </div>
                       <p style={{ fontSize: 11, fontWeight: 600, lineHeight: "17px", color: ink2 }}>

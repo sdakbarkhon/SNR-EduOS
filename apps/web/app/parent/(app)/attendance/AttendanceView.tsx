@@ -39,15 +39,17 @@ import {
   ToneBadge,
 } from "../_study/parts";
 import { accentGrad, glass2, glassBorder, ink1, ink2, ink3, status } from "../v2/tokens";
-import { WEEKDAY_SHORT, ruMonthYear } from "../_study/util";
+import { useDates } from "../_ui/dates";
 
 export type AttendanceLastDay = {
   id: string;
-  dateLabel: string;
+  /** Ключ дня «YYYY-MM-DD» — подпись собирается на языке экрана. */
+  dateKey: string;
   subject: string;
   statusLabel: string;
   status: AttendanceStatus;
-  arrivedLabel: string | null;
+  /** ISO момента отметки или null. */
+  arrivedAt: string | null;
 };
 
 type Stats = { total: number; present: number; excused: number; unexcused: number; percentage: number };
@@ -166,6 +168,7 @@ export function AttendanceView({
   lastDays: AttendanceLastDay[];
   todayKey: string;
 }) {
+  const dt = useDates();
   const todayYear = Number(todayKey.slice(0, 4));
   const todayMonth = Number(todayKey.slice(5, 7));
   const [visible, setVisible] = useState({ year: todayYear, month: todayMonth });
@@ -226,7 +229,7 @@ export function AttendanceView({
                 <IconChevronLeft size={13} color={ink1} strokeWidth={2.2} />
               </button>
               <span style={{ fontSize: 13, fontWeight: 800, color: ink1 }}>
-                {ruMonthYear(visible.year, visible.month)}
+                {dt.monthYear(visible.year, visible.month)}
               </span>
               <button
                 type="button"
@@ -248,7 +251,7 @@ export function AttendanceView({
 
             <div className="flex flex-col" style={{ gap: 4 }}>
               <div className="flex" style={{ gap: 4 }}>
-                {WEEKDAY_SHORT.map((w) => (
+                {dt.weekdaysShort().map((w) => (
                   <span
                     key={w}
                     className="flex-1 text-center"
@@ -301,7 +304,7 @@ export function AttendanceView({
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-                        {row.dateLabel}
+                        {dt.dayLabel(row.dateKey, todayKey)}
                       </span>
                       <span className="truncate" style={{ fontSize: 10, fontWeight: 700, color: st.text }}>
                         {row.statusLabel}
@@ -311,8 +314,8 @@ export function AttendanceView({
                       </span>
                     </span>
                     <span className="flex flex-col items-end">
-                      <span style={{ fontSize: 10, fontWeight: 700, color: row.arrivedLabel ? ink2 : ink3 }}>
-                        Отмечен: {row.arrivedLabel ?? "—"}
+                      <span style={{ fontSize: 10, fontWeight: 700, color: row.arrivedAt ? ink2 : ink3 }}>
+                        Отмечен: {row.arrivedAt ? dt.time(row.arrivedAt) : "—"}
                       </span>
                     </span>
                     <ToneBadge tone={meta.tone} kind={meta.kind} />

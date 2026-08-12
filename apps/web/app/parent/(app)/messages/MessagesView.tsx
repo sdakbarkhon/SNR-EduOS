@@ -39,15 +39,17 @@ import {
   WHITE,
 } from "../_ui/screen-kit";
 import { SECTION_CAP } from "../_ui/screen-tokens";
+import { useDates } from "../_ui/dates";
 import { accentGrad, chip, fontDisplay, ink1, ink2, ink3, status } from "../v2/tokens";
 
-/* ── Пропсы: всё считает сервер (см. page.tsx) ───────────────────────────── */
+/* ── Пропсы: данные считает сервер, подписи дат — клиент (см. _ui/dates) ─── */
 
 export type MessagesThreadItem = {
   id: string;
   name: string;
   roleLabel: string | null;
-  timeLabel: string;
+  /** Сырой ISO последнего сообщения — подпись собирается на языке экрана. */
+  stampIso: string;
   preview: string;
   unread: number;
   initials: string;
@@ -58,7 +60,7 @@ export type MessagesAnnouncementItem = {
   id: string;
   title: string;
   preview: string;
-  dateLabel: string;
+  createdAt: string;
   isPinned: boolean;
 };
 
@@ -76,9 +78,11 @@ const TABS: { key: Tab; label: string }[] = [
 export function MessagesView({
   threads,
   announcements,
+  today,
 }: {
   threads: MessagesThreadItem[];
   announcements: MessagesAnnouncementItem[];
+  today: string;
 }) {
   const [tab, setTab] = useState<Tab>("all");
 
@@ -156,7 +160,7 @@ export function MessagesView({
         {/* ─── Список ─── */}
         <div className="flex flex-col gap-[11px] px-[18px]">
           {showThreads
-            ? threads.map((t) => <ThreadCard key={t.id} row={t} />)
+            ? threads.map((t) => <ThreadCard key={t.id} row={t} today={today} />)
             : null}
 
           {showAnnouncements && annPreview.length > 0 ? (
@@ -184,7 +188,7 @@ export function MessagesView({
                 </div>
               ) : null}
               {annPreview.map((a) => (
-                <AnnouncementRow key={a.id} row={a} />
+                <AnnouncementRow key={a.id} row={a} today={today} />
               ))}
             </>
           ) : null}
@@ -242,7 +246,8 @@ function StoryRing({
 
 /* ═══ Карточка треда ═══ */
 
-function ThreadCard({ row }: { row: MessagesThreadItem }) {
+function ThreadCard({ row, today }: { row: MessagesThreadItem; today: string }) {
+  const dt = useDates();
   return (
     <Link href={`/parent/chat/${row.id}`} className="block">
       <GlassCard className="flex items-center gap-[11px]" style={{ padding: "11px 13px" }}>
@@ -256,7 +261,7 @@ function ThreadCard({ row }: { row: MessagesThreadItem }) {
             {row.roleLabel ? <RoleChip label={row.roleLabel} /> : null}
             <span className="flex-1" />
             <span className="shrink-0 text-[9px]" style={{ fontWeight: 700, color: ink3 }}>
-              {row.timeLabel}
+              {dt.stamp(row.stampIso, today)}
             </span>
           </div>
 
@@ -326,7 +331,8 @@ function CountBadge({ value }: { value: number }) {
 }
 
 /** Строка объявления в ленте сообщений — ведёт на полный экран объявлений. */
-function AnnouncementRow({ row }: { row: MessagesAnnouncementItem }) {
+function AnnouncementRow({ row, today }: { row: MessagesAnnouncementItem; today: string }) {
+  const dt = useDates();
   return (
     <Link href="/parent/announcements" className="block">
       <GlassCard className="flex items-center gap-[11px]" style={{ padding: "11px 13px" }}>
@@ -339,7 +345,7 @@ function AnnouncementRow({ row }: { row: MessagesAnnouncementItem }) {
             {row.isPinned ? <StatusChip label="Закреплено" family="orange" fontSize={8.5} /> : null}
             <span className="flex-1" />
             <span className="shrink-0 text-[9px]" style={{ fontWeight: 700, color: ink3 }}>
-              {row.dateLabel}
+              {dt.stamp(row.createdAt, today)}
             </span>
           </div>
           <p

@@ -21,6 +21,7 @@
  */
 
 import { useState } from "react";
+import { useDates } from "../_ui/dates";
 import Link from "next/link";
 import { InnerHeader, GlassCircle } from "../_study/InnerHeader";
 import {
@@ -50,17 +51,18 @@ import { hexToRgbCsv } from "../_study/util";
 
 export type ScheduleDay = {
   dateKey: string;
-  weekdayShort: string;
+  /** 0 = понедельник: по нему берётся подпись «Пн»/«Понедельник» из словаря. */
+  weekdayIndex: number;
   dayNumber: number;
-  /** Готовая подпись баннера: «Сегодня, 30 июля» / «Пятница, 31 июля». */
-  bannerTitle: string;
+  isToday: boolean;
 };
 
 export type ScheduleLessonVM = {
   id: string;
   subjectId: string | null;
-  timeStart: string;
-  timeEnd: string | null;
+  /** Сырой ISO: время урока подписывается на языке экрана. */
+  startsAt: string;
+  endsAt: string | null;
   title: string;
   room: string | null;
   topic: string | null;
@@ -70,13 +72,16 @@ export type ScheduleLessonVM = {
   done: boolean;
 };
 
+/** Урок с уже подписанным временем — то, что реально рисует строка. */
+type LessonWithTime = ScheduleLessonVM & { timeStart: string; timeEnd: string | null };
+
 type Row =
-  | { kind: "lesson"; key: string; lesson: ScheduleLessonVM }
+  | { kind: "lesson"; key: string; lesson: LessonWithTime }
   | { kind: "break"; key: string; start: string; end: string };
 
 /** Между двумя соседними уроками — приглушённая строка «Перемена»
  *  (starts_at = конец предыдущего, ends_at = начало следующего). */
-function buildRows(lessons: ScheduleLessonVM[]): Row[] {
+function buildRows(lessons: LessonWithTime[]): Row[] {
   const out: Row[] = [];
   lessons.forEach((lesson, i) => {
     out.push({ kind: "lesson", key: `l-${lesson.id}`, lesson });
@@ -91,10 +96,13 @@ function buildRows(lessons: ScheduleLessonVM[]): Row[] {
 /** Ячейка ленты дней (макет 635). */
 function DayPill({
   day,
+  label,
   active,
   onSelect,
 }: {
   day: ScheduleDay;
+  /** «Пн» на языке экрана — подпись приходит сверху, чтобы хук был один. */
+  label: string;
   active: boolean;
   onSelect: () => void;
 }) {
@@ -128,7 +136,7 @@ function DayPill({
           color: active ? "rgba(255,255,255,0.85)" : ink3,
         }}
       >
-        {day.weekdayShort}
+        {label}
       </span>
       <span style={{ fontSize: 14, fontWeight: 800, color: active ? "#fff" : ink1 }}>
         {day.dayNumber}
@@ -250,8 +258,19 @@ export function ScheduleView({
   initialIndex: number;
 }) {
   const [index, setIndex] = useState(initialIndex);
+  const dt = useDates();
   const day = days[index] ?? days[0];
-  const rows = day ? buildRows(lessonsByDate[day.dateKey] ?? []) : [];
+  // Время урока подписывается здесь, на языке экрана; строка перемены
+  // склеивается из тех же подписей, поэтому формат один на оба вида строк.
+  const rows = day
+    ? buildRows(
+        (lessonsByDate[day.dateKey] ?? []).map((l) => ({
+          ...l,
+          timeStart: dt.time(l.startsAt),
+          timeEnd: l.endsAt ? dt.time(l.endsAt) : null,
+        })),
+      )
+    : [];
 
   return (
     <>
@@ -272,7 +291,13 @@ export function ScheduleView({
         <div className="flex items-stretch" style={{ gap: 8 }}>
           <div className="flex flex-1 overflow-x-auto" style={{ gap: 7, paddingBottom: 2 }}>
             {days.map((d, i) => (
-              <DayPill key={d.dateKey} day={d} active={i === index} onSelect={() => setIndex(i)} />
+              <DayPill
+                key={d.dateKey}
+                day={d}
+                label={dt.weekdayShort(d.weekdayIndex)}
+                active={i === index}
+                onSelect={() => setIndex(i)}
+              />
             ))}
           </div>
           <Link
@@ -296,7 +321,9 @@ export function ScheduleView({
           <GlassPanel radius={999} style={{ alignSelf: "flex-start" }}>
             <div className="flex items-center" style={{ gap: 9, paddingBlock: 10, paddingInline: 14 }}>
               <IconCalendarCheck size={15} color={accent} strokeWidth={1.9} />
-              <span style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>{day.bannerTitle}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>
+                {`${day.isToday ? dt.words.today : dt.weekdayFull(day.weekdayIndex)}, ${dt.dayMonth(day.dateKey)}`}
+              </span>
             </div>
           </GlassPanel>
         )}

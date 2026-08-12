@@ -39,6 +39,7 @@ import {
 } from "../../_study/parts";
 import { accentGrad, chip, fontDisplay, ink1, ink2, ink3, status } from "../../v2/tokens";
 import { hexToRgbCsv } from "../../_study/util";
+import { DateText } from "../../_ui/dates";
 
 type Topic = { topic: string; pct: number; average: number; count: number };
 
@@ -78,7 +79,7 @@ function MiniCard({
 }: {
   caps: string;
   title: string;
-  meta: string;
+  meta: ReactNode;
   right: ReactNode;
 }) {
   return (
@@ -127,9 +128,10 @@ export function SubjectDetailView({
   average: number | null;
   gradeCount: number;
   topics: Topic[];
-  lastWork: { id: string; title: string; grade: number | null; dateLabel: string } | null;
-  upcomingTest: { title: string; dateLabel: string } | null;
-  teacherComment: { text: string; dateLabel: string } | null;
+  /** Даты — сырым ISO: подписи собирает клиентский <DateText/>. */
+  lastWork: { id: string; title: string; grade: number | null; gradedAt: string | null } | null;
+  upcomingTest: { title: string; startsAt: string } | null;
+  teacherComment: { text: string; gradedAt: string | null } | null;
 }) {
   const rgb = hexToRgbCsv(color);
   const gaugePct = average != null ? (average / 5) * 100 : 0;
@@ -291,7 +293,7 @@ export function SubjectDetailView({
           <MiniCard
             caps="Последняя работа"
             title={lastWork?.title ?? "Оценённых работ пока нет"}
-            meta={lastWork?.dateLabel ?? "—"}
+            meta={lastWork?.gradedAt ? <DateText kind="long" iso={lastWork.gradedAt} /> : "—"}
             right={
               lastWork?.grade != null ? (
                 <span
@@ -317,7 +319,7 @@ export function SubjectDetailView({
           <MiniCard
             caps="Ближайший тест"
             title={upcomingTest?.title ?? "Тестов не запланировано"}
-            meta={upcomingTest?.dateLabel ?? "—"}
+            meta={upcomingTest ? <DateText kind="dateTime" iso={upcomingTest.startsAt} /> : "—"}
             right={
               upcomingTest ? (
                 <span
@@ -359,7 +361,7 @@ export function SubjectDetailView({
                 {teacherComment.text}
               </p>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
-                {teacherComment.dateLabel}
+                {teacherComment.gradedAt ? <DateText kind="dateTime" iso={teacherComment.gradedAt} /> : "—"}
               </span>
             </div>
           </GlassPanel>

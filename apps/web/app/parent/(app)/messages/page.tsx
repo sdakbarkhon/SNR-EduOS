@@ -1,6 +1,6 @@
 import { parentAnnouncements, parentToday } from "@/lib/parent-queries";
 import { parentThreadVMs } from "../_ui/threads";
-import { previewOf, previousDay, relativeStamp } from "../_ui/format";
+import { previewOf } from "../_ui/format";
 import { MessagesView, type MessagesAnnouncementItem, type MessagesThreadItem } from "./MessagesView";
 
 /**
@@ -16,10 +16,9 @@ import { MessagesView, type MessagesAnnouncementItem, type MessagesThreadItem } 
  */
 export default async function ParentMessagesPage() {
   const today = await parentToday();
-  const yesterday = previousDay(today);
 
   const [threads, announcements] = await Promise.all([
-    parentThreadVMs(today),
+    parentThreadVMs(),
     parentAnnouncements(20),
   ]);
 
@@ -27,7 +26,7 @@ export default async function ParentMessagesPage() {
     id: t.id,
     name: t.name,
     roleLabel: t.roleLabel,
-    timeLabel: t.timeLabel,
+    stampIso: t.stampIso,
     preview: t.preview,
     unread: t.unread,
     initials: t.initials,
@@ -38,9 +37,9 @@ export default async function ParentMessagesPage() {
     id: a.id,
     title: a.title,
     preview: previewOf(a.body, 140),
-    dateLabel: relativeStamp(a.created_at, today, yesterday),
+    createdAt: a.created_at,
     isPinned: a.is_pinned,
   }));
 
-  return <MessagesView threads={threadItems} announcements={announcementItems} />;
+  return <MessagesView threads={threadItems} announcements={announcementItems} today={today} />;
 }

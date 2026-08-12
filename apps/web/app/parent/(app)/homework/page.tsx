@@ -1,6 +1,5 @@
-import { formatTime } from "@snr/core";
 import { childHomework, getSelectedChild, parentToday } from "@/lib/parent-queries";
-import { HomeworkListView, type HomeworkCardVM } from "./HomeworkListView";
+import { HomeworkListView, type HomeworkCardVM, type HomeworkDue } from "./HomeworkListView";
 import {
   homeworkGradeDisplay,
   homeworkStatusKind,
@@ -8,7 +7,8 @@ import {
   statusFamily,
   statusLabel,
 } from "../_study/homework-status";
-import { RU, addDaysKey, ruDayMonth, subjectColor, subjectGlyph, tashkentDateKey } from "../_study/util";
+import { subjectColor, subjectGlyph } from "../_study/util";
+import { addDaysKey, tashkentDateKey } from "../_ui/format";
 
 /**
  * Экран #12 «Домашние задания» — веб-порт apps/mobile-parent/src/screens/
@@ -35,16 +35,16 @@ export default async function ParentHomeworkPage() {
     const dueKey = hw.due_date ? tashkentDateKey(hw.due_date) : null;
     const overdue = kind === "not_submitted" && !!dueKey && dueKey < today;
 
-    let dueLabel: string;
-    if (!hw.due_date || !dueKey) {
-      dueLabel = "Без срока";
-    } else if (dueKey === today) {
-      dueLabel = `Срок: сегодня, ${formatTime(hw.due_date, RU)}`;
-    } else if (dueKey === tomorrow) {
-      dueLabel = `Срок: завтра, ${formatTime(hw.due_date, RU)}`;
-    } else {
-      dueLabel = `Срок: ${ruDayMonth(dueKey)}`;
-    }
+    // Подпись срока («Срок: завтра, 14:00») собирает клиент: и слова, и дата
+    // зависят от языка. Отсюда уезжает только вид срока и его момент.
+    const due: HomeworkDue =
+      !hw.due_date || !dueKey
+        ? { kind: "none" }
+        : dueKey === today
+          ? { kind: "today", at: hw.due_date }
+          : dueKey === tomorrow
+            ? { kind: "tomorrow", at: hw.due_date }
+            : { kind: "day", dateKey: dueKey };
 
     return {
       id: hw.id,
@@ -52,7 +52,7 @@ export default async function ParentHomeworkPage() {
       subjectGlyph: subjectGlyph(hw.subjectName ?? hw.group.subject),
       color: subjectColor(hw.subjectColor),
       title: hw.title,
-      dueLabel,
+      due,
       statusLabel: statusLabel(kind, grade),
       family: statusFamily(kind, overdue),
       progress: progressIndicator(hw),

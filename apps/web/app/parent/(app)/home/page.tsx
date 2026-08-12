@@ -1,4 +1,4 @@
-import type { Gradient, HomeFeedRow, HomeViewData } from "./HomeView";
+import type { Gradient, HomeDue, HomeFeedRow, HomeViewData } from "./HomeView";
 import { HomeView } from "./HomeView";
 import { getParentContext } from "@/lib/parent-context";
 import {
@@ -19,7 +19,6 @@ import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui
 import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
 import { billsCountLabel } from "../payments/mock-data";
 import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
-import { tashkentRelativeDayLabel, tashkentTimeLabel } from "./tashkent";
 
 /**
  * «Главная» (П5) — серверная сборка view-model из РЕАЛЬНЫХ данных Supabase.
@@ -195,12 +194,13 @@ export default async function ParentHomePage() {
           : "Профиль ученика ещё не привязан к вашему аккаунту",
       },
       statusChip: null,
-      metrics: { atSchoolSince: "—", lessonsTotal: "0", attended: "0/0", homework: "0", walletLabel: "—" },
+      metrics: { atSchoolSince: null, lessonsTotal: "0", attended: "0/0", homework: "0", walletLabel: "—" },
       nextLesson: null,
       due: { amountLabel: "—", subtitle: "" },
       meals: { statusLabel: "—", untilLabel: "" },
       assistantText: "",
       feed: [],
+      today: "",
     };
     return <HomeView data={data} />;
   }
@@ -261,17 +261,16 @@ export default async function ParentHomePage() {
     }
   }
 
+  // День и время следующего урока подписывает клиент (см. _ui/dates.tsx):
+  // отсюда уезжают ключ дня и ISO, а не готовая строка «завтра · 10:20».
   const nextLesson: HomeViewData["nextLesson"] = next
     ? {
         subjectName: next.subjectName || "Урок",
-        metaLabel: [
-          tashkentRelativeDayLabel(next.dateKey, today),
-          tashkentTimeLabel(next.startsAt),
-          next.room ? `каб. ${next.room}` : null,
-          next.teacher,
-        ]
-          .filter((p): p is string => Boolean(p))
-          .join(" · "),
+        dateKey: next.dateKey,
+        startsAt: next.startsAt,
+        metaTail: [next.room ? `каб. ${next.room}` : null, next.teacher].filter(
+          (p): p is string => Boolean(p),
+        ),
         glyph: SUBJECT_GLYPH[subjectKeyOf(next.subjectName || "Урок")],
         gradient: subjectGradient(next.subjectName || "Урок"),
       }
@@ -342,18 +341,20 @@ export default async function ParentHomePage() {
 
   for (const h of pendingHomework) {
     if (feed.length >= 4) break;
+    // Сам чип подписывается в клиенте: «Срок 3 августа» зависит от языка.
+    // Сервер решает только ЧТО показать — вид срока и его день.
     const dueKey = h.due_date ? tashkentDay(h.due_date) : null;
-    let label = "Без срока";
+    let due: HomeDue = { kind: "none" };
     let tone: StatusKey = "gray";
     if (dueKey) {
       if (dueKey < today) {
-        label = "Просрочено";
+        due = { kind: "overdue" };
         tone = "red";
       } else if (dueKey === today) {
-        label = "Срок сегодня";
+        due = { kind: "today" };
         tone = "orange";
       } else {
-        label = `Срок ${tashkentRelativeDayLabel(dueKey, today) ?? ""}`.trim();
+        due = { kind: "day", dateKey: dueKey };
         tone = "orange";
       }
     }
@@ -366,7 +367,7 @@ export default async function ParentHomePage() {
         gradient: subjectGradient(h.subjectName ?? h.title),
         glyph: SUBJECT_GLYPH[subjectKeyOf(h.subjectName ?? h.title)],
       },
-      badge: { kind: "chip", label, tone },
+      badge: { kind: "due", due, tone },
     });
   }
 
@@ -406,7 +407,7 @@ export default async function ParentHomePage() {
     },
     statusChip,
     metrics: {
-      atSchoolSince: stats.arrivalTime ? tashkentTimeLabel(stats.arrivalTime) : "—",
+      atSchoolSince: stats.arrivalTime,
       lessonsTotal: String(dayStatus.totalLessons),
       attended: `${dayStatus.attendedCount}/${dayStatus.totalLessons}`,
       homework: String(pendingHomework.length),
@@ -423,6 +424,7 @@ export default async function ParentHomePage() {
     meals: { statusLabel: MOCK_MEALS.statusLabel, untilLabel: MOCK_MEALS.untilLabel },
     assistantText: assistantParts.join(" "),
     feed,
+    today,
   };
 
   return <HomeView data={data} />;

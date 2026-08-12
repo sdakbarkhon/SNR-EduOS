@@ -9,7 +9,8 @@ import type { ChildTeacherProfile } from "@/lib/parent-queries";
 import { GlassCard } from "../../v2/GlassCard";
 import { Avatar, InnerHeader, ScreenScroll, SectionCap } from "../../_ui/screen-kit";
 import { DIVIDER } from "../../_ui/screen-tokens";
-import { avatarGradient, initialsOf, previousDay, relativeStamp } from "../../_ui/format";
+import { avatarGradient, initialsOf } from "../../_ui/format";
+import { useDates } from "../../_ui/dates";
 import { ink1, ink2, ink3 } from "../../v2/tokens";
 
 export function TeacherProfileView({
@@ -24,7 +25,7 @@ export function TeacherProfileView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).parentApp;
   const m = d.more;
-  const yesterday = previousDay(today);
+  const dt = useDates();
 
   const facts: Array<[string, string]> = [
     [m.teacherSubject, profile.subjectNames.join(" · ") || "—"],
@@ -102,7 +103,7 @@ export function TeacherProfileView({
                     {r.subjectName ?? ""}
                   </span>
                   <span className="shrink-0" style={{ fontSize: 10, fontWeight: 700, color: ink3 }}>
-                    {relativeStamp(r.gradedAt, today, yesterday)}
+                    {dt.stamp(r.gradedAt, today)}
                   </span>
                 </div>
                 <p style={{ fontSize: 11, fontWeight: 600, lineHeight: "17px", color: ink2, marginTop: 4 }}>

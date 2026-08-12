@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { formatDateTime } from "@snr/core";
 import { childHomeworkDetail, getSelectedChild } from "@/lib/parent-queries";
 import { HomeworkDetailView } from "./HomeworkDetailView";
 import {
@@ -8,7 +7,7 @@ import {
   statusFamily,
   statusLabel,
 } from "../../_study/homework-status";
-import { RU, fileExtLabel, fileSizeLabel, initials, subjectColor, subjectGlyph } from "../../_study/util";
+import { fileExtLabel, fileSizeLabel, initials, subjectColor, subjectGlyph } from "../../_study/util";
 
 /**
  * Экран #13 «Детали задания» — веб-порт apps/mobile-parent/src/screens/study/
@@ -52,8 +51,8 @@ export default async function ParentHomeworkDetailPage({
       statusLabel={statusLabel(kind, grade)}
       family={family}
       gradeDisplay={grade}
-      dueLabel={hw.due_date ? formatDateTime(hw.due_date, RU) : "Без срока"}
-      createdLabel={formatDateTime(hw.created_at, RU)}
+      dueAt={hw.due_date}
+      createdAt={hw.created_at}
       teacherName={hw.teacherName}
       teacherInitials={initials(hw.teacherName)}
       contentType={hw.content_type}
@@ -70,7 +69,7 @@ export default async function ParentHomeworkDetailPage({
       submission={
         sub
           ? {
-              submittedLabel: formatDateTime(sub.submitted_at, RU),
+              submittedAt: sub.submitted_at,
               answerText: sub.answer_text,
               codeText: sub.code_text,
               fileName: sub.file_original_name,
@@ -83,7 +82,7 @@ export default async function ParentHomeworkDetailPage({
       test={
         test
           ? {
-              submittedLabel: formatDateTime(test.submitted_at, RU),
+              submittedAt: test.submitted_at,
               score: test.score,
               maxScore: test.max_score,
             }

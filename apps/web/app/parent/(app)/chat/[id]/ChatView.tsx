@@ -42,6 +42,7 @@ import {
   shCard,
   status,
 } from "../../v2/tokens";
+import { useDates } from "../../_ui/dates";
 import { markParentThreadRead, sendParentMessage } from "./actions";
 
 export type ChatBubbleItem = {
@@ -49,9 +50,10 @@ export type ChatBubbleItem = {
   /** true = сообщение родителя (справа, accent). */
   own: boolean;
   body: string;
-  timeLabel: string;
-  /** Разделитель дня, который надо нарисовать ПЕРЕД этим сообщением. */
-  dayDivider: string | null;
+  /** Сырой ISO: и время, и разделитель дня собираются на языке экрана. */
+  createdAt: string;
+  /** Нужен ли разделитель дня ПЕРЕД этим сообщением (первое за свой день). */
+  showDayDivider: boolean;
   /** Автор — показывается только в групповых тредах у чужих сообщений. */
   authorName: string | null;
 };
@@ -78,13 +80,16 @@ export function ChatView({
   messages,
   isGroup,
   lastMessageId,
+  today,
 }: {
   header: ChatHeaderInfo;
   messages: ChatBubbleItem[];
   isGroup: boolean;
   lastMessageId: string | null;
+  today: string;
 }) {
   const router = useRouter();
+  const dt = useDates();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -166,11 +171,11 @@ export function ChatView({
 
         {messages.map((m) => (
           <div key={m.id} className="flex flex-col gap-2">
-            {m.dayDivider ? <DayDivider label={m.dayDivider} /> : null}
+            {m.showDayDivider ? <DayDivider label={dt.divider(m.createdAt, today)} /> : null}
             <Bubble
               own={m.own}
               body={m.body}
-              timeLabel={m.timeLabel}
+              timeLabel={dt.time(m.createdAt)}
               author={isGroup && !m.own ? m.authorName : null}
             />
           </div>

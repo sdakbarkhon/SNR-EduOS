@@ -1,16 +1,7 @@
-import { formatTime } from "@snr/core";
 import { childScheduleWeek, getSelectedChild, parentToday, parentWeekMonday } from "@/lib/parent-queries";
 import { ScheduleView, type ScheduleDay, type ScheduleLessonVM } from "./ScheduleView";
-import {
-  RU,
-  WEEKDAY_FULL,
-  WEEKDAY_SHORT,
-  addDaysKey,
-  dayOfKey,
-  ruDayMonth,
-  subjectColor,
-  tashkentDateKey,
-} from "../_study/util";
+import { subjectColor } from "../_study/util";
+import { addDaysKey, dayOfKey, tashkentDateKey } from "../_ui/format";
 
 /**
  * Экран #15 «Расписание» — веб-порт apps/mobile-parent/src/screens/study/
@@ -33,16 +24,12 @@ export default async function ParentSchedulePage() {
   const weekStart = await parentWeekMonday();
   const today = await parentToday();
 
-  const days: ScheduleDay[] = WEEKDAY_SHORT.map((label, i) => {
+  // Подписи дня («Пн», «Сегодня, 30 июля») больше не собираются здесь: они
+  // зависят от языка, а язык знает только клиент. Отсюда уезжают ключ дня,
+  // его номер в неделе и число месяца — ScheduleView подписывает сам.
+  const days: ScheduleDay[] = [0, 1, 2, 3, 4, 5, 6].map((i) => {
     const dateKey = addDaysKey(weekStart, i);
-    const dayMonth = ruDayMonth(dateKey);
-    return {
-      dateKey,
-      weekdayShort: label,
-      dayNumber: dayOfKey(dateKey),
-      bannerTitle:
-        dateKey === today ? `Сегодня, ${dayMonth}` : `${WEEKDAY_FULL[i] ?? label}, ${dayMonth}`,
-    };
+    return { dateKey, weekdayIndex: i, dayNumber: dayOfKey(dateKey), isToday: dateKey === today };
   });
 
   const lessonsByDate: Record<string, ScheduleLessonVM[]> = {};
@@ -53,8 +40,8 @@ export default async function ParentSchedulePage() {
     bucket.push({
       id: l.id,
       subjectId: l.subject?.id ?? null,
-      timeStart: formatTime(l.starts_at, RU),
-      timeEnd: l.ends_at ? formatTime(l.ends_at, RU) : null,
+      startsAt: l.starts_at,
+      endsAt: l.ends_at,
       title: l.subject?.name ?? l.title ?? "Урок",
       room: l.room,
       topic: l.topic,

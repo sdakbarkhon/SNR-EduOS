@@ -39,7 +39,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getDictionary } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "../v2/GlassCard";
+import { useDates } from "../_ui/dates";
 import { RootHeader } from "../v2/RootHeader";
 import {
   DIVIDER,
@@ -90,10 +93,10 @@ export interface ProgressGrade {
 export interface ProgressPeriod {
   /** "all" либо YYYY-MM. */
   id: string;
-  /** Именительный падеж для кнопки/попапа: «Июль 2026». */
-  label: string;
-  /** Предложный падеж для фразы «…чем в июне»: «июне». */
-  prepLabel: string;
+  /** «YYYY-MM» либо null для «Всё время» — подпись собирается на языке экрана. */
+  monthKey: string | null;
+  /** Дописывать ли год к подписи (месяц не из текущего года). */
+  withYear: boolean;
 }
 
 export interface ProgressReview {
@@ -103,13 +106,14 @@ export interface ProgressReview {
   teacherGradient: Gradient;
   subjectName: string;
   subjectId: string | null;
-  timeLabel: string;
+  /** Сырой ISO: подпись собирается на языке экрана (см. _ui/dates). */
+  gradedAt: string;
   comment: string;
 }
 
 export interface ProgressMonthPoint {
+  /** «YYYY-MM» — подпись месяца собирается на языке экрана. */
   monthKey: string;
-  label: string;
   avg: number;
 }
 
@@ -136,6 +140,9 @@ export interface ProgressViewData {
   weekActivity: { thisWeek: number; lastWeek: number; deltaPct: number | null };
   reviews: ProgressReview[];
   dynamics: ProgressMonthPoint[];
+  /** «Сегодня» школы, YYYY-MM-DD — по нему подписи отзывов становятся
+   *  «14:32» / «Вчера» / «21 июл.» на языке экрана. */
+  today: string;
 }
 
 /* ─── Маршруты ────────────────────────────────────────────────────────────── */
@@ -809,6 +816,22 @@ function pluralGrades(n: number): string {
 
 export function ProgressView({ data }: { data: ProgressViewData }) {
   const router = useRouter();
+  const dt = useDates();
+  const { locale } = useLocale();
+  const dd = getDictionary(locale).parentApp.date;
+
+  /** «Июль» / «Июль 2025» по ключу «YYYY-MM»; для «Всё время» — слово из словаря. */
+  const periodLabel = (p: ProgressPeriod): string => {
+    if (!p.monthKey) return dd.periodAll;
+    const [y, m] = p.monthKey.split("-").map(Number);
+    const name = dt.month(m ?? 1);
+    return p.withYear ? `${name} ${y}` : name;
+  };
+
+  /** «июл.» — подпись точки на графике динамики. */
+  const monthShortOf = (monthKey: string): string => {
+    return dt.monthShort(Number(monthKey.slice(5, 7)));
+  };
   const [activeTab, setActiveTab] = useState(0); // 0 — Оценки, 1 — Динамика
   const [period, setPeriod] = useState<string>(data.defaultPeriod);
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -895,13 +918,17 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
     const prevAvg = averageOf(grades.filter((g) => g.month === prevMonth).map((g) => g.grade5));
     if (prevAvg == null) return null;
     const diff = periodAverage - prevAvg;
-    const prep = data.periods.find((p) => p.id === prevMonth)?.prepLabel ?? "";
-    if (Math.abs(diff) < 0.05) return { text: `Столько же, что и в ${prep}`, up: true };
+    // Месяц берётся в той форме, которой требует язык фразы: в русском это
+    // предложный падеж («…чем в июне»), и он лежит в словаре — Intl такой
+    // формы не даёт вовсе.
+    const month = dt.monthIn(Number(prevMonth.slice(5, 7)));
+    const n = Math.abs(diff).toFixed(1);
+    if (Math.abs(diff) < 0.05) return { text: dd.deltaSame.replace("{month}", month), up: true };
     return {
-      text: `${diff > 0 ? "Выше" : "Ниже"} на ${Math.abs(diff).toFixed(1)}, чем в ${prep} ${diff > 0 ? "↗" : "↘"}`,
+      text: (diff > 0 ? dd.deltaUp : dd.deltaDown).replace("{n}", n).replace("{month}", month),
       up: diff > 0,
     };
-  }, [prevMonth, periodAverage, grades, data.periods]);
+  }, [prevMonth, periodAverage, grades, dt, dd]);
 
   const dynamicsValues = useMemo(() => dynamics.map((d) => d.avg), [dynamics]);
 
@@ -1116,7 +1143,10 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                         }}
                       >
                         <span style={{ fontSize: 11, fontWeight: 800, color: ink1 }}>
-                          {data.periods.find((p) => p.id === period)?.label ?? T.periodAll}
+                          {(() => {
+                            const p = data.periods.find((x) => x.id === period);
+                            return p ? periodLabel(p) : dd.periodAll;
+                          })()}
                         </span>
                         <ChevronDown size={10} color={ink1} strokeWidth={2.4} />
                       </button>
@@ -1153,7 +1183,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                                 color: p.id === period ? accent : ink1,
                               }}
                             >
-                              {p.label}
+                              {periodLabel(p)}
                             </button>
                           ))}
                         </div>
@@ -1322,7 +1352,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                               {[review.teacherName, review.subjectName].filter(Boolean).join(" · ")}
                             </span>
                             <span className="shrink-0" style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>
-                              {review.timeLabel}
+                              {dt.stamp(review.gradedAt, data.today)}
                             </span>
                           </span>
                           <span style={{ fontSize: 11, fontWeight: 600, lineHeight: "16.5px", color: ink2, ...CLAMP_3 }}>
@@ -1387,7 +1417,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                     <div className="flex justify-between">
                       {dynamics.map((m) => (
                         <span key={m.monthKey} style={{ fontSize: 10, fontWeight: 700, color: ink3 }}>
-                          {m.label}
+                          {monthShortOf(m.monthKey)}
                         </span>
                       ))}
                     </div>
@@ -1414,7 +1444,7 @@ export function ProgressView({ data }: { data: ProgressViewData }) {
                               className="flex-1"
                               style={{ fontSize: 12, fontWeight: i === 0 ? 800 : 700, color: ink1 }}
                             >
-                              {m.label}
+                              {periodLabel({ id: m.monthKey, monthKey: m.monthKey, withYear: false })}
                             </span>
                             <span
                               style={{ fontSize: 12, fontWeight: i === 0 ? 800 : 700, color: ink1, marginRight: 12 }}

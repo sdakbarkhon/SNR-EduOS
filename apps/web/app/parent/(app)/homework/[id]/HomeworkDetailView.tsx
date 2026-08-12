@@ -36,6 +36,7 @@ import {
   SubjectSquare,
 } from "../../_study/parts";
 import { DIVIDER } from "../../_ui/screen-tokens";
+import { DateText } from "../../_ui/dates";
 import { accentGrad, chip, ink1, ink2, ink3, status, type StatusKey } from "../../v2/tokens";
 
 type Attachment = {
@@ -46,7 +47,8 @@ type Attachment = {
 };
 
 type Submission = {
-  submittedLabel: string;
+  /** ISO момента сдачи — подпись собирает клиентский <DateText/>. */
+  submittedAt: string;
   answerText: string | null;
   codeText: string | null;
   fileName: string | null;
@@ -56,7 +58,8 @@ type Submission = {
 };
 
 type TestResult = {
-  submittedLabel: string;
+  /** ISO момента сдачи — подпись собирает клиентский <DateText/>. */
+  submittedAt: string;
   score: number | null;
   maxScore: number | null;
 };
@@ -114,8 +117,8 @@ export function HomeworkDetailView({
   statusLabel,
   family,
   gradeDisplay,
-  dueLabel,
-  createdLabel,
+  dueAt,
+  createdAt,
   teacherName,
   teacherInitials,
   contentType,
@@ -133,8 +136,9 @@ export function HomeworkDetailView({
   statusLabel: string;
   family: StatusKey;
   gradeDisplay: string | null;
-  dueLabel: string;
-  createdLabel: string;
+  /** ISO срока или null — подпись собирает клиентский <DateText/>. */
+  dueAt: string | null;
+  createdAt: string;
   teacherName: string | null;
   teacherInitials: string;
   contentType: string;
@@ -184,7 +188,9 @@ export function HomeworkDetailView({
             >
               <span className="flex items-center" style={{ gap: 5 }}>
                 <IconCalendar size={13} color={ink2} strokeWidth={1.9} />
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>{dueLabel}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: ink2 }}>
+                  <DateText kind="dateTimeOrNone" iso={dueAt} />
+                </span>
               </span>
               <span className="ml-auto flex items-center" style={{ gap: 6 }}>
                 <TeacherAvatar initials={teacherInitials} />
@@ -213,7 +219,7 @@ export function HomeworkDetailView({
                 {description}
               </p>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
-                Выдано: {createdLabel}
+                Выдано: <DateText kind="dateTime" iso={createdAt} />
               </span>
             </div>
           </GlassPanel>
@@ -294,7 +300,7 @@ export function HomeworkDetailView({
             ) : (
               <div className="flex flex-col" style={{ gap: 8 }}>
                 <span style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
-                  Отправлено: {submission.submittedLabel}
+                  Отправлено: <DateText kind="dateTime" iso={submission.submittedAt} />
                 </span>
 
                 {submission.codeText && (

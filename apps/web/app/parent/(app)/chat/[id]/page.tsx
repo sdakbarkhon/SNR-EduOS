@@ -6,7 +6,7 @@ import { EmptyState, Glyph, GlassCircleButton, InnerHeader, ScreenScroll } from 
 import { ICON } from "../../_ui/screen-tokens";
 import { ink1 } from "../../v2/tokens";
 import { parentThreadMessages, parentToday } from "@/lib/parent-queries";
-import { dayDivider, formatTime, previousDay, tashkentDay } from "../../_ui/format";
+import { tashkentDay } from "../../_ui/format";
 import {
   getAuthUserId,
   parentThreadParticipantNames,
@@ -31,9 +31,8 @@ export default async function ParentChatPage({
 }) {
   const { id } = await params;
   const today = await parentToday();
-  const yesterday = previousDay(today);
 
-  const threads = await parentThreadVMs(today);
+  const threads = await parentThreadVMs();
 
   // ── Псевдо-тред «поддержка» ──
   if (id === "support") {
@@ -80,14 +79,16 @@ export default async function ParentChatPage({
     .filter((m) => !m.deleted_at)
     .map((m) => {
       const day = tashkentDay(m.created_at);
-      const divider = day === prevDay ? null : dayDivider(m.created_at, today, yesterday);
+      // Сам разделитель («Сегодня, 23 июля») собирает клиент — здесь только
+      // решается, нужен ли он перед этим сообщением.
+      const needsDivider = day !== prevDay;
       prevDay = day;
       return {
         id: m.id,
         own: myUserId !== null && m.sender_id === myUserId,
         body: m.body,
-        timeLabel: formatTime(m.created_at),
-        dayDivider: divider,
+        createdAt: m.created_at,
+        showDayDivider: needsDivider,
         authorName: m.sender_id ? participantNames[m.sender_id] ?? null : null,
       };
     });
@@ -107,6 +108,7 @@ export default async function ParentChatPage({
       messages={bubbles}
       isGroup={thread.kind === "group"}
       lastMessageId={lastMessageId}
+      today={today}
     />
   );
 }
