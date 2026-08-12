@@ -2693,6 +2693,7 @@ export interface Dictionary {
       tests: string;
       library: string;
       teachers: string;
+      assistant: string;
       sessions: string;
     };
     more: {
@@ -3101,6 +3102,41 @@ export interface Dictionary {
       rus: string;
       prog: string;
       robo: string;
+    };
+    more2: {
+      diaryWeekGrades: string;
+      diaryWeekAvg: string;
+      diaryWeekHw: string;
+      diaryNoGrade: string;
+      diaryDayAvg: string;
+      diaryPrevWeek: string;
+      diaryNextWeek: string;
+      diaryEmptyTitle: string;
+      diaryEmptyText: string;
+      diaryNoLessonsDay: string;
+      topicsCount: string;
+      topicsMastered: string;
+      topicsAttention: string;
+      topicsOverall: string;
+      topicsAttentionChip: string;
+      topicsAllSubjects: string;
+      topicsMeta: string;
+      topicsEmptyTitle: string;
+      topicsEmptyText: string;
+      topicsNote: string;
+      assistantGenerate: string;
+      assistantRegenerate: string;
+      assistantWorking: string;
+      assistantGeneratedAt: string;
+      assistantEmptyTitle: string;
+      assistantEmptyText: string;
+      assistantError: string;
+      assistantNote: string;
+      assistantSummaryCap: string;
+      assistantItemsCap: string;
+      libraryOpen: string;
+      libraryOpening: string;
+      libraryOpenFailed: string;
     };
     ann: {
       catUrgent: string;

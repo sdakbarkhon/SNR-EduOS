@@ -136,6 +136,9 @@ const R = {
   profile: "/parent/profile",
   progress: "/parent/progress",
   messages: "/parent/messages",
+  /* 12.08.2026 — экран разбора помощника. Карточка ниже показывает короткую
+     сводку из чисел; за подробным разбором ведёт первая кнопка. */
+  assistant: "/parent/assistant",
 } as const;
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -939,8 +942,8 @@ export function HomeView({ data }: { data: HomeViewData }) {
                 {data.assistantText}
               </p>
               <div className="flex items-stretch" style={{ gap: 8 }}>
+                <AssistantCta label={dict.parentApp.common.more} href={R.assistant} />
                 <AssistantCta label={T.viewProgress} href={R.progress} />
-                <AssistantCta label={T.msgTeacher} href={R.messages} />
               </div>
             </AccentCard>
 

@@ -50,6 +50,29 @@ export function StudyTiles() {
       shadowRgb: "202,138,4",
       paths: SERVICE_ICON.reviews,
     },
+    /* 12.08.2026 — дневник, освоение тем и помощник. Первые два — виды поверх
+       оценок и уроков, третий зовёт модель по кнопке. */
+    {
+      label: d.svc.diary,
+      href: "/parent/diary",
+      gradient: ["#34d399", "#059669"] as const,
+      shadowRgb: "5,150,105",
+      paths: SERVICE_ICON.applications,
+    },
+    {
+      label: d.scr.topics,
+      href: "/parent/topics",
+      gradient: ["#2dd4bf", "#0d9488"] as const,
+      shadowRgb: "13,148,136",
+      paths: ICON.checkSquare,
+    },
+    {
+      label: d.scr.assistant,
+      href: "/parent/assistant",
+      gradient: ["#8b5cf6", "#6366f1"] as const,
+      shadowRgb: "99,102,241",
+      paths: ICON.info,
+    },
   ];
 
   return (

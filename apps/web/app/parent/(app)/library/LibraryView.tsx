@@ -9,20 +9,46 @@
  * нельзя: он разъедется с остальным приложением при первом же новом предмете.
  */
 
+import { useState, useTransition } from "react";
 import type { Locale } from "@snr/core";
 import { getDictionary, subjects as subjectConfig } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import type { LibraryBookItem } from "@/lib/parent-queries";
 import { GlassCard } from "../v2/GlassCard";
 import { EmptyState, ICON, IconTile, InnerHeader, ScreenScroll, SectionCap, StatusChip } from "../_ui/screen-kit";
+import { getBookFileUrl } from "@/app/actions/books";
 import { DIVIDER } from "../_ui/screen-tokens";
 import { avatarGradient } from "../_ui/format";
-import { ink1, ink2, ink3 } from "../v2/tokens";
+import { accentGrad, ink1, ink2, ink3 } from "../v2/tokens";
 
 export function LibraryView({ books }: { books: LibraryBookItem[] }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).parentApp;
   const m = d.more;
+  const m2 = d.more2;
+  // Какую книгу сейчас открываем и что сломалось — по одной за раз, так что
+  // хватает двух идентификаторов вместо карты состояний.
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  /** Открыть файл книги. Ссылку подписывает то же серверное действие, что
+   *  и у ученика с учителем; своей копии подписывания здесь нет. */
+  function openBook(id: string) {
+    setFailedId(null);
+    setOpeningId(id);
+    startTransition(async () => {
+      const url = await getBookFileUrl(id);
+      setOpeningId(null);
+      if (!url) {
+        setFailedId(id);
+        return;
+      }
+      // Новая вкладка, а не переход: возвращаться из просмотрщика браузера
+      // в приложение кнопкой «назад» — неудобно на телефоне.
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+  }
 
   return (
     <div className="mx-auto w-full max-w-[430px]">
@@ -78,7 +104,31 @@ export function LibraryView({ books }: { books: LibraryBookItem[] }) {
                         </span>
                       ) : null}
 
-                      {hasContent ? null : (
+                      {hasContent ? (
+                        <span className="flex items-center" style={{ gap: 8, marginTop: 2 }}>
+                          <button
+                            type="button"
+                            onClick={() => openBook(b.id)}
+                            disabled={openingId === b.id}
+                            className="rounded-full"
+                            style={{
+                              padding: "5px 12px",
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: "#FFFFFF",
+                              background: accentGrad,
+                              opacity: openingId === b.id ? 0.6 : 1,
+                            }}
+                          >
+                            {openingId === b.id ? m2.libraryOpening : m2.libraryOpen}
+                          </button>
+                          {failedId === b.id ? (
+                            <span style={{ fontSize: 9, fontWeight: 700, color: "var(--p-status-red-text, #B91C1C)" }}>
+                              {m2.libraryOpenFailed}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : (
                         <span style={{ fontSize: 9, fontWeight: 700, color: ink3 }}>{m.libraryNoFile}</span>
                       )}
                     </div>

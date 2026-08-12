@@ -49,6 +49,8 @@ import type {
   StudentGradeItem,
 } from "@snr/core";
 import { sessionIdFromAccessToken } from "@/lib/single-session";
+// Ключ дня по Ташкенту — тот же, что считает весь раздел (см. _ui/format.ts).
+import { tashkentDay as tashkentDayKey } from "@/app/parent/(app)/_ui/format";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
@@ -574,5 +576,233 @@ export const childTeacherProfile = cache(async (teacherId: string): Promise<Chil
     subjectNames: [...new Set(subjectRows.map((s) => s.name as string))],
     groupNames: [...new Set(subjectRows.map((s) => groupNameById.get(s.group_id as string)).filter(Boolean) as string[])],
     lessonCount,
+  };
+});
+
+// ── Дневник, освоение тем, помощник (12.08.2026) ─────────────────────────────
+//
+// Все три питаются уже существующими данными: дневник — уроками группы и
+// оценками за урок, темы — теми же оценками, сгруппированными по теме урока,
+// помощник — таблицей parent_insights. Своих таблиц не заводится.
+
+export type DiaryLesson = {
+  id: string;
+  subjectName: string;
+  subjectColor: string | null;
+  topic: string | null;
+  startsAt: string;
+  /** Оценка ребёнка за ЭТОТ урок (lesson_grades) или null. */
+  grade: number | null;
+  /** Комментарий учителя к оценке — в дневнике он к месту. */
+  comment: string | null;
+};
+
+export type DiaryDay = {
+  /** «YYYY-MM-DD» по Ташкенту. */
+  dateKey: string;
+  lessons: DiaryLesson[];
+  /** Средний балл дня или null, если оценок в этот день не было. */
+  average: number | null;
+};
+
+export type DiaryWeek = {
+  /** Понедельник недели, «YYYY-MM-DD». */
+  weekStart: string;
+  days: DiaryDay[];
+  gradeCount: number;
+  average: number | null;
+  /** Сдано домашних работ за эту неделю (homework_submissions.submitted_at). */
+  homeworkSubmitted: number;
+};
+
+/**
+ * Неделя дневника: уроки группы ребёнка + его оценки за эти уроки.
+ *
+ * Отдельной сущности «дневник» в базе нет — это вид поверх готового.
+ * Уроки берёт тот же `childScheduleWeek`, что и расписание (второго запроса
+ * к урокам не заводим), оценки — `lesson_grades` с привязкой к уроку:
+ * нормированный `childGrades` для дневника не годится, он теряет lesson_id,
+ * а оценка обязана встать напротив своего урока.
+ */
+export const childDiaryWeek = cache(async (weekStart: string): Promise<DiaryWeek> => {
+  const empty: DiaryWeek = { weekStart, days: [], gradeCount: 0, average: null, homeworkSubmitted: 0 };
+  const childId = await getSelectedChildId();
+  if (!childId) return empty;
+
+  const lessons = await childScheduleWeek(weekStart);
+  const db = await createClient();
+
+  const weekEnd = new Date(`${weekStart}T00:00:00Z`);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+  const weekEndKey = weekEnd.toISOString().slice(0, 10);
+
+  const lessonIds = lessons.map((l) => l.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyDb = db as any;
+
+  const gradeByLesson = new Map<string, { grade: number; comment: string | null }>();
+  if (lessonIds.length > 0) {
+    const { data: grades, error } = await anyDb
+      .from("lesson_grades")
+      .select("lesson_id, grade, comment")
+      .eq("student_id", childId)
+      .in("lesson_id", lessonIds);
+    if (error) throw error;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const g of (grades ?? []) as any[]) {
+      gradeByLesson.set(g.lesson_id as string, {
+        grade: g.grade as number,
+        comment: (g.comment as string | null) ?? null,
+      });
+    }
+  }
+
+  // Сдано за неделю — по моменту сдачи, а не по сроку: в шапке недели стоит
+  // «сдано работ», то есть сколько ребёнок сделал именно на этой неделе.
+  const { count: hwCount } = await anyDb
+    .from("homework_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", childId)
+    .gte("submitted_at", `${weekStart}T00:00:00+05:00`)
+    .lt("submitted_at", `${weekEndKey}T00:00:00+05:00`);
+
+  const byDay = new Map<string, DiaryLesson[]>();
+  for (const l of lessons) {
+    const key = tashkentDayKey(l.starts_at);
+    const g = gradeByLesson.get(l.id);
+    const row: DiaryLesson = {
+      id: l.id,
+      subjectName: l.subject?.name ?? l.title ?? "—",
+      subjectColor: l.subject?.color ?? null,
+      topic: l.topic ?? l.title ?? null,
+      startsAt: l.starts_at,
+      grade: g?.grade ?? null,
+      comment: g?.comment ?? null,
+    };
+    const bucket = byDay.get(key);
+    if (bucket) bucket.push(row);
+    else byDay.set(key, [row]);
+  }
+
+  const days: DiaryDay[] = [...byDay.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([dateKey, rows]) => {
+      const marks = rows.map((r) => r.grade).filter((g): g is number => g != null);
+      return {
+        dateKey,
+        lessons: rows.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+        average: marks.length > 0 ? marks.reduce((a, b) => a + b, 0) / marks.length : null,
+      };
+    });
+
+  const allMarks = days.flatMap((d) => d.lessons.map((l) => l.grade)).filter((g): g is number => g != null);
+
+  return {
+    weekStart,
+    days,
+    gradeCount: allMarks.length,
+    average: allMarks.length > 0 ? allMarks.reduce((a, b) => a + b, 0) / allMarks.length : null,
+    homeworkSubmitted: hwCount ?? 0,
+  };
+});
+
+export type TopicMasteryItem = {
+  topic: string;
+  subjectName: string;
+  subjectColor: string | null;
+  /** Средний балл по теме, 0..5. */
+  average: number;
+  /** Он же в процентах — как показывает мобильное приложение. */
+  pct: number;
+  /** Сколько оценок сложилось в этот процент. */
+  count: number;
+};
+
+/**
+ * Освоение тем по ВСЕМ предметам сразу.
+ *
+ * Тема — это `lessons.topic` реально проведённого урока, а «освоение» —
+ * средний балл ребёнка по урокам этой темы, приведённый к процентам. Ровно
+ * так же считает уже существующий `getChildSubjectDetail` для одного
+ * предмета (packages/core/src/queries/index.ts): формулу не меняем, только
+ * снимаем ограничение на один предмет — иначе на экран пришлось бы делать по
+ * запросу на предмет.
+ *
+ * Прохождение ЭТАПОВ урока (`lesson_stage_progress`) здесь ни при чём: это
+ * другая величина, и у демо-ребёнка её нет вовсе (см. отчёт).
+ */
+export const childTopicMastery = cache(async (): Promise<TopicMasteryItem[]> => {
+  const childId = await getSelectedChildId();
+  if (!childId) return [];
+  const db = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("lesson_grades")
+    .select("grade, lesson:lessons!inner(topic, title, subject:subjects(name, color))")
+    .eq("student_id", childId);
+  if (error) throw error;
+
+  const map = new Map<string, { sum: number; count: number; topic: string; subjectName: string; subjectColor: string | null }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (data ?? []) as any[]) {
+    const topic = (r.lesson?.topic as string | null) || (r.lesson?.title as string | null);
+    if (!topic) continue;
+    const subjectName = (r.lesson?.subject?.name as string | undefined) ?? "—";
+    const key = `${subjectName}::${topic}`;
+    const cur = map.get(key) ?? {
+      sum: 0,
+      count: 0,
+      topic,
+      subjectName,
+      subjectColor: (r.lesson?.subject?.color as string | null) ?? null,
+    };
+    cur.sum += r.grade as number;
+    cur.count += 1;
+    map.set(key, cur);
+  }
+
+  return [...map.values()]
+    .map((t) => ({
+      topic: t.topic,
+      subjectName: t.subjectName,
+      subjectColor: t.subjectColor,
+      average: t.sum / t.count,
+      pct: Math.round((t.sum / t.count / 5) * 100),
+      count: t.count,
+    }))
+    .sort((a, b) => b.pct - a.pct || a.topic.localeCompare(b.topic));
+});
+
+export type ParentInsight = {
+  summary: string;
+  insights: Array<{ title: string; body: string; category: string; sentiment: string }>;
+  generatedAt: string;
+};
+
+/**
+ * Последний разбор помощника по выбранному ребёнку на текущем языке.
+ * Только ЧТЕНИЕ: строку в parent_insights кладёт генерация (см.
+ * lib/ai/parent-insight.ts), и только служебным ключом — миграция 128 не даёт
+ * INSERT никому другому.
+ */
+export const childInsight = cache(async (locale: string): Promise<ParentInsight | null> => {
+  const childId = await getSelectedChildId();
+  if (!childId) return null;
+  const db = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("parent_insights")
+    .select("insight_json, generated_at")
+    .eq("child_id", childId)
+    .eq("locale", locale)
+    .order("generated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const j = data.insight_json as { summary?: string; insights?: ParentInsight["insights"] };
+  return {
+    summary: j?.summary ?? "",
+    insights: j?.insights ?? [],
+    generatedAt: data.generated_at as string,
   };
 });
