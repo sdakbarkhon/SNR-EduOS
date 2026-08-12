@@ -534,6 +534,11 @@ export type ChildTeacherReview = {
   subjectName: string | null;
   subjectColor: string | null;
   teacherName: string | null;
+  /** 12.08.2026 — id учителя (lesson_grades.graded_by). В запросе он и так
+   *  читался (по нему резолвится имя), но наружу не отдавался: экрану
+   *  «профиль учителя» у родителя нужно отобрать отзывы именно этого
+   *  учителя, а сопоставлять по ФИО — ненадёжно (тёзки). */
+  teacherId: string | null;
 };
 
 /** Последние текстовые отзывы учителей (lesson_grades.comment) по ребёнку.
@@ -584,6 +589,7 @@ export const getChildTeacherReviews = async (
     subjectName: r.lesson?.subject?.name ?? null,
     subjectColor: r.lesson?.subject?.color ?? null,
     teacherName: r.graded_by ? nameByTeacherId.get(r.graded_by) ?? null : null,
+    teacherId: r.graded_by ?? null,
   }));
 };
 

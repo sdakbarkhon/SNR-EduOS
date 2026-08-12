@@ -21,6 +21,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { Locale } from "@snr/core";
+import { getDictionary } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { LogoutOverlay, useLogout } from "@/components/LogoutOverlay";
 import { GlassCard } from "../v2/GlassCard";
 import { ModalPortal, Z_MODAL, Z_MODAL_PANEL } from "../v2/ModalPortal";
@@ -104,6 +107,17 @@ const SETTINGS_ITEMS: HubMenuItem[] = [
     gradient: ["#22d3ee", "#0891b2"],
     paths: ICON.globe,
   },
+  /* 12.08.2026 — «Активные сессии». Подписи берутся из словаря (см. ниже, в
+     самом рендере): экран новый и обязан говорить на трёх языках, а соседние
+     строки этого меню пока подписаны по-русски литералами. */
+  {
+    key: "sessions",
+    title: "",
+    subtitle: "",
+    href: "/parent/sessions",
+    gradient: ["#34d399", "#059669"],
+    paths: ICON.shield,
+  },
 ];
 
 const SUPPORT_ITEMS: HubMenuItem[] = [
@@ -142,6 +156,8 @@ export function ProfileView({
     ring: string;
   } | null;
 }) {
+  const { locale } = useLocale();
+  const dict = getDictionary(locale as Locale).parentApp;
   const [logoutOpen, setLogoutOpen] = useState(false);
   // Анимация confirm-панели: translateY(115%) → 0, .32s (макет строка 4228);
   // оверлей — opacity .28s (строка 4027).
@@ -248,7 +264,10 @@ export function ProfileView({
             {SETTINGS_ITEMS.map((it, i) => (
               <CardRow key={it.key} href={it.href} divider={i > 0}>
                 <IconTile gradient={it.gradient} paths={it.paths} size={36} glyphSize={18} />
-                <RowText title={it.title} subtitle={it.subtitle} />
+                <RowText
+                  title={it.key === "sessions" ? dict.scr.sessions : it.title}
+                  subtitle={it.key === "sessions" ? dict.more.sessionsSubtitle : it.subtitle}
+                />
                 <ChevronRight />
               </CardRow>
             ))}

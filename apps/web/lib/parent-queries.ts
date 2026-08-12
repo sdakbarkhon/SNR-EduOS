@@ -2,6 +2,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import {
+  getAllBooks,
   getChildAttendanceDetail,
   getChildDailyStats,
   getChildDailyStatus,
@@ -27,6 +28,7 @@ import {
   getUnreadCount,
 } from "@snr/core";
 import type {
+  Book,
   AppNotification,
   ChatMessageRow,
   ChatThreadSummary,
@@ -46,6 +48,7 @@ import type {
   ParentAnnouncement,
   StudentGradeItem,
 } from "@snr/core";
+import { sessionIdFromAccessToken } from "@/lib/single-session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
@@ -398,4 +401,178 @@ export const parentThreads = cache(async (): Promise<ChatThreadSummary[]> => {
 export const parentThreadMessages = cache(async (threadId: string): Promise<ChatMessageRow[]> => {
   const db = await createClient();
   return getThreadMessages(db, threadId);
+});
+
+// ── Пять экранов, перенесённых из мобильного приложения (11.08.2026) ──────────
+//
+// Все пять питаются НАСТОЯЩИМИ данными. Ни фикстур, ни моков: под каждый
+// экран проверено запросом, что родитель видит строки под своими правами
+// (тесты 4, книги 11, объявления от администрации 5, учителя 5).
+// Новых запросов ровно столько, сколько не хватало: объявления от
+// администрации — это фильтр над уже существующим parentAnnouncements(),
+// учителя — над childSubjectTeachers(), отдельных запросов им не нужно.
+
+export type ChildTestItem = {
+  id: string;
+  title: string;
+  subjectName: string | null;
+  submittedAt: string | null;
+  score: number | null;
+  maxScore: number | null;
+  grade: number | null;
+};
+
+/** Сданные ребёнком тесты. RLS сама сужает test_submissions до своих строк,
+ *  но studentId передаём явно: у родителя может быть несколько детей, и без
+ *  фильтра пришли бы работы всех сразу. */
+export const childTests = cache(async (): Promise<ChildTestItem[]> => {
+  const childId = await getSelectedChildId();
+  if (!childId) return [];
+  const db = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any)
+    .from("test_submissions")
+    .select("id, submitted_at, score, max_score, grade, homework:homework(title, subject:subjects(name))")
+    .eq("student_id", childId)
+    .order("submitted_at", { ascending: false });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id as string,
+    title: (r.homework?.title as string | undefined) ?? "Тест",
+    subjectName: (r.homework?.subject?.name as string | undefined) ?? null,
+    submittedAt: (r.submitted_at as string | null) ?? null,
+    score: (r.score as number | null) ?? null,
+    maxScore: (r.max_score as number | null) ?? null,
+    grade: (r.grade as number | null) ?? null,
+  }));
+});
+
+export type LibraryBookItem = Book & { isFavorite: boolean };
+
+/** Школьная библиотека. Книги видны родителю по школьной политике на books;
+ *  избранное — по конкретному ребёнку, чтобы отметка совпадала с той, что
+ *  видит сам ученик. */
+export const libraryBooks = cache(async (): Promise<LibraryBookItem[]> => {
+  const db = await createClient();
+  const [books, childId] = await Promise.all([getAllBooks(db), getSelectedChildId()]);
+  if (!childId) return books.map((b) => ({ ...b, isFavorite: false }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: favs } = await (db as any)
+    .from("book_favorites").select("book_id").eq("student_id", childId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const favSet = new Set(((favs ?? []) as any[]).map((f) => f.book_id as string));
+  return books.map((b) => ({ ...b, isFavorite: favSet.has(b.id) }));
+});
+
+/** Новости от администрации — те же объявления, что на экране «Объявления»,
+ *  но только с admin_id. Отдельного запроса не заводим: getParentAnnouncements
+ *  уже возвращает признак isFromAdmin. */
+export const parentAdminNews = cache(async (limit = 50): Promise<ParentAnnouncement[]> => {
+  const all = await parentAnnouncements(limit);
+  return all.filter((a) => a.isFromAdmin);
+});
+
+export type ParentSessionItem = {
+  id: string;
+  deviceInfo: string | null;
+  createdAt: string;
+  lastActivity: string | null;
+  isCurrent: boolean;
+};
+
+/**
+ * Устройства, с которых выполнен вход в аккаунт родителя.
+ *
+ * ПОЧЕМУ СЛУЖЕБНЫМ КЛЮЧОМ. На public.user_sessions включена защита строк и
+ * НЕТ НИ ОДНОЙ политики — под своей сессией родитель получает отказ по правам
+ * (проверено запросом). Заводить политику здесь нельзя: это миграция, а
+ * задача идёт без изменений схемы. Поэтому строки читает служебный клиент,
+ * но идентификатор пользователя берётся ИЗ СЕССИИ, а не из аргумента, и
+ * фильтр по нему стоит в самом запросе — чужие строки прийти не могут.
+ */
+export const parentSessions = cache(async (): Promise<ParentSessionItem[]> => {
+  const db = await createClient();
+  const { data: { session } } = await db.auth.getSession();
+  const userId = session?.user?.id;
+  if (!userId) return [];
+  const currentSessionId = session?.access_token
+    ? sessionIdFromAccessToken(session.access_token)
+    : null;
+
+  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (admin as any)
+    .from("user_sessions")
+    .select("id, session_id, device_info, created_at, last_activity")
+    .eq("user_id", userId)
+    .order("last_activity", { ascending: false });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id as string,
+    deviceInfo: (r.device_info as string | null) ?? null,
+    createdAt: r.created_at as string,
+    lastActivity: (r.last_activity as string | null) ?? null,
+    isCurrent: currentSessionId != null && r.session_id === currentSessionId,
+  }));
+});
+
+export type ChildTeacherProfile = {
+  id: string;
+  fullName: string;
+  subjectNames: string[];
+  groupNames: string[];
+  lessonCount: number;
+};
+
+/** Профиль одного учителя ребёнка: предметы, классы и число уроков в
+ *  расписании. Всё — из тех же таблиц, что уже читает childSubjectTeachers;
+ *  сюда добавлены только группы и счётчик уроков. */
+export const childTeacherProfile = cache(async (teacherId: string): Promise<ChildTeacherProfile | null> => {
+  const childId = await getSelectedChildId();
+  if (!childId) return null;
+  const db = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyDb = db as any;
+
+  const { data: teacher } = await anyDb
+    .from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle();
+  if (!teacher) return null;
+
+  const { data: groups } = await anyDb
+    .from("student_groups").select("group_id, groups(name)").eq("student_id", childId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const groupIds = ((groups ?? []) as any[]).map((g) => g.group_id as string);
+  if (groupIds.length === 0) {
+    return { id: teacher.id, fullName: teacher.full_name, subjectNames: [], groupNames: [], lessonCount: 0 };
+  }
+
+  // Отбор ровно тот же, что у getGroupSubjectTeachers (is_active), плюс
+  // отсев болванок: иначе список предметов в профиле разошёлся бы со списком
+  // на предыдущем экране, который приходит как раз оттуда.
+  const { data: subjects } = await anyDb
+    .from("subjects").select("id, name, group_id")
+    .eq("teacher_id", teacherId).eq("is_active", true).eq("is_stub", false).in("group_id", groupIds);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subjectRows = (subjects ?? []) as any[];
+  const subjectIds = subjectRows.map((s) => s.id as string);
+
+  let lessonCount = 0;
+  if (subjectIds.length > 0) {
+    const { count } = await anyDb
+      .from("lessons").select("id", { count: "exact", head: true })
+      .in("subject_id", subjectIds).in("group_id", groupIds);
+    lessonCount = count ?? 0;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const groupNameById = new Map(((groups ?? []) as any[]).map((g) => [g.group_id as string, g.groups?.name as string | undefined]));
+  return {
+    id: teacher.id as string,
+    fullName: teacher.full_name as string,
+    subjectNames: [...new Set(subjectRows.map((s) => s.name as string))],
+    groupNames: [...new Set(subjectRows.map((s) => groupNameById.get(s.group_id as string)).filter(Boolean) as string[])],
+    lessonCount,
+  };
 });

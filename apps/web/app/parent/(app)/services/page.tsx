@@ -1,5 +1,6 @@
 import { InnerHeader, ScreenScroll, SectionCap } from "../_ui/screen-kit";
 import { ICON, SERVICE_ICON, ServiceTile } from "./_service-kit";
+import { StudyTiles } from "./StudyTiles";
 import { ink3 } from "../v2/tokens";
 
 /**
@@ -98,6 +99,9 @@ export default function ParentServicesPage() {
           Питание, транспорт, портфолио, медкарта и заявления пока в разработке — на их экранах
           написано, что там появится. «Документы» работают уже сейчас.
         </span>
+
+        {/* 12.08.2026 — четыре раздела учёбы на настоящих данных. */}
+        <StudyTiles />
       </ScreenScroll>
     </div>
   );
