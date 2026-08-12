@@ -23,12 +23,20 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { TestPlayer } from "./TestPlayer";
 import { ProgrammingIDE } from "./ProgrammingIDE";
 import { BundleSolver } from "./BundleSolver";
+import {
+  AutoGrowTextarea,
+  FileDropZone,
+  MAX_SUBMISSION_BYTES,
+  SaveStateNote,
+  SubmissionStatusBadge,
+  formatBytes as formatSubmissionBytes,
+  useTextDraft,
+} from "@/components/submission/SubmissionKit";
 import { CodeCompletionSolver } from "./CodeCompletionSolver";
 import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
 import { useFullscreenToggle } from "@/lib/useFullscreenToggle";
 import { HomeworkHintPanel } from "./HomeworkHintPanel";
 
-const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} Б`;
@@ -444,33 +452,31 @@ function SubmitForm({
   const sb = createClient();
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    if (f && f.size > MAX_FILE_BYTES) {
-      setErrMsg(`Файл больше 50 МБ`);
-      e.target.value = "";
-      return;
-    }
-    setErrMsg("");
-    setFile(f);
+  /** Черновик ответа в браузере: колонки под него в базе нет, а терять
+   *  набранное при обновлении страницы нельзя. Отсюда же берётся подпись
+   *  «сохраняется / сохранено». */
+  const draft = useTextDraft(`homework_draft_${hw.id}`, false);
+  const text = draft.text;
+  const setText = draft.setText;
+
+  /** Строки общего набора: подставляем предельный размер в оба текста, чтобы
+   *  подсказка и ошибка называли одно и то же число. */
+  const kit = {
+    ...d.submission,
+    dropHint: d.submission.dropHint.replace("{max}", formatSubmissionBytes(MAX_SUBMISSION_BYTES)),
+    fileTooLarge: d.submission.fileTooLarge.replace("{max}", formatSubmissionBytes(MAX_SUBMISSION_BYTES)),
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (!f) return;
-    if (f.size > MAX_FILE_BYTES) {
-      setErrMsg(`Файл больше 50 МБ`);
-      return;
-    }
-    setErrMsg("");
-    setFile(f);
+  /** Выбор файла — общий на оба экрана сдачи: и клик, и перетаскивание, и
+   *  понятные тексты отказа. Прежние два обработчика (клик и drop) делали то
+   *  же самое двумя копиями и сообщали об ошибке сырой строкой. */
+  const handlePick = (picked: File | null, pickError: string | null) => {
+    setErrMsg(pickError ?? "");
+    setFile(picked);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -496,6 +502,8 @@ function SubmitForm({
       });
 
       setStatus("success");
+      // Черновик больше не нужен: ответ ушёл на сервер.
+      draft.clear();
       onSuccess?.();
       router.refresh();
     } catch {
@@ -534,62 +542,37 @@ function SubmitForm({
             />
           </label>
         ) : (
-          <textarea
+          <AutoGrowTextarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={setText}
             placeholder={d.homework.answerPlaceholder}
-            rows={4}
-            className="w-full resize-none rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none"
+            className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none"
           />
         )}
 
-        {/* File drop zone */}
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className="relative"
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,video/mp4"
-            onChange={handleFileChange}
-            className="hidden"
-            id="hw-file-upload"
+        {/* Выбор файла — общий компонент: клик, перетаскивание и понятные
+            отказы одинаковы здесь и в классной работе. */}
+        <FileDropZone
+          file={file}
+          onPick={handlePick}
+          disabled={status === "submitting"}
+          t={{
+            ...kit,
+            dropAction: external ? d.homework.externalPhotoLabel : d.homework.attachFile,
+            dropHint: external ? d.homework.externalPhotoHint : kit.dropHint,
+          }}
+        />
+
+        <div className="flex items-center justify-between gap-2">
+          <SubmissionStatusBadge submitted={false} t={kit} />
+          <SaveStateNote
+            state={status === "submitting" ? "saving" : status === "error" ? "error" : draft.state}
+            t={kit}
           />
-          {file ? (
-            <div className="flex items-center gap-3 rounded-xl border border-brand-blue/40 bg-blue-50/60 px-4 py-2.5">
-              <Paperclip size={14} className="flex-shrink-0 text-brand-blue" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-brand-blue">{file.name}</p>
-                <p className="text-xs text-slate-500">{formatBytes(file.size)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}
-                className="flex-shrink-0 text-slate-400 hover:text-red-500"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <label
-              htmlFor="hw-file-upload"
-              className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500 transition hover:border-brand-blue hover:text-brand-blue"
-            >
-              <Paperclip size={14} />
-              {status === "submitting" && file
-                ? d.homework.uploadingFile
-                : external ? d.homework.externalPhotoLabel : d.homework.attachFile}
-              <span className="text-xs text-slate-400 ml-1">
-                {external ? d.homework.externalPhotoHint : "PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 · до 50 МБ"}
-              </span>
-            </label>
-          )}
         </div>
 
         {errMsg && <p className="text-xs text-red-500">{errMsg}</p>}
-        {status === "error" && <p className="text-xs text-red-500">{d.homework.formError}</p>}
+        {status === "error" && <p className="text-xs text-red-500">{d.submission.uploadFailed}</p>}
 
         <button
           type="submit"

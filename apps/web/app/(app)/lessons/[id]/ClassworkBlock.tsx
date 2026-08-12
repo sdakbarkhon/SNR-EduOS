@@ -1,14 +1,31 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { FileText, TestTube2, BookOpen, Code2, Send, CheckCircle, Upload, Clock, Play } from "lucide-react";
+import { FileText, TestTube2, BookOpen, Code2, Send, Upload, Clock, Play } from "lucide-react";
 import type { Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkType } from "@snr/core";
-import { getClasswork, getMyClassworkSubmission, submitClasswork, getDictionary } from "@snr/core";
+import {
+  getClasswork,
+  getClassworkFileUrl,
+  getMyClassworkSubmission,
+  submitClasswork,
+  getDictionary,
+} from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { QuizChoiceTile, QuizChoiceGrid, OPTION_LETTERS } from "@/components/quiz/QuizChoiceTile";
 import { MarkdownInline } from "@/components/markdown-plugins";
+import {
+  AttachedFileCard,
+  AutoGrowTextarea,
+  FileDropZone,
+  MAX_SUBMISSION_BYTES,
+  SaveStateNote,
+  SubmissionStatusBadge,
+  formatBytes,
+  useTextDraft,
+  type SaveState,
+} from "@/components/submission/SubmissionKit";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -73,11 +90,20 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
   const [loading, setLoading] = useState(true);
 
   // Form state
-  const [textAnswer, setTextAnswer] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [testAnswers, setTestAnswers] = useState<(number | null)[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  /** Открыта ли форма поверх уже отправленной работы («Переделать»). */
+  const [redoMode, setRedoMode] = useState(false);
+  /** Состояние отправки: показывается рядом с кнопкой, а не вместо неё. */
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+
+  /** Черновик ответа держим в браузере: колонки под него в базе нет, а
+   *  терять набранное при обновлении страницы нельзя. */
+  const draft = useTextDraft(`classwork_draft_${lessonId}`, false);
+  const textAnswer = draft.text;
+  const setTextAnswer = draft.setText;
 
   // Test gate + timer
   const [testStarted, setTestStarted] = useState(false);
@@ -128,6 +154,7 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
   async function handleSubmit() {
     if (!classwork) return;
     setSubmitting(true);
+    setSaveState("saving");
     setError("");
     try {
       const filteredTestAnswers =
@@ -143,11 +170,37 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
       localStorage.removeItem(`test_start_${classwork.id}`);
       const sub = await getMyClassworkSubmission(db as never, classwork.id);
       setSubmission(sub);
+      setSaveState("saved");
+      setRedoMode(false);
+      draft.clear();
     } catch {
-      setError(d.classwork.submitError);
+      setError(d.submission.uploadFailed);
+      setSaveState("error");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Подписанная ссылка на отправленный файл. Живёт недолго, поэтому берётся
+   *  по нажатию — тем же ядром, что и у учителя (getClassworkFileUrl). */
+  async function resolveSubmittedFileUrl(): Promise<string | null> {
+    if (!submission?.file_storage_path) return null;
+    try {
+      return await getClassworkFileUrl(db as never, submission.file_storage_path);
+    } catch {
+      return null;
+    }
+  }
+
+  /** «Отправлено 29 июля, 14:32» — по часовому поясу школы. */
+  function submittedLabel(iso: string): string {
+    return new Date(iso).toLocaleString(locale === "en" ? "en-US" : locale === "uz" ? "uz-UZ" : "ru-RU", {
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Tashkent",
+    });
   }
 
   function handleStartTest() {
@@ -186,12 +239,15 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
         )}
       </div>
 
-      {submission ? (
+      {submission && !redoMode ? (
         /* Already submitted */
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-green-500 text-sm font-medium">
-            <CheckCircle className="w-4 h-4" />
-            {d.classwork.submittedTitle}
+          <div className="flex flex-wrap items-center gap-2">
+            <SubmissionStatusBadge
+              submitted
+              submittedLabel={submission.submitted_at ? submittedLabel(submission.submitted_at) : null}
+              t={d.submission}
+            />
           </div>
 
           {submission.test_score != null && (
@@ -203,8 +259,25 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
           )}
 
           {submission.text_answer && (
-            <div className="text-sm text-[var(--text-2)] bg-[var(--surface-2)] rounded-xl p-3">
-              {submission.text_answer}
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-[var(--text-3)]">{d.submission.yourAnswer}</p>
+              <div className="whitespace-pre-wrap rounded-xl bg-[var(--surface-2)] p-3 text-sm text-[var(--text-2)]">
+                {submission.text_answer}
+              </div>
+            </div>
+          )}
+
+          {/* Что именно отправлено: имя, размер и кнопка «Открыть». Раньше
+              файл после отправки не показывался вовсе. */}
+          {submission.file_storage_path && (
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-[var(--text-3)]">{d.submission.attachedTitle}</p>
+              <AttachedFileCard
+                name={submission.file_original_name ?? submission.file_storage_path.split("/").pop() ?? "file"}
+                sizeBytes={submission.file_size_bytes}
+                resolveUrl={resolveSubmittedFileUrl}
+                t={d.submission}
+              />
             </div>
           )}
 
@@ -217,6 +290,29 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
                 <p className="text-sm text-[var(--text-2)]">{submission.teacher_comment}</p>
               )}
             </div>
+          )}
+
+          {/* Переделать можно, пока учитель не проверил: ровно то же правило
+              стоит в базе (политика «student updates own ungraded submission»),
+              поэтому кнопка не обещает того, чего RLS не даст. Проверенную
+              работу не прячем молча — объясняем, почему её уже не изменить. */}
+          {classwork.work_type !== "test" && (
+            submission.grade == null ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setTextAnswer(submission.text_answer ?? "");
+                  setFile(null);
+                  setSaveState("idle");
+                  setRedoMode(true);
+                }}
+                className="w-full rounded-xl border border-[var(--border)] py-2 text-sm font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)]"
+              >
+                {d.submission.redo}
+              </button>
+            ) : (
+              <p className="text-xs text-[var(--text-3)]">{d.submission.lockedByGrade}</p>
+            )
           )}
         </div>
       ) : classwork.work_type === "test" ? (
@@ -288,33 +384,60 @@ export function ClassworkBlock({ lessonId, studentId }: Props) {
       ) : (
         /* File / text / learning / programming form */
         <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <SubmissionStatusBadge submitted={false} t={d.submission} />
+            <SaveStateNote state={saveState === "idle" ? draft.state : saveState} t={d.submission} />
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-[var(--text-2)] mb-1.5">
               {d.classwork.textAnswerLabel}
             </label>
-            <textarea
+            <AutoGrowTextarea
               value={textAnswer}
-              onChange={(e) => setTextAnswer(e.target.value)}
+              onChange={setTextAnswer}
               placeholder={d.classwork.textAnswerPlaceholder}
-              rows={4}
-              className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-1)] text-sm resize-none focus:outline-none focus:border-[var(--accent)]"
+              className="px-3 py-2.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-1)] text-sm focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
 
           {classwork.work_type === "file" && (
             <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-[var(--text-2)] mb-1.5 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs font-medium text-[var(--text-2)] mb-1.5">
                 <Upload className="w-3.5 h-3.5" />
                 {d.classwork.attachFileLabel}
               </label>
-              <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] text-sm text-[var(--text-3)] cursor-pointer hover:border-[var(--accent)] transition-colors">
-                <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                {file ? file.name : "…"}
-              </label>
+              <FileDropZone
+                file={file}
+                onPick={(picked, pickError) => {
+                  setFile(picked);
+                  setError(pickError ?? "");
+                }}
+                disabled={submitting}
+                t={{
+                  ...d.submission,
+                  dropHint: d.submission.dropHint.replace("{max}", formatBytes(MAX_SUBMISSION_BYTES)),
+                  fileTooLarge: d.submission.fileTooLarge.replace("{max}", formatBytes(MAX_SUBMISSION_BYTES)),
+                }}
+              />
             </div>
           )}
 
           {error && <p className="text-xs text-red-500">{error}</p>}
+
+          {redoMode && (
+            <button
+              type="button"
+              onClick={() => {
+                setRedoMode(false);
+                setFile(null);
+                setError("");
+              }}
+              className="w-full rounded-xl border border-[var(--border)] py-2 text-sm font-medium text-[var(--text-3)] transition-colors hover:bg-[var(--surface-2)]"
+            >
+              {d.submission.redoCancel}
+            </button>
+          )}
 
           <button
             onClick={handleSubmit}

@@ -10,8 +10,7 @@ import {
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Hand, Play, Link2,
-  Keyboard, Blocks,
-} from "lucide-react";
+  Keyboard, Blocks, ClipboardList,} from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
@@ -62,6 +61,7 @@ import { resolveMaterialUrl } from "@/lib/material-url";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { QuizResultsModal } from "./QuizResultsModal";
+import { ClassworkModal } from "./ClassworkModal";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
 import { KnowledgeBaseFilePicker, LESSON_ATTACH_MIME, LESSON_ATTACH_ACCEPT, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
@@ -790,6 +790,12 @@ export function TeacherLessonDetailView({
   const [startingLesson, setStartingLesson] = useState(false);
   const [endingLesson, setEndingLesson] = useState(false);
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
+  /**
+   * Окно классной работы. Компонент существовал с самого начала, но нигде не
+   * монтировался — учитель физически не мог увидеть, кто сдал работу. Точка
+   * входа рядом с этапами: классная работа принадлежит уроку, а не заданию.
+   */
+  const [classworkOpen, setClassworkOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
   const [reviewStage, setReviewStage] = useState<LessonStage | null>(null);
   const [kahootStage, setKahootStage] = useState<LessonStage | null>(null);
@@ -1541,6 +1547,12 @@ export function TeacherLessonDetailView({
           {!readOnly && (
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setClassworkOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95"
+              >
+                <ClipboardList className="h-4 w-4" /> {d.teacher.classworkBtn}
+              </button>
+              <button
                 onClick={() => setAiGenerateOpen(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-violet-300 bg-gradient-to-r from-blue-50 to-violet-50 px-4 py-2 text-sm font-bold text-violet-700 shadow-sm hover:from-blue-100 hover:to-violet-100 active:scale-95 dark:border-violet-500/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-300"
               >
@@ -2228,6 +2240,17 @@ export function TeacherLessonDetailView({
             onClose={() => setReviewStage(null)}
           />
         )
+      )}
+
+      {/* Классная работа: задание и сдачи учеников. */}
+      {mounted && classworkOpen && (
+        <ClassworkModal
+          open
+          onClose={() => setClassworkOpen(false)}
+          lessonId={lesson.id}
+          teacherId={teacher.id}
+          groupId={lesson.group_id}
+        />
       )}
 
       {/* Kahoot live game control panel */}

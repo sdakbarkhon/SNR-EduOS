@@ -4464,9 +4464,29 @@ export const submitHomeworkWithFile = async (
     await db.storage.from("homework-files").remove([existingRow.file_storage_path]);
   }
 
-  let fileStoragePath: string | null = null;
+  /**
+   * Пересдача без нового файла НЕ должна стирать прежний.
+   *
+   * Раньше эти три переменные начинались с null и в payload уходили как есть:
+   * ученик, переотправивший работу с одним лишь исправленным текстом, терял
+   * прикреплённый файл — строка обнулялась, а объект оставался в хранилище
+   * сиротой. Заметно это стало, когда пересдачу довели до конца на обоих
+   * экранах: до этого её почти не делали.
+   */
+  let fileStoragePath: string | null = existingRow?.file_storage_path ?? null;
   let fileSizeBytes: number | null = null;
   let fileOriginalName: string | null = null;
+
+  if (!file && existingRow) {
+    const { data: prev } = await db
+      .from("homework_submissions")
+      .select("file_size_bytes, file_original_name")
+      .eq("id", existingRow.id)
+      .maybeSingle();
+    const prevRow = prev as { file_size_bytes: number | null; file_original_name: string | null } | null;
+    fileSizeBytes = prevRow?.file_size_bytes ?? null;
+    fileOriginalName = prevRow?.file_original_name ?? null;
+  }
 
   if (file && fileName && teacherId) {
     const ext = fileName.split(".").pop() ?? "bin";
@@ -4647,9 +4667,22 @@ export const submitClasswork = async (
 ): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
-  let filePath: string | null = null;
-  let fileName: string | null = null;
-  let fileSize: number | null = null;
+
+  // Пересдача без нового файла не стирает прежний — тот же принцип, что в
+  // submitHomeworkWithFile выше: upsert перезаписывает строку целиком.
+  const { data: prevSub } = await db2
+    .from("classwork_submissions")
+    .select("file_storage_path, file_original_name, file_size_bytes")
+    .eq("classwork_id", classworkId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  const prevRow = prevSub as
+    | { file_storage_path: string | null; file_original_name: string | null; file_size_bytes: number | null }
+    | null;
+
+  let filePath: string | null = prevRow?.file_storage_path ?? null;
+  let fileName: string | null = prevRow?.file_original_name ?? null;
+  let fileSize: number | null = prevRow?.file_size_bytes ?? null;
 
   if (file) {
     const ext = file.name.split(".").pop() ?? "bin";

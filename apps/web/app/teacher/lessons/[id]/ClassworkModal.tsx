@@ -6,13 +6,14 @@ import { X, Plus, Trash2, Check, FileText, TestTube2, BookOpen, Code2, Pencil } 
 import type { Classwork, ClassworkQuestion, ClassworkSubmissionWithStudent, ClassworkType } from "@snr/core";
 import {
   getClasswork, createClasswork, createClassworkQuestions, deleteClasswork,
-  getClassworkSubmissions, gradeClasswork, getDictionary,
+  getClassworkSubmissions, getClassworkFileUrl, gradeClasswork, getDictionary,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { MarkdownInline } from "@/components/markdown-plugins";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
+import { AttachedFileCard } from "@/components/submission/SubmissionKit";
 
 const TYPE_ICONS: Record<ClassworkType, React.ReactNode> = {
   file:        <FileText className="w-4 h-4" />,
@@ -161,6 +162,29 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
         idx === qi ? { ...q, options: q.options.map((o, oidx) => (oidx === oi ? val : o)) } : q,
       ),
     );
+  }
+
+  /** Подписанная ссылка на файл сдачи. Ядро уже умеет это (getClassworkFileUrl) —
+   *  функция была написана заранее и до появления бакета не вызывалась. */
+  async function resolveSubmissionFileUrl(path: string | null): Promise<string | null> {
+    if (!path) return null;
+    try {
+      return await getClassworkFileUrl(db as never, path);
+    } catch {
+      return null;
+    }
+  }
+
+  /** «29 июля, 14:32» по часовому поясу школы. */
+  function submittedLabel(iso: string): string {
+    if (!iso) return "";
+    return new Date(iso).toLocaleString(locale === "en" ? "en-US" : locale === "uz" ? "uz-UZ" : "ru-RU", {
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Tashkent",
+    });
   }
 
   async function handleGrade(submissionId: string) {
@@ -446,10 +470,32 @@ export function ClassworkModal({ open, onClose, lessonId, teacherId, groupId }: 
                         </p>
                       )}
 
+                      {/* Когда сдал. Раньше учитель видел только «сдано» без
+                          времени — по нему не понять, успел ли ученик к уроку. */}
+                      {hasSubmission && (
+                        <p className="mb-2 text-[11px] text-[var(--text-3)]">
+                          {d.submission.submittedAt.replace("{date}", submittedLabel(s.submitted_at))}
+                        </p>
+                      )}
+
                       {hasSubmission && s.text_answer && (
-                        <p className="text-xs text-[var(--text-2)] bg-[var(--surface-1)] rounded-lg p-2 mb-2 line-clamp-2">
+                        <p className="text-xs text-[var(--text-2)] bg-[var(--surface-1)] rounded-lg p-2 mb-2 whitespace-pre-wrap">
                           {s.text_answer}
                         </p>
+                      )}
+
+                      {/* Файл сдачи. До появления бакета classwork-files
+                          (миграция 193) его невозможно было ни отправить, ни
+                          показать — теперь и то и другое работает. */}
+                      {hasSubmission && s.file_storage_path && (
+                        <div className="mb-2">
+                          <AttachedFileCard
+                            name={s.file_original_name ?? s.file_storage_path.split("/").pop() ?? "file"}
+                            sizeBytes={s.file_size_bytes}
+                            resolveUrl={() => resolveSubmissionFileUrl(s.file_storage_path)}
+                            t={d.submission}
+                          />
+                        </div>
                       )}
 
                       {/* Read-only grade view */}

@@ -2329,6 +2329,31 @@ export const ru: Dictionary = {
     typeLearning: "Материал",
     typeProgramming: "Программирование",
   },
+  /** 12.08.2026 — общие детали сдачи работы: один набор строк на классную
+   *  работу и на домашнее задание (components/submission/SubmissionKit.tsx). */
+  submission: {
+    dropAction: "Выбрать файл",
+    dropHint: "или перетащите его сюда · до {max}",
+    fileTooLarge: "Файл больше {max} — выберите поменьше",
+    fileWrongType: "Такой тип файла не принимается: PDF, Word, Excel, PowerPoint, JPG, PNG или MP4",
+    removeFile: "Убрать файл",
+    attachedTitle: "Прикреплено",
+    openFile: "Открыть",
+    openFailed: "Файл не открылся, попробуйте ещё раз",
+    stateSaving: "Сохраняем…",
+    stateSaved: "Черновик сохранён",
+    stateError: "Не удалось сохранить черновик",
+    statusDraft: "Черновик",
+    statusSubmitted: "Отправлено",
+    submittedAt: "Отправлено {date}",
+    yourAnswer: "Ваш ответ",
+    redo: "Переделать",
+    redoCancel: "Отменить изменения",
+    lockedByGrade: "Работа проверена, изменить её уже нельзя. Если нужно пересдать — попросите учителя снять оценку.",
+    uploading: "Отправляем…",
+    uploadFailed: "Не удалось отправить. Проверьте связь и попробуйте ещё раз.",
+    noFile: "Файл не прикреплён",
+  },
   ai: {
     chat: {
       title: "Робокот",

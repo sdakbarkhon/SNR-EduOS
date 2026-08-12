@@ -2421,6 +2421,29 @@ export interface Dictionary {
     typeLearning: string;
     typeProgramming: string;
   };
+  submission: {
+    dropAction: string;
+    dropHint: string;
+    fileTooLarge: string;
+    fileWrongType: string;
+    removeFile: string;
+    attachedTitle: string;
+    openFile: string;
+    openFailed: string;
+    stateSaving: string;
+    stateSaved: string;
+    stateError: string;
+    statusDraft: string;
+    statusSubmitted: string;
+    submittedAt: string;
+    yourAnswer: string;
+    redo: string;
+    redoCancel: string;
+    lockedByGrade: string;
+    uploading: string;
+    uploadFailed: string;
+    noFile: string;
+  };
   ai: {
     chat: {
       title: string;             // "Робокот"
