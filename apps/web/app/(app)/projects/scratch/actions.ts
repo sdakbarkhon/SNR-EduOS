@@ -16,8 +16,16 @@ import { schoolStoragePath } from "@snr/core";
  *
  * ПРАВА. Запись и чтение идут служебным клиентом, поэтому владение
  * проверяется здесь явно, на каждом действии: RLS под service-role не
- * применяется вовсе. Ученик работает только со своими работами. Учителю
- * список не отдаётся этим файлом совсем — его экран отдельный шаг.
+ * применяется вовсе. Ученик работает только со своими работами.
+ *
+ * УЧИТЕЛЬ (добавлено 13.08.2026). Две функции внизу файла отдают ему работы
+ * его классов. Они устроены иначе, чем ученические, и намеренно: список
+ * фильтрует САМА БАЗА политикой «teacher reads class work by assignment»
+ * (миграция 182), а не повторная проверка в коде. Поэтому чтение идёт
+ * пользовательским клиентом, под которым RLS работает; служебный нужен
+ * только чтобы подписать ссылку на файл — у бакета своих политик нет по
+ * решению той же миграции. Второй копии правил доступа в коде нет: одно
+ * правило, и оно в базе.
  */
 
 const BUCKET = "scratch-projects";
@@ -172,6 +180,100 @@ export async function getScratchProjectUrl(id: string): Promise<string | null> {
     .from("sandbox_projects").select("file_path")
     .eq("id", id).eq("student_id", student.id).maybeSingle();
   if (!row?.file_path) return null;
+  const { data } = await admin.storage.from(BUCKET).createSignedUrl(row.file_path as string, 60);
+  return data?.signedUrl ?? null;
+}
+
+// ── УЧИТЕЛЬ ────────────────────────────────────────────────────────────────
+
+/** Работа ученика в списке учителя. */
+export type ClassScratchWork = {
+  id: string;
+  name: string;
+  studentName: string;
+  groupName: string | null;
+  /** lesson | homework. Работ из песочницы здесь не бывает — их отсекает
+   *  политика в базе, а не этот код. */
+  origin: "lesson" | "homework";
+  /** Тема урока или название задания, откуда работа. */
+  sourceTitle: string | null;
+  sharedWithClass: boolean;
+  updatedAt: string;
+};
+
+/**
+ * Работы Scratch классов учителя, свежие сверху.
+ *
+ * Фильтрации по группам и по origin здесь НЕТ и быть не должно: и то и другое
+ * делает политика «teacher reads class work by assignment». Клиент
+ * пользовательский — под ним политика и срабатывает. Если войдёт не учитель,
+ * его собственные политики просто ничего не вернут.
+ */
+export async function listClassScratchProjects(): Promise<ClassScratchWork[]> {
+  const sb = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (sb as any)
+    .from("sandbox_projects")
+    .select(
+      "id, name, origin, shared_with_class, updated_at, student_id, " +
+      "student:students(full_name), " +
+      "stage:lesson_stages(title, lesson:lessons(topic, title, group:groups(name))), " +
+      "hw:homework(title, group:groups(name))",
+    )
+    .eq("service_id", SERVICE_ID)
+    .eq("is_autosave", false)
+    .not("file_path", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.error("[scratch] listClassScratchProjects failed:", error.message);
+    return [];
+  }
+
+  type Row = {
+    id: string; name: string; origin: "lesson" | "homework";
+    shared_with_class: boolean; updated_at: string;
+    student: { full_name: string } | null;
+    stage: { title: string | null; lesson: { topic: string | null; title: string | null; group: { name: string } | null } | null } | null;
+    hw: { title: string | null; group: { name: string } | null } | null;
+  };
+
+  return ((data ?? []) as Row[]).map((r) => ({
+    id: r.id,
+    name: r.name,
+    studentName: r.student?.full_name ?? "—",
+    groupName: r.stage?.lesson?.group?.name ?? r.hw?.group?.name ?? null,
+    origin: r.origin,
+    sourceTitle:
+      r.origin === "homework"
+        ? r.hw?.title ?? null
+        : r.stage?.lesson?.topic ?? r.stage?.lesson?.title ?? r.stage?.title ?? null,
+    sharedWithClass: r.shared_with_class,
+    updatedAt: r.updated_at,
+  }));
+}
+
+/**
+ * Подписанная ссылка на работу ученика — для просмотра учителем.
+ *
+ * Право на работу проверяет та же политика: сначала строку читаем
+ * пользовательским клиентом, и если политика её не отдала, дальше не идём.
+ * Служебный клиент подключается только на подписи файла.
+ *
+ * Перезаписать открытую работу учитель не может: сохранение идёт через
+ * saveScratchProject, а та первым делом требует профиль ученика
+ * (currentStudent) и учителю отвечает not_student. Экран учителя к тому же
+ * не подписан на сообщения save/share — то есть отказ стоит дважды.
+ */
+export async function getClassScratchProjectUrl(id: string): Promise<string | null> {
+  const sb = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: row } = await (sb as any)
+    .from("sandbox_projects").select("file_path").eq("id", id).maybeSingle();
+  if (!row?.file_path) return null;
+
+  const admin = createAdminClient();
   const { data } = await admin.storage.from(BUCKET).createSignedUrl(row.file_path as string, 60);
   return data?.signedUrl ?? null;
 }

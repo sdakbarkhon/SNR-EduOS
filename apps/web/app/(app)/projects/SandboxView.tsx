@@ -72,7 +72,10 @@ function SandboxFullscreen({
 // платформа шлёт в редактор сохранённую работу через postMessage, и для
 // этого нужен доступ к contentWindow. Остальные инструменты её не передают
 // и ведут себя ровно как раньше.
-function IframeSandbox({
+/** Рамка внешнего редактора с загрузкой, таймаутом и разбором отказа.
+ *  Экспортируется, потому что её же показывает экран работ Scratch у учителя
+ *  (teacher/projects): второй рамки со своим таймаутом заводить нельзя. */
+export function IframeSandbox({
   tool, name, frameRef,
 }: {
   tool: SandboxTool;

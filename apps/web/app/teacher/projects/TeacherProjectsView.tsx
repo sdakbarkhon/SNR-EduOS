@@ -6,6 +6,8 @@ import { Plus, Briefcase, Calendar, Layers, Users, Search } from "lucide-react";
 import { getDictionary, getSubjectStyle, type Locale, type TeacherProjectListItem } from "@snr/core";
 import { SubjectIcon, useLocale } from "@/components";
 import { TeacherProjectFormModal } from "./TeacherProjectFormModal";
+import { TeacherScratchWorksView } from "./TeacherScratchWorksView";
+import type { ClassScratchWork } from "@/app/(app)/projects/scratch/actions";
 
 function fmtDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -13,15 +15,20 @@ function fmtDate(iso: string | null): string | null {
 }
 
 export function TeacherProjectsView({
-  teacherId, projects, groups,
+  teacherId, projects, groups, scratchWorks,
 }: {
   teacherId: string;
   projects: TeacherProjectListItem[];
   groups: Array<{ id: string; name: string; subject: string }>;
+  /** Работы Scratch классов учителя — вторая вкладка этого же экрана. */
+  scratchWorks: ClassScratchWork[];
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.teacher.projects;
+  // Две вкладки, а не два пункта меню: ученик находит Scratch в «Проектах», и
+  // учитель находит работы там же. Сайдбар при этом не растёт.
+  const [tab, setTab] = useState<"projects" | "scratch">("projects");
   const [formOpen, setFormOpen] = useState(false);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -41,8 +48,32 @@ export function TeacherProjectsView({
     );
   }, [projects, query]);
 
+  const tabs = [
+    { key: "projects" as const, label: t.tabProjects },
+    { key: "scratch" as const, label: t.tabScratch },
+  ];
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex gap-1 rounded-xl bg-gray-100/70 p-1">
+        {tabs.map((x) => (
+          <button
+            key={x.key}
+            onClick={() => setTab(x.key)}
+            className={
+              "flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors " +
+              (tab === x.key ? "bg-white text-brand-ink shadow-sm" : "text-gray-500 hover:text-gray-700")
+            }
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "scratch" ? (
+        <TeacherScratchWorksView works={scratchWorks} />
+      ) : (
+      <>
       <div className="flex items-center gap-4">
         <div className="group relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-blue-600" />
@@ -94,6 +125,8 @@ export function TeacherProjectsView({
       )}
 
       {formOpen && <TeacherProjectFormModal teacherId={teacherId} groups={groups} onClose={() => setFormOpen(false)} />}
+      </>
+      )}
     </div>
   );
 }

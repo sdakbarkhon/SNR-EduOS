@@ -2407,6 +2407,24 @@ export interface Dictionary {
       files: string;
       gradeLabel: string; commentLabel: string; gradeBtn: string; gradedLabel: string;
       noStages: string;
+      tabProjects: string;
+      tabScratch: string;
+      scratchTitle: string;
+      scratchHint: string;
+      scratchEmpty: string;
+      scratchEmptyHint: string;
+      scratchNothingFound: string;
+      scratchSearch: string;
+      scratchFromLesson: string;
+      scratchFromHomework: string;
+      scratchShared: string;
+      scratchOpen: string;
+      scratchClose: string;
+      scratchOpening: string;
+      scratchOpenFailed: string;
+      scratchViewOnly: string;
+      scratchCount: string;
+      scratchAllGroups: string;
     };
     announcements: {
       nav: string;
