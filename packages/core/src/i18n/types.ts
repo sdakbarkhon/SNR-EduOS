@@ -1396,6 +1396,7 @@ export interface Dictionary {
     suggestions: string[];     // 4 quick-prompt chips
     // Пачка 3, Задача 2 — глобальный дневной лимит Gemini под чатом (миграция 136).
     usageLimitLabel: string;   // "Осталось запросов сегодня: {remaining} / {limit}" — интерполируются
+    usageLimitReached: string;  // сообщение при исчерпании общего дневного лимита ученика
   };
   demo: {
     showToClass: string;       // "Показать классу"

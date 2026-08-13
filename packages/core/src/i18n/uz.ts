@@ -1355,6 +1355,7 @@ export const uz: Dictionary = {
     tipTitle: "Kunning maslahati",
     tipBody: "Savollarni qismlarga bo'lib ber — murakkab mavzuni qadam-baqadam tushunish osonroq.",
     usageLimitLabel: "Bugun qolgan so'rovlar: {remaining} / {limit}",
+    usageLimitReached: "Yordamchiga kunlik so'rovlar limiti tugadi — kuniga o'quvchiga o'nta, dars va shu tugma uchun umumiy. Ertaga qaytib keling.",
     suggestions: [
       "Tenglamani yechishga yordam ber",
       "Matnni ingliz tiliga tarjima qil",

@@ -126,7 +126,12 @@ export function AiFloatingChat({ onClose }: { onClose: () => void }) {
 
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
     const result = await callAiChat(STUDENT_SYSTEM, trimmed, history);
-    const aiText = "error" in result ? t.errorFallback : result.text;
+    // limit_reached — не сбой, а исчерпанный общий лимит: говорим об этом
+    // словами, а не общей ошибкой «AI недоступен».
+    const aiText =
+      "error" in result
+        ? (result.error === "limit_reached" ? t.usageLimitReached : t.errorFallback)
+        : result.text;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
     setLoading(false);
     void fetchAiUsage().then((u) => { if (u) setUsage(u); });

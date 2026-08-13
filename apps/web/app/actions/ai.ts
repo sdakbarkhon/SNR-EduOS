@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/auth";
 import { computeEmbedding } from "@/lib/ai/embeddings";
 import { getMySchoolNow } from "@/lib/school-time-server";
+import { getStudentAiUsage, logStudentAiExchange } from "@/lib/ai/student-daily-limit";
 
 const RAG_TOP_K = 5;
 // Ниже этого порога совпадение считается нерелевантным — не подмешиваем
@@ -99,7 +100,17 @@ export async function callAiChat(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; text: string }>,
-): Promise<{ text: string; sources_used?: AiChatSource[] } | { error: string }> {
+): Promise<{ text: string; sources_used?: AiChatSource[]; remaining?: number } | { error: string }> {
+  // Дневной лимит ученика — ОДИН на оба помощника: тот же счётчик, что у
+  // чата внутри урока. Раньше здесь лимита не было вовсе, и ученик,
+  // исчерпавший десять запросов в уроке, продолжал спрашивать по кнопке.
+  const supabaseForLimit = await createClient();
+  const { data: { user: limitUser } } = await supabaseForLimit.auth.getUser();
+  const usage = limitUser
+    ? await getStudentAiUsage(supabaseForLimit, limitUser.id)
+    : { studentId: null, used: 0, remaining: 1, limit: 10 };
+  if (usage.studentId && usage.remaining <= 0) return { error: "limit_reached" };
+
   const rag = await buildRagContext(userMessage);
 
   let effectiveSystemPrompt = systemPrompt;
@@ -122,7 +133,23 @@ ${rag.contextBlock}`;
   ];
   const { text, error } = await chat(effectiveSystemPrompt, messages);
   if (error) return { error };
-  return rag?.kind === "found" ? { text, sources_used: rag.sources } : { text };
+
+  // Запись в ai_chat_messages без урока (миграция 196) — она же и есть
+  // счётчик: fn_ai_messages_today() считает строки с role='user'.
+  let remaining: number | undefined;
+  if (usage.studentId) {
+    await logStudentAiExchange(supabaseForLimit, {
+      studentId: usage.studentId,
+      lessonId: null,
+      question: userMessage,
+      answer: text,
+    });
+    remaining = Math.max(0, usage.remaining - 1);
+  }
+
+  return rag?.kind === "found"
+    ? { text, sources_used: rag.sources, remaining }
+    : { text, remaining };
 }
 
 export async function getStudyTip(): Promise<{ text: string } | { error: string }> {

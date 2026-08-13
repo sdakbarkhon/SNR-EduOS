@@ -6,10 +6,25 @@
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { getStudentAiUsage } from "@/lib/ai/student-daily-limit";
 
 const AI_USAGE_DAILY_LIMIT = 250;
 
 export async function GET() {
+  // Ученику показываем ЕГО счётчик — тот же, что у чата внутри урока
+  // (десять запросов в сутки на оба помощника). Общий счётчик вызовов на
+  // всю установку остаётся для остальных ролей: это защита от расходов,
+  // а не квота человека, и путать их под одной подписью нельзя.
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
+  if (user) {
+    const usage = await getStudentAiUsage(db, user.id);
+    if (usage.studentId) {
+      return NextResponse.json({ used: usage.used, limit: usage.limit, remaining: usage.remaining });
+    }
+  }
+
   const admin = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (admin.rpc as any)("get_ai_usage_today");

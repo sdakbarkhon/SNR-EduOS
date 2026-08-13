@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { chat } from "@/lib/ai/gemini-client";
 import { EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
-
-const DAILY_LIMIT = 10;
+import {
+  STUDENT_AI_DAILY_LIMIT,
+  getStudentAiUsage,
+  logStudentAiExchange,
+} from "@/lib/ai/student-daily-limit";
 
 // Build stage context without leaking correct answers for quiz stages
 async function buildStageContext(
@@ -74,24 +77,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  // Check daily limit
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: dayCountRaw } = await (db as any).rpc("fn_ai_messages_today", {
-    p_student_id: student.id,
-  });
-  const dayCount = (dayCountRaw as number) ?? 0;
-  if (dayCount >= DAILY_LIMIT) {
+  // Дневной лимит — общий с помощником по кнопке (см. student-daily-limit.ts).
+  const usage = await getStudentAiUsage(db, user.id);
+  if (usage.remaining <= 0) {
     return NextResponse.json(
-      { error: "Лимит исчерпан до завтра", remaining: 0 },
+      { error: "limit_reached", remaining: 0, limit: usage.limit },
       { status: 429 },
     );
   }
 
   // Get lesson context + membership check (student must be enrolled in lesson's group)
+  //
+  // Предмет берём из НАЗНАЧЕНИЯ урока (lessons.subject_id → subjects.name),
+  // а не из groups.subject. groups.subject — скалярный слаг, оставшийся от
+  // времён «одна группа = один предмет»: у всех трёх демо-классов там лежит
+  // 'programming', поэтому на уроке русского помощнику сообщали
+  // «Предмет: programming», и он честно отвечал про программирование.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("id, title, topic, description, group_id, group:groups(subject)")
+    .select("id, title, topic, description, group_id, subject:subjects(name), group:groups(subject)")
     .eq("id", body.lesson_id)
     .single();
 
@@ -108,13 +113,45 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const lessonSubject = (lesson?.group as { subject: string } | null)?.subject ?? "";
-  const lessonTitle = lesson?.title ?? lesson?.topic ?? "Урок";
+  const lessonSubject =
+    (lesson?.subject as { name: string } | null)?.name
+    ?? (lesson?.group as { subject: string } | null)?.subject
+    ?? "";
+  const lessonTitle = lesson?.topic ?? lesson?.title ?? "Урок";
   const lessonDesc = lesson?.description ?? "";
 
   // Get stage context (no correct answers for quizzes)
   const stageCtx = body.stage_id
     ? await buildStageContext(db, body.stage_id)
+    : "";
+
+  // План урока и его материалы — только этого урока. Раньше в контекст
+  // не попадало ни то, ни другое: помощник знал тему, но не знал, из чего
+  // урок состоит и что к нему приложено.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [{ data: stages }, { data: materials }] = await Promise.all([
+    (db as any)
+      .from("lesson_stages")
+      .select("title, position")
+      .eq("lesson_id", body.lesson_id)
+      .order("position"),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (db as any)
+      .from("lesson_materials")
+      .select("title")
+      .eq("lesson_id", body.lesson_id)
+      .limit(20),
+  ]);
+
+  const planCtx = (stages ?? []).length
+    ? `\nПЛАН ЭТОГО УРОКА (по порядку):\n${(stages as Array<{ title: string }>)
+        .map((s, i) => `${i + 1}. ${s.title}`)
+        .join("\n")}`
+    : "";
+  const materialsCtx = (materials ?? []).length
+    ? `\nМАТЕРИАЛЫ ЭТОГО УРОКА: ${(materials as Array<{ title: string }>)
+        .map((m) => m.title)
+        .join("; ")}`
     : "";
 
   // Get chat history (last 20 messages)
@@ -133,9 +170,14 @@ export async function POST(req: NextRequest) {
 Предмет: ${lessonSubject}
 Тема урока: ${lessonTitle}
 Описание: ${lessonDesc}
+${planCtx}
+${materialsCtx}
 ${stageCtx}
 
-Используй этот контекст чтобы давать релевантные подсказки. Отвечай по-русски.`;
+Ты находишься ВНУТРИ этого урока. На вопросы «какая тема», «какой предмет»,
+«что мы проходим» отвечай строго по контексту выше и не подменяй предмет или
+тему другими. Если ученик спрашивает о чём-то постороннем — ответить можно, но
+сначала обозначь, что это уже за рамками текущего урока. Отвечай по-русски.`;
 
   const chatMessages = [
     ...((history ?? []) as Array<{ role: string; content: string }>).map((m) => ({
@@ -153,25 +195,14 @@ ${stageCtx}
     return NextResponse.json({ error }, { status: 500 });
   }
 
-  // Save both messages
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any).from("ai_chat_messages").insert([
-    {
-      student_id: student.id,
-      lesson_id: body.lesson_id,
-      stage_id: body.stage_id ?? null,
-      role: "user",
-      content: body.user_message,
-    },
-    {
-      student_id: student.id,
-      lesson_id: body.lesson_id,
-      stage_id: body.stage_id ?? null,
-      role: "assistant",
-      content: text,
-    },
-  ]);
+  await logStudentAiExchange(db, {
+    studentId: student.id,
+    lessonId: body.lesson_id,
+    stageId: body.stage_id ?? null,
+    question: body.user_message,
+    answer: text,
+  });
 
-  const remaining = Math.max(0, DAILY_LIMIT - dayCount - 1);
-  return NextResponse.json({ text, remaining });
+  const remaining = Math.max(0, usage.remaining - 1);
+  return NextResponse.json({ text, remaining, limit: STUDENT_AI_DAILY_LIMIT });
 }
