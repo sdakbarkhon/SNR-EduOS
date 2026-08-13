@@ -460,6 +460,27 @@ export interface Dictionary {
     needGroupFirst: string;
     needSubjectFirst: string;
     needBasicsFirst: string;
+    setupTitle: string;
+    setupSubtitle: string;
+    setupDone: string;
+    setupNow: string;
+    setupOpen: string;
+    setupSubjects: string;
+    setupSubjectsHint: string;
+    setupTeachers: string;
+    setupTeachersHint: string;
+    setupGroups: string;
+    setupGroupsHint: string;
+    setupAssignments: string;
+    setupAssignmentsHint: string;
+    setupStudents: string;
+    setupStudentsHint: string;
+    setupParents: string;
+    setupParentsHint: string;
+    subjectsAndGroupsEmptyCta: string;
+    subjectsPickKnown: string;
+    subjectsOwnName: string;
+    subjectsOwnNameWarning: string;
   };
   superadmin: {
     title: string;

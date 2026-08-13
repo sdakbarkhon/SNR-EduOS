@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
@@ -120,7 +121,17 @@ function TeacherBindings({
   onUnassign: (assignmentId: string) => void;
 }) {
   if (rows.length === 0) {
-    return <p className="mt-1 text-xs font-normal text-gray-400">{t.subjectsAndGroupsEmpty}</p>;
+    // Раньше здесь была только констатация «Пока ничего не ведёт». Она не
+    // говорила, что учитель поэтому и видит пустой кабинет, и куда идти, чтобы
+    // это исправить. Даём ссылку прямо на «Назначения».
+    return (
+      <p className="mt-1 text-xs font-normal text-gray-400">
+        {t.subjectsAndGroupsEmpty}{" "}
+        <Link href="/admin/subject-assignments" className="font-medium text-violet-600 hover:underline">
+          {t.subjectsAndGroupsEmptyCta}
+        </Link>
+      </p>
+    );
   }
   return (
     <ul className="mt-1.5 space-y-1">

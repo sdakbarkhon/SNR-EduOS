@@ -51,9 +51,19 @@ export async function GET(
   }
 
   // 2) Per-content files (h5p.json, content/*) -- proxied from Supabase Storage.
-  const { url } = getSupabaseEnv();
-  const storageUrl = `${url}/storage/v1/object/public/h5p-content/${contentId}/${relPath}`;
-  const upstream = await fetch(storageUrl, { cache: "no-store" });
+  //
+  // Миграция 195 закрыла бакет h5p-content: раньше он был публичным, и любой
+  // файл задания открывался по прямому адресу без входа. Читаем служебным
+  // ключом — этот маршрут и так серверный, ключ в браузер не попадает, а
+  // признак public и RLS для служебной роли значения не имеют.
+  const { url, serviceKey } = getSupabaseEnv();
+  if (!serviceKey) return new NextResponse("Not configured", { status: 500 });
+
+  const storageUrl = `${url}/storage/v1/object/h5p-content/${contentId}/${relPath}`;
+  const upstream = await fetch(storageUrl, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+  });
   if (!upstream.ok) {
     return new NextResponse("Not found", { status: 404 });
   }
