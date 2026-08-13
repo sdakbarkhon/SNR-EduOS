@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { getParentContext, type ParentContext as ParentContextData } from "@snr/core";
+import { fetchSchoolFrozenDate, getParentContext, type ParentContext as ParentContextData } from "@snr/core";
 import { getSupabase } from "../lib/supabase";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { setRealChildren } from "../data";
 import { toChildRow } from "../lib/realChild";
+import { setSchoolFrozenDate } from "../lib/appTime";
 
 type Ctx = {
   data: ParentContextData | null;
@@ -27,7 +28,18 @@ const ParentDataContext = createContext<Ctx | null>(null);
  *  раздаются через контекст. Селектор ребёнка живёт тут же: >1 ребёнка —
  *  переключатель работает, 1 (или 0) — переключать нечего. */
 export function ParentDataProvider({ children }: { children: ReactNode }) {
-  const state = useAsyncData(() => getParentContext(getSupabase()), []);
+  // Дата заморозки школы едет тем же заходом, что и родитель с детьми: время
+  // приложения должно быть известно к моменту, когда появятся первые экраны с
+  // датами, а не догонять их вторым запросом.
+  const state = useAsyncData(async () => {
+    const db = getSupabase();
+    const [parent, frozen] = await Promise.all([
+      getParentContext(db),
+      fetchSchoolFrozenDate(db),
+    ]);
+    setSchoolFrozenDate(frozen);
+    return parent;
+  }, []);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
 
   // Настоящие дети — в слой данных, чтобы имена стали настоящими на всех

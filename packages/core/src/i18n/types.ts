@@ -3123,6 +3123,7 @@ export interface Dictionary {
       legalTerms: string;
       legalAnd: string;
       legalPrivacy: string;
+      legalNotReady: string;
       phoneHint: string;
       phonePlaceholder: string;
       kidsOne: string;

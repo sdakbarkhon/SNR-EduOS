@@ -3008,6 +3008,7 @@ export const uz: Dictionary = {
       legalTerms: "Foydalanish shartlariga",
       legalAnd: " va ",
       legalPrivacy: "Maxfiylik siyosatiga rozilik bildirasiz",
+      legalNotReady: "Hujjat tayyorlanmoqda. U chop etilishi bilan havola uni shu yerda ochadi. Hozircha tafsilotlar uchun maktabingizga murojaat qiling.",
       phoneHint: "TELEFON RAQAMI",
       phonePlaceholder: "90 123 45 67",
       kidsOne: "1 farzand",

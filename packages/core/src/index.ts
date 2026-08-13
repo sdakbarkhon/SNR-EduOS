@@ -11,6 +11,7 @@ export * from "./presenters";
 export * from "./config/subjects";
 export * from "./i18n";
 export * from "./utils/date";
+export * from "./utils/schoolTime";
 export * from "./utils/money";
 export * from "./utils/homework";
 export * from "./utils/plural";

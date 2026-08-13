@@ -1,20 +1,25 @@
 /**
  * Вход 2 — LoginPhoneScreen (макет layerA2, «SNR EduOS v2 Light.dc.html» 1972–2018).
  *
- * Block-list Захода 4a (строго по порядку сверху вниз):
+ * Состав экрана (сверху вниз), после уборки 13.08.2026:
  *   1. Шапка: back (GlassCircleButton) + text-link «Нужна помощь?».
  *   2. Заголовок Unbounded 20/600 «Добро пожаловать\nв SNR EduOS!».
  *   3. Subtitle 12/600 «Войдите в аккаунт, чтобы продолжить».
  *   4. GlassCard с caps-label «НОМЕР ТЕЛЕФОНА», country-picker + phone input,
  *      кнопка «Продолжить» (PrimaryButton, disabled пока цифр < 9).
- *   5. Разделитель «или» — две hairline-линии.
- *   6. Демо-CTA («Демо-вход для родителя») — фиолетовая рамка rgba(124,58,237,.5).
- *   7. CTA «Войти через Google».
- *   8. CTA «Войти через Apple».
- *   9. Legal-disclaimer со ссылками goTerms / goPrivacy.
+ *   5. Правовые ссылки — открывают документ, если его адрес задан в сборке.
+ *
+ * УБРАНО 13.08.2026: разделитель «или», «Войти через Google», «Войти через
+ * Apple». Все три из макета, но входа через сторонние учётные записи у нас
+ * нет: обе кнопки возвращали на онбординг. Родитель входит по номеру телефона
+ * с одноразовым кодом — это единственный путь, и теперь он единственный на
+ * экране. Иконки GoogleIcon/AppleIcon удалены из ui/auth/icons.tsx следом:
+ * других потребителей у них не было.
  */
 import { useMemo, useState } from "react";
 import {
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +27,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLocale } from "../../i18n";
@@ -35,16 +41,28 @@ import {
 import { getAuthFixtures } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import {
-  AppleIcon,
   BackArrowIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  GoogleIcon,
   SparkleIcon,
   UzFlagIcon,
 } from "../../ui/auth/icons";
 import { AuthHelpSheet } from "./sheets/AuthHelpSheet";
 import { LangThemeButtons } from "./LangThemeButtons";
+
+/**
+ * Правовые документы. Ссылки обязаны быть — их требуют магазины, — но вести
+ * в никуда они не могут. Поэтому адрес берётся из настроек сборки
+ * (`app.json → expo.extra.legalTermsUrl / legalPrivacyUrl`): как только
+ * заказчик даст ссылки, они заработают без единой правки кода. Пока адреса
+ * нет, вместо перехода показывается честное объяснение, а не молчаливый
+ * возврат на онбординг, как было до 13.08.2026.
+ */
+function legalUrl(kind: "terms" | "privacy"): string | null {
+  const extra = Constants.expoConfig?.extra as Record<string, unknown> | undefined;
+  const raw = extra?.[kind === "terms" ? "legalTermsUrl" : "legalPrivacyUrl"];
+  return typeof raw === "string" && raw.startsWith("http") ? raw : null;
+}
 
 /** Формат «90 123 45 67» — соответствует phoneFmt макета. */
 function formatPhone(digits: string): string {
@@ -73,8 +91,16 @@ export function LoginPhoneScreen() {
     scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.55)";
   const inputBorder =
     scheme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.85)";
-  // Hairline «или»: макет rgba(23,18,67,.12) — берём ink3 (в токенах ≈ та же плотность).
-  const hairline = tokens.ink3;
+
+  /** Открыть документ, если адрес задан в сборке; иначе честно объяснить. */
+  function openLegal(kind: "terms" | "privacy") {
+    const url = legalUrl(kind);
+    if (url) { void Linking.openURL(url); return; }
+    Alert.alert(
+      kind === "terms" ? t.legalTerms.trim() : t.legalPrivacy.trim(),
+      t.legalNotReady,
+    );
+  }
   // Заход 1: существующего компонента ошибки на этом экране не было
   // (фикстурный вход не мог провалиться) — переиспользуем семантический
   // токен status.red, как и на LoginSmsScreen.
@@ -283,113 +309,13 @@ export function LoginPhoneScreen() {
           </View>
         </GlassCard>
 
-        {/* 5. Разделитель «или» (макет 2002). */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            paddingVertical: 4,
-          }}
-        >
-          <View
-            style={{
-              flex: 1,
-              height: StyleSheet.hairlineWidth,
-              backgroundColor: hairline,
-            }}
-          />
-          <Text
-            style={{
-              fontFamily: fonts.manrope700,
-              fontSize: 10.5,
-              color: tokens.ink3,
-            }}
-          >
-            {t.or}
-          </Text>
-          <View
-            style={{
-              flex: 1,
-              height: StyleSheet.hairlineWidth,
-              backgroundColor: hairline,
-            }}
-          />
-        </View>
+        {/* Разделитель «или» и входы через Google и Apple убраны 13.08.2026.
+            Обе кнопки никуда не вели: их onPress возвращал на онбординг, а
+            входа через сторонние учётные записи у нас нет и не планируется —
+            родитель входит по номеру телефона с одноразовым кодом. Вместе с
+            ними ушёл и разделитель: разделять стало нечего. */}
 
-        {/* 7. CTA «Войти через Google» (макет 2008–2011). */}
-        <GlassCard
-          radius={16}
-          contentStyle={{
-            padding: 13,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 11,
-          }}
-          onPress={() => setPhase("onboarding")}
-        >
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 11,
-              backgroundColor:
-                scheme === "dark" ? "rgba(255,255,255,0.08)" : "#FFFFFF",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <GoogleIcon size={18} />
-          </View>
-          <Text
-            style={{
-              flex: 1,
-              fontFamily: fonts.manrope800,
-              fontSize: 12.5,
-              color: tokens.ink1,
-            }}
-          >
-            {t.withGoogle}
-          </Text>
-        </GlassCard>
-
-        {/* 8. CTA «Войти через Apple» (макет 2012–2015). */}
-        <GlassCard
-          radius={16}
-          contentStyle={{
-            padding: 13,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 11,
-          }}
-          onPress={() => setPhase("onboarding")}
-        >
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 11,
-              backgroundColor:
-                scheme === "dark" ? "rgba(255,255,255,0.08)" : "#FFFFFF",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <AppleIcon size={18} color={tokens.ink1} />
-          </View>
-          <Text
-            style={{
-              flex: 1,
-              fontFamily: fonts.manrope800,
-              fontSize: 12.5,
-              color: tokens.ink1,
-            }}
-          >
-            {t.withApple}
-          </Text>
-        </GlassCard>
-
-        {/* 9. Legal disclaimer (макет 2016). */}
+        {/* Правовые ссылки (макет 2016). */}
         <Text
           style={{
             fontFamily: fonts.manrope600,
@@ -404,14 +330,14 @@ export function LoginPhoneScreen() {
           {t.legalPrefix}
           <Text
             style={{ fontFamily: fonts.manrope800, color: tokens.accent }}
-            onPress={() => setPhase("onboarding")}
+            onPress={() => openLegal("terms")}
           >
             {t.legalTerms}
           </Text>
           {t.legalAnd}
           <Text
             style={{ fontFamily: fonts.manrope800, color: tokens.accent }}
-            onPress={() => setPhase("onboarding")}
+            onPress={() => openLegal("privacy")}
           >
             {t.legalPrivacy}
           </Text>

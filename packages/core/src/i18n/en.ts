@@ -3007,6 +3007,7 @@ export const en: Dictionary = {
       legalTerms: "Terms of Use",
       legalAnd: " and ",
       legalPrivacy: "Privacy Policy",
+      legalNotReady: "The document is being prepared. Once published, this link will open it right here. For now, please ask your school for details.",
       phoneHint: "PHONE NUMBER",
       phonePlaceholder: "90 123 45 67",
       kidsOne: "1 child",

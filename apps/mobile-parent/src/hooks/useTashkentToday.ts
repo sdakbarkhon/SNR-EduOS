@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { tashkentToday } from "../lib/tashkent";
-import { getAppNowMs } from "../lib/appTime";
+import { getAppNowMs, subscribeSchoolTime } from "../lib/appTime";
 
 /**
  * Долги, проход 2 — «сегодня» (Ташкент) больше не застывает на дате
@@ -34,6 +34,12 @@ export function useTashkentToday(): string {
       recompute();
     });
 
+    // Третий триггер, 13.08.2026: дата заморозки школы приезжает из базы уже
+    // после первой отрисовки. Без этой подписки экран, смонтированный до
+    // ответа, остался бы на настоящем «сегодня» до полуночи или сворачивания
+    // приложения — то самое мигание, которого нельзя допускать.
+    const unsubscribe = subscribeSchoolTime(recompute);
+
     let timeoutId: ReturnType<typeof setTimeout>;
     function scheduleMidnightTick() {
       timeoutId = setTimeout(() => {
@@ -45,6 +51,7 @@ export function useTashkentToday(): string {
 
     return () => {
       sub.remove();
+      unsubscribe();
       clearTimeout(timeoutId);
     };
   }, []);
