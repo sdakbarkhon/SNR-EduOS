@@ -74,6 +74,14 @@ export function StudentsView({
     setTimeout(() => setFlashMsg(null), 5000);
   }
 
+  // Пустой список и «поиск ничего не нашёл» — разные вещи. Раньше оба
+  // показывали «Ничего не найдено»: в новой школе это выглядело как поломка,
+  // а не как «здесь пока пусто, начните отсюда».
+  const noGroups = groups.length === 0;
+  const emptyText = search.trim()
+    ? t.noResults
+    : noGroups ? t.emptyStudentsNeedGroup : t.emptyStudents;
+
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
     const groupName = s.student_groups[0]?.groups?.name ?? "";
@@ -88,9 +96,14 @@ export function StudentsView({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">{t.studentsTitle}</h1>
+        {/* Форма ученика требует группу — без единой группы она открывается
+            пустой, и выбрать в ней нечего. Выключаем кнопку и подписываем
+            причину, вместо того чтобы вести человека в тупик. */}
         <button
           onClick={() => setModal({ kind: "add" })}
-          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+          disabled={noGroups}
+          title={noGroups ? t.needGroupFirst : undefined}
+          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-violet-600"
         >
           <Plus className="h-4 w-4" />
           {t.addStudentTitle}
@@ -128,7 +141,7 @@ export function StudentsView({
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                    {t.noResults}
+                    {emptyText}
                   </td>
                 </tr>
               ) : (

@@ -158,6 +158,8 @@ export function AssignmentsView({
     });
   }
 
+  const missingBasics = groups.length === 0 || teachers.length === 0;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       {/* Header */}
@@ -171,9 +173,14 @@ export function AssignmentsView({
             <p className="text-sm text-zinc-500">{d.assignmentsHint}</p>
           </div>
         </div>
+        {/* Назначение связывает предмет, группу и учителя. Предмет можно
+            завести прямо в форме, а группу и учителя — нет: без них форма
+            открывается с пустыми списками. */}
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-violet-700"
+          disabled={missingBasics}
+          title={missingBasics ? d.needBasicsFirst : undefined}
+          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-violet-600"
         >
           <Plus className="h-4 w-4" /> {d.assignmentsAdd}
         </button>
@@ -207,7 +214,9 @@ export function AssignmentsView({
       {/* List */}
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {rows.length === 0 ? (
-          <div className="py-12 text-center text-sm text-zinc-500">{d.assignmentsEmpty}</div>
+          <div className="py-12 text-center text-sm text-zinc-500">
+            {missingBasics ? d.assignmentsEmptyNeedBasics : d.assignmentsEmpty}
+          </div>
         ) : (
           <ul className="divide-y divide-zinc-100">
             {rows.map((a) => (

@@ -170,6 +170,13 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
     setTimeout(() => setFlashMsg(null), 8000);
   }
 
+  // Форма родителя требует выбрать хотя бы одного ребёнка из списка
+  // учеников школы. Пока учеников нет, создавать некого.
+  const noStudents = allStudents.length === 0;
+  const emptyText = search.trim()
+    ? t.noParents
+    : noStudents ? t.emptyParentsNeedStudents : t.noParents;
+
   const filtered = parents.filter((p) => p.full_name.toLowerCase().includes(search.toLowerCase()));
 
   function copyCode(code: string) {
@@ -185,13 +192,23 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">{t.title}</h1>
-        <Link
-          href="/admin/parents/new"
-          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
-        >
-          <Plus className="h-4 w-4" />
-          {t.addParent}
-        </Link>
+        {noStudents ? (
+          <span
+            title={t.needStudentsFirst}
+            className="flex cursor-not-allowed items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            {t.addParent}
+          </span>
+        ) : (
+          <Link
+            href="/admin/parents/new"
+            className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+          >
+            <Plus className="h-4 w-4" />
+            {t.addParent}
+          </Link>
+        )}
       </div>
 
       {flashMsg && (
@@ -224,7 +241,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t.noParents}</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
                 </tr>
               ) : (
                 filtered.map((p) => (

@@ -125,7 +125,12 @@ export function NewParentForm({ students }: { students: Student[] }) {
           />
         </div>
         <div className="flex flex-col gap-1">
+          {/* Поле было подписано «(необязательно)» при required в разметке:
+              подпись обещала одно, форма требовала другое. Оставили
+              обязательным — родитель входит именно по номеру, — а подпись
+              привели в соответствие и добавили пояснение зачем. */}
           <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPhone}</label>
+          <p className="text-xs text-gray-400">{t.fieldPhoneHint}</p>
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}

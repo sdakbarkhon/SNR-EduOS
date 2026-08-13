@@ -68,9 +68,11 @@ async function resolveLoginCandidates(
   const [students, teachers, admins] = await Promise.all([
     anyAdmin.from("students").select("user_id, school_id").ilike("username", login),
     anyAdmin.from("teachers").select("user_id, school_id").ilike("username", login),
-    // У админов своего username нет — он живёт только в адресе учётной
-    // записи, поэтому их находим по школам ниже, через сам адрес.
-    Promise.resolve({ data: [] as Array<{ user_id: string; school_id: string }> }),
+    // Миграция 194 — у админов появилась своя колонка логина. До неё здесь
+    // стоял пустой список, и администратор, которому при столкновении логинов
+    // достался школьный адрес (`логин.код@admins.snr.local`), не мог войти
+    // вообще: по логину его не находили, а простой адрес занят чужой школой.
+    anyAdmin.from("admins").select("user_id, school_id").ilike("username", login),
   ]);
 
   const rows = [

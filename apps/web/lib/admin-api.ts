@@ -1118,7 +1118,15 @@ export async function createSchoolAdmin(data: {
   });
   const { data: admin, error: aErr } = await sb
     .from("admins")
-    .insert({ user_id: userId, full_name: data.full_name, school_id: data.school_id })
+    // Миграция 194: логин пишем в саму строку, а не только в адрес учётной
+    // записи. Иначе при столкновении логинов адрес уедет в школьный вид, и
+    // резолвер входа этого админа не найдёт.
+    .insert({
+      user_id: userId,
+      full_name: data.full_name,
+      username: data.username.trim().toLowerCase(),
+      school_id: data.school_id,
+    })
     .select("id")
     .single();
   if (aErr || !admin) {

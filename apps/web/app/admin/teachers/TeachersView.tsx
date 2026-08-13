@@ -232,6 +232,10 @@ export function TeachersView({
     setTimeout(() => setFlashMsg(null), 5000);
   }
 
+  // «Ничего не найдено» — ответ на поиск. Пустая школа требует другого
+  // текста: что здесь будет и с чего начать.
+  const emptyText = search.trim() ? t.noResults : t.emptyTeachers;
+
   const filtered = teachers.filter((tc) => {
     const q = search.toLowerCase();
     return tc.full_name.toLowerCase().includes(q) || (tc.username ?? "").toLowerCase().includes(q);
@@ -278,7 +282,7 @@ export function TeachersView({
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">{t.noResults}</td>
+                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
                 </tr>
               ) : (
                 filtered.map((tc) => (

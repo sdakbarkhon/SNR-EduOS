@@ -451,6 +451,15 @@ export interface Dictionary {
     subjectsEnterName: string;
     subjectsDeleteTitle: string;
     subjectsIconSelected: string;  // "Выбрано: {icon}"
+    emptyStudents: string;
+    emptyStudentsNeedGroup: string;
+    emptyTeachers: string;
+    emptyGroups: string;
+    emptyGroupsNeedSubject: string;
+    assignmentsEmptyNeedBasics: string;
+    needGroupFirst: string;
+    needSubjectFirst: string;
+    needBasicsFirst: string;
   };
   superadmin: {
     title: string;
@@ -604,6 +613,9 @@ export interface Dictionary {
     resetPasswordConfirm: string;
     resetPasswordNotRegistered: string;
     newPasswordFlash: string;
+    emptyParentsNeedStudents: string;
+    needStudentsFirst: string;
+    fieldPhoneHint: string;
   };
   /** П.3 Заход 2 — человеческие сообщения об ошибках для админ-форм
    *  (apps/web/lib/admin-error-messages.ts), заменяют сырой Postgres-текст. */

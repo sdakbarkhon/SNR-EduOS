@@ -204,6 +204,13 @@ export function GroupsView({
     setTimeout(() => setFlashMsg(null), 5000);
   }
 
+  // Форма группы требует предмет из справочника. Пока справочник пуст,
+  // создать группу нельзя — выключаем кнопку и говорим, чего не хватает.
+  const noSubjects = catalog.filter((cItem) => cItem.is_active).length === 0;
+  const emptyText = search.trim()
+    ? t.noResults
+    : noSubjects ? t.emptyGroupsNeedSubject : t.emptyGroups;
+
   const filtered = groups.filter((g) => {
     const q = search.toLowerCase();
     return (
@@ -219,7 +226,9 @@ export function GroupsView({
         <h1 className="text-2xl font-bold text-gray-800">{t.groupsTitle}</h1>
         <button
           onClick={() => setModal({ kind: "add" })}
-          className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
+          disabled={noSubjects}
+          title={noSubjects ? t.needSubjectFirst : undefined}
+          className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-amber-500"
         >
           <Plus className="h-4 w-4" />
           {t.addGroupTitle}
@@ -255,7 +264,7 @@ export function GroupsView({
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{t.noResults}</td>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
                 </tr>
               ) : (
                 filtered.map((g) => {
