@@ -1,5 +1,110 @@
+diff --git a/src/components/menu-bar/menu-bar.jsx b/src/components/menu-bar/menu-bar.jsx
+index 9ad60de4d..1fb46bd8d 100644
+--- a/src/components/menu-bar/menu-bar.jsx
++++ b/src/components/menu-bar/menu-bar.jsx
+@@ -16,6 +16,8 @@ import ShareButton from './share-button.jsx';
+ import {ComingSoonTooltip} from '../coming-soon/coming-soon.jsx';
+ import Divider from '../divider/divider.jsx';
+ import SaveStatus from './save-status.jsx';
++// SNR EduOS: кнопки сохранения переведены с серверов Scratch на нашу платформу.
++import {sendProject, openMyProjects, listen} from '../../lib/snr-bridge.js';
+ import ProjectWatcher from '../../containers/project-watcher.jsx';
+ import MenuBarMenu from './menu-bar-menu.jsx';
+ import {MenuItem, MenuSection} from '../menu/menu.jsx';
+@@ -188,11 +190,17 @@ class MenuBar extends React.Component {
+             'handleKeyPress',
+             'handleRestoreOption',
+             'getSaveToComputerHandler',
+-            'restoreOptionMessage'
++            'restoreOptionMessage',
++            // SNR EduOS
++            'handleClickShareSnr',
++            'handleClickMyStuffSnr'
+         ]);
+     }
+     componentDidMount () {
+         document.addEventListener('keydown', this.handleKeyPress);
++        // SNR EduOS: платформа может прислать сохранённую работу для открытия.
++        // Меню монтируется один раз и держит vm в пропсах — здесь и слушаем.
++        listen(this.props.vm);
+     }
+     componentWillUnmount () {
+         document.removeEventListener('keydown', this.handleKeyPress);
+@@ -217,9 +225,19 @@ class MenuBar extends React.Component {
+         this.props.onRequestCloseFile();
+     }
+     handleClickSave () {
+-        this.props.onClickSave();
++        // SNR EduOS: вместо обращения к серверам Scratch отдаём проект платформе,
++        // она кладёт его в наше хранилище. См. src/lib/snr-bridge.js.
++        sendProject(this.props.vm, 'save', this.props.projectTitle);
+         this.props.onRequestCloseFile();
+     }
++    handleClickShareSnr () {
++        // SNR EduOS: «Поделиться» — внутри платформы, наружу ничего не уходит.
++        sendProject(this.props.vm, 'share', this.props.projectTitle);
++    }
++    handleClickMyStuffSnr () {
++        // SNR EduOS: список сохранённых работ живёт на платформе.
++        openMyProjects();
++    }
+     handleClickSaveAsCopy () {
+         this.props.onClickSaveAsCopy();
+         this.props.onRequestCloseFile();
+@@ -660,11 +678,12 @@ class MenuBar extends React.Component {
+                                 </ProjectWatcher>
+                             )
+                         ) : (
+-                            this.props.showComingSoon ? (
+-                                <MenuBarItemTooltip id="share-button">
+-                                    <ShareButton className={styles.menuBarButton} />
+-                                </MenuBarItemTooltip>
+-                            ) : []
++                            // SNR EduOS: было подсказкой «скоро» — теперь рабочая
++                            // кнопка, делится работой внутри платформы.
++                            <ShareButton
++                                className={styles.menuBarButton}
++                                onClick={this.handleClickShareSnr}
++                            />
+                         )}
+                         {this.props.canRemix ? remixButton : []}
+                     </div>
+@@ -811,20 +830,19 @@ class MenuBar extends React.Component {
+                         <React.Fragment>
+                             {this.props.showComingSoon ? (
+                                 <React.Fragment>
+-                                    <MenuBarItemTooltip id="mystuff">
+-                                        <div
+-                                            className={classNames(
+-                                                styles.menuBarItem,
+-                                                styles.hoverable,
+-                                                styles.mystuffButton
+-                                            )}
+-                                        >
+-                                            <img
+-                                                className={styles.mystuffIcon}
+-                                                src={mystuffIcon}
+-                                            />
+-                                        </div>
+-                                    </MenuBarItemTooltip>
++                                    <div
++                                        className={classNames(
++                                            styles.menuBarItem,
++                                            styles.hoverable,
++                                            styles.mystuffButton
++                                        )}
++                                        onClick={this.handleClickMyStuffSnr}
++                                    >
++                                        <img
++                                            className={styles.mystuffIcon}
++                                            src={mystuffIcon}
++                                        />
++                                    </div>
+                                     <MenuBarItemTooltip
+                                         id="account-nav"
+                                         place={this.props.isRtl ? 'right' : 'left'}
 diff --git a/src/containers/library-item.jsx b/src/containers/library-item.jsx
-index 51e1050..e596860 100644
+index 51e105053..e596860d1 100644
 --- a/src/containers/library-item.jsx
 +++ b/src/containers/library-item.jsx
 @@ -106,7 +106,7 @@ class LibraryItem extends React.PureComponent {
@@ -12,7 +117,7 @@ index 51e1050..e596860 100644
          return (
              <LibraryItemComponent
 diff --git a/src/lib/project-fetcher-hoc.jsx b/src/lib/project-fetcher-hoc.jsx
-index 11d16a7..e46b9a8 100644
+index 11d16a7cc..e46b9a878 100644
 --- a/src/lib/project-fetcher-hoc.jsx
 +++ b/src/lib/project-fetcher-hoc.jsx
 @@ -135,7 +135,9 @@ const ProjectFetcherHOC = function (WrappedComponent) {
@@ -26,8 +131,83 @@ index 11d16a7..e46b9a8 100644
          projectHost: 'https://projects.scratch.mit.edu'
      };
  
+diff --git a/src/lib/snr-bridge.js b/src/lib/snr-bridge.js
+new file mode 100644
+index 000000000..f6026e5b3
+--- /dev/null
++++ b/src/lib/snr-bridge.js
+@@ -0,0 +1,69 @@
++/**
++ * SNR EduOS — мост между редактором и платформой.
++ *
++ * Родные кнопки «Сохранить», «Поделиться» и «Мои работы» рассчитаны на серверы
++ * scratch.mit.edu, к которым эта копия не подключена: без правки «Сохранить»
++ * скрыт флагом canSave, а две другие показывают подсказку «скоро». Здесь они
++ * переводятся на платформу: редактор отдаёт файл проекта наружу событием окна,
++ * сохраняет уже платформа.
++ *
++ * Логика редактора не тронута — это тонкая обвязка вокруг vm.saveProjectSb3().
++ * Контракт сообщений описан на стороне платформы (apps/web/lib/scratch-bridge.ts);
++ * общий модуль невозможен, это разные сборки.
++ */
++
++const FROM_SCRATCH = 'snr-scratch';
++const FROM_PLATFORM = 'snr-platform';
++
++const inFrame = () => typeof window !== 'undefined' && window.parent !== window;
++
++const post = message => {
++    if (!inFrame()) return;
++    // '*' осознанно: адрес платформы этой сборке неизвестен, а секретов в
++    // сообщении нет — это тот же файл, который ученик может скачать кнопкой
++    // «Сохранить на свой компьютер».
++    window.parent.postMessage(message, '*');
++};
++
++/**
++ * Отдать текущий проект платформе.
++ * @param {object} vm - экземпляр VM редактора
++ * @param {string} type - 'save' или 'share'
++ * @param {string} name - название работы
++ * @returns {Promise<boolean>} удалось ли отдать
++ */
++const sendProject = (vm, type, name) => {
++    if (!vm || typeof vm.saveProjectSb3 !== 'function') return Promise.resolve(false);
++    return vm.saveProjectSb3()
++        .then(blob => blob.arrayBuffer())
++        .then(sb3 => {
++            post({source: FROM_SCRATCH, type: type, name: name || 'Без названия', sb3: sb3});
++            return true;
++        })
++        .catch(() => false);
++};
++
++/**
++ * Открыть список сохранённых работ на стороне платформы.
++ * @returns {void}
++ */
++const openMyProjects = () => post({source: FROM_SCRATCH, type: 'my-projects'});
++
++/**
++ * Приём проекта от платформы. Вызывается один раз при монтировании меню.
++ * @param {object} vm - экземпляр VM редактора
++ * @returns {void}
++ */
++const listen = vm => {
++    if (!inFrame()) return;
++    window.addEventListener('message', e => {
++        const d = e.data;
++        if (!d || typeof d !== 'object' || d.source !== FROM_PLATFORM) return;
++        if (d.type === 'load' && d.sb3 && vm) {
++            vm.loadProject(d.sb3).catch(() => {});
++        }
++    });
++    post({source: FROM_SCRATCH, type: 'ready'});
++};
++
++export {sendProject, openMyProjects, listen};
 diff --git a/src/lib/storage.js b/src/lib/storage.js
-index 0fc0516..ead3442 100644
+index 0fc0516a4..ead34423b 100644
 --- a/src/lib/storage.js
 +++ b/src/lib/storage.js
 @@ -59,7 +59,11 @@ class Storage extends ScratchStorage {
@@ -44,19 +224,25 @@ index 0fc0516..ead3442 100644
      getAssetCreateConfig (asset) {
          return {
 diff --git a/src/playground/index.ejs b/src/playground/index.ejs
-index abbd5d8..353d10d 100644
+index abbd5d8b0..320fc8105 100644
 --- a/src/playground/index.ejs
 +++ b/src/playground/index.ejs
-@@ -23,5 +23,21 @@
+@@ -23,5 +23,35 @@
        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<%- htmlWebpackPlugin.options.gtm_id %><%= htmlWebpackPlugin.options.gtm_env_auth %>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
        <!-- End Google Tag Manager (noscript) -->
      <% } %>
 +    <!-- SNR EduOS: AGPL-3.0 обязывает предоставлять исходный код при
-+         размещении по сети. Сборка неизменённая по существу (правки: адрес
-+         медиа и эта ссылка), поэтому ссылаемся на официальный репозиторий. -->
++         размещении по сети. Раньше сборка отличалась от upstream только
++         адресом медиа, и одной ссылки на официальный репозиторий хватало.
++         Теперь изменено и поведение редактора (кнопки «Сохранить»,
++         «Поделиться» и «Мои работы» ведут на платформу), поэтому рядом стоит
++         вторая ссылка — на наши изменения. -->
 +    <a id="snr-source-link"
 +       href="https://github.com/scratchfoundation/scratch-gui"
 +       target="_blank" rel="noopener noreferrer">Scratch — открытый проект, исходный код</a>
++    <a id="snr-changes-link"
++       href="https://github.com/MIPTKBoy/SNREduOS/tree/main/scratch"
++       target="_blank" rel="noopener noreferrer">наши изменения</a>
 +    <style>
 +      #snr-source-link {
 +        position: fixed; left: 6px; bottom: 4px; z-index: 2147483000;
@@ -66,6 +252,30 @@ index abbd5d8..353d10d 100644
 +        pointer-events: auto;
 +      }
 +      #snr-source-link:hover { opacity: 1; text-decoration: underline; }
++      #snr-changes-link {
++        position: fixed; left: 6px; bottom: 22px; z-index: 2147483000;
++        font: 500 10px/1.2 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
++        color: #575e75; opacity: .6; text-decoration: none;
++        background: rgba(255,255,255,.82); padding: 2px 6px; border-radius: 6px;
++        pointer-events: auto;
++      }
++      #snr-changes-link:hover { opacity: 1; text-decoration: underline; }
 +    </style>
    </body>
  </html>
+diff --git a/src/playground/render-gui.jsx b/src/playground/render-gui.jsx
+index 0f15fbfa7..bf9cd62b0 100644
+--- a/src/playground/render-gui.jsx
++++ b/src/playground/render-gui.jsx
+@@ -78,7 +78,10 @@ export default appTarget => {
+                 backpackVisible
+                 showComingSoon
+                 backpackHost={backpackHost}
+-                canSave={false}
++                /* SNR EduOS: показывает пункт «Сохранить» в меню «Файл». Он
++                   ведёт не на серверы Scratch, а на нашу платформу — см.
++                   menu-bar.jsx::handleClickSave и src/lib/snr-bridge.js. */
++                canSave
+                 onClickLogo={onClickLogo}
+             />,
+         appTarget);
