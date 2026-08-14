@@ -1,74 +1,77 @@
 /**
- * dlib «Библиотека» — заход block-by-block из макета
- * «SNR EduOS v2 Light.dc.html» (блок data-screen-label="Библиотека").
+ * dlib «Библиотека» — НАСТОЯЩИЕ ДАННЫЕ (14.08.2026).
  *
- * Block-list (сверху вниз, дословно):
- *  1. HeaderBar — back-glass 38 + title t.svc.library (Unbounded 15/600) +
- *     right search-glass 38 (магнифир r7 + ручка m20 20-3.5-3.5) → da6.
- *  2. ChildSwitcherCard compact row — аватар 44 + ФИО + «{class} класс ⌄» +
- *     «Сменить ›»; клик открывает шторку выбора ребёнка (шаблон 1:1 из
- *     ChildProfileScreen.tsx, Блок 2 + шторка в конце файла).
- *  3. Горизонтальный ряд фильтр-чипов libChips — «Все» + один чип на
- *     каждый уникальный subject_id, встречающийся в LIBRARY; активный —
- *     залит цветом предмета, обычный — glass (шаблон FilterChip 1:1 из
- *     TeacherReviewsScreen.tsx, «тесто-табы»).
- *  4. SectionLabel «НЕДАВНО ОТКРЫТЫЕ» (10.5/800 uppercase tracking .08em,
- *     цвет ink dimmed).
- *  5. Горизонтальный ряд libRecents (3 карточки = LIBRARY.filter(recommended)):
- *     карточка ~130px, glass r16, обложка 60×60 (subject.gradient + book-глиф),
- *     название (10.5/800, line-height ×1.3, numberOfLines 2), pill предмета
- *     ниже (цвета из subject.chip_bg/chip_border/text_color).
- *  6. SectionLabel «ВСЕ МАТЕРИАЛЫ».
- *  7. Grid 2 колонки libRows (LIBRARY, отфильтрованные по выбранному чипу):
- *     карточка glass r16 padding ~10, обложка-плашка (subject.gradient +
- *     book-глиф), название (10.5/800, numberOfLines 2), автор (9/600
- *     dimmed), нижняя строка: meta_label (8.5/700) + pill предмета (small).
- *     Клик по карточке → da2 (просмотр материала).
- *  8. InfoBanner (оранжевая плашка, rgba(249,115,22,.1)/.3, иконка-лампочка,
- *     текст про то, что материалы добавляют учителя по своим предметам).
+ * БЫЛО: массив `LIBRARY` из фикстуры, чипы предметов из фикстурной палитры,
+ * секция «Недавно открытые» по выдуманному флагу `recommended`, тап по
+ * карточке вёл на экран-заглушку «Просмотр материала».
  *
- * Данные — только getLibrary()/getSubjects() из "../../data" (фикстуры уже
- * готовы, не трогаем). Тексты — d.parentApp.* (t.svc.library, t.grades.class,
- * t.auth.chooseChild); литералы чипов/заголовков секций/банера — дословно из
- * макета (нет соответствующих i18n-ключей — устоявшееся правило проекта).
- * Обе темы — useTheme(). iOS safe-area — через InnerHeader/ChildSwitcherCard.
- * paddingBottom 118 (мокап "padding:4px 18px 118px" → literal 118, совпадает
- * с дефолтом стек-экранов).
+ * СТАЛО: `getLibraryBooks` из @snr/core — таблица `books` плюс отметки
+ * `book_favorites` выбранного ребёнка, тот же запрос, что питает
+ * «Библиотеку» на вебе. Тап по книге открывает файл: подписанная ссылка
+ * берётся тем же `getBookSignedUrl`, которым книгу открывают ученик и
+ * учитель, и отдаётся системе через `Linking` (новых зависимостей не
+ * появляется — Linking входит в React Native).
+ *
+ * ЧТО ЗАМЕНИЛОСЬ ЧЕСТНЫМ:
+ *  • «Недавно открытые» → «В избранном у ребёнка». Истории открытий в базе
+ *    нет ни у кого; избранное — есть и принадлежит именно этому ребёнку.
+ *    Секция скрывается, когда избранного нет.
+ *  • чипы предметов строятся по колонке `books.subject` — по тем предметам,
+ *    которые в библиотеке реально встречаются.
+ *  • «файл не приложен» — не украшение: у книги может не быть ни файла, ни
+ *    внешней ссылки, и тогда открывать нечего.
  */
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { format, getBookSignedUrl, getLibraryBooks, type LibraryBookItem } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassBlur, glassSurface } from "../../ui/glass";
 import {
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
+  EmptyBlock,
+  ErrorBlock,
   GlassCircleButton,
   InnerHeader,
-  type ChildPickerItem,
+  LoadingBlock,
 } from "../../ui";
-import {
-  getChildren,
-  getLibrary,
-  getSelectedChildContext,
-  getSubjects,
-} from "../../data";
-import type { BaseSubjectKey, LibraryBookRow, SubjectRow } from "../../data";
-import { useAuthSession } from "../../context/AuthSessionContext";
+import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { getSupabase } from "../../lib/supabase";
+import { hexToRgbCsv } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
 import { ICONS } from "../../navigation/routes";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
-/** ID фильтра: 'all' | конкретный предмет. */
-type FilterId = "all" | BaseSubjectKey;
+/**
+ * Цвет обложки по предмету книги.
+ *
+ * `books.subject` — свободная строка («programming», «math»…), своей палитры
+ * у книги в базе нет. Цвет берём детерминированно от самой строки, чтобы у
+ * одного предмета обложки всегда совпадали, а новый предмет не остался без
+ * цвета. Список — та же палитра предметов, что и в остальном приложении.
+ */
+const COVER_COLORS: [string, string][] = [
+  ["#38BDF8", "#0284C7"],
+  ["#2DD4BF", "#0D9488"],
+  ["#FACC15", "#CA8A04"],
+  ["#F472B6", "#DB2777"],
+  ["#E879F9", "#A21CAF"],
+  ["#A78BFA", "#7C3AED"],
+];
 
-/** Иконка поиска (лупа) — правый слот шапки (макет: r7 + ручка m20 20-3.5-3.5). */
+function coverGradient(subject: string): [string, string] {
+  let sum = 0;
+  for (let i = 0; i < subject.length; i += 1) sum = (sum + subject.charCodeAt(i)) % 997;
+  return COVER_COLORS[sum % COVER_COLORS.length];
+}
+
 function SearchIcon({ color }: { color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round">
@@ -79,10 +82,9 @@ function SearchIcon({ color }: { color: string }) {
   );
 }
 
-/** Книжный глиф (обложка) — белый stroke-контур, из ICONS.book. */
-function BookGlyph({ size, strokeWidth = 1.9 }: { size: number; strokeWidth?: number }) {
+function BookGlyph({ size }: { size: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
       {ICONS.book.map((p, i) => (
         <Path key={i} d={p} />
       ))}
@@ -90,7 +92,6 @@ function BookGlyph({ size, strokeWidth = 1.9 }: { size: number; strokeWidth?: nu
   );
 }
 
-/** Иконка-лампочка (идея/подсказка) — InfoBanner, макет: 17px stroke #c2410c 1.9. */
 function BulbIcon({ color, size }: { color: string; size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
@@ -101,10 +102,6 @@ function BulbIcon({ color, size }: { color: string; size: number }) {
   );
 }
 
-/**
- * FilterChip — пилл-фильтр (Блок 3), шаблон 1:1 из TeacherReviewsScreen.tsx:
- * активный — залит цветом предмета/акцентом, обычный — glass.
- */
 function FilterChip({
   label,
   active,
@@ -136,7 +133,6 @@ function FilterChip({
   );
 }
 
-/** Uppercase-заголовок секции 10.5/800 tracking .08em (Блок 4, 6). */
 function SectionCap({ children }: { children: string }) {
   const { tokens } = useTheme();
   return (
@@ -154,8 +150,9 @@ function SectionCap({ children }: { children: string }) {
   );
 }
 
-/** Pill предмета — цвета напрямую из SubjectRow.chip_bg/chip_border/text_color. */
-function SubjectPill({ subject, small }: { subject: SubjectRow; small?: boolean }) {
+function SubjectPill({ subject, small }: { subject: string; small?: boolean }) {
+  const [, deep] = coverGradient(subject);
+  const rgb = hexToRgbCsv(deep);
   return (
     <View
       style={{
@@ -163,22 +160,19 @@ function SubjectPill({ subject, small }: { subject: SubjectRow; small?: boolean 
         paddingVertical: small ? 3 : 4,
         paddingHorizontal: small ? 7 : 9,
         borderRadius: 999,
-        backgroundColor: subject.chip_bg,
+        backgroundColor: `rgba(${rgb},0.12)`,
         borderWidth: 1,
-        borderColor: subject.chip_border,
+        borderColor: `rgba(${rgb},0.3)`,
       }}
     >
-      <Text
-        numberOfLines={1}
-        style={{ fontFamily: fonts.manrope800, fontSize: small ? 8.5 : 9.5, color: subject.text_color }}
-      >
-        {subject.name}
+      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: small ? 8.5 : 9.5, color: deep }}>
+        {subject}
       </Text>
     </View>
   );
 }
 
-/** Обёртка-стекло карточки (glass1 r16) — общая для карточек recents/grid. */
+/** Стеклянная обёртка карточки — общая для «избранного» и общей сетки. */
 function LibCardSurface({
   children,
   onPress,
@@ -240,18 +234,11 @@ function LibCardSurface({
   );
 }
 
-/** Обложка-плашка: subject.gradient (135°) + book-глиф по центру. */
-function CoverPlaque({ subject, size }: { subject: SubjectRow; size: number }) {
-  const shadowRgbFromHex = (hex: string) => {
-    const m = hex.replace("#", "");
-    const r = parseInt(m.slice(0, 2), 16);
-    const g = parseInt(m.slice(2, 4), 16);
-    const b = parseInt(m.slice(4, 6), 16);
-    return `${r},${g},${b}`;
-  };
+function CoverPlaque({ subject, size, busy }: { subject: string; size: number; busy: boolean }) {
+  const gradient = coverGradient(subject);
   return (
     <LinearGradient
-      colors={subject.gradient}
+      colors={gradient}
       {...gradPoints(135)}
       style={[
         {
@@ -262,51 +249,47 @@ function CoverPlaque({ subject, size }: { subject: SubjectRow; size: number }) {
           justifyContent: "center",
           alignSelf: size <= 60 ? "flex-start" : "stretch",
         },
-        shadowStyle({ x: 0, y: 6, blur: 12, color: `rgba(${shadowRgbFromHex(subject.color)},0.3)` }),
+        shadowStyle({ x: 0, y: 6, blur: 12, color: `rgba(${hexToRgbCsv(gradient[1])},0.3)` }),
       ]}
     >
-      <BookGlyph size={size <= 60 ? 24 : 26} />
+      {busy ? <ActivityIndicator color="#FFFFFF" /> : <BookGlyph size={size <= 60 ? 24 : 26} />}
     </LinearGradient>
   );
 }
 
-/** Карточка «недавно открытого» (Блок 5) — ширина ~130, глиф 60×60. */
-function RecentCard({ book, subject, onPress }: { book: LibraryBookRow; subject: SubjectRow; onPress: () => void }) {
+function BookCard({
+  book,
+  wide,
+  busy,
+  noFileLabel,
+  favLabel,
+  onPress,
+}: {
+  book: LibraryBookItem;
+  wide: boolean;
+  busy: boolean;
+  noFileLabel: string;
+  favLabel: string;
+  onPress: () => void;
+}) {
   const { tokens } = useTheme();
+  const hasContent = Boolean(book.file_storage_path || book.external_url);
   return (
-    <LibCardSurface onPress={onPress} style={{ width: 130 }}>
-      <CoverPlaque subject={subject} size={60} />
-      <Text
-        numberOfLines={2}
-        style={{ fontFamily: fonts.manrope800, fontSize: 10.5, lineHeight: 10.5 * 1.3, color: tokens.ink1 }}
-      >
-        {book.name}
+    <LibCardSurface onPress={onPress} style={wide ? undefined : { width: 130 }}>
+      <CoverPlaque subject={book.subject} size={wide ? 72 : 60} busy={busy} />
+      <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 10.5, lineHeight: 10.5 * 1.3, color: tokens.ink1 }}>
+        {book.title}
       </Text>
-      <SubjectPill subject={subject} />
-    </LibCardSurface>
-  );
-}
-
-/** Карточка «всех материалов» (Блок 7) — 2-колоночный grid. */
-function LibraryGridCard({ book, subject, onPress }: { book: LibraryBookRow; subject: SubjectRow; onPress: () => void }) {
-  const { tokens } = useTheme();
-  return (
-    <LibCardSurface onPress={onPress}>
-      <CoverPlaque subject={subject} size={72} />
-      <Text
-        numberOfLines={2}
-        style={{ fontFamily: fonts.manrope800, fontSize: 10.5, lineHeight: 10.5 * 1.3, color: tokens.ink1 }}
-      >
-        {book.name}
-      </Text>
-      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9, color: tokens.ink3 }}>
-        {book.author}
-      </Text>
+      {wide ? (
+        <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9, color: tokens.ink3 }}>
+          {book.author ?? ""}
+        </Text>
+      ) : null}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, marginTop: 2 }}>
         <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.manrope700, fontSize: 8.5, color: tokens.ink3 }}>
-          {book.meta_label}
+          {hasContent ? (book.isFavorite ? favLabel : book.book_type) : noFileLabel}
         </Text>
-        <SubjectPill subject={subject} small />
+        <SubjectPill subject={book.subject} small />
       </View>
     </LibCardSurface>
   );
@@ -316,63 +299,58 @@ export default function LibraryScreen() {
   const { tokens, scheme } = useTheme();
   const { d } = useAppLocale();
   const t = d.parentApp;
+  const m = t.more;
+  const m2 = t.more2;
+  const m4 = t.more4;
   const navigation = useNavigation<Nav>();
-  const auth = useAuthSession();
 
-  const children = getChildren();
-  const [childId, setChildId] = useState<string>(() => auth.currentChildId ?? children[0].id);
+  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [filter, setFilter] = useState<FilterId>("all");
+  const [filter, setFilter] = useState<string>("all");
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
-  const ctx = getSelectedChildContext(childId);
-  const child = ctx.child;
+  // Книги видны всей школе, но отметка «в избранном» — по ребёнку, поэтому
+  // запрос всё равно привязан к выбранному ребёнку.
+  const state = useChildQuery(childId, (db, id) => getLibraryBooks(db, id));
+  const books = useMemo(() => state.data ?? [], [state.data]);
 
-  const subjects = getSubjects();
-  const library = getLibrary();
-
-  // Блок 3: уникальные предметы, встречающиеся в библиотеке — для чипов.
-  const subjectIds = useMemo<BaseSubjectKey[]>(() => {
-    const seen: BaseSubjectKey[] = [];
-    for (const b of library) {
-      if (!seen.includes(b.subject_id)) seen.push(b.subject_id);
-    }
-    return seen;
-  }, [library]);
-
-  // Блок 5: 3 рекомендованных материала.
-  const recents = useMemo(() => library.filter((b) => b.recommended), [library]);
-
-  // Блок 7: всё либо отфильтрованное по выбранному предмету.
+  const subjects = useMemo(() => [...new Set(books.map((b) => b.subject))].sort(), [books]);
+  const favorites = useMemo(() => books.filter((b) => b.isFavorite), [books]);
   const rows = useMemo(
-    () => (filter === "all" ? library : library.filter((b) => b.subject_id === filter)),
-    [library, filter],
+    () => (filter === "all" ? books : books.filter((b) => b.subject === filter)),
+    [books, filter],
   );
+
+  /** Открыть книгу: сначала внешняя ссылка, иначе подписанный файл. */
+  async function openBook(book: LibraryBookItem) {
+    if (openingId) return;
+    const url = book.external_url;
+    if (!url && !book.file_storage_path) {
+      Alert.alert(book.title, m.libraryNoFile);
+      return;
+    }
+    setOpeningId(book.id);
+    try {
+      const target = url ?? (await getBookSignedUrl(getSupabase(), book.file_storage_path as string));
+      await Linking.openURL(target);
+    } catch (e) {
+      console.error("[LibraryScreen] не удалось открыть книгу:", e);
+      Alert.alert(book.title, m2.libraryOpenFailed);
+    } finally {
+      setOpeningId(null);
+    }
+  }
 
   const bannerText = scheme === "light" ? "rgba(26,19,74,0.7)" : "rgba(255,255,255,0.75)";
 
-  const pickerItems: ChildPickerItem[] = children.map((k) => ({
-    id: k.id,
-    initials: k.first_name.slice(0, 1),
-    gradient: k.avatar_gradient,
-    ringColor: k.avatar_ring,
-    name: k.full_name,
-    classLabel: `${k.class_name} ${t.grades.class}`,
-    statusLabel: k.status_chip,
-    statusTone: k.status_chip === "В школе" ? "green" : "gray",
-  }));
-
-  const goMaterial = () => navigation.navigate("da2");
-  const goSearch = () => navigation.navigate("da6");
-
   return (
     <AppBackground>
-      {/* Блок 1: HeaderBar. */}
       <InnerHeader
         title={t.svc.library}
         titleSize={15}
         onBackPress={() => navigation.goBack()}
         right={
-          <GlassCircleButton onPress={goSearch}>
+          <GlassCircleButton onPress={() => navigation.navigate("da6")}>
             <SearchIcon color={tokens.ink1} />
           </GlassCircleButton>
         }
@@ -380,105 +358,119 @@ export default function LibraryScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 18,
-          paddingTop: 4,
-          paddingBottom: 118,
-          gap: 11,
-        }}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 118, gap: 11 }}
       >
-        {/* Блок 2: ChildSwitcherCard compact. */}
-        <ChildSwitcherCard
-          variant="compact"
-          avatar={{
-            initials: child.first_name.slice(0, 1),
-            gradient: child.avatar_gradient,
-            ringColor: child.avatar_ring,
-          }}
-          name={child.full_name}
-          classLabel={`${child.class_name} ${t.grades.class}`}
-          switchLabel="Сменить ›"
-          onPress={() => setSheetOpen(true)}
-        />
+        {child ? (
+          <ChildSwitcherCard
+            variant="compact"
+            avatar={{ initials: child.first_name.slice(0, 1), gradient: child.avatar_gradient, ringColor: child.avatar_ring }}
+            name={child.full_name}
+            classLabel={`${child.class_name} ${t.grades.class}`}
+            onPress={() => setSheetOpen(true)}
+          />
+        ) : null}
 
-        {/* Блок 3: горизонтальный ряд фильтр-чипов libChips. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, paddingBottom: 2 }}
-        >
-          <FilterChip label="Все" active={filter === "all"} activeColor={tokens.accent} onPress={() => setFilter("all")} />
-          {subjectIds.map((sid) => {
-            const s = subjects[sid];
-            return (
-              <FilterChip key={sid} label={s.name} active={filter === sid} activeColor={s.color} onPress={() => setFilter(sid)} />
-            );
-          })}
-        </ScrollView>
+        {childLoading || state.loading ? (
+          <LoadingBlock />
+        ) : state.error ? (
+          <ErrorBlock
+            title={m4.loadFailed}
+            message={state.error.message}
+            retryLabel={d.common.retry}
+            onRetry={() => state.refresh()}
+          />
+        ) : books.length === 0 ? (
+          <EmptyBlock title={m.libraryEmptyTitle} text={m.libraryEmptyText} />
+        ) : (
+          <>
+            {/* Чипы предметов — по тем, что реально есть в библиотеке. */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+              <FilterChip
+                label={m4.libraryFilterAll}
+                active={filter === "all"}
+                activeColor={tokens.accent}
+                onPress={() => setFilter("all")}
+              />
+              {subjects.map((s) => (
+                <FilterChip
+                  key={s}
+                  label={s}
+                  active={filter === s}
+                  activeColor={coverGradient(s)[1]}
+                  onPress={() => setFilter(s)}
+                />
+              ))}
+            </ScrollView>
 
-        {/* Блок 4: SectionLabel «НЕДАВНО ОТКРЫТЫЕ». */}
-        <SectionCap>НЕДАВНО ОТКРЫТЫЕ</SectionCap>
+            {/* Избранное ребёнка — секции нет, пока избранного нет. */}
+            {favorites.length > 0 ? (
+              <>
+                <SectionCap>{m4.libraryFavSection}</SectionCap>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 9, paddingBottom: 3 }}>
+                  {favorites.map((b) => (
+                    <BookCard
+                      key={`fav-${b.id}`}
+                      book={b}
+                      wide={false}
+                      busy={openingId === b.id}
+                      noFileLabel={m.libraryNoFile}
+                      favLabel={m.libraryFav}
+                      onPress={() => void openBook(b)}
+                    />
+                  ))}
+                </ScrollView>
+              </>
+            ) : null}
 
-        {/* Блок 5: горизонтальный ряд libRecents. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 9, paddingBottom: 3 }}
-        >
-          {recents.map((b, i) => (
-            <RecentCard key={`rec-${i}`} book={b} subject={subjects[b.subject_id]} onPress={goMaterial} />
-          ))}
-        </ScrollView>
+            <SectionCap>{m4.libraryAllSection}</SectionCap>
+            <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink3, marginTop: -4 }}>
+              {format(m.libraryCount, { n: String(rows.length) })}
+            </Text>
 
-        {/* Блок 6: SectionLabel «ВСЕ МАТЕРИАЛЫ». */}
-        <SectionCap>ВСЕ МАТЕРИАЛЫ</SectionCap>
-
-        {/* Блок 7: grid 2 колонки libRows. */}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4.5, rowGap: 9 }}>
-          {rows.map((b, i) => (
-            <View key={`row-${i}`} style={{ width: "50%", paddingHorizontal: 4.5 }}>
-              <LibraryGridCard book={b} subject={subjects[b.subject_id]} onPress={goMaterial} />
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4.5, rowGap: 9 }}>
+              {rows.map((b) => (
+                <View key={b.id} style={{ width: "50%", paddingHorizontal: 4.5 }}>
+                  <BookCard
+                    book={b}
+                    wide
+                    busy={openingId === b.id}
+                    noFileLabel={m.libraryNoFile}
+                    favLabel={m.libraryFav}
+                    onPress={() => void openBook(b)}
+                  />
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
 
-        {/* Блок 8: InfoBanner. */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: 10,
-            paddingVertical: 12,
-            paddingHorizontal: 14,
-            borderRadius: 18,
-            backgroundColor: "rgba(249,115,22,0.1)",
-            borderWidth: 1,
-            borderColor: "rgba(249,115,22,0.3)",
-          }}
-        >
-          <BulbIcon color="#C2410C" size={17} />
-          <Text
-            style={{
-              flex: 1,
-              fontFamily: fonts.manrope600,
-              fontSize: 10,
-              lineHeight: 10 * 1.55,
-              color: bannerText,
-            }}
-          >
-            Материалы добавляют учителя по своим предметам. Любой файл можно открыть в приложении или скачать на устройство.
-          </Text>
-        </View>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 10,
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                borderRadius: 18,
+                backgroundColor: "rgba(249,115,22,0.1)",
+                borderWidth: 1,
+                borderColor: "rgba(249,115,22,0.3)",
+              }}
+            >
+              <BulbIcon color="#C2410C" size={17} />
+              <Text style={{ flex: 1, fontFamily: fonts.manrope600, fontSize: 10, lineHeight: 10 * 1.55, color: bannerText }}>
+                {m4.libraryNote}
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* Шторка выбора ребёнка. */}
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
         <ChildPickerSheetContent
           title={t.auth.chooseChild}
           items={pickerItems}
-          selectedId={childId}
+          selectedId={childId ?? undefined}
           onSelect={(id) => {
-            setChildId(id);
+            selectChild(id);
             setSheetOpen(false);
           }}
         />

@@ -2,99 +2,10 @@
  * Оценки и успехи: дневник DIARY (строки 3180–3193 макета), сводка «Успехи»
  * П10 (C2), периоды успеваемости (B9). Все значения — ДОСЛОВНО из макета.
  */
-import type { DiaryWeekRow, GradesSummary } from "../types";
+import type { GradesSummary } from "../types";
 
-/** DIARY — дневник по неделям (week_index 1 — текущая «20 – 26 июля»). */
-export const DIARY_WEEKS: DiaryWeekRow[] = [
-  {
-    week_index: 1,
-    label: "20 – 26 июля",
-    grades_count_label: "8",
-    avg_label: "4.6",
-    homework_label: "8 из 10",
-    days: [
-      {
-        day_label: "ПОНЕДЕЛЬНИК · 21 июля",
-        avg_label: "4.5",
-        lessons: [
-          { subject_id: "rus", topic: "Части речи", homework_label: "Д/З: упражнения 45–48", grade: 5 },
-          { subject_id: "math", topic: "Дроби и проценты", homework_label: "Д/З: № 140–148", grade: 4 },
-          { subject_id: "eng", topic: "Past Simple: практика", homework_label: "Д/З: эссе «My Summer»", grade: null },
-        ],
-      },
-      {
-        day_label: "ВТОРНИК · 22 июля",
-        avg_label: "4.5",
-        lessons: [
-          { subject_id: "prog", topic: "Циклы в Python", homework_label: "Д/З: проект «Калькулятор»", grade: 5 },
-          { subject_id: "robo", topic: "Сборка манипулятора", homework_label: "Д/З: отчёт по сборке", grade: null },
-          { subject_id: "rus", topic: "Пунктуация", homework_label: "Д/З: не задано", grade: 4 },
-        ],
-      },
-      {
-        day_label: "СРЕДА · 23 июля",
-        avg_label: "5.0",
-        lessons: [
-          { subject_id: "math", topic: "Геометрия: углы", homework_label: "Д/З: задачи 12–18", grade: 5 },
-          { subject_id: "eng", topic: "Vocabulary: Travel", homework_label: "Д/З: выучить 20 слов", grade: null },
-        ],
-      },
-      {
-        day_label: "ЧЕТВЕРГ · 24 июля",
-        avg_label: "4.0",
-        lessons: [
-          { subject_id: "prog", topic: "Функции", homework_label: "Д/З: практика в тетради", grade: null },
-          { subject_id: "rus", topic: "Сочинение-рассуждение", homework_label: "Д/З: план сочинения", grade: null },
-          { subject_id: "math", topic: "Уравнения", homework_label: "Д/З: № 150–155", grade: 4 },
-        ],
-      },
-    ],
-  },
-  {
-    week_index: 0,
-    label: "13 – 19 июля",
-    grades_count_label: "11",
-    avg_label: "4.4",
-    homework_label: "9 из 11",
-    days: [
-      {
-        day_label: "ПОНЕДЕЛЬНИК · 14 июля",
-        avg_label: "4.3",
-        lessons: [
-          { subject_id: "math", topic: "Уравнения", homework_label: "Д/З: № 120–126", grade: 4 },
-          { subject_id: "rus", topic: "Диктант", homework_label: "Д/З: не задано", grade: 4 },
-          { subject_id: "eng", topic: "Reading", homework_label: "Д/З: пересказ текста", grade: 5 },
-        ],
-      },
-      {
-        day_label: "ВТОРНИК · 15 июля",
-        avg_label: "4.5",
-        lessons: [
-          { subject_id: "prog", topic: "Списки и словари", homework_label: "Д/З: задачи 1–5", grade: 5 },
-          { subject_id: "robo", topic: "Датчики", homework_label: "Д/З: схема подключения", grade: 4 },
-        ],
-      },
-      {
-        day_label: "СРЕДА · 16 июля",
-        avg_label: "4.0",
-        lessons: [
-          { subject_id: "eng", topic: "Essay writing", homework_label: "Д/З: черновик эссе", grade: 4 },
-          { subject_id: "math", topic: "Дроби", homework_label: "Д/З: № 130–136", grade: null },
-        ],
-      },
-      {
-        day_label: "ПЯТНИЦА · 18 июля",
-        avg_label: "4.7",
-        lessons: [
-          { subject_id: "rus", topic: "Части речи", homework_label: "Д/З: упражнения 40–44", grade: 5 },
-          { subject_id: "prog", topic: "Циклы", homework_label: "Д/З: не задано", grade: 5 },
-          { subject_id: "math", topic: "Проценты", homework_label: "Д/З: № 137–139", grade: 4 },
-        ],
-      },
-    ],
-  },
-];
-
+/* DIARY_WEEKS удалён 14.08.2026: «Дневник» собирается из расписания класса
+ * и оценок за уроки (getChildDiaryWeek), двухнедельная фикстура не нужна. */
 /** Сводка «Успехи» П10 (C2) — витринные значения макета дословно. */
 export const GRADES_SUMMARY: GradesSummary = {
   average_label: "4.6",

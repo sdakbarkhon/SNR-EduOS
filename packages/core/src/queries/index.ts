@@ -17,6 +17,7 @@ export * from "./chat";
 export * from "./curriculum";
 export * from "./sandbox";
 export * from "./parent";
+export * from "./parentScreens";
 export * from "./library";
 
 // --- Профиль / группы ---

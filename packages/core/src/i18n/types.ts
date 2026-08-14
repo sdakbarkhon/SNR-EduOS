@@ -3076,8 +3076,6 @@ export interface Dictionary {
       resend: string;
       chooseChild: string;
       demo: string;
-      withGoogle: string;
-      withApple: string;
       tagline: string;
       needHelp: string;
       moreTitle: string;
@@ -3141,7 +3139,6 @@ export interface Dictionary {
       featChatSub: string;
       helpPhoneValue: string;
       helpEmailValue: string;
-      or: string;
       close: string;
     };
     /** Заход 5x (правка 3): one-shot центр-модалка после демо-входа
@@ -3213,6 +3210,35 @@ export interface Dictionary {
       libraryOpen: string;
       libraryOpening: string;
       libraryOpenFailed: string;
+    };
+    /**
+     * Строки семи разделов, доведённых до настоящих данных в мобильном
+     * приложении 14.08.2026 (дневник, тесты, библиотека, учителя, объявления,
+     * новости администрации, уведомления). Часть из них нужна и вебу — блок
+     * общий, чтобы у одной и той же надписи не завелось двух переводов.
+     */
+    more4: {
+      loadFailed: string;
+      notifFilterAll: string;
+      notifFilterUnread: string;
+      notifEmptyTitle: string;
+      notifEmptyText: string;
+      notifUnreadEmptyTitle: string;
+      notifUnreadEmptyText: string;
+      testsPassed: string;
+      testsAvgGrade: string;
+      testsAvgResult: string;
+      libraryFilterAll: string;
+      libraryFavSection: string;
+      libraryAllSection: string;
+      libraryNote: string;
+      teachersTitle: string;
+      teachersPick: string;
+      annNotFoundTitle: string;
+      annNotFoundText: string;
+      annBackToList: string;
+      annOnlyAdmin: string;
+      diaryWeekEmptyDay: string;
     };
     more3: {
       skillKnowledge: string;

@@ -6,6 +6,18 @@
  */
 export const APP_TIME_ZONE = "Asia/Tashkent";
 
+/**
+ * ISO-таймстамп → «YYYY-MM-DD» по Ташкенту.
+ *
+ * Ташкент — UTC+5 круглый год, без переходов, поэтому день считается сдвигом
+ * на +5 часов и срезом ISO, а не через Intl: ключ дня обязан совпадать до
+ * символа на сервере и на клиенте (по нему сходятся «сегодня» и «вчера»), а
+ * наборы CLDR у них разные.
+ */
+export function tashkentDayKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 /** Время урока: "09:00". */
 export function formatTime(iso: string, locale = "ru-RU"): string {
   return new Date(iso).toLocaleTimeString(locale, {

@@ -72,5 +72,8 @@ export {
   type TabScreenScrollProps,
 } from "./TabScreenScroll";
 
+// ─── Состояния экрана на настоящих данных (заход 2 переноса) ─────────────────
+export { LoadingBlock, ErrorBlock, EmptyBlock } from "./DataStates";
+
 // ─── Графики (Заход 3, react-native-svg) ─────────────────────────────────────
 export * from "./charts";

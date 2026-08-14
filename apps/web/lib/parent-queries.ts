@@ -2,19 +2,22 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import {
-  getAllBooks,
   getChildAttendanceDetail,
   getChildDailyStats,
   getChildDailyStatus,
+  getChildDiaryWeek,
   getChildGradesSummary,
   getChildHomeworkDetail,
   getChildLessonDetail,
   getChildMaterials,
   getChildSubjectDetail,
+  getChildTeacherProfile,
   getChildTeacherReviews,
+  getChildTests,
   getChildWeekActivity,
   getGroupSubjectTeachers,
   getHomeworkWithSubmissions,
+  getLibraryBooks,
   getMyNotifications,
   getMyThreadSummaries,
   getNextStudentLessonDate,
@@ -28,8 +31,13 @@ import {
   getUnreadCount,
 } from "@snr/core";
 import type {
-  Book,
   AppNotification,
+  ChildTeacherProfile,
+  ChildTestItem,
+  DiaryDay,
+  DiaryLesson,
+  DiaryWeek,
+  LibraryBookItem,
   ChatMessageRow,
   ChatThreadSummary,
   ChildAttendanceDetail,
@@ -49,8 +57,6 @@ import type {
   StudentGradeItem,
 } from "@snr/core";
 import { sessionIdFromAccessToken } from "@/lib/single-session";
-// Ключ дня по Ташкенту — тот же, что считает весь раздел (см. _ui/format.ts).
-import { tashkentDay as tashkentDayKey } from "@/app/parent/(app)/_ui/format";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
@@ -413,58 +419,26 @@ export const parentThreadMessages = cache(async (threadId: string): Promise<Chat
 // Новых запросов ровно столько, сколько не хватало: объявления от
 // администрации — это фильтр над уже существующим parentAnnouncements(),
 // учителя — над childSubjectTeachers(), отдельных запросов им не нужно.
+//
+// 14.08.2026: тела запросов переехали в @snr/core (queries/parentScreens.ts) —
+// те же экраны появились в мобильном приложении, а этот модуль ему недоступен
+// (next/headers + серверный клиент). Здесь осталось то, что принадлежит вебу:
+// React-кэш и резолв выбранного ребёнка.
 
-export type ChildTestItem = {
-  id: string;
-  title: string;
-  subjectName: string | null;
-  submittedAt: string | null;
-  score: number | null;
-  maxScore: number | null;
-  grade: number | null;
-};
+export type { ChildTestItem, LibraryBookItem, ChildTeacherProfile, DiaryLesson, DiaryDay, DiaryWeek };
 
-/** Сданные ребёнком тесты. RLS сама сужает test_submissions до своих строк,
- *  но studentId передаём явно: у родителя может быть несколько детей, и без
- *  фильтра пришли бы работы всех сразу. */
+/** Сданные ребёнком тесты. */
 export const childTests = cache(async (): Promise<ChildTestItem[]> => {
   const childId = await getSelectedChildId();
   if (!childId) return [];
   const db = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
-    .from("test_submissions")
-    .select("id, submitted_at, score, max_score, grade, homework:homework(title, subject:subjects(name))")
-    .eq("student_id", childId)
-    .order("submitted_at", { ascending: false });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data ?? []) as any[]).map((r) => ({
-    id: r.id as string,
-    title: (r.homework?.title as string | undefined) ?? "Тест",
-    subjectName: (r.homework?.subject?.name as string | undefined) ?? null,
-    submittedAt: (r.submitted_at as string | null) ?? null,
-    score: (r.score as number | null) ?? null,
-    maxScore: (r.max_score as number | null) ?? null,
-    grade: (r.grade as number | null) ?? null,
-  }));
+  return getChildTests(db, childId);
 });
 
-export type LibraryBookItem = Book & { isFavorite: boolean };
-
-/** Школьная библиотека. Книги видны родителю по школьной политике на books;
- *  избранное — по конкретному ребёнку, чтобы отметка совпадала с той, что
- *  видит сам ученик. */
+/** Школьная библиотека + отметка «в избранном» у выбранного ребёнка. */
 export const libraryBooks = cache(async (): Promise<LibraryBookItem[]> => {
-  const db = await createClient();
-  const [books, childId] = await Promise.all([getAllBooks(db), getSelectedChildId()]);
-  if (!childId) return books.map((b) => ({ ...b, isFavorite: false }));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: favs } = await (db as any)
-    .from("book_favorites").select("book_id").eq("student_id", childId);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const favSet = new Set(((favs ?? []) as any[]).map((f) => f.book_id as string));
-  return books.map((b) => ({ ...b, isFavorite: favSet.has(b.id) }));
+  const [db, childId] = await Promise.all([createClient(), getSelectedChildId()]);
+  return getLibraryBooks(db, childId);
 });
 
 /** Новости от администрации — те же объявления, что на экране «Объявления»,
@@ -520,63 +494,12 @@ export const parentSessions = cache(async (): Promise<ParentSessionItem[]> => {
   }));
 });
 
-export type ChildTeacherProfile = {
-  id: string;
-  fullName: string;
-  subjectNames: string[];
-  groupNames: string[];
-  lessonCount: number;
-};
-
-/** Профиль одного учителя ребёнка: предметы, классы и число уроков в
- *  расписании. Всё — из тех же таблиц, что уже читает childSubjectTeachers;
- *  сюда добавлены только группы и счётчик уроков. */
+/** Профиль одного учителя ребёнка: предметы, классы и число уроков. */
 export const childTeacherProfile = cache(async (teacherId: string): Promise<ChildTeacherProfile | null> => {
   const childId = await getSelectedChildId();
   if (!childId) return null;
   const db = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyDb = db as any;
-
-  const { data: teacher } = await anyDb
-    .from("teachers").select("id, full_name").eq("id", teacherId).maybeSingle();
-  if (!teacher) return null;
-
-  const { data: groups } = await anyDb
-    .from("student_groups").select("group_id, groups(name)").eq("student_id", childId);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const groupIds = ((groups ?? []) as any[]).map((g) => g.group_id as string);
-  if (groupIds.length === 0) {
-    return { id: teacher.id, fullName: teacher.full_name, subjectNames: [], groupNames: [], lessonCount: 0 };
-  }
-
-  // Отбор ровно тот же, что у getGroupSubjectTeachers (is_active), плюс
-  // отсев болванок: иначе список предметов в профиле разошёлся бы со списком
-  // на предыдущем экране, который приходит как раз оттуда.
-  const { data: subjects } = await anyDb
-    .from("subjects").select("id, name, group_id")
-    .eq("teacher_id", teacherId).eq("is_active", true).eq("is_stub", false).in("group_id", groupIds);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subjectRows = (subjects ?? []) as any[];
-  const subjectIds = subjectRows.map((s) => s.id as string);
-
-  let lessonCount = 0;
-  if (subjectIds.length > 0) {
-    const { count } = await anyDb
-      .from("lessons").select("id", { count: "exact", head: true })
-      .in("subject_id", subjectIds).in("group_id", groupIds);
-    lessonCount = count ?? 0;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const groupNameById = new Map(((groups ?? []) as any[]).map((g) => [g.group_id as string, g.groups?.name as string | undefined]));
-  return {
-    id: teacher.id as string,
-    fullName: teacher.full_name as string,
-    subjectNames: [...new Set(subjectRows.map((s) => s.name as string))],
-    groupNames: [...new Set(subjectRows.map((s) => groupNameById.get(s.group_id as string)).filter(Boolean) as string[])],
-    lessonCount,
-  };
+  return getChildTeacherProfile(db, childId, teacherId);
 });
 
 // ── Дневник, освоение тем, помощник (12.08.2026) ─────────────────────────────
@@ -585,125 +508,18 @@ export const childTeacherProfile = cache(async (teacherId: string): Promise<Chil
 // оценками за урок, темы — теми же оценками, сгруппированными по теме урока,
 // помощник — таблицей parent_insights. Своих таблиц не заводится.
 
-export type DiaryLesson = {
-  id: string;
-  subjectName: string;
-  subjectColor: string | null;
-  topic: string | null;
-  startsAt: string;
-  /** Оценка ребёнка за ЭТОТ урок (lesson_grades) или null. */
-  grade: number | null;
-  /** Комментарий учителя к оценке — в дневнике он к месту. */
-  comment: string | null;
-};
-
-export type DiaryDay = {
-  /** «YYYY-MM-DD» по Ташкенту. */
-  dateKey: string;
-  lessons: DiaryLesson[];
-  /** Средний балл дня или null, если оценок в этот день не было. */
-  average: number | null;
-};
-
-export type DiaryWeek = {
-  /** Понедельник недели, «YYYY-MM-DD». */
-  weekStart: string;
-  days: DiaryDay[];
-  gradeCount: number;
-  average: number | null;
-  /** Сдано домашних работ за эту неделю (homework_submissions.submitted_at). */
-  homeworkSubmitted: number;
-};
-
 /**
  * Неделя дневника: уроки группы ребёнка + его оценки за эти уроки.
  *
- * Отдельной сущности «дневник» в базе нет — это вид поверх готового.
- * Уроки берёт тот же `childScheduleWeek`, что и расписание (второго запроса
- * к урокам не заводим), оценки — `lesson_grades` с привязкой к уроку:
- * нормированный `childGrades` для дневника не годится, он теряет lesson_id,
- * а оценка обязана встать напротив своего урока.
+ * Уроки берёт тот же `childScheduleWeek`, что и расписание, и передаёт их в
+ * общий сборщик готовыми — второго запроса к урокам не заводим и кэш
+ * расписания не теряем.
  */
 export const childDiaryWeek = cache(async (weekStart: string): Promise<DiaryWeek> => {
-  const empty: DiaryWeek = { weekStart, days: [], gradeCount: 0, average: null, homeworkSubmitted: 0 };
   const childId = await getSelectedChildId();
-  if (!childId) return empty;
-
-  const lessons = await childScheduleWeek(weekStart);
-  const db = await createClient();
-
-  const weekEnd = new Date(`${weekStart}T00:00:00Z`);
-  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
-  const weekEndKey = weekEnd.toISOString().slice(0, 10);
-
-  const lessonIds = lessons.map((l) => l.id);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyDb = db as any;
-
-  const gradeByLesson = new Map<string, { grade: number; comment: string | null }>();
-  if (lessonIds.length > 0) {
-    const { data: grades, error } = await anyDb
-      .from("lesson_grades")
-      .select("lesson_id, grade, comment")
-      .eq("student_id", childId)
-      .in("lesson_id", lessonIds);
-    if (error) throw error;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const g of (grades ?? []) as any[]) {
-      gradeByLesson.set(g.lesson_id as string, {
-        grade: g.grade as number,
-        comment: (g.comment as string | null) ?? null,
-      });
-    }
-  }
-
-  // Сдано за неделю — по моменту сдачи, а не по сроку: в шапке недели стоит
-  // «сдано работ», то есть сколько ребёнок сделал именно на этой неделе.
-  const { count: hwCount } = await anyDb
-    .from("homework_submissions")
-    .select("id", { count: "exact", head: true })
-    .eq("student_id", childId)
-    .gte("submitted_at", `${weekStart}T00:00:00+05:00`)
-    .lt("submitted_at", `${weekEndKey}T00:00:00+05:00`);
-
-  const byDay = new Map<string, DiaryLesson[]>();
-  for (const l of lessons) {
-    const key = tashkentDayKey(l.starts_at);
-    const g = gradeByLesson.get(l.id);
-    const row: DiaryLesson = {
-      id: l.id,
-      subjectName: l.subject?.name ?? l.title ?? "—",
-      subjectColor: l.subject?.color ?? null,
-      topic: l.topic ?? l.title ?? null,
-      startsAt: l.starts_at,
-      grade: g?.grade ?? null,
-      comment: g?.comment ?? null,
-    };
-    const bucket = byDay.get(key);
-    if (bucket) bucket.push(row);
-    else byDay.set(key, [row]);
-  }
-
-  const days: DiaryDay[] = [...byDay.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([dateKey, rows]) => {
-      const marks = rows.map((r) => r.grade).filter((g): g is number => g != null);
-      return {
-        dateKey,
-        lessons: rows.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-        average: marks.length > 0 ? marks.reduce((a, b) => a + b, 0) / marks.length : null,
-      };
-    });
-
-  const allMarks = days.flatMap((d) => d.lessons.map((l) => l.grade)).filter((g): g is number => g != null);
-
-  return {
-    weekStart,
-    days,
-    gradeCount: allMarks.length,
-    average: allMarks.length > 0 ? allMarks.reduce((a, b) => a + b, 0) / allMarks.length : null,
-    homeworkSubmitted: hwCount ?? 0,
-  };
+  if (!childId) return { weekStart, days: [], gradeCount: 0, average: null, homeworkSubmitted: 0 };
+  const [lessons, db] = await Promise.all([childScheduleWeek(weekStart), createClient()]);
+  return getChildDiaryWeek(db, childId, weekStart, lessons);
 });
 
 export type TopicMasteryItem = {

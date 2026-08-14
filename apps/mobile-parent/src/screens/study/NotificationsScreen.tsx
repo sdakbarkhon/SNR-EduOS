@@ -1,27 +1,28 @@
 /**
- * П8 «Уведомления» — Заход 5, block-by-block из макета
- * «SNR EduOS v2 Light.dc.html», строки 686–702.
+ * П8 «Уведомления» — НАСТОЯЩИЕ ДАННЫЕ (14.08.2026).
  *
- * Порядок блоков (block-list):
- *  687–690 InnerHeader (glass-back + Unbounded 15 title)
- *  691     ScrollView контейнер (gap 11, padding 4 18 118)
- *  692     ряд фильтр-чипов «Все / Непрочитанные / Важные» (SegmentPills)
- *  693     секционный хедер «СЕГОДНЯ» (ntTodayHdr)
- *  694–696 карточки за сегодня (ntToday sc-for, GlassCard-стиль ntList)
- *  697     секционный хедер «ВЧЕРА» (ntYdayHdr)
- *  698–700 карточки за вчера (ntYday sc-for)
+ * БЫЛО: фикстура `NOTIFICATIONS` из шести строк, разложенных по «сегодня» и
+ * «вчера» вручную, с выдуманным флагом «важное» и переходами по фикстурному
+ * полю `go`.
  *
- * Данные — только через фикстуры (getNotifications). Иконка карточки —
- * круг 38×38 с градиентом n.gradient и белыми path'ами (макет строка 3604).
- * Точка n.dot — 8×8 фиолетовый gradient при is_unread, иначе прозрачная
- * (макет строка 3607). Секции скрываются, если после фильтра пусто (макет
- * строка 3612 ntHdr → display:none).
+ * СТАЛО: `getMyNotifications` из @snr/core — таблица `notifications` (RLS
+ * отдаёт только свои строки), тот же запрос, что питает «Уведомления» на
+ * вебе.
  *
- * i18n: заголовок из d.parentApp.scr.notifications; секции — date.today/
- * yesterday в uppercase; чипы фильтров используют pay.all и msg.storyImportant,
- * «Непрочитанные» — литерал (соответствующего parentApp-ключа в словаре нет,
- * как и у HOMEWORK_FILTER_CHIPS). Обе темы через useTheme().
- * iOS safe-area — из InnerHeader; нижний отступ 118 под FloatingTabBar.
+ * ОТЛИЧИЯ ОТ МАКЕТА:
+ *  • фильтров два, а не три. «Важные» в макете опирались на выдуманный флаг
+ *    is_important, которого в `notifications` нет — остались «Все» и
+ *    «Непрочитанные»;
+ *  • секции — «Сегодня / Вчера / Ранее»: у настоящего родителя уведомления
+ *    старше вчерашнего дня есть, а в фикстуре их не бывало;
+ *  • иконка и переход выбираются по `kind` (реальная колонка), а не по
+ *    фикстурному `go`.
+ *
+ * ПЕРЕХОДЫ. `notifications.link` рассчитан на ученический веб («/homework»,
+ * «/grades»…) и в родительском приложении ведёт не туда, поэтому экран
+ * выбирается по `kind` и указывает на РОДИТЕЛЬСКИЕ маршруты. Виды, для
+ * которых у родителя подходящего экрана нет, остаются некликабельными: это
+ * честнее, чем увести на чужой раздел.
  */
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -29,309 +30,264 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { getMyNotifications, LOCALE_TAG, type AppNotification } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
-import { GlassCard, InnerHeader, SegmentPills } from "../../ui";
-import { getNotifications } from "../../data";
-import type { NotificationRow } from "../../data";
-import type { MainStackParamList, StubKey, TabRouteName } from "../../navigation/routes";
-import { TAB_ROUTES } from "../../navigation/routes";
+import {
+  EmptyBlock,
+  ErrorBlock,
+  GlassCard,
+  InnerHeader,
+  LoadingBlock,
+  SegmentPills,
+} from "../../ui";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
+import { getSupabase } from "../../lib/supabase";
+import { addDays, tashkentDateKey } from "../../lib/tashkent";
+import { stamp } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
+import type { MainStackParamList, TabRouteName } from "../../navigation/routes";
+import { TAB_ROUTES } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
-type Filter = "all" | "unread" | "important";
+type Filter = "all" | "unread";
+type Bucket = "today" | "yesterday" | "earlier";
 
-/** Иконка категории 38×38 rounded-50 с градиентом и белыми SVG-path'ами
- *  (макет строка 3604: bg linear-gradient 135°, boxShadow 0 6 12 c[1]44). */
-function CategoryIcon({
-  gradient,
-  paths,
-}: {
-  gradient: [string, string];
-  paths?: string[];
-}) {
+/** kind → градиент круглой иконки + глиф. Виды — реальные значения колонки
+ *  `notifications.kind`; те же наборы путей, что на вебе. */
+const KIND_STYLE: Record<string, { gradient: [string, string]; paths: string[] }> = {
+  grade_received: { gradient: ["#34d399", "#059669"], paths: ["M20 6 9 17l-5-5"] },
+  new_grade: { gradient: ["#34d399", "#059669"], paths: ["M20 6 9 17l-5-5"] },
+  homework_graded: { gradient: ["#34d399", "#059669"], paths: ["M20 6 9 17l-5-5"] },
+  new_homework: {
+    gradient: ["#60a5fa", "#2563eb"],
+    paths: ["M3 8a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5Z", "m8.5 12 2.5 2.5 5-5"],
+  },
+  student_submitted: {
+    gradient: ["#60a5fa", "#2563eb"],
+    paths: ["M3 8a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5Z", "m8.5 12 2.5 2.5 5-5"],
+  },
+  lesson_material: {
+    gradient: ["#22d3ee", "#0891b2"],
+    paths: ["M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z", "M14 3v5h5", "M9 13h6", "M9 17h4"],
+  },
+  lesson_created: {
+    gradient: ["#a78bfa", "#7c3aed"],
+    paths: ["M8 2v4", "M16 2v4", "M3 8a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z", "M3 10h18"],
+  },
+  lesson_starting_soon: {
+    gradient: ["#a78bfa", "#7c3aed"],
+    paths: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"],
+  },
+  student_excused: {
+    gradient: ["#fbbf24", "#f97316"],
+    paths: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"],
+  },
+  announcement: {
+    gradient: ["#f472b6", "#db2777"],
+    paths: ["m3 11 18-7v16L3 13v-2Z", "M11.6 16.8a3 3 0 1 1-5.8-1.6"],
+  },
+};
+
+const FALLBACK_STYLE = {
+  gradient: ["#94a3b8", "#64748b"] as [string, string],
+  paths: ["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"],
+};
+
+/**
+ * kind → экран родительского приложения. Виды, для которых экрана нет,
+ * сюда не попадают — карточка тогда не нажимается.
+ *
+ * Оценки живут на вкладке «Успехи» (p10), объявления — на d26, посещаемость
+ * и уроки — в расписании (d15), домашние задания — на d12.
+ */
+const TARGET_BY_KIND: Record<string, keyof MainStackParamList | TabRouteName> = {
+  grade_received: "p10",
+  new_grade: "p10",
+  homework_graded: "p10",
+  new_homework: "d12",
+  student_submitted: "d12",
+  announcement: "d26",
+  lesson_created: "d15",
+  lesson_starting_soon: "d15",
+  lesson_material: "d15",
+  student_excused: "d14",
+};
+
+/** Круглая 38×38 иконка категории с градиентом и белым глифом. */
+function CategoryIcon({ gradient, paths }: { gradient: [string, string]; paths: string[] }) {
   const g = gradPoints(135);
-  // Тень «0 6 12 g[1]44» ≈ hex-α 44 (≈0.27).
-  const shadow = { x: 0, y: 6, blur: 12, color: `${gradient[1]}44` };
   return (
-    <View style={[shadowStyle(shadow), { borderRadius: 19 }]}>
-      <View
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: 19,
-          overflow: "hidden",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <LinearGradient
-          colors={gradient}
-          start={g.start}
-          end={g.end}
-          style={StyleSheet.absoluteFill}
-        />
-        {paths && paths.length > 0 ? (
-          <Svg
-            width={16}
-            height={16}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#FFFFFF"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            {paths.map((d, i) => (
-              <Path key={i} d={d} />
-            ))}
-          </Svg>
-        ) : null}
+    <View style={[shadowStyle({ x: 0, y: 6, blur: 12, color: `${gradient[1]}44` }), { borderRadius: 19 }]}>
+      <View style={{ width: 38, height: 38, borderRadius: 19, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+        <LinearGradient colors={gradient} start={g.start} end={g.end} style={StyleSheet.absoluteFill} />
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          {paths.map((p, i) => (
+            <Path key={i} d={p} />
+          ))}
+        </Svg>
       </View>
     </View>
   );
 }
 
-/** Точка-маркер «непрочитано» 8×8 (макет строка 3607). */
+/** Точка-маркер «непрочитано» 8×8. */
 function UnreadDot({ visible }: { visible: boolean }) {
-  if (!visible) {
-    return <View style={{ width: 8, height: 8, marginTop: 4 }} />;
-  }
   const g = gradPoints(135);
+  if (!visible) return <View style={{ width: 8, height: 8, marginTop: 4 }} />;
   return (
     <View style={[shadowStyle({ x: 0, y: 0, blur: 6, color: "rgba(124,58,237,0.5)" }), { borderRadius: 4, marginTop: 4 }]}>
       <View style={{ width: 8, height: 8, borderRadius: 4, overflow: "hidden" }}>
-        <LinearGradient
-          colors={["#7c3aed", "#4f6df5"]}
-          start={g.start}
-          end={g.end}
-          style={StyleSheet.absoluteFill}
-        />
+        <LinearGradient colors={["#7c3aed", "#4f6df5"]} start={g.start} end={g.end} style={StyleSheet.absoluteFill} />
       </View>
     </View>
   );
 }
 
-/** Иконка категории по маршруту go/оттенку — используем path'ы из ICONS.
- *  В фикстуре хранится только цвет; глиф выбираем по семантике go, как в
- *  ntData макета (строки 3562–3570). */
-function iconPathsFor(n: NotificationRow): string[] {
-  switch (n.go) {
-    case "p10":
-      return ["M20 6 9 17l-5-5"]; // check (оценка)
-    case "d12":
-      return [
-        "M3 8a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5Z",
-        "m8.5 12 2.5 2.5 5-5",
-      ]; // check-square (ДЗ)
-    case "d18":
-      return [
-        "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z",
-        "M14 3v5h5",
-        "M9 13h6",
-        "M9 17h4",
-      ]; // doc (счёт)
-    case "d20":
-      return [
-        "M20 12V8H6a2 2 0 0 1 0-4h12v4",
-        "M4 6v12a2 2 0 0 0 2 2h14v-6",
-        "M18 12a2 2 0 0 0 0 4h4v-4Z",
-      ]; // wallet (платёж)
-    case "d14":
-      return ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"]; // clock (посещаемость)
-    case "stub:announce":
-      return ["m3 11 18-7v16L3 13v-2Z", "M11.6 16.8a3 3 0 1 1-5.8-1.6"]; // megaphone
-    default:
-      return ["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"]; // bell
-  }
-}
-
-/** Одна карточка уведомления (макет строки 695/699 + стиль ntList 3601). */
-function NotificationCard({
-  row,
-  onPress,
-}: {
-  row: NotificationRow;
-  onPress: () => void;
-}) {
-  const { tokens } = useTheme();
-  return (
-    <GlassCard
-      radius={18}
-      onPress={onPress}
-      contentStyle={{
-        padding: 11,
-        paddingHorizontal: 13,
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 10,
-      }}
-    >
-      <CategoryIcon gradient={row.gradient as [string, string]} paths={iconPathsFor(row)} />
-      <View style={{ flex: 1, minWidth: 0, flexDirection: "column", gap: 2 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-          }}
-        >
-          <Text
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              fontFamily: fonts.manrope800,
-              fontSize: 12,
-              color: tokens.ink1,
-            }}
-          >
-            {row.title}
-          </Text>
-          <Text
-            style={{
-              fontFamily: fonts.manrope700,
-              fontSize: 9,
-              color: tokens.ink3,
-            }}
-          >
-            {row.time_label}
-          </Text>
-        </View>
-        <Text
-          style={{
-            fontFamily: fonts.manrope600,
-            fontSize: 10.5,
-            lineHeight: 10.5 * 1.45,
-            color: tokens.ink2,
-          }}
-        >
-          {row.body}
-        </Text>
-      </View>
-      <UnreadDot visible={row.is_unread} />
-    </GlassCard>
-  );
-}
-
-/** Секционный хедер uppercase 10.5/800 letterSpacing .08em ink3
- *  (макет строка 3613 ntHdr). */
 function SectionCap({ label }: { label: string }) {
   const { tokens } = useTheme();
   return (
-    <Text
-      style={{
-        fontFamily: fonts.manrope800,
-        fontSize: 10.5,
-        letterSpacing: 10.5 * 0.08,
-        color: tokens.ink3,
-      }}
-    >
+    <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, letterSpacing: 10.5 * 0.08, color: tokens.ink3 }}>
       {label}
     </Text>
   );
 }
 
+function NotificationCard({
+  row,
+  timeLabel,
+  onPress,
+}: {
+  row: AppNotification;
+  timeLabel: string;
+  onPress?: () => void;
+}) {
+  const { tokens } = useTheme();
+  const style = KIND_STYLE[row.kind] ?? FALLBACK_STYLE;
+  return (
+    <GlassCard
+      radius={18}
+      onPress={onPress}
+      contentStyle={{ padding: 11, paddingHorizontal: 13, flexDirection: "row", alignItems: "flex-start", gap: 10 }}
+    >
+      <CategoryIcon gradient={style.gradient} paths={style.paths} />
+      <View style={{ flex: 1, minWidth: 0, flexDirection: "column", gap: 2 }}>
+        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+          <Text numberOfLines={2} style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+            {row.title}
+          </Text>
+          <Text style={{ fontFamily: fonts.manrope700, fontSize: 9, color: tokens.ink3 }}>{timeLabel}</Text>
+        </View>
+        {row.body ? (
+          <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, lineHeight: 10.5 * 1.45, color: tokens.ink2 }}>
+            {row.body}
+          </Text>
+        ) : null}
+      </View>
+      <UnreadDot visible={!row.is_read} />
+    </GlassCard>
+  );
+}
+
 export default function NotificationsScreen() {
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
+  const m4 = d.parentApp.more4;
+  const localeTag = LOCALE_TAG[locale];
   const navigation = useNavigation<Nav>();
 
-  // ntF: 'all' | 'unread' | 'imp' (макет строка 3901).
   const [filter, setFilter] = useState<Filter>("all");
+  const state = useAsyncData(() => getMyNotifications(getSupabase(), 50), []);
+  const rows = useMemo(() => state.data ?? [], [state.data]);
 
-  const today = getNotifications("today");
-  const yday = getNotifications("yday");
+  const todayKey = useTashkentToday();
+  const yesterdayKey = useMemo(() => addDays(todayKey, -1), [todayKey]);
 
-  const matches = (n: NotificationRow): boolean => {
-    if (filter === "all") return true;
-    if (filter === "unread") return n.is_unread;
-    return n.is_important;
-  };
+  const shown = useMemo(
+    () => (filter === "unread" ? rows.filter((n) => !n.is_read) : rows),
+    [filter, rows],
+  );
 
-  const todayShown = useMemo(() => today.filter(matches), [today, filter]);
-  const ydayShown = useMemo(() => yday.filter(matches), [yday, filter]);
+  const sections = useMemo(() => {
+    const bucketOf = (iso: string): Bucket => {
+      const key = tashkentDateKey(iso);
+      if (key === todayKey) return "today";
+      if (key === yesterdayKey) return "yesterday";
+      return "earlier";
+    };
+    return (["today", "yesterday", "earlier"] as const)
+      .map((bucket) => ({ bucket, rows: shown.filter((n) => bucketOf(n.created_at) === bucket) }))
+      .filter((s) => s.rows.length > 0);
+  }, [shown, todayKey, yesterdayKey]);
 
   const FILTERS: { key: Filter; label: string }[] = [
-    { key: "all", label: d.parentApp.pay.all },
-    { key: "unread", label: "Непрочитанные" },
-    { key: "important", label: d.parentApp.msg.storyImportant },
+    { key: "all", label: m4.notifFilterAll },
+    { key: "unread", label: m4.notifFilterUnread },
   ];
+  const activeIndex = Math.max(0, FILTERS.findIndex((f) => f.key === filter));
 
-  const activeIndex = FILTERS.findIndex((f) => f.key === filter);
-
-  // ИСПРАВЛЕНИЕ (пост-заход 8): n.go — либо «stub:key» (открыть заглушку
-  // с этим stubKey), либо имя реального маршрута. Реальный маршрут может
-  // быть табом (p5/p10/p17/d24/dhub) — туда нужно идти через вложенную
-  // форму navigate("Tabs", {screen}), голый navigate(tabName) молча
-  // ничего не делает (см. фикс routes.ts Tabs + 10 других мест приложения).
-  const goToNotification = (go: string) => {
-    if (go.startsWith("stub:")) {
-      navigation.navigate("stub", { stubKey: go.slice(5) as StubKey });
-      return;
-    }
-    if ((TAB_ROUTES as readonly string[]).includes(go)) {
-      navigation.navigate("Tabs", { screen: go as TabRouteName });
-      return;
-    }
-    // Имя маршрута динамическое (из фикстуры) — React Navigation не может
-    // сопоставить строку с конкретной перегрузкой navigate(); `as never` —
-    // рекомендуемый в их же TS-гайде обход именно для этого случая (ветки
-    // выше уже отфильтровали stub:/tab-маршруты типобезопасно).
-    navigation.navigate(go as never);
+  const bucketLabel: Record<Bucket, string> = {
+    today: d.parentApp.date.today.toUpperCase(),
+    yesterday: d.parentApp.date.yesterday.toUpperCase(),
+    earlier: d.parentApp.date.earlier.toUpperCase(),
   };
+
+  function open(kind: string) {
+    const target = TARGET_BY_KIND[kind];
+    if (!target) return;
+    if ((TAB_ROUTES as readonly string[]).includes(target)) {
+      navigation.navigate("Tabs", { screen: target as TabRouteName });
+      return;
+    }
+    navigation.navigate(target as never);
+  }
 
   return (
     <AppBackground>
-      {/* 687–690: InnerHeader (glass back + Unbounded 15 title). */}
       <InnerHeader
         title={d.parentApp.scr.notifications}
         titleSize={15}
         onBackPress={() => navigation.goBack()}
       />
 
-      {/* 691: скролл-контейнер списка. */}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 18,
-          paddingTop: 4,
-          paddingBottom: 118,
-          gap: 11,
-        }}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 118, gap: 11 }}
       >
-        {/* 692: ряд фильтр-чипов (Все / Непрочитанные / Важные). */}
         <SegmentPills
           items={FILTERS.map((f) => f.label)}
-          activeIndex={activeIndex < 0 ? 0 : activeIndex}
+          activeIndex={activeIndex}
           onChange={(i) => setFilter(FILTERS[i].key)}
         />
 
-        {/* 693 + 694–696: секция «СЕГОДНЯ» + карточки. */}
-        {todayShown.length > 0 ? (
-          <>
-            <SectionCap label={d.parentApp.date.today.toUpperCase()} />
-            {todayShown.map((n, idx) => (
-              <NotificationCard
-                key={`today-${idx}`}
-                row={n}
-                onPress={() => goToNotification(n.go)}
-              />
-            ))}
-          </>
-        ) : null}
-
-        {/* 697 + 698–700: секция «ВЧЕРА» + карточки. */}
-        {ydayShown.length > 0 ? (
-          <>
-            <SectionCap label={d.parentApp.date.yesterday.toUpperCase()} />
-            {ydayShown.map((n, idx) => (
-              <NotificationCard
-                key={`yday-${idx}`}
-                row={n}
-                onPress={() => goToNotification(n.go)}
-              />
-            ))}
-          </>
-        ) : null}
+        {state.loading ? (
+          <LoadingBlock />
+        ) : state.error ? (
+          <ErrorBlock
+            title={m4.loadFailed}
+            message={state.error.message}
+            retryLabel={d.common.retry}
+            onRetry={() => state.refresh()}
+          />
+        ) : sections.length === 0 ? (
+          <EmptyBlock
+            title={filter === "unread" ? m4.notifUnreadEmptyTitle : m4.notifEmptyTitle}
+            text={filter === "unread" ? m4.notifUnreadEmptyText : m4.notifEmptyText}
+          />
+        ) : (
+          sections.map((section) => (
+            <View key={section.bucket} style={{ gap: 11 }}>
+              <SectionCap label={bucketLabel[section.bucket]} />
+              {section.rows.map((n) => (
+                <NotificationCard
+                  key={n.id}
+                  row={n}
+                  timeLabel={stamp(n.created_at, todayKey, yesterdayKey, localeTag, d.parentApp.date.yesterday)}
+                  onPress={TARGET_BY_KIND[n.kind] ? () => open(n.kind) : undefined}
+                />
+              ))}
+            </View>
+          ))
+        )}
       </ScrollView>
     </AppBackground>
   );

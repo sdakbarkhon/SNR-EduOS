@@ -226,29 +226,9 @@ export interface AttendanceDayRow {
 }
 
 // ─── grades / diary ──────────────────────────────────────────────────────────
-
-/** Урок дневника (DIARY.l): [предмет, тема, ДЗ, оценка|null]. */
-export interface DiaryLessonRow {
-  subject_id: BaseSubjectKey;
-  topic: string;
-  homework_label: string;     // «Д/З: упражнения 45–48»
-  grade: number | null;
-}
-
-export interface DiaryDayRow {
-  day_label: string;          // «ПОНЕДЕЛЬНИК · 21 июля»
-  avg_label: string;          // «4.5»
-  lessons: DiaryLessonRow[];
-}
-
-export interface DiaryWeekRow {
-  week_index: 0 | 1;
-  label: string;              // «20 – 26 июля»
-  grades_count_label: string; // g
-  avg_label: string;          // avg
-  homework_label: string;     // hw «8 из 10»
-  days: DiaryDayRow[];
-}
+// Строки дневника (DiaryLessonRow/DiaryDayRow/DiaryWeekRow) удалены
+// 14.08.2026: «Дневник» собирается из расписания класса и оценок за уроки,
+// а типы приходят из @snr/core (DiaryWeek / DiaryDay / DiaryLesson).
 
 /** Сводка «Успехи» П10 (C2) — витринные значения макета. */
 export interface GradesSummary {
@@ -407,19 +387,8 @@ export interface WalletLimits {
 }
 
 // ─── notifications ───────────────────────────────────────────────────────────
-
-/** Уведомление (ntData) — аналог app_notifications. */
-export interface NotificationRow {
-  day: "today" | "yday";
-  title: string;              // t
-  body: string;               // x
-  time_label: string;         // tm
-  is_unread: boolean;         // u
-  is_important: boolean;      // imp
-  /** Куда ведёт тап (ключ маршрута макета или stub-ключ). */
-  go: string;
-  gradient: Gradient;         // c
-}
+// NotificationRow удалён 14.08.2026: лента идёт из таблицы notifications
+// (@snr/core, тип AppNotification). Здесь остались только НАСТРОЙКИ.
 
 /** Категория настроек уведомлений (NTF_DEFS). */
 export interface NotificationCategoryRow {
@@ -483,48 +452,6 @@ export interface ChatMessageRow {
 
 // ─── services: тесты / библиотека / портфолио / заявления / медкарта /
 //     транспорт / питание ────────────────────────────────────────────────────
-
-export interface TestRow {
-  done: boolean;
-  subject_id: BaseSubjectKey; // key
-  name: string;
-  topic: string;
-  date_label: string;
-  result_label?: string;      // res «9 из 10»
-  pct?: number;
-  grade?: number;             // gr
-  countdown_label?: string;   // cd «Через 3 дня»
-}
-
-export interface TestReviewOption {
-  text: string;               // t
-  chosen?: boolean;           // ch
-  correct?: boolean;          // cor
-}
-
-export interface TestReviewQuestionRow {
-  no: number;                 // n
-  is_correct: boolean;        // ok
-  text: string;               // txt
-  options: TestReviewOption[];
-  explanation?: string;       // exp
-}
-
-export interface LibraryBookRow {
-  subject_id: BaseSubjectKey;
-  name: string;
-  author: string;
-  meta_label: string;         // «PDF · 4.2 МБ»
-  recommended?: boolean;      // rec
-}
-
-/** Детали материала (MAT_X). */
-export interface MaterialDetailRow {
-  subject_id: BaseSubjectKey;
-  description: string;
-  contents: string[];
-  pages: number;
-}
 
 export interface PortfolioWorkRow {
   subject_id: BaseSubjectKey;

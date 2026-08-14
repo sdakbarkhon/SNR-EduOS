@@ -260,8 +260,15 @@ export type MainStackParamList = {
   /** Заход 2, шаг 5: список ДЗ передаёт id реального задания для real-флоу
    *  (демо по-прежнему навигирует без параметров — getHomeworkDetail()). */
   d13: { homeworkId?: string } | undefined;
+  /** Заход 2 переноса: без параметра — список учителей класса, с ним —
+   *  профиль конкретного учителя. Прежние переходы (чат, предмет, поддержка)
+   *  идут без параметра и попадают на список: кого именно они имели в виду,
+   *  они не знают, и показывать наугад одного учителя было бы выдумкой. */
+  dteach: { teacherId?: string } | undefined;
+  /** Заход 2 переноса: карточка объявления открывает его по id. */
+  d27: { announcementId?: string } | undefined;
 } & {
-  [K in Exclude<StackRouteName, "stub" | "dport" | "d13">]: undefined;
+  [K in Exclude<StackRouteName, "stub" | "dport" | "d13" | "dteach" | "d27">]: undefined;
 };
 
 /** ParamList таб-навигатора. */

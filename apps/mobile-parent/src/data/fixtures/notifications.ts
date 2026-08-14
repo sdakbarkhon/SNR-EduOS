@@ -1,78 +1,13 @@
 /**
- * Уведомления: лента ntData (строки 3560–3573 макета), категории настроек
- * NTF_DEFS (3287–3297) и дефолты тумблеров (initial state ntf).
- * Все значения — ДОСЛОВНО из макета.
+ * Настройки уведомлений: категории NTF_DEFS (строки 3287–3297 макета) и
+ * дефолты тумблеров. Значения — ДОСЛОВНО из макета.
  *
- * Бейдж колокольчика «3» НЕ хардкодится — считается из непрочитанных
- * (is_unread) через getUnreadNotificationsCount() в ../index.ts.
+ * САМА ЛЕНТА уведомлений отсюда ушла 14.08.2026: экран «Уведомления» перешёл
+ * на таблицу `notifications` (getMyNotifications), а бэйдж колокольчика — на
+ * getUnreadCount. Остались только настройки — это отдельный экран (d32) и
+ * отдельный заход.
  */
-import type { NotificationCategoryRow, NotificationRow } from "../types";
-
-export const NOTIFICATIONS: NotificationRow[] = [
-  {
-    day: "today",
-    title: "Оценка 5 по математике",
-    body: "Контрольная «Дроби и проценты» — отличный результат",
-    time_label: "10:42",
-    is_unread: true,
-    is_important: false,
-    go: "p10",
-    gradient: ["#34d399", "#059669"],
-  },
-  {
-    day: "today",
-    title: "Новое домашнее задание",
-    body: "Английский язык: эссе «My Summer» — срок завтра, 18:00",
-    time_label: "09:15",
-    is_unread: true,
-    is_important: false,
-    go: "d12",
-    gradient: ["#60a5fa", "#2563eb"],
-  },
-  {
-    day: "today",
-    title: "Выставлен счёт за август",
-    body: "Обучение · Малика — 4 500 000 сум, оплатить до 5 августа",
-    time_label: "08:05",
-    is_unread: true,
-    is_important: true,
-    go: "d18",
-    gradient: ["#fbbf24", "#f97316"],
-  },
-  {
-    day: "yday",
-    title: "Объявление школы",
-    body: "Родительское собрание 30 июля в 18:00, актовый зал",
-    time_label: "18:05",
-    is_unread: false,
-    is_important: true,
-    // Заход 8: «Объявления школы» (d26) теперь реальный экран, больше не
-    // stub:announce.
-    go: "d26",
-    gradient: ["#a78bfa", "#7c3aed"],
-  },
-  {
-    day: "yday",
-    title: "Питание оплачено",
-    body: "Обед 22 июля успешно оплачен · баланс 185 000 сум",
-    time_label: "12:41",
-    is_unread: false,
-    is_important: false,
-    go: "d20",
-    gradient: ["#22d3ee", "#0891b2"],
-  },
-  {
-    day: "yday",
-    title: "Отсутствие 21 июля",
-    body: "Малика отсутствовала без уважительной причины",
-    time_label: "08:40",
-    is_unread: false,
-    is_important: true,
-    go: "d14",
-    gradient: ["#fb7185", "#e11d48"],
-  },
-];
-
+import type { NotificationCategoryRow } from "../types";
 /** NTF_DEFS — категории настроек уведомлений; дефолты: все true, promo false. */
 export const NOTIFICATION_CATEGORIES: NotificationCategoryRow[] = [
   {

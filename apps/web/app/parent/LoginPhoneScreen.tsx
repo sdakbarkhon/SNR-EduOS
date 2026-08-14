@@ -21,35 +21,56 @@ import {
   accentGradCss,
 } from "@/lib/parent/glass-tokens";
 import {
-  AppleIcon,
   BackArrowIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  GoogleIcon,
   SparkleIcon,
   UzFlagIcon,
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
 import { LangButton } from "./LangButton";
 
-/**
- * Плитка 34×34 под логотипом соцвхода — ЖЁСТКИЙ белый в обеих темах: это
- * фирменная подложка Google/Apple, она белая и в тёмном интерфейсе.
- *
- * Задаётся инлайном, а не Tailwind-классом `bg-white`, намеренно:
- * app/globals.css держит голое правило `.dark .bg-white { background:#131a30 }`
- * для ученических экранов, и с появлением тёмной темы у родителя класс `dark`
- * доезжает и до /parent. Инлайн-стиль это правило перебить не может.
- */
-const SOCIAL_TILE_BG = "#FFFFFF";
-/**
- * Глиф Apple ЛЕЖИТ на этой белой плитке, поэтому он тоже жёстко тёмный и
- * НЕ красится ink1: ink1 в тёмной теме становится белым — получилась бы белая
- * иконка на белом. Значение — светлое значение ink1, привязанное к подложке.
- */
-const ON_WHITE_INK = "#171243";
-
 type SheetKey = null | "help";
+
+/**
+ * Правовые документы. Ссылки обязаны быть, но вести в никуда они не могут —
+ * до 14.08.2026 обе стояли на `href="#"` и просто перезагружали экран.
+ * Адрес берётся из переменных окружения (тот же приём, что в мобильном
+ * приложении, где он лежит в `app.json → expo.extra`): как только заказчик
+ * даст ссылки, они заработают без единой правки кода. Пока адреса нет,
+ * вместо перехода показывается честное объяснение.
+ */
+function legalUrl(kind: "terms" | "privacy"): string | null {
+  const raw =
+    kind === "terms"
+      ? process.env.NEXT_PUBLIC_LEGAL_TERMS_URL
+      : process.env.NEXT_PUBLIC_LEGAL_PRIVACY_URL;
+  return typeof raw === "string" && raw.startsWith("http") ? raw : null;
+}
+
+function LegalLink({
+  kind,
+  label,
+  onMissing,
+}: {
+  kind: "terms" | "privacy";
+  label: string;
+  onMissing: () => void;
+}) {
+  const url = legalUrl(kind);
+  if (url) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="font-extrabold" style={{ color: accent }}>
+        {label}
+      </a>
+    );
+  }
+  return (
+    <button type="button" onClick={onMissing} className="font-extrabold underline-offset-2" style={{ color: accent }}>
+      {label}
+    </button>
+  );
+}
 
 /** Формат «90 123 45 67» — 1:1 с мобильным LoginPhoneScreen.tsx. */
 function formatPhone(digits: string): string {
@@ -113,9 +134,18 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
   }
 
   function showComingSoon() {
-    setNotice(comingSoonText);
+    showNotice(comingSoonText);
+  }
+
+  /** Документа ещё нет — говорим об этом прямо, а не молча перезагружаем. */
+  function showLegalNotReady() {
+    showNotice(dict.parentApp.auth.legalNotReady);
+  }
+
+  function showNotice(text: string) {
+    setNotice(text);
     if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
-    noticeTimer.current = window.setTimeout(() => setNotice(null), 2200) as unknown as number;
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 4000) as unknown as number;
   }
 
   const canSubmit = phone.length === 9;
@@ -178,14 +208,6 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           </div>
         </GlassCard>
 
-        <div className="flex items-center gap-3 py-1">
-          <div className="h-px flex-1" style={{ background: ink3 }} />
-          <span className="text-[10.5px] font-bold" style={{ color: ink3 }}>
-            {t.or}
-          </span>
-          <div className="h-px flex-1" style={{ background: ink3 }} />
-        </div>
-
         {/* Рамка кнопки и цветная тень плитки — акцентный фиолет с альфой: он
             читается и на светлом, и на тёмном стекле, поэтому оставлен
             литералом (как ONLINE_GREEN — сигнальная заливка, не «цвет текста»). */}
@@ -214,49 +236,20 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           <ChevronRightIcon size={15} color={ink3} />
         </button>
 
-        <button
-          type="button"
-          onClick={showComingSoon}
-          className="flex items-center gap-2.5 p-3.5 text-left"
-          style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
-        >
-          <div
-            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
-            style={{ background: SOCIAL_TILE_BG }}
-          >
-            <GoogleIcon size={18} />
-          </div>
-          <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
-            {t.withGoogle}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={showComingSoon}
-          className="flex items-center gap-2.5 p-3.5 text-left"
-          style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
-        >
-          <div
-            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
-            style={{ background: SOCIAL_TILE_BG }}
-          >
-            <AppleIcon size={18} color={ON_WHITE_INK} />
-          </div>
-          <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
-            {t.withApple}
-          </span>
-        </button>
+        {/* Разделитель «или», «Продолжить с Google» и «Продолжить с Apple»
+            убраны 14.08.2026 — ровно как в мобильном приложении днём раньше.
+            Входа через сторонние учётные записи у нас нет и не планируется:
+            обе кнопки только показывали тост «Скоро». Родитель входит по
+            номеру телефона с одноразовым кодом; демо-кнопка выше — отдельный
+            настоящий путь, она осталась. Иконки GoogleIcon/AppleIcon удалены
+            из components/parent/auth/icons.tsx следом: других потребителей у
+            них не было. */}
 
         <p className="px-2 pt-1.5 text-center text-[9.5px] leading-[1.5]" style={{ color: ink3 }}>
           {t.legalPrefix}
-          <a href="#" className="font-extrabold" style={{ color: accent }}>
-            {t.legalTerms}
-          </a>
+          <LegalLink kind="terms" label={t.legalTerms} onMissing={showLegalNotReady} />
           {t.legalAnd}
-          <a href="#" className="font-extrabold" style={{ color: accent }}>
-            {t.legalPrivacy}
-          </a>
+          <LegalLink kind="privacy" label={t.legalPrivacy} onMissing={showLegalNotReady} />
         </p>
       </div>
 

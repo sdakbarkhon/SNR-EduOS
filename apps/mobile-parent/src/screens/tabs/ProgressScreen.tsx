@@ -86,7 +86,6 @@ import {
   getSubject,
   getSubjectStats,
   getTeacherReviews,
-  getUnreadNotificationsCount,
 } from "../../data";
 import type { BaseSubjectKey, SubjectStatRow } from "../../data";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
@@ -95,6 +94,7 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
 import { getSupabase } from "../../lib/supabase";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
@@ -470,7 +470,7 @@ export default function ProgressScreen() {
   }, [d.parentApp.skills, skills.radar_values]);
   const notes = getGradesAssistantNotes();
   const reviews = getTeacherReviews();
-  const bellCount = getUnreadNotificationsCount();
+  const bellCount = useUnreadNotifications();
 
   // Sparkline данные для карточки «Средний балл» — точки макета строка 286
   // «2,19 14,16 26,17 38,10 50,12 62,4»: значения = 24 − y (viewBox 64×24),

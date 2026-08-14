@@ -13,8 +13,12 @@
  *  - «К оплате» 4 950 000 = сумма отмеченных счетов основного списка (BILLS);
  *  - «2 счёта» = число отмеченных счетов основного списка;
  *  - кошелёк Малики 185 000 (Dashboard/П17/d6) = WALLETS[1] (getWalletBalance);
- *  - бейдж колокольчика «3» = непрочитанные NOTIFICATIONS;
  *  - итоги «Истории оплат» 10 250 000 / 10 100 000 / 150 000 = из PAYMENT_HISTORY.
+ *
+ * 14.08.2026 — семь разделов ушли отсюда на настоящие данные: дневник,
+ * тесты, библиотека, профиль учителя, объявления, новости администрации,
+ * уведомления. Их фикстуры и аксессоры удалены; бэйдж колокольчика тоже
+ * больше не считается здесь (см. hooks/useUnreadNotifications.ts).
  */
 import type {
   ApplicationDetailRow,
@@ -23,13 +27,10 @@ import type {
   BillRow,
   ChildInfoRow,
   ChildRow,
-  DiaryWeekRow,
   HomeworkCardRow,
   LegalDocRow,
-  MaterialDetailRow,
   MedicalCardRow,
   MessageThreadRow,
-  NotificationRow,
   PaymentHistoryRow,
   ReceiptRow,
   ScheduleDayRow,
@@ -38,7 +39,6 @@ import type {
   SubjectKey,
   SubjectRow,
   TeacherReviewRow,
-  TestRow,
   TopicMasteryRow,
   WalletOpsDayGroup,
   WalletRow,
@@ -79,7 +79,6 @@ import {
 import { ATTENDANCE_LAST_DAYS, ATTENDANCE_MONTHS, ATTENDANCE_STATS } from "./fixtures/attendance";
 import {
   DEFAULT_GRADE_PERIOD,
-  DIARY_WEEKS,
   GRADES_ASSISTANT_NOTES,
   GRADES_SUMMARY,
   GRADE_PERIODS,
@@ -117,7 +116,6 @@ import {
   WALLET_OPS,
 } from "./fixtures/wallet";
 import {
-  NOTIFICATIONS,
   NOTIFICATIONS_MASTER_DEFAULT,
   NOTIFICATION_CATEGORIES,
 } from "./fixtures/notifications";
@@ -137,9 +135,6 @@ import {
   APPLICATION_DETAILS,
   APPLICATION_TYPES,
   DEFAULT_MEAL_DAY_INDEX,
-  LIBRARY,
-  MATERIAL_DETAILS,
-  MATERIAL_RELATED_LESSON_LABEL,
   MEALS_DAY_PILLS,
   MEALS_WEEK,
   MEDICAL_CARDS,
@@ -148,9 +143,6 @@ import {
   PORTFOLIO_ACHIEVEMENTS,
   PORTFOLIO_CERTIFICATES,
   PORTFOLIO_WORKS,
-  TESTS,
-  TEST_REVIEW,
-  TEST_REVIEW_TIME_SPENT_SUFFIX,
   TRANSPORT_NOTIFY_DEFAULTS,
   TRANSPORT_STOPS,
   VACCINATIONS,
@@ -358,10 +350,6 @@ export function getAttendanceLastDays(childId?: string) {
 
 // ─── Оценки / дневник ────────────────────────────────────────────────────────
 
-export function getDiaryWeeks(): DiaryWeekRow[] {
-  return DIARY_WEEKS;
-}
-
 export function getGradesSummary() {
   return GRADES_SUMMARY;
 }
@@ -498,15 +486,12 @@ export function getTransferFixture() {
 }
 
 // ─── Уведомления ─────────────────────────────────────────────────────────────
-
-export function getNotifications(day?: NotificationRow["day"]): NotificationRow[] {
-  return day ? NOTIFICATIONS.filter((n) => n.day === day) : NOTIFICATIONS;
-}
-
-/** Бейдж колокольчика «3» — из is_unread, не хардкод. */
-export function getUnreadNotificationsCount(): number {
-  return NOTIFICATIONS.filter((n) => n.is_unread).length;
-}
+//
+// getNotifications() и getUnreadNotificationsCount() удалены 14.08.2026:
+// лента идёт из таблицы `notifications` (getMyNotifications), а бэйдж
+// колокольчика — из useUnreadNotifications() поверх getUnreadCount(). Здесь
+// остались только НАСТРОЙКИ уведомлений — это отдельный экран и отдельный
+// заход.
 
 export function getNotificationCategories() {
   return { categories: NOTIFICATION_CATEGORIES, master_default: NOTIFICATIONS_MASTER_DEFAULT };
@@ -541,26 +526,6 @@ export function getSupportChat() {
 }
 
 // ─── Сервисы ─────────────────────────────────────────────────────────────────
-
-export function getTests(): TestRow[] {
-  return TESTS;
-}
-
-export function getTestReview() {
-  return { questions: TEST_REVIEW, time_spent_suffix: TEST_REVIEW_TIME_SPENT_SUFFIX };
-}
-
-export function getLibrary() {
-  return LIBRARY;
-}
-
-export function getMaterialDetail(subjectKey: Exclude<SubjectKey, "rusF">): MaterialDetailRow | undefined {
-  return MATERIAL_DETAILS.find((m) => m.subject_id === subjectKey);
-}
-
-export function getMaterialRelatedLessonLabel() {
-  return MATERIAL_RELATED_LESSON_LABEL;
-}
 
 export function getPortfolio() {
   return { works: PORTFOLIO_WORKS, achievements: PORTFOLIO_ACHIEVEMENTS, certificates: PORTFOLIO_CERTIFICATES };
@@ -684,7 +649,6 @@ export function getDashboard(childId?: string) {
     meals_card: MEALS_CARD,
     quick_actions: QUICK_ACTIONS,
     feed: DASHBOARD_FEED,
-    unread_notifications: getUnreadNotificationsCount(),
     assistant_text: getAssistantTexts(child.id).dashboard,
   };
 }

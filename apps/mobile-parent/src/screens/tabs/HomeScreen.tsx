@@ -8,7 +8,8 @@
  *  264 SectionHeader ленты, 265–269 GlassCard с 3 ListRow «Сегодня».
  *
  * Данные — через аксессоры src/data (getDashboard, getChildren,
- * getSelectedChildContext, getUnreadNotificationsCount). Тексты — через
+ * getSelectedChildContext). Бэйдж колокольчика — useUnreadNotifications()
+ * (настоящая таблица notifications). Тексты — через
  * useAppLocale().d.parentApp.* (RU/UZ/EN). Обе темы через useTheme().
  * iOS safe-area у шапки — из RootHeader; у скролла — paddingBottom 118px
  * под FloatingTabBar (макет: строка 226 — «118 под FloatingTabBar»).
@@ -65,7 +66,6 @@ import {
   getDashboard,
   getParent,
   getSelectedChildContext,
-  getUnreadNotificationsCount,
 } from "../../data";
 import { ICONS, type MainStackParamList, type TabParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
@@ -74,6 +74,7 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
 import { getSupabase } from "../../lib/supabase";
 import { tashkentDateKey } from "../../lib/tashkent";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
@@ -270,7 +271,7 @@ export default function HomeScreen() {
   // Идентичность в ChildSwitcherCard (имя/класс/аватар/статус) — реальная
   // для phone-flow, фикстурная (как раньше) для демо.
   const identityChild = realChildRow ?? child;
-  const bellCount = getUnreadNotificationsCount();
+  const bellCount = useUnreadNotifications();
 
   // Приветствие: «Доброе утро, {родитель}!» + «Вот что происходит у {ребёнок}
   // сегодня». Заход 2, шаг 2: для real-flow — реальные ФИО (родитель из

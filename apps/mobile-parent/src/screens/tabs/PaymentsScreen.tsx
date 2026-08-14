@@ -44,10 +44,10 @@ import {
   getDueTotal,
   getPaymentsOverview,
   getSelectedChildContext,
-  getUnreadNotificationsCount,
 } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { ICONS } from "../../navigation/routes";
+import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
 import { PARENT } from "../../data/fixtures/family";
 import { formatMoney } from "../../utils/format";
 
@@ -86,7 +86,7 @@ export default function PaymentsScreen() {
   const dueBills = getDueBills();
   const dueTotal = getDueTotal();
   const dueCount = getDueBillsCount();
-  const unread = getUnreadNotificationsCount();
+  const unread = useUnreadNotifications();
 
   const [autopay, setAutopay] = useState<boolean>(overview.autopay_enabled);
 

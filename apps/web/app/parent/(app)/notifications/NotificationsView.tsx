@@ -60,15 +60,19 @@ const FALLBACK_STYLE = { gradient: ["#94a3b8", "#64748b"] as [string, string], p
 
 type Filter = "all" | "unread";
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "unread", label: "Непрочитанные" },
-];
-
 export function NotificationsView({ items, today }: { items: NotificationItem[]; today: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const { locale } = useLocale();
   const dd = getDictionary(locale).parentApp.date;
+  // 14.08.2026: подписи фильтров и пустых состояний переехали в словарь
+  // (`parentApp.more4`) — те же строки понадобились мобильному экрану, а до
+  // этого они лежали здесь русскими литералами и оставались русскими на
+  // узбекском и английском.
+  const m4 = getDictionary(locale).parentApp.more4;
+  const FILTERS: { key: Filter; label: string }[] = [
+    { key: "all", label: m4.notifFilterAll },
+    { key: "unread", label: m4.notifFilterUnread },
+  ];
   const bucketLabel: Record<NotificationItem["bucket"], string> = {
     today: dd.today,
     yesterday: dd.yesterday,
@@ -101,12 +105,8 @@ export function NotificationsView({ items, today }: { items: NotificationItem[];
       {sections.length === 0 ? (
         <GlassCard>
           <EmptyState
-            title={filter === "unread" ? "Непрочитанных нет" : "Уведомлений пока нет"}
-            text={
-              filter === "unread"
-                ? "Всё прочитано — здесь будут новые события по вашему ребёнку."
-                : "Здесь появятся оценки, домашние задания и новости школы."
-            }
+            title={filter === "unread" ? m4.notifUnreadEmptyTitle : m4.notifEmptyTitle}
+            text={filter === "unread" ? m4.notifUnreadEmptyText : m4.notifEmptyText}
             paths={ICON.bell}
           />
         </GlassCard>

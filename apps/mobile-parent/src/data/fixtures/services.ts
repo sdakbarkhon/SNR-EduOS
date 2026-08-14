@@ -12,130 +12,27 @@ import type {
   ApplicationRow,
   ApplicationTypeRow,
   CertificateRow,
-  LibraryBookRow,
-  MaterialDetailRow,
   MealsDayMenu,
   MedicalCardRow,
   PortfolioWorkRow,
-  TestReviewQuestionRow,
-  TestRow,
   TransportStopRow,
   VaccinationRow,
   WorkDetailRow,
 } from "../types";
 import { CHILDREN } from "./family";
 
-// ─── Тесты ───────────────────────────────────────────────────────────────────
+/* УДАЛЕНО 14.08.2026 — разделы перешли на настоящие данные:
+ *   TESTS               → test_submissions (getChildTests);
+ *   LIBRARY             → books + book_favorites (getLibraryBooks);
+ *   TEST_REVIEW,
+ *   TEST_REVIEW_TIME_SPENT_SUFFIX  — «Разбор ответов» (da1): в базе лежат
+ *     только итоги работы (баллы и оценка), самих ответов ученика нет, и
+ *     экран разбора рисовать не из чего. Переход на него убран;
+ *   MATERIAL_DETAILS,
+ *   MATERIAL_RELATED_LESSON_LABEL  — «Просмотр материала» (da2): книгу
+ *     теперь открывает система по подписанной ссылке, промежуточный экран
+ *     с выдуманным описанием не нужен. */
 
-export const TESTS: TestRow[] = [
-  { done: true, subject_id: "robo", name: "Тест «Датчики»", topic: "Робототехника · датчики и схемы", date_label: "Пройден 17 июля", result_label: "9 из 10", pct: 90, grade: 5 },
-  { done: true, subject_id: "eng", name: "Тест «Past Simple»", topic: "Английский · грамматика", date_label: "Пройден 15 июля", result_label: "7 из 10", pct: 70, grade: 4 },
-  { done: true, subject_id: "math", name: "Тест «Дроби и проценты»", topic: "Математика · дроби", date_label: "Пройден 10 июля", result_label: "8 из 10", pct: 80, grade: 4 },
-  { done: true, subject_id: "prog", name: "Тест «Циклы в Python»", topic: "Программирование · циклы", date_label: "Пройден 8 июля", result_label: "10 из 10", pct: 100, grade: 5 },
-  { done: false, subject_id: "math", name: "Тест «Геометрия. Углы»", topic: "Математика · геометрия", date_label: "Проведение: 26 июля, 10:00", countdown_label: "Через 3 дня" },
-  { done: false, subject_id: "rus", name: "Тест «Пунктуация»", topic: "Русский язык · знаки препинания", date_label: "Проведение: 28 июля, 09:25", countdown_label: "Через 5 дней" },
-];
-
-/** Дополнение шапки экрана «Разбор ответов» da1: date + это. */
-export const TEST_REVIEW_TIME_SPENT_SUFFIX = " · затрачено 32 мин";
-
-export const TEST_REVIEW: TestReviewQuestionRow[] = [
-  {
-    no: 1,
-    is_correct: true,
-    text: "Сократите дробь 12/18 до несократимого вида",
-    options: [{ text: "3/4" }, { text: "2/3", chosen: true, correct: true }, { text: "4/6" }, { text: "6/9" }],
-  },
-  {
-    no: 2,
-    is_correct: true,
-    text: "Переведите 0,25 в обыкновенную дробь",
-    options: [{ text: "1/4", chosen: true, correct: true }, { text: "1/5" }, { text: "2/5" }, { text: "1/3" }],
-  },
-  {
-    no: 3,
-    is_correct: true,
-    text: "Найдите 40% от числа 250",
-    options: [{ text: "90" }, { text: "100", chosen: true, correct: true }, { text: "110" }, { text: "125" }],
-  },
-  {
-    no: 4,
-    is_correct: false,
-    text: "Сравните дроби 3/7 и 4/9",
-    options: [{ text: "3/7 больше 4/9", chosen: true }, { text: "3/7 меньше 4/9", correct: true }, { text: "Дроби равны" }],
-    explanation:
-      "Приводим к общему знаменателю 63: получаем 27/63 и 28/63. Значит 3/7 меньше 4/9 — сравнивать удобнее через общий знаменатель, а не «на глаз».",
-  },
-  {
-    no: 5,
-    is_correct: true,
-    text: "Вычислите сумму 1/2 + 1/3",
-    options: [{ text: "2/5" }, { text: "5/6", chosen: true, correct: true }, { text: "3/5" }, { text: "1/6" }],
-  },
-  {
-    no: 6,
-    is_correct: false,
-    text: "Уменьшите число 480 на 15%",
-    options: [{ text: "420", chosen: true }, { text: "408", correct: true }, { text: "432" }, { text: "396" }],
-    explanation:
-      "Уменьшить на 15% — значит найти 85% от числа: 480 × 0,85 = 408. Ошибка — вычитание 60 вместо 72: 15% от 480 это 72, а не 60.",
-  },
-];
-
-// ─── Библиотека ──────────────────────────────────────────────────────────────
-
-export const LIBRARY: LibraryBookRow[] = [
-  { subject_id: "prog", name: "Python для школьников", author: "А. Петров", meta_label: "PDF · 4.2 МБ", recommended: true },
-  { subject_id: "math", name: "Сборник задач: дроби", author: "Г. Юсупова", meta_label: "PDF · 2.4 МБ", recommended: true },
-  { subject_id: "eng", name: "English Grammar in Use", author: "R. Murphy", meta_label: "PDF · 8.1 МБ", recommended: true },
-  { subject_id: "prog", name: "Алгоритмы в картинках", author: "А. Петров", meta_label: "PDF · 6.3 МБ" },
-  { subject_id: "math", name: "Геометрия: 7 класс", author: "Г. Юсупова", meta_label: "PDF · 3.8 МБ" },
-  { subject_id: "rus", name: "Сборник диктантов", author: "Д. Касымова", meta_label: "PDF · 1.9 МБ" },
-  { subject_id: "robo", name: "Основы робототехники", author: "С. Волков", meta_label: "PDF · 5.6 МБ" },
-  { subject_id: "rus", name: "Разбор сочинений", author: "Д. Касымова", meta_label: "PDF · 2.2 МБ" },
-];
-
-export const MATERIAL_DETAILS: MaterialDetailRow[] = [
-  {
-    subject_id: "prog",
-    description:
-      "Практический курс Python с нуля: переменные, условия, циклы и первые мини-проекты. Каждая глава заканчивается набором задач, которые ученики решают на уроках программирования и дома.",
-    contents: ["Знакомство со средой", "Переменные и типы данных", "Условия и логика", "Циклы for и while", "Мини-проект: калькулятор"],
-    pages: 148,
-  },
-  {
-    subject_id: "math",
-    description:
-      "Сборник задач по дробям и процентам для 7 класса: от базовых упражнений на сокращение до текстовых задач с процентами. Используется на уроках математики и для домашних заданий.",
-    contents: ["Обыкновенные дроби", "Сокращение и сравнение", "Десятичные дроби", "Проценты в задачах", "Итоговые контрольные"],
-    pages: 96,
-  },
-  {
-    subject_id: "eng",
-    description:
-      "Классический учебник грамматики английского языка: короткая теория слева, упражнения справа. Подходит для самостоятельной работы — ответы в конце книги.",
-    contents: ["Present Simple / Continuous", "Past Simple", "Future forms", "Modal verbs", "Prepositions"],
-    pages: 380,
-  },
-  {
-    subject_id: "rus",
-    description:
-      "Методические материалы по русскому языку: разборы типовых ошибок, тренировочные упражнения и примеры сильных работ учеников прошлых лет.",
-    contents: ["Части речи", "Орфография", "Пунктуация", "Работа с текстом", "Подготовка к диктанту"],
-    pages: 84,
-  },
-  {
-    subject_id: "robo",
-    description:
-      "Вводный курс робототехники: устройство контроллера, датчики, моторы и первые схемы. Все проекты собираются из набора, который используется на занятиях.",
-    contents: ["Контроллер и питание", "Датчики света и звука", "Моторы и движение", "Сборка манипулятора", "Итоговый проект"],
-    pages: 120,
-  },
-];
-
-/** Блок «связанные уроки» экрана da2 — уже с исправленной опечаткой макета
- *  («Разbor» → «Разбор», как это делает сам макет на строке 4447). */
-export const MATERIAL_RELATED_LESSON_LABEL = "Разбор домашних задач";
 
 // ─── Портфолио ───────────────────────────────────────────────────────────────
 
