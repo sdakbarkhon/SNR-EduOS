@@ -39,35 +39,34 @@
  * застывало на вчера, если приложение висело открытым через полночь.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getStudentAttendance, formatDate, formatTime, APP_TIME_ZONE, LOCALE_TAG, type AttendanceStatus } from "@snr/core";
+import {
+  format,
+  getStudentAttendance,
+  formatDate,
+  formatTime,
+  APP_TIME_ZONE,
+  LOCALE_TAG,
+  type AttendanceStatus,
+} from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
+  EmptyBlock,
+  ErrorBlock,
   GlassCard,
   InnerHeader,
-  type ChildPickerItem,
+  LoadingBlock,
 } from "../../ui";
-import {
-  getAttendanceLastDays,
-  getAttendanceMonths,
-  getAttendanceStats,
-  getChildren,
-  getSelectedChildContext,
-} from "../../data";
 import type { AttendanceCellCode, AttendanceDayRow, AttendanceStats } from "../../data";
-import { useAuthSession } from "../../context/AuthSessionContext";
-import { useParentData } from "../../context/ParentDataContext";
-import { toChildRow } from "../../lib/realChild";
-import { useAsyncData } from "../../hooks/useAsyncData";
+import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
-import { getSupabase } from "../../lib/supabase";
 import { addDays } from "../../lib/tashkent";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -148,20 +147,6 @@ function buildRealMonthCells(
   }
   return cells;
 }
-
-/** Маппинг статуса записи «Последних дней» → цвет подписи + вид бэйджа.
- *  Порядок соответствует ATTENDANCE_LAST_DAYS (макет строки 616–619):
- *   0 «Присутствует»                    → green + галочка,
- *   1 «Присутствовал{suf}»              → green + галочка,
- *   2 «Отсутствовал{suf} без уважит.»   → red   + крестик,
- *   3 «Уважительная причина · справка»  → orange + документ. */
-type BadgeKind = "check" | "x" | "doc";
-const LAST_DAYS_META: { tone: "green" | "red" | "orange"; badge: BadgeKind }[] = [
-  { tone: "green", badge: "check" },
-  { tone: "green", badge: "check" },
-  { tone: "red", badge: "x" },
-  { tone: "orange", badge: "doc" },
-];
 
 /** Иконка «info» правого слота шапки (макет 588, 17×17 stroke 1.9). */
 function InfoIcon({ color }: { color: string }) {
@@ -326,8 +311,9 @@ function LegendMarker({ color, label }: { color: string; label: string }) {
   );
 }
 
-/** Круглый 24×24 бэйдж-иконка справа в строке «Последних дней». */
-function LastDayBadge({ kind }: { kind: BadgeKind }) {
+/** Круглый 24×24 бэйдж-иконка справа в строке «Последних дней». Вид берётся
+ *  из StatusMeta.badge, то есть из НАСТОЯЩЕГО статуса записи. */
+function LastDayBadge({ kind }: { kind: StatusMeta["badge"] }) {
   const bg =
     kind === "check"
       ? "rgba(16,185,129,0.16)"
@@ -372,37 +358,20 @@ export default function AttendanceScreen() {
   const t = d.parentApp;
   const STATUS_META = useMemo(() => buildStatusMeta(t.attend), [t.attend]);
   const navigation = useNavigation<Nav>();
-  const session = useAuthSession();
 
-  const children = getChildren();
-  const [childId, setChildId] = useState<string>(
-    () => session.currentChildId ?? children[0].id,
-  );
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Заход 2, шаг 3: тот же общий свитчер, что и в Шагах 1–2 — реальная
-  // идентичность + реальная посещаемость для phone-login/демо-тапа, демо-
-  // флоу (session.demoParentId) не тронут ни строкой.
-  const { data: parentData, selectedChildId, selectChild } = useParentData();
-  const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
-  const realIndex = isRealFlow
-    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
-    : -1;
-  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+  // 14.08.2026: идентичность и переключатель — из общего useChildScope, того
+  // же, что у остальных экранов на настоящих данных. Прежняя ветка «нет
+  // родителя → фикстурный ребёнок» убрана: демо-вход удалён (см. шапку
+  // AuthSessionContext), и подставлять выдуманного ребёнка стало нечему.
+  const { childId: selectedChildId, child: identityChild, pickerItems, selectChild } = useChildScope();
 
-  const ctx = getSelectedChildContext(childId);
-  const child = ctx.child;
-  const identityChild = realChildRow ?? child;
-
-  // ── Реальные данные посещаемости активного ребёнка (ОДИН запрос без
-  // month-фильтра — throw-on-error getStudentAttendance, НЕ .catch(()=>[])).
-  // Перезапрашивается при смене selectedChildId (useAsyncData deps). ──────
-  const attendanceState = useAsyncData(
-    () =>
-      isRealFlow && selectedChildId
-        ? getStudentAttendance(getSupabase(), undefined, selectedChildId)
-        : Promise.resolve(null),
-    [isRealFlow, selectedChildId],
+  // ── Посещаемость активного ребёнка: ОДИН запрос без month-фильтра
+  // (throw-on-error getStudentAttendance, НЕ .catch(()=>[])).
+  // Перезапрашивается при смене ребёнка. ──────────────────────────────────
+  const attendanceState = useChildQuery(selectedChildId, (db, id) =>
+    getStudentAttendance(db, undefined, id),
   );
 
   // Долги, проход 2: не useMemo(() => tashkentToday(), []) — та не
@@ -470,28 +439,13 @@ export default function AttendanceScreen() {
       return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
     });
 
-  // ── Фикстурная ветка (демо) — байт-в-байт как было ──────────────────────
-  const fixtureStats = getAttendanceStats();
-  const fixtureMonths = getAttendanceMonths();
-  const fixtureLastDays = getAttendanceLastDays(childId);
-  const [monthIndex, setMonthIndex] = useState<number>(fixtureMonths.length - 1);
-  const activeFixtureMonth = fixtureMonths[monthIndex];
-  const fixtureCalendarDays = useMemo(() => {
-    let dayCounter = 0;
-    return activeFixtureMonth.cells.map((code) => {
-      if (code === "e") return { code, dayNumber: null as number | null };
-      dayCounter += 1;
-      return { code, dayNumber: dayCounter };
-    });
-  }, [activeFixtureMonth]);
-  const goPrevMonthFixture = () => setMonthIndex((i) => Math.max(0, i - 1));
-  const goNextMonthFixture = () => setMonthIndex((i) => Math.min(fixtureMonths.length - 1, i + 1));
-
-  // ── Единая точка ветвления real/демо для рендера ────────────────────────
-  const monthLabel = isRealFlow ? realMonthLabel : activeFixtureMonth.label;
-  const calendarDaysFinal = isRealFlow ? realCells : fixtureCalendarDays;
-  const goPrevMonth = isRealFlow ? goPrevMonthReal : goPrevMonthFixture;
-  const goNextMonth = isRealFlow ? goNextMonthReal : goNextMonthFixture;
+  // Фикстурная ветка календаря (ATTENDANCE_MONTHS / ATTENDANCE_STATS /
+  // ATTENDANCE_LAST_DAYS) удалена 14.08.2026 вместе с демо-входом: она была
+  // недостижима, а держать рядом второй, выдуманный календарь незачем.
+  const monthLabel = realMonthLabel;
+  const calendarDaysFinal = realCells;
+  const goPrevMonth = goPrevMonthReal;
+  const goNextMonth = goNextMonthReal;
 
   // Долги, проход 2: число рядов — динамическое, не жёсткие 5. Демо-фикстура
   // (cells()) всегда даёт ровно 35 ячеек (5×7) — Math.ceil(35/7)=5, поведение
@@ -533,9 +487,9 @@ export default function AttendanceScreen() {
       };
     });
   }, [attendanceState.data, todayKey, yesterdayKey, locale, t.date.today, t.date.yesterday, STATUS_META]);
-  const lastDaysFinal = isRealFlow ? realLastDays : fixtureLastDays;
-  // Тот же срез records, параллельно realLastDays — tone/badge по индексу,
-  // как и раньше делала фикстура (LAST_DAYS_META[i]), но по РЕАЛЬНОМУ статусу.
+  const lastDaysFinal = realLastDays;
+  // Тот же срез records, параллельно realLastDays — tone/badge по РЕАЛЬНОМУ
+  // статусу записи, а не по её позиции в списке.
   const realLastDaysMeta = useMemo(
     () => attendanceState.data?.records.slice(0, 4).map((r) => STATUS_META[r.status]) ?? [],
     [attendanceState.data],
@@ -543,39 +497,13 @@ export default function AttendanceScreen() {
 
   // Реальная сводка — за ВСЮ историю (не только видимый месяц календаря),
   // из того же ответа getStudentAttendance.stats.
-  const realStats: AttendanceStats | null = attendanceState.data
+  const statsFinal: AttendanceStats | null = attendanceState.data
     ? {
         attendance_pct: attendanceState.data.stats.percentage,
         excused_count: attendanceState.data.stats.excused,
         unexcused_count: attendanceState.data.stats.unexcused,
       }
     : null;
-  const statsFinal = isRealFlow ? realStats : fixtureStats;
-
-  const pickerItems: ChildPickerItem[] = isRealFlow
-    ? parentData!.children.map((c, i) => {
-        const row = toChildRow(c, i);
-        return {
-          id: row.id,
-          initials: row.first_name.slice(0, 1),
-          gradient: row.avatar_gradient,
-          ringColor: row.avatar_ring,
-          name: row.full_name,
-          classLabel: `${row.class_name} ${t.grades.class}`,
-          statusLabel: "—",
-          statusTone: "gray" as const,
-        };
-      })
-    : children.map((k) => ({
-        id: k.id,
-        initials: k.first_name.slice(0, 1),
-        gradient: k.avatar_gradient,
-        ringColor: k.avatar_ring,
-        name: k.full_name,
-        classLabel: `${k.class_name} ${t.grades.class}`,
-        statusLabel: k.status_chip,
-        statusTone: k.status_chip === "В школе" ? "green" : "gray",
-      }));
 
   return (
     <AppBackground>
@@ -597,17 +525,19 @@ export default function AttendanceScreen() {
         }}
       >
         {/* Блок 2: ChildSelectorCard (открывает шторку выбора ребёнка). */}
-        <ChildSwitcherCard
-          variant="compact"
-          avatar={{
-            initials: identityChild.first_name.slice(0, 1),
-            gradient: identityChild.avatar_gradient,
-            ringColor: identityChild.avatar_ring,
-          }}
-          name={identityChild.full_name}
-          classLabel={`${identityChild.class_name} ${t.grades.class}`}
-          onPress={() => setSheetOpen(true)}
-        />
+        {identityChild ? (
+          <ChildSwitcherCard
+            variant="compact"
+            avatar={{
+              initials: identityChild.first_name.slice(0, 1),
+              gradient: identityChild.avatar_gradient,
+              ringColor: identityChild.avatar_ring,
+            }}
+            name={identityChild.full_name}
+            classLabel={`${identityChild.class_name} ${t.grades.class}`}
+            onPress={() => setSheetOpen(true)}
+          />
+        ) : null}
 
         {/* Заход 2, шаг 3: loading/error — ТОЛЬКО для реального входа (демо
             резолвится мгновенно в data:null и никогда не попадает сюда).
@@ -615,43 +545,17 @@ export default function AttendanceScreen() {
             состояния, не заминаем сбой запроса пустым списком (история
             тихих RLS-пустот 75/76/77/82/126 — родитель получал 0 строк без
             ошибки). */}
-        {isRealFlow && attendanceState.loading ? (
-          <View style={{ paddingVertical: 48, alignItems: "center" }}>
-            <ActivityIndicator color={tokens.accent} />
-          </View>
-        ) : isRealFlow && attendanceState.error ? (
-          <GlassCard
-            radius={20}
-            contentStyle={{
-              padding: 18,
-              gap: 10,
-              alignItems: "center",
-              borderWidth: 1,
-              borderColor: `rgba(${tokens.status.red.rgb},0.35)`,
-            }}
-          >
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.red.text, textAlign: "center" }}>
-              {t.attend.loadError}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2, textAlign: "center" }}>
-              {attendanceState.error.message}
-            </Text>
-            <Pressable
-              onPress={() => attendanceState.refresh()}
-              style={{
-                paddingVertical: 8,
-                paddingHorizontal: 16,
-                borderRadius: 12,
-                backgroundColor: `rgba(${tokens.status.red.rgb},0.14)`,
-                borderWidth: 1,
-                borderColor: `rgba(${tokens.status.red.rgb},0.4)`,
-              }}
-            >
-              <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
-                {t.common.retry}
-              </Text>
-            </Pressable>
-          </GlassCard>
+        {attendanceState.loading ? (
+          <LoadingBlock />
+        ) : attendanceState.error ? (
+          <ErrorBlock
+            title={t.attend.loadError}
+            message={attendanceState.error.message}
+            retryLabel={d.common.retry}
+            onRetry={() => attendanceState.refresh()}
+          />
+        ) : (attendanceState.data?.records.length ?? 0) === 0 ? (
+          <EmptyBlock title={t.attend.empty} text={t.more4.attendanceNoRecords} />
         ) : (
           <>
             {/* Блок 3: StatsRow — 3 плитки (Посещаемость / Уважительные / Неуважительные). */}
@@ -734,7 +638,7 @@ export default function AttendanceScreen() {
                 Реальный вход с пустой историей (0 записей) — отдельная
                 нейтральная надпись, а не пустая GlassCard (которая выглядела
                 бы неотличимо от сбоя — уже отфильтрован веткой error выше). */}
-            {isRealFlow && lastDaysFinal.length === 0 ? (
+            {lastDaysFinal.length === 0 ? (
               <GlassCard radius={20} contentStyle={{ padding: 16, alignItems: "center" }}>
                 <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink3, textAlign: "center" }}>
                   {t.attend.empty}
@@ -743,9 +647,7 @@ export default function AttendanceScreen() {
             ) : (
               <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
                 {lastDaysFinal.map((row, i) => {
-                  const meta = isRealFlow
-                    ? (realLastDaysMeta[i] ?? STATUS_META.absent_unexcused)
-                    : (LAST_DAYS_META[i] ?? LAST_DAYS_META[0]);
+                  const meta = realLastDaysMeta[i] ?? STATUS_META.absent_unexcused;
                   const st = tokens.status[meta.tone];
                   const bothNull = row.arrived_label === null && row.left_label === null;
 
@@ -803,23 +705,39 @@ export default function AttendanceScreen() {
                 })}
               </GlassCard>
             )}
+
+            {/* Из чего сложились три плитки сверху — как на вебе: экран
+                показывает выведенные проценты, и родитель должен видеть, на
+                каких отметках они посчитаны. */}
+            <Text
+              style={{
+                fontFamily: fonts.manrope600,
+                fontSize: 9,
+                lineHeight: 14,
+                color: tokens.ink3,
+                textAlign: "center",
+                paddingHorizontal: 6,
+              }}
+            >
+              {format(t.more4.attendanceNote, {
+                total: String(attendanceState.data?.stats.total ?? 0),
+                present: String(attendanceState.data?.stats.present ?? 0),
+                excused: String(attendanceState.data?.stats.excused ?? 0),
+                unexcused: String(attendanceState.data?.stats.unexcused ?? 0),
+              })}
+            </Text>
           </>
         )}
       </ScrollView>
 
-      {/* Шторка выбора ребёнка. Реальный вход — реальные дети семьи +
-          selectChild (общий свитчер Шагов 1–2); демо — ровно как было. */}
+      {/* Шторка выбора ребёнка — общий свитчер семьи. */}
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>
         <ChildPickerSheetContent
           title={t.auth.chooseChild}
           items={pickerItems}
-          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
+          selectedId={selectedChildId ?? undefined}
           onSelect={(id) => {
-            if (isRealFlow) {
-              selectChild(id);
-            } else {
-              setChildId(id);
-            }
+            selectChild(id);
             setSheetOpen(false);
           }}
         />

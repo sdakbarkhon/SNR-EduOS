@@ -45,11 +45,16 @@ import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
+  format,
+  getChildSkills,
+  getHomeworkWithSubmissions,
+  getStudentAttendance,
   getStudentGrades,
   getChildTeacherReviews,
   getSubjectConfig,
   formatDate,
   LOCALE_TAG,
+  type Dictionary,
   type StudentGradeItem,
   type ChildTeacherReview,
 } from "@snr/core";
@@ -60,10 +65,12 @@ import {
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
+  EmptyBlock,
+  ErrorBlock,
   GlassCard,
+  LoadingBlock,
   Popover,
   ProgressBar,
-  Radar,
   RootHeader,
   SectionHeader,
   SegmentPills,
@@ -82,7 +89,6 @@ import {
   getGradesAssistantNotes,
   getGradesSummary,
   getSelectedChildContext,
-  getSkillsTab,
   getSubject,
   getSubjectStats,
   getTeacherReviews,
@@ -98,6 +104,31 @@ import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
 import { getSupabase } from "../../lib/supabase";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
+
+/** Градиент плитки навыка — тот же, что на экране «Навыки и развитие» (d16):
+ *  один навык обязан выглядеть одинаково на обоих экранах. */
+const PROGRESS_SKILL_GRADIENT: Record<
+  "knowledge" | "thinking" | "communication" | "independence" | "discipline",
+  [string, string]
+> = {
+  knowledge: ["#a78bfa", "#7c3aed"],
+  thinking: ["#60a5fa", "#2563eb"],
+  communication: ["#34d399", "#059669"],
+  independence: ["#f472b6", "#db2777"],
+  discipline: ["#fbbf24", "#f97316"],
+};
+
+/** Названия навыков — из общего словаря, что и на d16. */
+function PROGRESS_SKILL_NAME(d: Dictionary): Record<string, string> {
+  const m3 = d.parentApp.more3;
+  return {
+    knowledge: m3.skillKnowledge,
+    thinking: m3.skillThinking,
+    communication: m3.skillCommunication,
+    independence: m3.skillIndependence,
+    discipline: m3.skillDiscipline,
+  };
+}
 
 /** ФИО учителя → инициалы (2 буквы), как в HomeworkDetailScreen.tsx
  *  realTeacherInitials — тот же паттерн, не изобретаем новый. */
@@ -349,7 +380,20 @@ export default function ProgressScreen() {
   const child = realChildRow ?? ctx.child;
   const summary = getGradesSummary();
   const stats = getSubjectStats();
-  const skills = getSkillsTab();
+
+  // Навыки на вкладке «Навыки» — настоящие, тот же расчёт, что на d16.
+  const skillsState = useAsyncData(
+    async () => {
+      if (!isRealFlow || !selectedChildId) return null;
+      const db = getSupabase();
+      const [attendance, homework] = await Promise.all([
+        getStudentAttendance(db, undefined, selectedChildId),
+        getHomeworkWithSubmissions(db, selectedChildId),
+      ]);
+      return getChildSkills(db, selectedChildId, { attendance, homework });
+    },
+    [isRealFlow, selectedChildId],
+  );
 
   // Реальные оценки активного ребёнка — throw-on-error (getStudentGrades,
   // Долги-фикс), useAsyncData отдаёт loading/error/data раздельно, ничего не
@@ -447,27 +491,9 @@ export default function ProgressScreen() {
   const averageMaxLabel = isRealFlow ? "5.0" : summary.average_max_label;
   const averageChipLabel = isRealFlow ? (realAvgLoading || realAvgError ? "" : realAverageChip) : summary.average_chip;
   const averageStars = isRealFlow ? (realAvgLoading || realAvgError ? 0 : realStarsFilled) : summary.stars_filled;
-  // Радар «Профиль навыков» — редизайн: фикстура radar_values даёт 6 осей, а
-  // chips именует только 4 (на другой шкале, /5 — отдельный, несвязанный
-  // набор чисел, здесь не используется во избежание двух разных цифр у
-  // одного и того же навыка). Все 6 названий вершин — через i18n
-  // (d.parentApp.skills.axis*), короткие формы подобраны под бюджет символов
-  // «#16» (SkillsScreen.tsx: «Самост. 4.5» = 11 символов). Число у каждой
-  // подписи — ЕЁ реальный radar_values[i], без изменения фикстуры.
-  const skillsRadarLabels = useMemo((): [string, string, string, string, string, string] => {
-    const s = d.parentApp.skills;
-    const names = [
-      s.axisLogic,
-      s.axisCommunication,
-      s.axisDiscipline,
-      s.axisCreativity,
-      s.axisIndependence,
-      s.axisTeamwork,
-    ];
-    return names.map((name, i) => `${name} ${skills.radar_values[i]}%`) as [
-      string, string, string, string, string, string,
-    ];
-  }, [d.parentApp.skills, skills.radar_values]);
+  // Подписи осей радара удалены вместе с самим радаром (14.08.2026):
+  // навыков, посчитанных из данных, пять, а у радара шесть осей — шестую
+  // («Творчество», «Команда») взять неоткуда.
   const notes = getGradesAssistantNotes();
   const reviews = getTeacherReviews();
   const bellCount = useUnreadNotifications();
@@ -1113,116 +1139,84 @@ export default function ProgressScreen() {
               linkLabel={`${d.parentApp.common.more} ›`}
               onPress={() => navigation.navigate("d16")}
             />
-            {/* Grid 4×1 плитками навыков (макет строки 343–355) — одна строка,
-                iconTile 24×24, шрифт названия 9.5px, % 12px. */}
-            <View style={{ flexDirection: "row", flexWrap: "nowrap", gap: 6 }}>
-              {skills.tiles.map((t) => (
-                <View
-                  key={t.name}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: 10,
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: tokens.glassBorder,
-                    backgroundColor: "rgba(255,255,255,0.4)",
-                    gap: 6,
-                  }}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <LinearGradient
-                      colors={t.gradient}
-                      {...gradPoints(135)}
-                      style={{ width: 24, height: 24, borderRadius: 8 }}
-                    />
-                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
-                      {t.pct}%
-                    </Text>
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: tokens.ink2 }}
-                  >
-                    {t.name}
-                  </Text>
-                  <ProgressBar
-                    pct={t.pct / 100}
-                    height={3.5}
-                    fillGradient={t.gradient}
-                  />
-                </View>
-              ))}
-            </View>
+            {/* 14.08.2026: плитки навыков — НАСТОЯЩИЕ (getChildSkills, тот же
+                расчёт, что на экране «Навыки и развитие» d16). До этого здесь
+                стояли четыре числа из фикстуры — 92/88/85/90, — и они
+                расходились бы с настоящими на соседнем экране.
 
-            {/* Профиль навыков — Radar. */}
-            <GlassCard radius={22} contentStyle={{ padding: 14, gap: 10, alignItems: "center" }}>
-              <View style={{ alignSelf: "stretch" }}>
-                <Text
-                  style={{
-                    fontFamily: fonts.manrope800,
-                    fontSize: 10,
-                    letterSpacing: 10 * 0.08,
-                    textTransform: "uppercase",
-                    color: tokens.ink3,
-                  }}
-                >
-                  {d.parentApp.skills.profile}
-                </Text>
-              </View>
-              <Radar
-                values={
-                  skills.radar_values as unknown as [number, number, number, number, number, number]
-                }
-                max={100}
-                size={224}
-                fillColor={`rgba(${tokens.status.violet.rgb},0.28)`}
-                strokeColor={tokens.accent}
-                labels={skillsRadarLabels}
-                labelFontSize={7.5}
-                gridRings={[0.33, 0.66, 1]}
-                showSpokes
-                showDots
+                Радар «Профиль навыков» убран: у него шесть осей, а навыков,
+                посчитанных из данных, пять. Шестую («Творчество», «Команда»)
+                взять неоткуда — ни одна таблица о ней ничего не знает. */}
+            {skillsState.loading ? (
+              <LoadingBlock paddingVertical={28} />
+            ) : skillsState.error ? (
+              <ErrorBlock
+                title={d.parentApp.more4.loadFailed}
+                message={skillsState.error.message}
+                retryLabel={d.common.retry}
+                onRetry={() => skillsState.refresh()}
               />
-            </GlassCard>
+            ) : (skillsState.data?.source.gradeCount ?? 0) === 0 ? (
+              <EmptyBlock title={d.parentApp.more3.skillEmptyTitle} />
+            ) : (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                {skillsState.data!.skills.map((s) => {
+                  const g = PROGRESS_SKILL_GRADIENT[s.key];
+                  return (
+                    <View
+                      key={s.key}
+                      style={{
+                        width: "31.8%",
+                        flexGrow: 1,
+                        minWidth: 0,
+                        padding: 10,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: tokens.glassBorder,
+                        backgroundColor: "rgba(255,255,255,0.4)",
+                        gap: 6,
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <LinearGradient colors={g} {...gradPoints(135)} style={{ width: 24, height: 24, borderRadius: 8 }} />
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                          {`${s.pct}%`}
+                        </Text>
+                      </View>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: tokens.ink2 }}>
+                        {PROGRESS_SKILL_NAME(d)[s.key]}
+                      </Text>
+                      <ProgressBar pct={s.pct / 100} height={3.5} fillGradient={g} />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
-            <AccentCard
-              gradient={["#8b5cf6", "#6366f1"]}
-              shadowRgb="139,92,246"
-              radius={20}
-              contentStyle={{ padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}
-              onPress={() => navigation.navigate("d7")}
-            >
-              <View
+            {/* Карточка с «рекомендацией помощника» убрана 14.08.2026: это был
+                готовый текст в файле («Сильные стороны — логика и математика…»),
+                а не разбор чего-либо, и он расходился с настоящими числами
+                выше. Вместо неё — та же подпись, что на экране «Навыки»:
+                из чего посчитаны проценты. */}
+            {skillsState.data && skillsState.data.source.gradeCount > 0 ? (
+              <Text
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 11,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.35)",
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  fontFamily: fonts.manrope600,
+                  fontSize: 9,
+                  lineHeight: 14,
+                  color: tokens.ink3,
+                  paddingHorizontal: 2,
                 }}
               >
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.9}>
-                  <Path
-                    d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </Svg>
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
-                  EduOS Assistant
-                </Text>
-                <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, color: "rgba(255,255,255,0.9)" }}>
-                  {notes.skills}
-                </Text>
-              </View>
-              <ChevronRight />
-            </AccentCard>
+                {format(d.parentApp.more3.skillNote, {
+                  grades: String(skillsState.data.source.gradeCount),
+                  present: String(skillsState.data.source.attendancePresent),
+                  total: String(skillsState.data.source.attendanceTotal),
+                  done: String(skillsState.data.source.homeworkSubmitted),
+                  hw: String(skillsState.data.source.homeworkTotal),
+                })}
+              </Text>
+            ) : null}
           </>
         )}
 

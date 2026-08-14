@@ -112,14 +112,6 @@ export interface SubjectRow {
   teacher_name: string;       // tch
 }
 
-/** Освоение темы (TOPICS): [тема, %, метаданные]. */
-export interface TopicMasteryRow {
-  subject_id: BaseSubjectKey;
-  title: string;
-  mastery_pct: number;
-  meta_label: string;         // «8 уроков · 6 заданий»
-}
-
 /** Учитель (teachers) — профиль dteach (TEACHERS.math). */
 export interface TeacherProfileRow {
   full_name: string;
@@ -203,12 +195,6 @@ export interface DatePickerMonth {
  * u уважительная, n неуважительная, w выходной, f будущий, t сегодня.
  */
 export type AttendanceCellCode = "e" | "p" | "u" | "n" | "w" | "f" | "t";
-
-export interface AttendanceMonthRow {
-  month_index: number;        // 1 = «Июль 2026», 0 = «Июнь 2026»
-  label: string;
-  cells: AttendanceCellCode[]; // 35 ячеек, Пн–Вс
-}
 
 /** Статистика экрана «Посещаемость» (разметка 593–595). */
 export interface AttendanceStats {

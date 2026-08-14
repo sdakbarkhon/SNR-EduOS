@@ -23,7 +23,6 @@
 import type {
   ApplicationDetailRow,
   ApplicationRow,
-  AttendanceMonthRow,
   BillRow,
   ChildInfoRow,
   ChildRow,
@@ -39,7 +38,6 @@ import type {
   SubjectKey,
   SubjectRow,
   TeacherReviewRow,
-  TopicMasteryRow,
   WalletOpsDayGroup,
   WalletRow,
   WorkDetailRow,
@@ -61,7 +59,6 @@ import {
   SUBJECT_STATS,
   TEACHER_PROFILE,
   TEACHER_REVIEWS,
-  TOPICS,
 } from "./fixtures/subjects";
 import {
   DATE_PICKER_MONTHS,
@@ -76,13 +73,11 @@ import {
   TODAY_DONE_LESSONS,
   TODAY_LIVE_LESSON_INDEX,
 } from "./fixtures/schedule";
-import { ATTENDANCE_LAST_DAYS, ATTENDANCE_MONTHS, ATTENDANCE_STATS } from "./fixtures/attendance";
 import {
   DEFAULT_GRADE_PERIOD,
   GRADES_ASSISTANT_NOTES,
   GRADES_SUMMARY,
   GRADE_PERIODS,
-  SKILLS_TAB,
 } from "./fixtures/grades";
 import {
   HOMEWORK_DETAIL,
@@ -255,10 +250,6 @@ export function getSubject(key: SubjectKey): SubjectRow {
   return SUBJECTS[key];
 }
 
-export function getTopics(subjectKey?: Exclude<SubjectKey, "rusF">): TopicMasteryRow[] {
-  return subjectKey ? TOPICS.filter((t) => t.subject_id === subjectKey) : TOPICS;
-}
-
 export function getTeacherProfile() {
   return TEACHER_PROFILE;
 }
@@ -330,32 +321,10 @@ export function getDatePickerQuickChips() {
 
 // ─── Посещаемость ────────────────────────────────────────────────────────────
 
-export function getAttendanceMonths(): AttendanceMonthRow[] {
-  return ATTENDANCE_MONTHS;
-}
-
-export function getAttendanceStats() {
-  return ATTENDANCE_STATS;
-}
-
-/** {suf} в статусах («Присутствовал{suf}») резолвится по is_female ребёнка —
- *  как childSuf в макете (строка 3853); экраны получают готовые строки. */
-export function getAttendanceLastDays(childId?: string) {
-  const suf = resolveChild(childId).is_female ? "а" : "";
-  return ATTENDANCE_LAST_DAYS.map((row) => ({
-    ...row,
-    status_label: row.status_label.replace("{suf}", suf),
-  }));
-}
-
 // ─── Оценки / дневник ────────────────────────────────────────────────────────
 
 export function getGradesSummary() {
   return GRADES_SUMMARY;
-}
-
-export function getSkillsTab() {
-  return SKILLS_TAB;
 }
 
 export function getGradesAssistantNotes() {

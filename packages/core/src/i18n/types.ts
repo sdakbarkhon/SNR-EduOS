@@ -3239,6 +3239,13 @@ export interface Dictionary {
       annBackToList: string;
       annOnlyAdmin: string;
       diaryWeekEmptyDay: string;
+      sortTitle: string;
+      sortPctDesc: string;
+      sortPctAsc: string;
+      sortByTitle: string;
+      skillsSourceCap: string;
+      attendanceNote: string;
+      attendanceNoRecords: string;
     };
     more3: {
       skillKnowledge: string;

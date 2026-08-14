@@ -229,36 +229,51 @@ export const markAnnouncementRead = async (db: Db, announcementId: string, stude
 // truncated preview via notifications (kind='announcement'). Now that the
 // new "parent reads announcements for their children" SELECT policy exists,
 // this mirrors getStudentAnnouncements' shape/ordering exactly.
+/**
+ * Автор объявления для родителя.
+ *
+ * Учителя достаём вложением (`teachers` родителю читать можно), а имя
+ * администратора — вычисляемым полем `admin_name` (миграция 198). Вложение
+ * `admin:admins(full_name)` тут не работало и молча отдавало null: на
+ * public.admins защита строк пускает только самого администратора, и
+ * родитель получал ноль строк. Вместе с именем через таблицу приехал бы и
+ * `username` — логин администратора, поэтому политику не расширяли, а
+ * завели поле ровно из одного значения.
+ *
+ * Запасной вариант остаётся: у объявления учителя и у администратора чужой
+ * школы `admin_name` придёт NULL, и приложение подставит «Администрация
+ * школы» (parentApp.more.newsAuthorFallback).
+ */
+const PARENT_ANNOUNCEMENT_SELECT = "*, teacher:teachers(full_name), admin_name";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toParentAnnouncement = (a: any): ParentAnnouncement =>
+  ({
+    ...a,
+    authorName: a.teacher?.full_name ?? a.admin_name ?? null,
+    isFromAdmin: a.admin_id != null,
+    teacher: undefined,
+    admin_name: undefined,
+  }) as ParentAnnouncement;
+
 export const getParentAnnouncements = async (db: Db, limit = 100): Promise<ParentAnnouncement[]> => {
   const { data, error } = await (db as any).from("announcements")
-    .select("*, teacher:teachers(full_name), admin:admins(full_name)")
+    .select(PARENT_ANNOUNCEMENT_SELECT)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return ((data ?? []) as any[]).map((a) => ({
-    ...a,
-    authorName: a.teacher?.full_name ?? a.admin?.full_name ?? null,
-    isFromAdmin: a.admin_id != null,
-    teacher: undefined,
-    admin: undefined,
-  })) as ParentAnnouncement[];
+  return ((data ?? []) as any[]).map(toParentAnnouncement);
 };
 
 export const getParentAnnouncementById = async (db: Db, id: string): Promise<ParentAnnouncement | null> => {
   const { data, error } = await (db as any).from("announcements")
-    .select("*, teacher:teachers(full_name), admin:admins(full_name)")
+    .select(PARENT_ANNOUNCEMENT_SELECT)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return {
-    ...data,
-    authorName: data.teacher?.full_name ?? data.admin?.full_name ?? null,
-    isFromAdmin: data.admin_id != null,
-    teacher: undefined,
-    admin: undefined,
-  } as ParentAnnouncement;
+  return toParentAnnouncement(data);
 };
 
 // ── Notifications (any role; RLS limits to own) ──

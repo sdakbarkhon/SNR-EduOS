@@ -3113,6 +3113,13 @@ export const en: Dictionary = {
       annBackToList: "Back to announcements",
       annOnlyAdmin: "From administration only",
       diaryWeekEmptyDay: "No lessons",
+      sortTitle: "Sort",
+      sortPctDesc: "Mastered first",
+      sortPctAsc: "Needs attention first",
+      sortByTitle: "By topic name",
+      skillsSourceCap: "What this is based on",
+      attendanceNote: "Counted from the teacher's marks in class: {total} marks in total — {present} present, {excused} excused, {unexcused} unexcused.",
+      attendanceNoRecords: "No attendance marks yet. They will appear once teachers start marking attendance in class.",
     },
     more3: {
       skillKnowledge: "Knowledge",

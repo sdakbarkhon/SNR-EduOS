@@ -12,7 +12,6 @@ import type {
   SubjectStatRow,
   TeacherProfileRow,
   TeacherReviewRow,
-  TopicMasteryRow,
 } from "../types";
 
 export const SUBJECTS: Record<SubjectKey, SubjectRow> = {
@@ -84,29 +83,8 @@ export const SUBJECTS: Record<SubjectKey, SubjectRow> = {
   },
 };
 
-/** TOPICS — освоение тем. Правило макета: <70% → чип «Требует внимания». */
-export const TOPICS: TopicMasteryRow[] = [
-  { subject_id: "math", title: "Дроби и проценты", mastery_pct: 90, meta_label: "8 уроков · 6 заданий" },
-  { subject_id: "math", title: "Уравнения", mastery_pct: 85, meta_label: "7 уроков · 5 заданий" },
-  { subject_id: "math", title: "Геометрия: углы", mastery_pct: 62, meta_label: "5 уроков · 4 задания" },
-  { subject_id: "math", title: "Текстовые задачи", mastery_pct: 80, meta_label: "6 уроков · 5 заданий" },
-  { subject_id: "prog", title: "Циклы в Python", mastery_pct: 95, meta_label: "6 уроков · 4 задания" },
-  { subject_id: "prog", title: "Функции", mastery_pct: 92, meta_label: "5 уроков · 4 задания" },
-  { subject_id: "prog", title: "Списки и словари", mastery_pct: 88, meta_label: "4 урока · 3 задания" },
-  { subject_id: "prog", title: "Проект: калькулятор", mastery_pct: 100, meta_label: "3 урока · 1 задание" },
-  { subject_id: "robo", title: "Механика манипулятора", mastery_pct: 84, meta_label: "5 уроков · 3 задания" },
-  { subject_id: "robo", title: "Датчики", mastery_pct: 78, meta_label: "4 урока · 3 задания" },
-  { subject_id: "robo", title: "Сборка шасси", mastery_pct: 91, meta_label: "4 урока · 2 задания" },
-  { subject_id: "robo", title: "Программирование движения", mastery_pct: 66, meta_label: "3 урока · 3 задания" },
-  { subject_id: "eng", title: "Past Simple", mastery_pct: 64, meta_label: "6 уроков · 5 заданий" },
-  { subject_id: "eng", title: "Vocabulary: Travel", mastery_pct: 82, meta_label: "4 урока · 3 задания" },
-  { subject_id: "eng", title: "Reading comprehension", mastery_pct: 76, meta_label: "5 уроков · 4 задания" },
-  { subject_id: "eng", title: "Essay writing", mastery_pct: 58, meta_label: "4 урока · 4 задания" },
-  { subject_id: "rus", title: "Части речи", mastery_pct: 88, meta_label: "6 уроков · 4 задания" },
-  { subject_id: "rus", title: "Сочинение-рассуждение", mastery_pct: 61, meta_label: "5 уроков · 5 заданий" },
-  { subject_id: "rus", title: "Пунктуация", mastery_pct: 74, meta_label: "5 уроков · 4 задания" },
-  { subject_id: "rus", title: "Диктанты", mastery_pct: 86, meta_label: "4 урока · 3 задания" },
-];
+/* TOPICS удалён 14.08.2026: «Освоение тем» считается из оценок за уроки
+ * (getChildTopicMastery), двадцать выдуманных процентов больше не нужны. */
 
 /** TEACHERS — в макете заполнен только math (аномалия №6: профиль учителя
  *  всегда показывает Гульнору Юсупову). */

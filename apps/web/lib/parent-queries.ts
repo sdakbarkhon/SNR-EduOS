@@ -10,10 +10,12 @@ import {
   getChildHomeworkDetail,
   getChildLessonDetail,
   getChildMaterials,
+  getChildSkills,
   getChildSubjectDetail,
   getChildTeacherProfile,
   getChildTeacherReviews,
   getChildTests,
+  getChildTopicMastery,
   getChildWeekActivity,
   getGroupSubjectTeachers,
   getHomeworkWithSubmissions,
@@ -32,12 +34,15 @@ import {
 } from "@snr/core";
 import type {
   AppNotification,
+  ChildSkill,
+  ChildSkills,
   ChildTeacherProfile,
   ChildTestItem,
   DiaryDay,
   DiaryLesson,
   DiaryWeek,
   LibraryBookItem,
+  TopicMasteryItem,
   ChatMessageRow,
   ChatThreadSummary,
   ChildAttendanceDetail,
@@ -425,7 +430,17 @@ export const parentThreadMessages = cache(async (threadId: string): Promise<Chat
 // (next/headers + серверный клиент). Здесь осталось то, что принадлежит вебу:
 // React-кэш и резолв выбранного ребёнка.
 
-export type { ChildTestItem, LibraryBookItem, ChildTeacherProfile, DiaryLesson, DiaryDay, DiaryWeek };
+export type {
+  ChildTestItem,
+  LibraryBookItem,
+  ChildTeacherProfile,
+  DiaryLesson,
+  DiaryDay,
+  DiaryWeek,
+  TopicMasteryItem,
+  ChildSkill,
+  ChildSkills,
+};
 
 /** Сданные ребёнком тесты. */
 export const childTests = cache(async (): Promise<ChildTestItem[]> => {
@@ -522,71 +537,12 @@ export const childDiaryWeek = cache(async (weekStart: string): Promise<DiaryWeek
   return getChildDiaryWeek(db, childId, weekStart, lessons);
 });
 
-export type TopicMasteryItem = {
-  topic: string;
-  subjectName: string;
-  subjectColor: string | null;
-  /** Средний балл по теме, 0..5. */
-  average: number;
-  /** Он же в процентах — как показывает мобильное приложение. */
-  pct: number;
-  /** Сколько оценок сложилось в этот процент. */
-  count: number;
-};
-
-/**
- * Освоение тем по ВСЕМ предметам сразу.
- *
- * Тема — это `lessons.topic` реально проведённого урока, а «освоение» —
- * средний балл ребёнка по урокам этой темы, приведённый к процентам. Ровно
- * так же считает уже существующий `getChildSubjectDetail` для одного
- * предмета (packages/core/src/queries/index.ts): формулу не меняем, только
- * снимаем ограничение на один предмет — иначе на экран пришлось бы делать по
- * запросу на предмет.
- *
- * Прохождение ЭТАПОВ урока (`lesson_stage_progress`) здесь ни при чём: это
- * другая величина, и у демо-ребёнка её нет вовсе (см. отчёт).
- */
+/** Освоение тем ребёнка: тема урока + средний балл по ней в процентах. */
 export const childTopicMastery = cache(async (): Promise<TopicMasteryItem[]> => {
   const childId = await getSelectedChildId();
   if (!childId) return [];
   const db = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
-    .from("lesson_grades")
-    .select("grade, lesson:lessons!inner(topic, title, subject:subjects(name, color))")
-    .eq("student_id", childId);
-  if (error) throw error;
-
-  const map = new Map<string, { sum: number; count: number; topic: string; subjectName: string; subjectColor: string | null }>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of (data ?? []) as any[]) {
-    const topic = (r.lesson?.topic as string | null) || (r.lesson?.title as string | null);
-    if (!topic) continue;
-    const subjectName = (r.lesson?.subject?.name as string | undefined) ?? "—";
-    const key = `${subjectName}::${topic}`;
-    const cur = map.get(key) ?? {
-      sum: 0,
-      count: 0,
-      topic,
-      subjectName,
-      subjectColor: (r.lesson?.subject?.color as string | null) ?? null,
-    };
-    cur.sum += r.grade as number;
-    cur.count += 1;
-    map.set(key, cur);
-  }
-
-  return [...map.values()]
-    .map((t) => ({
-      topic: t.topic,
-      subjectName: t.subjectName,
-      subjectColor: t.subjectColor,
-      average: t.sum / t.count,
-      pct: Math.round((t.sum / t.count / 5) * 100),
-      count: t.count,
-    }))
-    .sort((a, b) => b.pct - a.pct || a.topic.localeCompare(b.topic));
+  return getChildTopicMastery(db, childId);
 });
 
 export type ParentInsight = {
@@ -623,120 +579,34 @@ export const childInsight = cache(async (locale: string): Promise<ParentInsight 
   };
 });
 
-// ── Навыки (12.08.2026) ──────────────────────────────────────────────────────
-
-export type ChildSkill = {
-  /** Ключ навыка — по нему берётся название и пояснение из словаря. */
-  key: "knowledge" | "thinking" | "communication" | "independence" | "discipline";
-  /** 0..100. */
-  pct: number;
-  /** Из чего сложился именно этот процент — подставляется в подпись. */
-  basis: { average?: number | null; subjects?: string[]; attendancePct?: number; submittedPct?: number };
-};
-
-export type ChildSkills = {
-  skills: ChildSkill[];
-  /** Средний уровень по четырём навыкам, 0..100. */
-  overall: number;
-  /** Предметы с их средним баллом — нижний список экрана. */
-  subjects: Array<{ name: string; average: number; count: number; color: string | null }>;
-  /** Числа, на которых всё построено, — для подписи внизу экрана. */
-  source: {
-    gradeCount: number;
-    average: number | null;
-    attendancePresent: number;
-    attendanceTotal: number;
-    homeworkSubmitted: number;
-    homeworkTotal: number;
-  };
-};
+// ── Навыки ───────────────────────────────────────────────────────────────────
 
 /**
- * Предметы, которые считаем «точными» и «языковыми».
- *
- * Матчим по названию, а не по ключу: в `subjects` названия свободные, ключа
- * палитры у них нет (см. home/page.tsx — там та же беда решается так же).
- * Незнакомый предмет не попадает ни в одну группу и влияет только на «Знания».
- */
-const EXACT_RE = /матем|алгебр|геометр|физик|информат|програм|робот|хими|matemat|fizika|dastur|robot|math|physic|program|robot|chemis|informat/i;
-const HUMANITIES_RE = /язык|литерат|истор|общество|англ|русск|til|adabiyot|tarix|ingliz|rus|langua|literat|histor|social/i;
-
-function avgOf(values: number[]): number | null {
-  return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
-}
-
-function pctOf5(avg: number | null): number {
-  return avg == null ? 0 : Math.round((avg / 5) * 100);
-}
-
-/**
- * Уровни навыков ребёнка — считаются ИЗ НАСТОЯЩИХ ДАННЫХ, без единой
- * выдуманной цифры. Формула нарочно простая: её видно на самом экране.
- *
- *  • Знания      = средний балл по всем предметам / 5;
- *  • Мышление    = средний балл по точным предметам / 5;
- *  • Общение     = средний балл по языковым и гуманитарным / 5;
- *  • Самостоятельность = доля сданных работ;
- *  • Дисциплина  = посещаемость.
- *
- * Если у ребёнка нет предметов какой-то группы, соответствующий навык
- * считается по всем предметам сразу — иначе экран показал бы честный, но
- * бессмысленный ноль.
+ * Уровни навыков ребёнка. Формула живёт в @snr/core (getChildSkills) — её
+ * же показывает подпись внизу экрана; посещаемость и домашние задания
+ * подаются уже прочитанными, чтобы не ходить за ними второй раз.
  */
 export const childSkills = cache(async (): Promise<ChildSkills> => {
-  const [summary, attendance, homework] = await Promise.all([
-    childGradesSummary(),
+  const childId = await getSelectedChildId();
+  const [attendance, homework, db] = await Promise.all([
     childAttendanceRecords(),
     childHomework(),
+    createClient(),
   ]);
-
-  const subjects = summary.subjects;
-  const allAvg = avgOf(subjects.map((s) => s.average));
-
-  const exact = subjects.filter((s) => EXACT_RE.test(s.subjectName));
-  const humanities = subjects.filter((s) => HUMANITIES_RE.test(s.subjectName));
-  const exactAvg = avgOf(exact.map((s) => s.average)) ?? allAvg;
-  const humanitiesAvg = avgOf(humanities.map((s) => s.average)) ?? allAvg;
-
-  const attTotal = attendance.stats.total;
-  const attPct = attTotal > 0 ? Math.round((attendance.stats.present / attTotal) * 100) : 0;
-
-  const hwTotal = homework.length;
-  const hwSubmitted = homework.filter((h) => h.submission != null || h.test_submission != null).length;
-  const hwPct = hwTotal > 0 ? Math.round((hwSubmitted / hwTotal) * 100) : 0;
-
-  // Дисциплина и самостоятельность — не про оценки, поэтому это доли, а не
-  // баллы, и считаются они по отдельности: дойти до урока и сдать работу —
-  // разные вещи, и одно усреднённое число прятало бы, что именно проседает.
-
-  const skills: ChildSkill[] = [
-    { key: "knowledge", pct: pctOf5(allAvg), basis: { average: allAvg } },
-    { key: "thinking", pct: pctOf5(exactAvg), basis: { average: exactAvg, subjects: exact.map((s) => s.subjectName) } },
-    {
-      key: "communication",
-      pct: pctOf5(humanitiesAvg),
-      basis: { average: humanitiesAvg, subjects: humanities.map((s) => s.subjectName) },
-    },
-    { key: "independence", pct: hwPct, basis: { submittedPct: hwPct } },
-    { key: "discipline", pct: attPct, basis: { attendancePct: attPct } },
-  ];
-
-  return {
-    skills,
-    overall: Math.round(skills.reduce((a, b) => a + b.pct, 0) / skills.length),
-    subjects: subjects.map((s) => ({
-      name: s.subjectName,
-      average: s.average,
-      count: s.count,
-      color: s.color,
-    })),
-    source: {
-      gradeCount: subjects.reduce((a, b) => a + b.count, 0),
-      average: allAvg,
-      attendancePresent: attendance.stats.present,
-      attendanceTotal: attTotal,
-      homeworkSubmitted: hwSubmitted,
-      homeworkTotal: hwTotal,
-    },
-  };
+  if (!childId) {
+    return {
+      skills: [],
+      overall: 0,
+      subjects: [],
+      source: {
+        gradeCount: 0,
+        average: null,
+        attendancePresent: 0,
+        attendanceTotal: 0,
+        homeworkSubmitted: 0,
+        homeworkTotal: 0,
+      },
+    };
+  }
+  return getChildSkills(db, childId, { attendance, homework });
 });

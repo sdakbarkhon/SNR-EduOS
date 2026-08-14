@@ -3114,6 +3114,13 @@ export const uz: Dictionary = {
       annBackToList: "E'lonlarga",
       annOnlyAdmin: "Faqat ma'muriyatdan",
       diaryWeekEmptyDay: "Darslar yo'q",
+      sortTitle: "Saralash",
+      sortPctDesc: "Avval o'zlashtirilganlar",
+      sortPctAsc: "Avval e'tibor talab qilganlar",
+      sortByTitle: "Mavzu nomi bo'yicha",
+      skillsSourceCap: "Nimadan hisoblangan",
+      attendanceNote: "O'qituvchining darsdagi belgilaridan hisoblanadi: jami {total} ta belgi, shundan qatnashgan {present}, sababli {excused}, sababsiz {unexcused}.",
+      attendanceNoRecords: "Hozircha davomat belgilari yo'q. O'qituvchi darslarda davomatni belgilay boshlagach chiqadi.",
     },
     more3: {
       skillKnowledge: "Bilim",
