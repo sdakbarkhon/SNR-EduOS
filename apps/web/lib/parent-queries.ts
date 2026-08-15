@@ -21,6 +21,7 @@ import {
   getHomeworkWithSubmissions,
   getLibraryBooks,
   getMyNotifications,
+  getMySessions,
   getMyThreadSummaries,
   getNextStudentLessonDate,
   getParentAnnouncements,
@@ -58,10 +59,10 @@ import type {
   LessonDetail,
   LessonWithSubject,
   MaterialWithGroup,
+  OwnSession,
   ParentAnnouncement,
   StudentGradeItem,
 } from "@snr/core";
-import { sessionIdFromAccessToken } from "@/lib/single-session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getParentContext, SELECTED_CHILD_COOKIE, resolveSelectedChild } from "@/lib/parent-context";
@@ -464,49 +465,20 @@ export const parentAdminNews = cache(async (limit = 50): Promise<ParentAnnouncem
   return all.filter((a) => a.isFromAdmin);
 });
 
-export type ParentSessionItem = {
-  id: string;
-  deviceInfo: string | null;
-  createdAt: string;
-  lastActivity: string | null;
-  isCurrent: boolean;
-};
-
 /**
- * Устройства, с которых выполнен вход в аккаунт родителя.
+ * Входы в аккаунт родителя.
  *
- * ПОЧЕМУ СЛУЖЕБНЫМ КЛЮЧОМ. На public.user_sessions включена защита строк и
- * НЕТ НИ ОДНОЙ политики — под своей сессией родитель получает отказ по правам
- * (проверено запросом). Заводить политику здесь нельзя: это миграция, а
- * задача идёт без изменений схемы. Поэтому строки читает служебный клиент,
- * но идентификатор пользователя берётся ИЗ СЕССИИ, а не из аргумента, и
- * фильтр по нему стоит в самом запросе — чужие строки прийти не могут.
+ * 15.08.2026. Раньше строки брались из public.user_sessions служебным ключом.
+ * Это была не та таблица: в ней реестр правила «одна активная сессия», ровно
+ * одна строка на аккаунт (UNIQUE (user_id)) — списка устройств из неё не
+ * бывает, и родитель всегда видел ровно один пункт. Настоящие входы лежат в
+ * auth.sessions; читает их RPC миграции 199 обычным клиентом вошедшего —
+ * служебный ключ здесь больше не нужен, а фильтр по пользователю стоит внутри
+ * функции и подменить его нечем. Тот же вызов, что и в приложении.
  */
-export const parentSessions = cache(async (): Promise<ParentSessionItem[]> => {
+export const parentSessions = cache(async (): Promise<OwnSession[]> => {
   const db = await createClient();
-  const { data: { session } } = await db.auth.getSession();
-  const userId = session?.user?.id;
-  if (!userId) return [];
-  const currentSessionId = session?.access_token
-    ? sessionIdFromAccessToken(session.access_token)
-    : null;
-
-  const admin = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (admin as any)
-    .from("user_sessions")
-    .select("id, session_id, device_info, created_at, last_activity")
-    .eq("user_id", userId)
-    .order("last_activity", { ascending: false });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data ?? []) as any[]).map((r) => ({
-    id: r.id as string,
-    deviceInfo: (r.device_info as string | null) ?? null,
-    createdAt: r.created_at as string,
-    lastActivity: (r.last_activity as string | null) ?? null,
-    isCurrent: currentSessionId != null && r.session_id === currentSessionId,
-  }));
+  return getMySessions(db);
 });
 
 /** Профиль одного учителя ребёнка: предметы, классы и число уроков. */

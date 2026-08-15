@@ -19,7 +19,7 @@
  * Дети берутся из настоящей привязки родителя (getParentContext через
  * ParentDataContext), а не из фикстурного набора, подобранного по количеству.
  */
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
 import { getSupabase } from "../lib/supabase";
 import { NotParentError } from "../lib/auth";
@@ -143,6 +143,26 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   // Найдено адверсариальной проверкой. Ref читается/пишется синхронно —
   // второй вызов в том же тике гарантированно увидит true.
   const verifyBusyRef = useRef(false);
+
+  // Сессия могла кончиться не по нашей воле: её закрыли с другого устройства
+  // на экране «Активные сессии» (миграция 199 удаляет строку auth.sessions
+  // вместе с refresh-токенами) или она протухла сама. Supabase в этом случае
+  // не может продлить вход, стирает сессию и присылает SIGNED_OUT.
+  //
+  // Раньше приложение этого не слышало вовсе: экраны оставались на месте и
+  // начинали молча отдавать ошибки — человек видел «не удалось загрузить»
+  // вместо честного «войдите заново». Теперь SIGNED_OUT возвращает на вход
+  // тем же сбросом, что и кнопка «Выйти».
+  useEffect(() => {
+    const { data } = getSupabase().auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_OUT") return;
+      // Свой выход уже сбросил состояние — второй сброс не навредит, но и не
+      // нужен: на фазе onboarding делать нечего.
+      setState((prev) => (prev.phase === "onboarding" ? prev : INITIAL_STATE));
+      selectParentChild(null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [selectParentChild]);
 
   const setPhase = useCallback((next: AuthPhase) => {
     setState((s) => ({ ...s, phase: next }));

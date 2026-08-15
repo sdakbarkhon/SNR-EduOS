@@ -3540,5 +3540,35 @@ export interface Dictionary {
       /** Однострочные объяснения у кнопок, которые ничего не сохраняют. */
       notes: Record<string, string>;
     };
+    /**
+     * Заход 6 (сессии). Экран «Активные сессии» переехал на настоящие данные —
+     * auth.sessions, строка на каждый вход. Здесь всё, чего не было у прежней
+     * фикстуры: закрытие чужого входа, честные подписи под цифрами и названия
+     * для входов, которые не являются устройством человека (служебный скрипт,
+     * сервер школы, само приложение).
+     */
+    sess: {
+      currentCap: string;   // «ЭТО УСТРОЙСТВО»
+      othersCap: string;    // «ДРУГИЕ ВХОДЫ»
+      othersEmpty: string;  // когда других входов нет
+      end: string;          // «Завершить»
+      endAll: string;       // «Завершить все другие входы»
+      ending: string;       // «Закрываем…»
+      endedOne: string;     // подтверждение с честным сроком
+      endedNone: string;    // сеанса уже нет
+      endCurrent: string;   // текущий не закрываем
+      endError: string;     // сеть/отказ
+      confirmTitle: string; // заголовок подтверждения
+      confirmText: string;  // «{device}»
+      deviceApp: string;    // вход из приложения
+      deviceScript: string; // служебный вход (скрипт)
+      deviceWeb: string;    // вход через сайт школы
+      entered: string;      // «Вход: {when}»
+      seen: string;         // «Продлён: {when}»
+      addr: string;         // «Адрес: {ip}»
+      noteSeen: string;     // что значит «продлён»
+      noteSingle: string;   // как это связано с правилом одной сессии
+      noteData: string;     // чего в данных нет
+    };
   };
 }
