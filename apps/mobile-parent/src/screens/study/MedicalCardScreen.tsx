@@ -46,6 +46,10 @@
  * getNoAllergiesText/getVaccinations (../../data). Тексты — d.parentApp.*,
  * литералы мокапа оставлены как есть (прецедент ChildProfileScreen.tsx).
  * Обе темы — useTheme(). iOS safe-area — из InnerHeader.
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «данных нет, это пример»: прививки,
+ * справки и осмотры выдуманы, медкабинет карту в системе не ведёт. Имя и
+ * класс ребёнка в шапке — настоящие.
  */
 import { useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -74,6 +78,7 @@ import {
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -376,6 +381,9 @@ export default function MedicalCardScreen() {
           gap: 11,
         }}
       >
+        {/* Плашка «это пример» — раздела ещё нет в базе школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.medcard} />
+
         {/* Блок 2: ChildSwitcherCard compact — открывает шторку выбора ребёнка. */}
         <ChildSwitcherCard
           variant="compact"

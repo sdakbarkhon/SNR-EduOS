@@ -66,6 +66,7 @@ import {
 } from "../../theme";
 import { GlassCard, GlassCircleButton, Popover } from "../../ui";
 import { getSupportChat } from "../../data";
+import { DemoBanner, SoonNote } from "../../ui/notices";
 import type { ChatMessageRow } from "../../data/types";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, StubKey } from "../../navigation/routes";
@@ -103,6 +104,10 @@ export default function SupportScreen() {
 
   const chat = getSupportChat();
   const [text, setText] = useState("");
+  // 15.08.2026 (заглушки). Кнопка «отправить» раньше просто чистила поле:
+  // текст исчезал, сообщение не появлялось, и родитель не понимал, ушло оно
+  // или нет. Теперь она объясняет, почему отправлять некуда.
+  const [sendNote, setSendNote] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const openStub = (key: StubKey) => {
@@ -288,6 +293,9 @@ export default function SupportScreen() {
             </View>
           </GlassCard>
 
+          {/* Плашка «это пример» — службы поддержки в системе школы нет. */}
+          <DemoBanner text={d.parentApp.soon.sections.support} />
+
           {/* 3. Section label caps */}
           <Text
             style={{
@@ -349,16 +357,14 @@ export default function SupportScreen() {
             paddingBottom: Math.max(insets.bottom, 10) + 6,
           }}
         >
+          {sendNote ? <SoonNote text={d.parentApp.soon.notes.supportSend} /> : null}
+
           <InputBar
             value={text}
             onChangeText={setText}
             placeholder={placeholder}
             onAttach={() => openStub("afile")}
-            onSend={() => {
-              // Отправка — заглушка: чистим поле; реальный поток появится в
-              // этапе данных (Supabase, см. корневой CLAUDE.md §4).
-              setText("");
-            }}
+            onSend={() => setSendNote(true)}
           />
         </View>
       </KeyboardAvoidingView>

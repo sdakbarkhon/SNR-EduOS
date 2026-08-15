@@ -23,9 +23,13 @@
  *     CenterModalFrame по CONFIRM_DIALOGS.deleteAccount).
  * 10. Секция «О ПРИЛОЖЕНИИ» (t.scrAbout).
  * 11. About-карточка — 3 строки: «Версия приложения» 1.0.0 (без chevron),
- *     «Условия использования» (nav → ddoc), «Политика конфиденциальности»
- *     (nav → ddoc). Секция «О приложении» присутствует прямо на #34,
- *     отдельно от about-экрана da7 (переиспользуется через ddoc).
+ *     «Условия использования» и «Политика конфиденциальности».
+ *
+ * 15.08.2026 (заглушки). Обе правовые ссылки вели на ОДИН безымянный экран
+ * «Просмотр документа» — теперь у каждой свой заголовок и свой текст о том,
+ * что документа пока нет и где спросить. Кнопка «Удалить аккаунт» больше не
+ * притворяется: подтверждение в модалке заменено объяснением, потому что
+ * аккаунт заводит школа. Настоящий экран «О приложении» — da7.
  *
  * ИНТЕРАКТИВ РАБОЧИЙ (по требованию Захода 7):
  * — Оформление: useTheme() → { appearance, setAppearance }.
@@ -51,10 +55,10 @@ import {
   CenterModalFrame,
   GlassCard,
   InnerHeader,
-  PrimaryButton,
   SectionHeader,
   Toggle,
 } from "../../ui";
+import { SoonNote } from "../../ui/notices";
 import { useAppLocale } from "../../i18n";
 import { getAutoExitFixture, getConfirmDialog } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -500,9 +504,12 @@ export default function LangSecurityScreen() {
             </Text>
           </View>
 
-          {/* Условия использования → ddoc. */}
+          {/* 15.08.2026 (заглушки). Обе ссылки вели на один и тот же экран
+              «Просмотр документа» — родитель нажимал «Политику
+              конфиденциальности» и попадал в безымянный документ. Теперь у
+              каждой свой заголовок и свой текст о том, чего ещё нет. */}
           <Pressable
-            onPress={goTo("ddoc")}
+            onPress={() => navigation.navigate("stub", { stubKey: "terms" })}
             style={({ pressed }) => [
               {
                 flexDirection: "row",
@@ -521,9 +528,9 @@ export default function LangSecurityScreen() {
             <ChevronRight />
           </Pressable>
 
-          {/* Политика конфиденциальности → ddoc. */}
+          {/* Политика конфиденциальности — свой текст, см. выше. */}
           <Pressable
-            onPress={goTo("ddoc")}
+            onPress={() => navigation.navigate("stub", { stubKey: "privacy" })}
             style={({ pressed }) => [
               {
                 flexDirection: "row",
@@ -554,32 +561,28 @@ export default function LangSecurityScreen() {
         title={delAccDialog?.title ?? "Удалить аккаунт?"}
         text={delAccDialog?.body}
       >
-        <View style={{ flexDirection: "row", gap: 10, alignSelf: "stretch", marginTop: 6 }}>
-          <Pressable
-            onPress={() => setDelAccOpen(false)}
-            style={{
-              flex: 1,
-              paddingVertical: 14,
-              borderRadius: 16,
-              alignItems: "center",
-              backgroundColor: scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(23,18,67,0.06)",
-            }}
-          >
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
-              {d.parentApp.common.cancel}
-            </Text>
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <PrimaryButton
-              label={delAccDialog?.action_label ?? d.parentApp.prof.deleteAcc}
-              onPress={() => {
-                // Реальное удаление аккаунта — этап данных (Supabase RPC).
-                // Пока модалка просто закрывается.
-                setDelAccOpen(false);
-              }}
-            />
-          </View>
-        </View>
+        {/* 15.08.2026 (заглушки). Красная кнопка «Удалить» тут просто закрывала
+            модалку — самое опасное действие в приложении молча не делало
+            ничего. Аккаунт заводит школа, удалять его из приложения нельзя,
+            поэтому вместо кнопки-обманки стоит объяснение и обычное
+            «Понятно»; строку в настройках при этом не прячем. */}
+        <SoonNote text={d.parentApp.soon.notes.delAcc} />
+        <Pressable
+          onPress={() => setDelAccOpen(false)}
+          accessibilityRole="button"
+          style={{
+            alignSelf: "stretch",
+            marginTop: 10,
+            paddingVertical: 14,
+            borderRadius: 16,
+            alignItems: "center",
+            backgroundColor: scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(23,18,67,0.06)",
+          }}
+        >
+          <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+            {d.parentApp.common.gotIt}
+          </Text>
+        </Pressable>
       </CenterModalFrame>
     </AppBackground>
   );

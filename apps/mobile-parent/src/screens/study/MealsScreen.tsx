@@ -40,6 +40,10 @@
  * локальные константы 1:1 из макета. В data-слое соответствующих аксессоров
  * пока нет (см. block-list п.5/п.10 — «стоит вынести в data при переносе»).
  * НЕТ «опозданий», НЕТ «кружков» (правила заказчика).
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «данных нет, это пример»: питание
+ * в базе школы не ведётся, баланс/меню/покупки собраны из фикстуры. Кнопки
+ * раздела ведут на экраны, которые честно объясняют, чего ещё нет.
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -49,6 +53,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { AccentCard, GlassCard, GlassCircleButton, InnerHeader, SectionHeader } from "../../ui";
+import { DemoBanner } from "../../ui/notices";
 import { DEMO_TODAY, getMealsWeek, getWalletBalance } from "../../data";
 import { useAppLocale } from "../../i18n";
 import { useAuthSession } from "../../context/AuthSessionContext";
@@ -336,6 +341,9 @@ export default function MealsScreen() {
           gap: 12,
         }}
       >
+        {/* Плашка «это пример» — раздела ещё нет в базе школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.meals} />
+
         {/* Блок 3 — WalletBalanceCard (строки 1472–1477). */}
         <AccentCard
           gradient={["#34d399", "#0ea5e9"]}

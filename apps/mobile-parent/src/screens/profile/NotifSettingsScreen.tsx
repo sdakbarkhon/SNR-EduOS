@@ -38,6 +38,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCard, InnerHeader, Toggle } from "../../ui";
+import { SoonNote } from "../../ui/notices";
 import { getNotificationCategories } from "../../data";
 import type { NotificationCategoryRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -206,8 +207,21 @@ export default function NotifSettingsScreen() {
     return init;
   });
 
-  const setOne = (id: string, next: boolean) =>
+  // 15.08.2026 (заглушки). Тумблеры переключаются, но сохранять их некуда:
+  // push-уведомления к приложению не подключены, таблицы настроек в базе нет.
+  // Молча «запоминать» настройку до первой перезагрузки — обман; при первой
+  // же правке экран говорит, что значение не сохранится.
+  const [notSaved, setNotSaved] = useState(false);
+
+  const setOne = (id: string, next: boolean) => {
+    setNotSaved(true);
     setValues((prev) => ({ ...prev, [id]: next }));
+  };
+
+  const setMasterExplained = (next: boolean) => {
+    setNotSaved(true);
+    setMaster(next);
+  };
 
   // Иконка-колокольчик мастер-карточки (макет строка 1282).
   const bellPaths = [
@@ -271,8 +285,11 @@ export default function NotifSettingsScreen() {
               Главный переключатель всех уведомлений
             </Text>
           </View>
-          <Toggle value={master} onValueChange={setMaster} />
+          <Toggle value={master} onValueChange={setMasterExplained} />
         </GlassCard>
+
+        {/* Объяснение появляется после первой правки — не пугаем заранее. */}
+        {notSaved ? <SoonNote text={d.parentApp.soon.notes.notifSave} /> : null}
 
         {/* 4. Секционный хедер. */}
         <SectionCap label="УВЕДОМЛЕНИЯ" />

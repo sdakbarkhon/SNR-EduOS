@@ -35,6 +35,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { Gauge, GlassCircleButton, ProgressBar } from "../../ui";
+import { SoonNote } from "../../ui/notices";
 import {
   getSelectedChildContext,
   getSubject,
@@ -137,6 +138,10 @@ export default function SubjectDetailScreen() {
   const teacher = getTeacherProfile();
 
   const [isFavorite, setIsFavorite] = useState(false);
+  // 15.08.2026 (заглушки). Сердечко переключается, но хранить отметку негде:
+  // «избранных предметов» в базе школы нет. Молча забывать выбор — обман,
+  // поэтому при первом нажатии экран говорит об этом.
+  const [favNote, setFavNote] = useState(false);
 
   const glass1Grad = gradPoints(tokens.glass1.angle);
   const teacherAvatarGrad = gradPoints(135);
@@ -206,7 +211,12 @@ export default function SubjectDetailScreen() {
           </Text>
         </View>
 
-        <GlassCircleButton onPress={() => setIsFavorite((v) => !v)}>
+        <GlassCircleButton
+          onPress={() => {
+            setIsFavorite((v) => !v);
+            setFavNote(true);
+          }}
+        >
           {/* Сердечко: залитое если favorite, иначе контур. */}
           <Svg
             width={18}
@@ -233,6 +243,8 @@ export default function SubjectDetailScreen() {
           gap: 12,
         }}
       >
+        {favNote ? <SoonNote text={d.parentApp.soon.notes.favSave} /> : null}
+
         {/* 3. Teacher Card (макет 462–467). */}
         <Pressable
           onPress={() => navigation.navigate("dteach")}

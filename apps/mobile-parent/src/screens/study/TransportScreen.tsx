@@ -59,6 +59,9 @@
  * Тексты — d.parentApp.svc.transport (заголовок); литералы баннера/водителя —
  * дословно из макета (нет соответствующих fixture-полей). Обе темы —
  * useTheme(). iOS safe-area — из InnerHeader.
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «данных нет, это пример»: маршрутов
+ * и автобусов в базе школы нет, карта и время подставлены из фикстуры.
  */
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -77,6 +80,7 @@ import {
 import { getTransportRoute } from "../../data";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -230,6 +234,9 @@ export default function TransportScreen() {
           gap: 11,
         }}
       >
+        {/* Плашка «это пример» — раздела ещё нет в базе школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.transport} />
+
         {/* Блок 3 — RouteBanner (1706–1710). */}
         <View
           style={[

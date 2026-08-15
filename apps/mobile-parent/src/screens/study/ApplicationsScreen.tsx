@@ -53,6 +53,9 @@
  * фильтров/чипов и текст «Подано …» в макете — литеральные русские
  * строки без {{t.xxx}}-биндинга → оставлены как литералы (прецедент
  * ChildProfileScreen.tsx: «Школа», «Телефон» и т.п.). Обе темы — useTheme().
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «данных нет, это пример»: заявлений
+ * школа через приложение не принимает, список собран из фикстуры.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -83,6 +86,7 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
 import { ICONS } from "../../navigation/routes";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -321,6 +325,9 @@ export default function ApplicationsScreen() {
           gap: 11,
         }}
       >
+        {/* Плашка «это пример» — раздела ещё нет в базе школы. */}
+        <DemoBanner text={t.soon.sections.applications} />
+
         {/* Блок 3: ChildSwitcherCard compact — открывает шторку выбора ребёнка. */}
         <ChildSwitcherCard
           variant="compact"

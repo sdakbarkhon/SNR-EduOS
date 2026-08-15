@@ -3005,6 +3005,18 @@ export interface Dictionary {
     about: {
       info: string;
       school: string;
+      /* Заход 5: экран «О приложении» стал настоящим — всё ниже реальное. */
+      appName: string;      // «SNR EduOS для родителей»
+      version: string;      // «Версия приложения»
+      channel: string;      // «Канал обновлений»
+      runtime: string;      // «Среда Expo»
+      updated: string;      // «Обновление загружено»
+      schoolToday: string;  // «Учебный день школы»
+      childrenCount: string; // «Детей привязано»
+      parent: string;       // «Родитель»
+      phone: string;        // «Телефон»
+      storeNote: string;    // почему версия обновляется «по воздуху»
+      unknown: string;      // «неизвестно»
     };
     set: {
       security: string;
@@ -3508,6 +3520,25 @@ export interface Dictionary {
       filterDone: string;        // «Выполнено»
       sizeKb: string;            // «{n} КБ»
       sizeMb: string;            // «{n} МБ»
+    };
+    /**
+     * Заход 5 (заглушки). Раздел, для которого в базе школы нет данных, не
+     * должен показывать пустой экран или «Экран в разработке»: он говорит,
+     * ЧТО здесь будет, КОГДА появится и ЧТО доступно сейчас. Тексты у каждого
+     * раздела свои — общей фразы «появится позже» на все случаи нет.
+     */
+    soon: {
+      badge: string;    // «Появится в будущих обновлениях»
+      whatCap: string;  // подпись «ЧТО ЗДЕСЬ БУДЕТ»
+      whenCap: string;  // подпись «КОГДА ПОЯВИТСЯ»
+      nowCap: string;   // подпись «ЧТО ДОСТУПНО СЕЙЧАС»
+      back: string;     // «Вернуться назад»
+      /** Ключ = stubKey или имя маршрута; см. SOON_KEY в StubScreen.tsx. */
+      items: Record<string, { what: string; when: string; now?: string }>;
+      /** Плашка сверху раздела, который целиком собран из примеров. */
+      sections: Record<string, string>;
+      /** Однострочные объяснения у кнопок, которые ничего не сохраняют. */
+      notes: Record<string, string>;
     };
   };
 }

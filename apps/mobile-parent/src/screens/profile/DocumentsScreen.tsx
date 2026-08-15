@@ -26,6 +26,9 @@
  * нет ключей (баннер, section-label'ы, кнопка, футнот), задаются здесь
  * строкой ru — соответствует практике других d-экранов до подключения
  * i18n-ключей на этапе перевода. Обе темы через tokens.
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «данных нет, это пример»: документов
+ * родителя в базе школы нет, список собран из фикстуры.
  */
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,6 +46,7 @@ import { useAppLocale } from "../../i18n";
 import { getChildDocuments, getParentDocuments } from "../../data";
 import type { DocumentRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -113,6 +117,9 @@ export default function DocumentsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Плашка «это пример» — раздела ещё нет в базе школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.documents} />
+
         {/* 3. Security-баннер (макет 1254–1257). */}
         <SecurityBanner tokens={tokens} />
 

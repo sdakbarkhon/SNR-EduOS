@@ -216,6 +216,10 @@ function DetailTopBar({
       >
         {title}
       </Text>
+      {/* 15.08.2026 (заглушки). В настоящем потоке кнопка приходила без
+          обработчика (onShare === undefined) и молча нажималась. Теперь её
+          просто нет, когда делать нечего. */}
+      {onShare ? (
       <GlassCircleButton onPress={onShare}>
         {/* upload-arrow-from-folder 16px stroke 1.8 — мокап строка 550. */}
         <Svg
@@ -233,6 +237,7 @@ function DetailTopBar({
           <Path d="M12 2v13" />
         </Svg>
       </GlassCircleButton>
+      ) : null}
     </View>
   );
 }

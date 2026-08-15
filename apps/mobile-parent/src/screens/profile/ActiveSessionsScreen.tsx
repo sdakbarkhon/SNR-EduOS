@@ -37,6 +37,13 @@
  * нужен (в макете этого блока нет, инструкция явно это подтверждает).
  *
  * Обе темы — useTheme(). iOS safe-area — из InnerHeader.
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «это пример»: настоящих входов
+ * приложение пока не показывает. Крестик у строки и «Завершить все другие
+ * сессии» больше не вычёркивают строки из локального списка (родитель видел
+ * «сеанс завершён», хотя ничего не происходило) — они раскрывают объяснение
+ * под кнопкой. Настоящие входы в базе есть (таблица user_sessions), но
+ * завершение сеанса — это запись, а её этот заход не делает.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -46,6 +53,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCard, InnerHeader } from "../../ui";
+import { DemoBanner, SoonNote } from "../../ui/notices";
 import { getSessions } from "../../data";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
@@ -99,7 +107,13 @@ export default function ActiveSessionsScreen() {
   const navigation = useNavigation<Nav>();
 
   // Блок 5: локальный список «других устройств» — снимок фикстуры один раз.
-  const [sessions, setSessions] = useState(() => getSessions());
+  const [sessions] = useState(() => getSessions());
+
+  // 15.08.2026 (заглушки). Крестик у строки и «Завершить все» раньше просто
+  // вычёркивали строки из локального списка: родитель видел «чужой вход
+  // завершён», хотя не происходило ничего — ровно та же беда, что была у
+  // кнопки перевода в кошельке. Теперь нажатие раскрывает объяснение.
+  const [killNote, setKillNote] = useState(false);
 
   const rowDivider = scheme === "light" ? "rgba(23,18,67,0.07)" : "rgba(255,255,255,0.08)";
   const capsInk = scheme === "light" ? "rgba(26,19,74,0.5)" : "rgba(255,255,255,0.55)";
@@ -107,8 +121,7 @@ export default function ActiveSessionsScreen() {
   const bannerText = scheme === "light" ? "rgba(26,19,74,0.7)" : "rgba(255,255,255,0.78)";
   const linkColor = scheme === "light" ? "#6D28D9" : "#C4B5FD";
 
-  const killOne = (id: string) => setSessions((s) => s.filter((row) => row.id !== id));
-  const killAll = () => setSessions([]);
+  const explainKill = () => setKillNote(true);
 
   return (
     <AppBackground>
@@ -129,6 +142,9 @@ export default function ActiveSessionsScreen() {
           gap: 11,
         }}
       >
+        {/* Плашка «это пример» — раздел целиком собран из выдуманных строк. */}
+        <DemoBanner text={t.soon.sections.sessions} />
+
         {/* Блок 3: CurrentDeviceHeroCard — литеральная, вне фикстуры. */}
         <View
           style={[
@@ -264,7 +280,7 @@ export default function ActiveSessionsScreen() {
                   </Text>
                 </View>
                 <Pressable
-                  onPress={() => killOne(row.id)}
+                  onPress={explainKill}
                   hitSlop={6}
                   style={({ pressed }) => [
                     {
@@ -289,7 +305,7 @@ export default function ActiveSessionsScreen() {
 
         {/* Блок 6: KillAllButton — outline red, очищает список локально. */}
         <Pressable
-          onPress={killAll}
+          onPress={explainKill}
           style={({ pressed }) => [
             {
               flexDirection: "row",
@@ -309,6 +325,9 @@ export default function ActiveSessionsScreen() {
             Завершить все другие сессии
           </Text>
         </Pressable>
+
+        {/* Объяснение — прямо под нажатой кнопкой, а не тостом наверху. */}
+        {killNote ? <SoonNote text={t.soon.notes.killSession} /> : null}
 
         {/* Блок 7: InfoBanner — оранжевая плашка с pressable-фрагментом. */}
         <View

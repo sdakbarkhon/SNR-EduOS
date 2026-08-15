@@ -1,11 +1,16 @@
 /**
- * Экран «Заглушка» — перенос 1:1 из макета (разметка строки 2448–2460,
- * динамические стили/тексты renderVals строки 4677–4682).
- * В Заходе 1 его рендерят ВСЕ 64 маршрута: конфиг берётся из SCREEN_INFO
- * по имени маршрута, а маршрут 'stub' — дополнительно из params.stubKey
- * (аналог goStub(k) макета).
+ * Экран «Появится в будущих обновлениях».
+ *
+ * До захода 5 здесь стояла общая заглушка из макета: плитка, номер экрана и
+ * одна и та же фраза «Экран в разработке» на все случаи жизни. Родитель,
+ * нажавший «Справка» или «Выбор даты», видел ровно то же, что родитель,
+ * нажавший «Новое заявление», и не понимал ни что это, ни чего ждать.
+ *
+ * Теперь экран отвечает на три вопроса, и по каждому разделу — своими словами
+ * (см. SoonBody и `parentApp.soon.items` в словаре на трёх языках). Ключ —
+ * stubKey нажатого действия, а для маршрутов без своего экрана — SOON_KEY ниже.
  */
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -14,11 +19,11 @@ import type { Dictionary } from "@snr/core";
 import { useAppLocale } from "../i18n";
 import { AppBackground, useTheme, gradPoints, fonts } from "../theme";
 import { ICONS, SCREEN_INFO, STUBS, type MainStackParamList, type StubInfo } from "../navigation/routes";
+import { SoonBody } from "./soon";
 
 /**
- * Заголовок заглушки: если у записи есть tKey («scr.notifications»), берём
- * перевод из d.parentApp (реагирует на смену языка в dev-панели); иначе —
- * дословный t макета (таких заголовков в словаре макета нет).
+ * Заголовок: если у записи есть tKey («scr.notifications»), берём перевод из
+ * d.parentApp (реагирует на смену языка); иначе — дословный t макета.
  */
 function stubTitle(d: Dictionary, stub: StubInfo): string {
   if (!stub.tKey) return stub.t;
@@ -27,22 +32,27 @@ function stubTitle(d: Dictionary, stub: StubInfo): string {
   return sec?.[key] ?? stub.t;
 }
 
-/** Тексты фаз — дословно из renderVals макета (строки 4677–4678). */
-function stubPhase(n: string): string {
-  if (n === "Действие") return "Действие вне прототипа";
-  if (n.indexOf("позже") > -1) return "Появится в следующих версиях";
-  return "Экран в разработке";
-}
-
-function stubDesc(n: string): string {
-  if (n === "Действие") {
-    return "Здесь выполняется системное действие устройства — оно за рамками кликабельного прототипа.";
-  }
-  if (n.indexOf("позже") > -1) {
-    return "Способ входа подключим после интеграции с провайдером.";
-  }
-  return "Содержание перенесём из комплекта А в этом же стиле — блок за блоком, ничего не сокращая.";
-}
+/**
+ * Маршруты без своего экрана → ключ объяснения.
+ *
+ * a1–a4 — экраны входа из первого прототипа: попасть в них из интерфейса уже
+ * нельзя (вход ведёт AuthSessionContext), но маршруты оставлены — значит и у
+ * них должен быть честный текст, а не «Экран в разработке».
+ */
+const SOON_KEY: Record<string, string> = {
+  da1: "testreview",
+  da2: "matview",
+  da3: "workdet",
+  da4: "appdet",
+  da5: "newapp",
+  da6: "search",
+  da8: "whatsnew",
+  ddoc: "docview",
+  a1: "authproto",
+  a2: "authproto",
+  a3: "authproto",
+  a4: "authproto",
+};
 
 const FALLBACK: StubInfo = STUBS.notif;
 
@@ -58,14 +68,18 @@ export default function StubScreen() {
     (stubKey ? STUBS[stubKey] : undefined) ?? SCREEN_INFO[route.name] ?? FALLBACK;
   const title = stubTitle(d, stub);
 
-  const icon = ICONS[stub.i] || ICONS.doc;
+  // Ключ объяснения: сначала нажатое действие, потом маршрут; если ни того,
+  // ни другого в словаре нет — общий честный текст, а не пустой экран.
+  const soon = d.parentApp.soon;
+  const itemKey = (stubKey && soon.items[stubKey] ? stubKey : SOON_KEY[route.name]) ?? "fallback";
+
   const glass1 = gradPoints(tokens.glass1.angle);
-  const tileGrad = gradPoints(135);
   const canGoBack = navigation.canGoBack();
+  const chip = tokens.chip(tokens.status.violet.rgb);
 
   return (
     <AppBackground>
-      {/* Шапка: круглая кнопка «назад» + заголовок (макет: padding 46px 18px 8px) */}
+      {/* Шапка: круглая кнопка «назад» + заголовок. */}
       <View
         style={{
           flexDirection: "row",
@@ -79,6 +93,7 @@ export default function StubScreen() {
         {canGoBack && (
           <Pressable
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
             style={{ width: 38, height: 38, borderRadius: 19, overflow: "hidden" }}
           >
             <LinearGradient
@@ -106,80 +121,44 @@ export default function StubScreen() {
         </Text>
       </View>
 
-      {/* Центр: плитка-иконка на градиенте, название, номер, фаза, описание */}
-      <View
-        style={{
-          flex: 1,
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
           alignItems: "center",
-          justifyContent: "center",
-          gap: 14,
-          paddingHorizontal: 32,
-          paddingBottom: 120,
+          gap: 12,
+          paddingHorizontal: 22,
+          paddingTop: 18,
+          paddingBottom: 140,
         }}
       >
-        <LinearGradient
-          colors={stub.g}
-          start={tileGrad.start}
-          end={tileGrad.end}
-          style={{
-            width: 86,
-            height: 86,
-            borderRadius: 26,
-            alignItems: "center",
-            justifyContent: "center",
-            shadowColor: stub.g[1],
-            shadowOffset: { width: 0, height: 20 },
-            shadowRadius: 22,
-            shadowOpacity: 0.33,
-            elevation: 12,
-          }}
-        >
-          <Svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-            {icon.map((d, i) => (
-              <Path key={i} d={d} />
-            ))}
-          </Svg>
-        </LinearGradient>
-        <Text
-          style={{
-            fontFamily: fonts.unbounded600,
-            fontSize: 17,
-            color: tokens.ink1,
-            textAlign: "center",
-          }}
-        >
-          {title}
-        </Text>
-        <View
-          style={{
-            paddingVertical: 4,
-            paddingHorizontal: 11,
-            borderRadius: 999,
-            backgroundColor: tokens.chip(tokens.status.violet.rgb).bg,
-            borderWidth: 1,
-            borderColor: tokens.chip(tokens.status.violet.rgb).border,
-          }}
-        >
-          <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, color: tokens.status.violet.text }}>
-            {stub.n}
-          </Text>
-        </View>
-        <Text style={{ fontFamily: fonts.manrope700, fontSize: 12, color: tokens.ink2 }}>
-          {stubPhase(stub.n)}
-        </Text>
-        <Text
-          style={{
-            fontFamily: fonts.manrope600,
-            fontSize: 11,
-            lineHeight: 11 * 1.6,
-            color: tokens.ink3,
-            textAlign: "center",
-            maxWidth: 250,
-          }}
-        >
-          {stubDesc(stub.n)}
-        </Text>
-      </View>
+        <SoonBody
+          title={title}
+          gradient={stub.g}
+          iconPaths={ICONS[stub.i] || ICONS.doc}
+          itemKey={itemKey}
+        />
+
+        {canGoBack && (
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            style={{
+              alignSelf: "stretch",
+              marginTop: 4,
+              paddingVertical: 13,
+              borderRadius: 16,
+              alignItems: "center",
+              backgroundColor: chip.bg,
+              borderWidth: 1,
+              borderColor: chip.border,
+            }}
+          >
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.status.violet.text }}>
+              {soon.back}
+            </Text>
+          </Pressable>
+        )}
+      </ScrollView>
     </AppBackground>
   );
 }

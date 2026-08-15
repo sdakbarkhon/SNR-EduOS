@@ -2879,6 +2879,17 @@ export const en: Dictionary = {
     about: {
       info: "Information",
       school: "School",
+      appName: "SNR EduOS for parents",
+      version: "App version",
+      channel: "Update channel",
+      runtime: "Expo runtime",
+      updated: "Update downloaded",
+      schoolToday: "School day",
+      childrenCount: "Children linked",
+      parent: "Parent",
+      phone: "Phone",
+      storeNote: "The app is not in the stores yet: it updates over the air, so a new version arrives without reinstalling.",
+      unknown: "unknown",
     },
     set: {
       security: "Security",
@@ -3362,6 +3373,164 @@ export const en: Dictionary = {
       filterDone: "Done",
       sizeKb: "{n} KB",
       sizeMb: "{n} MB",
+    },
+    soon: {
+      badge: "Coming in a future update",
+      whatCap: "WHAT WILL BE HERE",
+      whenCap: "WHEN IT ARRIVES",
+      nowCap: "AVAILABLE NOW",
+      back: "Go back",
+      items: {
+        testreview: {
+          what: "A question-by-question breakdown: what your child answered, where they went wrong and what the right answer is.",
+          when: "Once teachers start saving per-question answers — today the school only stores the final score.",
+          now: "The score, date and subject of each test are already real in the Tests section.",
+        },
+        matview: {
+          what: "Reading study material inside the app, with bookmarks and full-text search.",
+          when: "Once the app gets a built-in file viewer.",
+          now: "Library material already opens: the file is handed to the phone and opens in its own app.",
+        },
+        workdet: {
+          what: "A portfolio work card: photos, the teacher's comment and what the mark was given for.",
+          when: "Together with the portfolio itself — there are no works or achievements in the school database yet.",
+          now: "Marks and teacher feedback are already real in the Progress section.",
+        },
+        appdet: {
+          what: "The progress of a request: who accepted it, what stage it is at and what was decided.",
+          when: "Once the school starts accepting requests through the app.",
+          now: "You can contact the school in the Messages section.",
+        },
+        newapp: {
+          what: "Filing a request from the app — a certificate, leave, a transfer — on the school's own forms.",
+          when: "Together with the Requests section: there is nowhere to send a request yet, the school accepts them at the office.",
+          now: "You can write to the class teacher in Messages.",
+        },
+        search: {
+          what: "One search box across sections, lessons, homework and messages.",
+          when: "Once every section holds real data — searching through samples makes no sense.",
+          now: "All sections open from the Services screen.",
+        },
+        whatsnew: {
+          what: "The app changelog: what arrived in the latest version and what is being prepared.",
+          when: "Once the app reaches the stores and starts updating by version.",
+          now: "The installed version number is in Profile → About.",
+        },
+        docview: {
+          what: "Opening a school document — a contract, a certificate, a receipt — inside the app.",
+          when: "Once the school starts storing parent documents in the system.",
+          now: "Originals are issued by the school office.",
+        },
+        help: {
+          what: "An explanation of this screen: where the numbers come from and how they are calculated.",
+          when: "We are writing the texts together with the school — one per section.",
+          now: "Each table already carries a note saying what the figure is calculated from.",
+        },
+        profmenu: {
+          what: "The section menu: exporting data, printing and contacting the school about this card.",
+          when: "Once the school decides what a parent is allowed to export.",
+          now: "Everything available today is already a button on the screen itself.",
+        },
+        file: {
+          what: "Viewing an attachment without leaving the app.",
+          when: "Once the school has storage for homework and document attachments.",
+        },
+        datepick: {
+          what: "A calendar: jump to any school day in one tap.",
+          when: "Together with week-by-week browsing — right now the app shows the current school week.",
+          now: "Days switch on the date strip at the top of the screen.",
+        },
+        upload: {
+          what: "Submitting finished work as a photo or a file.",
+          when: "The school decides: the student submits work in their own app, the parent sees it.",
+          now: "The submitted work and the teacher's mark are already real inside the assignment.",
+        },
+        schedopts: {
+          what: "Timetable actions: lesson reminders and export to the phone calendar.",
+          when: "Once the app can send reminders to the phone.",
+          now: "The weekly timetable itself is already real — straight from the school register.",
+        },
+        compose: {
+          what: "A new conversation with any teacher at the school.",
+          when: "Once the school lets parents start conversations — today the teacher opens the thread.",
+          now: "You can write and reply in conversations that are already open.",
+        },
+        call: {
+          what: "Calling the route driver or the school with one button.",
+          when: "Together with the Transport section: route phone numbers are not in the school database.",
+        },
+        autoexit: {
+          what: "Choosing how long before the app signs itself out.",
+          when: "Once the school sets security rules for parent sign-ins.",
+          now: "You can sign out manually in the Profile section.",
+        },
+        aphoto: {
+          what: "A photo in a conversation — from the camera or the phone gallery.",
+          when: "Once the school enables attachments in chat.",
+          now: "Text messages are sent and received for real.",
+        },
+        afile: {
+          what: "A file in a conversation — a certificate, a scan, an assignment.",
+          when: "Together with chat attachments: there is nowhere to keep parent files yet.",
+          now: "You can describe the document in text and bring the original to the school.",
+        },
+        adddoc: {
+          what: "Uploading your own document into your child's file.",
+          when: "Once the school sets up storage for parent documents.",
+        },
+        actions: {
+          what: "Conversation actions: searching messages, muting notifications, reporting.",
+          when: "Once chat gets per-conversation settings.",
+          now: "Notifications as a whole are configured in Profile → Notifications.",
+        },
+        authproto: {
+          what: "A sign-in screen from the app's first prototype.",
+          when: "No longer needed: sign-in works by phone number and an SMS code.",
+          now: "Go back — the app will open the real sign-in.",
+        },
+        terms: {
+          what: "Terms of use: what the school promises a parent in the app and what it asks in return.",
+          when: "Once the school approves the text — today the document exists neither in the app nor on the school site.",
+          now: "Questions about access to your child's data can be asked at the school — the administration answers them.",
+        },
+        privacy: {
+          what: "Privacy policy: what data the app collects, where it is stored and who can see it.",
+          when: "Together with the terms of use — the school is preparing both documents.",
+          now: "In short: the app shows only your own children's data; access to anyone else's records is closed at the database level.",
+        },
+        subjfilter: {
+          what: "Filtering and sorting the subject list: by results, by teacher, only those with outstanding homework.",
+          when: "Once there are more than a dozen subjects — the current list needs no filter, but the button is already in the design.",
+          now: "The list shows every subject your child takes; tapping one opens its results.",
+        },
+        chpass: {
+          what: "Changing your sign-in code inside the app.",
+          when: "Once the school lets parents change the code themselves — today the school issues and keeps it.",
+          now: "You can get or change the code at the school. Sign-in uses your phone number and that code.",
+        },
+        fallback: {
+          what: "This section is being prepared.",
+          when: "It will arrive in one of the next app updates.",
+        },
+      },
+      sections: {
+        meals: "There is no catering data in the school database yet: the balance, menu and purchases below are a sample of how the section will look. It starts working once the canteen keeps its records in the system.",
+        transport: "There is no school transport in the database yet: the route, times and status below are a sample. The section starts working once the school enters its routes and buses.",
+        medcard: "There is no medical data in the school database yet: the vaccinations, certificates and check-ups below are a sample. The section starts working once the nurse's office keeps the card in the system.",
+        documents: "There are no parent documents in the school database yet: the list below is a sample. The section starts working once the office starts issuing documents through the app.",
+        portfolio: "There are no works or achievements in the school database yet: the cards below are a sample. Your child's name and class at the top are real. The section starts working once teachers collect portfolios in the system.",
+        applications: "There are no requests in the school database yet: the list below is a sample. The section starts working once the school starts accepting requests through the app.",
+        support: "There is no support desk in the app yet: the conversation below is a sample. This is where a chat with the school about payments and documents will live.",
+        sessions: "The app does not show real sign-ins yet: the devices below are a sample. This is where your sessions — and the option to end someone else's — will live.",
+      },
+      notes: {
+        killSession: "Sessions cannot be ended from the app yet: the device list is a sample, and sign-in management arrives together with the school's security settings.",
+        notifSave: "The switch moves, but there is nowhere to save it: push notifications are not connected to the app yet. The defaults come back on the next launch.",
+        favSave: "Favourites are not saved yet: the school database has no favourite-subject flag, so the heart resets the next time you open the screen.",
+        periodFilter: "Choosing a period does not change the numbers yet: the school database has no academic terms, so marks and the average cover the whole time. It starts working once the school sets terms up.",
+        supportSend: "Messages cannot be sent from here yet: the support desk does not exist in the school system. You can write to a teacher or the class teacher in Messages — that conversation is real.",
+        delAcc: "The account cannot be deleted from the app: it was created by the school and is tied to your child's record. Write to the school and it will be closed on your request.",
+      },
     },
   },
 };

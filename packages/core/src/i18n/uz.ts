@@ -2880,6 +2880,17 @@ export const uz: Dictionary = {
     about: {
       info: "Ma'lumot",
       school: "Maktab",
+      appName: "Ota-onalar uchun SNR EduOS",
+      version: "Ilova versiyasi",
+      channel: "Yangilanish kanali",
+      runtime: "Expo muhiti",
+      updated: "Yangilanish yuklandi",
+      schoolToday: "Maktabning o‘quv kuni",
+      childrenCount: "Bog‘langan farzandlar",
+      parent: "Ota-ona",
+      phone: "Telefon",
+      storeNote: "Ilova hozircha do‘konlarda emas: u havo orqali yangilanadi, shuning uchun yangi versiya qayta o‘rnatishsiz keladi.",
+      unknown: "noma’lum",
     },
     set: {
       security: "Xavfsizlik",
@@ -3363,6 +3374,164 @@ export const uz: Dictionary = {
       filterDone: "Bajarilgan",
       sizeKb: "{n} KB",
       sizeMb: "{n} MB",
+    },
+    soon: {
+      badge: "Kelgusi yangilanishlarda paydo bo‘ladi",
+      whatCap: "BU YERDA NIMA BO‘LADI",
+      whenCap: "QACHON PAYDO BO‘LADI",
+      nowCap: "HOZIR NIMA MAVJUD",
+      back: "Orqaga qaytish",
+      items: {
+        testreview: {
+          what: "Testning savol-savol tahlili: farzandingiz nima deb javob bergan, qayerda xato qilgan va to‘g‘ri javob qanday.",
+          when: "O‘qituvchilar har bir savol bo‘yicha javoblarni saqlay boshlaganidan keyin — hozir maktabda faqat yakuniy ball saqlanadi.",
+          now: "Testning bali, sanasi va fani «Testlar» bo‘limida allaqachon haqiqiy ma’lumotdan ko‘rsatiladi.",
+        },
+        matview: {
+          what: "O‘quv materialini ilovaning o‘zida o‘qish — xatchoʻplar va matn bo‘yicha qidiruv bilan.",
+          when: "Ilovada ichki fayl ko‘ruvchi paydo bo‘lgach.",
+          now: "Kutubxonadagi material allaqachon ochiladi: fayl telefonga uzatiladi va uning dasturida ochiladi.",
+        },
+        workdet: {
+          what: "Portfoliodagi ish kartochkasi: suratlar, o‘qituvchi izohi va baho nima uchun qo‘yilgani.",
+          when: "Portfolioning o‘zi bilan birga — maktab bazasida ishlar va yutuqlar hali yo‘q.",
+          now: "Baholar va o‘qituvchi fikrlari «Muvaffaqiyatlar» bo‘limida haqiqiy ma’lumotdan ko‘rsatiladi.",
+        },
+        appdet: {
+          what: "Arizaning yo‘li: kim qabul qilgan, ko‘rib chiqish qaysi bosqichda va qanday qaror chiqqan.",
+          when: "Maktab arizalarni ilova orqali qabul qila boshlagach.",
+          now: "Maktabga «Xabarlar» bo‘limi orqali murojaat qilish mumkin.",
+        },
+        newapp: {
+          what: "Arizani ilovadan yuborish — ma’lumotnoma, ta’til, ko‘chirish — maktabning tayyor blankalari bo‘yicha.",
+          when: "«Arizalar» bo‘limi bilan birga: hozir arizani yuboradigan joy yo‘q, maktab ularni devonxonada qabul qiladi.",
+          now: "Iltimosni sinf rahbariga «Xabarlar»da yozish mumkin.",
+        },
+        search: {
+          what: "Bo‘limlar, darslar, topshiriqlar va xabarlar bo‘yicha bitta qatorda qidiruv.",
+          when: "Barcha bo‘limlarda haqiqiy ma’lumot paydo bo‘lganda — namunalar ichidan qidirishning ma’nosi yo‘q.",
+          now: "Barcha bo‘limlar «Xizmatlar» ekranidan ochiladi.",
+        },
+        whatsnew: {
+          what: "Ilova o‘zgarishlari ro‘yxati: oxirgi versiyada nima paydo bo‘lgani va nima tayyorlanayotgani.",
+          when: "Ilova do‘konlarga chiqib, versiyalar bilan yangilana boshlaganda.",
+          now: "O‘rnatilgan versiya raqami — «Profil → Ilova haqida» bo‘limida.",
+        },
+        docview: {
+          what: "Maktab hujjatini — shartnoma, ma’lumotnoma, kvitansiya — ilovaning o‘zida ochish.",
+          when: "Maktab ota-ona hujjatlarini tizimda saqlay boshlagach.",
+          now: "Hujjatlarning asl nusxasini maktab devonxonasi beradi.",
+        },
+        help: {
+          what: "Shu ekran bo‘yicha izoh: raqamlar qayerdan olinadi va qanday hisoblanadi.",
+          when: "Matnlarni maktab bilan birga tayyorlayapmiz — har bir bo‘limga alohida.",
+          now: "Jadvallar ostida har bir ko‘rsatkich nimadan hisoblanishi allaqachon yozilgan.",
+        },
+        profmenu: {
+          what: "Bo‘lim menyusi: ma’lumotni yuklab olish, chop etish va shu kartochka bo‘yicha maktabga murojaat.",
+          when: "Maktab ota-onaga nimani yuklab olish mumkinligini belgilagach.",
+          now: "Hozir mavjud bo‘lgan hamma narsa ekranning o‘zida tugmalar bilan chiqarilgan.",
+        },
+        file: {
+          what: "Ilovadan chiqmasdan ilova qilingan faylni ko‘rish.",
+          when: "Maktabda topshiriq va hujjatlarga ilovalar uchun ombor paydo bo‘lgach.",
+        },
+        datepick: {
+          what: "Kalendar: bitta bosishda istalgan o‘quv kuniga o‘tish.",
+          when: "Haftalarni varaqlash bilan birga — hozir ilova joriy o‘quv haftasini ko‘rsatadi.",
+          now: "Kunlar ekran tepasidagi sanalar qatori bilan almashadi.",
+        },
+        upload: {
+          what: "Bajarilgan ishni surat yoki fayl sifatida yuborish.",
+          when: "Buni maktab hal qiladi: ishni o‘quvchi o‘z ilovasida topshiradi, ota-ona esa ko‘radi.",
+          now: "Topshirilgan ish va o‘qituvchi bahosi topshiriqda haqiqiy ma’lumotdan ko‘rsatiladi.",
+        },
+        schedopts: {
+          what: "Dars jadvali bilan ishlash: darslar haqida eslatmalar va telefon kalendariga yuklash.",
+          when: "Ilova telefonga eslatma yubora oladigan bo‘lgach.",
+          now: "Haftalik jadvalning o‘zi allaqachon haqiqiy — maktab jurnalidan.",
+        },
+        compose: {
+          what: "Maktabning istalgan o‘qituvchisi bilan yangi yozishma.",
+          when: "Maktab ota-onalarga yozishmani boshlash huquqini bergach — hozir suhbatni o‘qituvchi ochadi.",
+          now: "Allaqachon ochilgan suhbatlarda yozish va javob berish mumkin.",
+        },
+        call: {
+          what: "Marshrut haydovchisiga yoki maktabga bitta tugma bilan qo‘ng‘iroq.",
+          when: "«Transport» bo‘limi bilan birga: maktab bazasida marshrut telefonlari yo‘q.",
+        },
+        autoexit: {
+          what: "Ilova hisobdan o‘zi chiqib ketadigan vaqtni tanlash.",
+          when: "Maktab ota-ona kirishlari uchun xavfsizlik qoidalarini belgilagach.",
+          now: "Hisobdan qo‘lda chiqish mumkin — «Profil» bo‘limida.",
+        },
+        aphoto: {
+          what: "Yozishmaga surat — telefon kamerasi yoki galereyasidan.",
+          when: "Maktab chatda ilovalarni yoqqanidan keyin.",
+          now: "Matnli xabarlar haqiqatan yuboriladi va keladi.",
+        },
+        afile: {
+          what: "Yozishmaga fayl — ma’lumotnoma, hujjat nusxasi, topshiriq.",
+          when: "Chatdagi ilovalar bilan birga: ota-ona fayllarini saqlaydigan joy hali yo‘q.",
+          now: "Hujjat haqida matn bilan yozish, aslini esa maktabga olib borish mumkin.",
+        },
+        adddoc: {
+          what: "O‘z hujjatingizni farzandingiz shaxsiy ishiga yuklash.",
+          when: "Maktab ota-ona hujjatlari uchun ombor ochgandan keyin.",
+        },
+        actions: {
+          what: "Yozishma bilan ishlash: xabarlar bo‘yicha qidiruv, bildirishnomalarni o‘chirish, shikoyat.",
+          when: "Chatda alohida suhbat sozlamalari paydo bo‘lgach.",
+          now: "Bildirishnomalar butunlay «Profil → Bildirishnomalar»da sozlanadi.",
+        },
+        authproto: {
+          what: "Ilovaning birinchi prototipidagi kirish ekrani.",
+          when: "Endi kerak emas: kirish telefon raqami va SMS kodi orqali ishlaydi.",
+          now: "Orqaga qayting — ilova haqiqiy kirishni ochadi.",
+        },
+        terms: {
+          what: "Foydalanish shartlari: maktab ilovada ota-onaga nima va’da qiladi va undan nima so‘raydi.",
+          when: "Maktab matnni tasdiqlagandan keyin — hozir bu hujjat na ilovada, na maktab saytida bor.",
+          now: "Farzandingiz ma’lumotlariga kirish bo‘yicha savollarni maktabga berish mumkin — ma’muriyat javob beradi.",
+        },
+        privacy: {
+          what: "Maxfiylik siyosati: ilova qanday ma’lumot yig‘adi, qayerda saqlaydi va kimga ko‘rsatadi.",
+          when: "Foydalanish shartlari bilan birga — maktab ikkala hujjatni tayyorlamoqda.",
+          now: "Qisqacha: ilova faqat sizning farzandlaringiz ma’lumotini ko‘rsatadi, begona yozuvlarga kirish baza tomonida yopiq.",
+        },
+        subjfilter: {
+          what: "Fanlar ro‘yxatini filtrlash va saralash: o‘zlashtirish bo‘yicha, o‘qituvchi bo‘yicha, faqat qarzi borlar.",
+          when: "Fanlar o‘ndan oshganda — hozirgi ro‘yxatda filtr kerak emas, tugma esa maketda allaqachon chizilgan.",
+          now: "Ro‘yxat farzandingizning barcha fanlarini ko‘rsatadi; har birining natijasi bosilganda ochiladi.",
+        },
+        chpass: {
+          what: "Kirish kodini ilovaning o‘zida almashtirish.",
+          when: "Maktab ota-onalarga kodni mustaqil almashtirishga ruxsat bergandan keyin — hozir kodni maktab beradi va saqlaydi.",
+          now: "Kodni maktabdan bilib olish yoki almashtirish mumkin. Ilovaga kirish — telefon raqami va shu kod orqali.",
+        },
+        fallback: {
+          what: "Bo‘lim tayyorlanmoqda.",
+          when: "Ilovaning yaqin yangilanishlaridan birida paydo bo‘ladi.",
+        },
+      },
+      sections: {
+        meals: "Maktab bazasida ovqatlanish hali yo‘q: quyidagi balans, menyu va xaridlar — bo‘lim qanday ko‘rinishiga namuna. U oshxona tizimda hisob yuritishni boshlaganda ishlaydi.",
+        transport: "Bazada maktab transporti hali yo‘q: quyidagi marshrut, vaqt va holat — namuna. Bo‘lim maktab marshrut va avtobuslarni tizimga kiritganda ishlaydi.",
+        medcard: "Maktab bazasida tibbiy ma’lumotlar hali yo‘q: quyidagi emlashlar, ma’lumotnomalar va ko‘riklar — namuna. Bo‘lim tibbiyot xonasi kartani tizimda yuritishni boshlaganda ishlaydi.",
+        documents: "Maktab bazasida ota-ona hujjatlari hali yo‘q: quyidagi ro‘yxat — namuna. Bo‘lim devonxona hujjatlarni ilova orqali bera boshlaganda ishlaydi.",
+        portfolio: "Maktab bazasida ishlar va yutuqlar hali yo‘q: quyidagi kartochkalar — namuna. Yuqoridagi farzand ismi va sinfi — haqiqiy. Bo‘lim o‘qituvchilar portfolioni tizimda yig‘a boshlaganda ishlaydi.",
+        applications: "Maktab bazasida arizalar hali yo‘q: quyidagi ro‘yxat — namuna. Bo‘lim maktab arizalarni ilova orqali qabul qila boshlaganda ishlaydi.",
+        support: "Ilovada qo‘llab-quvvatlash xizmati hali yo‘q: quyidagi yozishma — namuna. Bu yerda to‘lov va hujjatlar bo‘yicha maktab bilan chat bo‘ladi.",
+        sessions: "Ilova hisobga haqiqiy kirishlarni hozircha ko‘rsatmaydi: quyidagi qurilmalar — namuna. Bu yerda sizning seanslaringiz va begonasini tugatish imkoni bo‘ladi.",
+      },
+      notes: {
+        killSession: "Seansni ilovadan tugatib bo‘lmaydi: qurilmalar ro‘yxati namuna sifatida ko‘rsatilgan, kirishlarni boshqarish maktabning xavfsizlik sozlamalari bilan birga paydo bo‘ladi.",
+        notifSave: "Tugma ishlaydi, lekin uni saqlaydigan joy yo‘q: ilovaga push-bildirishnomalar hali ulanmagan. Keyingi ishga tushirishda standart qiymatlar qaytadi.",
+        favSave: "Sevimlilar hozircha saqlanmaydi: maktab bazasida sevimli fan belgisi yo‘q, keyingi ochilishda yurakcha dastlabki holatiga qaytadi.",
+        periodFilter: "Davrni tanlash hozircha raqamlarni o‘zgartirmaydi: maktab bazasida choraklar yo‘q, shuning uchun baholar va o‘rtacha ball butun davr uchun ko‘rsatiladi. Maktab choraklarni kiritganda ishlaydi.",
+        supportSend: "Bu yerdan xabar yuborib bo‘lmaydi: qo‘llab-quvvatlash xizmati maktab tizimida ochilmagan. O‘qituvchi va sinf rahbariga «Xabarlar» bo‘limida yozish mumkin — u yerda yozishma haqiqiy.",
+        delAcc: "Hisobni ilovadan o‘chirib bo‘lmaydi: u maktab tomonidan ochilgan va farzandingiz shaxsiy ishi bilan bog‘langan. Maktabga yozing — arizangiz bo‘yicha hisob yopiladi.",
+      },
     },
   },
 };

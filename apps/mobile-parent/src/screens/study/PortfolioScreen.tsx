@@ -50,6 +50,10 @@
  * например, из ChildProfileScreen «Достижения»); читается защитно на случай,
  * если общий тип MainStackParamList["dport"] ещё не обновлён параллельным
  * процессом (на момент написания — уже обновлён, но код остаётся защитным).
+ *
+ * 15.08.2026 (заглушки). Сверху — плашка «данных нет, это пример»: работ,
+ * достижений и сертификатов в базе школы нет. Имя и класс ребёнка —
+ * настоящие, оценки и навыки живут в разделе «Успехи».
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -73,6 +77,7 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 import { ICONS } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -378,6 +383,9 @@ export default function PortfolioScreen() {
           gap: 11,
         }}
       >
+        {/* Плашка «это пример» — раздела ещё нет в базе школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.portfolio} />
+
         {/* Блок 2: ChildSwitcherCard compact — открывает шторку выбора ребёнка. */}
         <ChildSwitcherCard
           variant="compact"

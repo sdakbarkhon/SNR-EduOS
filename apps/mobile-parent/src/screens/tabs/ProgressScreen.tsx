@@ -93,6 +93,7 @@ import {
   getSubjectStats,
   getTeacherReviews,
 } from "../../data";
+import { SoonNote } from "../../ui/notices";
 import type { BaseSubjectKey, SubjectStatRow } from "../../data";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
@@ -365,6 +366,10 @@ export default function ProgressScreen() {
   const periods = getGradePeriods();
   const [period, setPeriod] = useState<string>(periods.default_period);
   const [periodOpen, setPeriodOpen] = useState(false);
+  // 15.08.2026 (заглушки). Выбор периода менял только подпись на кнопке:
+  // оценки под ним не пересчитывались, и родитель мог решить, что видит
+  // четверть. Учебных четвертей в базе школы нет — говорим об этом прямо.
+  const [periodNote, setPeriodNote] = useState(false);
 
   // Заход 2, шаг 6: реальный вход — тот же isRealFlow/selectedChildId
   // паттерн, что и на Home/Attendance/Homeworks (ParentDataContext).
@@ -727,6 +732,7 @@ export default function ProgressScreen() {
                         onPress={() => {
                           setPeriod(p);
                           setPeriodOpen(false);
+                          setPeriodNote(true);
                         }}
                         style={{ paddingVertical: 9, paddingHorizontal: 14 }}
                       >
@@ -750,6 +756,9 @@ export default function ProgressScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Объяснение — сразу под выбором периода. */}
+            {periodNote ? <SoonNote text={d.parentApp.soon.notes.periodFilter} /> : null}
 
             {/* Subjects grid (305–312). Заход 2, шаг 6: реальные данные при
                 isRealFlow — getStudentGrades сгруппированы по предмету

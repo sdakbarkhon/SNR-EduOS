@@ -21,6 +21,7 @@
  */
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import StubScreen from "../screens/StubScreen";
+import AboutScreen from "../screens/profile/AboutScreen";
 import TabNavigator from "./TabNavigator";
 import { STACK_ROUTES, type MainStackParamList, type StackRouteName } from "./routes";
 
@@ -157,6 +158,9 @@ const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   dtrans: TransportScreen,
   dchpass: ChangePasswordScreen,
   dsessions: ActiveSessionsScreen,
+  // Заход 5 (заглушки): «О приложении» — единственный маршрут-заглушка, под
+  // которым нашлись настоящие данные (версия, канал, школа, родитель).
+  da7: AboutScreen,
 };
 
 export default function MainNavigator() {
