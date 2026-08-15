@@ -55,7 +55,6 @@ import ActiveSessionsScreen from "../screens/profile/ActiveSessionsScreen";
 
 // Реальные экраны Захода 6 — Оплаты (12 шт., шторки открываются локально).
 import BillsScreen from "../screens/payments/BillsScreen";
-import CheckoutScreen from "../screens/payments/CheckoutScreen";
 import PaymentHistoryScreen from "../screens/payments/PaymentHistoryScreen";
 import ReceiptsScreen from "../screens/payments/ReceiptsScreen";
 import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
@@ -64,8 +63,6 @@ import TopUpScreen from "../screens/payments/TopUpScreen";
 import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
 import TransferScreen from "../screens/payments/TransferScreen";
 import LimitsScreen from "../screens/payments/LimitsScreen";
-import CardDetailsScreen from "../screens/payments/CardDetailsScreen";
-import AddCardScreen from "../screens/payments/AddCardScreen";
 
 // Реальные экраны Захода 7 — Messages (4 шт., шторки открываются локально).
 import ChatScreen from "../screens/messages/ChatScreen";
@@ -112,7 +109,6 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
  */
 const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
   d18: BillsScreen,
-  d19: CheckoutScreen,
   d20: PaymentHistoryScreen,
   d21: ReceiptsScreen,
   d22: ChildWalletScreen,
@@ -121,8 +117,6 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   dwops: WalletOpsScreen,
   dtransfer: TransferScreen,
   dlimits: LimitsScreen,
-  dcarddet: CardDetailsScreen,
-  daddcard: AddCardScreen,
 };
 
 /**

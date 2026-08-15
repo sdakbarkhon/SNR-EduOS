@@ -21,6 +21,11 @@
  * FAB, поиска, Empty-state и info-иконки на экране НЕТ (согласно extract'у).
  *
  * Обе темы через useTheme(); iOS safe-area — из InnerHeader.
+ *
+ * 15.08.2026 (оплаты). Сверху — плашка «это пример». Даты платежей и
+ * заголовки месяцев форматируются по локали (лежали строками «3 июля»,
+ * «ИЮЛЬ 2026»), подпись строки собирается из настоящего ребёнка. Данные — из
+ * data/demoPayments.ts.
  */
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -30,10 +35,14 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCircleButton, InnerHeader } from "../../ui";
-import { getPaymentHistory, getPaymentHistoryTotals } from "../../data";
+import { getPaymentHistoryTotals } from "../../data";
+import { monthLabel, paymentHistoryFor } from "../../data/demoPayments";
+import { useChildScope } from "../../hooks/useChildScope";
+import { LOCALE_TAG } from "@snr/core";
 import type { PaymentHistoryRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner } from "./parts";
 import { formatMoney } from "../../lib/format";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -374,10 +383,14 @@ function TotalsCard({
 
 export default function PaymentHistoryScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
-  const history = getPaymentHistory();
+  // Подписи дат — на языке интерфейса; «{Имя} · {класс}» — из настоящего
+  // ребёнка родителя, а не из чужой демо-семьи общего мока.
+  const { child } = useChildScope();
+  const localeTag = LOCALE_TAG[locale];
+  const history = paymentHistoryFor(localeTag, child ? `${child.first_name} · ${child.class_name}` : "");
   const totals = getPaymentHistoryTotals();
 
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -408,6 +421,8 @@ export default function PaymentHistoryScreen() {
           gap: 11,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* 4 chip-таба фильтра (макет 976). */}
         <View style={styles.chipsRow}>
           {FILTER_ITEMS.map((it) => (
@@ -421,13 +436,13 @@ export default function PaymentHistoryScreen() {
         </View>
 
         {/* ИЮЛЬ 2026 + строки. */}
-        <MonthHeader label="ИЮЛЬ 2026" visible={julVisible.length > 0} />
+        <MonthHeader label={monthLabel("2026-07-01", localeTag).toUpperCase()} visible={julVisible.length > 0} />
         {julVisible.map((row, i) => (
           <HistoryRow key={`jul-${i}-${row.title}`} row={row} />
         ))}
 
         {/* ИЮНЬ 2026 + строки. */}
-        <MonthHeader label="ИЮНЬ 2026" visible={junVisible.length > 0} />
+        <MonthHeader label={monthLabel("2026-06-01", localeTag).toUpperCase()} visible={junVisible.length > 0} />
         {junVisible.map((row, i) => (
           <HistoryRow key={`jun-${i}-${row.title}`} row={row} />
         ))}

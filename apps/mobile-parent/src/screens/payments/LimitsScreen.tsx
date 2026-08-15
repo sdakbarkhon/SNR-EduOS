@@ -70,6 +70,11 @@
  * Обе темы — useTheme(). iOS safe-area — из InnerHeader. paddingBottom 118
  * зарезервирован под FloatingTabBar (у stack-экрана его нет, но выравниваем
  * со всеми внутренними). Данные — только через аксессоры src/data.
+ *
+ * 15.08.2026 (оплаты). Сверху — плашка «это пример». Лимиты и тумблеры
+ * по-прежнему переключаются, но сохранять их некуда — таблицы лимитов в базе
+ * нет; при первой правке экран говорит об этом. Названия категорий пришли в
+ * словарь, данные — из data/demoPayments.ts.
  */
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -94,9 +99,10 @@ import {
   DEFAULT_CHILD_INDEX,
   getChildren,
   getSelectedChildContext,
-  getWalletLimits,
 } from "../../data";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner, SoonNote } from "./parts";
+import { walletLimitsFor } from "../../data/demoPayments";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -202,7 +208,11 @@ export default function LimitsScreen() {
   const { child } = getSelectedChildContext(childId);
 
   // ── Лимиты (fixture snapshot → локальный state) ────────────────────────────
-  const limitsFixture = getWalletLimits();
+  const limitsFixture = walletLimitsFor({
+    cafeteria: d.parentApp.pay2.limitCafeteria,
+    shop: d.parentApp.pay2.limitShop,
+    stationery: d.parentApp.pay2.limitStationery,
+  });
   const SPENT_TODAY = limitsFixture.spent_today; // 32 000 (hardcoded в макете).
 
   const [limDay, setLimDay] = useState<number>(limitsFixture.daily_limit);
@@ -213,6 +223,8 @@ export default function LimitsScreen() {
   });
   const [notifyLimit, setNotifyLimit] = useState<boolean>(limitsFixture.notify_limit); // 80%
   const [notifyOps, setNotifyOps] = useState<boolean>(limitsFixture.notify_ops); // каждая покупка
+  // Родитель что-то поменял — значит пора объяснить, что сохранять некуда.
+  const [touched, setTouched] = useState(false);
 
   const toggleCategory = (id: string) =>
     setCatEnabled((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -277,6 +289,8 @@ export default function LimitsScreen() {
           gap: 11,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* Блок 3 — ChildSwitcherCard (1806, compact, без status/switchLabel). */}
         <ChildSwitcherCard
           variant="compact"
@@ -416,7 +430,7 @@ export default function LimitsScreen() {
                   accentGradient={tokens.accentGrad.colors as [string, string]}
                   accentAngle={tokens.accentGrad.angle}
                   inactiveInk={limitAccent}
-                  onPress={() => setLimDay(v)}
+                  onPress={() => { setLimDay(v); setTouched(true); }}
                 />
               );
             })}
@@ -466,7 +480,7 @@ export default function LimitsScreen() {
                     {`до ${formatMoney(cat.limit)} в день`}
                   </Text>
                 </View>
-                <Toggle value={on} onValueChange={() => toggleCategory(cat.id)} />
+                <Toggle value={on} onValueChange={() => { toggleCategory(cat.id); setTouched(true); }} />
               </View>
             );
           })}
@@ -480,7 +494,7 @@ export default function LimitsScreen() {
           <NotificationRow
             label="Уведомить при достижении 80% лимита"
             value={notifyLimit}
-            onToggle={() => setNotifyLimit((v) => !v)}
+            onToggle={() => { setNotifyLimit((v) => !v); setTouched(true); }}
             first
             ink={tokens.ink1}
             divider={rowDivider}
@@ -488,11 +502,15 @@ export default function LimitsScreen() {
           <NotificationRow
             label="Уведомить о каждой покупке"
             value={notifyOps}
-            onToggle={() => setNotifyOps((v) => !v)}
+            onToggle={() => { setNotifyOps((v) => !v); setTouched(true); }}
             ink={tokens.ink1}
             divider={rowDivider}
           />
         </GlassCard>
+
+        {/* Лимиты меняются на экране, но сохранять их некуда: таблицы лимитов
+            в базе нет. Говорим об этом при первой же правке, а не молчим. */}
+        {touched ? <SoonNote text={d.parentApp.pay2.soon} /> : null}
 
         {/* Блок 11 — InfoBanner (1828–1831). */}
         <View

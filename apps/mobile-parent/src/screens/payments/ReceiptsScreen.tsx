@@ -46,6 +46,11 @@
  * Навигация: back → goBack; search → 'da6'; filter-menu — no-op заглушка
  * (в маркете вызов goHelp, но глиф — три линии, аналогично AllSubjects
  * §comment); goFile-download → stub «file».
+ *
+ * 15.08.2026 (оплаты). Сверху — плашка «это пример». Кнопка-«фильтр» в шапке
+ * удалена: она была молчаливым no-op, а фильтр по виду документа уже есть
+ * вкладками. «Скачать» объясняет, что файлов чеков в школе не хранится.
+ * Даты и номера документов собираются по локали из data/demoPayments.ts.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -60,7 +65,10 @@ import {
 } from "../../ui";
 import { AppBackground, fonts, gradPoints, useTheme, type ThemeTokens } from "../../theme";
 import { useAppLocale } from "../../i18n";
-import { getBills, getReceipts } from "../../data";
+import { DemoBanner, SoonNote } from "./parts";
+import { getBills } from "../../data";
+import { monthLabel, receiptsFor } from "../../data/demoPayments";
+import { LOCALE_TAG } from "@snr/core";
 import type { BillRow, ReceiptRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { formatMoney } from "../../utils/format";
@@ -70,7 +78,6 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 /* ─── icons / глифы ─────────────────────────────────────────────────────── */
 
 const SEARCH_PATHS = ["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z", "m20 20-3.5-3.5"];
-const FILTER_MENU_PATHS = ["M3 6h18", "M7 12h10", "M10 18h4"];
 const DOWNLOAD_PATHS = ["M12 3v12", "m7 10 5 5 5-5", "M5 21h14"];
 const SHIELD_CHECK_PATHS = [
   "M20 13c0 5-3.5 7.5-7.7 9a.6.6 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1Z",
@@ -296,7 +303,7 @@ function ReceiptListRow({ receipt, bills, currency, onDownload, tokens }: Receip
 
 export default function ReceiptsScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
   // Локальный state: 0 = «Чеки», 1 = «Invoices». One-hot переключение
@@ -306,7 +313,11 @@ export default function ReceiptsScreen() {
 
   // Фильтруем один раз (данные из фикстур — стабильны).
   const bills = getBills();
-  const allReceipts = getReceipts();
+  const localeTag = LOCALE_TAG[locale];
+  const allReceipts = receiptsFor(localeTag, {
+    check: d.parentApp.pay2.receiptsChecks,
+    invoice: d.parentApp.pay2.receiptsInvoices,
+  });
   const julChecks = allReceipts.filter((r) => r.kind === "check" && r.month === "jul");
   const junChecks = allReceipts.filter((r) => r.kind === "check" && r.month === "jun");
   const julInv = allReceipts.filter((r) => r.kind === "invoice" && r.month === "jul");
@@ -316,17 +327,16 @@ export default function ReceiptsScreen() {
 
   const goBack = () => navigation.goBack();
   const goSearch = () => navigation.navigate("da6");
-  const goFile = () => navigation.navigate("stub", { stubKey: "file" });
-  // Filter-меню — в макете биндинг называется goHelp, но глиф «три линии»
-  // указывает на фильтр списка (аналогично AllSubjectsScreen). На этом
-  // этапе меню фильтров не спроектировано в блок-листе — no-op заглушка,
-  // чтобы кнопка была визуально; поведение подключим отдельным заходом.
-  const onFilterMenu = () => {
-    // no-op (Nice-to-have)
-  };
+  // Файлов чеков в школе не хранится — «Скачать» объясняет это, а не
+  // открывает пустой просмотрщик.
+  const [fileSoon, setFileSoon] = useState(false);
+  const goFile = () => setFileSoon((v) => !v);
+  // Кнопка-«фильтр» в шапке удалена: она была молчаливым no-op, а фильтр по
+  // виду документа уже есть вкладками «Чеки / Счета» прямо под шапкой.
 
-  const monthJul2026 = "ИЮЛЬ 2026";
-  const monthJun2026 = "ИЮНЬ 2026";
+  // Заголовки месяцев — по локали, а не готовой русской строкой.
+  const monthJul2026 = monthLabel("2026-07-01", localeTag).toUpperCase();
+  const monthJun2026 = monthLabel("2026-06-01", localeTag).toUpperCase();
 
   const infoBannerBg = "rgba(59,130,246,0.10)";
   const infoBannerBorder = "rgba(59,130,246,0.30)";
@@ -341,19 +351,9 @@ export default function ReceiptsScreen() {
         titleSize={15}
         onBackPress={goBack}
         right={
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <GlassCircleButton onPress={goSearch}>
-              <Glyph paths={SEARCH_PATHS} size={15} color={tokens.ink1} stroke={2} />
-            </GlassCircleButton>
-            <GlassCircleButton onPress={onFilterMenu}>
-              <Glyph
-                paths={FILTER_MENU_PATHS}
-                size={16}
-                color={tokens.ink1}
-                stroke={1.8}
-              />
-            </GlassCircleButton>
-          </View>
+          <GlassCircleButton onPress={goSearch}>
+            <Glyph paths={SEARCH_PATHS} size={15} color={tokens.ink1} stroke={2} />
+          </GlassCircleButton>
         }
       />
 
@@ -368,6 +368,8 @@ export default function ReceiptsScreen() {
           paddingBottom: 118,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* 3. SegmentedTabs Чеки / Invoices. */}
         <SegmentPills
           items={["Чеки", "Invoices"]}
@@ -438,6 +440,8 @@ export default function ReceiptsScreen() {
             ))}
           </View>
         ) : null}
+
+        {fileSoon ? <SoonNote text={d.parentApp.pay2.soonFile} /> : null}
 
         {/* 14. InfoNotice (общий для обеих веток, после sc-if). */}
         <View

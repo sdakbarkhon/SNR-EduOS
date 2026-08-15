@@ -3247,6 +3247,46 @@ export interface Dictionary {
       attendanceNote: string;
       attendanceNoRecords: string;
     };
+    /**
+     * Оплаты мобильного приложения. Платёжной подсистемы в проекте нет, и
+     * половина этих строк — объяснения, почему кнопка ничего не делает.
+     * Держим их в словаре, а не литералами в экранах: экран, который на
+     * узбекском говорит по-русски «появится позже», объясняет плохо.
+     */
+    pay2: {
+      demoBanner: string;
+      soon: string;
+      soonFile: string;
+      cardsNote: string;
+      addCard: string;
+      addCardWhy: string;
+      cardValidThru: string;
+      methodLinked: string;
+      methodNotLinked: string;
+      billsDueCap: string;
+      billsLaterCap: string;
+      billsEmpty: string;
+      payAll: string;
+      historyCap: string;
+      historyTotal: string;
+      historyNet: string;
+      historyRefunds: string;
+      historyEmpty: string;
+      receiptsChecks: string;
+      receiptsInvoices: string;
+      receiptDownload: string;
+      receiptPaid: string;
+      receiptUnpaid: string;
+      topUpAmount: string;
+      topUpFrom: string;
+      topUpAction: string;
+      limitCafeteria: string;
+      limitShop: string;
+      limitStationery: string;
+      limitOf: string;
+      walletOpsIn: string;
+      walletOpsOut: string;
+    };
     more3: {
       skillKnowledge: string;
       skillThinking: string;

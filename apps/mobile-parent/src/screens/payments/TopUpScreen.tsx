@@ -42,6 +42,10 @@
  *  - При пустом поле CTA disabled (opacity + pointerEvents:none).
  *  - Экран не пишет в кошелёк — реальное списание/зачисление появится на этапе
  *    подключения платёжного провайдера (Payme). Сейчас doTopup — no-op.
+ *
+ * 15.08.2026 (оплаты). Сверху — плашка «это пример». Кнопка пополнения не
+ * делает вид, что деньги ушли: раскрывает объяснение под собой. Поле суммы
+ * оставлено — оно ничего не сохраняет и не собирает реквизитов.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -54,6 +58,7 @@ import { GlassCard, InnerHeader } from "../../ui";
 import { getSelectedChildContext, getTopupPresets } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner, SoonNote } from "./parts";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList } from "../../navigation/routes";
 
@@ -176,12 +181,12 @@ export default function TopUpScreen() {
 
   const goPaymeth = () => navigation.navigate("d33");
 
+  // Пополнение упирается в отсутствующую платёжную систему: кнопка НЕ
+  // делает вид, что деньги ушли, а раскрывает объяснение под собой.
+  const [soon, setSoon] = useState(false);
   const doTopup = () => {
-    // В проде — уход на страницу платёжного провайдера (Payme). Сейчас no-op:
-    // экран не изменяет кошелёк без реальной транзакции.
     if (!hasValue) return;
-    // TODO(payments): вызов Payme-checkout, затем возврат сюда с успешным
-    // paySheet (см. paySheet={ kind:'top', sum } в макете 3981).
+    setSoon((v) => !v);
   };
 
   return (
@@ -204,6 +209,8 @@ export default function TopUpScreen() {
           gap: 12,
         }}
       >
+        <DemoBanner text={t.pay2.demoBanner} />
+
         {/* Блок 3: WalletCard — инициал ребёнка + заголовок кошелька + баланс. */}
         <GlassCard radius={20} contentStyle={{ paddingVertical: 12, paddingHorizontal: 14 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 11 }}>
@@ -399,6 +406,7 @@ export default function TopUpScreen() {
             </Text>
           </View>
         </Pressable>
+        {soon ? <SoonNote text={t.pay2.soon} /> : null}
 
         {/* Блок 7: InstantNoticeBanner — «Зачисление мгновенное …». */}
         <View

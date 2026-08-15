@@ -47,6 +47,11 @@
  * кружков/категорий (Обучение/Питание/Форма/Экскурсия — это BILLS,
  * не переводы). Литералы «ОТКУДА»/«КУДА»/«СУММА ПЕРЕВОДА» — не через t.*
  * (в макете строки 1770/1777/1784 забиты дословно).
+ *
+ * 15.08.2026 (оплаты). Сверху — плашка «это пример». Кнопка «Перевести»
+ * раньше МЕНЯЛА балансы в памяти экрана и закрывала его — родитель видел
+ * «перевод выполнен», хотя не происходило ничего. Теперь она объясняет,
+ * почему перевода нет. Пресеты — из data/demoPayments.ts.
  */
 import { useState } from "react";
 import {
@@ -72,12 +77,13 @@ import {
 } from "../../ui";
 import {
   getChildren,
-  getTransferFixture,
   getWalletBalance,
 } from "../../data";
 import type { ChildRow } from "../../data/types";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner, SoonNote } from "./parts";
+import { TRANSFER_PRESETS } from "../../data/demoPayments";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList } from "../../navigation/routes";
 
@@ -351,23 +357,21 @@ export default function TransferScreen() {
     setFromId(id);
   };
 
-  // Транзакция (макет 3958 + 4160). В проде — успешная шторка + запись в БД;
-  // здесь: локальная мутация балансов + goBack (успех-шторка — общий компонент,
-  // его подключим отдельным Заходом; в проде здесь будет запрос платежному
-  // провайдеру + подтверждение по SMS/биометрии).
+  // Перевод упирается в отсутствующую платёжную систему. Раньше кнопка
+  // МЕНЯЛА балансы в памяти экрана и закрывала его — родитель видел «перевод
+  // выполнен», хотя не произошло ничего и после перезапуска деньги
+  // возвращались. Теперь кнопка объясняет, почему перевода нет.
+  const [soon, setSoon] = useState(false);
   const handleTransfer = () => {
     if (!enoughFunds || !toChild) return;
-    setBalances((prev) => ({
-      ...prev,
-      [fromChild!.id]: (prev[fromChild!.id] ?? 0) - valNum,
-      [toChild.id]: (prev[toChild.id] ?? 0) + valNum,
-    }));
-    setValStr("");
-    navigation.goBack();
+    setSoon((v) => !v);
   };
 
   // Пресеты трансфера [10000, 25000, 50000, null] — «Всё» = весь баланс FROM.
-  const transferFx = getTransferFixture();
+  const transferFx = {
+    presets: TRANSFER_PRESETS,
+    insufficient_text: d.parentApp.more3.transferNotEnough,
+  };
 
   // Данные для шторки выбора источника (переиспользуем компонент из UI-кита).
   const pickerItems: ChildPickerItem[] = kids.map((k) => ({
@@ -435,6 +439,8 @@ export default function TransferScreen() {
           gap: 10,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* Блок 3: Caption ОТКУДА. Литерал (не через t.*, макет 1770). */}
         <Text
           style={{
@@ -663,6 +669,7 @@ export default function TransferScreen() {
             </Text>
           </View>
         )}
+        {soon ? <SoonNote text={d.parentApp.pay2.soon} /> : null}
 
         {/* Блок 10: Info banner (зелёный, макет 1793–1795). */}
         <View

@@ -20,6 +20,14 @@
  * уведомления. Их фикстуры и аксессоры удалены; бэйдж колокольчика тоже
  * больше не считается здесь (см. hooks/useUnreadNotifications.ts).
  */
+import {
+  BILLS,
+  PAYMENTS_OVERVIEW,
+  TOPUP_PRESETS,
+  WALLET_BALANCE,
+  historyTotals,
+  walletOpsFor,
+} from "./demoPayments";
 import type {
   ApplicationDetailRow,
   ApplicationRow,
@@ -87,29 +95,7 @@ import {
   HOMEWORK_UPLOAD_FILES,
   HOMEWORK_UPLOAD_MAX_FILES,
 } from "./fixtures/homework";
-import {
-  ADD_CARD_PLACEHOLDERS,
-  BILLS,
-  CARD_BIN_BRANDS,
-  DEFAULT_PAY_METHOD_ID,
-  MAIN_CARD_LABEL,
-  PASSWORD_RULES,
-  PASSWORD_STRENGTH_LABELS,
-  PAYMENTS_FAQ,
-  PAYMENTS_OVERVIEW,
-  PAYMENT_HISTORY,
-  PAY_METHODS,
-  PAY_SHEET_TEXTS,
-  RECEIPTS,
-} from "./fixtures/payments";
-import {
-  TOPUP_PRESETS,
-  TRANSFER_INSUFFICIENT_TEXT,
-  TRANSFER_PRESETS,
-  WALLETS,
-  WALLET_LIMITS,
-  WALLET_OPS,
-} from "./fixtures/wallet";
+import { PASSWORD_RULES, PASSWORD_STRENGTH_LABELS } from "./fixtures/profile";
 import {
   NOTIFICATIONS_MASTER_DEFAULT,
   NOTIFICATION_CATEGORIES,
@@ -378,80 +364,41 @@ export function getDueBillsCount(): number {
   return BILLS.filter((b) => b.in_main_list && b.checked_by_default).length;
 }
 
-export function getPayMethods() {
-  return { methods: PAY_METHODS, default_id: DEFAULT_PAY_METHOD_ID };
-}
-
-export function getPaymentHistory(): Record<"jul" | "jun", PaymentHistoryRow[]> {
-  return PAYMENT_HISTORY;
-}
-
 /**
- * Итоги «Истории оплат» d20 — из PAYMENT_HISTORY:
- * всего = сумма не-возвратов (10 250 000), возвраты = |отрицательных|
- * (150 000), успешных = всего − возвраты (10 100 000).
+ * Итоги «Истории оплат» — считаются из demoPayments.PAYMENT_HISTORY, а не
+ * хардкодятся: правка одной строки не должна заставлять цифры внизу врать.
  */
 export function getPaymentHistoryTotals(): { total: number; successful: number; refunds: number } {
-  const all = [...PAYMENT_HISTORY.jul, ...PAYMENT_HISTORY.jun];
-  const total = all.filter((p) => !p.is_refund).reduce((s, p) => s + p.amount, 0);
-  const refunds = all.filter((p) => p.is_refund).reduce((s, p) => s + Math.abs(p.amount), 0);
-  return { total, successful: total - refunds, refunds };
-}
-
-export function getReceipts(kind?: ReceiptRow["kind"]): ReceiptRow[] {
-  return kind ? RECEIPTS.filter((r) => r.kind === kind) : RECEIPTS;
-}
-
-export function getPaymentsFaq() {
-  return PAYMENTS_FAQ;
+  const t = historyTotals();
+  return { total: t.total, successful: t.net, refunds: t.refunds };
 }
 
 export function getPaymentsOverview() {
   return PAYMENTS_OVERVIEW;
 }
 
-export function getCardsFixture() {
-  return {
-    main_card_label: MAIN_CARD_LABEL,
-    bin_brands: CARD_BIN_BRANDS,
-    add_card_placeholders: ADD_CARD_PLACEHOLDERS,
-  };
-}
-
 export function getPasswordFixture() {
   return { rules: PASSWORD_RULES, strength_labels: PASSWORD_STRENGTH_LABELS };
 }
 
-export function getPaySheetTexts() {
-  return PAY_SHEET_TEXTS;
-}
-
 // ─── Кошелёк ─────────────────────────────────────────────────────────────────
 
-export function getWallets(): WalletRow[] {
-  return WALLETS;
-}
-
-/** ЕДИНЫЙ источник баланса кошелька ребёнка (Малика → 185 000). */
-export function getWalletBalance(childId?: string): number {
-  return WALLETS[childIndex(childId)].balance;
+/**
+ * ЕДИНЫЙ источник баланса кошелька. Раньше он брался из таблицы балансов ПО
+ * ИНДЕКСУ выдуманного ребёнка — после перехода семьи на настоящие данные
+ * индекс указывал не туда, и главная спорила с экраном кошелька. Теперь одно
+ * число из demoPayments — то же, что показывает веб-родитель.
+ */
+export function getWalletBalance(_childId?: string): number {
+  return WALLET_BALANCE;
 }
 
 export function getWalletOps(_childId?: string): WalletOpsDayGroup[] {
-  // Макет показывает один и тот же список операций для активного ребёнка.
-  return WALLET_OPS;
+  return walletOpsFor();
 }
 
-export function getWalletLimits() {
-  return WALLET_LIMITS;
-}
-
-export function getTopupPresets() {
+export function getTopupPresets(): readonly number[] {
   return TOPUP_PRESETS;
-}
-
-export function getTransferFixture() {
-  return { presets: TRANSFER_PRESETS, insufficient_text: TRANSFER_INSUFFICIENT_TEXT };
 }
 
 // ─── Уведомления ─────────────────────────────────────────────────────────────

@@ -34,6 +34,11 @@
  *
  * Ни FAB, ни empty-state, ни поиска, ни секций «Кружки» — их в макете
  * этого экрана нет (правило заказчика §правила).
+ *
+ * 15.08.2026 (оплаты). Кнопка-«меню» в шапке убрана — за ней стояла заглушка
+ * без действий. Локальная витрина RECENT_OPS удалена: операции берутся из
+ * общего data/demoPayments.ts, подпись дня — «Сегодня/Вчера/дата» на языке
+ * интерфейса от школьного «сегодня». Сверху — плашка «это пример».
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,6 +48,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassCard, GlassCircleButton } from "../../ui";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner } from "./parts";
+import { LOCALE_TAG } from "@snr/core";
+import { WALLET_OPS } from "../../data/demoPayments";
+import { useTashkentToday } from "../../hooks/useTashkentToday";
+import { addDays } from "../../lib/tashkent";
+import { dayMonth } from "../../lib/dateLabels";
 import {
   DEFAULT_CHILD_INDEX,
   getChildren,
@@ -52,22 +63,18 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import type { MainStackParamList } from "../../navigation/routes";
 import { formatMoney } from "../../utils/format";
 
-/* ============================================================================
- * Навигация: экран лежит в общем Stack (роутинг подключит Заход 10). Пока
- * — структурная заглушка (как в PaymentsScreen), goD-хелпер для goTopup /
- * goTransfer / goHistory / goLimits / goWalletOps / goWalletMenu / goBack.
- * ============================================================================ */
+/** Экран лежит в общем Stack; navigate работает вверх по дереву. */
 interface AnyNav {
   navigate: (name: string, params?: object) => void;
   goBack: () => void;
 }
 
 /* ============================================================================
- * Курируемая витрина «Последние операции» (BLOCK-LIST 5) — 4 строки
- * ДОСЛОВНО из макета 1054–1057. Локальная фикстура: WALLET_OPS/getWalletOps
- * оперируют дневной группировкой и другими подписями (для экрана d wops),
- * а здесь витрина без дней и с укороченными подписями «Сегодня, 12:40»,
- * «Вчера, 13:05», «21 июля, 09:12», «21 июля, 10:20».
+ * «Последние операции». Раньше здесь лежала ВТОРАЯ копия операций кошелька
+ * — четыре строки прямо в файле, с датами русским текстом («21 июля, 09:12»).
+ * Теперь берём те же операции, что и экран «Все операции», из единственного
+ * места выдуманных оплат (data/demoPayments.ts), а подпись дня собираем на
+ * языке интерфейса от школьного «сегодня».
  * ============================================================================ */
 type OpKind = "expense" | "income";
 interface RecentOp {
@@ -78,63 +85,8 @@ interface RecentOp {
   kind: OpKind;
   gradient: [string, string];
   iconPaths: string[];
-  /** Толщина strokeWidth иконки внутри плитки 36×36 (макет: 1.9/2.2). */
   strokeWidth: number;
 }
-const RECENT_OPS: RecentOp[] = [
-  {
-    id: "op-caf-today",
-    title: "Столовая · обед",
-    timeTxt: "Сегодня, 12:40",
-    amount: 18000,
-    kind: "expense",
-    gradient: ["#34d399", "#0ea5e9"],
-    iconPaths: [
-      "M4 2v7a3 3 0 0 0 6 0V2",
-      "M7 12v10",
-      "M20 2a4 4 0 0 0-4 4v7h4",
-      "M20 13v9",
-    ],
-    strokeWidth: 1.9,
-  },
-  {
-    id: "op-shop-y",
-    title: "Школьный магазин · тетради",
-    timeTxt: "Вчера, 13:05",
-    amount: 12000,
-    kind: "expense",
-    gradient: ["#60a5fa", "#2563eb"],
-    iconPaths: [
-      "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z",
-      "M3 6h18",
-      "M16 10a4 4 0 0 1-8 0",
-    ],
-    strokeWidth: 1.9,
-  },
-  {
-    id: "op-topup-d21",
-    title: "Пополнение кошелька",
-    timeTxt: "21 июля, 09:12",
-    amount: 100000,
-    kind: "income",
-    gradient: ["#34d399", "#059669"],
-    iconPaths: ["M12 5v14", "M5 12h14"],
-    strokeWidth: 2.2,
-  },
-  {
-    id: "op-buf-d21",
-    title: "Буфет · сок и булочка",
-    timeTxt: "21 июля, 10:20",
-    amount: 9000,
-    kind: "expense",
-    gradient: ["#fbbf24", "#f97316"],
-    iconPaths: [
-      "M17 8h1a4 4 0 0 1 0 8h-1",
-      "M3 8h14v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z",
-    ],
-    strokeWidth: 1.9,
-  },
-];
 
 /* Цвета сумм — из макета (строки 1054–1057), НЕ токены темы:
  * balance-карточка всегда фиолетовая (единый вид в обеих темах),
@@ -172,17 +124,6 @@ function WhiteGlyph({
       {paths.map((d, i) => (
         <Path key={i} d={d} />
       ))}
-    </Svg>
-  );
-}
-
-/** «3 горизонтальные точки» — правая glass-кнопка шапки (макет 1039). */
-function DotsMenuIcon({ color }: { color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round">
-      <Circle cx={5} cy={12} r={1} />
-      <Circle cx={12} cy={12} r={1} />
-      <Circle cx={19} cy={12} r={1} />
     </Svg>
   );
 }
@@ -347,7 +288,7 @@ function OperationRow({
 
 export default function ChildWalletScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const navigation = useNavigation() as unknown as AnyNav;
   const insets = useSafeAreaInsets();
   const { currentChildId } = useAuthSession();
@@ -365,13 +306,40 @@ export default function ChildWalletScreen() {
   );
   const walletBalTxt = formatMoney(wallet_balance);
 
+  // Первые четыре операции из общего списка. Подпись дня — «Сегодня» /
+  // «Вчера» / дата на языке интерфейса, а не готовая русская строка.
+  const localeTag = LOCALE_TAG[locale];
+  const todayKey = useTashkentToday();
+  const recentOps: RecentOp[] = WALLET_OPS.flatMap((day) =>
+    day.ops.map((op) => {
+      const dayKey = addDays(todayKey, -day.daysAgo);
+      const dayTxt =
+        day.daysAgo === 0
+          ? d.parentApp.date.today
+          : day.daysAgo === 1
+            ? d.parentApp.date.yesterday
+            : dayMonth(dayKey, localeTag);
+      return {
+        id: op.id,
+        title: `${op.title} · ${op.via}`,
+        timeTxt: `${dayTxt}, ${op.time}`,
+        amount: op.amount,
+        kind: op.direction === "in" ? ("income" as const) : ("expense" as const),
+        gradient: op.gradient,
+        iconPaths: op.paths,
+        strokeWidth: 1.9,
+      };
+    }),
+  ).slice(0, 4);
+
   const go = (k: keyof MainStackParamList) => () => navigation.navigate(k);
   // walletmenu — единственная цель, у которой нет собственного экрана в
   // STACK_ROUTES (см. routes.ts): открываем универсальную заглушку
   // StubScreen через маршрут 'stub' + params.stubKey, как это делают
   // ScheduleScreen / TeacherProfileScreen / MealsScreen.
-  const goWalletMenu = () =>
-    navigation.navigate("stub", { stubKey: "walletmenu" });
+  // Кнопка-«меню» в шапке удалена: за ней стояла заглушка «Действия с
+  // кошельком», а все доступные действия и так лежат плитками на экране —
+  // пополнить, перевести, лимиты, все операции.
 
   const goTopup = go("dtop");
   const goTransfer = go("dtransfer");
@@ -422,9 +390,9 @@ export default function ChildWalletScreen() {
       >
         {d.parentApp.scr.childWallet}
       </Text>
-      <GlassCircleButton onPress={goWalletMenu}>
-        <DotsMenuIcon color={tokens.ink1} />
-      </GlassCircleButton>
+      {/* Правый слот пуст: кнопка-«меню» вела на заглушку без действий.
+          Держим ширину back-кнопки, чтобы заголовок остался по центру. */}
+      <View style={{ width: 38 }} />
     </View>
   );
 
@@ -453,6 +421,8 @@ export default function ChildWalletScreen() {
           gap: 12,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* BLOCK 2 — Balance Card (фиолетовый градиент). */}
         <View
           style={{
@@ -640,7 +610,7 @@ export default function ChildWalletScreen() {
 
         {/* BLOCK 5 — Operations List Card (4 строки с разделителями). */}
         <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
-          {RECENT_OPS.map((op, i) => (
+          {recentOps.map((op, i) => (
             <OperationRow
               key={op.id}
               op={op}

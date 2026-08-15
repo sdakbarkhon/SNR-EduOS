@@ -176,7 +176,6 @@ export const SCREEN_INFO: Record<string, StubInfo> = {
   dteach: STUBS.teacherprof,
   // Оплаты
   d18: STUBS.bills,
-  d19: STUBS.checkout,
   d20: STUBS.history,
   d21: STUBS.receipts,
   d22: STUBS.wallet,
@@ -185,8 +184,6 @@ export const SCREEN_INFO: Record<string, StubInfo> = {
   dwops: STUBS.walletops,
   dtransfer: STUBS.transfer,
   dlimits: STUBS.limits,
-  dcarddet: STUBS.carddet,
-  daddcard: STUBS.addcard,
   // Профиль
   d29: STUBS.child,
   d30: { t: "Данные родителя", tKey: "scr.parentData", n: "Экран #30", g: ["#8b5cf6", "#22d3ee"], i: "user" },
@@ -229,7 +226,7 @@ export const STACK_ROUTES = [
   "d6", "d11", "d12", "d13", "d14", "d15", "d16", "d7", "dallsubj", "drev", "dtopics",
   "d8", "d9",
   "d25", "d26", "d27", "d28", "dteach",
-  "d18", "d19", "d20", "d21", "d22", "d33", "dtop", "dwops", "dtransfer", "dlimits", "dcarddet", "daddcard",
+  "d18", "d20", "d21", "d22", "d33", "dtop", "dwops", "dtransfer", "dlimits",
   "d29", "d30", "d31", "d32", "d34", "dchpass", "dsessions",
   "dmeals", "ddiary", "dtests", "dlib", "dport", "dapps", "dmed", "dtrans",
   "a1", "a2", "a3", "a4",

@@ -54,6 +54,7 @@ import {
 import type { WalletOpsDayGroup } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner } from "./parts";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList } from "../../navigation/routes";
 
@@ -312,6 +313,8 @@ export default function WalletOpsScreen() {
           gap: 11,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* Блок 3: ChildSwitcherCard compact — открывает шторку. */}
         <ChildSwitcherCard
           variant="compact"

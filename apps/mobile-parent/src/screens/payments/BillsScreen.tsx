@@ -24,6 +24,13 @@
  *
  * i18n: заголовок — d.parentApp.scr.bills. Обе темы — через useTheme();
  * iOS safe-area — из InnerHeader; тени/стекло — токенами.
+ *
+ * 15.08.2026 (оплаты). Сверху — плашка «данных нет, это пример». Кнопка
+ * «Оплатить» больше не ведёт на выдуманный checkout с поддельной шторкой
+ * «Платёж проведён»: платёжной системы нет, и кнопка объясняет это под собой.
+ * «Скачать» — так же. Подпись строки собирается из НАСТОЯЩЕГО ребёнка, срок
+ * оплаты форматируется по локали (в фикстуре он лежал строкой «5 августа
+ * 2026»). Данные — из data/demoPayments.ts.
  */
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -33,11 +40,15 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCircleButton, InnerHeader } from "../../ui";
-import { getBills } from "../../data";
+import { BILLS, BILL_META } from "../../data/demoPayments";
+import { useChildScope } from "../../hooks/useChildScope";
+import { fullDate } from "../../lib/dateLabels";
+import { DemoBanner, SoonNote } from "./parts";
 import type { BillRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
 import { formatMoney } from "../../utils/format";
+import { format, LOCALE_TAG } from "@snr/core";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -403,11 +414,18 @@ const HELP_PATHS = ["M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3", "M12 17h.01"];
 
 export default function BillsScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
+  const localeTag = LOCALE_TAG[locale];
   const navigation = useNavigation<Nav>();
   const currency = d.parentApp.pay.sum;
 
-  const bills = getBills();
+  const bills = BILLS;
+  // Подпись строки собирается из НАСТОЯЩЕГО ребёнка родителя: в общем моке
+  // она содержит чужую демо-семью («Малика · 7-А»), а у родителя свой ребёнок.
+  const { child } = useChildScope();
+  const who = child ? `${child.first_name} · ${child.class_name}` : "";
+  const [paySoon, setPaySoon] = useState(false);
+  const [fileSoon, setFileSoon] = useState(false);
 
   // Стартовое состояние — из фикстур (edu/food в main + отмечены, form/exc в other).
   // Дальше состояние управляется локально: чекбокс тогглит выбор основных;
@@ -483,6 +501,8 @@ export default function BillsScreen() {
           gap: 12,
         }}
       >
+        <DemoBanner text={d.parentApp.pay2.demoBanner} />
+
         {/* 1. SummaryCard — количество счетов + крупная сумма (макет 915–918). */}
         <GlassSurface contentStyle={styles.summaryCardContent}>
           <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: muted }}>
@@ -516,7 +536,7 @@ export default function BillsScreen() {
                   numberOfLines={2}
                   style={{ fontFamily: fonts.manrope600, fontSize: 10, color: muted }}
                 >
-                  {b.note}
+                  {[who, BILL_META[b.id]?.noteTail].filter(Boolean).join(" · ")}
                 </Text>
               </View>
               <Text
@@ -553,7 +573,7 @@ export default function BillsScreen() {
                 <Path d="M3 10h18" />
               </Svg>
               <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: muted }}>
-                {`Срок оплаты: ${b.due_date_label}`}
+                {`${d.parentApp.pay.billDueBy.replace("{date}", fullDate(BILL_META[b.id].dueDate, localeTag))}`}
               </Text>
             </View>
           </GlassSurface>
@@ -569,12 +589,17 @@ export default function BillsScreen() {
           </Text>
         </GlassSurface>
 
-        {/* 4. PayAll CTA — «Оплатить всё» (макет 929). Disabled при пустом выборе. */}
-        <PayAllButton
-          label="Оплатить всё"
-          onPress={() => navigation.navigate("d19")}
-          disabled={payDisabled}
-        />
+        {/* 4. PayAll CTA. Раньше вела на выдуманный checkout с поддельной
+            шторкой «Платёж проведён»; платёжной системы нет, поэтому кнопка
+            объясняет это прямо под собой, а не изображает оплату. */}
+        <View>
+          <PayAllButton
+            label={format(d.parentApp.pay2.payAll, { sum: billTotalBig })}
+            onPress={() => setPaySoon((v) => !v)}
+            disabled={payDisabled}
+          />
+          {paySoon && !payDisabled ? <SoonNote text={d.parentApp.pay2.soon} /> : null}
+        </View>
 
         {/* 5. Секция «ДРУГИЕ СЧЕТА» (макет 930). Скрываем, если список пуст. */}
         {otherWrapVisible ? (
@@ -612,7 +637,7 @@ export default function BillsScreen() {
                       numberOfLines={1}
                       style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: mutedSofter }}
                     >
-                      {b.due_date_label}
+                      {fullDate(BILL_META[b.id].dueDate, localeTag)}
                     </Text>
                   </View>
                   <Text
@@ -627,11 +652,15 @@ export default function BillsScreen() {
           </>
         ) : null}
 
-        {/* 6. Download-all PDF (макет 936). */}
-        <DownloadPdfButton
-          label="Скачать все счета (PDF)"
-          onPress={() => navigation.navigate("stub", { stubKey: "dl" })}
-        />
+        {/* 6. Скачивание счетов. Файлов у школы не хранится — кнопка говорит
+            об этом, а не открывает пустую заглушку. */}
+        <View>
+          <DownloadPdfButton
+            label={d.parentApp.pay2.receiptDownload}
+            onPress={() => setFileSoon((v) => !v)}
+          />
+          {fileSoon ? <SoonNote text={d.parentApp.pay2.soonFile} /> : null}
+        </View>
       </ScrollView>
     </AppBackground>
   );

@@ -188,3 +188,9 @@ export const CONFIRM_DIALOGS: ConfirmDialogRow[] = [
 /** Автовыход (aeOpts); по умолчанию 15 минут. */
 export const AUTO_EXIT_OPTIONS = ["Через 5 минут", "Через 15 минут", "Через 30 минут", "Никогда"] as const;
 export const DEFAULT_AUTO_EXIT_VALUE = "15";
+
+/** Требования к паролю и шкала надёжности — экран смены пароля.
+ *  Переехали сюда 15.08.2026 из фикстур оплат: к оплатам они отношения не
+ *  имеют, а тот файл ушёл целиком в data/demoPayments.ts. */
+export const PASSWORD_RULES = ["Минимум 8 символов", "Есть заглавная буква", "Есть цифра"] as const;
+export const PASSWORD_STRENGTH_LABELS = ["Слабый", "Средний", "Надёжный"] as const;
