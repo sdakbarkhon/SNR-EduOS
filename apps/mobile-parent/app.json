@@ -13,7 +13,41 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.snr.eduos.parent",
-      "supportsTablet": true
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleLocalizations": [
+          "ru",
+          "uz",
+          "en"
+        ]
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "35F9.1"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.snr.eduos.parent",
@@ -48,7 +82,9 @@
       },
       "supabaseUrl": "https://qaljcmkkajqyawccxetq.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhbGpjbWtrYWpxeWF3Y2N4ZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA5ODksImV4cCI6MjA5NzIwNjk4OX0.PrvoDl7xAqBd51Y9mbfZSjXcmSHskXmGcvNsmA4Sd70",
-      "webApiBaseUrl": "https://snr-edu-os-web.vercel.app"
+      "webApiBaseUrl": "https://snr-edu-os-web.vercel.app",
+      "legalTermsUrl": "",
+      "legalPrivacyUrl": ""
     },
     "updates": {
       "url": "https://u.expo.dev/b4dbd5ca-95ba-4402-8dd6-3f18163e7f7f"

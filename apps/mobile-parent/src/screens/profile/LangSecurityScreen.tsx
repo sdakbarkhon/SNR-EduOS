@@ -43,7 +43,7 @@
  * токенами.
  */
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -60,6 +60,7 @@ import {
 } from "../../ui";
 import { SoonNote } from "../../ui/notices";
 import { useAppLocale } from "../../i18n";
+import { legalUrl, type LegalKind } from "../../lib/legal";
 import { getAutoExitFixture, getConfirmDialog } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 
@@ -301,6 +302,22 @@ export default function LangSecurityScreen() {
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
+  /**
+   * Правовой документ: если заказчик уже дал адрес (app.json → expo.extra),
+   * открываем его в браузере; если нет — ведём на экран, который объясняет,
+   * что документ готовится. Одна и та же проверка, что и на экране входа
+   * (lib/legal.ts) — до 15.08.2026 профиль про адреса не знал вовсе и после
+   * публикации документов так и остался бы без ссылки.
+   */
+  const openLegal = (kind: LegalKind) => {
+    const url = legalUrl(kind);
+    if (url) {
+      void Linking.openURL(url);
+      return;
+    }
+    navigation.navigate("stub", { stubKey: kind });
+  };
+
   const goTo = (route: keyof MainStackParamList) => () => navigation.navigate(route as never);
 
   // Строки «оформление» — иконка, ключи словаря, значение appearance.
@@ -509,7 +526,7 @@ export default function LangSecurityScreen() {
               конфиденциальности» и попадал в безымянный документ. Теперь у
               каждой свой заголовок и свой текст о том, чего ещё нет. */}
           <Pressable
-            onPress={() => navigation.navigate("stub", { stubKey: "terms" })}
+            onPress={() => openLegal("terms")}
             style={({ pressed }) => [
               {
                 flexDirection: "row",
@@ -530,7 +547,7 @@ export default function LangSecurityScreen() {
 
           {/* Политика конфиденциальности — свой текст, см. выше. */}
           <Pressable
-            onPress={() => navigation.navigate("stub", { stubKey: "privacy" })}
+            onPress={() => openLegal("privacy")}
             style={({ pressed }) => [
               {
                 flexDirection: "row",

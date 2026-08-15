@@ -38,6 +38,9 @@
  * Обе темы — useTheme(); iOS safe-area — useSafeAreaInsets (top для шапки,
  * bottom для composer). d25 живёт в STACK_ROUTES → под композером нет
  * FloatingTabBar, нижний отступ = safe-area.
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху ленты — плашка «это пример»:
+ * сообщения не отправляются и не приходят, переписка выдумана.
  */
 import { useState, type ReactNode } from "react";
 import {
@@ -63,6 +66,7 @@ import {
 import { getSubject, getTeacherChat } from "../../data";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -249,6 +253,9 @@ export default function ChatScreen() {
             gap: 8,
           }}
         >
+          {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+          <DemoBanner text={d.parentApp.soon.sections.chat} />
+
           {/* 4) Day divider. */}
           <View
             style={{

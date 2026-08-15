@@ -25,6 +25,10 @@
  * Данные — только через аксессоры src/data. Тексты — d.parentApp.*. Обе темы
  * через useTheme(); iOS safe-area — из InnerHeader; paddingBottom 118 под
  * FloatingTabBar (у экрана его нет, но выравниваем со всеми внутренними).
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху — плашка «это пример»: сводка по
+ * предметам ещё не собрана из журнала. Оценки в «Успехах» и дневнике —
+ * настоящие.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -55,6 +59,7 @@ import {
 import type { BaseSubjectKey, SubjectStatRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -235,6 +240,9 @@ export default function AllSubjectsScreen() {
           gap: 12,
         }}
       >
+        {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.subjects} />
+
         {/* Block 3: Child_Switcher_Card (compact, без status/switchLabel —
             только аватар + ФИО + «{cl} класс» + шеврон, как в макете 1371). */}
         <ChildSwitcherCard

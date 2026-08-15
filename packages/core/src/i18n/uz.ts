@@ -3522,6 +3522,13 @@ export const uz: Dictionary = {
         portfolio: "Maktab bazasida ishlar va yutuqlar hali yo‘q: quyidagi kartochkalar — namuna. Yuqoridagi farzand ismi va sinfi — haqiqiy. Bo‘lim o‘qituvchilar portfolioni tizimda yig‘a boshlaganda ishlaydi.",
         applications: "Maktab bazasida arizalar hali yo‘q: quyidagi ro‘yxat — namuna. Bo‘lim maktab arizalarni ilova orqali qabul qila boshlaganda ishlaydi.",
         support: "Ilovada qo‘llab-quvvatlash xizmati hali yo‘q: quyidagi yozishma — namuna. Bu yerda to‘lov va hujjatlar bo‘yicha maktab bilan chat bo‘ladi.",
+        messages: "Ilovadagi yozishmalar hozircha namuna sifatida ko‘rsatilgan: suhbatlar ro‘yxati va yuqoridagi lenta — namuna. Shu bo‘limdagi maktab e’lonlari va ma’muriyat yangiliklari — haqiqiy.",
+        chat: "Bu yozishma — namuna: xabarlar yuborilmaydi va kelmaydi. O‘qituvchi bilan haqiqiy yozishma maktab chati bilan birga paydo bo‘ladi.",
+        subjects: "Fanlar ro‘yxati va ulardagi raqamlar — namuna: fanlar bo‘yicha jamlanma hali jurnaldan yig‘ilmagan. «Muvaffaqiyatlar» va kundalikdagi baholar — haqiqiy.",
+        subjectDetail: "Fan kartochkasi — namuna: bu yerdagi o‘zlashtirish, mavzular va o‘qituvchi izohi to‘qilgan. Bu fan bo‘yicha haqiqiy baholar kundalikda va «Muvaffaqiyatlar»da ko‘rinadi.",
+        reviews: "O‘qituvchilar fikri — namuna: maktabda bunday qayta aloqa shakli hali yo‘q. O‘qituvchilarning haqiqiy izohlari baholar bilan birga keladi.",
+        dayStatus: "Kunning batafsil holati — namuna: maktab kelish-ketishni belgilamaydi. Kun bo‘yicha haqiqiy darslar, baholar va davomat — kundalikda.",
+        assistant: "Yordamchi — u o‘zlashtirishni qanday tahlil qilishiga namuna. Hozircha matnlar oldindan tayyorlangan va farzandingiz bo‘yicha hisoblanmaydi.",
         sessions: "Ilova hisobga haqiqiy kirishlarni hozircha ko‘rsatmaydi: quyidagi qurilmalar — namuna. Bu yerda sizning seanslaringiz va begonasini tugatish imkoni bo‘ladi.",
       },
       notes: {

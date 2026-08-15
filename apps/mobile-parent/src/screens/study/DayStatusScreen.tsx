@@ -32,6 +32,9 @@
  * Данные — через аксессоры (getDayStatus + getChildren + getSubject) и
  * фикстуру DEMO_TODAY. Тексты — d.parentApp.* (RU/UZ/EN). Обе темы — useTheme().
  * iOS safe-area у шапки. НЕТ «опозданий», НЕТ «кружков» (правила заказчика).
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху — плашка «это пример»: приходов
+ * и уходов школа не отмечает, цифры дня собраны из фикстуры.
  */
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
@@ -63,6 +66,7 @@ import { useAppLocale } from "../../i18n";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -394,6 +398,9 @@ export default function DayStatusScreen() {
           gap: 12,
         }}
       >
+        {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.dayStatus} />
+
         {/* 3. ChildSwitcherCard (compact, без switchLabel). */}
         <ChildSwitcherCard
           variant="compact"

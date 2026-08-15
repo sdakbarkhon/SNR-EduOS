@@ -3521,6 +3521,13 @@ export const en: Dictionary = {
         portfolio: "There are no works or achievements in the school database yet: the cards below are a sample. Your child's name and class at the top are real. The section starts working once teachers collect portfolios in the system.",
         applications: "There are no requests in the school database yet: the list below is a sample. The section starts working once the school starts accepting requests through the app.",
         support: "There is no support desk in the app yet: the conversation below is a sample. This is where a chat with the school about payments and documents will live.",
+        messages: "Conversations in the app are shown as a sample for now: the thread list and the row on top are examples. School announcements and administration news in the same section are real.",
+        chat: "This conversation is a sample: messages are neither sent nor received. Real messaging with a teacher arrives together with the school chat.",
+        subjects: "The subject list and the figures under it are a sample: a per-subject summary is not assembled from the register yet. Marks in Progress and in the diary are real.",
+        subjectDetail: "This subject card is a sample: the results, topics and teacher's comment here are invented. Real marks for this subject are visible in the diary and in Progress.",
+        reviews: "Teacher feedback is a sample: the school has no such feedback form yet. Real teacher comments arrive together with marks.",
+        dayStatus: "The detailed day status is a sample: the school does not record arrivals and departures. Real lessons, marks and attendance for the day are in the diary.",
+        assistant: "The assistant is a sample of how it will break down your child's results. For now the texts are prepared in advance and are not calculated for your child.",
         sessions: "The app does not show real sign-ins yet: the devices below are a sample. This is where your sessions — and the option to end someone else's — will live.",
       },
       notes: {

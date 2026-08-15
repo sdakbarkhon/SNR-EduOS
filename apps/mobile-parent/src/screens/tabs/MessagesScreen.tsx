@@ -14,6 +14,10 @@
  *  4. Список тредов: карточки-стекло, каждая — icon/аватар + row
  *     (name, role-chip, time справа) + row (preview 2 строки, badge справа).
  *     Фильтрация по выбранной вкладке.
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху — плашка «это пример»: список
+ * бесед и лента сториз собраны из фикстуры. Объявления и новости админа,
+ * которые открываются отсюда, — настоящие.
  */
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native"; // ScrollView остаётся для горизонтальных сториз
@@ -35,6 +39,7 @@ import { useAppLocale } from "../../i18n";
 import { getMessageThreads, getMessagesStories } from "../../data";
 import type { MessagesStoryRow, MessageThreadRow } from "../../data/types";
 import { ICONS, STUBS, type MainStackParamList, type StubKey } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 type Cat = "all" | MessageThreadRow["category"];
@@ -134,6 +139,9 @@ export default function MessagesScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ gap: 11 }}
       >
+        {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.messages} />
+
         {/* 2. Горизонтальная лента сториз. */}
         <ScrollView
           horizontal

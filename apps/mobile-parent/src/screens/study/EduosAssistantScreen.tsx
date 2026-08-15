@@ -26,6 +26,9 @@
  * Тексты хрома — d.parentApp.* (RU/UZ/EN). Обе темы — useTheme().
  *
  * Правила заказчика: НЕТ «Кружков», прогресс-список — 5 предметов из макета.
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху — плашка «это пример»: тексты
+ * помощника заготовлены заранее и не считаются по ребёнку.
  */
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,6 +37,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { AccentCard, GlassCard, InnerHeader, SectionHeader } from "../../ui";
+import { DemoBanner } from "../../ui/notices";
 import { getAssistantScreen } from "../../data";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
@@ -419,6 +423,9 @@ export default function EduosAssistantScreen() {
           gap: 12,
         }}
       >
+        {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.assistant} />
+
         {/* Блок 3 — AI Overall Insight card (макет 1340–1347). */}
         <AccentCard
           gradient={["#8b5cf6", "#6366f1"]}

@@ -27,6 +27,9 @@
  * Тексты — через useAppLocale().d.parentApp.*.
  * Обе темы — через useTheme(). iOS safe-area — из InnerHeader.
  * Скролл — paddingBottom 118 под FloatingTabBar (см. макет строка 1389).
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху — плашка «это пример»: такой
+ * формы отзывов в школе пока нет.
  */
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -55,6 +58,7 @@ import type { BaseSubjectKey, TeacherReviewRow } from "../../data";
 import { useAppLocale } from "../../i18n";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
+import { DemoBanner } from "../../ui/notices";
 
 type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
 
@@ -354,6 +358,9 @@ export default function TeacherReviewsScreen() {
           gap: 11,
         }}
       >
+        {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.reviews} />
+
         {/* 2. Child switcher (без статуса/switchLabel — по макету 1390). */}
         <ChildSwitcherCard
           variant="compact"

@@ -27,10 +27,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLocale } from "../../i18n";
+import { legalUrl } from "../../lib/legal";
 import { fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   GlassCard,
@@ -49,20 +49,6 @@ import {
 } from "../../ui/auth/icons";
 import { AuthHelpSheet } from "./sheets/AuthHelpSheet";
 import { LangThemeButtons } from "./LangThemeButtons";
-
-/**
- * Правовые документы. Ссылки обязаны быть — их требуют магазины, — но вести
- * в никуда они не могут. Поэтому адрес берётся из настроек сборки
- * (`app.json → expo.extra.legalTermsUrl / legalPrivacyUrl`): как только
- * заказчик даст ссылки, они заработают без единой правки кода. Пока адреса
- * нет, вместо перехода показывается честное объяснение, а не молчаливый
- * возврат на онбординг, как было до 13.08.2026.
- */
-function legalUrl(kind: "terms" | "privacy"): string | null {
-  const extra = Constants.expoConfig?.extra as Record<string, unknown> | undefined;
-  const raw = extra?.[kind === "terms" ? "legalTermsUrl" : "legalPrivacyUrl"];
-  return typeof raw === "string" && raw.startsWith("http") ? raw : null;
-}
 
 /** Формат «90 123 45 67» — соответствует phoneFmt макета. */
 function formatPhone(digits: string): string {

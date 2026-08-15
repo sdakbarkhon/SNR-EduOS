@@ -25,6 +25,9 @@
  *
  * Gauge — обёртка над react-native-svg (без overflow:visible проблем),
  * viewBox 120×70, thickness 10, size 110 — 1:1 макет строка 470.
+ *
+ * 15.08.2026 (подготовка к сборке). Сверху — плашка «это пример»:
+ * успеваемость, темы и комментарий учителя на этом экране выдуманы.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -35,7 +38,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { Gauge, GlassCircleButton, ProgressBar } from "../../ui";
-import { SoonNote } from "../../ui/notices";
+import { DemoBanner, SoonNote } from "../../ui/notices";
 import {
   getSelectedChildContext,
   getSubject,
@@ -243,6 +246,9 @@ export default function SubjectDetailScreen() {
           gap: 12,
         }}
       >
+        {/* Плашка «это пример» — раздел ещё не на данных школы. */}
+        <DemoBanner text={d.parentApp.soon.sections.subjectDetail} />
+
         {favNote ? <SoonNote text={d.parentApp.soon.notes.favSave} /> : null}
 
         {/* 3. Teacher Card (макет 462–467). */}

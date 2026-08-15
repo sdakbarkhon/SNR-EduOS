@@ -41,7 +41,9 @@
     "type-check": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "build:android": "eas build --profile preview --platform android",
-    "build:ios": "eas build --profile preview --platform ios"
+    "build:ios": "eas build --profile preview --platform ios",
+    "build:android:store": "eas build --profile production --platform android",
+    "build:ios:store": "eas build --profile production --platform ios"
   },
   "private": true
 }
