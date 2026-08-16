@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Download, Pencil } from "lucide-react";
-import { gradeSubmission, getDictionary, type Locale, type CodeLanguage } from "@snr/core";
+import { gradeSubmission, isMarkLockedError, getDictionary, type Locale, type CodeLanguage } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { CodeViewer } from "@/components/CodeEditor";
@@ -54,7 +54,10 @@ export function TeacherProgrammingSubmissions({
       setEditingId(null);
     } catch (e: unknown) {
       console.error("[grade] failed:", e);
-      setErrors((p) => ({ ...p, [s.id]: isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : d.common.error }));
+      setErrors((p) => ({ ...p, [s.id]:
+        isMarkLockedError(e) ? d.lesson.markLockedBody
+        : isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData
+        : d.common.error }));
     } finally {
       setGrades((p) => ({ ...p, [s.id]: { grade: p[s.id]?.grade ?? "", comment: p[s.id]?.comment ?? "", saving: false } }));
     }

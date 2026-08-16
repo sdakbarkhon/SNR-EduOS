@@ -274,6 +274,41 @@ export interface Dictionary {
     navParents: string;
     navProfile: string;
     navChats: string;
+    navMarks: string;
+    // Заход «замок 15 минут» — правка запертых оценок администратором
+    marks: {
+      title: string;
+      subtitle: string;
+      search: string;
+      allGroups: string;
+      allSubjects: string;
+      allKinds: string;
+      kindLessonGrade: string;
+      kindAttendance: string;
+      kindHomework: string;
+      kindTest: string;
+      colStudent: string;
+      colKind: string;
+      colClass: string;
+      colSubject: string;
+      colDate: string;
+      colValue: string;
+      colAction: string;
+      edit: string;
+      empty: string;
+      nothingFound: string;
+      shown: string;
+      editTitle: string;
+      newValue: string;
+      save: string;
+      cancel: string;
+      saved: string;
+      failed: string;
+      clear: string;
+      attPresent: string;
+      attExcused: string;
+      attUnexcused: string;
+    };
     // Пачка 7.20 — read-only chat viewer
     chats: {
       title: string;
@@ -1717,6 +1752,10 @@ export interface Dictionary {
     downloadReference: string;
   };
   lesson: {
+    markLockedTitle: string;   // замок на оценке (миграция 203)
+    markLockedBody: string;
+    markWindowLeft: string;    // «Исправить можно ещё {n} мин»
+    markCommentAlways: string;
     createNoSubjects: string;
     createSelectSubject: string;
     back: string;

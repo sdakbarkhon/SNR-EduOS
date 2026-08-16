@@ -15,4 +15,5 @@ export * from "./utils/schoolTime";
 export * from "./utils/money";
 export * from "./utils/homework";
 export * from "./utils/plural";
+export * from "./utils/markLock";
 export * from "./mocks/payments";

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Star, Check, Loader2 } from "lucide-react";
-import { getDictionary, gradeStudentForLesson } from "@snr/core";
+import { getDictionary, gradeStudentForLesson, isMarkLockedError, markLockState } from "@snr/core";
 import type { Locale, LessonGrade } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -38,12 +38,22 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
   const [customText, setCustomText] = useState<string>(existing?.comment ?? "");
   const [isOther, setIsOther] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [lockError, setLockError] = useState(false);
+
+  // Замок миграции 203: через 15 минут после выставления оценку меняет только
+  // администратор школы. Комментарий не запирается — его правят всегда.
+  const lock = markLockState(existing?.graded_at ?? null);
 
   // preset comments keyed by grade (1-5)
   const presets = grade ? (dl.gradeComments as Record<string, string[]>)[String(grade)] ?? [] : [];
 
   const comment = isOther ? customText : (selectedPreset != null ? presets[selectedPreset] ?? null : null);
-  const canSave = grade != null && (selectedPreset != null || (isOther && customText.trim().length > 0));
+  // Оценку менять нельзя, если запись заперта; комментарий — можно.
+  const gradeChanged = grade !== (existing?.grade ?? null);
+  const canSave =
+    grade != null
+    && (selectedPreset != null || (isOther && customText.trim().length > 0))
+    && !(lock.locked && gradeChanged);
 
   async function handleSave() {
     if (!canSave || !grade) return;
@@ -52,8 +62,11 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
       const saved = await gradeStudentForLesson(db, lessonId, teacherId, studentId, grade, comment);
       onSaved(saved);
       onClose();
-    } catch {
-      // error silently — button returns to active state
+    } catch (err) {
+      // Молчать здесь нельзя: запертую запись сервер отклоняет, и учитель
+      // должен понять, почему кнопка «не сработала».
+      if (isMarkLockedError(err)) setLockError(true);
+      else console.error("[GradeModal] сохранить не удалось:", err);
     } finally {
       setSaving(false);
     }
@@ -85,6 +98,20 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
         </div>
 
         <div className="p-5 space-y-5">
+          {/* Состояние замка. Заперто — говорим, к кому идти; идёт окно —
+              показываем, сколько времени ещё есть. Молчаливого отказа нет. */}
+          {(lock.locked || lockError) ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="text-xs font-bold text-amber-800">{dl.markLockedTitle}</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-amber-700">{dl.markLockedBody}</p>
+              <p className="mt-1 text-[11px] text-amber-600">{dl.markCommentAlways}</p>
+            </div>
+          ) : !lock.notSetYet ? (
+            <p className="text-[11px] font-medium text-slate-500">
+              {dl.markWindowLeft.replace("{n}", String(lock.minutesLeft))}
+            </p>
+          ) : null}
+
           {/* Grade picker */}
           <div>
             <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-slate-400">{dl.gradeChoose}</p>

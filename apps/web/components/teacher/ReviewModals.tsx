@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
-  getDictionary, gradeSubmission, getTestAnswersForSubmission, getSubmissionFileUrl,
+  getDictionary, gradeSubmission, isMarkLockedError, getTestAnswersForSubmission, getSubmissionFileUrl,
   approveAiHomeworkReview, declineAiHomeworkReview,
   type TeacherAiPendingReview, type AiHomeworkFeedback,
 } from "@snr/core";
@@ -106,7 +106,11 @@ export function ReviewModal({ submission, onClose, onGraded }: {
       await gradeSubmission(supabase, { submissionId: submission.id, grade: gradeNum, comment: comment.trim() });
       onGraded(gradeNum, comment.trim());
     } catch (e: unknown) {
-      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
+      setError(
+        isMarkLockedError(e) ? d.lesson.markLockedBody
+        : isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData
+        : (e as Error).message ?? d.common.error,
+      );
     } finally {
       setSaving(false);
     }
@@ -260,7 +264,11 @@ export function TestReviewModal({ testSub, questions, onClose, onGraded }: {
       if (err) throw err;
       onGraded(newScore, newMax);
     } catch (e: unknown) {
-      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
+      setError(
+        isMarkLockedError(e) ? d.lesson.markLockedBody
+        : isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData
+        : (e as Error).message ?? d.common.error,
+      );
     } finally {
       setSaving(false);
     }
@@ -421,7 +429,11 @@ export function AiReviewModal({ review, onClose, onResolved }: {
       await fn(supabase, { submissionId: review.id, grade: gradeNum, comment: comment.trim() });
       onResolved();
     } catch (e: unknown) {
-      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
+      setError(
+        isMarkLockedError(e) ? d.lesson.markLockedBody
+        : isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData
+        : (e as Error).message ?? d.common.error,
+      );
     } finally {
       setSaving(false);
     }

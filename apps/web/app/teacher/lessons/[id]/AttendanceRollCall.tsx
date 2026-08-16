@@ -7,6 +7,8 @@ import {
   markStudentAttendance,
   getLessonGrades,
   getDictionary,
+  isMarkLockedError,
+  markLockState,
   type AttendanceRollCallRow,
   type AttendanceStatus,
   type LessonGrade,
@@ -39,6 +41,9 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   const [rows, setRows] = useState<AttendanceRollCallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savedId, setSavedId] = useState<string | null>(null);
+  // Замок миграции 203: отметку старше 15 минут меняет только администратор.
+  // Молча откатывать кнопку нельзя — учитель должен понять, почему не вышло.
+  const [lockNotice, setLockNotice] = useState(false);
   // Grades map: studentId → LessonGrade
   const [gradesMap, setGradesMap] = useState<Record<string, LessonGrade>>({});
   // Grade modal state
@@ -83,6 +88,9 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
     studentId: string, oldStatus: AttendanceStatus | null, next: AttendanceStatus,
   ) {
     if (readOnly || next === oldStatus) return;
+    const current = rows.find((r) => r.student_id === studentId);
+    if (markLockState(current?.marked_at).locked) { setLockNotice(true); return; }
+    setLockNotice(false);
     setRows((prev) =>
       prev.map((r) =>
         r.student_id === studentId ? { ...r, status: next, marked_at: new Date(schoolNowMs()).toISOString() } : r,
@@ -92,10 +100,12 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
       await markStudentAttendance(db, lessonId, studentId, next, teacherId);
       setSavedId(studentId);
       setTimeout(() => setSavedId(null), 1500);
-    } catch {
+    } catch (err) {
       setRows((prev) =>
         prev.map((r) => r.student_id === studentId ? { ...r, status: oldStatus, marked_at: null } : r),
       );
+      if (isMarkLockedError(err)) setLockNotice(true);
+      else console.error("[AttendanceRollCall] отметка не сохранилась:", err);
     }
   }
 
@@ -151,6 +161,14 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
               </span>
             </>
           )}
+        </div>
+      )}
+
+      {/* Замок: прошло больше 15 минут — правит администратор школы. */}
+      {lockNotice && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+          <p className="text-xs font-bold text-amber-800">{d.lesson.markLockedTitle}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-amber-700">{d.lesson.markLockedBody}</p>
         </div>
       )}
 

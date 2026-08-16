@@ -7,6 +7,7 @@ import {
   getHomeworkSubtasks,
   getHomeworkSubtaskSubmissions,
   gradeSubmission,
+  isMarkLockedError,
 } from "@snr/core";
 import type { Locale, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, CodeLanguage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -180,7 +181,11 @@ function BundleGradeModal({
       await gradeSubmission(supabase, { submissionId: submission.id, grade: gradeNum, comment: comment.trim() });
       onGraded(gradeNum, comment.trim());
     } catch (e: unknown) {
-      setError(isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData : (e as Error).message ?? d.common.error);
+      setError(
+        isMarkLockedError(e) ? d.lesson.markLockedBody
+        : isDemoEditBlockedError(e) ? d.demoMode.cannotEditRealData
+        : (e as Error).message ?? d.common.error,
+      );
     } finally {
       setSaving(false);
     }
