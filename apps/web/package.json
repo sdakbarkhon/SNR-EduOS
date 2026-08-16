@@ -11,6 +11,9 @@
     "seed:demo-iter4": "tsx scripts/seed-demo-iteration4.ts"
   },
   "dependencies": {
+    "@blueprintjs/core": "^6.18.0",
+    "@blueprintjs/icons": "^6.13.0",
+    "@blueprintjs/select": "^6.3.4",
     "@google/generative-ai": "^0.24.1",
     "@monaco-editor/react": "^4.7.0",
     "@snr/core": "workspace:*",
@@ -29,6 +32,7 @@
     "next": "^15.1.3",
     "pdf-parse": "1.1.1",
     "pg": "^8.22.0",
+    "polotno": "^4.8.0",
     "pptxgenjs": "^4.0.1",
     "prismjs": "^1.30.0",
     "qrcode.react": "^4.2.0",

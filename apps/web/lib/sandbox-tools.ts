@@ -13,13 +13,17 @@ export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
   | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "typerun"
-  | "scratch"
+  | "scratch" | "polotno"
   | "google_docs" | "google_sheets" | "google_slides";
 
 export type SandboxTool = {
   id: SandboxToolId;
-  /** "iframe" → embed the editor; "code" → in-app Monaco runner. */
-  kind: "iframe" | "code";
+  /**
+   * "iframe" → embed the editor; "code" → in-app Monaco runner;
+   * "editor"  → редактор собран в наш бандл и рисуется прямо на странице
+   *             (Polotno, проба 16.08.2026) — рамки и чужого адреса нет.
+   */
+  kind: "iframe" | "code" | "editor";
   /** Fresh-editor URL for iframe tools. */
   embedUrl?: string;
   Icon: LucideIcon;
@@ -129,6 +133,16 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     embedUrl: "https://snr-scratch.vercel.app",
     Icon: Blocks,
     gradient: "from-amber-400 to-orange-500",
+  },
+  {
+    // 16.08.2026 — ПРОБНАЯ карточка Polotno: конструктор в духе Canva.
+    // Единственная карточка вида "editor": редактор не в рамке с чужого
+    // сайта, а собран в наш бандл и живёт прямо на странице. Подробности и
+    // ограничения пробы — в components/polotno/PolotnoEditor.tsx.
+    id: "polotno",
+    kind: "editor",
+    Icon: Palette,
+    gradient: "from-fuchsia-500 to-rose-500",
   },
   {
     // 10.08.2026 — Google Документы. В песочнице ТРИ карточки, а тип этапа

@@ -1316,6 +1316,7 @@ export interface Dictionary {
       sqlonline: { name: string; description: string };
       typerun: { name: string; description: string };
       scratch: { name: string; description: string };
+      polotno: { name: string; description: string };
       google_docs: { name: string; description: string };
       google_sheets: { name: string; description: string };
       google_slides: { name: string; description: string };
@@ -1369,6 +1370,43 @@ export interface Dictionary {
       notReady: string;         // редактор ещё не прислал «готов»
       // Тексты отказов. server action возвращает машинный код, человеку
       // нужен смысл: раньше он видел молчание.
+      errNotStudent: string;
+      errTooBig: string;
+      errLimit: string;
+      errFailed: string;
+      errOpenFailed: string;
+      errDeleteFailed: string;
+    };
+    /**
+     * Проба Polotno, 16.08.2026 — карточка «Дизайн» в песочнице. Редактор
+     * встроен в наш бандл, поэтому все подписи вокруг него наши; подписи
+     * САМОГО редактора переводятся его словарём
+     * (apps/web/components/polotno/translations.ts).
+     */
+    polotno: {
+      trialBadge: string;      // «Проба» — карточка платная и пока на пробном ключе
+      namePlaceholder: string;
+      templates: string;       // подпись выбора заготовки
+      templateNames: Record<string, string>;
+      saveBtn: string;
+      saving: string;
+      downloadBtn: string;     // скачать картинку себе
+      myWorks: string;
+      worksTitle: string;
+      closePanel: string;
+      countLabel: string;      // «Работ: {n}»
+      loading: string;
+      emptyTitle: string;
+      emptyBody: string;
+      openBtn: string;
+      opening: string;
+      deleteBtn: string;
+      deleteConfirm: string;   // «{name}»
+      untitled: string;
+      unitKb: string;          // «{n} КБ»
+      savedOk: string;
+      openedOk: string;
+      deletedOk: string;
       errNotStudent: string;
       errTooBig: string;
       errLimit: string;

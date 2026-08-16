@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
 import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
 import { ScratchSandbox } from "./scratch/ScratchSandbox";
+import { PolotnoSandbox } from "./polotno/PolotnoSandbox";
 import { CodeEditor } from "@/components/CodeEditor";
 import { StdinInput } from "@/components/StdinInput";
 import { pyodideReady } from "@/lib/pyodide";
@@ -622,6 +623,10 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
         >
           {active.kind === "code" ? (
             <CodeSandbox />
+          ) : active.kind === "editor" ? (
+            // Проба Polotno: редактор из нашего бандла, без рамки. Подключается
+            // только на клиенте — см. PolotnoSandbox.
+            <PolotnoSandbox />
           ) : active.id === "scratch" ? (
             // Scratch отличается от остальных рамок только обвязкой: своя
             // панель, список работ и мост сообщений. Сама рамка — та же
