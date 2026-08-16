@@ -95,10 +95,9 @@ import {
   type ChildPickerItem,
 } from "../../ui";
 import { Ring } from "../../ui/charts";
-import {
-  DEFAULT_CHILD_INDEX,
-  getChildren,
+import {  getChildren,
   getSelectedChildContext,
+  defaultChildId,
 } from "../../data";
 import { useAppLocale } from "../../i18n";
 import { DemoBanner, SoonNote } from "./parts";
@@ -202,7 +201,7 @@ export default function LimitsScreen() {
 
   // ── Ребёнок ────────────────────────────────────────────────────────────────
   const children = getChildren();
-  const initialChildId = auth.currentChildId ?? children[DEFAULT_CHILD_INDEX].id;
+  const initialChildId = auth.currentChildId ?? defaultChildId();
   const [childId, setChildId] = useState<string>(initialChildId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { child } = getSelectedChildContext(childId);

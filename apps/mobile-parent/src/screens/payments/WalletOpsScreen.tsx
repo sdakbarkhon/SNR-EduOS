@@ -50,6 +50,7 @@ import {
   getSelectedChildContext,
   getWalletBalance,
   getWalletOps,
+  defaultChildId,
 } from "../../data";
 import type { WalletOpsDayGroup } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
@@ -239,7 +240,7 @@ export default function WalletOpsScreen() {
 
   const children = getChildren();
   const [childId, setChildId] = useState<string>(
-    () => session.currentChildId ?? children[0].id,
+    () => session.currentChildId ?? defaultChildId(),
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("all");

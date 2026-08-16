@@ -74,6 +74,7 @@ import {
   getNoAllergiesText,
   getSelectedChildContext,
   getVaccinations,
+  defaultChildId,
 } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
@@ -327,7 +328,7 @@ export default function MedicalCardScreen() {
   const session = useAuthSession();
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(() => session.currentChildId ?? children[0].id);
+  const [childId, setChildId] = useState<string>(() => session.currentChildId ?? defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const ctx = getSelectedChildContext(childId);

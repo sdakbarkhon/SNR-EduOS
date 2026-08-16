@@ -55,9 +55,9 @@ import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { addDays } from "../../lib/tashkent";
 import { dayMonth } from "../../lib/dateLabels";
 import {
-  DEFAULT_CHILD_INDEX,
   getChildren,
   getSelectedChildContext,
+  defaultChildId,
 } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -295,7 +295,7 @@ export default function ChildWalletScreen() {
 
   // Активный ребёнок → инициал / walletTitle / walletBalTxt (BLOCK-LIST 2).
   const children = getChildren();
-  const initialChildId = currentChildId ?? children[DEFAULT_CHILD_INDEX].id;
+  const initialChildId = currentChildId ?? defaultChildId();
   const { child, wallet_balance } = getSelectedChildContext(initialChildId);
 
   const childInitial = child.first_name.slice(0, 1);

@@ -2644,6 +2644,8 @@ export const uz: Dictionary = {
       clear: "Tozalash",
       gotIt: "Tushunarli",
       retry: "Qayta urinish",
+      screenErrorTitle: "Bo‘lim ochilmadi",
+      screenErrorBody: "Bu bo‘limni ko‘rsatishda nimadir noto‘g‘ri ketdi. Ilovaning qolgan qismi ishlayapti: orqaga qayting yoki qayta urinib ko‘ring.",
     },
     search: {
       recent: "So'nggi so'rovlar",

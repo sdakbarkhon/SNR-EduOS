@@ -47,12 +47,11 @@ import {
   InnerHeader,
   type ChildPickerItem,
 } from "../../ui";
-import {
-  DEFAULT_CHILD_INDEX,
-  getChildren,
+import {  getChildren,
   getSelectedChildContext,
   getSubject,
   getTeacherReviews,
+  defaultChildId,
 } from "../../data";
 import type { BaseSubjectKey, TeacherReviewRow } from "../../data";
 import { useAppLocale } from "../../i18n";
@@ -292,7 +291,7 @@ export default function TeacherReviewsScreen() {
   const auth = useAuthSession();
 
   const children = getChildren();
-  const initialChildId = auth.currentChildId ?? children[DEFAULT_CHILD_INDEX].id;
+  const initialChildId = auth.currentChildId ?? defaultChildId();
   const [childId, setChildId] = useState<string>(initialChildId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filter, setFilter] = useState<FilterId>("all");

@@ -57,14 +57,13 @@ import {
   glassSurface,
   type ChildPickerItem,
 } from "../../ui";
-import {
-  DEFAULT_CHILD_INDEX,
-  DEMO_TODAY,
+import {  DEMO_TODAY,
   getChildren,
   getDaySchedule,
   getScheduleWeek,
   getSelectedChildContext,
   getSubject,
+  defaultChildId,
 } from "../../data";
 import type { BaseSubjectKey, ScheduleLessonRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -359,7 +358,7 @@ export default function ScheduleScreen() {
   const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
+  const [childId, setChildId] = useState<string>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
   // Долги, проход 3 — "сегодня" больше не застывает на дате монтирования
   // (useTashkentToday пересчитывает на возврат в foreground И на границе

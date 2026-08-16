@@ -67,6 +67,7 @@ import {
   getHomeworkDetail,
   getSelectedChildContext,
   getSubject,
+  defaultChildId,
 } from "../../data";
 import type { BaseSubjectKey } from "../../data/types";
 import { useAppLocale } from "../../i18n";
@@ -401,7 +402,7 @@ export default function HomeworkDetailScreen() {
 
   const children = getChildren();
   const [childId, setChildId] = useState<string>(() =>
-    auth.currentChildId ?? children[0].id,
+    auth.currentChildId ?? defaultChildId(),
   );
   const [sheetOpen, setSheetOpen] = useState(false);
 

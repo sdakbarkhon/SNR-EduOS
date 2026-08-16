@@ -48,13 +48,12 @@ import {
   type SubjectId,
 } from "../../ui";
 import { ProgressBar } from "../../ui/charts";
-import {
-  DEFAULT_CHILD_INDEX,
-  getChildren,
+import {  getChildren,
   getGradesSummary,
   getSelectedChildContext,
   getSubject,
   getSubjectStats,
+  defaultChildId,
 } from "../../data";
 import type { BaseSubjectKey, SubjectStatRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -189,7 +188,7 @@ export default function AllSubjectsScreen() {
   const navigation = useNavigation<Nav>();
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
+  const [childId, setChildId] = useState<string>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const ctx = getSelectedChildContext(childId);

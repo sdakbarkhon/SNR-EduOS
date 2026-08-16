@@ -185,6 +185,34 @@ export function getChildById(childId: string): ChildRow | undefined {
   return getChildren().find((c) => c.id === childId);
 }
 
+/**
+ * Ребёнок по умолчанию — тот, что выбран, когда экран открыли впервые.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНАЯ ФУНКЦИЯ, А НЕ children[DEFAULT_CHILD_INDEX]. Ровно на этом
+ * приложение падало белым экраном 16.08.2026: DEFAULT_CHILD_INDEX равен 1
+ * (в фикстуре три ребёнка, по умолчанию брали второго), а у настоящего
+ * родителя ребёнок ОДИН — children[1] возвращал undefined, и первое же
+ * обращение к .id роняло экран целиком:
+ *   TypeError: Cannot read property 'id' of undefined at HomeScreen
+ * Пока данные были выдуманными, массив всегда был длиной три и промаха не
+ * случалось; настоящие дети приехали заходом 2 — и индекс стал выходить за
+ * границы у КАЖДОГО родителя с одним ребёнком.
+ *
+ * Здесь индекс прижимается к длине списка, а пустой список отдаёт первого
+ * фикстурного — чтобы у вызывающего НИКОГДА не было undefined. Экраны зовут
+ * только это; прямое индексирование по DEFAULT_CHILD_INDEX убрано отовсюду.
+ */
+export function getDefaultChild(): ChildRow {
+  const rows = getChildren();
+  if (rows.length === 0) return CHILDREN[0];
+  return rows[Math.min(Math.max(0, DEFAULT_CHILD_INDEX), rows.length - 1)];
+}
+
+/** id ребёнка по умолчанию. Никогда не бросает — см. getDefaultChild. */
+export function defaultChildId(): string {
+  return getDefaultChild().id;
+}
+
 function resolveChild(childId?: string): ChildRow {
   return (childId ? getChildById(childId) : undefined) ?? CHILDREN[DEFAULT_CHILD_INDEX];
 }

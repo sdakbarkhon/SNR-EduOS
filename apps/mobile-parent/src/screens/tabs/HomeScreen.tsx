@@ -61,11 +61,11 @@ import {
   type MetricCell,
 } from "../../ui";
 import {
-  DEFAULT_CHILD_INDEX,
   getChildren,
   getDashboard,
   getParent,
   getSelectedChildContext,
+  defaultChildId,
 } from "../../data";
 import { ICONS, type MainStackParamList, type TabParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
@@ -250,7 +250,7 @@ export default function HomeScreen() {
   // Демо (session.demoParentId != null) не тронут: childId остаётся
   // единственным источником и для идентичности, и для фикстурных
   // data-плиток, ровно как было.
-  const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
+  const [childId, setChildId] = useState<string>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const session = useAuthSession();

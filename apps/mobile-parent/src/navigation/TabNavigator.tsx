@@ -22,6 +22,20 @@ import { getUnreadMessageThreadsCount } from "../data";
 import { useAppLocale } from "../i18n";
 import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
 import type { TabParamList, TabRouteName } from "./routes";
+import { withScreenBoundary } from "../components/ScreenErrorBoundary";
+
+/**
+ * Обёртки считаются ОДИН раз на модуль, а не в разметке.
+ * withScreenBoundary(X) внутри JSX возвращал бы новый тип компонента на
+ * каждый рендер навигатора — React считал бы это другим компонентом и
+ * перемонтировал экран, теряя его состояние и прокрутку.
+ */
+const HomeScreenTab = withScreenBoundary(HomeScreen);
+const ProgressScreenTab = withScreenBoundary(ProgressScreen);
+const PaymentsScreenTab = withScreenBoundary(PaymentsScreen);
+const MessagesScreenTab = withScreenBoundary(MessagesScreen);
+const ProfileHubScreenTab = withScreenBoundary(ProfileHubScreen);
+
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -94,11 +108,11 @@ export default function TabNavigator() {
         sceneStyle: { backgroundColor: "transparent" },
       }}
     >
-      <Tab.Screen name="p5" component={HomeScreen} />
-      <Tab.Screen name="p10" component={ProgressScreen} />
-      <Tab.Screen name="p17" component={PaymentsScreen} />
-      <Tab.Screen name="d24" component={MessagesScreen} />
-      <Tab.Screen name="dhub" component={ProfileHubScreen} />
+      <Tab.Screen name="p5" component={HomeScreenTab} />
+      <Tab.Screen name="p10" component={ProgressScreenTab} />
+      <Tab.Screen name="p17" component={PaymentsScreenTab} />
+      <Tab.Screen name="d24" component={MessagesScreenTab} />
+      <Tab.Screen name="dhub" component={ProfileHubScreenTab} />
     </Tab.Navigator>
   );
 }

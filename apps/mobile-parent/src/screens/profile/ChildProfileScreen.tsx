@@ -65,6 +65,7 @@ import {
   getChildInfo,
   getChildren,
   getSelectedChildContext,
+  defaultChildId,
 } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
@@ -162,7 +163,7 @@ export default function ChildProfileScreen() {
 
   const children = getChildren();
   const [childId, setChildId] = useState<string>(
-    () => session.currentChildId ?? children[0].id,
+    () => session.currentChildId ?? defaultChildId(),
   );
   const [sheetOpen, setSheetOpen] = useState(false);
 

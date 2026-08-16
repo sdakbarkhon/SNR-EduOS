@@ -82,7 +82,6 @@ import {
   type SubjectId,
 } from "../../ui";
 import {
-  DEFAULT_CHILD_INDEX,
   getAssistantTexts,
   getChildren,
   getGradePeriods,
@@ -92,6 +91,7 @@ import {
   getSubject,
   getSubjectStats,
   getTeacherReviews,
+  defaultChildId,
 } from "../../data";
 import { SoonNote } from "../../ui/notices";
 import type { BaseSubjectKey, SubjectStatRow } from "../../data";
@@ -359,7 +359,7 @@ export default function ProgressScreen() {
   const navigation = useNavigation<Nav>();
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(children[DEFAULT_CHILD_INDEX].id);
+  const [childId, setChildId] = useState<string>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0 grades, 1 skills, 2 dyn
 

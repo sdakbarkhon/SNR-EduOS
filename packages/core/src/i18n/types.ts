@@ -2742,6 +2742,10 @@ export interface Dictionary {
       // Долги, проход 1: общая кнопка "повторить" в error-карточках
       // real-данных (посещаемость/расписание/задания) — один ключ на всех.
       retry: string;
+      // 16.08.2026 — страховка экрана: если раздел упал при отрисовке,
+      // показываем карточку вместо белого листа (ScreenErrorBoundary).
+      screenErrorTitle: string;
+      screenErrorBody: string;
     };
     search: {
       recent: string;

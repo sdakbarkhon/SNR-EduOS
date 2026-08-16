@@ -81,6 +81,7 @@ import {
   getSelectedChildContext,
   type ApplicationRow,
   type ApplicationStatus,
+  defaultChildId,
 } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
@@ -284,7 +285,7 @@ export default function ApplicationsScreen() {
 
   const children = getChildren();
   const [childId, setChildId] = useState<string>(
-    () => session.currentChildId ?? children[0].id,
+    () => session.currentChildId ?? defaultChildId(),
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");

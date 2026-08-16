@@ -2643,6 +2643,8 @@ export const en: Dictionary = {
       clear: "Clear",
       gotIt: "Got it",
       retry: "Retry",
+      screenErrorTitle: "This section did not open",
+      screenErrorBody: "Something went wrong while showing this section. The rest of the app still works: go back or try again.",
     },
     search: {
       recent: "Recent searches",

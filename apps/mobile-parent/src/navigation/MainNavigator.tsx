@@ -77,6 +77,7 @@ import ParentDataScreen from "../screens/profile/ParentDataScreen";
 import DocumentsScreen from "../screens/profile/DocumentsScreen";
 import NotifSettingsScreen from "../screens/profile/NotifSettingsScreen";
 import LangSecurityScreen from "../screens/profile/LangSecurityScreen";
+import { withScreenBoundary } from "../components/ScreenErrorBoundary";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -163,6 +164,31 @@ const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   da7: AboutScreen,
 };
 
+
+/**
+ * Экран маршрута, уже обёрнутый в собственную границу ошибок.
+ *
+ * Кэш обязателен: withScreenBoundary(X) возвращает НОВЫЙ тип компонента, и
+ * вызов прямо в разметке заставлял бы React перемонтировать экран на каждый
+ * рендер навигатора — с потерей состояния и прокрутки. Реестр маршрутов
+ * статичен, поэтому считаем по одному разу и запоминаем.
+ */
+const WRAPPED: Partial<Record<StackRouteName, React.ComponentType<any>>> = {};
+function screenFor(name: StackRouteName): React.ComponentType<any> {
+  const cached = WRAPPED[name];
+  if (cached) return cached;
+  const raw =
+    STUDY_SCREENS[name] ??
+    PAYMENT_SCREENS[name] ??
+    MESSAGE_SCREENS[name] ??
+    PROFILE_SCREENS[name] ??
+    SERVICE_SCREENS[name] ??
+    StubScreen;
+  const wrapped = withScreenBoundary(raw);
+  WRAPPED[name] = wrapped;
+  return wrapped;
+}
+
 export default function MainNavigator() {
   return (
     <Stack.Navigator
@@ -177,14 +203,7 @@ export default function MainNavigator() {
         <Stack.Screen
           key={name}
           name={name}
-          component={
-            STUDY_SCREENS[name] ??
-            PAYMENT_SCREENS[name] ??
-            MESSAGE_SCREENS[name] ??
-            PROFILE_SCREENS[name] ??
-            SERVICE_SCREENS[name] ??
-            StubScreen
-          }
+          component={screenFor(name)}
         />
       ))}
     </Stack.Navigator>

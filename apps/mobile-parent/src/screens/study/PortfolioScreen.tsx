@@ -71,7 +71,13 @@ import {
   InnerHeader,
   type ChildPickerItem,
 } from "../../ui";
-import { getChildren, getPortfolio, getSelectedChildContext, getSubject } from "../../data";
+import {
+  getChildren,
+  getPortfolio,
+  getSelectedChildContext,
+  getSubject,
+  defaultChildId,
+} from "../../data";
 import type { AchievementRow, CertificateRow, PortfolioWorkRow } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
@@ -320,7 +326,7 @@ export default function PortfolioScreen() {
 
   const children = getChildren();
   const [childId, setChildId] = useState<string>(
-    () => session.currentChildId ?? children[0].id,
+    () => session.currentChildId ?? defaultChildId(),
   );
   const [sheetOpen, setSheetOpen] = useState(false);
 
