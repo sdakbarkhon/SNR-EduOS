@@ -3258,7 +3258,15 @@ export interface Dictionary {
       withGoogle: string;
       withApple: string;
       soonBadge: string;   // «скоро» на неактивной кнопке
-      socialSoon: string;  // объяснение по нажатию
+      socialSoon: string;  // объяснение по нажатию (Apple — ещё не подключён)
+      // Вход через Google: подпись на кнопке во время перехода и отказы
+      googleSigningIn: string;
+      googleNotLinked: string;
+      googleNoAccount: string;
+      googleSchoolArchived: string;
+      googleFailed: string;
+      appleSoon: string;
+      googleWebOnly: string;   // мобильное: Google-вход пока только в браузере
       phoneHint: string;
       phonePlaceholder: string;
       kidsOne: string;

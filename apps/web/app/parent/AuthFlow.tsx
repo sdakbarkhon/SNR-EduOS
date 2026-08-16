@@ -20,12 +20,29 @@ type Step = "onboarding" | "phone" | "code";
  * телефона → код. Онбординг — 1:1 с apps/mobile-parent/src/screens/auth/
  * OnboardingScreen.tsx, см. OnboardingCarousel.tsx.
  */
-export function AuthFlow() {
+/** Коды отказа с /auth/callback → готовый текст на языке пользователя. */
+function googleErrorText(
+  code: string | null,
+  d: ReturnType<typeof getDictionary>["parentApp"]["auth"],
+): string | null {
+  switch (code) {
+    case "not_linked": return d.googleNotLinked;
+    case "no_account": return d.googleNoAccount;
+    case "school_archived": return d.googleSchoolArchived;
+    case "failed": return d.googleFailed;
+    // "cancelled" — человек сам нажал «Отмена» у Google, объяснять нечего.
+    default: return null;
+  }
+}
+
+export function AuthFlow({ googleError }: { googleError?: string | null }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).parentApp.auth;
 
   const router = useRouter();
-  const [step, setStep] = useState<Step>("onboarding");
+  // Вернулись с отказом от Google — начинаем не с карусели, а сразу с экрана
+  // входа: человек уже пытался войти, показывать ему онбординг заново незачем.
+  const [step, setStep] = useState<Step>(googleError ? "phone" : "onboarding");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +122,7 @@ export function AuthFlow() {
         onPhoneChange={onPhoneDigits}
         onSubmit={submitPhone}
         onBack={() => setStep("onboarding")}
+        initialNotice={googleErrorText(googleError ?? null, d)}
       />
     );
   }

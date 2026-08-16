@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDictionary, type Locale } from "@snr/core";
 import { demoParentLogin } from "@/app/actions/parentPhoneAuth";
+import { startParentGoogleLogin } from "@/app/actions/parentGoogleAuth";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "@/components/parent/glass/GlassCard";
 import { GlassButton } from "@/components/parent/glass/GlassButton";
@@ -86,6 +87,8 @@ type Props = {
   onPhoneChange: (digits: string) => void;
   onSubmit: () => void;
   onBack: () => void;
+  /** Готовый текст отказа с возврата от Google — показывается сразу тостом. */
+  initialNotice?: string | null;
 };
 
 /**
@@ -98,7 +101,7 @@ type Props = {
  * показывает тост «Скоро», как и клики по Google/Apple (OAuth не
  * подключаем в этом заходе).
  */
-export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Props) {
+export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack, initialNotice }: Props) {
   const { locale } = useLocale();
   const dict = getDictionary(locale as Locale);
   const t = dict.parentApp.auth;
@@ -139,10 +142,33 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
     showNotice(comingSoonText);
   }
 
-  /** Вход через Google/Apple ещё не подключён — объясняем это по нажатию. */
-  function showSocialSoon() {
-    showNotice(t.socialSoon);
+  /** Apple ещё не подключён — объясняем это по нажатию, а не молчим. */
+  function showAppleSoon() {
+    showNotice(t.appleSoon);
   }
+
+  // Вход через Google. Ведёт не в аккаунт Google, а в аккаунт родителя:
+  // почта сверяется с parents.google_email на возврате (app/auth/callback).
+  const [googleBusy, setGoogleBusy] = useState(false);
+  async function handleGoogleLogin() {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const result = await startParentGoogleLogin(window.location.origin);
+    if (!result.ok) {
+      setGoogleBusy(false);
+      showNotice(t.googleFailed);
+      return;
+    }
+    // Уходим целиком, а не в новой вкладке: возврат придёт в это же окно.
+    window.location.assign(result.url);
+  }
+
+  // Отказ с возврата приезжает адресом (?error=...) — показываем его сразу,
+  // молча на экран входа человека не выбрасываем.
+  useEffect(() => {
+    if (initialNotice) showNotice(initialNotice);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialNotice]);
 
   /** Документа ещё нет — говорим об этом прямо, а не молча перезагружаем. */
   function showLegalNotReady() {
@@ -230,8 +256,9 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
 
         <button
           type="button"
-          onClick={showSocialSoon}
-          className="flex items-center gap-2.5 p-3.5 text-left opacity-60"
+          onClick={handleGoogleLogin}
+          disabled={googleBusy}
+          className="flex items-center gap-2.5 p-3.5 text-left disabled:opacity-60"
           style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
         >
           <div
@@ -241,14 +268,13 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
             <GoogleIcon size={18} />
           </div>
           <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
-            {t.withGoogle}
+            {googleBusy ? t.googleSigningIn : t.withGoogle}
           </span>
-          <span className="text-[9.5px] font-bold" style={{ color: ink3 }}>{t.soonBadge}</span>
         </button>
 
         <button
           type="button"
-          onClick={showSocialSoon}
+          onClick={showAppleSoon}
           className="flex items-center gap-2.5 p-3.5 text-left opacity-60"
           style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
         >

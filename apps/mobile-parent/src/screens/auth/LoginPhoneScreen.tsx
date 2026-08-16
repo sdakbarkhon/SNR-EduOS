@@ -373,11 +373,12 @@ export function LoginPhoneScreen() {
           </View>
         </GlassCard>
 
-        {/* Вход через Google и Apple. Кнопки вернулись 16.08.2026: убирать их
-            было ошибкой — заказчик просил убрать только демо-кнопку. Пока они
-            НЕАКТИВНЫ: провайдер Google в проекте выключен, ключи заводит
-            заказчик. Молчания нет — по нажатию появляется объяснение, тот же
-            текст, что и на сайте школы. */}
+        {/* Вход через Google и Apple. Google в проекте уже включён и работает
+            в браузерной версии кабинета, но НЕ здесь: возврат из браузера в
+            приложение идёт по своей схеме (snreduosparent://), а Expo Go такие
+            схемы не поддерживает — там только exp://. Пока приложение живёт в
+            Expo Go, кнопка честно отправляет в браузер. Apple не подключён
+            вовсе. Молчания нет — по нажатию появляется объяснение. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: tokens.ink3, opacity: 0.35 }} />
           <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink3 }}>{t.or}</Text>
@@ -388,13 +389,13 @@ export function LoginPhoneScreen() {
           label={t.withGoogle}
           badge={t.soonBadge}
           glyph={<GoogleGlyph />}
-          onPress={() => Alert.alert(t.withGoogle, t.socialSoon)}
+          onPress={() => Alert.alert(t.withGoogle, t.googleWebOnly)}
         />
         <SocialButton
           label={t.withApple}
           badge={t.soonBadge}
           glyph={<AppleGlyph />}
-          onPress={() => Alert.alert(t.withApple, t.socialSoon)}
+          onPress={() => Alert.alert(t.withApple, t.appleSoon)}
         />
 
         {/* Правовые ссылки (макет 2016). */}

@@ -45,13 +45,17 @@ export async function updateSession(request: NextRequest) {
   // (app/parent/page.tsx) редиректит уже залогиненного родителя на
   // /parent/home — здесь просто не гейтим, как раньше не гейтили join.
   const isParentLoginRoute = pathname === "/parent";
+  // Возврат от Google. Сессии в этот момент ещё нет по определению — она
+  // выдаётся внутри самого обработчика, — поэтому гейт «не залогинен → на
+  // экран входа» тут съел бы код обмена и вход никогда бы не завершился.
+  const isOauthCallback = pathname.startsWith("/auth/callback");
   const isTeacherRoute = pathname.startsWith("/teacher");
   const isAdminRoute = pathname.startsWith("/admin");
   const isSuperadminRoute = pathname.startsWith("/superadmin");
   const isParentRoute = pathname.startsWith("/parent") && !isParentLoginRoute;
 
-  // Публичный экран телефон-входа — без гейта.
-  if (isParentLoginRoute) {
+  // Публичный экран телефон-входа и возврат от провайдера — без гейта.
+  if (isParentLoginRoute || isOauthCallback) {
     return response;
   }
 
