@@ -67,6 +67,17 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (/duplicate key.*parents_phone_key/i.test(raw)) {
     return t.phoneTaken;
   }
+  // Миграция 201: одну почту нельзя привязать двум родителям. Ловим обе —
+  // Google и Apple — и объясняем человеку, а не показываем текст Postgres.
+  if (/duplicate key.*parents_google_email_key/i.test(raw)) {
+    return t.googleEmailTaken;
+  }
+  if (/duplicate key.*parents_apple_email_key/i.test(raw)) {
+    return t.appleEmailTaken;
+  }
+  if (/parents_google_email_shape|parents_apple_email_shape/i.test(raw)) {
+    return t.socialEmailInvalid;
+  }
   if (/duplicate key.*schools_code_key/i.test(raw)) {
     return t.schoolCodeTaken;
   }

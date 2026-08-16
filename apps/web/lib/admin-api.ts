@@ -1208,12 +1208,29 @@ export async function getUserEmails(userIds: string[]): Promise<Record<string, s
  * `parents.phone` теперь UNIQUE, и при занятом номере лучше упасть до
  * создания учётной записи, чем откатывать её следом.
  */
+/**
+ * Почта под вход через Google/Apple: приводим к тому виду, который требует
+ * база (миграция 201 — нижний регистр, без пробелов по краям). Пусто и одни
+ * пробелы означают «не указана»: поля необязательные.
+ *
+ * Приводим ЗДЕСЬ, а не в форме: форм две (создание и правка), и обе могли бы
+ * разойтись. База при этом всё равно проверяет вид значения сама — на случай,
+ * если строка придёт не из формы.
+ */
+function normalizeSocialEmail(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim().toLowerCase();
+  return v.length > 0 ? v : null;
+}
+
 export async function createParent(data: {
   full_name: string;
   phone: string;
   student_ids: string[];
   school_id: string;
   created_by: string;
+  /** Необязательные — родитель сможет входить через Google вместо кода. */
+  google_email?: string | null;
+  apple_email?: string | null;
 }): Promise<{ parentId: string; userId: string; password: string }> {
   const sb = getServiceClient();
 
@@ -1240,6 +1257,8 @@ export async function createParent(data: {
       phone,
       school_id: data.school_id,
       created_by: data.created_by,
+      google_email: normalizeSocialEmail(data.google_email),
+      apple_email: normalizeSocialEmail(data.apple_email),
     })
     .select("id")
     .single();
@@ -1317,7 +1336,14 @@ export async function deleteParent(parentId: string, callerSchoolId: string, cal
  *  add/remove diff against parent_students without a separate diff step). */
 export async function updateParent(
   parentId: string,
-  data: { full_name: string; phone?: string; student_ids: string[]; school_id: string },
+  data: {
+    full_name: string;
+    phone?: string;
+    student_ids: string[];
+    school_id: string;
+    google_email?: string | null;
+    apple_email?: string | null;
+  },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
@@ -1326,7 +1352,12 @@ export async function updateParent(
 
   const { error: pErr } = await sb
     .from("parents")
-    .update({ full_name: data.full_name, phone: data.phone || null })
+    .update({
+      full_name: data.full_name,
+      phone: data.phone || null,
+      google_email: normalizeSocialEmail(data.google_email),
+      apple_email: normalizeSocialEmail(data.apple_email),
+    })
     .eq("id", parentId);
   if (pErr) throw pErr;
 

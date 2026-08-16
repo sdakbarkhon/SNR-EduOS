@@ -26,6 +26,8 @@ import {
   ChevronRightIcon,
   SparkleIcon,
   UzFlagIcon,
+  GoogleIcon,
+  AppleIcon,
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
 import { LangButton } from "./LangButton";
@@ -137,6 +139,11 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
     showNotice(comingSoonText);
   }
 
+  /** Вход через Google/Apple ещё не подключён — объясняем это по нажатию. */
+  function showSocialSoon() {
+    showNotice(t.socialSoon);
+  }
+
   /** Документа ещё нет — говорим об этом прямо, а не молча перезагружаем. */
   function showLegalNotReady() {
     showNotice(dict.parentApp.auth.legalNotReady);
@@ -208,6 +215,55 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           </div>
         </GlassCard>
 
+        {/* Вход через Google и Apple. Кнопки вернулись 16.08.2026: убирать их
+            было ошибкой — заказчик просил убрать только демо-кнопку. Пока они
+            НЕАКТИВНЫ и говорят об этом: провайдер Google в проекте выключен,
+            ключи заводит заказчик. Молчаливого бездействия нет — по нажатию
+            появляется объяснение. */}
+        <div className="flex items-center gap-3 py-1">
+          <div className="h-px flex-1" style={{ background: ink3 }} />
+          <span className="text-[10.5px] font-bold" style={{ color: ink3 }}>
+            {t.or}
+          </span>
+          <div className="h-px flex-1" style={{ background: ink3 }} />
+        </div>
+
+        <button
+          type="button"
+          onClick={showSocialSoon}
+          className="flex items-center gap-2.5 p-3.5 text-left opacity-60"
+          style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
+        >
+          <div
+            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
+            style={{ background: "#FFFFFF" }}
+          >
+            <GoogleIcon size={18} />
+          </div>
+          <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
+            {t.withGoogle}
+          </span>
+          <span className="text-[9.5px] font-bold" style={{ color: ink3 }}>{t.soonBadge}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={showSocialSoon}
+          className="flex items-center gap-2.5 p-3.5 text-left opacity-60"
+          style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
+        >
+          <div
+            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
+            style={{ background: "#FFFFFF" }}
+          >
+            <AppleIcon size={18} color="#171243" />
+          </div>
+          <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
+            {t.withApple}
+          </span>
+          <span className="text-[9.5px] font-bold" style={{ color: ink3 }}>{t.soonBadge}</span>
+        </button>
+
         {/* Рамка кнопки и цветная тень плитки — акцентный фиолет с альфой: он
             читается и на светлом, и на тёмном стекле, поэтому оставлен
             литералом (как ONLINE_GREEN — сигнальная заливка, не «цвет текста»). */}
@@ -235,15 +291,6 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack }: Pro
           </div>
           <ChevronRightIcon size={15} color={ink3} />
         </button>
-
-        {/* Разделитель «или», «Продолжить с Google» и «Продолжить с Apple»
-            убраны 14.08.2026 — ровно как в мобильном приложении днём раньше.
-            Входа через сторонние учётные записи у нас нет и не планируется:
-            обе кнопки только показывали тост «Скоро». Родитель входит по
-            номеру телефона с одноразовым кодом; демо-кнопка выше — отдельный
-            настоящий путь, она осталась. Иконки GoogleIcon/AppleIcon удалены
-            из components/parent/auth/icons.tsx следом: других потребителей у
-            них не было. */}
 
         <p className="px-2 pt-1.5 text-center text-[9.5px] leading-[1.5]" style={{ color: ink3 }}>
           {t.legalPrefix}

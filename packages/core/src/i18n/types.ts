@@ -637,12 +637,20 @@ export interface Dictionary {
     emptyParentsNeedStudents: string;
     needStudentsFirst: string;
     fieldPhoneHint: string;
+    fieldSocialLogins: string;      // заголовок блока в форме родителя (миграция 201)
+    fieldSocialLoginsHint: string;
+    fieldGoogleEmail: string;
+    fieldAppleEmail: string;
+    fieldAppleEmailNote: string;
   };
   /** П.3 Заход 2 — человеческие сообщения об ошибках для админ-форм
    *  (apps/web/lib/admin-error-messages.ts), заменяют сырой Postgres-текст. */
   adminErrors: {
     usernameTaken: string;
     phoneTaken: string;
+    googleEmailTaken: string;   // почта уже у другого родителя (миграция 201)
+    appleEmailTaken: string;
+    socialEmailInvalid: string; // адрес не похож на почту
     schoolCodeTaken: string;
     foreignKeyBlocked: string;
     requiredField: string;   // "Обязательное поле: {field}"
@@ -3178,6 +3186,11 @@ export interface Dictionary {
       legalAnd: string;
       legalPrivacy: string;
       legalNotReady: string;
+      or: string;          // разделитель над кнопками Google/Apple
+      withGoogle: string;
+      withApple: string;
+      soonBadge: string;   // «скоро» на неактивной кнопке
+      socialSoon: string;  // объяснение по нажатию
       phoneHint: string;
       phonePlaceholder: string;
       kidsOne: string;

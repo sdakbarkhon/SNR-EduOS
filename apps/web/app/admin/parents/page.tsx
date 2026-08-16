@@ -19,7 +19,7 @@ export default async function AdminParentsPage() {
     { data: invites, error: invitesError },
     { data: allStudents, error: studentsError },
   ] = await Promise.all([
-    sb.from("parents").select("id, full_name, phone, user_id, created_at").order("full_name"),
+    sb.from("parents").select("id, full_name, phone, user_id, created_at, google_email, apple_email").order("full_name"),
     sb.from("parent_students").select("parent_id, student_id"),
     sb.from("parent_invites").select("id, parent_id, code, expires_at, used_at, created_at").order("created_at", { ascending: false }),
     sb.from("students").select("id, full_name, username").order("full_name"),
@@ -29,7 +29,10 @@ export default async function AdminParentsPage() {
   if (invitesError) console.error("[AdminParentsPage] parent_invites query failed:", invitesError.message);
   if (studentsError) console.error("[AdminParentsPage] students query failed:", studentsError.message);
 
-  type ParentRow = { id: string; full_name: string; phone: string | null; user_id: string | null; created_at: string };
+  type ParentRow = {
+    id: string; full_name: string; phone: string | null; user_id: string | null; created_at: string;
+    google_email: string | null; apple_email: string | null;
+  };
   type LinkRow = { parent_id: string; student_id: string };
   type InviteRow = { id: string; parent_id: string; code: string; expires_at: string; used_at: string | null; created_at: string };
   type StudentRow = { id: string; full_name: string; username: string };
@@ -67,6 +70,8 @@ export default async function AdminParentsPage() {
       user_id: p.user_id,
       full_name: p.full_name,
       phone: p.phone,
+      googleEmail: p.google_email,
+      appleEmail: p.apple_email,
       isRegistered: !!p.user_id,
       created_at: p.created_at,
       children: childrenByParent.get(p.id) ?? [],

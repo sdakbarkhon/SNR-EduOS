@@ -35,6 +35,9 @@ export async function actionCreateParent(formData: FormData) {
     student_ids,
     school_id: schoolId,
     created_by: userId,
+    // Обе необязательные: под будущий вход через Google/Apple (миграция 201).
+    google_email: String(formData.get("google_email") ?? ""),
+    apple_email: String(formData.get("apple_email") ?? ""),
   });
   revalidatePath("/admin/parents");
   return result;
@@ -68,7 +71,19 @@ export async function actionUpdateParent(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const student_ids = formData.getAll("student_ids").map((v) => String(v));
   if (!full_name) throw new Error("Missing fields");
-  await updateParent(parent_id, { full_name, phone: phone || undefined, student_ids, school_id: schoolId }, schoolId, isSuperAdmin);
+  await updateParent(
+    parent_id,
+    {
+      full_name,
+      phone: phone || undefined,
+      student_ids,
+      school_id: schoolId,
+      google_email: String(formData.get("google_email") ?? ""),
+      apple_email: String(formData.get("apple_email") ?? ""),
+    },
+    schoolId,
+    isSuperAdmin,
+  );
   revalidatePath("/admin/parents");
 }
 
