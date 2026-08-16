@@ -408,11 +408,6 @@ export default function HomeScreen() {
       value: homeworkCountValue,
       valueColor: tokens.status.orange.text,
     },
-    {
-      label: d.parentApp.home.wallet,
-      value: `${formatMoney(dashboard.wallet_balance)} ${d.parentApp.pay.sum}`,
-      flex: 1.4,
-    },
   ];
 
   // Карточка «Следующий урок» (242–245): реальные предмет/время/кабинет/
@@ -446,8 +441,6 @@ export default function HomeScreen() {
   const nextLessonCardPress =
     isRealFlow && homeError ? () => homeDataState.refresh() : () => navigation.navigate("d15");
 
-  const dueSum = `${formatMoney(dashboard.due_card.amount)} ${d.parentApp.pay.sum}`;
-  const dueSubtitle = `${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`;
 
   // Пункты шторки выбора ребёнка (BottomSheetFrame + ChildPickerSheetContent).
   // Заход 2, шаг 1: для реального входа — РЕАЛЬНЫЕ дети семьи (не полный
@@ -600,111 +593,12 @@ export default function HomeScreen() {
           <AccentGlyphTile gradient={dashboard.next_lesson.gradient} glyph={nextLessonView.tileLabel} />
         </AccentCard>
 
-        {/* Ряд «К оплате / Питание» (246–249). */}
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <AccentCard
-            gradient={[dashboard.due_card.gradient[0], dashboard.due_card.gradient[1]]}
-            shadowRgb="244,63,94"
-            radius={18}
-            contentStyle={{ padding: 12, gap: 4 }}
-            style={{ flex: 1 }}
-            onPress={() => navigation.navigate("p17")}
-          >
-            <Text
-              style={{
-                fontFamily: fonts.manrope800,
-                fontSize: 9,
-                letterSpacing: 9 * 0.08,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.85)",
-              }}
-            >
-              {d.parentApp.status.due}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
-              {dueSum}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: "rgba(255,255,255,0.9)" }}>
-              {dueSubtitle}
-            </Text>
-          </AccentCard>
-          <AccentCard
-            gradient={[dashboard.meals_card.gradient[0], dashboard.meals_card.gradient[1]]}
-            shadowRgb="52,211,153"
-            radius={18}
-            contentStyle={{ padding: 12, gap: 4 }}
-            style={{ flex: 1 }}
-            onPress={() => navigation.navigate("dmeals")}
-          >
-            <Text
-              style={{
-                fontFamily: fonts.manrope800,
-                fontSize: 9,
-                letterSpacing: 9 * 0.08,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.85)",
-              }}
-            >
-              {d.parentApp.svc.meals}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
-              {dashboard.meals_card.status_label}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: "rgba(255,255,255,0.9)" }}>
-              {dashboard.meals_card.until_label}
-            </Text>
-          </AccentCard>
-        </View>
-
-        {/* AccentCard «EduOS Assistant» + 2 CTA (250–254). */}
-        <AccentCard
-          gradient={["#8b5cf6", "#6366f1"]}
-          shadowRgb="139,92,246"
-          radius={20}
-          contentStyle={{ padding: 14, gap: 10 }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 11,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.35)",
-                backgroundColor: "rgba(255,255,255,0.2)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <WhiteGlyph paths={ICONS.spark} size={18} />
-            </View>
-            <Text style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 14, color: "#FFFFFF" }}>
-              EduOS Assistant
-            </Text>
-            <StatusChip label="NEW" variant="new" />
-          </View>
-          <Text
-            style={{
-              fontFamily: fonts.manrope600,
-              fontSize: 12,
-              lineHeight: 12 * 1.55,
-              color: "rgba(255,255,255,0.95)",
-            }}
-          >
-            {dashboard.assistant_text}
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "stretch", gap: 8 }}>
-            <AssistantCta
-              label={d.parentApp.home.viewProgress}
-              onPress={() => navigation.navigate("p10")}
-            />
-            <AssistantCta
-              label={d.parentApp.home.msgTeacher}
-              onPress={() => navigation.navigate("d24")}
-            />
-          </View>
-        </AccentCard>
-
+        {/* 16.08.2026. Отсюда убраны три выдуманных блока: «К оплате» и
+            «Питание» (суммы и счета, которых в базе нет), карточка помощника
+            (заготовленный текст) и лента «Сегодня» (выдуманные события).
+            Осталось то, что читает базу: приветствие с настоящими именами,
+            метрики ребёнка, следующий урок и быстрые действия — они ведут в
+            живые разделы. Выдуманных сумм на главной больше нет. */}
         {/* Быстрые действия (255–263). */}
         <SectionHeader title={d.parentApp.home.quickActions} />
         <QuickActionsGrid columns={3}>
@@ -720,52 +614,6 @@ export default function HomeScreen() {
           ))}
         </QuickActionsGrid>
 
-        {/* Лента «Сегодня» (264–269). */}
-        <SectionHeader
-          title={d.parentApp.home.todaySection}
-          linkLabel={`${d.parentApp.common.viewAll} ›`}
-          onPress={() => navigation.navigate("d8")}
-        />
-        <GlassCard radius={22} contentStyle={{ paddingHorizontal: 14 }}>
-          {dashboard.feed.map((row, idx) => {
-            // Иконка ряда — по маршруту go: d11 → math √x, d12 → eng Aa, dmeals → food.
-            const icon =
-              row.go === "d11" ? (
-                <FeedIconTile gradient={["#facc15", "#ca8a04"]} glyph="√x" />
-              ) : row.go === "d12" ? (
-                <FeedIconTile gradient={["#f472b6", "#db2777"]} glyph="Aa" />
-              ) : (
-                <FeedIconTile gradient={["#34d399", "#0ea5e9"]} svgPaths={ICONS.food} />
-              );
-            const right =
-              row.badge.kind === "grade" ? (
-                <GradeBadge value={row.badge.value} />
-              ) : (
-                <StatusChip
-                  label={row.badge.label}
-                  family={
-                    row.badge.label === "Успешно"
-                      ? "green"
-                      : row.badge.label.indexOf("Срок") === 0
-                        ? "orange"
-                        : "gray"
-                  }
-                />
-              );
-            return (
-              <ListRow
-                key={idx}
-                left={icon}
-                title={row.title}
-                subtitle={row.subtitle}
-                right={right}
-                divider={idx > 0}
-                verticalPadding={10}
-                onPress={() => navigation.navigate(row.go as never)}
-              />
-            );
-          })}
-        </GlassCard>
       </TabScreenScroll>
 
       {/* Шторка выбора ребёнка. Реальный phone-flow — переключаем реального

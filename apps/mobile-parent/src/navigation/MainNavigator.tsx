@@ -21,60 +21,39 @@
  */
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import StubScreen from "../screens/StubScreen";
+import { comingSoon } from "../screens/ComingSoonScreen";
 import AboutScreen from "../screens/profile/AboutScreen";
 import TabNavigator from "./TabNavigator";
 import { STACK_ROUTES, type MainStackParamList, type StackRouteName } from "./routes";
 
 // Реальные экраны Захода 5 (15 шт.).
-import DayStatusScreen from "../screens/study/DayStatusScreen";
-import SubjectDetailScreen from "../screens/study/SubjectDetailScreen";
 import HomeworksScreen from "../screens/study/HomeworksScreen";
 import HomeworkDetailScreen from "../screens/study/HomeworkDetailScreen";
 import AttendanceScreen from "../screens/study/AttendanceScreen";
 import ScheduleScreen from "../screens/study/ScheduleScreen";
 import SkillsScreen from "../screens/study/SkillsScreen";
-import EduosAssistantScreen from "../screens/study/EduosAssistantScreen";
-import AllSubjectsScreen from "../screens/study/AllSubjectsScreen";
-import TeacherReviewsScreen from "../screens/study/TeacherReviewsScreen";
 import TopicMasteryScreen from "../screens/study/TopicMasteryScreen";
 import NotificationsScreen from "../screens/study/NotificationsScreen";
 import ServicesScreen from "../screens/study/ServicesScreen";
 import TeacherProfileScreen from "../screens/study/TeacherProfileScreen";
-import MealsScreen from "../screens/study/MealsScreen";
 
 // Реальные экраны Захода 8 — родительские сервис-разделы (8 шт.), заменяют
 // StubScreen под dtests/dlib/dport/dapps/dmed/dtrans/dchpass/dsessions.
 import DiaryScreen from "../screens/study/DiaryScreen";
 import TestsScreen from "../screens/study/TestsScreen";
 import LibraryScreen from "../screens/study/LibraryScreen";
-import PortfolioScreen from "../screens/study/PortfolioScreen";
-import ApplicationsScreen from "../screens/study/ApplicationsScreen";
-import MedicalCardScreen from "../screens/study/MedicalCardScreen";
-import TransportScreen from "../screens/study/TransportScreen";
 import ChangePasswordScreen from "../screens/profile/ChangePasswordScreen";
 import ActiveSessionsScreen from "../screens/profile/ActiveSessionsScreen";
 
 // Реальные экраны Захода 6 — Оплаты (12 шт., шторки открываются локально).
-import BillsScreen from "../screens/payments/BillsScreen";
-import PaymentHistoryScreen from "../screens/payments/PaymentHistoryScreen";
-import ReceiptsScreen from "../screens/payments/ReceiptsScreen";
-import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
-import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
-import TopUpScreen from "../screens/payments/TopUpScreen";
-import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
-import TransferScreen from "../screens/payments/TransferScreen";
-import LimitsScreen from "../screens/payments/LimitsScreen";
 
 // Реальные экраны Захода 7 — Messages (4 шт., шторки открываются локально).
-import ChatScreen from "../screens/messages/ChatScreen";
 import AnnouncementsScreen from "../screens/messages/AnnouncementsScreen";
 import AdminNewsScreen from "../screens/messages/AdminNewsScreen";
-import SupportScreen from "../screens/messages/SupportScreen";
 
 // Реальные экраны Захода 7 — Profile (5 шт., шторки открываются локально).
 import ChildProfileScreen from "../screens/profile/ChildProfileScreen";
 import ParentDataScreen from "../screens/profile/ParentDataScreen";
-import DocumentsScreen from "../screens/profile/DocumentsScreen";
 import NotifSettingsScreen from "../screens/profile/NotifSettingsScreen";
 import LangSecurityScreen from "../screens/profile/LangSecurityScreen";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
@@ -87,21 +66,21 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
  * Для всех остальных маршрутов из STACK_ROUTES остаётся StubScreen.
  */
 const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
-  d6: DayStatusScreen,
-  d7: EduosAssistantScreen,
+  d6: comingSoon("dayStatus", "clock", ["#34d399", "#0ea5e9"]),
+  d7: comingSoon("assistant", "spark", ["#8b5cf6", "#6366f1"]),
   d8: NotificationsScreen,
   d9: ServicesScreen,
-  d11: SubjectDetailScreen,
+  d11: comingSoon("subjectDetail", "book", ["#facc15", "#ca8a04"]),
   d12: HomeworksScreen,
   d13: HomeworkDetailScreen,
   d14: AttendanceScreen,
   d15: ScheduleScreen,
   d16: SkillsScreen,
-  dallsubj: AllSubjectsScreen,
-  drev: TeacherReviewsScreen,
+  dallsubj: comingSoon("subjects", "book", ["#38bdf8", "#0284c7"]),
+  drev: comingSoon("reviews", "star", ["#f472b6", "#db2777"]),
   dtopics: TopicMasteryScreen,
   dteach: TeacherProfileScreen,
-  dmeals: MealsScreen,
+  dmeals: comingSoon("meals", "food", ["#f472b6", "#db2777"]),
 };
 
 /**
@@ -110,15 +89,15 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
  * открываются как локальные BottomSheet внутри своих parent-экранов.
  */
 const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
-  d18: BillsScreen,
-  d20: PaymentHistoryScreen,
-  d21: ReceiptsScreen,
-  d22: ChildWalletScreen,
-  d33: PayMethodsScreen,
-  dtop: TopUpScreen,
-  dwops: WalletOpsScreen,
-  dtransfer: TransferScreen,
-  dlimits: LimitsScreen,
+  d18: comingSoon("bills", "doc", ["#fb923c", "#ef4444"]),
+  d20: comingSoon("payHistory", "clock", ["#60a5fa", "#2563eb"]),
+  d21: comingSoon("receipts", "doc", ["#fbbf24", "#f97316"]),
+  d22: comingSoon("wallet", "wallet", ["#7c3aed", "#a855f7"]),
+  d33: comingSoon("payMethods", "card", ["#a78bfa", "#7c3aed"]),
+  dtop: comingSoon("topup", "plus", ["#34d399", "#059669"]),
+  dwops: comingSoon("walletOps", "clock", ["#fbbf24", "#f97316"]),
+  dtransfer: comingSoon("transfer", "card", ["#60a5fa", "#2563eb"]),
+  dlimits: comingSoon("limits", "grid", ["#a78bfa", "#7c3aed"]),
 };
 
 /**
@@ -126,10 +105,10 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
  * Шторки НЕ в стеке — открываются локально из parent screens.
  */
 const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
-  d25: ChatScreen,
+  d25: comingSoon("chat", "chat", ["#22d3ee", "#0891b2"]),
   d26: AnnouncementsScreen,
   d27: AdminNewsScreen,
-  d28: SupportScreen,
+  d28: comingSoon("support", "chat", ["#60a5fa", "#2563eb"]),
 };
 
 /**
@@ -139,7 +118,7 @@ const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
 const PROFILE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
   d29: ChildProfileScreen,
   d30: ParentDataScreen,
-  d31: DocumentsScreen,
+  d31: comingSoon("documents", "doc", ["#60a5fa", "#2563eb"]),
   d32: NotifSettingsScreen,
   d34: LangSecurityScreen,
 };
@@ -153,10 +132,10 @@ const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   ddiary: DiaryScreen,
   dtests: TestsScreen,
   dlib: LibraryScreen,
-  dport: PortfolioScreen,
-  dapps: ApplicationsScreen,
-  dmed: MedicalCardScreen,
-  dtrans: TransportScreen,
+  dport: comingSoon("portfolio", "star", ["#2dd4bf", "#0d9488"]),
+  dapps: comingSoon("applications", "doc", ["#34d399", "#059669"]),
+  dmed: comingSoon("medcard", "plus", ["#fb7185", "#e11d48"]),
+  dtrans: comingSoon("transport", "clock", ["#fbbf24", "#f97316"]),
   dchpass: ChangePasswordScreen,
   dsessions: ActiveSessionsScreen,
   // Заход 5 (заглушки): «О приложении» — единственный маршрут-заглушка, под

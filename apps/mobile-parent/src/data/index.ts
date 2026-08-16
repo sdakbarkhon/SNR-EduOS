@@ -20,14 +20,6 @@
  * уведомления. Их фикстуры и аксессоры удалены; бэйдж колокольчика тоже
  * больше не считается здесь (см. hooks/useUnreadNotifications.ts).
  */
-import {
-  BILLS,
-  PAYMENTS_OVERVIEW,
-  TOPUP_PRESETS,
-  WALLET_BALANCE,
-  historyTotals,
-  walletOpsFor,
-} from "./demoPayments";
 import type {
   ApplicationDetailRow,
   ApplicationRow,
@@ -63,16 +55,13 @@ import {
 } from "./fixtures/family";
 import {
   SUBJECTS,
-  SUBJECT_DETAIL_MATH,
   SUBJECT_STATS,
-  TEACHER_PROFILE,
   TEACHER_REVIEWS,
 } from "./fixtures/subjects";
 import {
   DATE_PICKER_MONTHS,
   DATE_PICKER_QUICK_CHIPS,
   DEMO_TODAY,
-  LESSON_SETS,
   SCHEDULE_DAYS,
   SCHEDULE_ROOM_LABEL,
   SETS_BY_CHILD,
@@ -95,59 +84,25 @@ import {
   HOMEWORK_UPLOAD_FILES,
   HOMEWORK_UPLOAD_MAX_FILES,
 } from "./fixtures/homework";
-import { PASSWORD_RULES, PASSWORD_STRENGTH_LABELS } from "./fixtures/profile";
 import {
   NOTIFICATIONS_MASTER_DEFAULT,
   NOTIFICATION_CATEGORIES,
 } from "./fixtures/notifications";
 import {
-  CHAT_ATTACH_OPTIONS,
-  MESSAGES_STORIES,
   MESSAGE_THREADS,
-  SUPPORT_CHAT,
-  SUPPORT_CHAT_HEADER,
-  SUPPORT_CHIPS,
-  TEACHER_CHAT,
-  TEACHER_CHAT_HEADER,
 } from "./fixtures/messages";
 import {
-  ABSENCE_REASONS,
-  APPLICATIONS,
-  APPLICATION_DETAILS,
-  APPLICATION_TYPES,
-  DEFAULT_MEAL_DAY_INDEX,
-  MEALS_DAY_PILLS,
-  MEALS_WEEK,
   MEDICAL_CARDS,
-  NEW_APPLICATION_SUBMIT,
-  NO_ALLERGIES_TEXT,
-  PORTFOLIO_ACHIEVEMENTS,
-  PORTFOLIO_CERTIFICATES,
-  PORTFOLIO_WORKS,
-  TRANSPORT_NOTIFY_DEFAULTS,
-  TRANSPORT_STOPS,
-  VACCINATIONS,
-  WORK_DETAILS,
 } from "./fixtures/services";
 import {
   AUTO_EXIT_OPTIONS,
   CONFIRM_DIALOGS,
   DEFAULT_AUTO_EXIT_VALUE,
-  DOCUMENTS,
-  LEGAL_DOCS,
-  SESSIONS,
-  WHATS_NEW,
 } from "./fixtures/profile";
-import { SEARCH_FILTERS, SEARCH_POPULAR, SEARCH_RECENT, SEARCH_RESULTS } from "./fixtures/search";
 import {
-  ASSISTANT_SCREEN,
   ASSISTANT_TEXT_TEMPLATES,
   DASHBOARD_CHILD_STATUS,
-  DASHBOARD_FEED,
   DASHBOARD_GREETING,
-  DAY_STATUS,
-  DUE_CARD,
-  MEALS_CARD,
   NEXT_LESSON_CARD,
   QUICK_ACTIONS,
 } from "./fixtures/home";
@@ -226,11 +181,10 @@ function childIndex(childId?: string): number {
 export function getSelectedChildContext(childId?: string): {
   child: ChildRow;
   info: ChildInfoRow;
-  wallet_balance: number;
 } {
   const child = resolveChild(childId);
   const idx = childIndex(childId);
-  return { child, info: CHILD_INFO[idx], wallet_balance: getWalletBalance(child.id) };
+  return { child, info: CHILD_INFO[idx] };
 }
 
 export function getChildInfo(childId?: string): ChildInfoRow {
@@ -256,17 +210,11 @@ export function getAuthFixtures() {
 
 // ─── Предметы ────────────────────────────────────────────────────────────────
 
-export function getSubjects(): Record<SubjectKey, SubjectRow> {
-  return SUBJECTS;
-}
 
 export function getSubject(key: SubjectKey): SubjectRow {
   return SUBJECTS[key];
 }
 
-export function getTeacherProfile() {
-  return TEACHER_PROFILE;
-}
 
 export function getTeacherReviews(): TeacherReviewRow[] {
   return TEACHER_REVIEWS;
@@ -276,11 +224,6 @@ export function getSubjectStats() {
   return SUBJECT_STATS;
 }
 
-/** Детали предмета d11 (в макете реализована только математика);
- *  teacher_comment генерируется от имени ребёнка (B10). */
-export function getSubjectDetail(childId?: string) {
-  return { ...SUBJECT_DETAIL_MATH, teacher_comment: getAssistantTexts(childId).review };
-}
 
 // ─── Расписание ──────────────────────────────────────────────────────────────
 
@@ -288,9 +231,6 @@ export function getScheduleWeek(): ScheduleDayRow[] {
   return SCHEDULE_DAYS;
 }
 
-export function getLessonSets() {
-  return LESSON_SETS;
-}
 
 /**
  * Уроки дня для ребёнка (аналог schedRowsFor макета): сет по SETS_BY_CHILD,
@@ -321,9 +261,6 @@ export function getDaySchedule(dayIndex: number, childId?: string): ScheduleLess
   });
 }
 
-export function getTodaySchedule(childId?: string): ScheduleLessonRow[] {
-  return getDaySchedule(DEMO_TODAY.weekday_index, childId);
-}
 
 export function getDatePickerMonths() {
   return DATE_PICKER_MONTHS;
@@ -373,61 +310,17 @@ export function getHomeworkUploadFixture() {
 
 // ─── Оплаты ──────────────────────────────────────────────────────────────────
 
-export function getBills(): BillRow[] {
-  return BILLS;
-}
 
-/** Счета основного списка «К оплате сейчас» (по умолчанию отмечены). */
-export function getDueBills(): BillRow[] {
-  return BILLS.filter((b) => b.in_main_list);
-}
 
-/** ЕДИНЫЙ источник суммы «К оплате» (4 950 000 = 4 500 000 + 450 000). */
-export function getDueTotal(): number {
-  return BILLS.filter((b) => b.in_main_list && b.checked_by_default).reduce((s, b) => s + b.amount, 0);
-}
 
-/** «2 счёта» на Dashboard/П17 — считается, не хардкодится. */
-export function getDueBillsCount(): number {
-  return BILLS.filter((b) => b.in_main_list && b.checked_by_default).length;
-}
 
-/**
- * Итоги «Истории оплат» — считаются из demoPayments.PAYMENT_HISTORY, а не
- * хардкодятся: правка одной строки не должна заставлять цифры внизу врать.
- */
-export function getPaymentHistoryTotals(): { total: number; successful: number; refunds: number } {
-  const t = historyTotals();
-  return { total: t.total, successful: t.net, refunds: t.refunds };
-}
 
-export function getPaymentsOverview() {
-  return PAYMENTS_OVERVIEW;
-}
 
-export function getPasswordFixture() {
-  return { rules: PASSWORD_RULES, strength_labels: PASSWORD_STRENGTH_LABELS };
-}
 
 // ─── Кошелёк ─────────────────────────────────────────────────────────────────
 
-/**
- * ЕДИНЫЙ источник баланса кошелька. Раньше он брался из таблицы балансов ПО
- * ИНДЕКСУ выдуманного ребёнка — после перехода семьи на настоящие данные
- * индекс указывал не туда, и главная спорила с экраном кошелька. Теперь одно
- * число из demoPayments — то же, что показывает веб-родитель.
- */
-export function getWalletBalance(_childId?: string): number {
-  return WALLET_BALANCE;
-}
 
-export function getWalletOps(_childId?: string): WalletOpsDayGroup[] {
-  return walletOpsFor();
-}
 
-export function getTopupPresets(): readonly number[] {
-  return TOPUP_PRESETS;
-}
 
 // ─── Уведомления ─────────────────────────────────────────────────────────────
 //
@@ -443,9 +336,6 @@ export function getNotificationCategories() {
 
 // ─── Сообщения ───────────────────────────────────────────────────────────────
 
-export function getMessageThreads(category?: MessageThreadRow["category"]): MessageThreadRow[] {
-  return category ? MESSAGE_THREADS.filter((t) => t.category === category) : MESSAGE_THREADS;
-}
 
 /**
  * Бейдж таба «Сообщения» — «2» в макете (строка 2651): число непрочитанных
@@ -456,90 +346,32 @@ export function getUnreadMessageThreadsCount(): number {
   return MESSAGE_THREADS.filter((t) => t.category === "chats" && (t.badge ?? 0) > 0).length;
 }
 
-export function getTeacherChat() {
-  return { header: TEACHER_CHAT_HEADER, messages: TEACHER_CHAT, attach_options: CHAT_ATTACH_OPTIONS };
-}
 
-/** Сториз-ряд экрана d24 «Сообщения» (5 круглых элементов сверху). */
-export function getMessagesStories() {
-  return MESSAGES_STORIES;
-}
 
-export function getSupportChat() {
-  return { header: SUPPORT_CHAT_HEADER, messages: SUPPORT_CHAT, chips: SUPPORT_CHIPS };
-}
 
 // ─── Сервисы ─────────────────────────────────────────────────────────────────
 
-export function getPortfolio() {
-  return { works: PORTFOLIO_WORKS, achievements: PORTFOLIO_ACHIEVEMENTS, certificates: PORTFOLIO_CERTIFICATES };
-}
 
-export function getWorkDetail(workIndex: number): WorkDetailRow | undefined {
-  return WORK_DETAILS[workIndex];
-}
 
-export function getApplications(): ApplicationRow[] {
-  return APPLICATIONS;
-}
 
-export function getApplicationTypes() {
-  return APPLICATION_TYPES;
-}
 
-export function getApplicationDetail(numberLabel: string): ApplicationDetailRow | undefined {
-  return APPLICATION_DETAILS[numberLabel];
-}
 
-export function getAbsenceReasons() {
-  return ABSENCE_REASONS;
-}
 
-export function getNewApplicationFixture() {
-  return NEW_APPLICATION_SUBMIT;
-}
 
 export function getMedicalCard(childId?: string): MedicalCardRow {
   return MEDICAL_CARDS[childIndex(childId)];
 }
 
-export function getNoAllergiesText() {
-  return NO_ALLERGIES_TEXT;
-}
 
-export function getVaccinations() {
-  return VACCINATIONS;
-}
 
-export function getTransportRoute() {
-  return { stops: TRANSPORT_STOPS, notify_defaults: TRANSPORT_NOTIFY_DEFAULTS };
-}
 
-export function getMealsWeek() {
-  return { week: MEALS_WEEK, day_pills: MEALS_DAY_PILLS, default_day_index: DEFAULT_MEAL_DAY_INDEX };
-}
 
 // ─── Профиль / настройки ─────────────────────────────────────────────────────
 
-export function getSessions() {
-  return SESSIONS;
-}
 
-export function getChildDocuments() {
-  return DOCUMENTS.filter((d) => d.owner === "child");
-}
 
-export function getParentDocuments() {
-  return DOCUMENTS.filter((d) => d.owner === "parent");
-}
 
-export function getLegalDoc(id: LegalDocRow["id"]): LegalDocRow {
-  return LEGAL_DOCS.find((d) => d.id === id) ?? LEGAL_DOCS[0];
-}
 
-export function getWhatsNew() {
-  return WHATS_NEW;
-}
 
 export function getConfirmDialog(id: string) {
   return CONFIRM_DIALOGS.find((c) => c.id === id);
@@ -551,13 +383,7 @@ export function getAutoExitFixture() {
 
 // ─── Поиск ───────────────────────────────────────────────────────────────────
 
-export function getSearchResults(filter?: SearchResultRow["filter"]): SearchResultRow[] {
-  return filter ? SEARCH_RESULTS.filter((r) => r.filter === filter) : SEARCH_RESULTS;
-}
 
-export function getSearchFixture() {
-  return { popular: SEARCH_POPULAR, recent: SEARCH_RECENT, filters: SEARCH_FILTERS };
-}
 
 // ─── Dashboard / EduOS Assistant ─────────────────────────────────────────────
 
@@ -587,38 +413,9 @@ export function getDashboard(childId?: string) {
     parent: PARENT,
     child,
     child_status: DASHBOARD_CHILD_STATUS,
-    wallet_balance: getWalletBalance(child.id),
     next_lesson: NEXT_LESSON_CARD,
-    due_card: { ...DUE_CARD, amount: getDueTotal(), bills_count: getDueBillsCount() },
-    meals_card: MEALS_CARD,
     quick_actions: QUICK_ACTIONS,
-    feed: DASHBOARD_FEED,
-    assistant_text: getAssistantTexts(child.id).dashboard,
   };
 }
 
-/** Статус дня d6: расписание и баланс питания — из общих источников.
- *  {suf} в banner_sub («Пришл{suf} в 08:12») резолвится по is_female —
- *  как childSuf в макете (строка 3853). */
-export function getDayStatus(childId?: string) {
-  const child = resolveChild(childId);
-  return {
-    ...DAY_STATUS,
-    banner_sub: DAY_STATUS.banner_sub.replace("{suf}", child.is_female ? "а" : ""),
-    date_label: DEMO_TODAY.label_full,
-    child,
-    lessons: getTodaySchedule(child.id),
-    lessons_attended: DASHBOARD_CHILD_STATUS.lessons_attended,
-    lessons_total: DASHBOARD_CHILD_STATUS.lessons_total,
-    meals_balance: getWalletBalance(child.id),
-  };
-}
 
-/** Экран EduOS Assistant d7: прогресс по предметам = SUBJECT_STATS. */
-export function getAssistantScreen(childId?: string) {
-  return {
-    ...ASSISTANT_SCREEN,
-    overview_text: getAssistantTexts(childId).overview7,
-    subject_progress: SUBJECT_STATS,
-  };
-}

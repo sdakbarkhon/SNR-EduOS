@@ -2988,6 +2988,8 @@ export interface Dictionary {
       walletTitleGeneric: string;   // «Кошелёк ребёнка»
     };
     msg: {
+      announcementsSub: string;  // подпись раздела на вкладке «Сообщения»
+      adminNewsSub: string;
       online: string;
       typeMessage: string;
       teachers: string;
@@ -3611,6 +3613,17 @@ export interface Dictionary {
       noteSeen: string;     // что значит «продлён»
       noteSingle: string;   // как это связано с правилом одной сессии
       noteData: string;     // чего в данных нет
+    };
+    /**
+     * 16.08.2026. Разделы, которых нет в базе школы, больше не показывают
+     * выдуманные данные с плашкой «это пример» — вместо них экран «Скоро»:
+     * иконка, название и одна-две строки о том, что здесь будет и при каком
+     * условии появится. Текст у каждого раздела свой.
+     */
+    soon2: {
+      badge: string;   // «Появится в будущих обновлениях»
+      items: Record<string, { title: string; text: string }>;
+      fallback: { title: string; text: string };
     };
   };
 }

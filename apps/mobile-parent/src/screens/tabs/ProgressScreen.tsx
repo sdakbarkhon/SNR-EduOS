@@ -684,9 +684,11 @@ export default function ProgressScreen() {
           </View>
         </AccentCard>
 
-        {/* SegmentPills 3 таба (290). */}
+        {/* Две вкладки: «Оценки» и «Навыки» — обе на настоящих данных.
+            Третья, «Динамика», убрана 16.08.2026: её график был нарисован по
+            выдуманному ряду, считать тренд пока не из чего. */}
         <SegmentPills
-          items={[d.parentApp.grades.tabGrades, d.parentApp.grades.tabSkills, d.parentApp.grades.tabDyn]}
+          items={[d.parentApp.grades.tabGrades, d.parentApp.grades.tabSkills]}
           activeIndex={activeTab}
           onChange={setActiveTab}
         />
@@ -1099,44 +1101,9 @@ export default function ProgressScreen() {
               </GlassCard>
             )}
 
-            {/* Assistant CTA (332–336). */}
-            <AccentCard
-              gradient={["#8b5cf6", "#6366f1"]}
-              shadowRgb="139,92,246"
-              radius={20}
-              contentStyle={{ padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}
-              onPress={() => navigation.navigate("d7")}
-            >
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 11,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.35)",
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.9}>
-                  <Path
-                    d="M12 2l2.2 7.2L22 12l-7.8 2.8L12 22l-2.2-7.2L2 12l7.8-2.8L12 2z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </Svg>
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
-                  EduOS Assistant
-                </Text>
-                <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, color: "rgba(255,255,255,0.9)" }}>
-                  {notes.grades}
-                </Text>
-              </View>
-              <ChevronRight />
-            </AccentCard>
+            {/* 16.08.2026. Карточка помощника убрана: её текст был заготовлен
+                заранее и к ребёнку отношения не имел. Оценки, предметы и отзыв
+                учителя выше — настоящие, из журнала. */}
           </>
         )}
 
@@ -1229,104 +1196,6 @@ export default function ProgressScreen() {
           </>
         )}
 
-        {/* Ветка «Динамика». */}
-        {activeTab === 2 && (
-          <>
-            <GlassCard radius={22} contentStyle={{ padding: 14, gap: 10 }}>
-              <Text
-                style={{
-                  fontFamily: fonts.manrope800,
-                  fontSize: 10,
-                  letterSpacing: 10 * 0.08,
-                  textTransform: "uppercase",
-                  color: tokens.ink3,
-                }}
-              >
-                {d.parentApp.grades.dynAvg}
-              </Text>
-              <Sparkline
-                values={dynSparklineValues}
-                width={320}
-                height={90}
-                strokeColor={tokens.accent}
-                strokeWidth={3}
-                endDot
-                endDotRadius={4.5}
-                preserveAspectRatio="none"
-              />
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                {["фев", "мар", "апр", "май", "июн", "июл"].map((m) => (
-                  <Text
-                    key={m}
-                    style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink3 }}
-                  >
-                    {m}
-                  </Text>
-                ))}
-              </View>
-            </GlassCard>
-
-            <GlassCard radius={22} contentStyle={{ padding: 14 }}>
-              {summary.dynamics_months.map((m, i) => {
-                const isCurrent = i === summary.dynamics_months.length - 1;
-                return (
-                  <View
-                    key={m.month_label}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingVertical: 10,
-                      borderTopWidth: i === 0 ? 0 : 1,
-                      borderTopColor: "rgba(23,18,67,0.07)",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontFamily: isCurrent ? fonts.manrope800 : fonts.manrope700,
-                        fontSize: 12,
-                        color: tokens.ink1,
-                      }}
-                    >
-                      {m.month_label}
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: isCurrent ? fonts.manrope800 : fonts.manrope700,
-                        fontSize: 12,
-                        color: tokens.ink1,
-                        marginRight: 12,
-                      }}
-                    >
-                      {m.avg_label}
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: fonts.manrope800,
-                        fontSize: 11,
-                        color: tokens.status.green.text,
-                      }}
-                    >
-                      {m.delta_label}
-                    </Text>
-                  </View>
-                );
-              })}
-            </GlassCard>
-
-            <Text
-              style={{
-                fontFamily: fonts.manrope600,
-                fontSize: 11,
-                color: tokens.ink2,
-                textAlign: "center",
-                paddingHorizontal: 12,
-              }}
-            >
-              {summary.dynamics_note}
-            </Text>
-          </>
-        )}
       </TabScreenScroll>
 
       <BottomSheetFrame visible={sheetOpen} onClose={() => setSheetOpen(false)}>

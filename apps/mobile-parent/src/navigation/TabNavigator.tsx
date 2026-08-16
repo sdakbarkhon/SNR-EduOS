@@ -15,7 +15,6 @@ import { CreditCard, Home, MessageCircle, TrendingUp, User } from "lucide-react-
 import type { Dictionary } from "@snr/core";
 import HomeScreen from "../screens/tabs/HomeScreen";
 import ProgressScreen from "../screens/tabs/ProgressScreen";
-import PaymentsScreen from "../screens/tabs/PaymentsScreen";
 import MessagesScreen from "../screens/tabs/MessagesScreen";
 import ProfileHubScreen from "../screens/tabs/ProfileHubScreen";
 import { getUnreadMessageThreadsCount } from "../data";
@@ -23,6 +22,7 @@ import { useAppLocale } from "../i18n";
 import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
 import type { TabParamList, TabRouteName } from "./routes";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
+import { comingSoon } from "../screens/ComingSoonScreen";
 
 /**
  * Обёртки считаются ОДИН раз на модуль, а не в разметке.
@@ -32,7 +32,9 @@ import { withScreenBoundary } from "../components/ScreenErrorBoundary";
  */
 const HomeScreenTab = withScreenBoundary(HomeScreen);
 const ProgressScreenTab = withScreenBoundary(ProgressScreen);
-const PaymentsScreenTab = withScreenBoundary(PaymentsScreen);
+const PaymentsScreenTab = withScreenBoundary(
+  comingSoon("payments", "card", ["#7c3aed", "#4f6df5"], true),
+);
 const MessagesScreenTab = withScreenBoundary(MessagesScreen);
 const ProfileHubScreenTab = withScreenBoundary(ProfileHubScreen);
 

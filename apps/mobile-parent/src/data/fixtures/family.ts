@@ -179,12 +179,6 @@ export const PARENT_PROFILE: ParentProfileRow = {
   backup_phone: "+998 93 555-21-77",
 };
 
-/** Стартовый выделенный ребёнок в списке A4 в зависимости от числа детей у
- *  демо-родителя (state.authSel макета, строка 4295): 3 → 1 (Малика), иначе 0. */
-export const DEMO_PARENT_DEFAULT_CHILD_INDEX: Record<number, number> = { 1: 0, 2: 0, 3: 1 };
-
-/** Демо-родитель по умолчанию — 3-детный (совпадает с настоящим PARENT). */
-export const DEFAULT_DEMO_PARENT_ID = "demo-dilnoza";
 
 /** Текст демо-шторки B9 — заголовок и подзаголовок (макет строки 4270+). */
 export const DEMO_SHEET_TEXT = {
