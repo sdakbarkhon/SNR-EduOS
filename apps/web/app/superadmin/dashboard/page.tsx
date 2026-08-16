@@ -10,7 +10,8 @@ async function getStats(supabase: Awaited<ReturnType<typeof createClient>>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const { data: schoolRows } = await sb.from("schools").select("id").eq("is_demo", false);
+  const { data: schoolRows } = await sb
+    .from("schools").select("id").eq("is_demo", false).eq("is_active", true);
   const schoolIds = ((schoolRows ?? []) as { id: string }[]).map((s) => s.id);
 
   if (schoolIds.length === 0) {

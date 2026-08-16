@@ -64,6 +64,14 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
     || /duplicate key.*users_email/i.test(raw)) {
     return t.usernameTaken;
   }
+  // Миграция 202: демо-школа защищена триггером в базе, а название школы
+  // сверяется на сервере — сюда приходят их машинные коды.
+  if (/demo_school_cannot_be_deleted|demo_school_cannot_be_archived|demo_flag_is_permanent/i.test(raw)) {
+    return t.demoSchoolProtected;
+  }
+  if (/school_name_mismatch/i.test(raw)) {
+    return t.schoolNameMismatch;
+  }
   if (/duplicate key.*parents_phone_key/i.test(raw)) {
     return t.phoneTaken;
   }

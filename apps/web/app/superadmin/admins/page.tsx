@@ -20,7 +20,7 @@ export default async function SuperAdminAdminsPage({
   // отфильтруешь один — либо «—» в колонке, либо демо-школа как цель переноса.
   // Сначала берём не-демо школы, затем ограничиваем админов по их school_id.
   const { data: schools, error: schoolsError } = await sb
-    .from("schools").select("id, name").eq("is_demo", false).order("name");
+    .from("schools").select("id, name").eq("is_demo", false).eq("is_active", true).order("name");
   if (schoolsError) console.error("[SuperAdminAdminsPage] schools query failed:", schoolsError.message);
 
   const schoolRows = (schools ?? []) as { id: string; name: string }[];

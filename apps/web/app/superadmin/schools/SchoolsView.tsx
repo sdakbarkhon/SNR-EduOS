@@ -2,13 +2,24 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Plus, X } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Trash2, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
-import { actionCreateSchool } from "../actions";
+import {
+  actionCreateSchool,
+  actionDeleteSchoolForever,
+  actionSchoolWipePreview,
+  actionSetSchoolArchived,
+} from "../actions";
+import type { SchoolWipePreview } from "@/lib/school-lifecycle";
 
-type School = { id: string; name: string; code: string | null; autostart_enabled: boolean; created_at: string };
+type School = {
+  id: string; name: string; code: string | null;
+  autostart_enabled: boolean; created_at: string;
+  /** false — школа в архиве (миграция 202). */
+  is_active: boolean;
+};
 
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return createPortal(
@@ -62,6 +73,33 @@ export function SchoolsView({ schools }: { schools: School[] }) {
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Диалог «убрать школу»: сначала выбор между архивом и удалением, и только
+  // после выбора «удалить» — цена решения и подтверждение названием.
+  const [wipe, setWipe] = useState<School | null>(null);
+  const [preview, setPreview] = useState<SchoolWipePreview | null>(null);
+  const [mode, setMode] = useState<"choose" | "delete">("choose");
+  const [confirmText, setConfirmText] = useState("");
+
+  function openWipe(school: School) {
+    setWipe(school);
+    setMode("choose");
+    setConfirmText("");
+    setPreview(null);
+    startTransition(async () => {
+      try {
+        setPreview(await actionSchoolWipePreview(school.id));
+      } catch (err) {
+        flash(humanizeAdminError(err, locale as Locale));
+      }
+    });
+  }
+
+  function closeWipe() {
+    setWipe(null);
+    setPreview(null);
+    setConfirmText("");
+  }
+
   function flash(msg: string) {
     setFlashMsg(msg);
     setTimeout(() => setFlashMsg(null), 6000);
@@ -98,17 +136,25 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 <th className="px-4 py-3">{t.schoolsTableCode}</th>
                 <th className="px-4 py-3">{t.autostartLabel}</th>
                 <th className="px-4 py-3">{t.schoolsTableCreated}</th>
+                <th className="px-4 py-3 text-right">&nbsp;</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {schools.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-400">{t.noSchools}</td>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{t.noSchools}</td>
                 </tr>
               ) : (
                 schools.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-3 font-medium text-gray-800">{s.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {s.name}
+                      {!s.is_active && (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">
+                          {t.schoolArchivedBadge}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{s.code ?? "—"}</td>
                     <td className="px-4 py-3">
                       {s.autostart_enabled ? (
@@ -119,6 +165,34 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                     </td>
                     <td className="px-4 py-3 text-gray-400">
                       {new Date(s.created_at).toLocaleDateString("ru-RU")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        {s.is_active ? (
+                          <button
+                            onClick={() => openWipe(s)}
+                            title={t.schoolWipeBtn}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600"
+                          >
+                            <Archive className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startTransition(async () => {
+                              try {
+                                await actionSetSchoolArchived(s.id, false);
+                                flash(t.schoolRestoredMsg.replace("{name}", s.name));
+                              } catch (err) {
+                                flash(humanizeAdminError(err, locale as Locale));
+                              }
+                            })}
+                            title={t.schoolRestoreBtn}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600"
+                          >
+                            <ArchiveRestore className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -165,6 +239,110 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 </button>
               </div>
             </form>
+          </ModalCard>
+        </Backdrop>
+      )}
+
+      {/* Убрать школу: сначала выбор, потом — если удаление — цена и слово. */}
+      {wipe && (
+        <Backdrop onClose={closeWipe}>
+          <ModalCard title={t.schoolWipeTitle.replace("{name}", wipe.name)} onClose={closeWipe}>
+            {mode === "choose" ? (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">{t.schoolWipeIntro}</p>
+
+                <button
+                  onClick={() => startTransition(async () => {
+                    try {
+                      await actionSetSchoolArchived(wipe.id, true);
+                      flash(t.schoolArchivedMsg.replace("{name}", wipe.name));
+                      closeWipe();
+                    } catch (err) {
+                      flash(humanizeAdminError(err, locale as Locale));
+                    }
+                  })}
+                  disabled={isPending}
+                  className="w-full rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-left hover:bg-amber-50 disabled:opacity-60"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                    <Archive className="h-4 w-4" /> {t.schoolArchiveOption}
+                  </span>
+                  <span className="mt-1 block text-xs leading-snug text-amber-700">{t.schoolArchiveHint}</span>
+                </button>
+
+                <button
+                  onClick={() => setMode("delete")}
+                  className="w-full rounded-xl border border-red-200 bg-red-50/60 p-4 text-left hover:bg-red-50"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-red-700">
+                    <Trash2 className="h-4 w-4" /> {t.schoolDeleteOption}
+                  </span>
+                  <span className="mt-1 block text-xs leading-snug text-red-600">{t.schoolDeleteHint}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Цена решения — числами, до подтверждения. */}
+                <div className="rounded-xl bg-gray-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.schoolWipeWhatGoes}</p>
+                  {preview ? (
+                    <ul className="mt-2 space-y-0.5 text-sm text-gray-700">
+                      <li>{t.wipeStudents.replace("{n}", String(preview.students))}</li>
+                      <li>{t.wipeTeachers.replace("{n}", String(preview.teachers))}</li>
+                      <li>{t.wipeParents.replace("{n}", String(preview.parents))}</li>
+                      <li>{t.wipeGroups.replace("{n}", String(preview.groups))}</li>
+                      <li>{t.wipeLessons.replace("{n}", String(preview.lessons))}</li>
+                      <li>{t.wipeGrades.replace("{n}", String(preview.grades))}</li>
+                      <li>{t.wipeFiles.replace("{n}", String(preview.files))}</li>
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-gray-400">{t.wipeCounting}</p>
+                  )}
+                </div>
+
+                <p className="text-sm font-medium text-red-700">{t.schoolDeleteIrreversible}</p>
+
+                <Field label={t.schoolDeleteConfirmLabel.replace("{name}", wipe.name)}>
+                  <Input
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder={wipe.name}
+                    autoCapitalize="none"
+                  />
+                </Field>
+
+                <div className="flex gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setMode("choose")}
+                    className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    {t.backBtn}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending || confirmText.trim() !== wipe.name.trim()}
+                    onClick={() => startTransition(async () => {
+                      try {
+                        const res = await actionDeleteSchoolForever(wipe.id, confirmText);
+                        flash(
+                          t.schoolDeletedMsg
+                            .replace("{name}", wipe.name)
+                            .replace("{files}", String(res.files))
+                            .replace("{users}", String(res.users)),
+                        );
+                        closeWipe();
+                      } catch (err) {
+                        flash(humanizeAdminError(err, locale as Locale));
+                      }
+                    })}
+                    className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
+                  >
+                    {isPending ? t.deleting : t.schoolDeleteConfirmBtn}
+                  </button>
+                </div>
+              </div>
+            )}
           </ModalCard>
         </Backdrop>
       )}

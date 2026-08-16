@@ -547,6 +547,33 @@ export interface Dictionary {
     deleting: string;
     resetPasswordBtn: string;
     resetting: string;
+    schoolArchivedBadge: string;
+    schoolWipeBtn: string;
+    schoolRestoreBtn: string;
+    schoolRestoredMsg: string;
+    schoolArchivedMsg: string;
+    schoolWipeTitle: string;
+    schoolWipeIntro: string;
+    schoolArchiveOption: string;
+    schoolArchiveHint: string;
+    schoolDeleteOption: string;
+    schoolDeleteHint: string;
+    schoolWipeWhatGoes: string;
+    wipeCounting: string;
+    wipeStudents: string;
+    wipeTeachers: string;
+    wipeParents: string;
+    wipeGroups: string;
+    wipeLessons: string;
+    wipeGrades: string;
+    wipeFiles: string;
+    schoolDeleteIrreversible: string;
+    schoolDeleteConfirmLabel: string;
+    schoolDeleteConfirmBtn: string;
+    schoolDeletedMsg: string;
+    backBtn: string;
+    demoSchoolProtected: string;
+    schoolNameMismatch: string;
   };
   parent: {
     title: string;
@@ -648,6 +675,8 @@ export interface Dictionary {
   adminErrors: {
     usernameTaken: string;
     phoneTaken: string;
+    demoSchoolProtected: string;
+    schoolNameMismatch: string;
     googleEmailTaken: string;   // почта уже у другого родителя (миграция 201)
     appleEmailTaken: string;
     socialEmailInvalid: string; // адрес не похож на почту

@@ -33,7 +33,8 @@ type LoginResult =
   // не стоит ни на одной школе или стоит сразу на двух). Отделён от
   // all_busy намеренно: «мест нет, зайдите позже» и «демо сломано» — разные
   // сообщения, и смешивать их значит врать посетителю про причину.
-  | { ok: false; error: "invalid" | "failed" | "all_busy" | "demo_unavailable"; reason?: string }
+  // school_archived — миграция 202: школа убрана в архив, вход закрыт.
+  | { ok: false; error: "invalid" | "failed" | "all_busy" | "demo_unavailable" | "school_archived"; reason?: string }
   // Z.2.10 — один логин в нескольких школах: спрашиваем, в какую входить.
   // reason здесь не используется, но объявлен: DemoRoleModal читает
   // result.reason на всём объединении, и без него сужение по error ломается.
@@ -111,6 +112,16 @@ async function finishLogin(
   user: { id: string },
   accessToken: string,
 ): Promise<LoginResult> {
+  // Школа в архиве — вход закрыт (миграция 202). Проверка стоит ЗДЕСЬ, на
+  // входе, а не в middleware на каждом запросе: архив — редкое событие, и
+  // платить за него лишним обращением к базе на каждый переход незачем.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: activeSchool } = await (supabase as any).rpc("school_is_active_for_me");
+  if (activeSchool === false) {
+    await supabase.auth.signOut({ scope: "local" });
+    return { ok: false, error: "school_archived" };
+  }
+
   await registerSession({ userId: user.id, accessToken });
   (await cookies()).delete(DEMO_SESSION_COOKIE);
   return { ok: true, dest: await resolveDest(supabase, user.id), isDemo: false };

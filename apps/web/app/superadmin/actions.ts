@@ -5,6 +5,10 @@ import {
   updateSchoolAdmin, deleteSchoolAdmin, resetSchoolAdminPassword,
   assertSchoolIsManageable, assertAdminIsManageable,
 } from "@/lib/admin-api";
+import {
+  deleteSchoolForever, getSchoolWipePreview, setSchoolArchived,
+  type SchoolWipePreview, type WipeResult,
+} from "@/lib/school-lifecycle";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -30,6 +34,50 @@ export async function actionCreateSchool(formData: FormData) {
   revalidatePath("/superadmin/schools");
   revalidatePath("/superadmin/dashboard");
   return id;
+}
+
+/**
+ * Что уйдёт при удалении школы. Показывается в диалоге до подтверждения.
+ * Доступно только суперадмину: админ школы своей школы удалить не может.
+ */
+export async function actionSchoolWipePreview(schoolId: string): Promise<SchoolWipePreview | null> {
+  await verifySuperAdmin();
+  return getSchoolWipePreview(schoolId);
+}
+
+/** Архивировать школу или вернуть из архива. Обратимо. */
+export async function actionSetSchoolArchived(schoolId: string, archived: boolean) {
+  await verifySuperAdmin();
+  await assertSchoolIsManageable(schoolId);
+  await setSchoolArchived(schoolId, archived);
+  revalidatePath("/superadmin/schools");
+  revalidatePath("/superadmin/dashboard");
+}
+
+/**
+ * Удалить школу насовсем.
+ *
+ * Подтверждение — НАЗВАНИЕ школы, набранное вручную. Слово «УДАЛИТЬ» набирается
+ * механически и одинаково для любой строки списка; название заставляет
+ * посмотреть, ту ли школу удаляешь. Сверка идёт ЗДЕСЬ, на сервере: проверка
+ * только в форме обходится вызовом действия напрямую.
+ */
+export async function actionDeleteSchoolForever(
+  schoolId: string,
+  confirmation: string,
+): Promise<WipeResult> {
+  await verifySuperAdmin();
+  await assertSchoolIsManageable(schoolId);
+
+  const preview = await getSchoolWipePreview(schoolId);
+  if (!preview) throw new Error("Школа не найдена");
+  if (preview.isDemo) throw new Error("demo_school_cannot_be_deleted");
+  if (confirmation.trim() !== preview.name.trim()) throw new Error("school_name_mismatch");
+
+  const result = await deleteSchoolForever(schoolId);
+  revalidatePath("/superadmin/schools");
+  revalidatePath("/superadmin/dashboard");
+  return result;
 }
 
 // ── SCHOOL ADMINS ────────────────────────────────────────────────────────────

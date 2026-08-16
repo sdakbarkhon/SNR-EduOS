@@ -16,7 +16,7 @@ import {
 import { useLocale } from "@/components";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
-import { SANDBOX_TOOLS, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
+import { SANDBOX_TOOLS_VISIBLE, type SandboxTool, type SandboxToolId } from "@/lib/sandbox-tools";
 import { getServicesForSubject, SUBJECT_SERVICE_MAP } from "@/lib/external-services";
 import { ScratchSandbox } from "./scratch/ScratchSandbox";
 import { PolotnoSandbox } from "./polotno/PolotnoSandbox";
@@ -546,7 +546,7 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
   const d = getDictionary(locale as Locale);
   const t = d.sandbox;
   const [active, setActive] = useState<SandboxTool | null>(
-    () => SANDBOX_TOOLS.find((tool) => tool.id === initialToolId) ?? null,
+    () => SANDBOX_TOOLS_VISIBLE.find((tool) => tool.id === initialToolId) ?? null,
   );
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -569,8 +569,8 @@ export function SandboxView({ initialToolId }: { initialToolId?: SandboxToolId }
   const allowedServices = new Set<string>(getServicesForSubject(subjectFilter));
   const ALWAYS_SHOWN: string[] = ["google_docs", "google_sheets", "google_slides"];
   const visibleTools = subjectFilter === "all"
-    ? SANDBOX_TOOLS
-    : SANDBOX_TOOLS.filter((tool) =>
+    ? SANDBOX_TOOLS_VISIBLE
+    : SANDBOX_TOOLS_VISIBLE.filter((tool) =>
         tool.id === "code"
           ? subjectFilter === "Программирование"
           : ALWAYS_SHOWN.includes(tool.id) || allowedServices.has(tool.id),
