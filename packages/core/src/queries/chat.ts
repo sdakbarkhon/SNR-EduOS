@@ -70,7 +70,10 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
   const [{ data: teacherRows }, { data: studentRows }, { data: parentRows }] = await Promise.all([
     userIds.length ? sb.from("teachers").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
     userIds.length ? sb.from("students").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
-    userIds.length ? sb.from("parents").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
+    // Не parents, а представление из миграции 204: в строке родителя лежат
+    // телефон и почты Google/Apple, а чату нужно только имя. Отбор «мы в одном
+    // треде» тот же, что был в снятой политике, — он внутри представления.
+    userIds.length ? sb.from("chat_parent_names").select("user_id, full_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
   ]);
   const nameByUserId = new Map<string, string>();
   (teacherRows ?? []).forEach((t: any) => nameByUserId.set(t.user_id, t.full_name));
