@@ -33,6 +33,10 @@ export function getSupabase(): Db {
       "Отсутствуют supabaseUrl/supabaseAnonKey (app.json expo.extra) и EXPO_PUBLIC_SUPABASE_URL/ANON_KEY (.env.local) — оба источника пусты.",
     );
   }
-  client = createBaseClient({ url, anonKey, storage: secureStorageAdapter });
+  // flowType pkce — ради входа через Google: Supabase возвращает нас по схеме
+  // приложения с параметром `code`, а секрет проверки к нему лежит здесь же, в
+  // защищённом хранилище. На вход по телефону это не влияет никак: там код из
+  // SMS меняется на сессию через verifyOtp, мимо этой схемы.
+  client = createBaseClient({ url, anonKey, storage: secureStorageAdapter, flowType: "pkce" });
   return client;
 }

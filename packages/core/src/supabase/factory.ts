@@ -18,6 +18,15 @@ export interface SupabaseConfig {
   storage?: SessionStorage;
   /** false для серверного использования без авто-persist (SSR). */
   persistSession?: boolean;
+  /**
+   * Схема обмена при входе через провайдера. По умолчанию supabase-js берёт
+   * "implicit" — токены приезжают во фрагменте адреса. Мобильному приложению
+   * нужен "pkce": возврат приходит по схеме приложения с параметром `code`, а
+   * обменивает его exchangeCodeForSession, у которого секрет проверки лежит в
+   * защищённом хранилище устройства. Опускаем везде, где вход через провайдера
+   * не используется, — чтобы не менять поведение существующих клиентов.
+   */
+  flowType?: "implicit" | "pkce";
 }
 
 /**
@@ -32,6 +41,7 @@ export function createBaseClient(config: SupabaseConfig): Db {
       persistSession: config.persistSession ?? true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
+      ...(config.flowType ? { flowType: config.flowType } : {}),
     },
   });
 }

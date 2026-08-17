@@ -24,6 +24,7 @@ import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
 import { getSupabase } from "../lib/supabase";
 import { NotParentError } from "../lib/auth";
 import { PhoneLoginFailure, requestPhoneCode, verifyPhoneCode, type PhoneLoginError } from "../lib/parentPhoneLogin";
+import { GoogleLoginFailure, loginParentWithGoogle, type GoogleLoginError } from "../lib/parentGoogleLogin";
 import { useParentData } from "./ParentDataContext";
 
 export type AuthPhase = "onboarding" | "phone" | "sms" | "childPicker" | "app";
@@ -78,6 +79,10 @@ export interface AuthSessionState {
   /** Дошла ли доставка. Пока провайдера нет — всегда false, и экран кода
    *  честно говорит, что код надо взять у школы. */
   codeDelivered: boolean;
+  /** Причина отказа при входе через Google. Машинный код, экран переводит. */
+  googleError: GoogleLoginError | null;
+  /** Идёт вход через Google — кнопка заблокирована, пока не вернёмся. */
+  googleBusy: boolean;
 }
 
 export interface AuthSessionCtx extends AuthSessionState {
@@ -91,6 +96,8 @@ export interface AuthSessionCtx extends AuthSessionState {
   /** Повторная выдача кода — сервер сам не даёт чаще раза в минуту. */
   resendCode(): Promise<boolean>;
   verifyCode(): Promise<"picker" | "app" | "error">;
+  /** Вход через Google. Тот же хвост, что у verifyCode: сессия → дети → фаза. */
+  signInWithGoogle(): Promise<"picker" | "app" | "error">;
   pickChildIndex(i: number): void;
   enterApp(childIndex: number): void;
   /** ЗАХОД 5x (правка 3): закрыть one-shot центр-модалку «Демо-режим». */
@@ -116,6 +123,8 @@ const INITIAL_STATE: AuthSessionState = {
   authBusy: false,
   pendingPhone: null,
   codeDelivered: false,
+  googleError: null,
+  googleBusy: false,
 };
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
@@ -143,6 +152,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   // Найдено адверсариальной проверкой. Ref читается/пишется синхронно —
   // второй вызов в том же тике гарантированно увидит true.
   const verifyBusyRef = useRef(false);
+  const googleBusyRef = useRef(false);
 
   // Сессия могла кончиться не по нашей воле: её закрыли с другого устройства
   // на экране «Активные сессии» (миграция 199 удаляет строку auth.sessions
@@ -156,6 +166,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data } = getSupabase().auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
+      // Вход через Google сам гасит промежуточную сессию Google посреди пути
+      // (см. lib/parentGoogleLogin.ts, шаг 5). Это НЕ конец сессии родителя, и
+      // сбрасывать состояние здесь нельзя — иначе человека выкинет на
+      // онбординг ровно в тот момент, когда он входит. Состоянием на это время
+      // распоряжается signInWithGoogle.
+      if (googleBusyRef.current) return;
       // Свой выход уже сбросил состояние — второй сброс не навредит, но и не
       // нужен: на фазе onboarding делать нечего.
       setState((prev) => (prev.phase === "onboarding" ? prev : INITIAL_STATE));
@@ -277,6 +293,51 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshParentData]);
 
+  /**
+   * Вход через Google. Хвост после успеха — тот же, что у verifyCode: сессия
+   * уже установлена, надо перезапросить детей и выбрать фазу. Дублировать
+   * этот кусок нельзя, поэтому он вынесен в enterAfterSession ниже.
+   */
+  const signInWithGoogle = useCallback(async (): Promise<"picker" | "app" | "error"> => {
+    if (googleBusyRef.current) return "error";
+    googleBusyRef.current = true;
+    setState((s) => ({ ...s, googleBusy: true, googleError: null }));
+    try {
+      try {
+        await loginParentWithGoogle();
+      } catch (e) {
+        const reason: GoogleLoginError =
+          e instanceof GoogleLoginFailure ? e.reason : "failed";
+        if (!(e instanceof GoogleLoginFailure)) {
+          console.error("[AuthSessionContext] signInWithGoogle: неожиданная ошибка:", e);
+        }
+        setState((s) => ({
+          ...s,
+          googleBusy: false,
+          // «Отмена» у Google — не ошибка, показывать нечего.
+          googleError: reason === "cancelled" ? null : reason,
+        }));
+        return "error";
+      }
+      await refreshParentData();
+      const kids = parentDataRef.current?.children ?? [];
+      setState((s) => ({
+        ...s,
+        googleBusy: false,
+        kidsCount: kids.length,
+        authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? 0,
+      }));
+      if (kids.length <= 1) {
+        setState((s) => ({ ...s, phase: "app", currentChildId: kids[0]?.id ?? null }));
+        return "app";
+      }
+      setState((s) => ({ ...s, phase: "childPicker" }));
+      return "picker";
+    } finally {
+      googleBusyRef.current = false;
+    }
+  }, [refreshParentData]);
+
   const pickChildIndex = useCallback((i: number) => {
     setState((s) => ({ ...s, authSel: i }));
   }, []);
@@ -317,6 +378,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       submitPhone,
       resendCode,
       verifyCode,
+      signInWithGoogle,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,
@@ -332,6 +394,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       submitPhone,
       resendCode,
       verifyCode,
+      signInWithGoogle,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,

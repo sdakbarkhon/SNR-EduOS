@@ -3143,7 +3143,7 @@ export const en: Dictionary = {
       googleSchoolArchived: "This school is no longer active. Contact your school administrator.",
       googleFailed: "Google sign-in did not work. Try again or sign in with your phone number.",
       appleSoon: "Signing in with Apple ID comes later. For now use Google or your phone number.",
-      googleWebOnly: "Google sign-in is not available in the app yet. It already works in the browser — open eduos.snruz.uz/parent. Here, sign in with your phone number.",
+      googleWebOnly: "Google sign-in will not work here: this app is running in Expo Go, and the return from the browser never reaches it. Install the regular app build, or sign in from the browser — eduos.snruz.uz/parent. Phone-number sign-in works here too.",
       phoneHint: "PHONE NUMBER",
       phonePlaceholder: "90 123 45 67",
       kidsOne: "1 child",

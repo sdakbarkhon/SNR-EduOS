@@ -41,6 +41,7 @@ import {
 } from "../../ui";
 import { getAuthFixtures } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
+import { isGoogleLoginAvailable } from "../../lib/parentGoogleLogin";
 import {
   BackArrowIcon,
   ChevronDownIcon,
@@ -86,22 +87,26 @@ function AppleGlyph() {
   );
 }
 
-/** Кнопка входа через сторонний аккаунт: приглушена, справа пометка «скоро». */
+/** Кнопка входа через сторонний аккаунт. Без пометки «скоро» — рабочая:
+ *  видом не отличаться от неактивной она не должна. */
 function SocialButton({
   label,
   badge,
   glyph,
   onPress,
+  disabled,
 }: {
   label: string;
-  badge: string;
+  badge?: string;
   glyph: React.ReactNode;
   onPress: () => void;
+  disabled?: boolean;
 }) {
   const { tokens } = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
       style={({ pressed }) => [
         {
@@ -113,7 +118,8 @@ function SocialButton({
           borderWidth: 1,
           borderColor: tokens.glassBorder,
           backgroundColor: tokens.chip(tokens.status.gray.rgb).bg,
-          opacity: pressed ? 0.5 : 0.65,
+          // Рабочая кнопка не приглушается — приглушены только те, что с пометкой.
+          opacity: pressed ? 0.5 : badge ? 0.65 : 1,
         },
       ]}
     >
@@ -132,7 +138,9 @@ function SocialButton({
       <Text style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
         {label}
       </Text>
-      <Text style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: tokens.ink3 }}>{badge}</Text>
+      {badge ? (
+        <Text style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: tokens.ink3 }}>{badge}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -142,8 +150,8 @@ export function LoginPhoneScreen() {
   const t = d.parentApp.auth;
   const { tokens, scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { country, phone, setCountry, setPhone, submitPhone, setPhase, phoneError } =
-    useAuthSession();
+  const { country, phone, setCountry, setPhone, submitPhone, setPhase, phoneError,
+    signInWithGoogle, googleBusy, googleError } = useAuthSession();
   const [countryOpen, setCountryOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey>(null);
 
@@ -180,6 +188,28 @@ export function LoginPhoneScreen() {
     network_error: t.networkError,
   };
   const phoneErrorText = phoneError ? (PHONE_ERROR_TEXT[phoneError] ?? t.networkError) : null;
+
+  // Отказы входа через Google — те же четыре причины, что на вебе, плюс
+  // «здесь так нельзя» для Expo Go. «Отмена» в карту не входит: контекст
+  // гасит её в null, показывать нечего.
+  const GOOGLE_ERROR_TEXT: Record<string, string> = {
+    not_linked: t.googleNotLinked,
+    no_account: t.googleNoAccount,
+    school_archived: t.googleSchoolArchived,
+    failed: t.googleFailed,
+    expo_go: t.googleWebOnly,
+    config_error: t.configError,
+  };
+  const googleErrorText = googleError ? (GOOGLE_ERROR_TEXT[googleError] ?? t.googleFailed) : null;
+
+  // В Expo Go возврата по схеме приложения не бывает — там кнопка не молчит,
+  // а объясняет и отправляет в браузерную версию.
+  const googleReady = isGoogleLoginAvailable();
+
+  function onGooglePress() {
+    if (!googleReady) { Alert.alert(t.withGoogle, t.googleWebOnly); return; }
+    void signInWithGoogle();
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -386,11 +416,17 @@ export function LoginPhoneScreen() {
         </View>
 
         <SocialButton
-          label={t.withGoogle}
-          badge={t.soonBadge}
+          label={googleBusy ? t.googleSigningIn : t.withGoogle}
+          badge={googleReady ? undefined : t.soonBadge}
           glyph={<GoogleGlyph />}
-          onPress={() => Alert.alert(t.withGoogle, t.googleWebOnly)}
+          onPress={onGooglePress}
+          disabled={googleBusy}
         />
+        {googleErrorText && (
+          <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, lineHeight: 16, color: errorColor, paddingHorizontal: 4 }}>
+            {googleErrorText}
+          </Text>
+        )}
         <SocialButton
           label={t.withApple}
           badge={t.soonBadge}

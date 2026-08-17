@@ -3144,7 +3144,7 @@ export const uz: Dictionary = {
       googleSchoolArchived: "Maktab tizimda endi ishlamaydi. Maktab administratoriga murojaat qiling.",
       googleFailed: "Google orqali kirib bo‘lmadi. Qayta urinib ko‘ring yoki telefon raqami orqali kiring.",
       appleSoon: "Apple ID orqali kirish keyinroq paydo bo‘ladi. Hozircha Google yoki telefon raqami orqali kiring.",
-      googleWebOnly: "Ilovada Google orqali kirish hozircha mavjud emas. U brauzerda ishlaydi — eduos.snruz.uz/parent manzilini oching. Bu yerda telefon raqami orqali kiring.",
+      googleWebOnly: "Bu yerda Google orqali kirish ishlamaydi: ilova Expo Go’da ishga tushgan, brauzerdan qaytish unga yetib bormaydi. Ilovaning oddiy versiyasini o‘rnating yoki brauzerda kiring — eduos.snruz.uz/parent. Telefon raqami orqali kirish bu yerda ham ishlaydi.",
       phoneHint: "TELEFON RAQAMI",
       phonePlaceholder: "90 123 45 67",
       kidsOne: "1 farzand",

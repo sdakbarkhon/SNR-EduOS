@@ -3266,7 +3266,7 @@ export interface Dictionary {
       googleSchoolArchived: string;
       googleFailed: string;
       appleSoon: string;
-      googleWebOnly: string;   // мобильное: Google-вход пока только в браузере
+      googleWebOnly: string;   // мобильное: в Expo Go возврат по схеме не приходит
       phoneHint: string;
       phonePlaceholder: string;
       kidsOne: string;

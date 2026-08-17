@@ -82,7 +82,7 @@
       },
       "supabaseUrl": "https://qaljcmkkajqyawccxetq.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhbGpjbWtrYWpxeWF3Y2N4ZXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA5ODksImV4cCI6MjA5NzIwNjk4OX0.PrvoDl7xAqBd51Y9mbfZSjXcmSHskXmGcvNsmA4Sd70",
-      "webApiBaseUrl": "https://snr-edu-os-web.vercel.app",
+      "webApiBaseUrl": "https://eduos.snruz.uz",
       "legalTermsUrl": "",
       "legalPrivacyUrl": ""
     },
