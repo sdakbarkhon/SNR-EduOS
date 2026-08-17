@@ -3113,6 +3113,10 @@ export const en: Dictionary = {
       codeTooMany: "Too many attempts. Request a new code",
 
       codeFromSchool: "SMS are not being sent yet — ask the school for the code",
+      codeAttemptsLeft: "Attempts left: {n}",
+      codeLastAttempt: "One attempt left",
+      codeChecking: "Checking the code…",
+      codeAccepted: "Code accepted",
 
       resendCode: "Send the code again",
       wrongCode: "Wrong code",

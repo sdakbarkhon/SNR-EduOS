@@ -243,7 +243,15 @@ export async function issueParentCode(rawPhone: string): Promise<IssueCodeResult
 
 export type VerifyCodeResult =
   | { ok: true; parentId: string; userId: string | null }
-  | { ok: false; error: "invalid_phone" | "no_code" | "expired" | "too_many" | "wrong_code" | "failed" };
+  | {
+      ok: false;
+      error: "invalid_phone" | "no_code" | "expired" | "too_many" | "wrong_code" | "failed";
+      /** Сколько попыток осталось у действующего кода. Есть только у
+       *  wrong_code — в остальных случаях код уже погашен. Нужно, чтобы
+       *  человек видел, сколько ему осталось, а не упирался в глухое
+       *  «слишком много попыток» после пятой. */
+      attemptsLeft?: number;
+    };
 
 /** Проверяет код по-настоящему: срок жизни, число попыток, одноразовость. */
 export async function verifyParentCode(rawPhone: string, code: string): Promise<VerifyCodeResult> {
@@ -273,9 +281,10 @@ export async function verifyParentCode(rawPhone: string, code: string): Promise<
   }
 
   if (row.code_hash !== hashCode(code, phone)) {
+    const used = (row.attempts as number) + 1;
     await anySb.from("parent_phone_codes")
-      .update({ attempts: (row.attempts as number) + 1 }).eq("id", row.id);
-    return { ok: false, error: "wrong_code" };
+      .update({ attempts: used }).eq("id", row.id);
+    return { ok: false, error: "wrong_code", attemptsLeft: Math.max(0, MAX_ATTEMPTS - used) };
   }
 
   // Гасим до выдачи сессии: код одноразовый даже если вход дальше не удастся.

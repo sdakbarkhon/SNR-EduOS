@@ -35,7 +35,12 @@ export async function POST(req: NextRequest) {
   const verified = await verifyParentCode(phone, code);
   if (!verified.ok) {
     const status = verified.error === "failed" ? 500 : 400;
-    return NextResponse.json({ error: verified.error }, { status });
+    // attemptsLeft приходит только с wrong_code — приложение показывает его
+    // человеку, чтобы пятая попытка не оказалась неожиданностью.
+    return NextResponse.json(
+      { error: verified.error, ...(verified.attemptsLeft != null ? { attemptsLeft: verified.attemptsLeft } : {}) },
+      { status },
+    );
   }
   if (!verified.userId) {
     // Родитель заведён до Z.2.8 и учётной записи не имеет. Сам он это не

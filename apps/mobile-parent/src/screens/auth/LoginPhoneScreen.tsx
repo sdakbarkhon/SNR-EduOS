@@ -227,10 +227,13 @@ export function LoginPhoneScreen() {
         <GlassCircleButton onPress={() => setPhase("onboarding")}>
           <BackArrowIcon color={tokens.ink1} />
         </GlassCircleButton>
-        <View style={{ flex: 1 }} />
+        <View style={{ flex: 1, minWidth: 8 }} />
         <LangThemeButtons />
-        <Pressable onPress={() => setSheet("help")} hitSlop={8}>
+        {/* Ссылка сжимается первой и не переносится: на узбекском и английском
+            она длиннее русской и раньше выдавливала кнопки к заголовку. */}
+        <Pressable onPress={() => setSheet("help")} hitSlop={8} style={{ flexShrink: 1 }}>
           <Text
+            numberOfLines={1}
             style={{
               fontFamily: fonts.manrope800,
               fontSize: 11.5,

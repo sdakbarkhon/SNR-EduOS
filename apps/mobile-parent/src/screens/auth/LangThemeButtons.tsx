@@ -18,6 +18,11 @@ import { CheckIcon, DeviceIcon, GlobeIcon, MoonIcon, SunIcon } from "../../ui/au
 
 type SheetKey = null | "lang" | "theme";
 
+/** Диаметр круглой кнопки и полная ширина пары — нужна экранам, чтобы
+ *  посчитать, сколько места нельзя занимать заголовком. */
+export const LANG_THEME_BTN = 32;
+export const LANG_THEME_WIDTH = LANG_THEME_BTN * 2 + 6;
+
 const LANGUAGE_AUTONYMS: Record<Locale, string> = { ru: "Русский", uz: "Oʻzbekcha", en: "English" };
 
 function CheckDot({ active }: { active: boolean }) {
@@ -89,11 +94,14 @@ export function LangThemeButtons() {
 
   return (
     <>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <GlassCircleButton onPress={() => setSheet("lang")}>
+      {/* Компактнее макетных 38: на узких экранах пара кнопок в правом углу
+          наезжала на центрированный заголовок «SNR EduOS». 32+6+32 = 70 против
+          прежних 84 — вместе с ограничением ширины заголовка этого хватает. */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <GlassCircleButton size={LANG_THEME_BTN} onPress={() => setSheet("lang")}>
           <GlobeIcon color={tokens.ink1} />
         </GlassCircleButton>
-        <GlassCircleButton onPress={() => setSheet("theme")}>
+        <GlassCircleButton size={LANG_THEME_BTN} onPress={() => setSheet("theme")}>
           {scheme === "dark" ? <MoonIcon color={tokens.ink1} /> : <SunIcon color={tokens.ink1} />}
         </GlassCircleButton>
       </View>

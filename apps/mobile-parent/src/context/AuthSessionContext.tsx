@@ -79,6 +79,10 @@ export interface AuthSessionState {
   /** Дошла ли доставка. Пока провайдера нет — всегда false, и экран кода
    *  честно говорит, что код надо взять у школы. */
   codeDelivered: boolean;
+  /** Сколько попыток осталось у кода. null — пока не пробовали. */
+  smsAttemptsLeft: number | null;
+  /** Код подошёл: экран показывает подтверждение, фаза переключится следом. */
+  smsOk: boolean;
   /** Причина отказа при входе через Google. Машинный код, экран переводит. */
   googleError: GoogleLoginError | null;
   /** Идёт вход через Google — кнопка заблокирована, пока не вернёмся. */
@@ -105,6 +109,9 @@ export interface AuthSessionCtx extends AuthSessionState {
   signOut(): void;
 }
 
+/** Сколько держим «Код принят» перед переходом. */
+const SUCCESS_HOLD_MS = 450;
+
 const AuthSessionContext = createContext<AuthSessionCtx | null>(null);
 
 const INITIAL_STATE: AuthSessionState = {
@@ -123,6 +130,8 @@ const INITIAL_STATE: AuthSessionState = {
   authBusy: false,
   pendingPhone: null,
   codeDelivered: false,
+  smsAttemptsLeft: null,
+  smsOk: false,
   googleError: null,
   googleBusy: false,
 };
@@ -268,7 +277,19 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         if (!(e instanceof PhoneLoginFailure) && !(e instanceof NotParentError)) {
           console.error("[AuthSessionContext] verifyCode: неожиданная ошибка:", e);
         }
-        setState((s) => ({ ...s, authBusy: false, smsError }));
+        const attemptsLeft =
+          e instanceof PhoneLoginFailure && typeof e.attemptsLeft === "number"
+            ? e.attemptsLeft
+            : reason === "too_many" ? 0 : null;
+        setState((s) => ({
+          ...s,
+          authBusy: false,
+          smsError,
+          smsAttemptsLeft: attemptsLeft ?? s.smsAttemptsLeft,
+          // Поле чистим сразу: человек набирает заново, не стирая руками, и
+          // автоотправка не может выстрелить второй раз по тому же коду.
+          smsCode: "",
+        }));
         return "error";
       }
       // Сессия установлена — ParentDataProvider должен перезапросить
@@ -279,14 +300,19 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         authBusy: false,
+        smsOk: true,
+        smsAttemptsLeft: null,
         kidsCount: kids.length,
         authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? 0,
       }));
+      // Короткая пауза, чтобы человек увидел, что код принят, а не гадал,
+      // почему экран моргнул. Держим её маленькой — люди ждут входа.
+      await new Promise((r) => setTimeout(r, SUCCESS_HOLD_MS));
       if (kids.length <= 1) {
-        setState((s) => ({ ...s, phase: "app", currentChildId: kids[0]?.id ?? null }));
+        setState((s) => ({ ...s, smsOk: false, phase: "app", currentChildId: kids[0]?.id ?? null }));
         return "app";
       }
-      setState((s) => ({ ...s, phase: "childPicker" }));
+      setState((s) => ({ ...s, smsOk: false, phase: "childPicker" }));
       return "picker";
     } finally {
       verifyBusyRef.current = false;

@@ -48,7 +48,7 @@ import { useAppLocale } from "../../i18n";
 import { fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { AuthFeaturesSheet } from "./sheets/AuthFeaturesSheet";
-import { LangThemeButtons } from "./LangThemeButtons";
+import { LangThemeButtons, LANG_THEME_WIDTH } from "./LangThemeButtons";
 
 const CENTER_PADDING_H = 22;
 const SLIDE_COUNT = 3;
@@ -99,8 +99,13 @@ export function OnboardingScreen() {
     <View style={{ flex: 1 }}>
       {/* ─── ВЕРХ: логотип-хедер + тэглайн (fixed) ────────────────────── */}
       <View style={{ position: "relative" }}>
-        {/* Язык/Тема — в правом верхнем углу, не задевают центрированный лого-блок. */}
-        <View style={{ position: "absolute", top: Math.max(50, insets.top + 10), right: 18, zIndex: 10 }}>
+        {/* Язык/Тема — в правом верхнем углу. Лого-блок центрирован, поэтому
+            на узких экранах он раньше подлезал под кнопки: строка «SNR EduOS»
+            с маркой занимает ~150, кнопки — ещё 70 справа, и на 320 точках
+            они пересекались. Ширина лого-блока ниже ограничена так, чтобы
+            зона кнопок с ОБЕИХ сторон осталась свободной — центровка при этом
+            сохраняется. */}
+        <View style={{ position: "absolute", top: Math.max(50, insets.top + 10), right: 16, zIndex: 10 }}>
           <LangThemeButtons />
         </View>
         <View
@@ -111,14 +116,29 @@ export function OnboardingScreen() {
             gap: 6,
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              maxWidth: Math.max(180, windowWidth - 2 * (LANG_THEME_WIDTH + 16 + 8)),
+            }}
+          >
             <Image
               source={require("../../../assets/logo-mark.png")}
-              style={{ width: 38, height: 38 }}
+              style={{ width: 34, height: 34 }}
               resizeMode="contain"
             />
+            {/* Одна строка, при нехватке места кегль ужимается сам — так
+                надпись не переносится и не лезет под кнопки ни на одном
+                экране. Текст не переводится, но соседний тэглайн переводится,
+                и на uz/en он длиннее русского. */}
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
               style={{
+                flexShrink: 1,
                 fontFamily: fonts.unbounded700,
                 fontSize: 19,
                 color: tokens.ink1,

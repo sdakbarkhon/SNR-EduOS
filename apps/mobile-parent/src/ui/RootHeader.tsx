@@ -57,9 +57,13 @@ export interface RootHeaderProps {
 export function GlassCircleButton({
   onPress,
   children,
+  size = 38,
 }: {
   onPress?: () => void;
   children?: ReactNode;
+  /** Диаметр. По умолчанию 38 — как в макете. Компактный вариант (32) нужен
+   *  на экранах входа, где кнопки соседствуют с центрированным заголовком. */
+  size?: number;
 }) {
   const { tokens, scheme } = useTheme();
   // Цвета glass1, blur(18) из макета (строка 223); тёмная пара — glass1 dark.
@@ -70,12 +74,12 @@ export function GlassCircleButton({
     <Pressable
       onPress={onPress}
       disabled={!onPress}
-      style={{ width: 38, height: 38, borderRadius: 19 }}
+      style={{ width: size, height: size, borderRadius: size / 2 }}
     >
       <View
         style={{
           flex: 1,
-          borderRadius: 19,
+          borderRadius: size / 2,
           overflow: "hidden",
           borderWidth: 1,
           borderColor: tokens.glassBorder,

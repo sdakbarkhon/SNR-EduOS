@@ -1,5 +1,5 @@
 /**
- * Провайдер темы v2: appearance 'light' | 'dark' | 'system' (дефолт system),
+ * Провайдер темы v2: appearance 'light' | 'dark' | 'system' (дефолт light),
  * резолв system через useColorScheme(), персист выбора — через существующий
  * src/lib/mockStorage.ts (expo-secure-store), ключ "pm2.appearance".
  * Синхронно с настройкой темы на экране #34 макета.
@@ -31,7 +31,11 @@ const ThemeContext = createContext<ThemeCtx | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
-  const [appearance, setAppearanceState] = useState<AppearancePref>("system");
+  // По умолчанию СВЕТЛАЯ, а не системная: приложение должно открываться
+  // светлым независимо от настройки телефона. Это только НАЧАЛЬНОЕ значение —
+  // сохранённый выбор человека (в том числе явно выбранная «Системная»)
+  // читается ниже и перекрывает его.
+  const [appearance, setAppearanceState] = useState<AppearancePref>("light");
 
   useEffect(() => {
     getJSON<AppearancePref>(APPEARANCE_KEY).then((saved) => {

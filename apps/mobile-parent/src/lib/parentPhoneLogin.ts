@@ -50,7 +50,11 @@ export type PhoneLoginError =
   | "network_error";
 
 export class PhoneLoginFailure extends Error {
-  constructor(public reason: PhoneLoginError) {
+  constructor(
+    public reason: PhoneLoginError,
+    /** Сколько попыток осталось у кода. Приходит только с wrong_code. */
+    public attemptsLeft?: number,
+  ) {
     super(reason);
   }
 }
@@ -72,8 +76,10 @@ async function post(path: string, body: unknown): Promise<Record<string, unknown
   if (!res.ok) {
     const reason = String(json.error ?? "");
     const known: PhoneLoginError[] = ["not_found", "too_soon", "wrong_code", "expired", "too_many", "no_account"];
+    const left = typeof json.attemptsLeft === "number" ? json.attemptsLeft : undefined;
     throw new PhoneLoginFailure(
       (known as string[]).includes(reason) ? (reason as PhoneLoginError) : "network_error",
+      left,
     );
   }
   return json;

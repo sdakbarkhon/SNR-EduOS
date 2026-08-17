@@ -3114,6 +3114,10 @@ export const uz: Dictionary = {
       codeTooMany: "Juda ko'p urinish. Yangi kod so'rang",
 
       codeFromSchool: "SMS hozircha yuborilmaydi — kodni maktabdan so'rang",
+      codeAttemptsLeft: "Qolgan urinishlar: {n}",
+      codeLastAttempt: "Oxirgi urinish qoldi",
+      codeChecking: "Kod tekshirilmoqda…",
+      codeAccepted: "Kod qabul qilindi",
 
       resendCode: "Kodni qayta yuborish",
       wrongCode: "Kod noto'g'ri",

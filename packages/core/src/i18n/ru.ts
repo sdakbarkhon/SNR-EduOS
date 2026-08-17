@@ -3124,6 +3124,10 @@ export const ru: Dictionary = {
       codeTooMany: "Слишком много попыток. Запросите новый код",
 
       codeFromSchool: "SMS пока не приходят — код можно узнать в школе",
+      codeAttemptsLeft: "Осталось попыток: {n}",
+      codeLastAttempt: "Осталась последняя попытка",
+      codeChecking: "Проверяем код…",
+      codeAccepted: "Код принят",
 
       resendCode: "Выслать код ещё раз",
       wrongCode: "Неверный код",

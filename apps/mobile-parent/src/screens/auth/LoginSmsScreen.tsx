@@ -21,7 +21,7 @@
  * не менялся).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLocale } from "../../i18n";
 import { useTheme, fonts, shadowStyle } from "../../theme";
@@ -68,6 +68,8 @@ export function LoginSmsScreen() {
     setPhase,
     smsError,
     authBusy,
+    smsAttemptsLeft,
+    smsOk,
   } = useAuthSession();
 
   const [cooldown, setCooldown] = useState<number>(RESEND_COOLDOWN);
@@ -93,19 +95,59 @@ export function LoginSmsScreen() {
     };
   }, [cooldown > 0]);
 
-  // Автоверификация при 4 цифрах (setTimeout 350ms). verifyCode() асинхронна
-  // (реальный signInWithPassword внутри) и сама решает переход фазы —
-  // здесь достаточно её вызвать и не дать повторный вызов, пока первая
-  // проверка ещё в полёте (authBusy из контекста).
+  // Автоотправка — РОВНО ОДИН раз на один набранный код.
+  //
+  // Что было сломано. Условие смотрело только «в поле 4 цифры и мы не заняты».
+  // После неверного кода поле оставалось заполненным, authBusy возвращался в
+  // false — и эффект тут же назначал новую проверку. Одна опечатка съедала
+  // подряд все пять попыток кода, и человек оставался без входа, ничего для
+  // этого не сделав.
+  //
+  // Как стало. Отправляем только на ПЕРЕХОДЕ с неполного кода на полный.
+  // Повторные прогоны эффекта (authBusy туда-обратно, приезд ошибки) видят,
+  // что длина не менялась, и молчат. Контекст вдобавок чистит поле на ошибке,
+  // так что следующая проверка возможна только после нового набора.
+  const prevLenRef = useRef(0);
   useEffect(() => {
-    if (smsCode.length !== SMS_LEN || authBusy) return;
+    const prevLen = prevLenRef.current;
+    prevLenRef.current = smsCode.length;
+    if (smsCode.length !== SMS_LEN || prevLen === SMS_LEN) return;
+    if (authBusy) return;
     autoSubmitRef.current = setTimeout(() => {
-      verifyCode();
+      void verifyCode();
     }, AUTO_SUBMIT_DELAY);
     return () => {
       if (autoSubmitRef.current) clearTimeout(autoSubmitRef.current);
     };
   }, [smsCode, authBusy, verifyCode]);
+
+  // ── Анимации ячеек: тряска на ошибке, пульс на проверке ──────────────────
+  // Всё на Animated из react-native — новых модулей не добавляем.
+  const shake = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!smsError) return;
+    shake.setValue(0);
+    Animated.sequence([
+      Animated.timing(shake, { toValue: 1, duration: 55, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -1, duration: 55, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 0.6, duration: 55, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 0, duration: 55, useNativeDriver: true }),
+    ]).start();
+  }, [smsError, shake]);
+
+  useEffect(() => {
+    if (!authBusy) { pulse.stopAnimation(); pulse.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 480, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 480, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [authBusy, pulse]);
 
   // Заход 1: во время authBusy verifyCode() уже улетел в сеть (реальный
   // signInWithPassword + загрузка детей) и САМ переключит фазу по готовности
@@ -152,6 +194,27 @@ export function LoginSmsScreen() {
     loginFailed: t.loginFailed,
   };
   const smsErrorText = smsError ? (SMS_ERROR_TEXT[smsError] ?? t.loginFailed) : null;
+
+  // Цвета состояний ячейки. Зелёный — тот же семантический токен, что у
+  // «сдано вовремя»; своих цветов не заводим.
+  const okColor = tokens.status.green.text;
+  const filledBorder = scheme === "dark" ? "rgba(255,255,255,0.34)" : "rgba(23,18,67,0.26)";
+
+  // Сколько попыток осталось. Показываем только когда счётчик реально пришёл
+  // с сервера — выдумывать число нельзя, а после погашенного кода его нет.
+  const attemptsText =
+    smsAttemptsLeft == null || smsAttemptsLeft <= 0
+      ? null
+      : smsAttemptsLeft === 1
+        ? t.codeLastAttempt
+        : t.codeAttemptsLeft.replace("{n}", String(smsAttemptsLeft));
+
+  const statusTextStyle = (color: string) => ({
+    fontFamily: fonts.manrope700,
+    fontSize: 11,
+    color,
+    textAlign: "center" as const,
+  });
 
   return (
     <View style={{ flex: 1 }}>
@@ -224,20 +287,31 @@ export function LoginSmsScreen() {
             обратная связь на время реального сетевого логина: без неё экран
             выглядит зависшим на несколько сотен мс между вводом 4-й цифры
             и переходом дальше. */}
-        <View
+        <Animated.View
           style={{
             flexDirection: "row",
             gap: 10,
             justifyContent: "center",
             paddingVertical: 6,
-            opacity: authBusy ? 0.55 : 1,
+            transform: [{ translateX: shake.interpolate({ inputRange: [-1, 1], outputRange: [-7, 7] }) }],
           }}
         >
           {Array.from({ length: SMS_LEN }).map((_, i) => {
             const digit = smsCode[i] ?? "";
-            const isActive = smsCode.length === i;
+            const filled = digit !== "";
+            // Куда пойдёт следующая цифра — видно и до, и после ошибки.
+            const isNext = !smsError && !smsOk && smsCode.length === i;
+            const borderColor = smsOk
+              ? okColor
+              : smsError
+                ? errorColor
+                : isNext
+                  ? activeBorder
+                  : filled
+                    ? filledBorder
+                    : glassBorder;
             return (
-              <View
+              <Animated.View
                 key={i}
                 style={[
                   {
@@ -247,11 +321,16 @@ export function LoginSmsScreen() {
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: glassBg,
-                    borderWidth: isActive || smsError ? 2 : 1,
-                    borderColor: smsError ? errorColor : isActive ? activeBorder : glassBorder,
+                    borderWidth: isNext || filled || smsError || smsOk ? 2 : 1,
+                    borderColor,
+                    // Во время проверки ячейки мягко дышат — экран не выглядит
+                    // замершим, пока ответ идёт по сети.
+                    opacity: authBusy
+                      ? pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.45] })
+                      : 1,
                   },
                   shadowStyle(
-                    isActive
+                    isNext
                       ? { x: 0, y: 10, blur: 24, color: "rgba(124,58,237,0.2)" }
                       : { x: 0, y: 8, blur: 18, color: "rgba(99,86,214,0.1)" },
                   ),
@@ -261,31 +340,48 @@ export function LoginSmsScreen() {
                   style={{
                     fontFamily: fonts.unbounded600,
                     fontSize: 20,
-                    color: tokens.ink1,
+                    color: smsOk ? okColor : tokens.ink1,
                   }}
                 >
                   {digit}
                 </Text>
-              </View>
+                {/* Пустая ячейка, куда пойдёт следующая цифра, помечена точкой —
+                    иначе непонятно, где сейчас каретка. */}
+                {!filled && isNext ? (
+                  <View
+                    style={{
+                      position: "absolute",
+                      bottom: 12,
+                      width: 14,
+                      height: 2,
+                      borderRadius: 1,
+                      backgroundColor: tokens.accent,
+                    }}
+                  />
+                ) : null}
+              </Animated.View>
             );
           })}
-        </View>
+        </Animated.View>
 
-        {/* Заход 1: ошибка "Неверный код" / сбой сети при логине — вне
-            block-list макета (там неоткуда взяться, фикстурный вход не мог
-            провалиться), минимальный inline-Text на status.red. */}
-        {smsErrorText ? (
-          <Text
-            style={{
-              fontFamily: fonts.manrope700,
-              fontSize: 11,
-              color: errorColor,
-              textAlign: "center",
-            }}
-          >
-            {smsErrorText}
-          </Text>
-        ) : null}
+        {/* Состояние проверки: «проверяем» → «принят» → причина отказа.
+            Высота строки постоянная, чтобы блок не прыгал. */}
+        <View style={{ minHeight: 34, justifyContent: "center" }}>
+          {authBusy ? (
+            <Text style={statusTextStyle(tokens.ink2)}>{t.codeChecking}</Text>
+          ) : smsOk ? (
+            <Text style={statusTextStyle(okColor)}>{t.codeAccepted}</Text>
+          ) : smsErrorText ? (
+            <>
+              <Text style={statusTextStyle(errorColor)}>{smsErrorText}</Text>
+              {attemptsText ? (
+                <Text style={[statusTextStyle(tokens.ink3), { fontSize: 10.5, marginTop: 2 }]}>
+                  {attemptsText}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
+        </View>
 
         {/* SMS пока не отправляются — провайдера нет. Честно говорим об этом
             и даём запросить код заново; сервер сам не даст чаще раза в

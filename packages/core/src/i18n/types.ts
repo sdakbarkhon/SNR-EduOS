@@ -3236,6 +3236,11 @@ export interface Dictionary {
       codeExpired: string;
       codeTooMany: string;
       codeFromSchool: string;
+      // Ввод кода: остаток попыток и состояния проверки
+      codeAttemptsLeft: string;
+      codeLastAttempt: string;
+      codeChecking: string;
+      codeAccepted: string;
       wrongCode: string;
     /** Z.2.8 — настоящий код: срок жизни и защита от частых запросов. */
     codeTooSoon: string;
