@@ -58,7 +58,6 @@ const ITEM_STYLE: Record<string, { color: string; bg: string }> = {
   books: { color: "#FF7A3D", bg: "#FFE7DC" },
   projects: { color: "#46C06B", bg: "#E2F5E9" },
   achievements: { color: "#FFB020", bg: "#FFF0CE" },
-  clubs: { color: "#8A5CF6", bg: "#EFE7FF" },
   messages: { color: "#F5455C", bg: "#FFE1EA" },
   ai: { color: "#6A48E4", bg: "#EFEBFF" },
   profile: { color: "#9A9AB5", bg: "#ECECF3" },

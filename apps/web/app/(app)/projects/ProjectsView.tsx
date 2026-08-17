@@ -13,29 +13,15 @@ type Mode = "projects" | "sandbox";
 // Extract, а не свой список строк: если инструмент когда-нибудь уедет из
 // песочницы, ошибка вылезет здесь при сборке, а не пустой карточкой у ученика.
 type ExternalTool = Extract<SandboxToolId, "wokwi" | "geogebra" | "phet">;
-type ExternalProject = { title: string; description: string; tool: ExternalTool };
 
 // "Внешние" проекты не имеют БД-бэкинга вообще (содержимое живёт на стороннем
 // сервисе, не у нас) — всегда 0%/"Не начат", клик открывает песочницу с
 // предвыбранным инструментом. Список зависит от класса ученика.
-const EXTERNAL_PROJECTS_BY_CLASS: Record<string, ExternalProject[]> = {
-  "3-А класс": [
-    { title: "Мигающий светодиод", description: "Управление светодиодом через Wokwi симулятор", tool: "wokwi" },
-    { title: "График функции y=x", description: "Построение графика функции в GeoGebra", tool: "geogebra" },
-    { title: "Опыт с шариком", description: "Простая симуляция в PhET", tool: "phet" },
-  ],
-  "7-А класс": [
-    { title: "Умный дом на Arduino", description: "Датчики температуры и света через Wokwi", tool: "wokwi" },
-    { title: "Парабола в GeoGebra", description: "Построение параболы и её свойств", tool: "geogebra" },
-    { title: "Опыт с маятником", description: "Симуляция физического маятника в PhET", tool: "phet" },
-  ],
-  "10-А класс": [
-    { title: "Робот с датчиками", description: "Симуляция робота с датчиками через Wokwi", tool: "wokwi" },
-    { title: "3D модель в GeoGebra", description: "Построение 3D-фигур в GeoGebra", tool: "geogebra" },
-    { title: "Симуляция физики", description: "Эксперимент по механике в PhET", tool: "phet" },
-  ],
-};
-const DEFAULT_EXTERNAL_PROJECTS: ExternalProject[] = EXTERNAL_PROJECTS_BY_CLASS["3-А класс"] ?? [];
+// «Внешние инструменты» убраны 17.08.2026. Это была зашитая в код подборка
+// идей по названию класса: у всех карточек стояло «0%, не начат», хотя учитель
+// их не задавал, а ученик не начинал. Новый ученик открывал раздел и видел
+// список, из которого следовало, что у него уже есть работы. Настоящие проекты
+// приходят из таблицы projects; песочница осталась на своей вкладке.
 
 // Иконка "своего" проекта — по ключевым словам в заголовке (нет отдельного
 // поля "тип" на строке БД, см. отчёт по схеме — не заводим лишнюю колонку
@@ -65,7 +51,6 @@ export function ProjectsView({
     setMode("sandbox");
   }
 
-  const externalProjects = EXTERNAL_PROJECTS_BY_CLASS[className] ?? DEFAULT_EXTERNAL_PROJECTS;
 
   function internalStatusBadge(p: StudentProjectListItem) {
     if (!p.submission) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>;
@@ -161,40 +146,6 @@ export function ProjectsView({
             })}
           </div>
 
-          <h2 className="mt-8 text-lg font-bold text-slate-900">{t.externalProjectsSection}</h2>
-          <div className="mt-4 grid grid-cols-1 gap-6 pb-12 md:grid-cols-2 lg:grid-cols-3">
-            {externalProjects.map((p) => {
-              const tool = sandboxToolById(p.tool);
-              if (!tool) return null;
-              return (
-                <button
-                  key={p.title}
-                  type="button"
-                  onClick={() => openSandbox(p.tool)}
-                  className="group flex flex-col overflow-hidden rounded-[20px] border border-white bg-white/70 p-5 text-left shadow-md backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-sm", tool.gradient)}>
-                      <tool.Icon className="h-5 w-5" />
-                    </div>
-                    <h3 className="font-bold text-slate-900">{p.title}</h3>
-                  </div>
-                  <p className="mt-3 line-clamp-2 flex-1 text-[13px] text-slate-500">{p.description}</p>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="flex flex-1 items-center gap-3">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-slate-200" style={{ width: "0%" }} />
-                      </div>
-                      <span className="text-[11px] font-bold tabular-nums text-slate-400">0%</span>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
         </>
       )}
     </div>
