@@ -3,6 +3,7 @@
   "buildCommand": "cd ../.. && pnpm turbo run build --filter=web",
   "installCommand": "cd ../.. && pnpm install",
   "outputDirectory": ".next",
+  "regions": ["fra1"],
   "crons": [
     { "path": "/api/cron/restore-demo-lesson-shape", "schedule": "15 19 * * *" }
   ]
