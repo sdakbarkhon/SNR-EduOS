@@ -1298,6 +1298,8 @@ export const ru: Dictionary = {
     },
   },
   projects: {
+    actionFailed: "Не получилось сохранить. Проверьте связь и попробуйте ещё раз.",
+    submitFailed: "Работа не отправлена. Проверьте связь и попробуйте ещё раз.",
     title: "Мои проекты",
     filterAll: "Все", filterActive: "Активные", filterSubmitted: "Сданные", filterGraded: "Оценённые",
     statusNotStarted: "Не начат", statusInProgress: "В работе", statusAwaiting: "Сдан, ждёт проверки", statusGraded: "Оценено",

@@ -1326,6 +1326,8 @@ export interface Dictionary {
     };
   };
   projects: {
+    actionFailed: string;
+    submitFailed: string;
     title: string;
     filterAll: string; filterActive: string; filterSubmitted: string; filterGraded: string;
     statusNotStarted: string; statusInProgress: string; statusAwaiting: string; statusGraded: string;

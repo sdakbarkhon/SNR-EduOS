@@ -1298,6 +1298,8 @@ export const en: Dictionary = {
     },
   },
   projects: {
+    actionFailed: "Could not save. Check your connection and try again.",
+    submitFailed: "The work was not submitted. Check your connection and try again.",
     title: "My projects",
     filterAll: "All", filterActive: "Active", filterSubmitted: "Submitted", filterGraded: "Graded",
     statusNotStarted: "Not started", statusInProgress: "In progress", statusAwaiting: "Submitted, awaiting review", statusGraded: "Graded",

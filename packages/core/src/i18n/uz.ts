@@ -1298,6 +1298,8 @@ export const uz: Dictionary = {
     },
   },
   projects: {
+    actionFailed: "Saqlab bo‘lmadi. Aloqani tekshirib, qayta urinib ko‘ring.",
+    submitFailed: "Ish yuborilmadi. Aloqani tekshirib, qayta urinib ko‘ring.",
     title: "Mening loyihalarim",
     filterAll: "Hammasi", filterActive: "Faol", filterSubmitted: "Topshirilgan", filterGraded: "Baholangan",
     statusNotStarted: "Boshlanmagan", statusInProgress: "Jarayonda", statusAwaiting: "Topshirilgan, tekshiruv kutilmoqda", statusGraded: "Baholangan",

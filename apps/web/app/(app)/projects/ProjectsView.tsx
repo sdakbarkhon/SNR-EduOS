@@ -69,6 +69,17 @@ export function ProjectsView({
 
   function internalStatusBadge(p: StudentProjectListItem) {
     if (!p.submission) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{t.statusNotStarted}</span>;
+    // Ветки «оценено» здесь не было вовсе: оценка приезжает в карточку
+    // (queries/projects.ts кладёт grade), но список показывал «на проверке»
+    // даже после проверки. Подпись t.statusGraded лежала в словаре без единого
+    // потребителя.
+    if (p.submission.grade != null) {
+      return (
+        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white">
+          {t.statusGraded} · {p.submission.grade}
+        </span>
+      );
+    }
     if (p.submission.is_submitted) return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">{t.statusAwaiting}</span>;
     return <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-700">{t.statusInProgress}</span>;
   }

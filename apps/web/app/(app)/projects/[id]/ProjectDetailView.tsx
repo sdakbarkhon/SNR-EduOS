@@ -56,6 +56,10 @@ export function ProjectDetailView({
 
   const due = project.deadline ? new Date(project.deadline).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent" }) : null;
   const graded = submission?.grade != null;
+  // Все действия ученика на этом экране раньше глотали ошибку: пустой catch и
+  // .catch(() => null), ни тоста, ни строки. Работа не сохранялась, а экран
+  // рисовал успех. Теперь любой отказ виден.
+  const [failed, setFailed] = useState<string | null>(null);
 
   function progFor(stageId: string) { return progress.find((p) => p.stage_id === stageId); }
 
@@ -64,7 +68,11 @@ export function ProjectDetailView({
     try {
       const sub = await startProject(db, project.id, studentId);
       setSubmission(sub);
-    } catch { /* noop */ } finally { setStarting(false); }
+      setFailed(null);
+    } catch (e) {
+      console.error("[ProjectDetail] начать проект:", e);
+      setFailed(t.actionFailed);
+    } finally { setStarting(false); }
   }
 
   async function toggleStage(stageId: string) {
@@ -78,13 +86,25 @@ export function ProjectDetailView({
         const others = p.filter((x) => x.stage_id !== stageId);
         return [...others, { id: current?.id ?? stageId, submission_id: submission.id, stage_id: stageId, is_completed: next, completed_at: next ? new Date(schoolNowMs()).toISOString() : null, student_notes: notes[stageId] ?? null }];
       });
-    } catch { /* noop */ } finally { setBusy(false); }
+      setFailed(null);
+    } catch (e) {
+      console.error("[ProjectDetail] отметить этап:", e);
+      setFailed(t.actionFailed);
+    } finally { setBusy(false); }
   }
 
   async function saveNotes(stageId: string) {
     if (!submission || readOnly) return;
     const current = progFor(stageId);
-    await toggleStageCompletion(db, submission.id, stageId, current?.is_completed ?? false, notes[stageId] ?? null).catch(() => null);
+    try {
+      await toggleStageCompletion(db, submission.id, stageId, current?.is_completed ?? false, notes[stageId] ?? null);
+      setFailed(null);
+    } catch (e) {
+      // Заметки сохраняются по уходу с поля. Молчаливый отказ здесь means
+      // потерянный текст — говорим сразу.
+      console.error("[ProjectDetail] сохранить заметку:", e);
+      setFailed(t.actionFailed);
+    }
   }
 
   async function uploadFile(stageId: string | null, file: File) {
@@ -93,23 +113,49 @@ export function ProjectDetailView({
     try {
       const att = await uploadProjectAttachment(db, { studentId, projectId: project.id, submissionId: submission.id, stageId, file });
       setAttachments((a) => [...a, att]);
-    } catch { /* noop */ } finally { setBusy(false); }
+      setFailed(null);
+    } catch (e) {
+      console.error("[ProjectDetail] приложить файл:", e);
+      setFailed(t.actionFailed);
+    } finally { setBusy(false); }
   }
 
   async function removeFile(att: ProjectAttachment) {
     if (readOnly) return;
-    await deleteProjectAttachment(db, att.id, att.storage_path).catch(() => null);
+    try {
+      await deleteProjectAttachment(db, att.id, att.storage_path);
+    } catch (e) {
+      // Файл не удалён — из списка его убирать нельзя, иначе он «исчезнет»
+      // только на экране и вернётся при следующем открытии.
+      console.error("[ProjectDetail] удалить файл:", e);
+      setFailed(t.actionFailed);
+      return;
+    }
     setAttachments((a) => a.filter((x) => x.id !== att.id));
   }
 
   async function download(att: ProjectAttachment) {
-    const url = await getProjectAttachmentUrl(db, att.storage_path, att.original_filename).catch(() => null);
+    const url = await getProjectAttachmentUrl(db, att.storage_path, att.original_filename).catch((e) => {
+      console.error("[ProjectDetail] ссылка на файл:", e);
+      return null;
+    });
     if (url) window.open(url, "_blank");
+    else setFailed(t.actionFailed);
   }
 
   async function handleSubmit() {
     if (!submission) return;
-    await submitProject(db, submission.id).catch(() => null);
+    // Раньше строка ниже стояла ВНЕ ветки успеха, а отказ гасился .catch:
+    // работа не отправлялась, а экран честно писал «Сдано». Теперь состояние
+    // меняется только после подтверждения от сервера.
+    try {
+      await submitProject(db, submission.id);
+    } catch (e) {
+      console.error("[ProjectDetail] отправить работу:", e);
+      setFailed(t.submitFailed);
+      return;
+    }
+    setFailed(null);
     setSubmission((s) => (s ? { ...s, is_submitted: true, submitted_at: new Date(schoolNowMs()).toISOString() } : s));
   }
 
@@ -224,6 +270,12 @@ export function ProjectDetailView({
             })}
           </div>
 
+          {failed && (
+            <p className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-center text-[13px] font-semibold text-red-700">
+              {failed}
+            </p>
+          )}
+
           {/* Footer state */}
           {graded ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 text-center">
@@ -234,6 +286,13 @@ export function ProjectDetailView({
             <div className="flex flex-col items-center gap-2 rounded-2xl border border-yellow-200 bg-yellow-50/60 p-8 text-center">
               <Clock className="h-9 w-9 text-yellow-500" />
               <p className="text-sm font-bold text-yellow-700">{t.submittedTitle}</p>
+              {/* Комментарий учителя был спрятан за оценкой: он выводился только
+                  в ветке graded. В базе у всех 90 сдач комментарий есть, а
+                  оценки нет ни у одной — то есть отзыв учителя не видел никто.
+                  Показываем его и до оценки. */}
+              {submission!.teacher_comment && (
+                <p className="mt-1 max-w-md text-sm text-slate-600">{submission!.teacher_comment}</p>
+              )}
             </div>
           ) : (
             <div className="rounded-2xl border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
