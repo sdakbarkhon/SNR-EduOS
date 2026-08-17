@@ -3241,6 +3241,7 @@ export interface Dictionary {
       codeLastAttempt: string;
       codeChecking: string;
       codeAccepted: string;
+      sendingCode: string;   // затянувшаяся отправка кода — подпись в кнопке
       wrongCode: string;
     /** Z.2.8 — настоящий код: срок жизни и защита от частых запросов. */
     codeTooSoon: string;

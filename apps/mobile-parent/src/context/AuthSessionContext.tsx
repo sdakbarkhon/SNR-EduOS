@@ -162,6 +162,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   // второй вызов в том же тике гарантированно увидит true.
   const verifyBusyRef = useRef(false);
   const googleBusyRef = useRef(false);
+  // Тот же приём, что у verifyBusyRef: authBusy — это React state, он
+  // коммитится только на СЛЕДУЮЩЕМ рендере. Три быстрых нажатия по
+  // «Продолжить» все три читали authBusy===false и уходили тремя запросами —
+  // а сервер не даёт код чаще раза в минуту, так что второй и третий
+  // возвращали «слишком часто» и затирали успех первого. Ref читается и
+  // пишется синхронно: второй вызов в том же тике уже видит true.
+  const requestBusyRef = useRef(false);
 
   // Сессия могла кончиться не по нашей воле: её закрыли с другого устройства
   // на экране «Активные сессии» (миграция 199 удаляет строку auth.sessions
@@ -214,6 +221,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   /** Просит сервер выслать код. Номер, которого нет в базе, честно получает
    *  «не найден»: родителей заводит админ, это не публичная регистрация. */
   const requestFor = useCallback(async (digits: string): Promise<boolean> => {
+    if (requestBusyRef.current) return false;
+    requestBusyRef.current = true;
     setState((s) => ({ ...s, authBusy: true, phoneError: null, smsError: null }));
     try {
       const { delivered } = await requestPhoneCode(digits);
@@ -223,6 +232,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       const reason = e instanceof PhoneLoginFailure ? e.reason : "network_error";
       setState((s) => ({ ...s, authBusy: false, phoneError: reason }));
       return false;
+    } finally {
+      requestBusyRef.current = false;
     }
   }, []);
 

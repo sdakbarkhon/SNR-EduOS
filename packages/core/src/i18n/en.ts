@@ -3117,6 +3117,7 @@ export const en: Dictionary = {
       codeLastAttempt: "One attempt left",
       codeChecking: "Checking the code…",
       codeAccepted: "Code accepted",
+      sendingCode: "Sending the code…",
 
       resendCode: "Send the code again",
       wrongCode: "Wrong code",

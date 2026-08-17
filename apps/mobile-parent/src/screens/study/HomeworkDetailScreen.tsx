@@ -114,12 +114,21 @@ function fileSizeLabel(bytes: number | null | undefined, hw: Dictionary["parentA
 
 const HTTP_URL_RE = /^https?:\/\/\S+$/;
 
+// Подпись ссылки идёт по сети, и всё это время кнопка оставалась нажимаемой:
+// каждый тап уходил новым запросом и новым открытием браузера. Замок общий на
+// экран — файлов на нём несколько, но открывать два разом всё равно незачем.
+let signingFile = false;
+
 async function openSignedFile(storagePath: string, errorTitle: string) {
+  if (signingFile) return;
+  signingFile = true;
   try {
     const url = await getSubmissionFileUrl(getSupabase(), storagePath);
     await Linking.openURL(url);
   } catch (e) {
     Alert.alert(errorTitle, e instanceof Error ? e.message : String(e));
+  } finally {
+    signingFile = false;
   }
 }
 

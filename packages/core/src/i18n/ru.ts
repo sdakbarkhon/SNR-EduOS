@@ -3128,6 +3128,7 @@ export const ru: Dictionary = {
       codeLastAttempt: "Осталась последняя попытка",
       codeChecking: "Проверяем код…",
       codeAccepted: "Код принят",
+      sendingCode: "Отправляем код…",
 
       resendCode: "Выслать код ещё раз",
       wrongCode: "Неверный код",

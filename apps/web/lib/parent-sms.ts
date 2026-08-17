@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createHash, randomInt } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeUzPhone } from "@snr/core";
@@ -204,7 +205,23 @@ export type IssueCodeResult =
  * просто ошибся цифрой. Перебором номеров это не злоупотребишь — код всё
  * равно приходит только на настоящий телефон.
  */
-export async function issueParentCode(rawPhone: string): Promise<IssueCodeResult> {
+/**
+ * Выдаёт код. `deferSms` — не ждать провайдера: ответ уходит, как только код
+ * записан, а отправка доигрывается после ответа через after() из next/server.
+ *
+ * ЗАЧЕМ. Замерено на боевом адресе: один вход к Eskiz занимает 0,8–3,1 с, и
+ * это ещё до самой отправки. Всё это время человек смотрел на замерший экран,
+ * хотя код уже лежал в базе и продиктовать его админ мог сразу. Ждать
+ * провайдера, чтобы показать экран ввода кода, незачем.
+ *
+ * По умолчанию режим прежний (ждём) — веб-форма родителя показывает
+ * «код не отправился» по полю delivered, и менять ей поведение мы не вправе.
+ * Мобильное приложение это поле не читает вовсе, поэтому зовёт с deferSms.
+ */
+export async function issueParentCode(
+  rawPhone: string,
+  opts?: { deferSms?: boolean },
+): Promise<IssueCodeResult> {
   const phone = normalizeUzPhone(rawPhone);
   if (!phone) return { ok: false, error: "invalid_phone" };
 
@@ -212,14 +229,16 @@ export async function issueParentCode(rawPhone: string): Promise<IssueCodeResult
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anySb = sb as any;
 
-  const { data: parent, error: pErr } = await anySb
-    .from("parents").select("id").eq("phone", phone).maybeSingle();
+  // Два независимых чтения — параллельно. Последовательно они стоили лишний
+  // круг до Франкфурта (~0,3 с) на ровном месте.
+  const [{ data: parent, error: pErr }, { data: last }] = await Promise.all([
+    anySb.from("parents").select("id").eq("phone", phone).maybeSingle(),
+    anySb.from("parent_phone_codes").select("created_at")
+      .eq("phone", phone).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
   if (pErr) return { ok: false, error: "failed" };
   if (!parent) return { ok: false, error: "not_found" };
 
-  const { data: last } = await anySb
-    .from("parent_phone_codes").select("created_at")
-    .eq("phone", phone).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (last && Date.now() - Date.parse(last.created_at as string) < RESEND_COOLDOWN_MS) {
     return { ok: false, error: "too_soon" };
   }
@@ -237,7 +256,23 @@ export async function issueParentCode(rawPhone: string): Promise<IssueCodeResult
   });
   if (insErr) return { ok: false, error: "failed" };
 
-  const { delivered } = await sendSms(phone, buildCodeText(code));
+  const text = buildCodeText(code);
+  if (opts?.deferSms) {
+    // Ответ уходит сейчас, отправка доигрывается после него. after() держит
+    // функцию живой до конца отправки — «выстрелил и забыл» на serverless
+    // оборвал бы запрос вместе с ответом.
+    after(async () => {
+      try {
+        await sendSms(phone, text);
+      } catch (e) {
+        console.error("[sms] отложенная отправка не удалась:", e);
+      }
+    });
+    // Ждать было нечего, поэтому и утверждать «доставлено» нельзя.
+    return { ok: true, expiresAt, delivered: false };
+  }
+
+  const { delivered } = await sendSms(phone, text);
   return { ok: true, expiresAt, delivered };
 }
 

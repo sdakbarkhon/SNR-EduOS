@@ -27,8 +27,15 @@ export function useAsyncData<T>(
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const generation = useRef(0);
+  // Пока запрос в полёте, повторное «Повторить» новый запрос не шлёт. Раньше
+  // защиты не было вовсе: кнопка ошибки остаётся нажимаемой весь запрос, и
+  // каждый тап уходил в сеть заново. Ref, а не state — state коммитится
+  // следующим кадром и от быстрых нажатий не спасает.
+  const inFlight = useRef(false);
 
   const run = useCallback((isRefresh: boolean): Promise<void> => {
+    if (isRefresh && inFlight.current) return Promise.resolve();
+    inFlight.current = true;
     const myGen = ++generation.current;
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -43,6 +50,7 @@ export function useAsyncData<T>(
         setError(e instanceof Error ? e : new Error(String(e)));
       })
       .finally(() => {
+        inFlight.current = false;
         if (generation.current !== myGen) return;
         setLoading(false);
         setRefreshing(false);

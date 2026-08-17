@@ -22,7 +22,9 @@ export async function POST(req: NextRequest) {
   const phone = String(body?.phone ?? "").trim();
   if (!phone) return NextResponse.json({ error: "phone required" }, { status: 400 });
 
-  const result = await issueParentCode(phone);
+  // deferSms: приложение не ждёт провайдера. Код уже записан, экран ввода
+  // открывается сразу, отправка доигрывается после ответа.
+  const result = await issueParentCode(phone, { deferSms: true });
   if (!result.ok) {
     // 404 на неизвестный номер намеренно: родителей заводит админ, это не
     // публичная регистрация, и «код отправлен» на чужой номер запутал бы

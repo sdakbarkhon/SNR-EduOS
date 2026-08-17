@@ -175,6 +175,22 @@ export function LoginSmsScreen() {
     setSmsCode(smsCode + k);
   };
 
+  // Повтор запрещён, пока идёт проверка И пока код уже набран целиком: выдача
+  // нового кода гасит старый, а проверка в этот момент возьмёт свежую строку и
+  // сравнит с ней ТО, что человек ввёл раньше. Он потерял бы попытку у кода,
+  // которого даже не видел.
+  const resendBlocked = authBusy || smsCode.length === SMS_LEN;
+
+  /** Выслать код заново: чистим поле и заводим отсчёт, иначе шапка показывает
+   *  протухший таймер, а полное поле блокирует автоотправку нового кода. */
+  async function handleResend() {
+    if (resendBlocked) return;
+    const ok = await resendCode();
+    if (!ok) return;
+    setSmsCode("");
+    setCooldown(RESEND_COOLDOWN);
+  }
+
   const smsResendActive = cooldown === 0;
   const smsResendTxt = cooldown > 0
     ? t.smsResendCountdown.replace("{sec}", String(cooldown).padStart(2, "0"))
@@ -396,17 +412,23 @@ export function LoginSmsScreen() {
         >
           {t.codeFromSchool}
         </Text>
-        <Pressable onPress={() => { void resendCode(); }} disabled={authBusy}>
+        {/* Пока код выдаётся заново — говорим об этом прямо в ссылке, а не
+            гасим её молча: выдача идёт через сеть и занимает время. */}
+        <Pressable
+          onPress={() => { void handleResend(); }}
+          disabled={resendBlocked}
+          style={({ pressed }) => ({ opacity: pressed && !resendBlocked ? 0.6 : 1 })}
+        >
           <Text
             style={{
               fontFamily: fonts.manrope700,
               fontSize: 11,
-              color: authBusy ? tokens.ink3 : tokens.ink2,
+              color: resendBlocked ? tokens.ink3 : tokens.ink2,
               textAlign: "center",
-              textDecorationLine: "underline",
+              textDecorationLine: resendBlocked ? "none" : "underline",
             }}
           >
-            {t.resendCode}
+            {authBusy ? t.sendingCode : t.resendCode}
           </Text>
         </Pressable>
 

@@ -16,7 +16,7 @@
  * экране. Иконки GoogleIcon/AppleIcon удалены из ui/auth/icons.tsx следом:
  * других потребителей у них не было.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Linking,
@@ -151,7 +151,7 @@ export function LoginPhoneScreen() {
   const { tokens, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { country, phone, setCountry, setPhone, submitPhone, setPhase, phoneError,
-    signInWithGoogle, googleBusy, googleError } = useAuthSession();
+    authBusy, signInWithGoogle, googleBusy, googleError } = useAuthSession();
   const [countryOpen, setCountryOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey>(null);
 
@@ -205,6 +205,15 @@ export function LoginPhoneScreen() {
   // В Expo Go возврата по схеме приложения не бывает — там кнопка не молчит,
   // а объясняет и отправляет в браузерную версию.
   const googleReady = isGoogleLoginAvailable();
+
+  // Если ответ идёт дольше двух секунд — подписываем, что происходит, а не
+  // оставляем крутящийся кружок без объяснения.
+  const [slowHint, setSlowHint] = useState<string | null>(null);
+  useEffect(() => {
+    if (!authBusy) { setSlowHint(null); return; }
+    const id = setTimeout(() => setSlowHint(t.sendingCode), 2000);
+    return () => clearTimeout(id);
+  }, [authBusy, t.sendingCode]);
 
   function onGooglePress() {
     if (!googleReady) { Alert.alert(t.withGoogle, t.googleWebOnly); return; }
@@ -394,13 +403,17 @@ export function LoginPhoneScreen() {
               {phoneErrorText}
             </Text>
           ) : null}
-          {/* CTA «Продолжить» (phoneBtnStyle: disabled → opacity 0.5) */}
+          {/* CTA «Продолжить». Пока запрос в полёте — кружок вместо надписи и
+              кнопка не принимает нажатий: раньше экран просто замирал на
+              несколько секунд, и человек жал ещё и ещё. */}
           <View style={{ marginTop: 12 }}>
             <PrimaryButton
               label={t.continue}
               disabled={!canSubmit}
+              loading={authBusy}
+              loadingHint={slowHint}
               onPress={() => {
-                if (canSubmit) submitPhone();
+                if (canSubmit) void submitPhone();
               }}
             />
           </View>

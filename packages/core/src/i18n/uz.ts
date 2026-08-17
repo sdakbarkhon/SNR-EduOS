@@ -3118,6 +3118,7 @@ export const uz: Dictionary = {
       codeLastAttempt: "Oxirgi urinish qoldi",
       codeChecking: "Kod tekshirilmoqda…",
       codeAccepted: "Kod qabul qilindi",
+      sendingCode: "Kod yuborilmoqda…",
 
       resendCode: "Kodni qayta yuborish",
       wrongCode: "Kod noto'g'ri",
