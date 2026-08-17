@@ -21,7 +21,12 @@ export default async function AdminGroupsPage({
     supabase
       .from("groups")
       .select(
-        "id, name, subject, teacher_id, teachers(id, full_name), student_groups(student_id)",
+        // teachers! с именем связи — обязательно. Между groups и teachers ДВА
+        // пути: прямой groups.teacher_id и через таблицу group_teachers.
+        // PostgREST отказывается угадывать и валит ВЕСЬ запрос ошибкой
+        // PGRST201, а страница показывает «Групп пока нет» — потому что
+        // groups приходит null и превращается в пустой массив ниже.
+        "id, name, subject, teacher_id, teachers!groups_teacher_id_fkey(id, full_name), student_groups(student_id)",
       )
       .order("name"),
     supabase.from("teachers").select("id, full_name").order("full_name"),
