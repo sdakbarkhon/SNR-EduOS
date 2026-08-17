@@ -17,7 +17,7 @@ import HomeScreen from "../screens/tabs/HomeScreen";
 import ProgressScreen from "../screens/tabs/ProgressScreen";
 import MessagesScreen from "../screens/tabs/MessagesScreen";
 import ProfileHubScreen from "../screens/tabs/ProfileHubScreen";
-import { getUnreadMessageThreadsCount } from "../data";
+import { useUnreadThreads } from "../hooks/useUnreadThreads";
 import { useAppLocale } from "../i18n";
 import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
 import type { TabParamList, TabRouteName } from "./routes";
@@ -60,9 +60,12 @@ const TAB_ICONS = {
   dhub: User,
 } as const;
 
-function renderTabBar(props: BottomTabBarProps, labels: Record<TabRouteName, string>) {
+function renderTabBar(
+  props: BottomTabBarProps,
+  labels: Record<TabRouteName, string>,
+  unreadMessages: number,
+) {
   const { state, navigation } = props;
-  const unreadMessages = getUnreadMessageThreadsCount();
 
   const items: FloatingTabItem[] = state.routes.map((route) => {
     const name = route.name as TabRouteName;
@@ -100,10 +103,13 @@ function renderTabBar(props: BottomTabBarProps, labels: Record<TabRouteName, str
 export default function TabNavigator() {
   const { d } = useAppLocale();
   const labels = tabLabels(d);
+  // Бейдж «Сообщения» — из базы, а не из фикстуры. Хук живёт здесь, потому что
+  // renderTabBar — обычная функция, а не компонент: хук в ней вызывать нельзя.
+  const unreadMessages = useUnreadThreads();
 
   return (
     <Tab.Navigator
-      tabBar={(props) => renderTabBar(props, labels)}
+      tabBar={(props) => renderTabBar(props, labels, unreadMessages)}
       screenOptions={{
         headerShown: false,
         // Фон под табами красит сам экран (AppBackground)

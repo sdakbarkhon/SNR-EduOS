@@ -37,6 +37,8 @@ import NotificationsScreen from "../screens/study/NotificationsScreen";
 import ServicesScreen from "../screens/study/ServicesScreen";
 import TeacherProfileScreen from "../screens/study/TeacherProfileScreen";
 import ReviewsScreen from "../screens/study/ReviewsScreen";
+import DayStatusScreen from "../screens/study/DayStatusScreen";
+import SubjectDetailScreen from "../screens/study/SubjectDetailScreen";
 import SubjectsScreen from "../screens/study/SubjectsScreen";
 
 // Реальные экраны Захода 8 — родительские сервис-разделы (8 шт.), заменяют
@@ -68,11 +70,11 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
  * Для всех остальных маршрутов из STACK_ROUTES остаётся StubScreen.
  */
 const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
-  d6: comingSoon("dayStatus", "clock", ["#34d399", "#0ea5e9"]),
+  d6: DayStatusScreen,
   d7: comingSoon("assistant", "spark", ["#8b5cf6", "#6366f1"]),
   d8: NotificationsScreen,
   d9: ServicesScreen,
-  d11: comingSoon("subjectDetail", "book", ["#facc15", "#ca8a04"]),
+  d11: SubjectDetailScreen,
   d12: HomeworksScreen,
   d13: HomeworkDetailScreen,
   d14: AttendanceScreen,

@@ -2796,6 +2796,35 @@ export interface Dictionary {
   // рядом с секцией в ru.ts. Старая секция parentMobile (прежнее приложение)
   // не трогается и живёт параллельно до завершения редизайна.
   parentApp: {
+    subjectDetailScreen: {
+      title: string;
+      gradeCount: string;
+      noGrades: string;
+      topics: string;
+      lastComment: string;
+      lastWork: string;
+      noSubjectTitle: string;
+      noSubjectText: string;
+      toSubjects: string;
+      notFoundTitle: string;
+      notFoundText: string;
+      footnote: string;
+    };
+    dayStatusScreen: {
+      title: string;
+      statLessons: string;
+      statAttended: string;
+      statMissed: string;
+      attPresent: string;
+      attExcused: string;
+      attUnexcused: string;
+      attNotMarked: string;
+      gradesToday: string;
+      homeworkAssigned: string;
+      dayOffTitle: string;
+      dayOffText: string;
+      footnote: string;
+    };
     reviewsScreen: {
       title: string;
       hint: string;

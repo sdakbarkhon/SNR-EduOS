@@ -95,15 +95,17 @@ export function SubjectsScreen() {
         ) : (
           rows.map((s) => {
             const tint = tintOf(s.color, tokens.accent);
+            // Нажатие на карточку ведёт в карточку предмета; отдельная
+            // подпись справа — к учителю, если он назначен.
+            const openSubject = () => navigation.navigate("d11", { subjectId: s.subjectId });
             const openTeacher = s.teacherId
               ? () => navigation.navigate("dteach", { teacherId: s.teacherId as string })
               : undefined;
             return (
               <Pressable
                 key={s.subjectId}
-                onPress={openTeacher}
-                disabled={!openTeacher}
-                style={({ pressed }) => ({ opacity: pressed && openTeacher ? 0.75 : 1 })}
+                onPress={openSubject}
+                style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
               >
                 <GlassCard radius={18} contentStyle={{ padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <View
@@ -129,7 +131,9 @@ export function SubjectsScreen() {
                     </Text>
                   </View>
                   {openTeacher ? (
-                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.accent }}>{t.openTeacher}</Text>
+                    <Pressable onPress={openTeacher} hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                      <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.accent }}>{t.openTeacher}</Text>
+                    </Pressable>
                   ) : null}
                 </GlassCard>
               </Pressable>

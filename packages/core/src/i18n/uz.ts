@@ -2699,6 +2699,35 @@ export const uz: Dictionary = {
   // Родительское приложение v2 — словарь макета, ДОСЛОВНО (225 ключей).
   // Апострофы узбекского — прямой U+0027, как в макете (не типографский).
   parentApp: {
+    subjectDetailScreen: {
+      title: "Fan",
+      gradeCount: "baholar: {n}",
+      noGrades: "fan bo‘yicha baholar hozircha yo‘q",
+      topics: "Mavzularni o‘zlashtirish",
+      lastComment: "O‘qituvchi izohi",
+      lastWork: "oxirgi ish",
+      noSubjectTitle: "Fan tanlanmagan",
+      noSubjectText: "Kartochkani fanlar ro‘yxatidan oching — shunda qaysi fan haqida gap ketayotgani ko‘rinadi.",
+      toSubjects: "Fanlar ro‘yxatiga",
+      notFoundTitle: "Fan topilmadi",
+      notFoundText: "Ehtimol u sinfdan olib tashlangan. Fanlar ro‘yxatini qaytadan oching.",
+      footnote: "Mavzu foizi — shu mavzu darslari uchun o‘rtacha baho, yuzga keltirilgan. Raqamlar jurnaldan olinadi.",
+    },
+    dayStatusScreen: {
+      title: "Kun holati",
+      statLessons: "dars",
+      statAttended: "kelgan",
+      statMissed: "qoldirgan",
+      attPresent: "kelgan",
+      attExcused: "sababli",
+      attUnexcused: "sababsiz",
+      attNotMarked: "belgilanmagan",
+      gradesToday: "Kun baholari",
+      homeworkAssigned: "Berilgan uy vazifalari: {n}",
+      dayOffTitle: "Bugun dars yo‘q",
+      dayOffText: "Sinf jadvalida bu kunga dars qo‘yilmagan.",
+      footnote: "Maktab kelish-ketishni belgilamaydi — bu yerda faqat jurnalga yozilgani: darslar, davomat va baholar.",
+    },
     reviewsScreen: {
       title: "O‘qituvchi izohlari",
       hint: "Izoh — bu o‘qituvchining bahoga qoldirgan sharhi. Maktabda alohida izoh shakli yo‘q, shuning uchun bu yerda jurnalga yozilgani turadi.",

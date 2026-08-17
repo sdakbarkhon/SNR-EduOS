@@ -268,8 +268,12 @@ export type MainStackParamList = {
   dteach: { teacherId?: string } | undefined;
   /** Заход 2 переноса: карточка объявления открывает его по id. */
   d27: { announcementId?: string } | undefined;
+  /** Карточка предмета: открывается по subjectId из списка предметов. Раньше
+   *  маршрут был без параметров, и открыть карточку было нечем — отсюда и
+   *  стояла заглушка. Без параметра экран отправляет в список предметов. */
+  d11: { subjectId?: string } | undefined;
 } & {
-  [K in Exclude<StackRouteName, "stub" | "dport" | "d13" | "dteach" | "d27">]: undefined;
+  [K in Exclude<StackRouteName, "stub" | "dport" | "d13" | "dteach" | "d27" | "d11">]: undefined;
 };
 
 /** ParamList таб-навигатора. */
