@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { AdminSectionHint } from "@/components/AdminSectionHint";
 
 export function AdminShell({ adminName, children }: { adminName: string; children: ReactNode }) {
   return (
@@ -20,6 +21,9 @@ export function AdminShell({ adminName, children }: { adminName: string; childre
 
         <main className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
           {children}
+          {/* Подсказка раздела — одна на весь каркас, выбирается по адресу.
+              Внизу страницы, мелко и приглушённо: не баннер и не окно. */}
+          <AdminSectionHint />
         </main>
       </div>
     </div>

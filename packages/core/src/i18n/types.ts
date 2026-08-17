@@ -263,6 +263,19 @@ export interface Dictionary {
     teacherLegendNone: string;
   };
   admin: {
+    hints: {
+      dashboard: string;
+      subjects: string;
+      teachers: string;
+      groups: string;
+      assignments: string;
+      students: string;
+      parents: string;
+      announcements: string;
+      marks: string;
+      profile: string;
+      chats: string;
+    };
     title: string;
     navDashboard: string;
     navStudents: string;
