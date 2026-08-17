@@ -232,9 +232,15 @@ function EditDialog({
                 ))}
               </div>
             ) : row.kind === "test" ? (
+              // type="number" пропускает «e», «+» и «-»: браузер считает их
+              // частью числа, поле после них отдаёт пустоту, и админ видит
+              // молчаливо несохранённый балл. Здесь принимаются только цифры —
+              // всё остальное просто не вводится.
               <input
-                type="number" min={0} value={next}
-                onChange={(e) => setNext(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                value={next}
+                onChange={(e) => setNext(e.target.value.replace(/\D/g, "").slice(0, 3))}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-300"
               />
             ) : (

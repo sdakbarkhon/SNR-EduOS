@@ -677,6 +677,8 @@ export interface Dictionary {
     fieldPassword: string;
     passwordShownOnce: string;
     parentLoginHint: string;
+    parentCreatedNext: string;
+    copyPhone: string;
     parentPhoneRequired: string;
     showCodeBtn: string;
     codeLabel: string;

@@ -30,8 +30,9 @@ export function NewParentForm({ students }: { students: Student[] }) {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ password: string; phone: string } | null>(null);
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  // Пароля здесь нет намеренно — см. комментарий у экрана результата ниже.
+  const [result, setResult] = useState<{ phone: string } | null>(null);
+  const [copied, setCopied] = useState<"phone" | "link" | null>(null);
   const guard = useSubmitGuard();
 
   const filteredStudents = students.filter((s) =>
@@ -59,24 +60,28 @@ export function NewParentForm({ students }: { students: Student[] }) {
         fd.set("apple_email", appleEmail.trim());
         selectedIds.forEach((id) => fd.append("student_ids", id));
         const res = await actionCreateParent(fd);
-        setResult({ password: res.password, phone: storedFromDigits(phoneDigits) });
+        setResult({ phone: storedFromDigits(phoneDigits) });
       } catch (err) {
         setError(humanizeAdminError(err, locale as Locale));
       }
     }));
   }
 
-  function copy(text: string, kind: "code" | "link") {
+  function copy(text: string, kind: "phone" | "link") {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(kind);
       setTimeout(() => setCopied(null), 2000);
     });
   }
 
-  // Z.2.8 — приглашений больше нет. Родитель входит телефоном и одноразовым
-  // кодом, а пароль нужен мобильному приложению и как запасной путь. Пароль
-  // показывается ОДИН раз, как для админов школ: в базе он хешируется, и
-  // восстановить его потом нельзя — только сбросить.
+  // Пароль админу больше НЕ показывается (17.08.2026). Учётной записи он
+  // технически нужен и генерируется как раньше, но родитель им нигде не
+  // пользуется: вход идёт по номеру телефона с одноразовым кодом — и на сайте,
+  // и в приложении. Прежний экран показывал пароль крупно, называл его «кодом»
+  // на кнопке «Скопировать код» и писал, что он нужен приложению. Админ
+  // диктовал этот пароль родителю как код входа, и родитель не входил.
+  // Настоящий код появляется только после запроса из приложения и смотрится
+  // круглой стрелкой рядом со статусом родителя в списке.
   if (result) {
     return (
       <div className="mx-auto max-w-md space-y-6">
@@ -84,18 +89,16 @@ export function NewParentForm({ students }: { students: Student[] }) {
         <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-black/5">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPhone}</p>
           <p className="mb-4 text-xl font-bold text-gray-800">{result.phone}</p>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPassword}</p>
-          <p className="mb-4 text-3xl font-bold tracking-widest text-violet-700">{result.password}</p>
-          <p className="mb-4 text-xs text-amber-600">{t.passwordShownOnce}</p>
           <button
-            onClick={() => copy(`${result.phone} / ${result.password}`, "code")}
+            onClick={() => copy(result.phone, "phone")}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700"
           >
-            {copied === "code" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {t.copyCode}
+            {copied === "phone" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {t.copyPhone}
           </button>
         </div>
-        <p className="text-center text-xs text-gray-500">{t.parentLoginHint}</p>
+        <p className="text-center text-xs leading-relaxed text-gray-500">{t.parentLoginHint}</p>
+        <p className="text-center text-xs leading-relaxed text-gray-400">{t.parentCreatedNext}</p>
         <button
           onClick={() => router.push("/admin/parents")}
           className="w-full rounded-xl bg-gray-800 py-2.5 text-sm font-medium text-white hover:bg-gray-900"
