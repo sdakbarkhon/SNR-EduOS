@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { AdminPhoneInput, storedFromDigits } from "@/components/admin/PhoneInput";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import { actionCreateParent } from "../actions";
 
@@ -20,7 +21,8 @@ export function NewParentForm({ students }: { students: Student[] }) {
   const router = useRouter();
 
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  // Девять цифр без кода страны — код рисует само поле и стереть его нельзя.
+  const [phoneDigits, setPhoneDigits] = useState("");
   // Необязательные адреса под будущий вход через Google/Apple (миграция 201).
   const [googleEmail, setGoogleEmail] = useState("");
   const [appleEmail, setAppleEmail] = useState("");
@@ -44,7 +46,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
     e.preventDefault();
     setError(null);
     // Z.2.8 — телефон обязателен: он ключ входа.
-    if (!fullName.trim() || !phone.trim() || selectedIds.length === 0) {
+    if (!fullName.trim() || phoneDigits.length !== 9 || selectedIds.length === 0) {
       setError(t.parentPhoneRequired);
       return;
     }
@@ -52,12 +54,12 @@ export function NewParentForm({ students }: { students: Student[] }) {
       try {
         const fd = new FormData();
         fd.set("full_name", fullName.trim());
-        fd.set("phone", phone.trim());
+        fd.set("phone", storedFromDigits(phoneDigits));
         fd.set("google_email", googleEmail.trim());
         fd.set("apple_email", appleEmail.trim());
         selectedIds.forEach((id) => fd.append("student_ids", id));
         const res = await actionCreateParent(fd);
-        setResult({ password: res.password, phone: phone.trim() });
+        setResult({ password: res.password, phone: storedFromDigits(phoneDigits) });
       } catch (err) {
         setError(humanizeAdminError(err, locale as Locale));
       }
@@ -136,14 +138,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
               привели в соответствие и добавили пояснение зачем. */}
           <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPhone}</label>
           <p className="text-xs text-gray-400">{t.fieldPhoneHint}</p>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-            inputMode="tel"
-            placeholder="+998 90 123 45 67"
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
-          />
+          <AdminPhoneInput digits={phoneDigits} onChange={setPhoneDigits} required />
         </div>
         {/* Вход через Google/Apple: адреса вписывает администратор, сам
             родитель нигде не регистрируется. Поля необязательные — без них

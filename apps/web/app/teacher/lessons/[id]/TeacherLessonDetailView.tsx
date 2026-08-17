@@ -62,6 +62,17 @@ import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { QuizResultsModal } from "./QuizResultsModal";
 import { ClassworkModal } from "./ClassworkModal";
+
+/**
+ * Классная работа спрятана 17.08.2026 по решению заказчика: раздел дублирует
+ * домашние задания, за всё время им не воспользовались ни разу — в базе ноль
+ * заданий и ноль сдач. Код и таблицы НЕ удалены, ровно как с Polotno: вернуть
+ * можно одной переменной окружения.
+ *
+ * КАК ВЕРНУТЬ: NEXT_PUBLIC_ENABLE_CLASSWORK=1 и пересборка (значение
+ * подставляется на этапе сборки, существующее развёртывание его не увидит).
+ */
+const CLASSWORK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_CLASSWORK === "1";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
 import { KnowledgeBaseFilePicker, LESSON_ATTACH_MIME, LESSON_ATTACH_ACCEPT, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
@@ -766,12 +777,18 @@ export function TeacherLessonDetailView({
   lesson,
   teacher,
   isCurator = false,
+  autostartEnabled = false,
 }: {
   lesson: TeacherLessonView;
   teacher: Teacher;
   /** Наблюдатель ли зритель. Считает СЕРВЕР одним помощником на весь
    *  проект (lib/curator.ts) — здесь своей формулы больше нет. */
   isCurator?: boolean;
+  /** У школы включён автозапуск уроков (schools.autostart_enabled). Тогда урок
+   *  открывается и закрывается сам по расписанию, и ручные кнопки «Начать» /
+   *  «Закончить» учителю не нужны — они только сбивают с толку. В школе с
+   *  выключенным автозапуском кнопки остаются: там их нечем заменить. */
+  autostartEnabled?: boolean;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -1354,12 +1371,12 @@ export function TeacherLessonDetailView({
                 кнопки показываем причину, чтобы учитель не упирался в сырую
                 ошибку Postgres. Замороженный день и всё, что позже,
                 стартуются как раньше — правило 1/2/3+ не затронуто. */}
-            {status === "scheduled" && !isCurator && isPastDay(lesson.starts_at) && (
+            {!autostartEnabled && status === "scheduled" && !isCurator && isPastDay(lesson.starts_at) && (
               <span className="rounded-[11px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
                 {dl.startBlockedPastDay}
               </span>
             )}
-            {status === "scheduled" && !isCurator && !isPastDay(lesson.starts_at) && (
+            {!autostartEnabled && status === "scheduled" && !isCurator && !isPastDay(lesson.starts_at) && (
               <button
                 onClick={handleStartLesson}
                 disabled={startingLesson}
@@ -1368,7 +1385,7 @@ export function TeacherLessonDetailView({
                 {startingLesson ? "…" : dl.startLessonBtn}
               </button>
             )}
-            {status === "in_progress" && !isCurator && (
+            {!autostartEnabled && status === "in_progress" && !isCurator && (
               <button
                 onClick={handleEndLesson}
                 disabled={endingLesson}
@@ -1546,12 +1563,14 @@ export function TeacherLessonDetailView({
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
           {!readOnly && (
             <div className="flex items-center gap-2">
+              {CLASSWORK_ENABLED && (
               <button
                 onClick={() => setClassworkOpen(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95"
               >
                 <ClipboardList className="h-4 w-4" /> {d.teacher.classworkBtn}
               </button>
+              )}
               <button
                 onClick={() => setAiGenerateOpen(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-violet-300 bg-gradient-to-r from-blue-50 to-violet-50 px-4 py-2 text-sm font-bold text-violet-700 shadow-sm hover:from-blue-100 hover:to-violet-100 active:scale-95 dark:border-violet-500/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-300"
@@ -2243,7 +2262,7 @@ export function TeacherLessonDetailView({
       )}
 
       {/* Классная работа: задание и сдачи учеников. */}
-      {mounted && classworkOpen && (
+      {CLASSWORK_ENABLED && mounted && classworkOpen && (
         <ClassworkModal
           open
           onClose={() => setClassworkOpen(false)}

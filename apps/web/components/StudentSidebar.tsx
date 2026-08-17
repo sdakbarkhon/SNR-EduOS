@@ -26,7 +26,9 @@ interface SidebarItem extends NavItem {
 // touching in this redesign.
 const STUB_ITEMS: SidebarItem[] = [
   { key: "achievements", href: "#", icon: Trophy, label: (d) => d.nav.achievements, isStub: true },
-  { key: "clubs", href: "#", icon: CircleDot, label: (d) => d.nav.clubs, isStub: true },
+  // «Кружки» убраны 17.08.2026: такого раздела не будет. Пункт вёл на «#»
+  // и ничего не открывал. Строка d.nav.clubs осталась в словаре — её ещё
+  // используют другие места; сам пункт меню не возвращать.
   { key: "messages", href: "/messages", icon: MessageCircle, label: (d) => d.nav.messages },
 ];
 

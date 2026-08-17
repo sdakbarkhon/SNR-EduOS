@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { AdminPhoneInput, digitsFromStored, storedFromDigits } from "@/components/admin/PhoneInput";
 import { actionParentPendingCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
 
 type ParentRow = {
@@ -65,7 +66,9 @@ function EditParentModal({
   locale: Locale;
 }) {
   const [fullName, setFullName] = useState(parent.full_name);
-  const [phone, setPhone] = useState(parent.phone ?? "");
+  // Из базы приходит «+998912345678» — вытаскиваем девять цифр, чтобы
+  // карточка уже заведённого родителя открывалась с заполненным полем.
+  const [phoneDigits, setPhoneDigits] = useState(() => digitsFromStored(parent.phone));
   const [googleEmail, setGoogleEmail] = useState(parent.googleEmail ?? "");
   const [appleEmail, setAppleEmail] = useState(parent.appleEmail ?? "");
   const [selectedIds, setSelectedIds] = useState<string[]>(parent.childIds);
@@ -88,7 +91,7 @@ function EditParentModal({
         const fd = new FormData();
         fd.set("parent_id", parent.id);
         fd.set("full_name", fullName.trim());
-        fd.set("phone", phone.trim());
+        fd.set("phone", storedFromDigits(phoneDigits));
         fd.set("google_email", googleEmail.trim());
         fd.set("apple_email", appleEmail.trim());
         selectedIds.forEach((id) => fd.append("student_ids", id));
@@ -116,11 +119,7 @@ function EditParentModal({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPhone}</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
-            />
+            <AdminPhoneInput digits={phoneDigits} onChange={setPhoneDigits} />
           </div>
           {/* Те же два адреса, что и в форме создания: одна логика на обе. */}
           <div className="flex flex-col gap-1 rounded-xl bg-gray-50/70 p-3">
