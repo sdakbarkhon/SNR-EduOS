@@ -2699,6 +2699,22 @@ export const uz: Dictionary = {
   // Родительское приложение v2 — словарь макета, ДОСЛОВНО (225 ключей).
   // Апострофы узбекского — прямой U+0027, как в макете (не типографский).
   parentApp: {
+    reviewsScreen: {
+      title: "O‘qituvchi izohlari",
+      hint: "Izoh — bu o‘qituvchining bahoga qoldirgan sharhi. Maktabda alohida izoh shakli yo‘q, shuning uchun bu yerda jurnalga yozilgani turadi.",
+      emptyTitle: "Hozircha izoh yo‘q",
+      emptyText: "O‘qituvchilar bu bolaning baholariga hali izoh qoldirmagan. Ular baholar bilan birga paydo bo‘ladi.",
+      noSubject: "Fan ko‘rsatilmagan",
+      noTeacher: "O‘qituvchi ko‘rsatilmagan",
+    },
+    subjectsScreen: {
+      title: "Fanlar",
+      hint: "Sinf fanlari va ularni olib boradigan o‘qituvchilar. Fan bo‘yicha baholar — «Muvaffaqiyatlar»da, mavzularni o‘zlashtirish — alohida bo‘limda.",
+      emptyTitle: "Hozircha fanlar yo‘q",
+      emptyText: "Bolaning sinfiga fanlar hali kiritilmagan. Ularni maktab administratori kiritadi.",
+      noTeacher: "O‘qituvchi tayinlanmagan",
+      openTeacher: "o‘qituvchi haqida",
+    },
     common: {
       back: "Orqaga",
       viewAll: "Barchasini ko'rish",

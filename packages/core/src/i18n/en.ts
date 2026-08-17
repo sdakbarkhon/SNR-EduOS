@@ -2698,6 +2698,22 @@ export const en: Dictionary = {
   },
   // Родительское приложение v2 — словарь макета, ДОСЛОВНО (225 ключей).
   parentApp: {
+    reviewsScreen: {
+      title: "Teacher feedback",
+      hint: "A note here is a teacher's comment on a grade. The school has no separate feedback form, so this is exactly what the teacher wrote in the register.",
+      emptyTitle: "No comments yet",
+      emptyText: "Teachers have not commented on this child's grades yet. Comments arrive together with grades.",
+      noSubject: "No subject",
+      noTeacher: "Teacher not set",
+    },
+    subjectsScreen: {
+      title: "Subjects",
+      hint: "The class subjects and the teachers who teach them. Grades per subject are in Progress; topic mastery has its own section.",
+      emptyTitle: "No subjects yet",
+      emptyText: "The child's class has no subjects yet. The school administrator adds them.",
+      noTeacher: "No teacher assigned",
+      openTeacher: "about teacher",
+    },
     common: {
       back: "Back",
       viewAll: "View all",

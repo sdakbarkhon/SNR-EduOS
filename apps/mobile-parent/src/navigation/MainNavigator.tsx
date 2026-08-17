@@ -36,6 +36,8 @@ import TopicMasteryScreen from "../screens/study/TopicMasteryScreen";
 import NotificationsScreen from "../screens/study/NotificationsScreen";
 import ServicesScreen from "../screens/study/ServicesScreen";
 import TeacherProfileScreen from "../screens/study/TeacherProfileScreen";
+import ReviewsScreen from "../screens/study/ReviewsScreen";
+import SubjectsScreen from "../screens/study/SubjectsScreen";
 
 // Реальные экраны Захода 8 — родительские сервис-разделы (8 шт.), заменяют
 // StubScreen под dtests/dlib/dport/dapps/dmed/dtrans/dchpass/dsessions.
@@ -76,8 +78,8 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
   d14: AttendanceScreen,
   d15: ScheduleScreen,
   d16: SkillsScreen,
-  dallsubj: comingSoon("subjects", "book", ["#38bdf8", "#0284c7"]),
-  drev: comingSoon("reviews", "star", ["#f472b6", "#db2777"]),
+  dallsubj: SubjectsScreen,
+  drev: ReviewsScreen,
   dtopics: TopicMasteryScreen,
   dteach: TeacherProfileScreen,
   dmeals: comingSoon("meals", "food", ["#f472b6", "#db2777"]),
