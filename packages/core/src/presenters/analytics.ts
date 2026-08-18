@@ -57,6 +57,9 @@ export type AnalyticsGrade = {
   date: string;
   /** Оценка, приведённая к пятибалльной. null — не оценено. */
   grade5: number | null;
+  /** Название работы. Своего справочника тем у оценок нет, а название работы —
+   *  ровно то, что учитель узнаёт; по нему ищутся просевшие темы. */
+  title?: string;
 };
 
 export type AnalyticsAttendance = {

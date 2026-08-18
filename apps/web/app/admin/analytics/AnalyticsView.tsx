@@ -11,6 +11,7 @@ import {
 } from "@snr/core";
 import type { Locale, AnalyticsInput, RiskFlag, StudentStat } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { AiReviewBlock } from "./AiReviewBlock";
 
 export type AnalyticsFacts = AnalyticsInput & {
   students: Array<{ id: string; name: string; groupName: string; groupId: string }>;
@@ -227,6 +228,10 @@ export function AnalyticsView({ facts }: { facts: AnalyticsFacts }) {
                 noPrev={!overallPrev} labels={t} danger={overall.overdue > 0} />
             </div>
           </section>
+
+          {/* Разбор от ИИ — сразу после чисел: сначала факты, потом что они
+              значат. Сам не грузится, см. AiReviewBlock. */}
+          <AiReviewBlock />
 
           {/* ── 2. Ученики ───────────────────────────────────────────────── */}
           <section className="space-y-4">

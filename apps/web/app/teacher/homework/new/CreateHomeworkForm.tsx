@@ -906,6 +906,8 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         onClose={() => setAiGenerateOpen(false)}
         type={(isExternal ? "file" : format) as "file" | "test" | "programming" | "bundle"}
         groupLabel={groups.find((g) => g.id === groupId)?.name ?? ""}
+        groupId={groupId}
+        subjectId={subjectId}
         onApply={handleAiGenerateApply}
       />
 

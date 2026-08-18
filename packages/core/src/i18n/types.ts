@@ -273,6 +273,14 @@ export interface Dictionary {
     teacherLegendNone: string;
   };
   admin: {
+    anAiTitle: string;
+    anAiHint: string;
+    anAiLoading: string;
+    anAiRefresh: string;
+    anAiGenerated: string;
+    anAiFailed: string;
+    anAiLittle: string;
+    anAiShow: string;
     navAnalytics: string;
     anTitle: string;
     anSubtitle: string;
@@ -670,6 +678,7 @@ export interface Dictionary {
     task_embeddings: string;
     task_study_tip: string;
     task_grades_advice: string;
+    task_analytics_review: string;
     task_other: string;
     statSchools: string;
     statAdmins: string;

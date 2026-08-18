@@ -29,6 +29,11 @@ interface Props {
   onClose: () => void;
   type: "file" | "test" | "programming" | "bundle";
   groupLabel: string; // e.g. "Математика — 7А", shown read-only as the auto-filled "level" context
+  /** Группа и предмет — чтобы сервер подстроил сложность под то, как эта
+   *  группа реально учится. Необязательны: если их нет, задание генерируется
+   *  ровно как раньше. */
+  groupId?: string;
+  subjectId?: string;
   onApply: (data: GeneratedHomework) => void;
 }
 
@@ -45,7 +50,7 @@ function bundleTypeLabel(bt: BundleSubtaskType, d: ReturnType<typeof getDictiona
   }
 }
 
-export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, onApply }: Props) {
+export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, groupId, subjectId, onApply }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.ai.generateHomework;
@@ -90,6 +95,7 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, onA
           topic: topic.trim(),
           level: groupLabel,
           hints: hints.trim() || undefined,
+          groupId, subjectId,
           ...(type === "bundle" && bundleTypes.size > 0
             ? { bundleSubtaskTypes: Array.from(bundleTypes) }
             : {}),

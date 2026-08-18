@@ -88,11 +88,18 @@ function hintsLine(hints: string | undefined): string {
   return hints && hints.trim() ? `\nПожелания учителя: ${hints.trim()}` : "";
 }
 
-export function buildHomeworkFilePrompt(topic: string, level: string, hints: string | undefined): string {
+/** Уровень группы — одной строкой, в тот же промпт. Пустая строка, если данных
+ *  мало: промпт тогда неотличим от прежнего. Текст готовит
+ *  lib/ai/group-performance.ts, здесь только место вставки. */
+function groupLine(groupContext: string | undefined): string {
+  return groupContext && groupContext.trim() ? groupContext : "";
+}
+
+export function buildHomeworkFilePrompt(topic: string, level: string, hints: string | undefined, groupContext?: string): string {
   return `Ты — методический ассистент учителя школы в Узбекистане. Составь домашнее задание типа "файл" (ученик готовит и присылает файл/текстовый ответ).
 
 Тема: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
+Класс/уровень: ${level}${hintsLine(hints)}${groupLine(groupContext)}
 
 title — короткое название без кавычек. description — чёткая инструкция ученику: что сделать и что сдать, академический стиль, без markdown и эмодзи.`;
 }
@@ -100,16 +107,16 @@ title — короткое название без кавычек. description �
 // Что делает: составляет тест (домашнее задание типа "тест") — ОДИН из двух
 // мест платформы, где реально генерируется квиз из темы (второе — content_type
 // "quiz_qia" внутри generate-stages, см. buildLessonGenerationPrompt ниже).
-export function buildHomeworkTestPrompt(topic: string, level: string, hints: string | undefined): string {
+export function buildHomeworkTestPrompt(topic: string, level: string, hints: string | undefined, groupContext?: string): string {
   return `Ты — методический ассистент учителя школы в Узбекистане. Составь тест с вопросами с одним правильным ответом.
 
 Тема: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
+Класс/уровень: ${level}${hintsLine(hints)}${groupLine(groupContext)}
 
 title — короткое название без кавычек. description — инструкция ученику, 1-2 предложения, без markdown и эмодзи. questions — 5-10 вопросов, каждый: question (текст), options (4 варианта), correctIndex (0-based индекс правильного). Вопросы проверяют ПОНИМАНИЕ темы, не запоминание формулировок/синтаксиса.`;
 }
 
-export function buildHomeworkProgrammingPrompt(topic: string, level: string, hints: string | undefined): string {
+export function buildHomeworkProgrammingPrompt(topic: string, level: string, hints: string | undefined, groupContext?: string): string {
   const langHint = hints && /c\+\+|си\+\+|cpp/i.test(hints) ? "cpp"
     : hints && /java(?!script)/i.test(hints) ? "java"
     : hints && /javascript|js\b/i.test(hints) ? "javascript"
@@ -117,7 +124,7 @@ export function buildHomeworkProgrammingPrompt(topic: string, level: string, hin
   return `Ты — методический ассистент учителя школы в Узбекистане. Составь задание по программированию.
 
 Тема: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
+Класс/уровень: ${level}${hintsLine(hints)}${groupLine(groupContext)}
 Язык по умолчанию: ${langHint} (используй, если пожелания учителя явно не требуют другого из "python"|"javascript"|"cpp"|"java").
 
 title — короткое название без кавычек. description — условие задачи: что делает программа, входные/выходные данные, академический стиль, без markdown и эмодзи. starterCode — код-скелет с TODO (НЕ полное решение). expectedOutput — пример вывода правильного решения. language — "python"|"javascript"|"cpp"|"java".`;
@@ -129,6 +136,7 @@ export function buildHomeworkBundlePrompt(
   hints: string | undefined,
   requestedTypes: string[],
   externalServiceOrder: readonly string[],
+  groupContext?: string,
 ): string {
   const typesInstruction = requestedTypes.length > 0
     ? `Создай РОВНО ${requestedTypes.length} подзадач(и) — по одной подзадаче на каждый из следующих типов, СТРОГО в этом порядке: ${requestedTypes.join(", ")}.`
@@ -137,7 +145,7 @@ export function buildHomeworkBundlePrompt(
   return `Ты — методический ассистент учителя школы в Узбекистане. Составь домашнее задание типа "набор заданий" (bundle) — несколько независимых подзадач разных типов, которые ученик решает по отдельности, а учитель оценивает весь набор ОДНОЙ общей оценкой.
 
 Тема задания: ${topic}
-Класс/уровень: ${level}${hintsLine(hints)}
+Класс/уровень: ${level}${hintsLine(hints)}${groupLine(groupContext)}
 
 Доступные типы подзадач:
 - "file" — ученик присылает файл/текстовый ответ. config всегда {} (пустой объект).
@@ -250,6 +258,12 @@ export function buildLessonGenerationPrompt(input: {
   materials: Array<{ title: string; text: string }>;
   curriculumTopic?: CurriculumTopicContext | null;
   kbMaterials?: string[];
+  /** Как эта группа учится по этому предмету — готовый текстовый раздел из
+   *  lib/ai/group-performance.ts. Пустая строка, если данных мало: тогда
+   *  промпт остаётся ровно таким, каким был, и генерация работает как
+   *  работала. Отдельного вызова модели подстройка не стоит — это часть
+   *  ЭТОГО же промпта. */
+  groupPerformance?: string;
 }): string {
   const hasFiles = input.materials.length > 0;
   const materialsContext = hasFiles
@@ -266,6 +280,8 @@ ${input.curriculumTopic.description ? `- Описание темы: ${input.curr
 ${input.kbMaterials && input.kbMaterials.length > 0
     ? `\nДоступные материалы: ${input.kbMaterials.join("; ")}`
     : ""}` : "";
+
+  const performanceSection = input.groupPerformance ?? "";
 
   const stageCountBase = input.durationMin <= 30 ? "2–3" :
     input.durationMin <= 45 ? "3–4" :
@@ -332,7 +348,7 @@ ${input.kbMaterials && input.kbMaterials.length > 0
 
 МАТЕРИАЛЫ ОТ УЧИТЕЛЯ:
 ${materialsContext}
-${curriculumSection}
+${curriculumSection}${performanceSection}
 ${programmingSection}
 
 ТИП ЭТАПА ВЫБИРАЕТСЯ ПО ЕГО РОЛИ В УРОКЕ — это правило важнее всех подсказок ниже.
@@ -494,4 +510,28 @@ ${input.overallDifficulty === "easy"
 }
 
 ВАЖНО: ТОЛЬКО валидный JSON. Заголовки и описания на русском. starter_code только для code-этапов.`;
+}
+
+// ── Разбор аналитики школы (директор → что происходит и что делать) ─────────
+// Что делает: превращает посчитанные числа в связный разбор для руководителя.
+// Вход: свод по школе, группам, предметам и ученикам — уже посчитанный
+// общим слоем, модель ничего не считает сама.
+// Выход: короткий текст без markdown.
+//
+// ГЛАВНОЕ, ЧЕГО ЗДЕСЬ НЕ ДОЛЖНО БЫТЬ: пересказа чисел, которые и так на
+// экране. Директор видит «средний балл 4.37» своими глазами; ему нужно, что
+// из этого следует.
+export function buildAnalyticsReviewPrompt(facts: string, enoughData: boolean): string {
+  return `Ты — методист школы. Перед тобой сводка по школе, посчитанная из настоящих данных. Напиши короткий разбор для директора.
+
+${facts}
+
+ПРАВИЛА:
+1. НЕ пересказывай числа — директор видит их на экране. Пиши, что они ЗНАЧАТ и что с этим делать.
+2. Ищи связи: совпадает ли низкий балл по предмету с низкой посещаемостью по нему же; у скольких учеников проблема одна и та же; отличается ли группа от других по одному показателю или по всем.
+3. Пиши про помощь и поддержку, а не про плохих учеников. Никаких ярлыков вроде «слабые», «неуспевающие», «отстающие как класс». Формулируй как «этим ученикам нужна поддержка по такому-то предмету».
+4. Учеников по именам называй только там, где это нужно для действия, и не больше трёх.
+5. Не выдумывай причин, которых нет в данных. Если картина неоднозначная — так и скажи.
+${enoughData ? "" : `6. ДАННЫХ МАЛО. Прямо начни с того, что выводы делать рано и почему (мало оценок или короткий период), и ограничься тем, что видно наверняка. Не строй гипотез.\n`}
+ФОРМАТ: 3–5 абзацев, каждый с новой строки. Обычный текст, без markdown, без списков, без заголовков, без эмодзи. Первый абзац — главное в двух предложениях. Последний — что сделать в ближайшую неделю, конкретно.`;
 }

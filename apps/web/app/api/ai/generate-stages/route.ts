@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
+import { getGroupPerformance, groupPerformancePromptSection } from "@/lib/ai/group-performance";
+import { getMySchoolNow } from "@/lib/school-time-server";
+import { getSubjectKeyByLabel } from "@snr/core";
 import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
@@ -343,9 +346,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Как эта группа учится по этому предмету. Уходит в ТОТ ЖЕ промпт ниже —
+  // отдельного обращения к модели подстройка не стоит.
+  //
+  // Если группа новая и данных мало, справка пустая, и промпт получается
+  // ровно таким, каким был до этой правки. Ветки «есть данные / нет данных» в
+  // генерации нет: есть пустая строка.
+  let performanceSection = "";
+  try {
+    const schoolNow = await getMySchoolNow(db);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: subjRow } = await (db as any)
+      .from("subjects").select("name").eq("id", (lesson as { subject_id: string | null }).subject_id).maybeSingle();
+    const perf = await getGroupPerformance(db, {
+      groupName: group.name ?? "",
+      subjectKey: getSubjectKeyByLabel((subjRow as { name: string } | null)?.name) ?? "",
+      todayIso: schoolNow.toISOString().slice(0, 10),
+    });
+    performanceSection = groupPerformancePromptSection(perf);
+  } catch (e) {
+    // Подсказка — надстройка над генерацией, а не её часть. Сбой здесь не
+    // имеет права отменить урок: продолжаем без неё.
+    console.error("[ai-generate] справка по группе не собралась:", (e as Error)?.message);
+  }
+
   const prompt = buildLessonGenerationPrompt({
     topic: body.topic.trim(), grade, subject, durationMin, overallDifficulty, materials,
     curriculumTopic, kbMaterials,
+    groupPerformance: performanceSection,
   });
 
   let result: GenResult | null = null;

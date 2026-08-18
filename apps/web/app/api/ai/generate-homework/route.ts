@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
+import { getGroupPerformance, groupPerformanceHomeworkHint } from "@/lib/ai/group-performance";
+import { getMySchoolNow } from "@/lib/school-time-server";
+import { getSubjectKeyByLabel } from "@snr/core";
 import {
   buildHomeworkFilePrompt, buildHomeworkTestPrompt, buildHomeworkProgrammingPrompt, buildHomeworkBundlePrompt,
 } from "@/lib/ai/prompts";
@@ -27,6 +30,10 @@ interface RequestBody {
   level: string;
   hints?: string;
   bundleSubtaskTypes?: string[];
+  /** Для подстройки сложности под группу. Необязательны — без них задание
+   *  генерируется ровно как раньше. */
+  groupId?: string;
+  subjectId?: string;
 }
 
 interface GenQuestion {
@@ -194,10 +201,36 @@ export async function POST(req: NextRequest) {
     ? body.bundleSubtaskTypes.filter((t): t is SubtaskType => ALLOWED_SUBTASK_TYPES.includes(t as SubtaskType))
     : [];
 
-  const prompt = type === "file" ? buildHomeworkFilePrompt(topic, level, hints)
-    : type === "test" ? buildHomeworkTestPrompt(topic, level, hints)
-    : type === "programming" ? buildHomeworkProgrammingPrompt(topic, level, hints)
-    : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, EXTERNAL_SERVICE_ORDER);
+  // Уровень группы — в ТОТ ЖЕ промпт, отдельного обращения к модели нет.
+  // Данных мало или группа не передана — строка пустая, и промпт получается
+  // ровно прежним.
+  let groupContext = "";
+  if (body.groupId) {
+    try {
+      const schoolNow = await getMySchoolNow(db);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [{ data: grp }, { data: subj }] = await Promise.all([
+        (db as any).from("groups").select("name").eq("id", body.groupId).maybeSingle(),
+        body.subjectId
+          ? (db as any).from("subjects").select("name").eq("id", body.subjectId).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      const perf = await getGroupPerformance(db, {
+        groupName: (grp as { name: string } | null)?.name ?? "",
+        subjectKey: getSubjectKeyByLabel((subj as { name: string } | null)?.name) ?? "",
+        todayIso: schoolNow.toISOString().slice(0, 10),
+      });
+      groupContext = groupPerformanceHomeworkHint(perf);
+    } catch (e) {
+      // Подсказка — надстройка. Задание должно составиться и без неё.
+      console.error("[ai-homework] уровень группы не собрался:", (e as Error)?.message);
+    }
+  }
+
+  const prompt = type === "file" ? buildHomeworkFilePrompt(topic, level, hints, groupContext)
+    : type === "test" ? buildHomeworkTestPrompt(topic, level, hints, groupContext)
+    : type === "programming" ? buildHomeworkProgrammingPrompt(topic, level, hints, groupContext)
+    : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, EXTERNAL_SERVICE_ORDER, groupContext);
 
   // bundle остаётся без строгой схемы — см. комментарий в lib/ai/schemas.ts
   // (config-форма зависит от значения соседнего поля "type", Gemini responseSchema
