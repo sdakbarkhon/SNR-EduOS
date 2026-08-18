@@ -28,7 +28,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ParentByGoogleEmail =
   | { ok: true; parentId: string; userId: string; authEmail: string; fullName: string }
-  | { ok: false; reason: "not_linked" | "no_account" | "school_archived" | "failed" };
+  | { ok: false; reason: "not_linked" | "no_account" | "school_archived" | "demo_school" | "failed" };
 
 /** Ровно та же нормализация, что стоит в CHECK и в уникальном индексе 201. */
 export function normalizeEmail(raw: string | null | undefined): string {
@@ -72,6 +72,15 @@ export async function findParentByGoogleEmail(verifiedEmail: string): Promise<Pa
   // Школа в архиве (миграция 202) — вход не открываем.
   const { data: active } = await anyAdmin.rpc("school_is_active", { p_school_id: parent.school_id });
   if (active === false) return { ok: false, reason: "school_archived" };
+
+  // Демо-школа через Google не открывается — у неё своя кнопка. См. подробный
+  // разбор в lib/google-identity.ts: замок ставится в обоих путях, потому что
+  // этим ходит мобильное приложение, а тем — браузер.
+  const { data: school } = await anyAdmin
+    .from("schools").select("is_demo").eq("id", parent.school_id).maybeSingle();
+  if ((school as { is_demo: boolean } | null)?.is_demo) {
+    return { ok: false, reason: "demo_school" };
+  }
 
   const { data: authUser, error: userErr } = await admin.auth.admin.getUserById(parent.user_id);
   const authEmail = authUser?.user?.email;

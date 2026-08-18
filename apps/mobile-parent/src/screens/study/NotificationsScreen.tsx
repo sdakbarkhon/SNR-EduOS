@@ -24,13 +24,13 @@
  * которых у родителя подходящего экрана нет, остаются некликабельными: это
  * честнее, чем увести на чужой раздел.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getMyNotifications, LOCALE_TAG, type AppNotification } from "@snr/core";
+import { getMyNotifications, markAllNotificationsRead, LOCALE_TAG, type AppNotification } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   EmptyBlock,
@@ -198,6 +198,25 @@ export default function NotificationsScreen() {
   const [filter, setFilter] = useState<Filter>("all");
   const state = useAsyncData(() => getMyNotifications(getSupabase(), 50), []);
   const rows = useMemo(() => state.data ?? [], [state.data]);
+
+  // Открыл список — значит увидел. 18.08.2026: раньше приложение не помечало
+  // прочитанным НИЧЕГО, функция markAllNotificationsRead существовала в ядре и
+  // не вызывалась отсюда ни разу — поэтому счётчик над вкладкой не двигался
+  // никогда, сколько ни открывай.
+  //
+  // Помечаем ПОСЛЕ загрузки списка, а не при входе на экран: иначе при сбое
+  // запроса непрочитанные исчезли бы, так и не показавшись человеку.
+  //
+  // Список на экране НЕ перерисовываем — фильтр «непрочитанные» должен
+  // остаться рабочим, пока человек стоит на экране. Число над вкладкой
+  // обновится при возврате: бейдж перечитывается по фокусу.
+  useEffect(() => {
+    if (state.loading || state.error) return;
+    if (!rows.some((n) => !n.is_read)) return;
+    markAllNotificationsRead(getSupabase()).catch((e) => {
+      console.error("[NotificationsScreen] отметка о прочтении не записалась:", e?.message);
+    });
+  }, [state.loading, state.error, rows]);
 
   const todayKey = useTashkentToday();
   const yesterdayKey = useMemo(() => addDays(todayKey, -1), [todayKey]);

@@ -107,6 +107,7 @@ export const uz: Dictionary = {
     errorParseFailed: "Rejani tahlil qilib bo'lmadi",
   },
   auth: {
+    googleDemoSchool: "Google orqali demo rejimga kirilmaydi. Kirish ekranidagi «Demo» tugmasini bosing.",
     googleNotLinked: "Bu Google pochtasi hech qaysi hisobga bog‘lanmagan. Maktab administratoriga murojaat qiling yoki login va parol bilan kiring.",
     googleNoAccount: "Pochta mos keldi, lekin hisob hali yo‘q. Maktab administratoriga murojaat qiling.",
     googleSchoolArchived: "Maktab endi tizimda ishlamaydi. Maktab administratoriga murojaat qiling.",
@@ -3453,6 +3454,7 @@ export const uz: Dictionary = {
       demoSigningIn: "Demo ochilmoqda…",
       demoFailed: "Hozir barcha demo o‘rinlar band. Bir necha daqiqadan so‘ng urinib ko‘ring.",
       demoHint: "Telefon va kodsiz ilovani ko‘rish",
+      googleDemoSchool: "Google orqali demo rejimga kirilmaydi. Kirish ekranidagi «Demo» tugmasini bosing.",
       withGoogle: "Google bilan davom etish",
       withApple: "Apple bilan davom etish",
       soonBadge: "tez orada",

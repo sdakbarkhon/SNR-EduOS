@@ -41,7 +41,7 @@ export type GoogleIdentity =
       /** Куда вести после входа — тот же порядок, что у обычного входа. */
       dest: string;
     }
-  | { ok: false; reason: "not_linked" | "no_account" | "school_archived" | "wrong_school" | "failed" };
+  | { ok: false; reason: "not_linked" | "no_account" | "school_archived" | "wrong_school" | "demo_school" | "failed" };
 
 /** Где искать и куда вести. Порядок тот же, что у приоритета ролей в обычном
  *  входе: администратор → родитель → учитель → ученик. */
@@ -96,6 +96,23 @@ export async function findIdentityByGoogleEmail(
     // Школа в архиве (миграция 202) — вход не открываем.
     const { data: active } = await anyAdmin.rpc("school_is_active", { p_school_id: data.school_id });
     if (active === false) return { ok: false, reason: "school_archived" };
+
+    // В ДЕМО-ШКОЛУ ЧЕРЕЗ GOOGLE НЕ ПУСКАЕМ ВОВСЕ.
+    //
+    // Найдено 18.08.2026: у демо-родителя в карточке была вписана настоящая
+    // почта, и вход через Google заводил его как обычного пользователя —
+    // мимо аренды демо-слота, мимо срока жизни и мимо баннера «это демо».
+    // Проверялся только архив, а демо-школа не архивная, поэтому проверка её
+    // пропускала.
+    //
+    // Демо — витрина с собственной кнопкой, и это единственная дверь в неё.
+    // Правило шире родителя намеренно: впиши кто-нибудь почту демо-учителю,
+    // повторилось бы то же самое.
+    const { data: school } = await anyAdmin
+      .from("schools").select("is_demo").eq("id", data.school_id).maybeSingle();
+    if ((school as { is_demo: boolean } | null)?.is_demo) {
+      return { ok: false, reason: "demo_school" };
+    }
 
     // Выбрана школа — она должна совпасть. Отказ отдельный, не «почта не
     // привязана»: почта-то привязана, человек ошибся школой, и говорить ему

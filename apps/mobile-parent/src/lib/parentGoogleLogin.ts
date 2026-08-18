@@ -38,6 +38,7 @@ const RETURN_URL = "snreduosparent://auth";
 
 /** Причины отказа — те же четыре, что на вебе, плюс местные. */
 export type GoogleLoginError =
+  | "demo_school"       // почта ведёт в демо-школу: туда только по кнопке «Демо»
   | "not_linked"        // почта не привязана ни к одному родителю
   | "no_account"        // почта совпала, учётной записи у родителя нет
   | "school_archived"   // школа в архиве
@@ -153,7 +154,7 @@ export async function loginParentWithGoogle(): Promise<void> {
     });
     const json = (await res.json().catch(() => ({}))) as { tokenHash?: string; error?: string };
     if (res.ok && json.tokenHash) tokenHash = json.tokenHash;
-    else if (json.error && ["not_linked", "no_account", "school_archived"].includes(json.error)) {
+    else if (json.error && ["not_linked", "no_account", "school_archived", "demo_school"].includes(json.error)) {
       reason = json.error as GoogleLoginError;
     }
   } catch {

@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { getUnreadCount } from "@snr/core";
 import { getSupabase } from "../lib/supabase";
 import { useAsyncData } from "./useAsyncData";
@@ -15,7 +17,23 @@ import { useAsyncData } from "./useAsyncData";
  * — бэйдж просто не покажется, и это верное поведение: врать числом хуже,
  * чем промолчать.
  */
+
+/**
+ * 18.08.2026 — счётчик не уменьшался после прочтения. Причин было ДВЕ, и
+ * закрыты обе.
+ *
+ * Первая — здесь: useAsyncData с пустым списком зависимостей читает один раз
+ * при монтировании. Таб-бар живёт всю сессию и не размонтируется, поэтому
+ * число, посчитанное при входе в приложение, так и висело до перезапуска.
+ * Теперь запрос повторяется каждый раз, когда экран получает фокус, — то есть
+ * при любом возврате из списка уведомлений.
+ *
+ * Вторая — в самом списке: он не помечал ничего прочитанным (см.
+ * NotificationsScreen).
+ */
 export function useUnreadNotifications(): number {
-  const state = useAsyncData(() => getUnreadCount(getSupabase()), []);
+  const [tick, setTick] = useState(0);
+  useFocusEffect(useCallback(() => { setTick((n) => n + 1); }, []));
+  const state = useAsyncData(() => getUnreadCount(getSupabase()), [tick]);
   return state.data ?? 0;
 }

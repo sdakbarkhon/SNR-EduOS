@@ -11,6 +11,7 @@
  */
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fonts, useTheme } from "../theme";
@@ -20,6 +21,18 @@ export interface InnerHeaderProps {
   title: string;
   /** Размер заголовка Unbounded 600: 15 (строка 689) или 16 (часть экранов). */
   titleSize?: 15 | 16;
+  /** Что делать по «назад». НЕОБЯЗАТЕЛЕН: без него шапка сама вернётся на
+   *  предыдущий экран.
+   *
+   *  18.08.2026 — раньше без этого свойства кнопка не делала НИЧЕГО: экран
+   *  отзывов, карточка предмета, список предметов, статус дня, домашнее
+   *  задание и профиль ребёнка передавать его забыли, и «назад» там просто не
+   *  реагировал. Молчаливая кнопка хуже отсутствующей: человек жмёт её ещё и
+   *  ещё, считая, что завис экран.
+   *
+   *  Поэтому поведение по умолчанию — goBack(), а свойство осталось для
+   *  редких экранов, которым нужно уйти не на предыдущий (например закрыть
+   *  локальную шторку вместо ухода со всего экрана). */
   onBackPress?: () => void;
   /** Правый слот (кнопки действий). */
   right?: ReactNode;
@@ -33,6 +46,13 @@ export function InnerHeader({
 }: InnerHeaderProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  // canGoBack() обязателен: на самом первом экране стека возвращаться некуда,
+  // и goBack() там был бы тихой пустышкой — той же, от которой уходим.
+  const handleBack = onBackPress ?? (() => {
+    if (navigation.canGoBack()) navigation.goBack();
+  });
 
   return (
     <View
@@ -45,7 +65,7 @@ export function InnerHeader({
         paddingBottom: 8,
       }}
     >
-      <GlassCircleButton onPress={onBackPress}>
+      <GlassCircleButton onPress={handleBack}>
         {/* Стрелка «назад» 18 stroke 2 (строка 688). */}
         <Svg
           width={18}

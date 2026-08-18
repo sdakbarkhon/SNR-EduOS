@@ -102,6 +102,7 @@ export interface Dictionary {
     errorParseFailed: string;   // "Не удалось распарсить план"
   };
   auth: {
+    googleDemoSchool: string;
     googleNotLinked: string;
     googleNoAccount: string;
     googleSchoolArchived: string;
@@ -3575,6 +3576,7 @@ export interface Dictionary {
       demoSigningIn: string;
       demoFailed: string;
       demoHint: string;
+      googleDemoSchool: string;
       withGoogle: string;
       withApple: string;
       soonBadge: string;   // «скоро» на неактивной кнопке

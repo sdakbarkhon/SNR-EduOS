@@ -198,6 +198,8 @@ export function LoginPhoneScreen() {
     not_linked: t.googleNotLinked,
     no_account: t.googleNoAccount,
     school_archived: t.googleSchoolArchived,
+    // Демо через Google не открывается — у него своя кнопка прямо ниже.
+    demo_school: t.googleDemoSchool,
     failed: t.googleFailed,
     expo_go: t.googleWebOnly,
     config_error: t.configError,

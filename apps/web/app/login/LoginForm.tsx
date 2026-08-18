@@ -91,6 +91,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
     else if (g === "no_account") setError(t.googleNoAccount);
     else if (g === "school_archived") setError(t.googleSchoolArchived);
     else if (g === "wrong_school") setError(t.googleWrongSchool);
+    else if (g === "demo_school") setError(t.googleDemoSchool);
     else if (g === "failed") setError(t.googleFailed);
     // «cancelled» — не ошибка: человек сам нажал «Отмена» у Google.
   }, [searchParams, t]);

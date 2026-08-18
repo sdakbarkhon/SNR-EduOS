@@ -107,6 +107,7 @@ export const en: Dictionary = {
     errorParseFailed: "Failed to parse the plan",
   },
   auth: {
+    googleDemoSchool: "The demo cannot be entered through Google. Use the Demo button on the sign-in screen.",
     googleNotLinked: "This Google address is not linked to any account. Ask your school administrator, or sign in with your username and password.",
     googleNoAccount: "The address matched, but there is no account yet. Ask your school administrator.",
     googleSchoolArchived: "This school is no longer active. Ask your school administrator.",
@@ -3452,6 +3453,7 @@ export const en: Dictionary = {
       demoSigningIn: "Opening the demo…",
       demoFailed: "All demo seats are taken right now. Try again in a few minutes.",
       demoHint: "Look around without a phone number or code",
+      googleDemoSchool: "The demo cannot be entered through Google. Use the Demo button on the sign-in screen.",
       withGoogle: "Continue with Google",
       withApple: "Continue with Apple",
       soonBadge: "soon",

@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { getUnreadThreadCount } from "@snr/core";
 import { getSupabase } from "../lib/supabase";
 import { useAsyncData } from "./useAsyncData";
@@ -17,7 +19,12 @@ import { useAsyncData } from "./useAsyncData";
  * При ошибке хук вернёт 0 — бейдж просто не покажется: промолчать честнее,
  * чем показать неверное число.
  */
+/** Перечитывается при получении фокуса — см. разбор в useUnreadNotifications:
+ *  таб-бар не размонтируется, и разовый запрос при монтировании держал число
+ *  неизменным всю сессию. */
 export function useUnreadThreads(): number {
-  const state = useAsyncData(() => getUnreadThreadCount(getSupabase()), []);
+  const [tick, setTick] = useState(0);
+  useFocusEffect(useCallback(() => { setTick((n) => n + 1); }, []));
+  const state = useAsyncData(() => getUnreadThreadCount(getSupabase()), [tick]);
   return state.data ?? 0;
 }
