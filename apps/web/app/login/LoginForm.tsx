@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, User, Lock, ArrowRight, GraduationCap, Sparkles } from "lucide-react";
+import { Eye, EyeOff, User, Lock, ArrowRight, Sparkles } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { loginWithUsername, loginWithUsernameInSchool } from "@/app/actions/auth";
@@ -216,8 +216,8 @@ export function LoginForm({ locale }: { locale: Locale }) {
       {/* Промт 6.2.3: логотип вынесен ИЗ карточки — стоит отдельно, крупно,
           по центру, над карточкой. mb-10 (40px) — отступ до карточки;
           h-[76px] → ширина ≈226px (диапазон 200-240px по аспекту логотипа
-          849:285). Иконка-шапочка выпускника осталась внутри карточки, как
-          была изначально (см. ниже).
+          849:285). Квадратик со значком шапочки убран 18.08.2026: он ничего
+          не сообщал, а держал над содержимым пустую полосу.
           lg:hidden — на lg+ уже виден большой логотип в BrandingColumn
           (page.tsx: тот же breakpoint, "hidden ... lg:flex"); без этого
           на широком экране показывались оба логотипа одновременно. */}
@@ -233,17 +233,13 @@ export function LoginForm({ locale }: { locale: Locale }) {
             контент на планшете 768 — теперь высота card естественная,
             скроллится вся страница (page.tsx: min-h-screen). */}
         <div className="p-6 [@media(max-height:760px)]:p-4">
-          <div className="mb-4 [@media(max-height:760px)]:mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 shadow-sm">
-            <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
-          </div>
-
           {/* Школа — крупно и по центру: логотип, под ним название. Раньше это
               была мелкая строка сбоку, и человек, за которого выбор подставился
               из памяти браузера, её просто не замечал. Заголовок при этом
               уходит: две крупные надписи подряд спорят друг с другом, а
               «в какую школу вхожу» важнее, чем «это экран входа». */}
           {picked?.school ? (
-            <div className="mb-5 [@media(max-height:760px)]:mb-3 flex flex-col items-center text-center">
+            <div className="mb-5 [@media(max-height:760px)]:mb-3 flex flex-col items-center pt-1 text-center">
               <SchoolMark name={picked.school.name} logoUrl={picked.school.logoUrl} size="xl" />
               <p className="mt-3 text-lg font-bold leading-tight text-slate-900">{picked.school.name}</p>
               <button
