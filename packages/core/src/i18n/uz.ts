@@ -2760,6 +2760,13 @@ export const uz: Dictionary = {
     noFile: "Fayl biriktirilmagan",
   },
   ai: {
+    workElapsed: "{n} s o‘tdi",
+    workUsually: "odatda taxminan {n} s",
+    workStepModel: "SI dars bosqichlarini tuzmoqda",
+    workStepSaving: "Bosqichlar darsga saqlanmoqda",
+    workStepMaterials: "Kutubxonadan materiallar biriktirilmoqda",
+    workStepHomework: "SI topshiriq tuzmoqda",
+    workOf: "{n} dan {i}",
     chat: {
       title: "Robobot",
       placeholder: "Savol yozing…",

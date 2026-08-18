@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import { getDictionary, type Locale, type CodeLanguage, type ExternalServiceType } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { AiWorkProgress, useTypicalDuration } from "@/components/AiWorkProgress";
+import { AI_TASKS } from "@/lib/ai/usage";
 import { EduOSAssistantIcon } from "@/components/EduOSAssistantIcon";
 import { cn } from "@/lib/cn";
 import { SERVICE_CONFIG, EXTERNAL_SERVICE_ORDER, isExternalService } from "@/lib/external-services";
@@ -59,6 +61,10 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
   const [hints, setHints] = useState("");
   const [bundleTypes, setBundleTypes] = useState<Set<BundleSubtaskType>>(new Set());
   const [generating, setGenerating] = useState(false);
+  // Здесь шаг ровно один: составление задания — это единственный запрос, и
+  // разбить его на видимые части нечем. Поэтому показываем честно один шаг,
+  // прошедшее время и типичную длительность из настоящих замеров.
+  const typicalMs = useTypicalDuration(AI_TASKS.generateHomework);
   const [error, setError] = useState("");
 
   // Reset transient state whenever the modal is (re)opened/closed so a
@@ -196,6 +202,18 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
 
           {error && <p className="text-[13px] font-medium text-danger">{error}</p>}
         </div>
+
+        {generating && (
+          <div className="shrink-0 border-t border-slate-100 px-6 py-3">
+            <AiWorkProgress
+              currentIndex={0}
+              typicalMs={typicalMs}
+              hintElapsed={d.ai.workElapsed}
+              hintUsually={d.ai.workUsually}
+              steps={[{ key: "model", label: d.ai.workStepHomework }]}
+            />
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">

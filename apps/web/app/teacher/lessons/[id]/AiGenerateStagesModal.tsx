@@ -12,6 +12,8 @@ import { addLessonStage, replaceQuizQuestions, getDictionary, linkLessonMaterial
 import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide, QuizQuestionInput } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
+import { AiWorkProgress, useTypicalDuration, type WorkStep } from "@/components/AiWorkProgress";
+import { AI_TASKS } from "@/lib/ai/usage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -143,6 +145,17 @@ export function AiGenerateStagesModal({
   const [adding, setAdding] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
+  // Настоящие шаги работы, а не крутящийся кружок.
+  //
+  // Шага три, и только первый непрозрачен: это один запрос к серверу, внутри
+  // которого модель и генерация картинок. Второй и третий клиент выполняет
+  // сам, по одному этапу за раз, поэтому у них есть точный счёт «3 из 7».
+  // Типичная длительность первого берётся из настоящих замеров учёта.
+  const [workStep, setWorkStep] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
+  const [totalToSave, setTotalToSave] = useState(0);
+  const typicalMs = useTypicalDuration(AI_TASKS.generateStages);
+
   // Fetch attached materials once.
   useEffect(() => {
     let cancelled = false;
@@ -222,6 +235,8 @@ export function AiGenerateStagesModal({
     }
     setAdding(true);
     setGenError("");
+    setTotalToSave(toAdd.length);
+    setSavedCount(0);
     try {
       for (const s of toAdd) {
         const config: Record<string, unknown> = {};
@@ -256,7 +271,9 @@ export function AiGenerateStagesModal({
           }));
           await replaceQuizQuestions(db, newStage.id, questions).catch(() => null);
         }
+        setSavedCount((n) => n + 1);
       }
+      setWorkStep(2);
       // Пачка «240 пустых уроков», ЧАСТЬ 3 — финальный шаг: прицепить до 3
       // книг БЗ того же предмета (БЕЗ вызова Gemini, чистое сопоставление
       // subjectName -> canonical slug -> books.subject). Best-effort — этапы
@@ -277,6 +294,8 @@ export function AiGenerateStagesModal({
     if (!topic.trim()) return;
     setGenerating(true);
     setGenError("");
+    setWorkStep(0);
+    setSavedCount(0);
     try {
       const res = await fetch("/api/ai/generate-stages", {
         method: "POST",
@@ -296,6 +315,7 @@ export function AiGenerateStagesModal({
         return;
       }
       setResult(data);
+      setWorkStep(1);
       await addToLesson(data.stages);
     } catch {
       setGenError(t.error);
@@ -423,6 +443,31 @@ export function AiGenerateStagesModal({
                   )}
                 </div>
               </div>
+
+              {/* Настоящие шаги вместо крутящегося кружка. Показываются только
+                  во время работы; форма при этом остаётся на экране, чтобы
+                  учитель видел, что именно генерируется. */}
+              {(generating || adding) && (
+                <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 dark:border-blue-500/20 dark:bg-blue-500/5">
+                  <AiWorkProgress
+                    currentIndex={workStep}
+                    typicalMs={typicalMs}
+                    hintElapsed={d.ai.workElapsed}
+                    hintUsually={d.ai.workUsually}
+                    steps={[
+                      { key: "model", label: d.ai.workStepModel },
+                      {
+                        key: "save",
+                        label: d.ai.workStepSaving,
+                        detail: totalToSave > 0
+                          ? d.ai.workOf.replace("{i}", String(savedCount)).replace("{n}", String(totalToSave))
+                          : undefined,
+                      },
+                      { key: "materials", label: d.ai.workStepMaterials },
+                    ] as WorkStep[]}
+                  />
+                </div>
+              )}
 
               {genError && (
                 <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">

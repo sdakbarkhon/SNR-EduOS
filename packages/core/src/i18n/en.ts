@@ -2760,6 +2760,13 @@ export const en: Dictionary = {
     noFile: "No file attached",
   },
   ai: {
+    workElapsed: "{n} s elapsed",
+    workUsually: "usually about {n} s",
+    workStepModel: "The AI is drafting the lesson stages",
+    workStepSaving: "Saving the stages into the lesson",
+    workStepMaterials: "Attaching materials from the library",
+    workStepHomework: "The AI is drafting the assignment",
+    workOf: "{i} of {n}",
     chat: {
       title: "Robocat",
       placeholder: "Ask a question…",

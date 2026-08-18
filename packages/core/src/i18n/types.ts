@@ -2858,6 +2858,13 @@ export interface Dictionary {
     noFile: string;
   };
   ai: {
+    workElapsed: string;
+    workUsually: string;
+    workStepModel: string;
+    workStepSaving: string;
+    workStepMaterials: string;
+    workStepHomework: string;
+    workOf: string;
     chat: {
       title: string;             // "Робокот"
       placeholder: string;       // "Напиши вопрос…"
