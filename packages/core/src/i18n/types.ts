@@ -77,6 +77,16 @@ export interface Dictionary {
     errorParseFailed: string;   // "Не удалось распарсить план"
   };
   auth: {
+    chooseSchoolTitle: string;
+    chooseSchoolSubtitle: string;
+    chooseSchoolLoading: string;
+    chooseSchoolNone: string;
+    chooseSchoolSkip: string;
+    chooseSchoolSkipHint: string;
+    chooseSchoolChange: string;
+    chooseSchoolLabel: string;
+    wrongSchool: string;
+    wrongSchoolNamed: string;
     title: string;
     usernameLabel: string;
     usernamePlaceholder: string;

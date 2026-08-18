@@ -35,6 +35,13 @@ type LoginResult =
   // сообщения, и смешивать их значит врать посетителю про причину.
   // school_archived — миграция 202: школа убрана в архив, вход закрыт.
   | { ok: false; error: "invalid" | "failed" | "all_busy" | "demo_unavailable" | "school_archived"; reason?: string }
+  // 18.08.2026 — на входе появился первый экран с выбором школы. Логин
+  // подошёл, но принадлежит другой школе: человек выбрал не ту плитку.
+  // Отдельный вид отказа, а не "invalid": пароль-то верный, и говорить
+  // «неверный логин или пароль» здесь было бы прямой неправдой. schoolName —
+  // настоящая школа этого логина; называть её можно, потому что пароль уже
+  // проверен, то есть перед нами владелец учётной записи.
+  | { ok: false; error: "wrong_school"; schoolName: string | null; reason?: string }
   // Z.2.10 — один логин в нескольких школах: спрашиваем, в какую входить.
   // reason здесь не используется, но объявлен: DemoRoleModal читает
   // result.reason на всём объединении, и без него сужение по error ломается.
@@ -106,11 +113,55 @@ async function resolveLoginCandidates(
   });
 }
 
+/**
+ * Школа вошедшего — для сверки с той, что он выбрал на первом экране.
+ *
+ * Возвращает `{ schoolId: null }` для суперадминистратора: школы у него нет
+ * вовсе, и это не ошибка, а его нормальное состояние. Такой ответ означает
+ * «сверять не с чем, пропускай».
+ *
+ * Ищет по всем четырём ролям, у которых есть school_id: ученик, учитель,
+ * администратор, родитель. Родитель тут обязателен — про него легко забыть,
+ * потому что в резолвере логинов (resolveLoginCandidates) его нет: там ищут
+ * по колонке username, а у родителя её не существует, он входит по телефону.
+ */
+async function schoolOfUser(
+  userId: string,
+): Promise<{ schoolId: string | null; schoolName: string | null; isDemo: boolean }> {
+  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyAdmin = admin as any;
+
+  const [sup, st, te, ad, pa] = await Promise.all([
+    anyAdmin.from("super_admins").select("id").eq("user_id", userId).maybeSingle(),
+    anyAdmin.from("students").select("school_id").eq("user_id", userId).maybeSingle(),
+    anyAdmin.from("teachers").select("school_id").eq("user_id", userId).maybeSingle(),
+    anyAdmin.from("admins").select("school_id").eq("user_id", userId).maybeSingle(),
+    anyAdmin.from("parents").select("school_id").eq("user_id", userId).maybeSingle(),
+  ]);
+
+  if (sup.data) return { schoolId: null, schoolName: null, isDemo: false };
+
+  const schoolId = (st.data?.school_id ?? te.data?.school_id ?? ad.data?.school_id ?? pa.data?.school_id ?? null) as string | null;
+  if (!schoolId) return { schoolId: null, schoolName: null, isDemo: false };
+
+  const { data: school } = await anyAdmin.from("schools").select("name, is_demo").eq("id", schoolId).maybeSingle();
+  return {
+    schoolId,
+    schoolName: (school as { name: string } | null)?.name ?? null,
+    isDemo: Boolean((school as { is_demo: boolean } | null)?.is_demo),
+  };
+}
+
 /** Общий хвост успешного входа: сессия, снятие демо-куки, адрес назначения. */
 async function finishLogin(
   supabase: Awaited<ReturnType<typeof createClient>>,
   user: { id: string },
   accessToken: string,
+  /** Школа, выбранная на первом экране. null — выбора не было (суперадмин
+   *  нажал «войти без выбора», или список школ не открылся): тогда сверять
+   *  не с чем и вход идёт как раньше. */
+  expectedSchoolId?: string | null,
 ): Promise<LoginResult> {
   // Школа в архиве — вход закрыт (миграция 202). Проверка стоит ЗДЕСЬ, на
   // входе, а не в middleware на каждом запросе: архив — редкое событие, и
@@ -120,6 +171,24 @@ async function finishLogin(
   if (activeSchool === false) {
     await supabase.auth.signOut({ scope: "local" });
     return { ok: false, error: "school_archived" };
+  }
+
+  // Выбрана школа — проверяем, из неё ли этот логин. Проверка стоит ПОСЛЕ
+  // успешной проверки пароля: до неё мы не знаем, кто перед нами, и любой
+  // ответ был бы подсказкой постороннему.
+  //
+  // Пропускаются двое:
+  //   • суперадминистратор — школы у него нет, упереться в этот шаг он не
+  //     должен;
+  //   • демо-аккаунт — демо-школы в списке нет и не будет (у неё своя
+  //     кнопка), поэтому прямой вход демо-логином остаётся рабочим ровно
+  //     как был.
+  if (expectedSchoolId) {
+    const mine = await schoolOfUser(user.id);
+    if (mine.schoolId && !mine.isDemo && mine.schoolId !== expectedSchoolId) {
+      await supabase.auth.signOut({ scope: "local" });
+      return { ok: false, error: "wrong_school", schoolName: mine.schoolName };
+    }
   }
 
   await registerSession({ userId: user.id, accessToken });
@@ -156,6 +225,10 @@ async function resolveDest(
 export async function loginWithUsername(
   username: string,
   password: string,
+  /** Школа, выбранная на первом экране входа. Необязательна: суперадмин
+   *  входит без выбора, и если список школ вообще не открылся, экран
+   *  показывает обычную форму — вход не должен зависеть от нового шага. */
+  schoolId?: string | null,
 ): Promise<LoginResult> {
   const supabase = await createClient();
   // Обычный путь — как был. Сегодня он закрывает 100% случаев, потому что
@@ -165,7 +238,7 @@ export async function loginWithUsername(
     // Обычный логин — не демо. Cookie DEMO_SESSION_COOKIE ставится ТОЛЬКО
     // при demoLogin. Здесь защитно снимаем, если она осталась от предыдущей
     // демо-сессии этого же браузера.
-    return finishLogin(supabase, result.data.user, result.data.session.access_token);
+    return finishLogin(supabase, result.data.user, result.data.session.access_token, schoolId);
   }
 
   // Z.2.10 — не вышло по простому адресу: возможно, логин живёт во второй
@@ -179,12 +252,31 @@ export async function loginWithUsername(
     if (single.error || !single.data.user || !single.data.session) {
       return { ok: false, error: "invalid" };
     }
-    return finishLogin(supabase, single.data.user, single.data.session.access_token);
+    return finishLogin(supabase, single.data.user, single.data.session.access_token, schoolId);
   }
 
-  // Настоящая коллизия: логин есть в нескольких школах. Пароль здесь НЕ
-  // проверяем — иначе форма превратилась бы в способ узнать, в какой школе
-  // он подходит. Спрашиваем школу и проверяем пароль уже под неё.
+  // Настоящая коллизия: логин есть в нескольких школах.
+  //
+  // Если школа УЖЕ выбрана на первом экране — второй вопрос лишний, ответ на
+  // него получен заранее: берём кандидата этой школы. Ради этого выбор школы
+  // и полезен помимо картинки — одинаковые логины перестают спрашиваться.
+  if (schoolId) {
+    const picked = candidates.find((c) => c.schoolId === schoolId);
+    if (picked) {
+      const signed = await supabase.auth.signInWithPassword({ email: picked.email, password });
+      if (signed.error || !signed.data.user || !signed.data.session) {
+        return { ok: false, error: "invalid" };
+      }
+      return finishLogin(supabase, signed.data.user, signed.data.session.access_token, schoolId);
+    }
+    // Логин есть, но ни один из его аккаунтов не в выбранной школе. Пароль
+    // здесь НЕ проверен, поэтому настоящую школу назвать нельзя — это
+    // превратило бы форму в способ узнать, где заведён чужой логин.
+    return { ok: false, error: "wrong_school", schoolName: null };
+  }
+
+  // Школа не выбрана — старый второй шаг. Пароль здесь НЕ проверяем: иначе
+  // форма превратилась бы в способ узнать, в какой школе он подходит.
   return {
     ok: false,
     error: "pick_school",

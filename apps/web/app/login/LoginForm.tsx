@@ -9,6 +9,8 @@ import type { Locale } from "@snr/core";
 import { loginWithUsername, loginWithUsernameInSchool } from "@/app/actions/auth";
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 import { Logo } from "@/components/Logo";
+import { SchoolMark } from "@/components/SchoolMark";
+import { SchoolPicker, rememberSchool, type PublicSchool } from "./SchoolPicker";
 
 function GoogleIcon() {
   return (
@@ -50,6 +52,19 @@ export function LoginForm({ locale }: { locale: Locale }) {
   // Z.2.10 — второй шаг появляется ТОЛЬКО при настоящей коллизии: один логин
   // заведён в нескольких школах. Пока населена одна школа, он недостижим.
   const [schoolChoices, setSchoolChoices] = useState<Array<{ id: string; name: string }> | null>(null);
+
+  // 18.08.2026 — первый шаг входа: выбор школы.
+  //
+  // `null` — шаг ещё идёт, форма логина не показана. Как только шаг пройден
+  // (школа выбрана, или школ нет, или человек вошёл без выбора), сюда
+  // ложится объект: `school` — выбранная школа либо null.
+  //
+  // Проверка «свой ли это логин для выбранной школы» живёт НА СЕРВЕРЕ
+  // (finishLogin). Здесь только показ: браузеру такие решения не доверяем.
+  const [picked, setPicked] = useState<{ school: PublicSchool | null } | null>(null);
+  // Запомненный выбор подставляет сам SchoolPicker: он и так грузит список,
+  // и название с логотипом берёт оттуда же. Здесь про localStorage знать
+  // незачем — кроме кнопки «Сменить школу» ниже.
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -92,7 +107,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
     if (!result.ok) {
       setLoading(false);
       setSchoolChoices(null);
-      setError(t.invalid);
+      setError(result.error === "wrong_school" ? t.wrongSchool : t.invalid);
       return;
     }
     const dest = result.dest;
@@ -112,7 +127,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
     // parent > teacher > student).
     let result: Awaited<ReturnType<typeof loginWithUsername>>;
     try {
-      result = await loginWithUsername(username, password);
+      result = await loginWithUsername(username, password, picked?.school?.id ?? null);
     } catch {
       setLoading(false);
       setError(t.invalid);
@@ -122,6 +137,15 @@ export function LoginForm({ locale }: { locale: Locale }) {
       setLoading(false);
       if (result.error === "pick_school") {
         setSchoolChoices(result.schools);
+        return;
+      }
+      // Пароль верный, но логин из другой школы. Говорить «неверный логин или
+      // пароль» здесь было бы прямой неправдой, и человек искал бы опечатку
+      // там, где её нет.
+      if (result.error === "wrong_school") {
+        setError(result.schoolName
+          ? t.wrongSchoolNamed.replace("{name}", result.schoolName)
+          : t.wrongSchool);
         return;
       }
       setError(t.invalid);
@@ -176,10 +200,37 @@ export function LoginForm({ locale }: { locale: Locale }) {
             {t.title}
           </h1>
 
-          {/* Z.2.10 — один логин заведён в нескольких школах: спрашиваем, в
-              какую входить. Пароль проверяется уже под выбранную школу,
-              поэтому форма не подсказывает, где он подходит. */}
-          {schoolChoices ? (
+          {/* Выбранная школа — над формой, с логотипом и возможностью
+              передумать. Без этой строки человек, за которого выбор
+              подставился из памяти браузера, не понял бы, куда входит. */}
+          {picked?.school && (
+            <div className="mb-4 [@media(max-height:760px)]:mb-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-white/70 px-3 py-2.5">
+              <SchoolMark name={picked.school.name} logoUrl={picked.school.logoUrl} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t.chooseSchoolLabel}</p>
+                <p className="truncate text-sm font-semibold text-slate-800">{picked.school.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { rememberSchool(null); setPicked(null); setError(null); setSchoolChoices(null); }}
+                className="shrink-0 text-xs font-medium text-slate-500 underline hover:text-slate-700"
+              >
+                {t.chooseSchoolChange}
+              </button>
+            </div>
+          )}
+
+          {/* Первый шаг. Пока школа не выбрана (и шаг не пропущен), формы
+              логина нет вовсе. Если школ не окажется или список не откроется,
+              SchoolPicker сам позовёт onSkip и форма появится немедленно —
+              вход не должен зависеть от нового шага. */}
+          {picked === null ? (
+            <SchoolPicker
+              locale={locale}
+              onPick={(school) => setPicked({ school })}
+              onSkip={() => setPicked({ school: null })}
+            />
+          ) : schoolChoices ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-slate-700">{t.pickSchoolTitle}</p>
               {schoolChoices.map((sc) => (
@@ -286,15 +337,21 @@ export function LoginForm({ locale }: { locale: Locale }) {
           </form>
           )}
 
-          <div className="mt-3 [@media(max-height:760px)]:mt-1.5 text-center">
-            <button
-              type="button"
-              onClick={() => showNotice(t.comingSoon)}
-              className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
-            >
-              {t.forgot}
-            </button>
-          </div>
+          {/* «Забыли пароль» на шаге выбора школы не показываем: человек ещё
+              не сказал, кто он, и восстанавливать нечего. Ряд ниже — демо и
+              OAuth — остаётся на месте всегда: демо это отдельная дверь, и
+              она работает ровно как работала. */}
+          {picked !== null && (
+            <div className="mt-3 [@media(max-height:760px)]:mt-1.5 text-center">
+              <button
+                type="button"
+                onClick={() => showNotice(t.comingSoon)}
+                className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
+              >
+                {t.forgot}
+              </button>
+            </div>
+          )}
 
           <div className="my-4 [@media(max-height:760px)]:my-2 flex items-center gap-3">
             <div className="h-px flex-1 bg-white/40" />
