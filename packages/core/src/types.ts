@@ -516,6 +516,11 @@ export type CurriculumPlanWithTopics = CurriculumPlan & {
  *  для селектора темы в форме создания урока ("использована в N уроках"). */
 export type CurriculumTopicWithUsage = CurriculumPlanTopic & {
   used_in_lessons: number;
+  /** Первый урок, созданный по этой теме, — чтобы кнопка вела К НЕМУ, а не
+   *  плодила дубль. null, если уроков по теме ещё нет. Если их несколько
+   *  (тему можно было использовать повторно), берётся самый ранний. */
+  lesson_id: string | null;
+  lesson_starts_at: string | null;
 };
 
 // migration 118 — Промт 5Б: сохранённые проекты песочницы. service_id —

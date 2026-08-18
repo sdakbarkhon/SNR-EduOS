@@ -102,19 +102,84 @@ export async function deleteCurriculumPlanTopic(db: Db, topicId: string): Promis
 }
 
 /** Темы плана + сколько НОВЫХ уроков (curriculum_topic_id) уже используют
- *  каждую — для лейбла "использована в N уроках" в селекторе формы урока. */
+ *  каждую, и ссылка на самый ранний из них.
+ *
+ *  Ссылка нужна кнопке «Создать урок» рядом с темой: если урок уже есть,
+ *  кнопка обязана вести к нему, а не создавать второй. Раньше возвращался
+ *  только счётчик, поэтому показать урок было нечем — только надпись
+ *  «Урок создан», никуда не ведущая.
+ *
+ *  Сортировка по starts_at, а не по created_at: «первый урок по теме» для
+ *  человека — тот, что раньше в расписании. */
 export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Promise<CurriculumTopicWithUsage[]> {
   const [{ data: topics, error: topicsErr }, { data: lessons, error: lessonsErr }] = await Promise.all([
     (db as AnyDb).from("curriculum_plan_topics").select("*").eq("plan_id", planId).order("order_index"),
-    (db as AnyDb).from("lessons").select("curriculum_topic_id").not("curriculum_topic_id", "is", null),
+    (db as AnyDb)
+      .from("lessons")
+      .select("id, curriculum_topic_id, starts_at")
+      .not("curriculum_topic_id", "is", null)
+      .order("starts_at"),
   ]);
   if (topicsErr) throw topicsErr;
   if (lessonsErr) throw lessonsErr;
+
   const usageCount = new Map<string, number>();
-  for (const l of (lessons ?? []) as Array<{ curriculum_topic_id: string }>) {
+  const firstLesson = new Map<string, { id: string; starts_at: string }>();
+  for (const l of (lessons ?? []) as Array<{ id: string; curriculum_topic_id: string; starts_at: string }>) {
     usageCount.set(l.curriculum_topic_id, (usageCount.get(l.curriculum_topic_id) ?? 0) + 1);
+    // Список уже отсортирован по времени — первым встреченным и будет самый
+    // ранний, поэтому переписывать запись не нужно.
+    if (!firstLesson.has(l.curriculum_topic_id)) {
+      firstLesson.set(l.curriculum_topic_id, { id: l.id, starts_at: l.starts_at });
+    }
   }
-  return ((topics ?? []) as CurriculumPlanTopic[]).map((t) => ({ ...t, used_in_lessons: usageCount.get(t.id) ?? 0 }));
+
+  return ((topics ?? []) as CurriculumPlanTopic[]).map((t) => ({
+    ...t,
+    used_in_lessons: usageCount.get(t.id) ?? 0,
+    lesson_id: firstLesson.get(t.id)?.id ?? null,
+    lesson_starts_at: firstLesson.get(t.id)?.starts_at ?? null,
+  }));
+}
+
+/** Добавить свою тему в план — рядом с теми, что пришли из разбора файла.
+ *
+ *  ВСТАЁТ В КОНЕЦ. order_index = максимальный + 1. Так предсказуемее всего:
+ *  учитель дописывает то, чего не хватило в файле, а это почти всегда
+ *  продолжение, а не вставка в середину. Переставить её потом можно теми же
+ *  стрелками, что и любую другую тему, — отдельного механизма вставки «куда
+ *  укажу» не заводим, он дублировал бы уже работающую перестановку.
+ *
+ *  Нумерация не ломается: order_index у существующих тем не трогается вовсе,
+ *  а номер в списке — это позиция при показе, а не хранимое поле. */
+export async function createCurriculumPlanTopic(
+  db: Db,
+  input: { planId: string; title: string; description?: string | null; estimatedLessons?: number },
+): Promise<CurriculumPlanTopic> {
+  const { data: last, error: lastErr } = await (db as AnyDb)
+    .from("curriculum_plan_topics")
+    .select("order_index")
+    .eq("plan_id", input.planId)
+    .order("order_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lastErr) throw lastErr;
+
+  const nextIndex = ((last as { order_index: number } | null)?.order_index ?? -1) + 1;
+
+  const { data, error } = await (db as AnyDb)
+    .from("curriculum_plan_topics")
+    .insert({
+      plan_id: input.planId,
+      order_index: nextIndex,
+      title: input.title,
+      description: input.description ?? null,
+      estimated_lessons: input.estimatedLessons ?? 1,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as CurriculumPlanTopic;
 }
 
 /** Загружает файл плана в бакет curriculum-plans (миграция 116) — путь

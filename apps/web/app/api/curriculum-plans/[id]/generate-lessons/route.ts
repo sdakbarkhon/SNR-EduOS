@@ -1,62 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMySchoolNowMs } from "@/lib/school-time-server";
-import { getCurriculumPlanById, getCurriculumTopicsWithUsage, createLesson, getGroupLessonsInDateRange } from "@snr/core";
+import { getCurriculumPlanById, getCurriculumTopicsWithUsage, createLesson } from "@snr/core";
+import { planLessonSlots, ROOM, SLOT_DURATION_MIN } from "@/lib/curriculum-lesson-planner";
 
-// Учебные планы, Часть 2А — "Создать все уроки автоматически": раскладывает
-// НЕиспользованные темы плана по одной в день начиная с 1 августа 2026,
-// начиная с 09:00 либо со следующего свободного слота (45 мин урок + 10 мин
-// перемена) у ЭТОЙ группы. Идемпотентно: тема считается "уже использована",
-// если у неё уже есть привязанный урок (lessons.curriculum_topic_id) — такие
-// темы пропускаются, повторный вызов не создаёт дублей.
+// Учебные планы — создание уроков из тем плана.
+//
+// ОДИН РОУТ НА ОБА СЛУЧАЯ. Без тела — раскладывает ВСЕ неиспользованные темы
+// (кнопка «Создать все автоматически», как было). С телом {"topicId": "..."} —
+// ровно одну тему (кнопка «Создать урок» рядом с темой). Это не два способа, а
+// один с фильтром: та же проверка прав, та же раскладка по свободным слотам
+// (lib/curriculum-lesson-planner.ts), тот же createLesson, та же
+// идемпотентность.
+//
+// ИДЕМПОТЕНТНОСТЬ. Тема считается использованной, если у неё уже есть
+// привязанный урок (lessons.curriculum_topic_id). Такие темы пропускаются, и
+// повторный вызов дублей не создаёт — в том числе если по кнопке щёлкнули
+// дважды подряд.
+//
+// ЭТАПЫ УРОКА здесь не создаются и не должны: стартовый и итоговый этапы
+// заводит триггер trg_lesson_default_stages на самой таблице lessons. Так это
+// работает для ЛЮБОГО способа создания урока, включая обычную форму, — своей
+// логики этапов ни у одного из путей нет.
 
-const AUTO_START_DATE = "2026-08-01";
-const SLOT_START_MIN = 9 * 60; // 09:00
-const SLOT_DURATION_MIN = 45;
-const SLOT_STRIDE_MIN = 55; // урок 45 + перемена 10
-const MAX_SLOTS_PER_DAY = 16; // 09:00 .. ~22:00, с большим запасом
-const ROOM = "Кабинет 101";
-
-function addDaysUTC(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + days);
-  return dt.toISOString().slice(0, 10);
-}
-
-function tashkentDateOf(iso: string): string {
-  const utcMs = new Date(iso).getTime();
-  return new Date(utcMs + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-function minutesToHHMM(mins: number): string {
-  const h = Math.floor(mins / 60), m = mins % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-/** Первый свободный слот сетки на эту дату для этой группы, либо null если день занят целиком. */
-function findFreeSlot(dayLessons: Array<{ starts_at: string; ends_at: string | null }>, date: string): string | null {
-  for (let n = 0; n < MAX_SLOTS_PER_DAY; n++) {
-    const startMin = SLOT_START_MIN + n * SLOT_STRIDE_MIN;
-    const hhmm = minutesToHHMM(startMin);
-    const candStartMs = new Date(`${date}T${hhmm}:00+05:00`).getTime();
-    const candEndMs = candStartMs + SLOT_DURATION_MIN * 60 * 1000;
-    const overlaps = dayLessons.some((l) => {
-      const ls = new Date(l.starts_at).getTime();
-      const le = l.ends_at ? new Date(l.ends_at).getTime() : ls + SLOT_DURATION_MIN * 60 * 1000;
-      return candStartMs < le && candEndMs > ls;
-    });
-    if (!overlaps) return hhmm;
-  }
-  return null;
-}
-
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: planId } = await params;
   const db = await createClient();
 
   const { data: { user } } = await db.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Тело необязательное: старый вызов «создать все» шлёт POST без него вовсе,
+  // и падать на разборе пустого тела нельзя.
+  let onlyTopicId: string | null = null;
+  try {
+    const body = (await req.json()) as { topicId?: string } | null;
+    onlyTopicId = body?.topicId?.trim() ? body.topicId : null;
+  } catch { /* тела нет — значит «создать все» */ }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: teacher, error: teacherErr } = await (db as any)
@@ -91,66 +71,51 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка загрузки тем" }, { status: 500 });
   }
-  const unused = topicsWithUsage.filter((t) => t.used_in_lessons === 0).sort((a, b) => a.order_index - b.order_index);
-  const skipped = topicsWithUsage.length - unused.length;
+
+  // Тема из тела должна принадлежать ЭТОМУ плану: id приходит от клиента, и
+  // проверка владения планом сама по себе чужую тему не отсекает.
+  if (onlyTopicId && !topicsWithUsage.some((t) => t.id === onlyTopicId)) {
+    return NextResponse.json({ error: "Тема не найдена в этом плане" }, { status: 404 });
+  }
+
+  const candidates = onlyTopicId
+    ? topicsWithUsage.filter((t) => t.id === onlyTopicId)
+    : topicsWithUsage;
+  const unused = candidates.filter((t) => t.used_in_lessons === 0).sort((a, b) => a.order_index - b.order_index);
+  const skipped = candidates.length - unused.length;
 
   if (unused.length === 0) {
-    return NextResponse.json({ created: 0, skipped, lessons: [], message: "Все темы плана уже созданы как уроки" });
+    // Урок уже есть — возвращаем ссылку на него, а не отказ: кнопка рядом с
+    // темой должна привести к существующему уроку, а не сообщить об ошибке.
+    const already = candidates[0];
+    return NextResponse.json({
+      created: 0,
+      skipped,
+      lessons: [],
+      existingLessonId: already?.lesson_id ?? null,
+      message: onlyTopicId ? "Урок по этой теме уже создан" : "Все темы плана уже созданы как уроки",
+    });
   }
 
-  const rangeTo = addDaysUTC(AUTO_START_DATE, unused.length + 30);
-  let existingLessons;
-  try {
-    existingLessons = await getGroupLessonsInDateRange(db, plan.group_id, AUTO_START_DATE, rangeTo);
-  } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка проверки занятости расписания" }, { status: 500 });
-  }
-
-  const lessonsByDate = new Map<string, Array<{ starts_at: string; ends_at: string | null }>>();
-  for (const l of existingLessons) {
-    const key = tashkentDateOf(l.starts_at);
-    if (!lessonsByDate.has(key)) lessonsByDate.set(key, []);
-    lessonsByDate.get(key)!.push(l);
-  }
-
-  const assignments: Array<{ topicId: string; title: string; description: string | null; date: string; time: string }> = [];
-  let cursorDate = AUTO_START_DATE;
-  for (const topic of unused) {
-    let assigned = false;
-    for (let guard = 0; guard < 400 && !assigned; guard++) {
-      const dayLessons = lessonsByDate.get(cursorDate) ?? [];
-      const slot = findFreeSlot(dayLessons, cursorDate);
-      if (slot) {
-        assignments.push({ topicId: topic.id, title: topic.title, description: topic.description, date: cursorDate, time: slot });
-        // Занимаем слот сразу же, чтобы следующая тема (если вдруг попадёт на
-        // тот же день из-за guard-обхода) не встала в тот же промежуток.
-        const startsAtMs = new Date(`${cursorDate}T${slot}:00+05:00`).getTime();
-        lessonsByDate.set(cursorDate, [...dayLessons, {
-          starts_at: new Date(startsAtMs).toISOString(),
-          ends_at: new Date(startsAtMs + SLOT_DURATION_MIN * 60 * 1000).toISOString(),
-        }]);
-        cursorDate = addDaysUTC(cursorDate, 1);
-        assigned = true;
-      } else {
-        cursorDate = addDaysUTC(cursorDate, 1);
-      }
-    }
-    if (!assigned) {
-      return NextResponse.json({
-        error: `Не удалось найти свободный слот для темы «${topic.title}» — расписание группы забито слишком плотно`,
-        created: assignments.length,
-      }, { status: 500 });
-    }
-  }
-
-  const created: Array<{ topicId: string; title: string; date: string; time: string }> = [];
   // Z.3, заход 2 — валидация даты создаваемого урока от времени школы
-  // учителя. Один раз до цикла: значение не меняется от урока к уроку.
+  // учителя. Нужен и раскладке: она не должна предлагать прошедшие даты.
   const nowMs = await getMySchoolNowMs(db);
+
+  let assignments;
+  try {
+    assignments = await planLessonSlots(db, plan.group_id, unused, nowMs);
+  } catch (e) {
+    return NextResponse.json({
+      error: e instanceof Error ? e.message : "Ошибка подбора места в расписании",
+      created: 0,
+    }, { status: 500 });
+  }
+
+  const created: Array<{ topicId: string; title: string; date: string; time: string; lessonId: string }> = [];
 
   for (const a of assignments) {
     try {
-      await createLesson(db, {
+      const lesson = await createLesson(db, {
         groupId: plan.group_id,
         startsAt: `${a.date}T${a.time}:00+05:00`,
         durationMinutes: SLOT_DURATION_MIN,
@@ -160,7 +125,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         subjectId: plan.subject_id,
         curriculumTopicId: a.topicId,
       }, nowMs);
-      created.push({ topicId: a.topicId, title: a.title, date: a.date, time: a.time });
+      created.push({ topicId: a.topicId, title: a.title, date: a.date, time: a.time, lessonId: lesson.id });
     } catch (e) {
       return NextResponse.json({
         error: `Создано ${created.length} из ${assignments.length}. Ошибка на теме «${a.title}»: ${e instanceof Error ? e.message : "неизвестная ошибка"}`,

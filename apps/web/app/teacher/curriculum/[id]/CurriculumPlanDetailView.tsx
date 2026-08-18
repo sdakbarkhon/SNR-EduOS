@@ -5,13 +5,16 @@ import Link from "next/link";
 import {
   ArrowLeft, ChevronUp, ChevronDown, Pencil, Trash2, Check,
   Sparkles, ListPlus, LayoutTemplate, AlertTriangle, CalendarPlus, Loader2,
+  Plus, ArrowRight,
 } from "lucide-react";
 import {
   getCurriculumTopicsWithUsage, updateCurriculumPlanTopic,
   reorderCurriculumPlanTopics, deleteCurriculumPlanTopic, createLesson,
+  createCurriculumPlanTopic, getDictionary,
 } from "@snr/core";
-import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "@snr/core";
+import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
+import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { useRealtimeChannel } from "@/lib/realtime";
@@ -26,7 +29,9 @@ function topicWord(n: number): string {
 type GenerateLessonsResult = {
   created: number;
   skipped?: number;
-  lessons?: Array<{ topicId: string; title: string; date: string; time: string }>;
+  lessons?: Array<{ topicId: string; title: string; date: string; time: string; lessonId?: string }>;
+  /** Урок по теме уже был — роут возвращает его, чтобы кнопка привела к нему. */
+  existingLessonId?: string | null;
   message?: string;
   error?: string;
 };
@@ -42,6 +47,8 @@ export function CurriculumPlanDetailView({
   const schoolNowMs = useSchoolNowSnapshot();
   const db = createClient();
   const isOwner = plan.teacher_id === teacherId;
+  const { locale } = useLocale();
+  const tt = getDictionary(locale as Locale).teacher;
 
   // Большой фикс, Блок 6, ЗАДАЧА 1 — фоновый парсинг: пока status='processing'
   // тем ещё нет (background-parse дописывает их асинхронно), поэтому текущий
@@ -81,8 +88,11 @@ export function CurriculumPlanDetailView({
     }
   }
 
+  // Первый рендер идёт с сервера, где связей с уроками ещё не считали, —
+  // отсюда нули и пустые ссылки. Настоящие значения подставит эффект ниже,
+  // до этого момента кнопки скрыты флагом usageLoaded.
   const [topics, setTopics] = useState<CurriculumTopicWithUsage[]>(
-    plan.topics.map((t) => ({ ...t, used_in_lessons: 0 })),
+    plan.topics.map((t) => ({ ...t, used_in_lessons: 0, lesson_id: null, lesson_starts_at: null })),
   );
   const [usageLoaded, setUsageLoaded] = useState(false);
 
@@ -211,12 +221,101 @@ export function CurriculumPlanDetailView({
         subjectId: plan.subject_id,
         curriculumTopicId: t.id,
       }, schoolNowMs());
-      setTopics((cur) => cur.map((x) => (x.id === t.id ? { ...x, used_in_lessons: x.used_in_lessons + 1 } : x)));
+      // Перечитываем из базы, а не дорисовываем счётчик: строке нужна ещё и
+      // ссылка на созданный урок, иначе рядом с темой останется «Урок создан»,
+      // никуда не ведущее.
+      const fresh = await getCurriculumTopicsWithUsage(db, plan.id).catch(() => null);
+      if (fresh) setTopics(fresh);
+      else setTopics((cur) => cur.map((x) => (x.id === t.id ? { ...x, used_in_lessons: x.used_in_lessons + 1 } : x)));
     } catch (e) {
       setOneByOneError({ id: t.id, message: e instanceof Error ? e.message : "Не удалось создать урок" });
     } finally {
       setOneByOneBusy(null);
     }
+  }
+
+  // ── Кнопка «Создать урок» рядом с темой ─────────────────────────────────
+  //
+  // Идёт в ТОТ ЖЕ роут, что и «создать все автоматически», только с одной
+  // темой в теле. Значит место в расписании подбирается теми же правилами
+  // (1 августа 2026, 09:00, шаг 55 минут, свободный слот группы), а группа и
+  // предмет берутся из плана — спрашивать их не у кого и незачем.
+  //
+  // Дата и время НЕ спрашиваются: у темы плана нет своего времени, а
+  // придумывать его руками ради каждой темы — ровно та работа, от которой
+  // кнопка избавляет. Что получилось, показывается тут же строкой «Урок 3
+  // августа в 09:00», и урок открывается ссылкой.
+  const [creatingFor, setCreatingFor] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<{ id: string; message: string } | null>(null);
+
+  async function handleCreateLessonForTopic(t: CurriculumTopicWithUsage) {
+    if (creatingFor) return;
+    setCreatingFor(t.id);
+    setCreateError(null);
+    try {
+      const res = await fetch(`/api/curriculum-plans/${plan.id}/generate-lessons`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topicId: t.id }),
+      });
+      const json = (await res.json()) as GenerateLessonsResult;
+      if (!res.ok) {
+        setCreateError({ id: t.id, message: json.error || "Не удалось создать урок" });
+        return;
+      }
+      // Перечитываем темы, а не дорисовываем счётчик в состоянии: ссылка на
+      // урок и его время приходят из базы, и придумывать их на клиенте
+      // значило бы показать не то, что записано.
+      const fresh = await getCurriculumTopicsWithUsage(db, plan.id).catch(() => null);
+      if (fresh) setTopics(fresh);
+    } catch {
+      setCreateError({ id: t.id, message: "Ошибка сети" });
+    } finally {
+      setCreatingFor(null);
+    }
+  }
+
+  // ── Кнопка «Добавить тему» ──────────────────────────────────────────────
+  const [adding, setAdding] = useState(false);
+  const [addTitle, setAddTitle] = useState("");
+  const [addDescription, setAddDescription] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  async function handleAddTopic() {
+    const title = addTitle.trim();
+    if (!title) { setAddError(tt.curAddTopicEmpty); return; }
+    setAddBusy(true);
+    setAddError(null);
+    try {
+      const created = await createCurriculumPlanTopic(db, {
+        planId: plan.id,
+        title,
+        description: addDescription.trim() || null,
+      });
+      // Своя тема ведёт себя как любая другая: у неё нет уроков, поэтому
+      // used_in_lessons = 0 — и кнопка «Создать урок» у неё сразу активна.
+      setTopics((cur) => [...cur, { ...created, used_in_lessons: 0, lesson_id: null, lesson_starts_at: null }]);
+      setAddTitle("");
+      setAddDescription("");
+      setAdding(false);
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : tt.curAddTopicFailed);
+    } finally {
+      setAddBusy(false);
+    }
+  }
+
+  /** «2026-08-03T09:00:00+05:00» → дата и время по-ташкентски, как их увидит
+   *  группа. toLocaleString с часовым поясом, а не срез строки: сервер может
+   *  вернуть время в UTC. */
+  function lessonWhen(iso: string): { date: string; time: string } {
+    const dt = new Date(iso);
+    const opts = { timeZone: "Asia/Tashkent" } as const;
+    return {
+      date: dt.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", { ...opts, day: "numeric", month: "long" }),
+      time: dt.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", { ...opts, hour: "2-digit", minute: "2-digit" }),
+    };
   }
 
   const inputCls = "rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -316,11 +415,23 @@ export function CurriculumPlanDetailView({
                   </button>
                 )}
                 {t.description && <p className="mt-1 text-xs text-slate-500">{t.description}</p>}
-                <div className="mt-1.5 flex items-center gap-2">
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   {t.used_in_lessons > 0 ? (
-                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                      Урок создан{t.used_in_lessons > 1 ? ` (${t.used_in_lessons})` : ""}
-                    </span>
+                    <>
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        Урок создан{t.used_in_lessons > 1 ? ` (${t.used_in_lessons})` : ""}
+                      </span>
+                      {/* Урок уже есть — ведём К НЕМУ, а не создаём второй.
+                          Рядом стоит когда он: без этого «урок создан» не
+                          говорит, куда именно он встал. */}
+                      {t.lesson_starts_at && (
+                        <span className="text-[10px] text-slate-400">
+                          {tt.curTopicLessonAt
+                            .replace("{date}", lessonWhen(t.lesson_starts_at).date)
+                            .replace("{time}", lessonWhen(t.lesson_starts_at).time)}
+                        </span>
+                      )}
+                    </>
                   ) : usageLoaded && (
                     <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
                       Урок не создан
@@ -328,6 +439,7 @@ export function CurriculumPlanDetailView({
                   )}
                 </div>
                 {rowError?.id === t.id && <p className="mt-1 text-[11px] text-red-500">{rowError.message}</p>}
+                {createError?.id === t.id && <p className="mt-1 text-[11px] text-red-500">{createError.message}</p>}
 
                 {oneByOneMode && isOwner && t.used_in_lessons === 0 && (
                   <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-dashed border-slate-100 pt-2.5">
@@ -355,6 +467,28 @@ export function CurriculumPlanDetailView({
                   </div>
                 )}
               </div>
+              {/* Кнопка рядом с темой. Всегда на виду, а не за режимом внизу
+                  страницы: создание урока — то, ради чего в план и заходят. */}
+              {isOwner && editingId !== t.id && (
+                t.lesson_id ? (
+                  <Link
+                    href={`/teacher/lessons/${t.lesson_id}`}
+                    className="flex shrink-0 items-center gap-1 self-start rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    {tt.curTopicOpenLesson}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                ) : usageLoaded && (
+                  <button
+                    onClick={() => handleCreateLessonForTopic(t)}
+                    disabled={creatingFor !== null}
+                    className="flex shrink-0 items-center gap-1 self-start rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5" />
+                    {creatingFor === t.id ? tt.curTopicCreating : tt.curTopicCreateLesson}
+                  </button>
+                )
+              )}
               {isOwner && editingId !== t.id && (
                 <div className="flex shrink-0 items-center gap-1">
                   <button onClick={() => moveTopic(i, -1)} disabled={i === 0 || reordering} className="rounded-lg p-1 text-slate-300 hover:bg-slate-50 hover:text-slate-600 disabled:opacity-30">
@@ -371,6 +505,60 @@ export function CurriculumPlanDetailView({
             </div>
           </div>
         ))}
+
+        {/* Своя тема. Раньше темы появлялись только из разобранного файла —
+            дописать своё было нельзя вовсе. Встаёт в конец списка; переставить
+            можно теми же стрелками, что и любую другую. */}
+        {isOwner && (
+          adding ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
+              <p className="text-xs font-bold text-slate-900">{tt.curAddTopicTitle}</p>
+              <input
+                autoFocus
+                value={addTitle}
+                onChange={(e) => { setAddTitle(e.target.value); setAddError(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddTopic();
+                  if (e.key === "Escape") { setAdding(false); setAddError(null); }
+                }}
+                placeholder={tt.curAddTopicPlaceholder}
+                className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <textarea
+                value={addDescription}
+                onChange={(e) => setAddDescription(e.target.value)}
+                placeholder={tt.curAddTopicDescription}
+                rows={2}
+                className="mt-2 w-full resize-y rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <p className="mt-1.5 text-[11px] text-slate-400">{tt.curAddTopicHint}</p>
+              {addError && <p className="mt-1 text-[11px] text-red-500">{addError}</p>}
+              <div className="mt-2.5 flex gap-2">
+                <button
+                  onClick={() => { setAdding(false); setAddError(null); }}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleAddTopic}
+                  disabled={addBusy}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {addBusy ? tt.curAddTopicSaving : tt.curAddTopicSave}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAdding(true)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-slate-200 bg-white/60 py-3 text-xs font-bold text-slate-500 hover:border-blue-300 hover:text-blue-600"
+            >
+              <Plus className="h-4 w-4" />
+              {tt.curAddTopic}
+            </button>
+          )
+        )}
       </div>
 
       {/* Часть 2 — три способа создания уроков */}

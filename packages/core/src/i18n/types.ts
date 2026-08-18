@@ -2344,6 +2344,20 @@ export interface Dictionary {
     completedGoNow: string;
   };
   teacher: {
+    curTopicCreateLesson: string;
+    curTopicCreating: string;
+    curTopicOpenLesson: string;
+    curTopicLessonAt: string;
+    curTopicLessonExists: string;
+    curAddTopic: string;
+    curAddTopicTitle: string;
+    curAddTopicPlaceholder: string;
+    curAddTopicDescription: string;
+    curAddTopicHint: string;
+    curAddTopicSave: string;
+    curAddTopicSaving: string;
+    curAddTopicEmpty: string;
+    curAddTopicFailed: string;
     role: string;
     navHome: string;
     navHomework: string;
