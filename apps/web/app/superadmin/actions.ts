@@ -10,6 +10,7 @@ import {
   type SchoolWipePreview, type WipeResult,
 } from "@/lib/school-lifecycle";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   readCardFields, removeSchoolLogo, uploadSchoolLogo,
 } from "@/lib/school-card";
@@ -162,7 +163,8 @@ export async function actionUpdateSchoolAdmin(formData: FormData) {
   // кого-либо В демо-школу.
   await assertAdminIsManageable({ adminId: admin_id });
   await assertSchoolIsManageable(school_id);
-  await updateSchoolAdmin(admin_id, { full_name, school_id });
+  const google_email = String(formData.get("google_email") ?? "").trim() || null;
+  await updateSchoolAdmin(admin_id, { full_name, school_id, google_email });
   revalidatePath("/superadmin/admins");
 }
 
@@ -183,6 +185,27 @@ export async function actionResetSchoolAdminPassword(userId: string) {
   const newPassword = await resetSchoolAdminPassword(userId);
   revalidatePath("/superadmin/admins");
   return newPassword;
+}
+
+/**
+ * Почта Google самому суперадминистратору (миграция 214).
+ *
+ * Пишет он себе сам — ролей выше него нет, и просить кого-то другого вписать
+ * ему адрес некого. Уникальность по всем пяти ролям держит база: тот же
+ * триггер, что у остальных.
+ */
+export async function actionSetOwnGoogleEmail(formData: FormData) {
+  const user = await verifySuperAdmin();
+  const raw = String(formData.get("google_email") ?? "").trim().toLowerCase();
+  const value = raw === "" ? null : raw;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (createAdminClient() as any)
+    .from("super_admins")
+    .update({ google_email: value })
+    .eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath("/superadmin/settings");
 }
 
 export async function actionChangeOwnPassword(formData: FormData) {

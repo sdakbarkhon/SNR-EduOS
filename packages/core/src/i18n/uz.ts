@@ -311,6 +311,8 @@ export const uz: Dictionary = {
     teacherLegendNone: "Belgilanmagan",
   },
   admin: {
+    googleBlockTitle: "Google orqali kirish",
+    googleBlockHint: "Ixtiyoriy. Pochta kiritilsa, odam login va parol o‘rniga Google orqali kira oladi. Bitta pochta — bitta odam.",
     fieldGoogleEmailAny: "Google pochtasi (ixtiyoriy)",
     fieldGoogleEmailHint: "Kiritilsa — odam Google tugmasi orqali, login va parolsiz kira oladi. Bitta pochta — bitta odam.",
     anAiTitle: "SI sharhi",
@@ -629,6 +631,9 @@ export const uz: Dictionary = {
     subjectsOwnNameWarning: "O'z nomingiz standart belgi va rangga ega bo'ladi: tizim faqat ro'yxatdagi o'nta nomni taniydi.",
   },
   superadmin: {
+    googleEmailSavedMsg: "Pochta saqlandi",
+    googleBlockTitle: "Google orqali kirish",
+    googleBlockHint: "Ixtiyoriy. Pochta kiritilsa, odam login va parol o‘rniga Google orqali kira oladi. Bitta pochta — bitta odam.",
     fieldGoogleEmailAny: "Google pochtasi (ixtiyoriy)",
     schoolCardTitle: "Maktab kartasi: {name}",
     schoolEditBtn: "O‘zgartirish",

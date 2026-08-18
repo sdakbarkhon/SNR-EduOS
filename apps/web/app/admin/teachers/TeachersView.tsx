@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
@@ -391,9 +392,7 @@ export function TeachersView({
             >
               <Field label={t.fieldFullName}><Input name="full_name" required defaultValue={modal.teacher.full_name} /></Field>
               <Field label={t.fieldUsername}><Input name="username" required defaultValue={modal.teacher.username ?? ""} autoCapitalize="none" /></Field>
-              {/* Почта Google — необязательна: вписана, значит учитель может
-                  входить кнопкой Google. Одна почта — один человек, держит база. */}
-              <Field label={t.fieldGoogleEmailAny}><Input name="google_email" type="email" defaultValue={modal.teacher.googleEmail ?? ""} autoCapitalize="none" /></Field>
+              <GoogleEmailField defaultValue={modal.teacher.googleEmail} placeholder="anna@gmail.com" />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60">
@@ -484,8 +483,7 @@ function AddTeacherForm({
     >
       <Field label={t.fieldFullName}><Input name="full_name" required placeholder="Анна Смирнова" /></Field>
       <Field label={t.fieldUsername}><Input name="username" required placeholder="teacher_anna" autoCapitalize="none" /></Field>
-      <Field label={t.fieldGoogleEmailAny}><Input name="google_email" type="email" placeholder="anna@gmail.com" autoCapitalize="none" /></Field>
-      <p className="text-xs text-gray-500">{t.fieldGoogleEmailHint}</p>
+      <GoogleEmailField placeholder="anna@gmail.com" />
       <Field label={t.fieldPassword}>
         <div className="flex gap-2">
           <input

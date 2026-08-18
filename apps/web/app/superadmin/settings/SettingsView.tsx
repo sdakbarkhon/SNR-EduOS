@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
-import { actionChangeOwnPassword } from "../actions";
+import { actionChangeOwnPassword, actionSetOwnGoogleEmail } from "../actions";
+import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 
-export function SettingsView() {
+export function SettingsView({ googleEmail }: { googleEmail?: string | null }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.superadmin;
@@ -31,6 +32,38 @@ export function SettingsView() {
           {flashMsg}
         </div>
       )}
+
+      {/* Почта для входа через Google — себе. Ролей выше суперадминистратора
+          нет, просить кого-то вписать ему адрес некого, поэтому единственное
+          место, где это можно сделать, — его собственные настройки
+          (миграция 214). */}
+      <div className="max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
+        <h2 className="mb-4 text-base font-semibold text-gray-700">{t.googleBlockTitle}</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            startTransition(async () => {
+              try {
+                await actionSetOwnGoogleEmail(fd);
+                flash(t.googleEmailSavedMsg);
+              } catch (err) {
+                flash(humanizeAdminError(err, locale as Locale));
+              }
+            });
+          }}
+          className="space-y-4"
+        >
+          <GoogleEmailField defaultValue={googleEmail} placeholder="super@gmail.com" />
+          <button
+            type="submit"
+            disabled={isPending}
+            className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+          >
+            {t.schoolSaveBtn}
+          </button>
+        </form>
+      </div>
 
       <div className="max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
         <h2 className="mb-4 text-base font-semibold text-gray-700">{t.changePassword}</h2>

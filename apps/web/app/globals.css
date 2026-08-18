@@ -4,7 +4,32 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hide scrollbars while keeping scroll functionality */
+/* ─── Полосы прокрутки скрыты во всём приложении ───────────────────────────
+   18.08.2026. Серая полоса вылезала в боковом меню админки и в любом другом
+   блоке с прокруткой — при полупрозрачном стекле и цветных градиентах она
+   выглядит как чужая деталь.
+
+   ПРОКРУТКА ПРИ ЭТОМ ЖИВАЯ. Скрывается только сама полоса: display:none на
+   псевдоэлементе ::-webkit-scrollbar и scrollbar-width:none в Firefox не
+   отключают прокрутку — колесо мыши, палец на планшете, стрелки, PageUp/Down,
+   Home/End и перетаскивание выделением работают как работали. Это оформление,
+   а не поведение.
+
+   Правило общее (`*`), а не по классам: полоса вылезает там, где о ней не
+   думали, — новый длинный список появится завтра, и его снова придётся
+   вылавливать глазами. Класс .scrollbar-hide оставлен: на него ссылается
+   существующая разметка, и снимать его ради чистоты значит трогать десятки
+   файлов без всякой пользы. */
+* {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* старый Edge */
+}
+*::-webkit-scrollbar {            /* Chrome, Safari, новый Edge */
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
 

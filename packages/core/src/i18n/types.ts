@@ -307,6 +307,8 @@ export interface Dictionary {
     teacherLegendNone: string;
   };
   admin: {
+    googleBlockTitle: string;
+    googleBlockHint: string;
     fieldGoogleEmailAny: string;
     fieldGoogleEmailHint: string;
     anAiTitle: string;
@@ -637,6 +639,9 @@ export interface Dictionary {
     subjectsOwnNameWarning: string;
   };
   superadmin: {
+    googleEmailSavedMsg: string;
+    googleBlockTitle: string;
+    googleBlockHint: string;
     fieldGoogleEmailAny: string;
     schoolCardTitle: string;
     schoolEditBtn: string;

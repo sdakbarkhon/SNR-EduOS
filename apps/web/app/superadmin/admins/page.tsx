@@ -28,12 +28,13 @@ export default async function SuperAdminAdminsPage({
 
   let adminRows: {
     id: string; user_id: string | null; full_name: string; school_id: string; created_at: string;
+    google_email?: string | null;
   }[] = [];
 
   if (schoolIds.length > 0) {
     const { data: admins, error: adminsError } = await sb
       .from("admins")
-      .select("id, user_id, full_name, school_id, created_at")
+      .select("id, user_id, full_name, school_id, created_at, google_email")
       .in("school_id", schoolIds)
       .order("full_name");
     if (adminsError) console.error("[SuperAdminAdminsPage] admins query failed:", adminsError.message);

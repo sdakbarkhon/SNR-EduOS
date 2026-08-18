@@ -311,6 +311,8 @@ export const ru: Dictionary = {
     teacherLegendNone: "Не отмечен",
   },
   admin: {
+    googleBlockTitle: "Вход через Google",
+    googleBlockHint: "Необязательно. Если вписать почту, человек сможет входить через Google вместо логина и пароля. Одна почта — один человек.",
     fieldGoogleEmailAny: "Почта Google (необязательно)",
     fieldGoogleEmailHint: "Если вписать — человек сможет входить кнопкой Google, без логина и пароля. Одна почта — один человек.",
     anAiTitle: "Разбор от ИИ",
@@ -629,6 +631,9 @@ export const ru: Dictionary = {
     subjectsOwnNameWarning: "У своего названия будет стандартный значок и цвет: система узнаёт только десять названий из списка.",
   },
   superadmin: {
+    googleEmailSavedMsg: "Почта сохранена",
+    googleBlockTitle: "Вход через Google",
+    googleBlockHint: "Необязательно. Если вписать почту, человек сможет входить через Google вместо логина и пароля. Одна почта — один человек.",
     fieldGoogleEmailAny: "Почта Google (необязательно)",
     schoolCardTitle: "Карточка школы: {name}",
     schoolEditBtn: "Изменить",

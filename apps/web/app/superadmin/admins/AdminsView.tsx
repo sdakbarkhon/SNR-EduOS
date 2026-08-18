@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Plus, X, RefreshCw, Pencil, Trash2, KeyRound } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import {
   actionCreateSchoolAdmin, actionUpdateSchoolAdmin,
@@ -17,6 +18,8 @@ type Admin = {
   full_name: string;
   school_id: string;
   created_at: string;
+  /** Почта Google для входа (миграция 213). */
+  googleEmail?: string | null;
 };
 
 type School = { id: string; name: string };
@@ -223,7 +226,7 @@ export function AdminsView({
               <Field label={t.fieldUsername}><Input name="username" required placeholder="admin_maktab2" autoCapitalize="none" /></Field>
               {/* Почту администратора вписывает суперадминистратор — сам себе
                   администратор её назначить не может. */}
-              <Field label={t.fieldGoogleEmailAny}><Input name="google_email" type="email" placeholder="admin@gmail.com" autoCapitalize="none" /></Field>
+              <GoogleEmailField placeholder="admin@gmail.com" />
               <Field label={t.fieldPassword}>
                 <div className="flex gap-2">
                   <input
@@ -299,6 +302,7 @@ export function AdminsView({
                   ))}
                 </select>
               </Field>
+              <GoogleEmailField defaultValue={modal.admin.googleEmail} placeholder="admin@gmail.com" />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">

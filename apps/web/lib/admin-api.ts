@@ -1167,12 +1167,12 @@ export async function createSchoolAdmin(data: {
  *  — this function itself has no auth context, same as the rest of this file). */
 export async function updateSchoolAdmin(
   adminId: string,
-  data: { full_name: string; school_id: string },
+  data: { full_name: string; school_id: string; google_email?: string | null },
 ) {
   const sb = getServiceClient();
   const { error } = await sb
     .from("admins")
-    .update({ full_name: data.full_name, school_id: data.school_id })
+    .update({ full_name: data.full_name, school_id: data.school_id, google_email: normalizeSocialEmail(data.google_email) })
     .eq("id", adminId);
   if (error) throw error;
 }

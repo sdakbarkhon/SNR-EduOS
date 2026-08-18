@@ -311,6 +311,8 @@ export const en: Dictionary = {
     teacherLegendNone: "Not marked",
   },
   admin: {
+    googleBlockTitle: "Sign in with Google",
+    googleBlockHint: "Optional. Fill in an address and the person can sign in with Google instead of a username and password. One address, one person.",
     fieldGoogleEmailAny: "Google address (optional)",
     fieldGoogleEmailHint: "Fill it in and the person can sign in with the Google button, without a username or password. One address, one person.",
     anAiTitle: "AI review",
@@ -629,6 +631,9 @@ export const en: Dictionary = {
     subjectsOwnNameWarning: "A custom name gets the default icon and colour: the system recognises only the ten names in the list.",
   },
   superadmin: {
+    googleEmailSavedMsg: "Address saved",
+    googleBlockTitle: "Sign in with Google",
+    googleBlockHint: "Optional. Fill in an address and the person can sign in with Google instead of a username and password. One address, one person.",
     fieldGoogleEmailAny: "Google address (optional)",
     schoolCardTitle: "School card: {name}",
     schoolEditBtn: "Edit",

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { gradeFromGroupName } from "@/lib/group-grade";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
@@ -372,14 +373,9 @@ function AddStudentModal({
         <Field label={t.fieldUsername}>
           <Input name="username" required placeholder="alisher_07" autoCapitalize="none" />
         </Field>
-        {/* Почта Google — необязательна. Вписал администратор — человек может
-            входить кнопкой Google, не вписал — входит логином и паролем, как
-            раньше. Одна почта принадлежит одному человеку, и это держит база
-            (миграция 213), а не форма. */}
-        <Field label={t.fieldGoogleEmailAny}>
-          <Input name="google_email" type="email" placeholder="ivan@gmail.com" autoCapitalize="none" />
-          <p className="mt-1 text-xs text-gray-500">{t.fieldGoogleEmailHint}</p>
-        </Field>
+        {/* Один блок на все роли — см. components/admin/GoogleEmailField.tsx.
+            Раньше здесь стояло голое поле без единого слова о том, зачем оно. */}
+        <GoogleEmailField placeholder="alisher@gmail.com" />
         <Field label={t.fieldPassword}>
           <div className="flex gap-2">
             <Input
@@ -460,10 +456,7 @@ function EditStudentModal({
         <Field label={t.fieldUsername}>
           <Input name="username" required defaultValue={student.username} autoCapitalize="none" />
         </Field>
-        <Field label={t.fieldGoogleEmailAny}>
-          <Input name="google_email" type="email" defaultValue={student.googleEmail ?? ""} autoCapitalize="none" />
-          <p className="mt-1 text-xs text-gray-500">{t.fieldGoogleEmailHint}</p>
-        </Field>
+        <GoogleEmailField defaultValue={student.googleEmail} placeholder="alisher@gmail.com" />
         <Field label={t.fieldGroup}>
           <Select name="group_id" defaultValue={currentGroupId}>
             <option value="">{t.noGroupOption}</option>

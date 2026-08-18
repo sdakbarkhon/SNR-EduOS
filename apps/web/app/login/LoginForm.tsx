@@ -239,6 +239,8 @@ export function LoginForm({ locale }: { locale: Locale }) {
               из памяти браузера, её просто не замечал. Заголовок при этом
               уходит: две крупные надписи подряд спорят друг с другом, а
               «в какую школу вхожу» важнее, чем «это экран входа». */}
+          {/* Школа известна — логотип и название; ещё нет — заголовок. Место
+              под шапку занято в обоих случаях, поэтому карточка не прыгает. */}
           {picked?.school ? (
             <div className="mb-5 [@media(max-height:760px)]:mb-3 flex flex-col items-center pt-1 text-center">
               <SchoolMark name={picked.school.name} logoUrl={picked.school.logoUrl} size="xl" />
@@ -274,11 +276,18 @@ export function LoginForm({ locale }: { locale: Locale }) {
             />
           )}
 
-          {picked === null ? (
-            // Пока школа не выбрана, форму не показываем: над ней окно, и
-            // мелькающие под ним поля только сбивают с толку.
-            <p className="py-6 text-center text-sm text-slate-400">{t.chooseSchoolLoading}</p>
-          ) : schoolChoices ? (
+          {/* 18.08.2026 — КАРТОЧКА БОЛЬШЕ НЕ ЖДЁТ СПИСОК ШКОЛ.
+              Было: пока список не пришёл, здесь стояла одна строка «Загружаем
+              список школ…», и карточка держалась маленькой. Замер в браузере:
+              страница готова за 335 мс, шрифты за 151 мс, а запрос списка школ
+              длился 3510 мс — всё это время человек смотрел на узкую карточку,
+              которая потом разом становилась формой. Выглядело как «грузится
+              шесть секунд и раскрывается», хотя анимации нет вовсе
+              (transition-duration 0s — проверено).
+              Стало: форма рисуется сразу и в полный размер, а школа
+              подставляется в шапку, когда приедет. Ждать её незачем — школа
+              нужна только в момент отправки, а не для показа полей. */}
+          {schoolChoices ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-slate-700">{t.pickSchoolTitle}</p>
               {schoolChoices.map((sc) => (
@@ -370,7 +379,9 @@ export function LoginForm({ locale }: { locale: Locale }) {
 
             <button
               type="submit"
-              disabled={loading || isPending}
+              // Пока школа не выбрана, отправлять нечего: форма видна, но
+              // кнопка ждёт. Это честнее, чем прятать всю форму.
+              disabled={loading || isPending || picked === null}
               className="group relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-transparent bg-gradient-to-r from-[#FFC145] to-[#FF6B6B] px-4 py-3 text-base font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="relative z-10 flex items-center gap-2">
