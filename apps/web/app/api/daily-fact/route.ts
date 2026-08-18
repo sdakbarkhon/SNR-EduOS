@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
 
 /**
  * «Сегодня» по Ташкенту, НАСТОЯЩИЕ часы. Z.3, заход 4 — решение заказчика.
@@ -77,7 +78,11 @@ async function fetchAiFact(): Promise<string | null> {
   const prompt =
     `Один короткий интересный факт для школьников. СТРОГО: одно законченное предложение на русском языке, до 140 символов. Без вступления, без кавычек, без тире в начале. Только сам факт.\n` +
     `Примеры: "Сердце синего кита весит около 600 кг." / "Антарктида — самая большая пустыня мира."`;
-  const { text: raw, error } = await generateText(prompt, { maxTokens: 256, thinkingBudget: 0 });
+  const { text: raw, error } = await generateText(prompt, {
+    maxTokens: 256,
+    thinkingBudget: 0,
+    usage: { task: AI_TASKS.dailyFact },
+  });
   if (error || !raw.trim()) return null;
   let text = raw
     .trim()

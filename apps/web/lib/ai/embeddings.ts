@@ -21,6 +21,17 @@
 // apps/web/lib/ai-imagen.ts (тот же приём для Imagen, тоже не покрыт
 // SDK), — прямой fetch к REST API вместо SDK-метода embedContent().
 
+import { recordAiCall, AI_TASKS } from "./usage";
+//
+// УЧЁТ РАСХОДОВ. Файл ходит к модели МИМО gemini-client (прямой REST), поэтому
+// запись вызова добавлена здесь явно — той же единственной функцией
+// recordAiCall. ТОКЕНОВ ЗДЕСЬ НЕТ: ответ embedContent состоит из одного поля
+// embedding.values, блока usageMetadata в нём не бывает — в отличие от
+// generateContent. Поэтому вектора считаются по числу обращений, а токены
+// пишутся пустыми. Врать нулями нельзя: ноль означал бы «вызов был
+// бесплатным». Если понадобится точная цена векторов — придётся звать
+// countTokens отдельным запросом, а это лишний вызов на каждый вектор.
+
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const EMBEDDING_DIMENSIONS = 768;
 const EMBED_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`;
@@ -49,6 +60,7 @@ const BACKOFF_429_MS = [3000, 10000, 30000];
 export async function computeEmbedding(text: string): Promise<number[]> {
   const apiKey = getApiKey();
 
+  const startedAt = Date.now();
   let otherErrorRetried = false;
   for (let attempt = 0; ; attempt++) {
     const controller = new AbortController();
@@ -77,6 +89,10 @@ export async function computeEmbedding(text: string): Promise<number[]> {
       if (values.length !== EMBEDDING_DIMENSIONS) {
         throw new Error(`Unexpected embedding dimensionality: ${values.length} (expected ${EMBEDDING_DIMENSIONS})`);
       }
+      recordAiCall({
+        task: AI_TASKS.embeddings, model: EMBEDDING_MODEL, ok: true,
+        usage: null, durationMs: Date.now() - startedAt,
+      });
       return values;
     } catch (e) {
       const isTimeout = (e as Error)?.name === "AbortError";
@@ -92,12 +108,22 @@ export async function computeEmbedding(text: string): Promise<number[]> {
         console.warn(`[embeddings] timeout after ${GEMINI_TIMEOUT_MS}ms, 1 retry`);
         continue;
       }
-      if (isTimeout) throw new Error(`embedContent timed out after ${GEMINI_TIMEOUT_MS}ms (2 attempts)`);
+      if (isTimeout) {
+        recordAiCall({
+          task: AI_TASKS.embeddings, model: EMBEDDING_MODEL, ok: false,
+          errorReason: `timeout ${GEMINI_TIMEOUT_MS}ms`, durationMs: Date.now() - startedAt,
+        });
+        throw new Error(`embedContent timed out after ${GEMINI_TIMEOUT_MS}ms (2 attempts)`);
+      }
       if (!is429 && !otherErrorRetried) {
         otherErrorRetried = true;
         console.warn(`[embeddings] error "${(e as Error)?.message}", 1 retry`);
         continue;
       }
+      recordAiCall({
+        task: AI_TASKS.embeddings, model: EMBEDDING_MODEL, ok: false,
+        errorReason: (e as Error)?.message ?? "unknown", durationMs: Date.now() - startedAt,
+      });
       throw e;
     } finally {
       clearTimeout(timer);

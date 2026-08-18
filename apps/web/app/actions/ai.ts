@@ -1,6 +1,7 @@
 "use server";
 
 import { chat, generateText } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserRole } from "@/lib/auth";
 import { computeEmbedding } from "@/lib/ai/embeddings";
@@ -112,7 +113,7 @@ export async function getStudyTip(): Promise<{ text: string } | { error: string 
   const supabase = await createClient();
   const today = (await getMySchoolNow(supabase)).toISOString().slice(0, 10);
   const prompt = `Ты — школьный коуч. Дай один практичный совет по учёбе, концентрации или продуктивности — 1-2 предложения, конкретно и по делу. Только совет, без вводных фраз. Дата: ${today}.\n\nДай совет по учёбе на сегодня.`;
-  const { text, error } = await generateText(prompt);
+  const { text, error } = await generateText(prompt, { usage: { task: AI_TASKS.studyTip } });
   if (error) return { error };
   return { text };
 }
@@ -121,7 +122,7 @@ export async function getGradesAdvice(
   gradesSummary: string,
 ): Promise<{ text: string } | { error: string }> {
   const prompt = `Ты — добрый школьный наставник. На основе оценок ученика дай персональный совет: что улучшить, на что обратить внимание, что делать дальше. Ответ — 2-3 предложения, поддерживающий тон, конкретно. Только совет, без вводных.\n\n${gradesSummary}`;
-  const { text, error } = await generateText(prompt);
+  const { text, error } = await generateText(prompt, { usage: { task: AI_TASKS.gradesAdvice } });
   if (error) return { error };
   return { text };
 }

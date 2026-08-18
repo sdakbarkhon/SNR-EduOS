@@ -13,6 +13,7 @@ import {
 } from "@google/generative-ai";
 import { resolveModel, type AiModelTier } from "./config";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAiCall, readUsage, type AiCallContext, type TokenUsage } from "./usage";
 
 // Пачка 3, Задача 2 — глобальный дневной счётчик вызовов Gemini (X/250,
 // миграция 136). withRetry() — единственная точка, через которую проходят
@@ -66,7 +67,17 @@ export type AiOptions = {
   // обрыв на полуслове (см. «Факт дня»). Проверено эмпирически: с
   // thinkingBudget:0 факт приходит целым при maxTokens=256.
   thinkingBudget?: number;
+  /** Учёт расходов: вид задачи, школа, человек. Приходит ИЗ МЕСТА ВЫЗОВА —
+   *  клиент не знает, чем занят вызывающий. Если не передать, вызов всё равно
+   *  запишется, но как "other": так видно, что какое-то место забыли, а не
+   *  тихо потеряно. */
+  usage?: Partial<AiCallContext>;
 };
+
+/** Что возвращает внутренний исполнитель запроса: текст ответа и счётчик
+ *  токенов от провайдера. Раньше здесь была голая строка, и usageMetadata
+ *  выбрасывался — из-за этого учитывать было нечего. */
+type RunResult = { text: string; usage: TokenUsage | null };
 
 function searchTool(useSearch: boolean | undefined): Tool[] | undefined {
   return useSearch ? [{ googleSearchRetrieval: {} }] : undefined;
@@ -106,24 +117,44 @@ function isZeroQuota(message: string): boolean {
  *  может отличаться от запрошенного, если сработал zero-quota downgrade. */
 async function withRetry(
   label: string,
-  requestedTier: AiModelTier | undefined,
-  run: (tier: AiModelTier | undefined) => Promise<string>,
+  options: AiOptions | undefined,
+  run: (tier: AiModelTier | undefined) => Promise<RunResult>,
 ): Promise<AiResult> {
+  const requestedTier = options?.model;
+  // Контекст учёта. Вид задачи по умолчанию — "other": лучше запись с честной
+  // пометкой «место вызова не подписалось», чем молча потерянный вызов.
+  const ctx: AiCallContext = {
+    task: options?.usage?.task ?? "other",
+    schoolId: options?.usage?.schoolId ?? null,
+    studentId: options?.usage?.studentId ?? null,
+    teacherId: options?.usage?.teacherId ?? null,
+  };
+  const startedAt = Date.now();
+  /** Отказ до/вместо ответа модели. Записывается так же, как успех: без этого
+   *  в отчёте не видно, что фича ломалась. */
+  const failed = (reason: string): AiResult => {
+    recordAiCall({ ...ctx, model: resolveModel(requestedTier), ok: false, errorReason: reason, durationMs: Date.now() - startedAt });
+    return { text: "", error: reason };
+  };
+
   let apiKeyPresent = true;
   try {
     getClient();
   } catch {
     apiKeyPresent = false;
   }
-  console.log(`[gemini-client] ${label} | key present:`, apiKeyPresent, "| tier:", requestedTier ?? "flash");
-  if (!apiKeyPresent) return { text: "", error: "API key not configured" };
+  console.log(`[gemini-client] ${label} | key present:`, apiKeyPresent, "| tier:", requestedTier ?? "flash", "| task:", ctx.task);
+  if (!apiKeyPresent) return failed("API key not configured");
 
   let tier = requestedTier;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const text = await run(tier);
-      console.log(`[gemini-client] ${label} done, response length:`, text.length);
+      const { text, usage } = await run(tier);
+      console.log(`[gemini-client] ${label} done, response length:`, text.length, "| tokens:", usage ? `${usage.input}/${usage.output}` : "нет счётчика");
+      // Прежний счётчик обращений — на нём держится дневной предел, трогать
+      // его нельзя. Стоит ровно там же и вызывается ровно так же, как раньше.
       bumpAiUsage();
+      recordAiCall({ ...ctx, model: resolveModel(tier), usage, ok: true, durationMs: Date.now() - startedAt });
       return { text, error: null };
     } catch (e: unknown) {
       if (e instanceof GoogleGenerativeAIFetchError) {
@@ -140,11 +171,11 @@ async function withRetry(
             await sleep(delay);
             continue;
           }
-          return { text: "", error: "Сейчас много запросов, попробуй через минуту" };
+          return failed("Сейчас много запросов, попробуй через минуту");
         }
         if (status === 401 || status === 403) {
           console.error(`[gemini-client] ${label} auth error:`, e.message);
-          return { text: "", error: "AI временно недоступен (ошибка авторизации)" };
+          return failed("AI временно недоступен (ошибка авторизации)");
         }
         if (status >= 500) {
           if (attempt < MAX_RETRIES - 1) {
@@ -153,22 +184,22 @@ async function withRetry(
             await sleep(delay);
             continue;
           }
-          return { text: "", error: "AI временно перегружен, попробуй чуть позже" };
+          return failed("AI временно перегружен, попробуй чуть позже");
         }
       }
       const err = e as Error;
       console.error(`[gemini-client] ${label} SDK error:`, err?.message);
-      return { text: "", error: err?.message || "AI request failed" };
+      return failed(err?.message || "AI request failed");
     }
   }
-  return { text: "", error: "AI request failed after retries" };
+  return failed("AI request failed after retries");
 }
 
 /** Простой одноразовый текстовый запрос (без истории). Модель по умолчанию —
  *  Flash. Используется для коротких генераций: факт дня, совет по учёбе,
  *  совет по оценкам. */
 export async function generateText(prompt: string, options?: AiOptions): Promise<AiResult> {
-  return withRetry("generateText", options?.model, async (tier) => {
+  return withRetry("generateText", options, async (tier) => {
     const client = getClient();
     const model = client.getGenerativeModel({
       model: resolveModel(tier),
@@ -185,7 +216,7 @@ export async function generateText(prompt: string, options?: AiOptions): Promise
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       ...(searchTool(options?.useSearch) ? { tools: searchTool(options?.useSearch) } : {}),
     });
-    return result.response.text();
+    return { text: result.response.text(), usage: readUsage(result.response) };
   });
 }
 
@@ -216,7 +247,7 @@ export async function generateJSON<T>(
   schema: ResponseSchema | null,
   options?: AiOptions,
 ): Promise<{ data: T | null; error: string | null }> {
-  const { text, error } = await withRetry("generateJSON", options?.model, async (tier) => {
+  const { text, error } = await withRetry("generateJSON", options, async (tier) => {
     const client = getClient();
     const model = client.getGenerativeModel({
       model: resolveModel(tier),
@@ -228,7 +259,7 @@ export async function generateJSON<T>(
       },
     });
     const result = await model.generateContent(prompt);
-    return result.response.text();
+    return { text: result.response.text(), usage: readUsage(result.response) };
   });
   if (error) return { data: null, error };
   try {
@@ -249,7 +280,7 @@ export async function chat(
   messages: ChatMessage[],
   options?: AiOptions,
 ): Promise<AiResult> {
-  return withRetry("chat", options?.model, async (tier) => {
+  return withRetry("chat", options, async (tier) => {
     const client = getClient();
     const model = client.getGenerativeModel({
       model: resolveModel(tier),
@@ -265,7 +296,7 @@ export async function chat(
       contents,
       ...(searchTool(options?.useSearch) ? { tools: searchTool(options?.useSearch) } : {}),
     });
-    return result.response.text();
+    return { text: result.response.text(), usage: readUsage(result.response) };
   });
 }
 

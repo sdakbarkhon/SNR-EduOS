@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
 import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
@@ -356,6 +357,13 @@ export async function POST(req: NextRequest) {
       model: "pro",
       temperature: 0.85,
       useSearch,
+      usage: {
+        task: AI_TASKS.generateStages,
+        teacherId: teacher.id,
+        // Школа берётся у урока, а не из current_school_id(): под служебным
+        // ключом её там нет (миграции 188/189) — см. lessonSchoolId выше.
+        schoolId: lessonSchoolId || null,
+      },
     });
 
     if (error || !parsed) {

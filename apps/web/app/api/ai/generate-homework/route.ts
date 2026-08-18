@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateJSON } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
 import {
   buildHomeworkFilePrompt, buildHomeworkTestPrompt, buildHomeworkProgrammingPrompt, buildHomeworkBundlePrompt,
 } from "@/lib/ai/prompts";
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: teacher } = await (db as any)
-    .from("teachers").select("id").eq("user_id", user.id).single();
+    .from("teachers").select("id, school_id").eq("user_id", user.id).single();
   if (!teacher) return NextResponse.json({ error: "Not a teacher" }, { status: 403 });
 
   const body = (await req.json()) as Partial<RequestBody>;
@@ -210,7 +211,10 @@ export async function POST(req: NextRequest) {
   let lastError = "";
 
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
-    const { data: parsed, error } = await generateJSON<GenRaw>(prompt, schema, { temperature: 0.8 });
+    const { data: parsed, error } = await generateJSON<GenRaw>(prompt, schema, {
+      temperature: 0.8,
+      usage: { task: AI_TASKS.generateHomework, teacherId: teacher.id, schoolId: teacher.school_id ?? null },
+    });
 
     if (error || !parsed) {
       console.error(`[ai-generate-homework] attempt ${attempt} error:`, error);

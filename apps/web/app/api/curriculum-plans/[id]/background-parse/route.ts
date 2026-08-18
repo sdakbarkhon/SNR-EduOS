@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
 import { buildCurriculumParsePrompt } from "@/lib/ai/prompts";
 import { CURRICULUM_TOPICS_SCHEMA } from "@/lib/ai/schemas";
 import { extractText, mimeFromName } from "@/lib/file-extractors";
@@ -67,7 +68,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let topics: ParsedTopic[] | null = null;
     let lastError: string | null = null;
     for (let attempt = 0; attempt < 3 && !topics; attempt++) {
-      const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, CURRICULUM_TOPICS_SCHEMA, { model: "pro" });
+      const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, CURRICULUM_TOPICS_SCHEMA, {
+        model: "pro",
+        usage: { task: AI_TASKS.curriculumParse },
+      });
       if (error || !Array.isArray(parsed) || parsed.length === 0) {
         lastError = error || "Не удалось разобрать ответ AI";
         continue;

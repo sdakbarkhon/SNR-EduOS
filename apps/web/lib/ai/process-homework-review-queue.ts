@@ -33,7 +33,7 @@ export async function reviewOneSubmission(
 ): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const { data: submission, error: subErr } = await db
     .from("homework_submissions")
-    .select("id, homework_id, answer_text, code_text")
+    .select("id, homework_id, answer_text, code_text, student_id, school_id")
     .eq("id", submissionId)
     .single();
   if (subErr || !submission) return { ok: false, skipped: true, error: "submission not found" };
@@ -64,6 +64,9 @@ export async function reviewOneSubmission(
     subject_name: subjectName,
     answer_text: answerText,
     group_grade: gradeFromGroupName(homework.group?.name) ?? AI_FALLBACK_GRADE,
+    // Только для учёта расходов — на проверку не влияет.
+    school_id: submission.school_id ?? null,
+    student_id: submission.student_id ?? null,
   });
 
   const { error: updateErr } = await db
@@ -108,7 +111,7 @@ export async function processHomeworkReviewQueueBatch(
     try {
       const { data: submission, error: subErr } = await db
         .from("homework_submissions")
-        .select("id, homework_id, answer_text, code_text")
+        .select("id, homework_id, answer_text, code_text, student_id, school_id")
         .eq("id", row.submission_id)
         .single();
       if (subErr || !submission) {
@@ -150,6 +153,9 @@ export async function processHomeworkReviewQueueBatch(
         subject_name: subjectName,
         answer_text: answerText,
         group_grade: gradeFromGroupName(homework.group?.name) ?? AI_FALLBACK_GRADE,
+        // Только для учёта расходов — на проверку не влияет.
+        school_id: submission.school_id ?? null,
+        student_id: submission.student_id ?? null,
       });
       console.log("[batch] AI call end:", row.submission_id);
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { chat } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
+
 import {
   EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT,
   EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT,
@@ -65,7 +67,8 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: student } = await (db as any)
     .from("students")
-    .select("id")
+    // school_id — только для учёта расходов, на ответ помощника не влияет.
+    .select("id, school_id")
     .eq("user_id", user.id)
     .single();
   if (!student) return NextResponse.json({ error: "Not a student" }, { status: 403 });
@@ -209,7 +212,9 @@ ${stageCtx}
     { role: "user" as const, content: body.user_message },
   ];
 
-  const { text, error } = await chat(systemPrompt, chatMessages);
+  const { text, error } = await chat(systemPrompt, chatMessages, {
+    usage: { task: AI_TASKS.assistantChat, studentId: student.id, schoolId: student.school_id ?? null },
+  });
 
   if (error) {
     console.error("[ai-chat] chat() returned error:", error);

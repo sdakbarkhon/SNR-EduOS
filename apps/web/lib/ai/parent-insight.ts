@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
+import { AI_TASKS } from "@/lib/ai/usage";
 import { buildParentInsightPrompt, type InsightDataContext } from "@/lib/ai/prompts";
 import { PARENT_INSIGHT_SCHEMA } from "@/lib/ai/schemas";
 import { getMySchoolNowMs } from "@/lib/school-time-server";
@@ -197,6 +198,7 @@ export async function buildParentInsight(
   const prompt = buildParentInsightPrompt(context, locale);
   const { data: generated, error } = await generateJSON<InsightPayload>(prompt, PARENT_INSIGHT_SCHEMA, {
     temperature: 0.7,
+    usage: { task: AI_TASKS.parentInsight, schoolId: student.school_id, studentId: childId },
   });
 
   if (error || !generated) {

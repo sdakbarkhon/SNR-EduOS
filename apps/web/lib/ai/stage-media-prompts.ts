@@ -8,6 +8,7 @@
 // а не lib/ai/gemini-client.ts).
 import type { LessonStage } from "@snr/core";
 import { generateJSON, generateText } from "./gemini-client";
+import { AI_TASKS } from "./usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { stageAllowsMedia } from "@/lib/lesson-stage-media";
 import { schoolStoragePath } from "@snr/core";
@@ -88,7 +89,10 @@ export async function decideStageMedia(
   const { data, error } = await generateJSON<{
     need_image?: boolean;
     image_prompt?: string;
-  }>(prompt, null, { temperature: 0.4 });
+  }>(prompt, null, {
+    temperature: 0.4,
+    usage: { task: AI_TASKS.stageImage },
+  });
 
   if (error || !data) {
     console.warn("[stage-media-prompts] decideStageMedia failed, defaulting to no media:", error);

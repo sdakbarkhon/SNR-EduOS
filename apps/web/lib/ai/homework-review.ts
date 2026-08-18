@@ -6,6 +6,12 @@
 // здесь по ТЗ нужен 5с/15с/45с).
 
 import { GoogleGenerativeAI, GoogleGenerativeAIFetchError, GoogleGenerativeAIAbortError } from "@google/generative-ai";
+import { recordAiCall, readUsage, AI_TASKS } from "./usage";
+//
+// УЧЁТ РАСХОДОВ. Этот файл ходит к модели МИМО gemini-client, поэтому запись
+// вызова добавлена здесь явно. Это НЕ вторая реализация учёта: зовётся та же
+// единственная функция recordAiCall из lib/ai/usage.ts. Логика ретраев ниже не
+// тронута ни на строку — добавлены только строки записи.
 
 const MODEL = "gemini-2.5-flash";
 // Ни SDK, ни голый fetch не имеют дефолтного таймаута — подвисший
@@ -88,6 +94,9 @@ export async function reviewHomework(input: {
   subject_name: string;
   answer_text: string;
   group_grade: number;
+  /** Только для учёта расходов — на саму проверку не влияет. */
+  school_id?: string | null;
+  student_id?: string | null;
 }): Promise<HomeworkReview> {
   const client = getClient();
   const model = client.getGenerativeModel({
@@ -98,6 +107,7 @@ export async function reviewHomework(input: {
 
   const userPrompt = `Задание: "${input.homework_title}"\nОписание задания: ${input.homework_description || "(без описания)"}\n\nОтвет ученика:\n${input.answer_text}`;
 
+  const startedAt = Date.now();
   let text = "";
   let otherErrorRetried = false;
   for (let attempt = 0; ; attempt++) {
@@ -108,6 +118,12 @@ export async function reviewHomework(input: {
       const result = await model.generateContent(userPrompt, { signal: controller.signal });
       text = result.response.text();
       console.log("[homework-review] AI call end (ok)");
+      recordAiCall({
+        task: AI_TASKS.homeworkReview, model: MODEL,
+        usage: readUsage(result.response), ok: true,
+        schoolId: input.school_id ?? null, studentId: input.student_id ?? null,
+        durationMs: Date.now() - startedAt,
+      });
       break;
     } catch (e) {
       const isTimeout = e instanceof GoogleGenerativeAIAbortError || (e as Error)?.name === "AbortError";
@@ -129,6 +145,12 @@ export async function reviewHomework(input: {
           console.warn(`[homework-review] timeout after ${GEMINI_TIMEOUT_MS}ms, 1 retry`);
           continue;
         }
+        recordAiCall({
+          task: AI_TASKS.homeworkReview, model: MODEL, ok: false,
+          errorReason: `timeout ${GEMINI_TIMEOUT_MS}ms`,
+          schoolId: input.school_id ?? null, studentId: input.student_id ?? null,
+          durationMs: Date.now() - startedAt,
+        });
         throw new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS}ms (2 attempts)`);
       }
       if (!is429 && !otherErrorRetried) {
@@ -137,6 +159,12 @@ export async function reviewHomework(input: {
         await sleep(3000);
         continue;
       }
+      recordAiCall({
+        task: AI_TASKS.homeworkReview, model: MODEL, ok: false,
+        errorReason: (e as Error)?.message ?? "unknown",
+        schoolId: input.school_id ?? null, studentId: input.student_id ?? null,
+        durationMs: Date.now() - startedAt,
+      });
       throw e;
     } finally {
       clearTimeout(timer);

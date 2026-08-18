@@ -15,6 +15,11 @@
 // инкремент здесь задвоил бы счётчик.
 
 import { GoogleGenerativeAI, GoogleGenerativeAIFetchError } from "@google/generative-ai";
+import { recordAiCall, readUsage, AI_TASKS } from "./usage";
+//
+// УЧЁТ РАСХОДОВ. Файл ходит к модели МИМО gemini-client, поэтому запись вызова
+// добавлена здесь явно. Это НЕ вторая реализация учёта: зовётся та же
+// единственная функция recordAiCall из lib/ai/usage.ts. Ретраи не тронуты.
 
 const MODEL = "gemini-2.5-flash";
 
@@ -154,11 +159,16 @@ export async function generateLessonContent(input: {
 
   const userPrompt = `Тема урока: "${input.topic}"\nПредмет: ${input.subject_name}\nКласс: ${input.group_grade}\nФормат: ${input.format}`;
 
+  const startedAt = Date.now();
   let text = "";
   for (let attempt = 0; ; attempt++) {
     try {
       const result = await model.generateContent(userPrompt);
       text = result.response.text();
+      recordAiCall({
+        task: AI_TASKS.lessonContent, model: MODEL,
+        usage: readUsage(result.response), ok: true, durationMs: Date.now() - startedAt,
+      });
       break;
     } catch (e) {
       const is429 = e instanceof GoogleGenerativeAIFetchError && e.status === 429;
@@ -168,6 +178,10 @@ export async function generateLessonContent(input: {
         await sleep(delay);
         continue;
       }
+      recordAiCall({
+        task: AI_TASKS.lessonContent, model: MODEL, ok: false,
+        errorReason: (e as Error)?.message ?? "unknown", durationMs: Date.now() - startedAt,
+      });
       throw e;
     }
   }
