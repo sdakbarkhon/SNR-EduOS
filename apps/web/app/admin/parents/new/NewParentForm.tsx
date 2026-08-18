@@ -23,9 +23,9 @@ export function NewParentForm({ students }: { students: Student[] }) {
   const [fullName, setFullName] = useState("");
   // Девять цифр без кода страны — код рисует само поле и стереть его нельзя.
   const [phoneDigits, setPhoneDigits] = useState("");
-  // Необязательные адреса под будущий вход через Google/Apple (миграция 201).
+  // Необязательный адрес под вход через Google (миграция 201). Apple ID убран
+  // 18.08.2026 по решению заказчика — колонка в базе осталась, но не пишется.
   const [googleEmail, setGoogleEmail] = useState("");
-  const [appleEmail, setAppleEmail] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +57,6 @@ export function NewParentForm({ students }: { students: Student[] }) {
         fd.set("full_name", fullName.trim());
         fd.set("phone", storedFromDigits(phoneDigits));
         fd.set("google_email", googleEmail.trim());
-        fd.set("apple_email", appleEmail.trim());
         selectedIds.forEach((id) => fd.append("student_ids", id));
         const res = await actionCreateParent(fd);
         setResult({ phone: storedFromDigits(phoneDigits) });
@@ -143,7 +142,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
           <p className="text-xs text-gray-400">{t.fieldPhoneHint}</p>
           <AdminPhoneInput digits={phoneDigits} onChange={setPhoneDigits} required />
         </div>
-        {/* Вход через Google/Apple: адреса вписывает администратор, сам
+        {/* Вход через Google: адрес вписывает администратор, сам
             родитель нигде не регистрируется. Поля необязательные — без них
             вход по номеру и коду работает как работал. */}
         <div className="flex flex-col gap-1 rounded-xl bg-gray-50/70 p-3">
@@ -162,16 +161,6 @@ export function NewParentForm({ students }: { students: Student[] }) {
             className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
           />
 
-          <label className="mt-2 text-xs font-medium text-gray-600">{t.fieldAppleEmail}</label>
-          <input
-            value={appleEmail}
-            onChange={(e) => setAppleEmail(e.target.value)}
-            inputMode="email"
-            autoCapitalize="none"
-            placeholder="ivan@icloud.com"
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
-          />
-          <p className="mt-1 text-xs text-amber-600">{t.fieldAppleEmailNote}</p>
         </div>
 
         <div className="flex flex-col gap-1">

@@ -116,7 +116,6 @@ export const STUBS: Record<string, StubInfo> = {
   privacy: { t: "Политика конфиденциальности", tKey: "prof.privacy", n: "Документ", g: ["#94a3b8", "#64748b"], i: "doc" },
   profmenu: { t: "Действия", n: "Действие", g: ["#94a3b8", "#64748b"], i: "grid" },
   authGoogle: { t: "Вход через Google", n: "Сервис появится позже", g: ["#60a5fa", "#2563eb"], i: "user" },
-  authApple: { t: "Вход через Apple", n: "Сервис появится позже", g: ["#334155", "#0f172a"], i: "user" },
   call: { t: "Звонок в школу", n: "Действие", g: ["#34d399", "#059669"], i: "chat" },
   testreview: { t: "Разбор ответов", tKey: "scr.testReview", n: "Раздел «Тесты»", g: ["#38bdf8", "#0284c7"], i: "doc" },
   matview: { t: "Просмотр материала", n: "Раздел «Библиотека»", g: ["#818cf8", "#4f46e5"], i: "book" },

@@ -16,7 +16,7 @@
  * экране. Иконки GoogleIcon/AppleIcon удалены из ui/auth/icons.tsx следом:
  * других потребителей у них не было.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Linking,
@@ -75,13 +75,14 @@ function GoogleGlyph() {
   );
 }
 
-/** Глиф Apple. Лежит на белой плитке, поэтому цвет жёстко тёмный. */
-function AppleGlyph() {
+/** Глиф демо-режима: звёздочка. Своя иконка, а не чужой логотип — демо это
+ *  наш режим, а не сторонний сервис. */
+function DemoGlyph() {
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24">
       <Path
-        d="M17.6 12.5c0-2 1.6-2.9 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3.1.7-.6 0-1.6-.7-2.7-.7-1.4 0-2.7.8-3.4 2-1.5 2.5-.4 6.3 1 8.4.7 1 1.5 2.2 2.6 2.2 1 0 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.7 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.2-.8-2.2-3.7zM15.6 6c.6-.7 1-1.7.9-2.6-.8 0-1.9.5-2.4 1.2-.5.6-1 1.6-.8 2.6.9.1 1.8-.5 2.3-1.2z"
-        fill="#171243"
+        d="M12 2.6l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1-5.3 3.1 1.3-6L3.4 8.8l6.1-.6L12 2.6z"
+        fill="#7C4DFF"
       />
     </Svg>
   );
@@ -151,7 +152,8 @@ export function LoginPhoneScreen() {
   const { tokens, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { country, phone, setCountry, setPhone, submitPhone, setPhase, phoneError,
-    authBusy, signInWithGoogle, googleBusy, googleError } = useAuthSession();
+    authBusy, signInWithGoogle, googleBusy, googleError,
+    signInAsDemo, demoBusy } = useAuthSession();
   const [countryOpen, setCountryOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey>(null);
 
@@ -200,6 +202,12 @@ export function LoginPhoneScreen() {
     expo_go: t.googleWebOnly,
     config_error: t.configError,
   };
+  /** Демо-вход: без телефона и кода. Отказ показывается словами, а не молчанием. */
+  const onDemoPress = useCallback(async () => {
+    const res = await signInAsDemo();
+    if (res === "error") Alert.alert(t.withDemo, t.demoFailed);
+  }, [signInAsDemo, t.withDemo, t.demoFailed]);
+
   const googleErrorText = googleError ? (GOOGLE_ERROR_TEXT[googleError] ?? t.googleFailed) : null;
 
   // В Expo Go возврата по схеме приложения не бывает — там кнопка не молчит,
@@ -423,8 +431,9 @@ export function LoginPhoneScreen() {
             в браузерной версии кабинета, но НЕ здесь: возврат из браузера в
             приложение идёт по своей схеме (snreduosparent://), а Expo Go такие
             схемы не поддерживает — там только exp://. Пока приложение живёт в
-            Expo Go, кнопка честно отправляет в браузер. Apple не подключён
-            вовсе. Молчания нет — по нажатию появляется объяснение. */}
+            Expo Go, кнопка честно отправляет в браузер.
+            Apple ID убран 18.08.2026 по решению заказчика: остаются телефон
+            с кодом, Google и демо. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: tokens.ink3, opacity: 0.35 }} />
           <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink3 }}>{t.or}</Text>
@@ -443,12 +452,19 @@ export function LoginPhoneScreen() {
             {googleErrorText}
           </Text>
         )}
+
+        {/* Демо-режим. Кнопка вернулась 18.08.2026: её убрали по ошибке, когда
+            чистили неактивные кнопки, — но эта как раз рабочая. Слот берёт та
+            же серверная функция, что и кнопка «Демо» в браузере. */}
         <SocialButton
-          label={t.withApple}
-          badge={t.soonBadge}
-          glyph={<AppleGlyph />}
-          onPress={() => Alert.alert(t.withApple, t.appleSoon)}
+          label={demoBusy ? t.demoSigningIn : t.withDemo}
+          glyph={<DemoGlyph />}
+          onPress={onDemoPress}
+          disabled={demoBusy}
         />
+        <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, lineHeight: 15, color: tokens.ink3, textAlign: "center", paddingHorizontal: 10 }}>
+          {t.demoHint}
+        </Text>
 
         {/* Правовые ссылки (макет 2016). */}
         <Text

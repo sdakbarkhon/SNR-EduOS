@@ -35,9 +35,9 @@ export async function actionCreateParent(formData: FormData) {
     student_ids,
     school_id: schoolId,
     created_by: userId,
-    // Обе необязательные: под будущий вход через Google/Apple (миграция 201).
+    // Необязательный: под вход через Google (миграция 201). Apple ID убран
+    // 18.08.2026 — колонка осталась, но форма её больше не шлёт.
     google_email: String(formData.get("google_email") ?? ""),
-    apple_email: String(formData.get("apple_email") ?? ""),
   });
   revalidatePath("/admin/parents");
   return result;
@@ -79,7 +79,6 @@ export async function actionUpdateParent(formData: FormData) {
       student_ids,
       school_id: schoolId,
       google_email: String(formData.get("google_email") ?? ""),
-      apple_email: String(formData.get("apple_email") ?? ""),
     },
     schoolId,
     isSuperAdmin,

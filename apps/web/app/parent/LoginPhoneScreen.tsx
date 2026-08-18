@@ -28,7 +28,6 @@ import {
   SparkleIcon,
   UzFlagIcon,
   GoogleIcon,
-  AppleIcon,
 } from "@/components/parent/auth/icons";
 import { AuthHelpSheet } from "./AuthHelpSheet";
 import { LangButton } from "./LangButton";
@@ -98,7 +97,7 @@ type Props = {
  * phone/onSubmit управляются в AuthFlow.tsx как и раньше.
  *
  * Селектор страны в этой версии статичен (только Узбекистан) — клик
- * показывает тост «Скоро», как и клики по Google/Apple (OAuth не
+ * показывает тост «Скоро», как и клики по Google (OAuth не
  * подключаем в этом заходе).
  */
 export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack, initialNotice }: Props) {
@@ -140,11 +139,6 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack, initi
 
   function showComingSoon() {
     showNotice(comingSoonText);
-  }
-
-  /** Apple ещё не подключён — объясняем это по нажатию, а не молчим. */
-  function showAppleSoon() {
-    showNotice(t.appleSoon);
   }
 
   // Вход через Google. Ведёт не в аккаунт Google, а в аккаунт родителя:
@@ -241,7 +235,8 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack, initi
           </div>
         </GlassCard>
 
-        {/* Вход через Google и Apple. Кнопки вернулись 16.08.2026: убирать их
+        {/* Вход через Google. Apple ID убран 18.08.2026 по решению заказчика:
+            остаются телефон с кодом, Google и демо. Кнопки вернулись 16.08.2026: убирать их
             было ошибкой — заказчик просил убрать только демо-кнопку. Пока они
             НЕАКТИВНЫ и говорят об этом: провайдер Google в проекте выключен,
             ключи заводит заказчик. Молчаливого бездействия нет — по нажатию
@@ -270,24 +265,6 @@ export function LoginPhoneScreen({ phone, onPhoneChange, onSubmit, onBack, initi
           <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
             {googleBusy ? t.googleSigningIn : t.withGoogle}
           </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={showAppleSoon}
-          className="flex items-center gap-2.5 p-3.5 text-left opacity-60"
-          style={{ ...ctaCardStyle, border: `1px solid ${glassBorder}` }}
-        >
-          <div
-            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px]"
-            style={{ background: "#FFFFFF" }}
-          >
-            <AppleIcon size={18} color="#171243" />
-          </div>
-          <span className="flex-1 text-[12.5px] font-extrabold" style={{ color: ink1 }}>
-            {t.withApple}
-          </span>
-          <span className="text-[9.5px] font-bold" style={{ color: ink3 }}>{t.soonBadge}</span>
         </button>
 
         {/* Рамка кнопки и цветная тень плитки — акцентный фиолет с альфой: он

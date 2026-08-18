@@ -22,6 +22,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
 import { getSupabase } from "../lib/supabase";
+import { claimDemoParent } from "../lib/demoApi";
 import { NotParentError } from "../lib/auth";
 import { PhoneLoginFailure, requestPhoneCode, verifyPhoneCode, type PhoneLoginError } from "../lib/parentPhoneLogin";
 import { GoogleLoginFailure, loginParentWithGoogle, type GoogleLoginError } from "../lib/parentGoogleLogin";
@@ -87,6 +88,7 @@ export interface AuthSessionState {
   googleError: GoogleLoginError | null;
   /** Идёт вход через Google — кнопка заблокирована, пока не вернёмся. */
   googleBusy: boolean;
+  demoBusy: boolean;
 }
 
 export interface AuthSessionCtx extends AuthSessionState {
@@ -102,6 +104,8 @@ export interface AuthSessionCtx extends AuthSessionState {
   verifyCode(): Promise<"picker" | "app" | "error">;
   /** Вход через Google. Тот же хвост, что у verifyCode: сессия → дети → фаза. */
   signInWithGoogle(): Promise<"picker" | "app" | "error">;
+  /** Демо-вход родителем. Тот же хвост, что у Google: сессия → дети → фаза. */
+  signInAsDemo(): Promise<"picker" | "app" | "error">;
   pickChildIndex(i: number): void;
   enterApp(childIndex: number): void;
   /** ЗАХОД 5x (правка 3): закрыть one-shot центр-модалку «Демо-режим». */
@@ -124,6 +128,7 @@ const INITIAL_STATE: AuthSessionState = {
   authSel: DEFAULT_CHILD_INDEX,
   isDemo: false,
   demoNoticeSeen: false,
+  demoBusy: false,
   currentChildId: null,
   phoneError: null,
   smsError: null,
@@ -335,6 +340,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
    * уже установлена, надо перезапросить детей и выбрать фазу. Дублировать
    * этот кусок нельзя, поэтому он вынесен в enterAfterSession ниже.
    */
+  const demoBusyRef = useRef(false);
+
   const signInWithGoogle = useCallback(async (): Promise<"picker" | "app" | "error"> => {
     if (googleBusyRef.current) return "error";
     googleBusyRef.current = true;
@@ -372,6 +379,60 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       return "picker";
     } finally {
       googleBusyRef.current = false;
+    }
+  }, [refreshParentData]);
+
+  /**
+   * Демо-вход родителем.
+   *
+   * Слот берёт та же серверная функция claim_demo_slot, что и кнопка «Демо» на
+   * вебе; отличие ровно одно — куда положить сессию. Сервер входит сам и
+   * отдаёт токены, приложение кладёт их через setSession.
+   *
+   * Хвост после успеха тот же, что у входа через Google и по коду: перечитать
+   * детей и выбрать фазу. Дублировать его нельзя, поэтому шаги те же самые.
+   *
+   * Защиту одной сессии не задевает: демо-вход не регистрируется в
+   * user_sessions — как и на вебе.
+   */
+  const signInAsDemo = useCallback(async (): Promise<"picker" | "app" | "error"> => {
+    if (demoBusyRef.current) return "error";
+    demoBusyRef.current = true;
+    setState((s) => ({ ...s, demoBusy: true }));
+    try {
+      const claimed = await claimDemoParent();
+      if (!claimed || "error" in claimed) {
+        console.error("[AuthSessionContext] демо-слот не выдан:", claimed && "error" in claimed ? claimed.error : "нет ответа");
+        setState((s) => ({ ...s, demoBusy: false }));
+        return "error";
+      }
+
+      const { error } = await getSupabase().auth.setSession({
+        access_token: claimed.access_token,
+        refresh_token: claimed.refresh_token,
+      });
+      if (error) {
+        console.error("[AuthSessionContext] setSession не принял токены демо:", error.message);
+        setState((s) => ({ ...s, demoBusy: false }));
+        return "error";
+      }
+
+      await refreshParentData();
+      const kids = parentDataRef.current?.children ?? [];
+      setState((s) => ({
+        ...s,
+        demoBusy: false,
+        kidsCount: kids.length,
+        authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? 0,
+      }));
+      if (kids.length <= 1) {
+        setState((s) => ({ ...s, phase: "app", currentChildId: kids[0]?.id ?? null }));
+        return "app";
+      }
+      setState((s) => ({ ...s, phase: "childPicker" }));
+      return "picker";
+    } finally {
+      demoBusyRef.current = false;
     }
   }, [refreshParentData]);
 
@@ -416,6 +477,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       resendCode,
       verifyCode,
       signInWithGoogle,
+      signInAsDemo,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,
@@ -432,6 +494,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       resendCode,
       verifyCode,
       signInWithGoogle,
+      signInAsDemo,
       pickChildIndex,
       enterApp,
       dismissDemoNotice,

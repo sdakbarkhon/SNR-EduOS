@@ -3560,6 +3560,10 @@ export interface Dictionary {
       legalPrivacy: string;
       legalNotReady: string;
       or: string;          // разделитель над кнопками Google/Apple
+      withDemo: string;
+      demoSigningIn: string;
+      demoFailed: string;
+      demoHint: string;
       withGoogle: string;
       withApple: string;
       soonBadge: string;   // «скоро» на неактивной кнопке
