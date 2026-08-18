@@ -25,6 +25,9 @@ const SIZES = {
   lg: { box: "h-14 w-14 rounded-2xl", text: "text-base" },
   // Шапка формы входа: логотип школы должен быть заметен, а не угадываться.
   xl: { box: "h-20 w-20 rounded-3xl", text: "text-2xl" },
+  // Плитка в окне выбора школы. Логотип здесь — главное: его узнают раньше,
+  // чем читают название, поэтому он крупнее, чем где-либо ещё.
+  tile: { box: "h-24 w-24 rounded-3xl", text: "text-3xl" },
 } as const;
 
 export function SchoolMark({
