@@ -23,6 +23,8 @@ function initials(name: string): string {
 const SIZES = {
   sm: { box: "h-8 w-8 rounded-lg", text: "text-[11px]" },
   lg: { box: "h-14 w-14 rounded-2xl", text: "text-base" },
+  // Шапка формы входа: логотип школы должен быть заметен, а не угадываться.
+  xl: { box: "h-20 w-20 rounded-3xl", text: "text-2xl" },
 } as const;
 
 export function SchoolMark({

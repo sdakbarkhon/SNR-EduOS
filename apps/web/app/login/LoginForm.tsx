@@ -10,7 +10,7 @@ import { loginWithUsername, loginWithUsernameInSchool } from "@/app/actions/auth
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 import { Logo } from "@/components/Logo";
 import { SchoolMark } from "@/components/SchoolMark";
-import { SchoolPicker, rememberSchool, type PublicSchool } from "./SchoolPicker";
+import { SchoolPickerModal, rememberSchool, type PublicSchool } from "./SchoolPicker";
 
 function GoogleIcon() {
   return (
@@ -62,6 +62,10 @@ export function LoginForm({ locale }: { locale: Locale }) {
   // Проверка «свой ли это логин для выбранной школы» живёт НА СЕРВЕРЕ
   // (finishLogin). Здесь только показ: браузеру такие решения не доверяем.
   const [picked, setPicked] = useState<{ school: PublicSchool | null } | null>(null);
+  /** Окно открыто повторно по «Сменить школу». Отличается тем, что не
+   *  подставляет ни запомненное, ни единственную школу: человек пришёл сюда
+   *  именно затем, чтобы выбрать другую. */
+  const [reopenPicker, setReopenPicker] = useState(false);
   // Запомненный выбор подставляет сам SchoolPicker: он и так грузит список,
   // и название с логотипом берёт оттуда же. Здесь про localStorage знать
   // незачем — кроме кнопки «Сменить школу» ниже.
@@ -196,40 +200,50 @@ export function LoginForm({ locale }: { locale: Locale }) {
             <GraduationCap className="h-5 w-5 text-[#FFB020]" strokeWidth={2.5} />
           </div>
 
-          <h1 className="mb-4 [@media(max-height:760px)]:mb-2 text-2xl font-bold leading-tight tracking-tight text-slate-900">
-            {t.title}
-          </h1>
-
-          {/* Выбранная школа — над формой, с логотипом и возможностью
-              передумать. Без этой строки человек, за которого выбор
-              подставился из памяти браузера, не понял бы, куда входит. */}
-          {picked?.school && (
-            <div className="mb-4 [@media(max-height:760px)]:mb-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-white/70 px-3 py-2.5">
-              <SchoolMark name={picked.school.name} logoUrl={picked.school.logoUrl} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t.chooseSchoolLabel}</p>
-                <p className="truncate text-sm font-semibold text-slate-800">{picked.school.name}</p>
-              </div>
+          {/* Школа — крупно и по центру: логотип, под ним название. Раньше это
+              была мелкая строка сбоку, и человек, за которого выбор подставился
+              из памяти браузера, её просто не замечал. Заголовок при этом
+              уходит: две крупные надписи подряд спорят друг с другом, а
+              «в какую школу вхожу» важнее, чем «это экран входа». */}
+          {picked?.school ? (
+            <div className="mb-5 [@media(max-height:760px)]:mb-3 flex flex-col items-center text-center">
+              <SchoolMark name={picked.school.name} logoUrl={picked.school.logoUrl} size="xl" />
+              <p className="mt-3 text-lg font-bold leading-tight text-slate-900">{picked.school.name}</p>
               <button
                 type="button"
-                onClick={() => { rememberSchool(null); setPicked(null); setError(null); setSchoolChoices(null); }}
-                className="shrink-0 text-xs font-medium text-slate-500 underline hover:text-slate-700"
+                onClick={() => { setReopenPicker(true); setError(null); setSchoolChoices(null); }}
+                className="mt-1 text-xs font-medium text-slate-500 underline hover:text-slate-700"
               >
                 {t.chooseSchoolChange}
               </button>
             </div>
+          ) : (
+            <h1 className="mb-4 [@media(max-height:760px)]:mb-2 text-2xl font-bold leading-tight tracking-tight text-slate-900">
+              {t.title}
+            </h1>
           )}
 
-          {/* Первый шаг. Пока школа не выбрана (и шаг не пропущен), формы
-              логина нет вовсе. Если школ не окажется или список не откроется,
-              SchoolPicker сам позовёт onSkip и форма появится немедленно —
-              вход не должен зависеть от нового шага. */}
-          {picked === null ? (
-            <SchoolPicker
+          {/* Окно выбора школы. Открыто, пока школа не выбрана, — и повторно
+              по «Сменить школу».
+
+              Если школ не окажется или список не откроется, окно само позовёт
+              onSkip, и форма появится немедленно: вход не должен зависеть от
+              нового шага. Единственная школа подставляется без окна — выбирать
+              из одной плитки нечего. */}
+          {(picked === null || reopenPicker) && (
+            <SchoolPickerModal
               locale={locale}
-              onPick={(school) => setPicked({ school })}
-              onSkip={() => setPicked({ school: null })}
+              reopened={reopenPicker}
+              onPick={(school) => { setPicked({ school }); setReopenPicker(false); }}
+              onSkip={() => { setPicked({ school: null }); setReopenPicker(false); }}
+              onClose={() => setReopenPicker(false)}
             />
+          )}
+
+          {picked === null ? (
+            // Пока школа не выбрана, форму не показываем: над ней окно, и
+            // мелькающие под ним поля только сбивают с толку.
+            <p className="py-6 text-center text-sm text-slate-400">{t.chooseSchoolLoading}</p>
           ) : schoolChoices ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-slate-700">{t.pickSchoolTitle}</p>

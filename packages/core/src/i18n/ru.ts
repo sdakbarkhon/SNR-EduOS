@@ -107,6 +107,8 @@ export const ru: Dictionary = {
     errorParseFailed: "Не удалось распарсить план",
   },
   auth: {
+    chooseSchoolSearch: "Поиск по названию",
+    chooseSchoolNotFound: "Ничего не найдено",
     chooseSchoolTitle: "Выберите школу",
     chooseSchoolSubtitle: "Потом введёте логин и пароль",
     chooseSchoolLoading: "Загружаем список школ…",
@@ -117,7 +119,7 @@ export const ru: Dictionary = {
     chooseSchoolLabel: "Школа",
     wrongSchool: "Этот логин относится к другой школе. Вернитесь и выберите свою",
     wrongSchoolNamed: "Этот логин относится к школе «{name}». Вернитесь и выберите её",
-    title: "Вход для ученика",
+    title: "Вход в кабинет",
     usernameLabel: "Логин",
     usernamePlaceholder: "Введите логин",
     passwordLabel: "Пароль",

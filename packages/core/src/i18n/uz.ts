@@ -107,6 +107,8 @@ export const uz: Dictionary = {
     errorParseFailed: "Rejani tahlil qilib bo'lmadi",
   },
   auth: {
+    chooseSchoolSearch: "Nomi bo‘yicha qidirish",
+    chooseSchoolNotFound: "Hech narsa topilmadi",
     chooseSchoolTitle: "Maktabni tanlang",
     chooseSchoolSubtitle: "Keyin login va parolni kiritasiz",
     chooseSchoolLoading: "Maktablar ro‘yxati yuklanmoqda…",
@@ -117,7 +119,7 @@ export const uz: Dictionary = {
     chooseSchoolLabel: "Maktab",
     wrongSchool: "Bu login boshqa maktabga tegishli. Ortga qayting va o‘zingiznikini tanlang",
     wrongSchoolNamed: "Bu login «{name}» maktabiga tegishli. Ortga qayting va o‘shani tanlang",
-    title: "O’quvchi uchun kirish",
+    title: "Kabinetga kirish",
     usernameLabel: "Login",
     usernamePlaceholder: "Loginni kiriting",
     passwordLabel: "Parol",

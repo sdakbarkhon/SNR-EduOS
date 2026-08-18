@@ -107,6 +107,8 @@ export const en: Dictionary = {
     errorParseFailed: "Failed to parse the plan",
   },
   auth: {
+    chooseSchoolSearch: "Search by name",
+    chooseSchoolNotFound: "Nothing found",
     chooseSchoolTitle: "Choose your school",
     chooseSchoolSubtitle: "You'll enter your username and password next",
     chooseSchoolLoading: "Loading the list of schools…",
@@ -117,7 +119,7 @@ export const en: Dictionary = {
     chooseSchoolLabel: "School",
     wrongSchool: "This login belongs to a different school. Go back and choose yours",
     wrongSchoolNamed: "This login belongs to “{name}”. Go back and choose it",
-    title: "Student sign in",
+    title: "Sign in",
     usernameLabel: "Username",
     usernamePlaceholder: "Enter username",
     passwordLabel: "Password",

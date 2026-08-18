@@ -102,6 +102,8 @@ export interface Dictionary {
     errorParseFailed: string;   // "Не удалось распарсить план"
   };
   auth: {
+    chooseSchoolSearch: string;
+    chooseSchoolNotFound: string;
     chooseSchoolTitle: string;
     chooseSchoolSubtitle: string;
     chooseSchoolLoading: string;
