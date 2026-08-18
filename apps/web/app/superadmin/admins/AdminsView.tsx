@@ -221,6 +221,9 @@ export function AdminsView({
             >
               <Field label={t.fieldFullName}><Input name="full_name" required placeholder="Иван Петров" /></Field>
               <Field label={t.fieldUsername}><Input name="username" required placeholder="admin_maktab2" autoCapitalize="none" /></Field>
+              {/* Почту администратора вписывает суперадминистратор — сам себе
+                  администратор её назначить не может. */}
+              <Field label={t.fieldGoogleEmailAny}><Input name="google_email" type="email" placeholder="admin@gmail.com" autoCapitalize="none" /></Field>
               <Field label={t.fieldPassword}>
                 <div className="flex gap-2">
                   <input

@@ -16,7 +16,16 @@ import { createClient } from "@/lib/supabase/server";
  */
 export type GoogleStartResult = { ok: true; url: string } | { ok: false };
 
-export async function startParentGoogleLogin(origin: string): Promise<GoogleStartResult> {
+export async function startParentGoogleLogin(
+  origin: string,
+  /** Школа, выбранная на экране входа. Уезжает в адрес возврата и там
+   *  сверяется: ученик школы А, выбравший школу Б, войти не должен.
+   *  null — школу не спрашивали (вход родителя из приложения). */
+  schoolId?: string | null,
+  /** Куда возвращать при отказе: «/login» для общего входа, «/parent» для
+   *  родительского. Иначе человек, вошедший не туда, увидит чужой экран. */
+  from: "login" | "parent" = "parent",
+): Promise<GoogleStartResult> {
   // Адрес возврата собираем из origin, который пришёл от браузера, но берём из
   // него только схему и хост — чтобы подставленный кем-то путь или параметры
   // не уехали в redirectTo. Совсем чужой адрес Supabase и так отбросит: список
@@ -24,7 +33,10 @@ export async function startParentGoogleLogin(origin: string): Promise<GoogleStar
   let redirectTo: string;
   try {
     const u = new URL(origin);
-    redirectTo = `${u.protocol}//${u.host}/auth/callback`;
+    const back = new URL(`${u.protocol}//${u.host}/auth/callback`);
+    back.searchParams.set("from", from);
+    if (schoolId) back.searchParams.set("school", schoolId);
+    redirectTo = back.toString();
   } catch {
     return { ok: false };
   }

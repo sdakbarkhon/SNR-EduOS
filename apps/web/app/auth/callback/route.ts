@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { registerSession } from "@/lib/register-session";
-import { findParentByGoogleEmail, issueParentSessionToken } from "@/lib/parent-google";
+import { findIdentityByGoogleEmail, issueSessionToken } from "@/lib/google-identity";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 
 /**
@@ -13,7 +13,9 @@ import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
  *      не родителю. Нужна она ровно за одним: узнать подтверждённую почту.
  *   2. Убеждаемся, что почту подтвердил сам Google. Неподтверждённую почту
  *      сверять нельзя: её можно вписать в чужой провайдер.
- *   3. Ищем родителя с такой google_email.
+ *   3. Ищем человека с такой google_email — среди администраторов,
+ *      родителей, учителей и учеников. Роль определяется находкой, а не
+ *      тем, с какого экрана пришли.
  *   4. Гасим Google-сессию — в любом исходе. Не совпало — не оставляем висеть
  *      сессию, под которой человек всё равно ничего не увидит, кроме сбоя.
  *      Совпало — она тоже не нужна: дальше работает учётная запись родителя.
@@ -30,7 +32,9 @@ export const dynamic = "force-dynamic";
 /** Причина отказа уезжает в адрес — экран входа переводит её на язык человека. */
 function back(req: NextRequest, reason: string) {
   const url = req.nextUrl.clone();
-  url.pathname = "/parent";
+  // Куда возвращать при отказе — знает только тот, кто начинал вход: с общего
+  // экрана пришли или с родительского. Значение приехало в адресе возврата.
+  url.pathname = req.nextUrl.searchParams.get("from") === "login" ? "/login" : "/parent";
   url.search = `?error=${reason}`;
   return NextResponse.redirect(url);
 }
@@ -57,8 +61,13 @@ export async function GET(req: NextRequest) {
     || googleUser.user_metadata?.email_verified === true;
   const email = googleUser.email ?? null;
 
+  // Школа, выбранная на экране входа. Пустая строка и мусор здесь безвредны:
+  // сверка просто не совпадёт, и вход не откроется — то есть ошибка в эту
+  // сторону закрывает доступ, а не открывает.
+  const chosenSchool = req.nextUrl.searchParams.get("school");
+
   const found = email && verified
-    ? await findParentByGoogleEmail(email)
+    ? await findIdentityByGoogleEmail(email, chosenSchool)
     : ({ ok: false, reason: "not_linked" } as const);
 
   // Шаг 4 — до любого редиректа и до выдачи новой сессии.
@@ -66,7 +75,7 @@ export async function GET(req: NextRequest) {
 
   if (!found.ok) return back(req, found.reason);
 
-  const tokenHash = await issueParentSessionToken(found.authEmail);
+  const tokenHash = await issueSessionToken(found.authEmail);
   if (!tokenHash) return back(req, "failed");
 
   const { data: session, error: otpErr } = await supabase.auth.verifyOtp({
@@ -74,7 +83,7 @@ export async function GET(req: NextRequest) {
     token_hash: tokenHash,
   });
   if (otpErr || !session.user || !session.session) {
-    console.error("[auth/callback] сессию родителя выдать не удалось:", otpErr?.message);
+    console.error("[auth/callback] сессию выдать не удалось:", otpErr?.message);
     return back(req, "failed");
   }
 
@@ -91,8 +100,10 @@ export async function GET(req: NextRequest) {
     return back(req, "failed");
   }
 
+  // Куда вести — решает найденная роль, а не экран, с которого пришли:
+  // администратор, вошедший через Google, должен попасть в админку.
   const home = req.nextUrl.clone();
-  home.pathname = "/parent/home";
+  home.pathname = found.dest;
   home.search = "";
   const res = NextResponse.redirect(home);
   res.cookies.delete(DEMO_SESSION_COOKIE);

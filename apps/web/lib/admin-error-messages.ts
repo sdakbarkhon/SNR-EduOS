@@ -65,6 +65,19 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
     }
   }
 
+  // Миграция 213 — логин уникален во всей системе, почта привязана к одному
+  // человеку. Обе проверки живут в базе (индексы плюс триггер между
+  // таблицами) и бросают машинный код: администратору читать
+  // «duplicate key value violates unique constraint» незачем.
+  if (/LOGIN_TAKEN/i.test(raw)
+    || /duplicate key.*(students|teachers|admins)_username_global_uniq/i.test(raw)) {
+    return t.usernameTaken;
+  }
+  if (/EMAIL_TAKEN/i.test(raw)
+    || /duplicate key.*(students|teachers|admins|parents)_google_email_uniq/i.test(raw)) {
+    return t.googleEmailTaken;
+  }
+
   // Z.2.9 — имена ограничений сверены с живой базой. Прежние
   // `students_username_key` / `teachers_username_key` НЕ СУЩЕСТВУЮТ: реальные
   // называются `students_school_username_key` и `teachers_school_username_key`

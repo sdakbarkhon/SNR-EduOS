@@ -11,6 +11,7 @@ import { DemoRoleModal } from "@/components/DemoRoleModal";
 import { Logo } from "@/components/Logo";
 import { SchoolMark } from "@/components/SchoolMark";
 import { SchoolPickerModal, rememberSchool, type PublicSchool } from "./SchoolPicker";
+import { startParentGoogleLogin } from "@/app/actions/parentGoogleAuth";
 
 function GoogleIcon() {
   return (
@@ -66,6 +67,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
    *  подставляет ни запомненное, ни единственную школу: человек пришёл сюда
    *  именно затем, чтобы выбрать другую. */
   const [reopenPicker, setReopenPicker] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   // Запомненный выбор подставляет сам SchoolPicker: он и так грузит список,
   // и название с логотипом берёт оттуда же. Здесь про localStorage знать
   // незачем — кроме кнопки «Сменить школу» ниже.
@@ -81,7 +83,17 @@ export function LoginForm({ locale }: { locale: Locale }) {
     if (searchParams.get("reason") === "session_replaced") {
       setError(t.sessionReplaced);
     }
-  }, [searchParams, t.sessionReplaced]);
+    // Возврат от Google с отказом: причина приезжает в адресе, экран переводит
+    // её на язык человека. Молчания быть не должно — человек только что
+    // прошёл через чужой экран входа и вернулся ни с чем.
+    const g = searchParams.get("error");
+    if (g === "not_linked") setError(t.googleNotLinked);
+    else if (g === "no_account") setError(t.googleNoAccount);
+    else if (g === "school_archived") setError(t.googleSchoolArchived);
+    else if (g === "wrong_school") setError(t.googleWrongSchool);
+    else if (g === "failed") setError(t.googleFailed);
+    // «cancelled» — не ошибка: человек сам нажал «Отмена» у Google.
+  }, [searchParams, t]);
 
   // Warm the two most likely post-login route bundles so the RSC payload
   // isn't fetched cold the instant login succeeds (Iter5 hotfix P14.1).
@@ -119,6 +131,31 @@ export function LoginForm({ locale }: { locale: Locale }) {
       router.replace(dest);
       router.refresh();
     });
+  }
+
+  /**
+   * Вход через Google. Механизм тот же, что у родителей: серверное действие
+   * начинает вход (секрет PKCE должен лечь в HttpOnly-cookie сервера), браузер
+   * уходит к Google, возврат обрабатывает /auth/callback.
+   *
+   * Выбранная школа уезжает вместе с адресом возврата и сверяется там: ученик
+   * школы А, выбравший школу Б, войти не должен.
+   */
+  async function onGoogle() {
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      const res = await startParentGoogleLogin(
+        window.location.origin,
+        picked?.school?.id ?? null,
+        "login",
+      );
+      if (!res.ok) { setError(t.googleFailed); setGoogleBusy(false); return; }
+      window.location.href = res.url;
+    } catch {
+      setError(t.googleFailed);
+      setGoogleBusy(false);
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -388,10 +425,15 @@ export function LoginForm({ locale }: { locale: Locale }) {
                 {d.demoMode.shortLabel}
               </span>
             </button>
+            {/* Вход через Google — рабочий для учеников, учителей,
+                администраторов и родителей: почту вписывает администратор, и
+                она сверяется на возврате. */}
             <button
               type="button"
-              onClick={() => showNotice(t.comingSoon)}
-              className="flex items-center justify-center rounded-xl border border-white/50 bg-white/80 py-3 shadow-sm transition-colors hover:bg-white"
+              onClick={onGoogle}
+              disabled={googleBusy}
+              title={t.withGoogle}
+              className="flex items-center justify-center rounded-xl border border-white/50 bg-white/80 py-3 shadow-sm transition-colors hover:bg-white disabled:opacity-50"
             >
               <GoogleIcon />
             </button>

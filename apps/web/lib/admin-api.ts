@@ -133,6 +133,9 @@ export async function createStudent(data: {
   password: string;
   group_id: string;
   school_id: string;
+  /** Почта Google для входа. Необязательна: без неё вход только по логину и
+   *  паролю, как раньше. Нормализуется той же функцией, что у родителей. */
+  google_email?: string | null;
 }): Promise<{ userId: string; studentId: string }> {
   const sb = getServiceClient();
   // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
@@ -142,7 +145,7 @@ export async function createStudent(data: {
   });
   const { data: student, error: stuErr } = await sb
     .from("students")
-    .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id })
+    .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id, google_email: normalizeSocialEmail(data.google_email) })
     .select("id")
     .single();
   if (stuErr || !student) {
@@ -170,7 +173,7 @@ export async function createStudent(data: {
 export async function updateStudent(
   studentId: string,
   userId: string,
-  data: { full_name: string; username: string; group_id?: string; old_group_id?: string },
+  data: { full_name: string; username: string; group_id?: string; old_group_id?: string; google_email?: string | null },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
@@ -179,7 +182,7 @@ export async function updateStudent(
 
   const { error } = await sb
     .from("students")
-    .update({ full_name: data.full_name, username: data.username })
+    .update({ full_name: data.full_name, username: data.username, google_email: normalizeSocialEmail(data.google_email) })
     .eq("id", studentId);
   if (error) throw error;
 
@@ -268,6 +271,7 @@ export async function createTeacher(data: {
   username: string;
   password: string;
   school_id: string;
+  google_email?: string | null;
 }): Promise<{ userId: string; teacherId: string }> {
   const sb = getServiceClient();
   // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
@@ -277,7 +281,7 @@ export async function createTeacher(data: {
   });
   const { data: teacher, error: tErr } = await sb
     .from("teachers")
-    .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id })
+    .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id, google_email: normalizeSocialEmail(data.google_email) })
     .select("id")
     .single();
   if (tErr || !teacher) {
@@ -291,14 +295,14 @@ export async function createTeacher(data: {
 export async function updateTeacher(
   teacherId: string,
   userId: string,
-  data: { full_name: string; username: string },
+  data: { full_name: string; username: string; google_email?: string | null },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
   const sb = getServiceClient();
   await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
 
-  const { error } = await sb.from("teachers").update({ full_name: data.full_name, username: data.username }).eq("id", teacherId);
+  const { error } = await sb.from("teachers").update({ full_name: data.full_name, username: data.username, google_email: normalizeSocialEmail(data.google_email) }).eq("id", teacherId);
   if (error) throw error;
   await sb.auth.admin.updateUserById(userId, {
     email: `${data.username.trim().toLowerCase()}@teachers.snr.local`,
@@ -1126,6 +1130,9 @@ export async function createSchoolAdmin(data: {
   username: string;
   password: string;
   school_id: string;
+  /** Почта Google для входа. Вписывает суперадминистратор — сам себе
+   *  администратор её не назначит. */
+  google_email?: string | null;
 }): Promise<{ userId: string; adminId: string }> {
   const sb = getServiceClient();
   // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
@@ -1143,6 +1150,7 @@ export async function createSchoolAdmin(data: {
       full_name: data.full_name,
       username: data.username.trim().toLowerCase(),
       school_id: data.school_id,
+      google_email: normalizeSocialEmail(data.google_email),
     })
     .select("id")
     .single();

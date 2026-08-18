@@ -45,7 +45,8 @@ export async function actionCreateStudent(formData: FormData) {
   const password = String(formData.get("password") ?? "").trim();
   const group_id = String(formData.get("group_id") ?? "").trim();
   if (!full_name || !username || !password || !group_id) throw new Error("Missing fields");
-  const result = await createStudent({ full_name, username, password, group_id, school_id: schoolId });
+  const google_email = String(formData.get("google_email") ?? "").trim() || null;
+  const result = await createStudent({ full_name, username, password, group_id, school_id: schoolId, google_email });
   revalidatePath("/admin/students");
   revalidatePath("/admin");
   return result;
@@ -59,7 +60,8 @@ export async function actionUpdateStudent(formData: FormData) {
   const username = String(formData.get("username") ?? "").trim();
   const group_id = String(formData.get("group_id") ?? "").trim();
   const old_group_id = String(formData.get("old_group_id") ?? "").trim();
-  await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id }, schoolId, isSuperAdmin);
+  const google_email = String(formData.get("google_email") ?? "").trim() || null;
+  await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id, google_email }, schoolId, isSuperAdmin);
   revalidatePath("/admin/students");
 }
 
@@ -85,7 +87,8 @@ export async function actionCreateTeacher(formData: FormData) {
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "").trim();
   if (!full_name || !username || !password) throw new Error("Missing fields");
-  const result = await createTeacher({ full_name, username, password, school_id: schoolId });
+  const google_email = String(formData.get("google_email") ?? "").trim() || null;
+  const result = await createTeacher({ full_name, username, password, school_id: schoolId, google_email });
   revalidatePath("/admin/teachers");
   revalidatePath("/admin");
   return result;
@@ -97,7 +100,8 @@ export async function actionUpdateTeacher(formData: FormData) {
   const user_id = String(formData.get("user_id") ?? "");
   const full_name = String(formData.get("full_name") ?? "").trim();
   const username = String(formData.get("username") ?? "").trim();
-  await updateTeacher(teacher_id, user_id, { full_name, username }, schoolId, isSuperAdmin);
+  const google_email = String(formData.get("google_email") ?? "").trim() || null;
+  await updateTeacher(teacher_id, user_id, { full_name, username, google_email }, schoolId, isSuperAdmin);
   revalidatePath("/admin/teachers");
 }
 

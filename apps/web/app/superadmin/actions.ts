@@ -145,7 +145,8 @@ export async function actionCreateSchoolAdmin(formData: FormData) {
   if (!full_name || !username || !password || !school_id) throw new Error("Missing fields");
   // Z.1: school_id приходит из FormData — фильтр в <select> ничего не гарантирует.
   await assertSchoolIsManageable(school_id);
-  const result = await createSchoolAdmin({ full_name, username, password, school_id });
+  const google_email = String(formData.get("google_email") ?? "").trim() || null;
+  const result = await createSchoolAdmin({ full_name, username, password, school_id, google_email });
   revalidatePath("/superadmin/admins");
   revalidatePath("/superadmin/dashboard");
   return result;

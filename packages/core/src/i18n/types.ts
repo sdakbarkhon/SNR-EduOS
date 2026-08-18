@@ -102,6 +102,12 @@ export interface Dictionary {
     errorParseFailed: string;   // "Не удалось распарсить план"
   };
   auth: {
+    googleNotLinked: string;
+    googleNoAccount: string;
+    googleSchoolArchived: string;
+    googleWrongSchool: string;
+    googleFailed: string;
+    withGoogle: string;
     chooseSchoolSearch: string;
     chooseSchoolNotFound: string;
     chooseSchoolTitle: string;
@@ -300,6 +306,8 @@ export interface Dictionary {
     teacherLegendNone: string;
   };
   admin: {
+    fieldGoogleEmailAny: string;
+    fieldGoogleEmailHint: string;
     anAiTitle: string;
     anAiHint: string;
     anAiLoading: string;
@@ -628,6 +636,7 @@ export interface Dictionary {
     subjectsOwnNameWarning: string;
   };
   superadmin: {
+    fieldGoogleEmailAny: string;
     schoolCardTitle: string;
     schoolEditBtn: string;
     schoolSaveBtn: string;
