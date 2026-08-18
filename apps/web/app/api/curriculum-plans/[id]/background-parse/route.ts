@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
-import { buildCurriculumParsePrompt } from "@/lib/ai/prompts";
+import { buildCurriculumParsePrompt, buildBookToPlanPrompt } from "@/lib/ai/prompts";
 import { CURRICULUM_TOPICS_SCHEMA } from "@/lib/ai/schemas";
 import { extractText, mimeFromName } from "@/lib/file-extractors";
-import { updateCurriculumPlanProgress, markCurriculumPlanReady, markCurriculumPlanError } from "@snr/core";
+import {
+  updateCurriculumPlanProgress, markCurriculumPlanReady, markCurriculumPlanError,
+  updateCurriculumPlanStage, markCurriculumPlanPreview,
+} from "@snr/core";
+import { buildBookOutline } from "@/lib/ai/book-outline";
 
 // Большой фикс, Блок 6, ЗАДАЧА 1 — фоновый воркер парсинга учебного плана.
 // Триггерится fire-and-forget'ом из create-processing/route.ts (или
@@ -43,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: plan, error: planErr } = await anyDb
     .from("curriculum_plans")
-    .select("id, source_file_url, status")
+    .select("id, source_file_url, source_book_id, status, subject_id, group_id")
     .eq("id", planId)
     .maybeSingle();
   if (planErr) return NextResponse.json({ error: planErr.message }, { status: 500 });
@@ -52,25 +56,86 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // вызова, или дублирующий триггер), второй раз не парсим.
   if (plan.status !== "processing") return NextResponse.json({ ok: true, skipped: true });
 
+  // ДВА ИСТОЧНИКА, ОДИН РАЗБОРЩИК. Файл готового плана лежит в бакете
+  // curriculum-plans, учебник — в books. Различаются они ровно здесь: где взять
+  // байты и каким промптом их читать. Всё остальное — извлечение текста,
+  // ретраи, нормализация тем, запись — общее. Второго разборщика нет и заводить
+  // его незачем: темы в обоих случаях получаются одной формы, и дальше по ним
+  // одинаково создаются уроки.
+  const fromBook = Boolean(plan.source_book_id);
+
   try {
-    if (!plan.source_file_url) throw new Error("У плана нет файла");
+    if (!fromBook && !plan.source_file_url) throw new Error("У плана нет файла");
 
-    await updateCurriculumPlanProgress(db, planId, 30);
-    const { data: fileData, error: dlErr } = await db.storage.from("curriculum-plans").download(plan.source_file_url);
-    if (dlErr || !fileData) throw new Error("Не удалось скачать файл плана");
-    const buffer = Buffer.from(await fileData.arrayBuffer());
-    const extracted = await extractText(buffer, mimeFromName(plan.source_file_url), plan.source_file_url);
-    const planText = extracted.text;
-    if (!planText.trim()) throw new Error("Файл пуст или не удалось извлечь текст");
+    // ── Скачивание ──────────────────────────────────────────────────────────
+    // Стадия пишется НАСТОЯЩАЯ, а не примета: учебник на тридцать мегабайт
+    // качается ощутимо долго, и учитель, глядя на застывший процент, решает,
+    // что всё сломалось.
+    await updateCurriculumPlanStage(db, planId, "download", 15);
 
-    await updateCurriculumPlanProgress(db, planId, 60);
-    const prompt = buildCurriculumParsePrompt(planText, MAX_TOPICS);
+    let buffer: Buffer;
+    let sourceName: string;
+    let bookTitle = "";
+    let bookSubject = "";
+    if (fromBook) {
+      const { data: book } = await anyDb
+        .from("books").select("title, subject, file_storage_path").eq("id", plan.source_book_id).maybeSingle();
+      if (!book?.file_storage_path) throw new Error("У выбранной книги нет файла");
+      bookTitle = String(book.title ?? "Учебник");
+      bookSubject = String(book.subject ?? "");
+      sourceName = String(book.file_storage_path);
+      const { data: fileData, error: dlErr } = await db.storage.from("books").download(sourceName);
+      if (dlErr || !fileData) throw new Error("Не удалось скачать книгу из библиотеки");
+      buffer = Buffer.from(await fileData.arrayBuffer());
+    } else {
+      sourceName = plan.source_file_url as string;
+      const { data: fileData, error: dlErr } = await db.storage.from("curriculum-plans").download(sourceName);
+      if (dlErr || !fileData) throw new Error("Не удалось скачать файл плана");
+      buffer = Buffer.from(await fileData.arrayBuffer());
+    }
+
+    // ── Извлечение текста ───────────────────────────────────────────────────
+    await updateCurriculumPlanStage(db, planId, "extract", 35);
+    // Для учебника берём ВЕСЬ текст: структура книги ищется по заголовкам во
+    // всей толще, и обрезка на пятидесяти тысячах оставила бы от толстого
+    // учебника первые двадцать страниц. Сжатием занимается book-outline ниже.
+    const extracted = await extractText(buffer, mimeFromName(sourceName), sourceName, fromBook ? 4_000_000 : undefined);
+    const sourceText = extracted.text;
+    if (!sourceText.trim()) {
+      throw new Error(fromBook
+        ? "Из книги не удалось извлечь текст — возможно, это скан без текстового слоя"
+        : "Файл пуст или не удалось извлечь текст");
+    }
+
+    // ── Скелет книги ────────────────────────────────────────────────────────
+    let prompt: string;
+    if (fromBook) {
+      await updateCurriculumPlanStage(db, planId, "outline", 50);
+      const outline = buildBookOutline(sourceText);
+      console.log(`[background-parse] книга ${bookTitle}: ${outline.sourceChars} символов`
+        + (outline.condensed ? ` -> выжимка ${outline.text.length}, заголовков ${outline.headingCount}` : " — целиком"));
+      const { data: grp } = await anyDb.from("groups").select("name").eq("id", plan.group_id).maybeSingle();
+      prompt = buildBookToPlanPrompt({
+        bookTitle,
+        subject: bookSubject || "—",
+        grade: String((grp as { name: string } | null)?.name ?? "—"),
+        outline: outline.text,
+        condensed: outline.condensed,
+        headingCount: outline.headingCount,
+        maxTopics: MAX_TOPICS,
+      });
+    } else {
+      prompt = buildCurriculumParsePrompt(sourceText, MAX_TOPICS);
+    }
+
+    // ── Модель ──────────────────────────────────────────────────────────────
+    await updateCurriculumPlanStage(db, planId, "model", 65);
     let topics: ParsedTopic[] | null = null;
     let lastError: string | null = null;
     for (let attempt = 0; attempt < 3 && !topics; attempt++) {
       const { data: parsed, error } = await generateJSON<Partial<ParsedTopic>[]>(prompt, CURRICULUM_TOPICS_SCHEMA, {
         model: "pro",
-        usage: { task: AI_TASKS.curriculumParse },
+        usage: { task: fromBook ? AI_TASKS.bookToPlan : AI_TASKS.curriculumParse },
       });
       if (error || !Array.isArray(parsed) || parsed.length === 0) {
         lastError = error || "Не удалось разобрать ответ AI";
@@ -86,14 +151,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     if (!topics) throw new Error(lastError || "Не удалось распарсить план");
 
-    await updateCurriculumPlanProgress(db, planId, 90);
-    await markCurriculumPlanReady(
-      db,
-      planId,
-      topics.map((t) => ({ title: t.title, description: t.description, estimatedLessons: t.estimated_lessons })),
-    );
+    await updateCurriculumPlanStage(db, planId, "save", 90);
+    const rows = topics.map((t) => ({ title: t.title, description: t.description, estimatedLessons: t.estimated_lessons }));
 
-    return NextResponse.json({ ok: true, topicsCount: topics.length });
+    // Книга кончается ПРЕДПРОСМОТРОМ, а не готовым планом: темы предложены,
+    // учитель их правит и подтверждает. Файл готового плана — как и был:
+    // учитель уже принёс план, спрашивать согласия с собственным планом незачем.
+    if (fromBook) await markCurriculumPlanPreview(db, planId, rows);
+    else await markCurriculumPlanReady(db, planId, rows);
+
+    return NextResponse.json({ ok: true, topicsCount: topics.length, preview: fromBook });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Неизвестная ошибка парсинга";
     await markCurriculumPlanError(db, planId, message).catch(() => null);

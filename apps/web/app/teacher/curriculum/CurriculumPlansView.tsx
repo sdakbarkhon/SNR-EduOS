@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Upload, X, FileText, AlertTriangle, Search, ChevronRight } from "lucide-react";
+import { Upload, X, FileText, AlertTriangle, Search, ChevronRight, BookOpen } from "lucide-react";
 import { uploadCurriculumPlanFile, getCurriculumPlanForGroupSubject, getDictionary } from "@snr/core";
 import type { CurriculumPlanWithTopics, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
+import { FromBookModal } from "./FromBookModal";
 
 type GroupItem = { id: string; name: string };
 type SubjectItem = { id: string; name: string; group_id: string };
@@ -31,6 +32,7 @@ export function CurriculumPlansView({
   // список этой страницы просто не участвует в том флоу.
   const plans = initialPlans;
   const [uploadModal, setUploadModal] = useState(false);
+  const [bookModal, setBookModal] = useState(false);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
 
@@ -61,6 +63,14 @@ export function CurriculumPlansView({
             className="w-full rounded-xl border border-slate-200 bg-white/60 py-2.5 pl-11 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>
+        {/* Два источника плана рядом: готовый файл — и учебник, если готового
+            плана нет вовсе. Разбирает их один и тот же механизм. */}
+        <button
+          onClick={() => setBookModal(true)}
+          className="flex shrink-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 active:scale-95"
+        >
+          <BookOpen className="h-4 w-4" /> {d.fromBookBtn}
+        </button>
         <button
           onClick={() => setUploadModal(true)}
           className="flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95"
@@ -98,6 +108,14 @@ export function CurriculumPlansView({
           subjects={subjects}
           teacherId={teacherId}
           onClose={() => setUploadModal(false)}
+        />
+      )}
+
+      {bookModal && (
+        <FromBookModal
+          groups={groups}
+          subjects={subjects}
+          onClose={() => setBookModal(false)}
         />
       )}
     </PageContainer>

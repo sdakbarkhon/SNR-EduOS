@@ -66,6 +66,31 @@ export interface Dictionary {
   };
   // Промт 4 — учебные планы (curriculum_plans, migration 116).
   curriculum: {
+    replaceConfirm: string;
+    fromBookBtn: string;
+    fromBookTitle: string;
+    fromBookSubtitle: string;
+    fromBookPick: string;
+    fromBookNoBooks: string;
+    fromBookNoFile: string;
+    fromBookStart: string;
+    fromBookStarting: string;
+    fromBookBadge: string;
+    fromBookCost: string;
+    stageQueued: string;
+    stageDownload: string;
+    stageExtract: string;
+    stageOutline: string;
+    stageModel: string;
+    stageSave: string;
+    previewTitle: string;
+    previewHint: string;
+    previewAccept: string;
+    previewAccepting: string;
+    previewReject: string;
+    previewRejecting: string;
+    previewRejectConfirm: string;
+    previewTopicCount: string;
     title: string;              // "Учебные планы"
     uploadPlan: string;         // "Загрузить учебный план"
     parseWithAi: string;        // "Распарсить AI"
@@ -679,6 +704,7 @@ export interface Dictionary {
     task_study_tip: string;
     task_grades_advice: string;
     task_analytics_review: string;
+    task_book_to_plan: string;
     task_other: string;
     statSchools: string;
     statAdmins: string;

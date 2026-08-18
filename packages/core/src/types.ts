@@ -478,7 +478,7 @@ export type LibraryMaterialWithDetails = LibraryMaterial & {
 // error_message для фонового парсинга: план создаётся сразу со
 // status='processing' (пустой, без topics), background-parse route
 // дописывает topics и переводит в 'ready' (или 'error' + error_message).
-export type CurriculumPlanStatus = 'processing' | 'ready' | 'error';
+export type CurriculumPlanStatus = "processing" | "preview" | "ready" | "error";
 
 export type CurriculumPlan = {
   id: string;
@@ -493,6 +493,11 @@ export type CurriculumPlan = {
   status: CurriculumPlanStatus;
   progress_percent: number;
   error_message: string | null;
+  /** Книга-источник, если план собран из учебника (миграция 212). */
+  source_book_id: string | null;
+  /** Чем сервер занят прямо сейчас: download/extract/outline/model/save.
+   *  В отличие от процентов, это настоящий шаг, а не примета в коде. */
+  progress_stage: string | null;
 };
 
 export type CurriculumPlanTopic = {

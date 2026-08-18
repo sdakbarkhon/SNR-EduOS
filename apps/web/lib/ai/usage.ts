@@ -46,6 +46,8 @@ export const AI_TASKS = {
   gradesAdvice: "grades_advice",
   /** Разбор аналитики школы для директора. */
   analyticsReview: "analytics_review",
+  /** Сборка учебного плана из учебника. */
+  bookToPlan: "book_to_plan",
   /** Место вызова не подписалось. Не должно встречаться; если встретилось —
    *  значит появился новый вызов модели, который забыли назвать. */
   other: "other",

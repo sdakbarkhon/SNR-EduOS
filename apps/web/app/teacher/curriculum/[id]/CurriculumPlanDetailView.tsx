@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ChevronUp, ChevronDown, Pencil, Trash2, Check,
   Sparkles, ListPlus, LayoutTemplate, AlertTriangle, CalendarPlus, Loader2,
@@ -48,7 +49,9 @@ export function CurriculumPlanDetailView({
   const db = createClient();
   const isOwner = plan.teacher_id === teacherId;
   const { locale } = useLocale();
+  const router = useRouter();
   const tt = getDictionary(locale as Locale).teacher;
+  const tc = getDictionary(locale as Locale).curriculum;
 
   // Большой фикс, Блок 6, ЗАДАЧА 1 — фоновый парсинг: пока status='processing'
   // тем ещё нет (background-parse дописывает их асинхронно), поэтому текущий
@@ -59,16 +62,24 @@ export function CurriculumPlanDetailView({
   const [progressPercent, setProgressPercent] = useState(plan.progress_percent);
   const [errorMessage, setErrorMessage] = useState(plan.error_message);
   const [retrying, setRetrying] = useState(false);
+  // Настоящая стадия работы, а не только процент. Проценты расставлены по коду
+  // приметами; стадия говорит, чем сервер занят прямо сейчас — при разборе
+  // тридцатимегабайтного учебника это разница между «работает» и «зависло».
+  const [progressStage, setProgressStage] = useState<string | null>(
+    (plan as { progress_stage?: string | null }).progress_stage ?? null,
+  );
+  const [confirming, setConfirming] = useState<"accept" | "reject" | null>(null);
 
   useRealtimeChannel(
-    planStatus === "ready" ? null : `curriculum-plan-${plan.id}`,
+    planStatus === "ready" || planStatus === "preview" ? null : `curriculum-plan-${plan.id}`,
     "curriculum_plans",
     `id=eq.${plan.id}`,
     (payload) => {
-      const row = payload.new as { status?: string; progress_percent?: number; error_message?: string | null };
+      const row = payload.new as { status?: string; progress_percent?: number; error_message?: string | null; progress_stage?: string | null };
       if (typeof row.progress_percent === "number") setProgressPercent(row.progress_percent);
-      if (row.status === "processing" || row.status === "ready" || row.status === "error") setPlanStatus(row.status);
+      if (row.status === "processing" || row.status === "preview" || row.status === "ready" || row.status === "error") setPlanStatus(row.status);
       if ("error_message" in row) setErrorMessage(row.error_message ?? null);
+      if ("progress_stage" in row) setProgressStage(row.progress_stage ?? null);
     },
   );
 
@@ -97,7 +108,7 @@ export function CurriculumPlanDetailView({
   const [usageLoaded, setUsageLoaded] = useState(false);
 
   useEffect(() => {
-    if (planStatus !== "ready") return;
+    if (planStatus !== "ready" && planStatus !== "preview") return;
     let cancelled = false;
     getCurriculumTopicsWithUsage(db, plan.id)
       .then((withUsage) => { if (!cancelled) { setTopics(withUsage); setUsageLoaded(true); } })
@@ -234,6 +245,26 @@ export function CurriculumPlanDetailView({
     }
   }
 
+  /** Согласие с предложенными темами — или отказ от черновика. */
+  async function confirmPlan(accept: boolean) {
+    setConfirming(accept ? "accept" : "reject");
+    try {
+      const res = await fetch(`/api/curriculum-plans/${plan.id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accept }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setErrorMessage(json.error || "Не получилось"); return; }
+      if (json.deleted) router.push("/teacher/curriculum");
+      else setPlanStatus("ready");
+    } catch {
+      setErrorMessage("Ошибка сети");
+    } finally {
+      setConfirming(null);
+    }
+  }
+
   // ── Кнопка «Создать урок» рядом с темой ─────────────────────────────────
   //
   // Идёт в ТОТ ЖЕ роут, что и «создать все автоматически», только с одной
@@ -330,7 +361,7 @@ export function CurriculumPlanDetailView({
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{plan.subject_name}</p>
             <h1 className="mt-0.5 text-xl font-bold text-slate-900">{plan.group_name}</h1>
-            {planStatus === "ready" && (
+            {(planStatus === "ready" || planStatus === "preview") && (
               <p className="mt-1 text-sm text-slate-500">{topics.length} {topicWord(topics.length)}</p>
             )}
           </div>
@@ -340,7 +371,13 @@ export function CurriculumPlanDetailView({
       {planStatus === "processing" && (
         <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-8 text-center">
           <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-500" />
-          <p className="text-sm font-semibold text-slate-700">План готовится — AI разбирает файл на темы…</p>
+          <p className="text-sm font-semibold text-slate-700">
+            {progressStage
+              ? ({ queued: tc.stageQueued, download: tc.stageDownload, extract: tc.stageExtract,
+                   outline: tc.stageOutline, model: tc.stageModel, save: tc.stageSave } as Record<string, string>)[progressStage]
+                ?? "План готовится — AI разбирает файл на темы…"
+              : "План готовится — AI разбирает файл на темы…"}
+          </p>
           <p className="mt-1 text-xs text-slate-400">Можно закрыть эту вкладку — мы покажем уведомление, когда план будет готов.</p>
           <div className="mx-auto mt-5 h-2 w-full max-w-sm overflow-hidden rounded-full bg-blue-100">
             <div
@@ -369,8 +406,37 @@ export function CurriculumPlanDetailView({
         </div>
       )}
 
-      {planStatus === "ready" && (
+      {(planStatus === "ready" || planStatus === "preview") && (
       <>
+      {/* Предпросмотр: темы предложены, плана ещё нет. Панель стоит НАД
+          списком — учитель должен понимать, что смотрит черновик, прежде чем
+          начнёт его править. */}
+      {planStatus === "preview" && isOwner && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+          <p className="text-sm font-bold text-slate-900">{tc.previewTitle}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">{tc.previewHint}</p>
+          <p className="mt-1.5 text-xs font-semibold text-blue-700">
+            {tc.previewTopicCount.replace("{n}", String(topics.length))}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => confirmPlan(true)}
+              disabled={confirming !== null}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {confirming === "accept" ? tc.previewAccepting : tc.previewAccept}
+            </button>
+            <button
+              onClick={() => { if (window.confirm(tc.previewRejectConfirm)) confirmPlan(false); }}
+              disabled={confirming !== null}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {confirming === "reject" ? tc.previewRejecting : tc.previewReject}
+            </button>
+          </div>
+        </div>
+      )}
+
       {!isOwner && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />

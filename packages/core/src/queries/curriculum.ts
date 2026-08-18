@@ -371,3 +371,114 @@ export async function resetCurriculumPlanForRetry(db: Db, planId: string): Promi
     .eq("id", planId);
   if (error) throw error;
 }
+
+// ── Учебный план из книги (миграция 212) ────────────────────────────────────
+//
+// Разбирает книгу ТОТ ЖЕ background-parse, что разбирает файл плана: меняется
+// только место, откуда берутся байты, и то, чем всё кончается — не 'ready', а
+// 'preview' (темы предложены, учитель ещё не согласился). Второго разборщика
+// не появилось.
+
+/** Книги школы, годные как источник плана: только те, у которых есть файл.
+ *  Внешняя ссылка (external_url) источником быть не может — файл нужно
+ *  скачать и извлечь текст, а по чужой ссылке этого не сделать. */
+export async function getBooksForPlanSource(
+  db: Db,
+  subjectSlug?: string | null,
+): Promise<Array<{ id: string; title: string; author: string | null; subject: string | null; file_size_bytes: number | null }>> {
+  let q = (db as AnyDb)
+    .from("books")
+    .select("id, title, author, subject, file_size_bytes")
+    .not("file_storage_path", "is", null)
+    .order("title");
+  if (subjectSlug) q = q.eq("subject", subjectSlug);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; title: string; author: string | null; subject: string | null; file_size_bytes: number | null }>;
+}
+
+/** Создаёт план-заготовку из книги: сразу 'processing', тем ещё нет.
+ *  Дальше его разбирает background-parse — см. шапку выше. */
+export async function createCurriculumPlanFromBook(
+  db: Db,
+  input: { groupId: string; subjectId: string; teacherId: string; title: string; bookId: string },
+): Promise<CurriculumPlan> {
+  const plan = await (db as AnyDb)
+    .from("curriculum_plans")
+    .insert({
+      group_id: input.groupId,
+      subject_id: input.subjectId,
+      teacher_id: input.teacherId,
+      title: input.title,
+      source_book_id: input.bookId,
+      status: "processing",
+      progress_percent: 5,
+      progress_stage: "queued",
+    })
+    .select("*")
+    .single()
+    .then(unwrap);
+  return plan as CurriculumPlan;
+}
+
+/** «Заменить?» под книжный источник — тот же delete-then-insert. */
+export async function replaceCurriculumPlanFromBook(
+  db: Db,
+  existingPlanId: string,
+  input: Parameters<typeof createCurriculumPlanFromBook>[1],
+): Promise<CurriculumPlan> {
+  const { error } = await (db as AnyDb).from("curriculum_plans").delete().eq("id", existingPlanId);
+  if (error) throw error;
+  return createCurriculumPlanFromBook(db, input);
+}
+
+/** Чем сервер занят прямо сейчас. Пишется на каждом настоящем шаге разбора —
+ *  в отличие от процентов, которые расставлены по коду приметами. */
+export async function updateCurriculumPlanStage(
+  db: Db,
+  planId: string,
+  stage: "queued" | "download" | "extract" | "outline" | "model" | "save",
+  percent: number,
+): Promise<void> {
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .update({ progress_stage: stage, progress_percent: percent })
+    .eq("id", planId);
+  if (error) throw error;
+}
+
+/** Темы разобраны и предложены учителю. План ещё НЕ рабочий: пока он в
+ *  'preview', уроки по нему не создают. */
+export async function markCurriculumPlanPreview(
+  db: Db,
+  planId: string,
+  topics: Array<{ title: string; description: string | null; estimatedLessons: number }>,
+): Promise<void> {
+  if (topics.length > 0) {
+    const { error: topicsErr } = await (db as AnyDb).from("curriculum_plan_topics").insert(
+      topics.map((t, i) => ({
+        plan_id: planId,
+        order_index: i,
+        title: t.title,
+        description: t.description,
+        estimated_lessons: t.estimatedLessons,
+      })),
+    );
+    if (topicsErr) throw topicsErr;
+  }
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .update({ status: "preview", progress_percent: 100, progress_stage: null })
+    .eq("id", planId);
+  if (error) throw error;
+}
+
+/** Учитель согласился — план становится обычным. Темы к этому моменту уже
+ *  им поправлены теми же кнопками, что и у любого другого плана. */
+export async function confirmCurriculumPlan(db: Db, planId: string): Promise<void> {
+  const { error } = await (db as AnyDb)
+    .from("curriculum_plans")
+    .update({ status: "ready", progress_percent: 100, progress_stage: null })
+    .eq("id", planId);
+  if (error) throw error;
+}

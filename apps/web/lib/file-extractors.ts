@@ -21,6 +21,12 @@ export async function extractText(
   buffer: Buffer,
   mimeType: string,
   fileName = "",
+  /** Потолок символов. По умолчанию 50 000 — столько нужно, чтобы дать модели
+   *  контекст материалов урока. Разбору учебника нужен ВЕСЬ текст: структура
+   *  книги ищется по заголовкам во всей толще, и обрезка на пятидесяти тысячах
+   *  оставила бы от восьмисотстраничного учебника первые двадцать страниц.
+   *  Сжатием до размера промпта занимается lib/ai/book-outline.ts. */
+  maxChars = MAX_CHARS,
 ): Promise<ExtractResult> {
   const mt = (mimeType || "").toLowerCase();
   const ext = (fileName.split(".").pop() ?? "").toLowerCase();
@@ -56,8 +62,8 @@ export async function extractText(
   // Normalize whitespace.
   text = text.replace(/\s+/g, " ").trim();
 
-  const truncated = text.length > MAX_CHARS;
-  if (truncated) text = text.slice(0, MAX_CHARS);
+  const truncated = text.length > maxChars;
+  if (truncated) text = text.slice(0, maxChars);
 
   return { text, truncated, pages };
 }
