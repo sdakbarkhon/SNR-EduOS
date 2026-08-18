@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, Plus,
-  MoreHorizontal, Pencil, Trash2, X, AlertTriangle, CalendarDays,
+  MoreHorizontal, Pencil, Trash2, X, AlertTriangle, CalendarDays, CalendarRange,
 } from "lucide-react";
 import {
   createLesson, updateLesson, deleteLesson,
@@ -23,6 +23,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
+import { BulkLessonsModal } from "./BulkLessonsModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -567,6 +568,9 @@ export function TeacherLessonsView({
   const searchParams = useSearchParams();
   const toast = useToast();
   const dc = getDictionary(defaultLocale).common;
+  // Массовое создание — по языку пользователя, а не по языку по умолчанию.
+  const { locale: uiLocale } = useLocale();
+  const dt = getDictionary(uiLocale as Locale).teacher;
   const dbRef = useRef(createClient());
   const db = dbRef.current;
 
@@ -590,6 +594,8 @@ export function TeacherLessonsView({
   const [loading, setLoading] = useState(false);
 
   const [formModal, setFormModal] = useState<"create" | "edit" | null>(null);
+  // Массовое создание — отдельное окно: правило на период, а не один урок.
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editLesson, setEditLesson] = useState<LessonItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LessonItem | null>(null);
 
@@ -837,12 +843,22 @@ export function TeacherLessonsView({
                 {fmtDayHeader(selectedDayKey)}
               </h3>
               {!isCurator && (
-                <button
-                  onClick={openCreate}
-                  className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Создать урок
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {/* Уроки в школе повторяются неделя за неделей — правило на
+                      период вместо сотни отдельных нажатий на четверть. */}
+                  <button
+                    onClick={() => setBulkOpen(true)}
+                    className="flex items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                  >
+                    <CalendarRange className="h-3.5 w-3.5" /> {dt.bulkBtn}
+                  </button>
+                  <button
+                    onClick={openCreate}
+                    className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Создать урок
+                  </button>
+                </div>
               )}
             </div>
 
@@ -874,6 +890,15 @@ export function TeacherLessonsView({
       </div>
 
       {/* Modals */}
+      {bulkOpen && (
+        <BulkLessonsModal
+          groups={groups}
+          teacherSubjects={teacherSubjects}
+          onClose={() => setBulkOpen(false)}
+          onCreated={() => { void loadMonth(viewYear, viewMonth); }}
+        />
+      )}
+
       {formModal && (
         <LessonFormModal
           mode={formModal}
