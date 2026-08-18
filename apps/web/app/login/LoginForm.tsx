@@ -10,7 +10,8 @@ import { loginWithUsername, loginWithUsernameInSchool } from "@/app/actions/auth
 import { DemoRoleModal } from "@/components/DemoRoleModal";
 import { Logo } from "@/components/Logo";
 import { SchoolMark } from "@/components/SchoolMark";
-import { SchoolPickerModal, rememberSchool, type PublicSchool } from "./SchoolPicker";
+import { SchoolPickerModal, rememberSchool } from "./SchoolPicker";
+import { resolveSchoolStep, type PublicSchool } from "./school-step";
 import { startParentGoogleLogin } from "@/app/actions/parentGoogleAuth";
 
 function GoogleIcon() {
@@ -35,7 +36,16 @@ function MicrosoftIcon() {
   );
 }
 
-export function LoginForm({ locale }: { locale: Locale }) {
+export function LoginForm({
+  locale,
+  /** Список школ, пришедший в готовом HTML. `null` — сервер спросить не
+   *  смог (см. lib/public-schools.ts): тогда список переспрашивает браузер,
+   *  как было раньше. */
+  initialSchools,
+}: {
+  locale: Locale;
+  initialSchools: PublicSchool[] | null;
+}) {
   const d = getDictionary(locale);
   const t = d.auth;
   const router = useRouter();
@@ -86,14 +96,40 @@ export function LoginForm({ locale }: { locale: Locale }) {
   //
   // Проверка «свой ли это логин для выбранной школы» живёт НА СЕРВЕРЕ
   // (finishLogin). Здесь только показ: браузеру такие решения не доверяем.
-  const [picked, setPicked] = useState<{ school: PublicSchool | null } | null>(null);
+  //
+  // 19.08.2026 — НАЧАЛЬНОЕ ЗНАЧЕНИЕ СЧИТАЕТСЯ НА СЕРВЕРЕ, И ЭТО ВСЯ ПРАВКА
+  // ПРОТИВ МЕЛЬКАНИЯ ЗАГОЛОВКА.
+  //
+  // Раньше здесь стоял безусловный null: сервер про школу не знал ничего,
+  // рисовал общий заголовок «Вход в кабинет», а через секунду с лишним
+  // браузер читал память и подменял его логотипом школы. Теперь список школ
+  // приезжает в HTML (app/login/page.tsx), и сервер решает ровно то, что
+  // может решить, — правилом resolveSchoolStep, тем же, которым потом
+  // пользуется браузер:
+  //
+  //   школа одна   → подставлена уже в HTML, подменять нечего;
+  //   школ ноль    → шага нет, сразу форма с заголовком;
+  //   школ много   → null, то есть «пока не знаю» — и на месте шапки стоит
+  //                  место под школу, а не чужой заголовок (ниже).
+  //
+  // rememberedId здесь НЕ передаётся намеренно: на сервере его нет, а
+  // читать localStorage на первом рендере в браузере нельзя — разметка
+  // разойдётся с серверной, и React перерисует всё заново. Память читает
+  // окно выбора, уже после гидратации.
+  const [picked, setPicked] = useState<{ school: PublicSchool | null } | null>(() => {
+    if (initialSchools === null) return null;
+    const step = resolveSchoolStep(initialSchools, null);
+    if (step.kind === "pick") return { school: step.school };
+    if (step.kind === "skip") return { school: null };
+    return null;
+  });
   /** Окно открыто повторно по «Сменить школу». Отличается тем, что не
    *  подставляет ни запомненное, ни единственную школу: человек пришёл сюда
    *  именно затем, чтобы выбрать другую. */
   const [reopenPicker, setReopenPicker] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
-  // Запомненный выбор подставляет сам SchoolPicker: он и так грузит список,
-  // и название с логотипом берёт оттуда же. Здесь про localStorage знать
+  // Запомненный выбор подставляет сам SchoolPicker: список у него уже есть, и
+  // название с логотипом он берёт оттуда же. Здесь про localStorage знать
   // незачем — кроме кнопки «Сменить школу» ниже.
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -275,9 +311,44 @@ export function LoginForm({ locale }: { locale: Locale }) {
               из памяти браузера, её просто не замечал. Заголовок при этом
               уходит: две крупные надписи подряд спорят друг с другом, а
               «в какую школу вхожу» важнее, чем «это экран входа». */}
-          {/* Школа известна — логотип и название; ещё нет — заголовок. Место
-              под шапку занято в обоих случаях, поэтому карточка не прыгает. */}
-          {picked?.school ? (
+          {/* ТРИ СОСТОЯНИЯ ШАПКИ, И НИ ОДНО НЕ ПОДМЕНЯЕТ ДРУГОЕ ПО СМЫСЛУ.
+
+              19.08.2026 — было два: «школа известна» и «заголовок». Второе
+              доставалось и тому, про кого просто ещё не выяснили школу, — и
+              человек видел «Вход в кабинет», который через секунду с лишним
+              превращался в логотип его школы. Кадр менял смысл на глазах.
+
+              Теперь незнание отделено от отсутствия:
+
+              picked.school — школа известна. Логотип, название, «Сменить
+              школу». При одной школе в установке это состояние приезжает уже
+              в HTML, то есть человек видит его первым кадром.
+
+              picked === null — ЕЩЁ НЕ ЗНАЕМ (школ несколько, а какую помнит
+              этот браузер, серверу неизвестно: HTML один на всех и лежит в
+              кэше). Занимаем ровно то место, которое займёт школа: рамка под
+              логотип, полоса под название, пустая строка под ссылку. Никакого
+              текста — сказать пока нечего, а обещать «просто вход» нельзя.
+              Через мгновение место заполнится, и ничего не сдвинется.
+
+              picked.school === null — школы НЕТ (ни одной в установке, либо
+              список не открылся). Вот здесь заголовок уместен: показывать
+              нечего и не будет.
+
+              Высоты всех трёх совпадают — проверено замером, карточка не
+              прыгает ни при каком переходе. */}
+          {picked === null ? (
+            <div
+              aria-hidden
+              className="mb-5 [@media(max-height:760px)]:mb-3 flex flex-col items-center pt-1"
+            >
+              {/* Размеры повторяют SchoolMark size="xl" и строку названия
+                  один в один — иначе появление школы сдвинуло бы форму. */}
+              <div className="h-20 w-20 animate-pulse rounded-3xl bg-slate-200/70" />
+              <div className="mt-3 h-[22.5px] w-44 animate-pulse rounded-md bg-slate-200/70" />
+              <div className="mt-1 h-4" />
+            </div>
+          ) : picked.school ? (
             <div className="mb-5 [@media(max-height:760px)]:mb-3 flex flex-col items-center pt-1 text-center">
               <SchoolMark name={picked.school.name} logoUrl={picked.school.logoUrl} size="xl" />
               <p className="mt-3 text-lg font-bold leading-tight text-slate-900">{picked.school.name}</p>
@@ -305,6 +376,7 @@ export function LoginForm({ locale }: { locale: Locale }) {
           {(picked === null || reopenPicker) && (
             <SchoolPickerModal
               locale={locale}
+              initialSchools={initialSchools}
               reopened={reopenPicker}
               onPick={(school) => { setPicked({ school }); setReopenPicker(false); }}
               onSkip={() => { setPicked({ school: null }); setReopenPicker(false); }}
@@ -435,18 +507,23 @@ export function LoginForm({ locale }: { locale: Locale }) {
           {/* «Забыли пароль» на шаге выбора школы не показываем: человек ещё
               не сказал, кто он, и восстанавливать нечего. Ряд ниже — демо и
               OAuth — остаётся на месте всегда: демо это отдельная дверь, и
-              она работает ровно как работала. */}
-          {picked !== null && (
-            <div className="mt-3 [@media(max-height:760px)]:mt-1.5 text-center">
-              <button
-                type="button"
-                onClick={() => showNotice(t.comingSoon)}
-                className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
-              >
-                {t.forgot}
-              </button>
-            </div>
-          )}
+              она работает ровно как работала.
+
+              19.08.2026 — НЕ ПОКАЗЫВАЕМ, НО МЕСТО ДЕРЖИМ. Раньше блок просто не
+              рисовался, и когда школа подставлялась, карточка подрастала на
+              31 пиксель — замерено. Прыжок приходился ровно туда, куда человек
+              смотрит, и читался как вторая перерисовка экрана. visibility
+              вместо снятия с разметки: кнопка так же недоступна и невидима, но
+              высота занята с первого кадра. */}
+          <div className={`mt-3 [@media(max-height:760px)]:mt-1.5 text-center${picked === null ? " invisible" : ""}`}>
+            <button
+              type="button"
+              onClick={() => showNotice(t.comingSoon)}
+              className="text-sm font-medium text-blue-500 transition-colors hover:text-blue-700"
+            >
+              {t.forgot}
+            </button>
+          </div>
 
           <div className="my-4 [@media(max-height:760px)]:my-2 flex items-center gap-3">
             <div className="h-px flex-1 bg-white/40" />

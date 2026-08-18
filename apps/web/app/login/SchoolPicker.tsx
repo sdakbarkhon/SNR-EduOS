@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { SchoolMark } from "@/components/SchoolMark";
+import { resolveSchoolStep, type PublicSchool } from "./school-step";
 
 /**
  * Выбор школы перед входом — модальным окном поверх экрана.
@@ -65,7 +66,8 @@ import { SchoolMark } from "@/components/SchoolMark";
 
 const STORAGE_KEY = "login_school_id";
 
-export type PublicSchool = { id: string; name: string; logoUrl: string | null };
+// Тип и правило шага переехали в school-step.ts: их зовёт и сервер тоже.
+export type { PublicSchool };
 
 export function readRememberedSchool(): string | null {
   try {
@@ -91,6 +93,7 @@ export function SchoolPickerModal({
    *  пришёл сюда именно затем, чтобы выбрать другую. */
   reopened = false,
   onClose,
+  initialSchools,
 }: {
   locale: Locale;
   onPick: (school: PublicSchool) => void;
@@ -98,43 +101,65 @@ export function SchoolPickerModal({
   onSkip: () => void;
   reopened?: boolean;
   onClose?: () => void;
+  /** Список, приехавший в HTML (app/login/page.tsx). Есть — второго запроса не
+   *  делаем вовсе. `null`/не передан — спрашиваем сами, как раньше. */
+  initialSchools?: PublicSchool[] | null;
 }) {
   const d = getDictionary(locale);
   const t = d.auth;
 
-  const [schools, setSchools] = useState<PublicSchool[] | null>(null);
+  // Порядок по алфавиту. Сервер уже сортирует, но полагаться на это нельзя:
+  // сортировка в базе зависит от collation, а тут нужен порядок, понятный
+  // человеку в его языке.
+  const byName = (list: PublicSchool[]) =>
+    list.slice().sort((a, b) => a.name.localeCompare(b.name, locale === "en" ? "en" : "ru"));
+
+  const [schools, setSchools] = useState<PublicSchool[] | null>(
+    initialSchools ? byName(initialSchools) : null,
+  );
   const [query, setQuery] = useState("");
+
+  // 19.08.2026 — ОКНО РИСУЕТСЯ ТОЛЬКО ПОСЛЕ МОНТИРОВАНИЯ, и это не
+  // осторожность, а необходимость: ниже стоит createPortal в document.body, а
+  // на сервере document не существует. Раньше до портала дело не доходило по
+  // случайности — список там всегда был null и срабатывал ранний выход. Теперь
+  // список приезжает готовым, и выход больше не срабатывает.
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    // РЕШЕНИЕ О ШАГЕ — одно на оба пути: и когда список приехал в HTML, и когда
+    // его пришлось переспросить. Само правило живёт в school-step.ts, потому
+    // что тем же правилом пользуется сервер при сборке страницы.
+    const decide = (list: PublicSchool[]) => {
+      if (reopened) return; // повторное открытие — только ручной выбор
+      const step = resolveSchoolStep(list, readRememberedSchool());
+      if (step.kind === "skip") { onSkip(); return; }
+      if (step.kind === "pick") { rememberSchool(step.school.id); onPick(step.school); }
+      // "ask" — окно остаётся открытым, человек выбирает сам.
+    };
+
+    // Список уже есть — второго запроса не делаем.
+    if (schools !== null) {
+      decide(schools);
+      setMounted(true);
+      return;
+    }
+
     fetch("/api/public/schools")
       .then((r) => (r.ok ? r.json() : { schools: [] }))
       .then((json: { schools?: PublicSchool[] }) => {
         if (cancelled) return;
-        // Порядок по алфавиту. Сервер уже сортирует, но полагаться на это
-        // нельзя: сортировка в базе зависит от collation, а тут нужен порядок,
-        // понятный человеку в его языке.
-        const list = (Array.isArray(json.schools) ? json.schools : [])
-          .slice()
-          .sort((a, b) => a.name.localeCompare(b.name, locale === "en" ? "en" : "ru"));
+        const list = byName(Array.isArray(json.schools) ? json.schools : []);
         setSchools(list);
-
-        if (reopened) return; // повторное открытие — только ручной выбор
-
-        // Ни одной школы — шага не существует.
-        if (list.length === 0) { onSkip(); return; }
-
-        // Прошлый выбор подставляется сам, без второго запроса.
-        const remembered = readRememberedSchool();
-        const found = remembered ? list.find((s) => s.id === remembered) : undefined;
-        if (found) { onPick(found); return; }
-
-        // Единственная школа — выбирать не из чего.
-        if (list.length === 1) { rememberSchool(list[0]!.id); onPick(list[0]!); }
+        setMounted(true);
+        decide(list);
       })
       .catch(() => {
         if (cancelled) return;
         setSchools([]);
+        setMounted(true);
         if (!reopened) onSkip();
       });
     return () => { cancelled = true; };
@@ -149,6 +174,7 @@ export function SchoolPickerModal({
 
   // Пока список грузится и шаг ещё может оказаться пропущенным, окна не
   // показываем вовсе: мигать модалкой на долю секунды хуже, чем подождать.
+  if (!mounted) return null;
   if (schools === null && !reopened) return null;
 
   return createPortal(

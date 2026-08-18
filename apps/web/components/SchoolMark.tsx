@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 /**
  * Знак школы: логотип, а если его нет — буквы названия.
  *
@@ -12,6 +14,14 @@
  * уже написано словами. Внутри маленького квадрата оно превратилось бы в
  * нечитаемую кашу — поэтому там первые буквы, до двух: «SNR International
  * School» → «SI».
+ *
+ * КАРТИНКА НЕ ЗАГРУЗИЛАСЬ — ТОЖЕ БУКВЫ. Ссылка на логотип подписана на час
+ * (lib/school-card.ts), а с 19.08.2026 она попадает прямо в HTML страницы
+ * входа, который лежит в кэше края. Ночь без единого захода — и страница
+ * отдаётся со ссылкой старше часа. Дальше браузер показал бы битую картинку,
+ * то есть худшее из возможного: не логотип и не название. Правило «нет
+ * логотипа — показываем буквы» одно, и неудачная загрузка попадает под него
+ * же, а не заводит третий случай.
  */
 
 function initials(name: string): string {
@@ -40,13 +50,19 @@ export function SchoolMark({
   size?: keyof typeof SIZES;
 }) {
   const s = SIZES[size];
+  const [broken, setBroken] = useState(false);
 
-  if (logoUrl) {
+  if (logoUrl && !broken) {
     return (
       <div className={`flex ${s.box} shrink-0 items-center justify-center overflow-hidden bg-white ring-1 ring-violet-100`}>
         {/* object-contain, а не cover: логотип нельзя обрезать по краям. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoUrl} alt={name} className="h-full w-full object-contain" />
+        <img
+          src={logoUrl}
+          alt={name}
+          className="h-full w-full object-contain"
+          onError={() => setBroken(true)}
+        />
       </div>
     );
   }
