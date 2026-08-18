@@ -1,6 +1,5 @@
 "use client";
 
-import { Suspense } from "react";
 import { Montserrat } from "next/font/google";
 import { useLocale } from "@/components/LocaleProvider";
 import { BackgroundArt } from "./BackgroundArt";
@@ -52,9 +51,27 @@ export default function LoginPage() {
         </div>
 
         <div className="flex min-h-0 items-center justify-center overflow-y-auto px-6 py-2 [@media(max-height:760px)]:py-0 lg:px-12">
-          <Suspense fallback={null}>
-            <LoginForm locale={locale} />
-          </Suspense>
+          {/* 18.08.2026 — ЗДЕСЬ БЫЛ <Suspense fallback={null}>, И ОН СТОИЛ
+              КАРТОЧКЕ ВСЕЙ ЗАДЕРЖКИ.
+
+              Граница Suspense появилась не по нужде, а по требованию Next.js:
+              внутри формы стоял useSearchParams(), а его без такой границы
+              собрать нельзя. Побочное действие оказалось дороже пользы —
+              компонент, читающий адресную строку, при статической сборке из
+              пререндера исключается, и в готовый HTML вместо карточки
+              укладывается fallback. Fallback был null, то есть пустота.
+              Проверено на проде: в теле страницы не было ни одного поля формы.
+
+              Границы больше нет, потому что нет и причины для неё: форма
+              адресную строку теперь читает после монтирования (см. подробный
+              разбор в LoginForm.tsx). Карточка приезжает готовой вместе со
+              страницей.
+
+              ЕСЛИ БУДЕШЬ ВОЗВРАЩАТЬ SUSPENSE — fallback={null} не ставь
+              никогда. Пустой fallback здесь означает «правая половина экрана
+              пустая, пока не выполнится весь JS», и выглядит это ровно как
+              зависшая страница. */}
+          <LoginForm locale={locale} />
         </div>
       </div>
 

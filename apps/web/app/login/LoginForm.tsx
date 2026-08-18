@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, Sparkles } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -39,10 +39,34 @@ export function LoginForm({ locale }: { locale: Locale }) {
   const d = getDictionary(locale);
   const t = d.auth;
   const router = useRouter();
-  const searchParams = useSearchParams();
-  // Pre-filled after a parent completes /parent/join, so they don't have to
-  // retype the username they just chose.
-  const [username, setUsername] = useState(() => searchParams.get("username") ?? "");
+
+  // 18.08.2026 — ЗДЕСЬ БЫЛ useSearchParams(), И ИМЕННО ОН ПРЯТАЛ КАРТОЧКУ.
+  //
+  // Жалоба звучала как «карточка входа появляется через 2-3 секунды»: страница
+  // открыта, слева картинка и логотип, справа пусто. Причина оказалась не в
+  // скорости чего-либо, а в том, что карточки НЕ БЫЛО В HTML ВООБЩЕ. Проверено
+  // на проде: `curl https://eduos.snruz.uz/login | grep 'type="password"'` —
+  // ноль совпадений, единственные name= во всём документе это name="viewport"
+  // и name="description". Левая колонка в том же HTML присутствовала.
+  //
+  // Так работает правило Next.js: компонент, читающий адресную строку через
+  // useSearchParams(), при статической сборке из пререндера ИСКЛЮЧАЕТСЯ
+  // целиком — сервер не знает адреса, по которому его откроют. Вместо него в
+  // HTML кладётся fallback ближайшего Suspense, а он был fallback={null}. То
+  // есть на месте карточки в готовой странице лежала пустота, и появлялась
+  // карточка не «через 2-3 секунды после запроса», а только когда браузер
+  // скачает и выполнит 363 КБ сжатого JS. Отсюда и ощущение задержки, никак не
+  // связанное с прошлым ускорением списка школ (тот запрос кэшируется и
+  // отвечает за 100 мс — проверено, X-Vercel-Cache: HIT).
+  //
+  // Адресная строка нужна здесь трижды, и НИ РАЗУ на первом кадре: подставить
+  // логин после /parent/join, показать «сессию заняли на другом устройстве» и
+  // перевести отказ, с которым вернул Google. Всё это спокойно читается из
+  // window.location.search после монтирования — а карточка за это не платит.
+  //
+  // НЕ ВОЗВРАЩАЙ СЮДА useSearchParams(). Если понадобится читать адрес —
+  // читай его в useEffect, как ниже.
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -76,17 +100,27 @@ export function LoginForm({ locale }: { locale: Locale }) {
 
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
 
+  // Логин, подставленный после /parent/join, чтобы родителю не набирать
+  // заново тот, который он только что придумал. Один раз при монтировании и
+  // больше никогда: смена языка не должна затирать то, что человек уже успел
+  // набрать сам.
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get("username");
+    if (u) setUsername(u);
+  }, []);
+
   // Single-session: middleware выкинул эту сессию, потому что тем же
   // аккаунтом вошли с другого устройства. Постоянный error-pill, не
   // 2.5-секундный notice — сообщение должно дожить до взгляда пользователя.
   useEffect(() => {
-    if (searchParams.get("reason") === "session_replaced") {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("reason") === "session_replaced") {
       setError(t.sessionReplaced);
     }
     // Возврат от Google с отказом: причина приезжает в адресе, экран переводит
     // её на язык человека. Молчания быть не должно — человек только что
     // прошёл через чужой экран входа и вернулся ни с чем.
-    const g = searchParams.get("error");
+    const g = q.get("error");
     if (g === "not_linked") setError(t.googleNotLinked);
     else if (g === "no_account") setError(t.googleNoAccount);
     else if (g === "school_archived") setError(t.googleSchoolArchived);
@@ -94,7 +128,9 @@ export function LoginForm({ locale }: { locale: Locale }) {
     else if (g === "demo_school") setError(t.googleDemoSchool);
     else if (g === "failed") setError(t.googleFailed);
     // «cancelled» — не ошибка: человек сам нажал «Отмена» у Google.
-  }, [searchParams, t]);
+    // Зависимость от t сохранена намеренно: сменил человек язык — сообщение
+    // должно перечитаться на новом.
+  }, [t]);
 
   // Warm the two most likely post-login route bundles so the RSC payload
   // isn't fetched cold the instant login succeeds (Iter5 hotfix P14.1).
