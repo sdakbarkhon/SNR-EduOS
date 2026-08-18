@@ -96,61 +96,12 @@ async function buildRagContext(userMessage: string): Promise<RagContext | null> 
   return { kind: "found", contextBlock, sources };
 }
 
-export async function callAiChat(
-  systemPrompt: string,
-  userMessage: string,
-  history: Array<{ role: "user" | "model"; text: string }>,
-): Promise<{ text: string; sources_used?: AiChatSource[]; remaining?: number } | { error: string }> {
-  // Дневной лимит ученика — ОДИН на оба помощника: тот же счётчик, что у
-  // чата внутри урока. Раньше здесь лимита не было вовсе, и ученик,
-  // исчерпавший десять запросов в уроке, продолжал спрашивать по кнопке.
-  const supabaseForLimit = await createClient();
-  const { data: { user: limitUser } } = await supabaseForLimit.auth.getUser();
-  const usage = limitUser
-    ? await getStudentAiUsage(supabaseForLimit, limitUser.id)
-    : { studentId: null, used: 0, remaining: 1, limit: 10 };
-  if (usage.studentId && usage.remaining <= 0) return { error: "limit_reached" };
-
-  const rag = await buildRagContext(userMessage);
-
-  let effectiveSystemPrompt = systemPrompt;
-  if (rag?.kind === "found") {
-    effectiveSystemPrompt = `${systemPrompt}
-
-КОНТЕКСТ ИЗ УРОКОВ УЧЕНИКА (используй для ответа, если он релевантен вопросу; не выдумывай факты сверх этого списка и не упоминай, что это "контекст" или "источники" — отвечай естественно, как будто просто знаешь материал):
-
-${rag.contextBlock}`;
-  } else if (rag?.kind === "no_context") {
-    effectiveSystemPrompt = `${systemPrompt}${RAG_NO_CONTEXT_HINT}`;
-  }
-
-  const messages = [
-    ...history.map((m) => ({
-      role: (m.role === "model" ? "assistant" : "user") as "user" | "assistant",
-      content: m.text,
-    })),
-    { role: "user" as const, content: userMessage },
-  ];
-  const { text, error } = await chat(effectiveSystemPrompt, messages);
-  if (error) return { error };
-
-  // Запись в ai_chat_messages без урока (миграция 196) — она же и есть
-  // счётчик: fn_ai_messages_today() считает строки с role='user'.
-  let remaining: number | undefined;
-  if (usage.studentId) {
-    await logStudentAiExchange(supabaseForLimit, {
-      studentId: usage.studentId,
-      lessonId: null,
-      question: userMessage,
-      answer: text,
-    });
-    remaining = Math.max(0, usage.remaining - 1);
-  }
-
-  return rag?.kind === "found"
-    ? { text, sources_used: rag.sources, remaining }
-    : { text, remaining };
-}
+// callAiChat УДАЛЁН 17.08.2026. Это был второй механизм помощника: серверное
+// действие со своим промтом, своей историей в sessionStorage браузера и БЕЗ
+// какого-либо контекста урока. Именно из-за него помощник, открытый плавающей
+// кнопкой внутри урока, называл чужую тему — урок в него не передавался вовсе.
+// Прятать за переключателем не стали: механизм один, /api/ai/chat, и у него
+// два режима. Клиенты ходят туда через lib/ai/ask-assistant.ts.
 
 export async function getStudyTip(): Promise<{ text: string } | { error: string }> {
   // Z.3, заход 2 — дата в подсказке от времени школы. Дневной лимит ИИ этим

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Bot, Send, MoreHorizontal, Calculator, Languages, Bug, BookOpen } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components";
-import { callAiChat } from "@/app/actions/ai";
-import { EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
+import { askAssistant } from "@/lib/ai/ask-assistant";
 import { PageContainer } from "@/components/PageContainer";
 
 const SUGGESTION_ICONS = [Calculator, Languages, Bug, BookOpen];
@@ -47,6 +46,12 @@ export function AiAssistantView() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [usage, setUsage] = useState<AiUsage | null>(null);
+  // Один источник правды по счётчику: /api/ai/usage. Он же отдаёт число,
+  // которое видит помощник внутри урока — лимит общий на оба.
+  const refreshUsage = useCallback(async () => {
+    const fresh = await fetchAiUsage();
+    if (fresh) setUsage(fresh);
+  }, []);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,10 +81,19 @@ export function AiAssistantView() {
     // на реальное значение после того, как запрос отработает (успешно или нет).
     setUsage((prev) => (prev ? { ...prev, used: prev.used + 1, remaining: Math.max(0, prev.remaining - 1) } : prev));
 
-    const history = messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({ role: m.role, text: m.text }));
-    const result = await callAiChat(EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT, trimmed, history);
-    const aiText = "error" in result ? t.errorFallback : result.text;
+    // История больше не шлётся с клиента: её ведёт сам маршрут по
+    // ai_chat_messages — одно хранилище на оба режима.
+    const result = await askAssistant({ message: trimmed, lessonId: null });
+    const aiText = result.ok
+      ? result.text
+      : result.reason === "limit_reached" ? t.usageLimitReached : t.errorFallback;
     setMessages((prev) => [...prev, { role: "model", text: aiText }]);
+    // Счётчик перечитываем у общего источника, а не досчитываем в уме.
+    // Лимит один на обоих помощников (fn_ai_messages_today в базе), и запрос
+    // мог быть потрачен в уроке — тогда наша местная арифметика расходится с
+    // тем, что видно там. Читаем после КАЖДОГО ответа, включая ошибочный:
+    // при ошибке запрос не засчитывается, и вернуть число надо тоже.
+    void refreshUsage();
     setLoading(false);
     void fetchAiUsage().then((u) => { if (u) setUsage(u); });
   }

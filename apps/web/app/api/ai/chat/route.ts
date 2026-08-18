@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { chat } from "@/lib/ai/gemini-client";
-import { EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT } from "@/lib/ai/prompts";
+import {
+  EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT,
+  EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT,
+} from "@/lib/ai/prompts";
 import {
   STUDENT_AI_DAILY_LIMIT,
   getStudentAiUsage,
@@ -68,12 +71,16 @@ export async function POST(req: NextRequest) {
   if (!student) return NextResponse.json({ error: "Not a student" }, { status: 403 });
 
   const body = (await req.json()) as {
-    lesson_id: string;
+    lesson_id?: string | null;
     stage_id?: string | null;
     user_message: string;
   };
 
-  if (!body.lesson_id || !body.user_message?.trim()) {
+  // lesson_id необязателен: с ним — режим урока, без него — обычный помощник.
+  // Механизм ОДИН, режима два. Второго транспорта (server action callAiChat)
+  // больше нет, вместе с ним ушли и вторые промты.
+  const lessonId = body.lesson_id?.trim() ? body.lesson_id : null;
+  if (!body.user_message?.trim()) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
@@ -94,11 +101,11 @@ export async function POST(req: NextRequest) {
   // 'programming', поэтому на уроке русского помощнику сообщали
   // «Предмет: programming», и он честно отвечал про программирование.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: lesson } = await (db as any)
+  const { data: lesson } = lessonId ? await (db as any)
     .from("lessons")
     .select("id, title, topic, description, group_id, subject:subjects(name), group:groups(subject)")
-    .eq("id", body.lesson_id)
-    .single();
+    .eq("id", lessonId)
+    .single() : { data: null };
 
   if (lesson?.group_id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,19 +136,19 @@ export async function POST(req: NextRequest) {
   // не попадало ни то, ни другое: помощник знал тему, но не знал, из чего
   // урок состоит и что к нему приложено.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [{ data: stages }, { data: materials }] = await Promise.all([
+  const [{ data: stages }, { data: materials }] = lessonId ? await Promise.all([
     (db as any)
       .from("lesson_stages")
       .select("title, position")
-      .eq("lesson_id", body.lesson_id)
+      .eq("lesson_id", lessonId)
       .order("position"),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (db as any)
       .from("lesson_materials")
       .select("title")
-      .eq("lesson_id", body.lesson_id)
+      .eq("lesson_id", lessonId)
       .limit(20),
-  ]);
+  ]) : [{ data: null }, { data: null }];
 
   const planCtx = (stages ?? []).length
     ? `\nПЛАН ЭТОГО УРОКА (по порядку):\n${(stages as Array<{ title: string }>)
@@ -154,17 +161,27 @@ export async function POST(req: NextRequest) {
         .join("; ")}`
     : "";
 
-  // Get chat history (last 20 messages)
+  // История: у каждого урока своя, у общего помощника — общая (lesson_id пуст).
+  // Ветки истории разные, хранилище одно — ai_chat_messages, никакого
+  // sessionStorage, как было у второго механизма.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: history } = await (db as any)
+  let historyQuery = (db as any)
     .from("ai_chat_messages")
     .select("role, content")
-    .eq("student_id", student.id)
-    .eq("lesson_id", body.lesson_id)
+    .eq("student_id", student.id);
+  historyQuery = lessonId
+    ? historyQuery.eq("lesson_id", lessonId)
+    : historyQuery.is("lesson_id", null);
+  const { data: history } = await historyQuery
     .order("created_at", { ascending: true })
     .limit(20);
 
-  const systemPrompt = `${EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT}
+  // ДВА РЕЖИМА, ОДИН МЕХАНИЗМ.
+  //   есть lessonId  — режим урока: предмет, тема, план этапов, материалы,
+  //                    текущий этап. Всё строго по ЭТОМУ уроку.
+  //   нет lessonId   — обычный помощник: учёба, платформа, поддержка.
+  const systemPrompt = lessonId
+    ? `${EDUOS_ASSISTANT_LESSON_CHAT_SYSTEM_PROMPT}
 
 КОНТЕКСТ УРОКА:
 Предмет: ${lessonSubject}
@@ -177,7 +194,12 @@ ${stageCtx}
 Ты находишься ВНУТРИ этого урока. На вопросы «какая тема», «какой предмет»,
 «что мы проходим» отвечай строго по контексту выше и не подменяй предмет или
 тему другими. Если ученик спрашивает о чём-то постороннем — ответить можно, но
-сначала обозначь, что это уже за рамками текущего урока. Отвечай по-русски.`;
+сначала обозначь, что это уже за рамками текущего урока. Отвечай по-русски.`
+    : `${EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT}
+
+Ты сейчас ВНЕ урока: конкретного занятия перед тобой нет. Если вопрос про
+материал определённого урока — предложи открыть этот урок и спросить там,
+помощник внутри урока видит его тему, этапы и материалы. Отвечай по-русски.`;
 
   const chatMessages = [
     ...((history ?? []) as Array<{ role: string; content: string }>).map((m) => ({
@@ -197,7 +219,7 @@ ${stageCtx}
 
   await logStudentAiExchange(db, {
     studentId: student.id,
-    lessonId: body.lesson_id,
+    lessonId,
     stageId: body.stage_id ?? null,
     question: body.user_message,
     answer: text,
