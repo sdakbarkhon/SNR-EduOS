@@ -1847,6 +1847,12 @@ export interface Dictionary {
     downloadReference: string;
   };
   lesson: {
+    stagePreviewShow: string;
+    stagePreviewHide: string;
+    stagePreviewGaps: string;
+    stagePreviewEmpty: string;
+    stagePreviewLiveHint: string;
+    stagePreviewTeacherOnly: string;
     markLockedTitle: string;   // замок на оценке (миграция 203)
     markLockedBody: string;
     markWindowLeft: string;    // «Исправить можно ещё {n} мин»

@@ -1,27 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Pencil, ExternalLink } from "lucide-react";
-import { getDictionary, getQuizQuestions, getKahootLeaderboard, getMaterialDownloadUrl } from "@snr/core";
-import type { Locale, LessonStage, LessonStatus, QuizQuestion, QuizLeaderboardEntry } from "@snr/core";
+import { X, Pencil } from "lucide-react";
+import { getDictionary } from "@snr/core";
+import type { Locale, LessonStage, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { createClient } from "@/lib/supabase/client";
-import { SERVICE_CONFIG, DEFAULT_EXTERNAL_URLS, isExternalService } from "@/lib/external-services";
-import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
-import { MarkdownContent } from "@/components/MarkdownContent";
-import { QuizReviewList } from "@/components/quiz/QuizReviewList";
-import { MarkdownInline } from "@/components/markdown-plugins";
-import { StageMedia } from "@/components/lesson-stages/StageMedia";
-import { stageAllowsMedia } from "@/lib/lesson-stage-media";
+import { StageContentPreview } from "@/components/lesson-stages/StageContentPreview";
 
-const LIVE_SCORES_POLL_MS = 12000;
-
-// Read-only view of a lesson stage (БОЛЬШОЕ ОБНОВЛЕНИЕ §7.5). Opened by clicking
-// a stage row; "Редактировать этап" switches the parent to edit mode (StageModal).
-// For quiz_qia/quiz_kahoot stages, also polls live per-student scores while the
-// lesson is in_progress (§7.7) — quiz_attempts/quiz_answers are shared by both
-// content types, so getKahootLeaderboard works unmodified here despite its name.
+// Просмотр этапа во весь экран (БОЛЬШОЕ ОБНОВЛЕНИЕ §7.5). Открывается кликом по
+// строке этапа; «Редактировать этап» переключает родителя в правку (StageModal).
+//
+// 18.08.2026 — тело окна переехало в components/lesson-stages/
+// StageContentPreview.tsx. Причина: то же самое содержимое понадобилось
+// показывать врезкой прямо в списке этапов, чтобы во время урока учитель не
+// открывал по одному этапу окном поверх занятия. Две разметки на один и тот же
+// показ разошлись бы через месяц, поэтому она одна, а окно осталось рамкой:
+// шапка с названием, кнопка правки и закрытие. Ни одного блока содержимого
+// здесь больше нет — и добавлять сюда нельзя, только в компонент.
 export function StageViewModal({
   stage,
   lessonStatus,
@@ -36,61 +31,6 @@ export function StageViewModal({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
-  const db = createClient();
-
-  const isQuizType = stage.content_type === "quiz_qia" || stage.content_type === "quiz_kahoot";
-  const hasSlidesHere = !!stage.slides && stage.slides.length > 0;
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [loadingQuiz, setLoadingQuiz] = useState(isQuizType);
-  const [scores, setScores] = useState<QuizLeaderboardEntry[]>([]);
-
-  // БОЛЬШОЕ ОБНОВЛЕНИЕ Этап 12 — teacher's own read-only preview previously
-  // had no branch at all for a manually-uploaded .pptx (stage.slides is
-  // only populated for AI-generated presentations), so the teacher never
-  // saw their own uploaded file here. Same Office Online embed as the
-  // student-facing LessonWorkspaceView.
-  const presentationFile = (stage.config as { presentation_file?: { storagePath: string; filename: string } } | null)?.presentation_file ?? null;
-  const [presentationUrl, setPresentationUrl] = useState<string | null>(null);
-  const [presentationFailed, setPresentationFailed] = useState(false);
-
-  useEffect(() => {
-    if (!presentationFile) return;
-    let cancelled = false;
-    setPresentationUrl(null);
-    setPresentationFailed(false);
-    getMaterialDownloadUrl(db, presentationFile.storagePath, presentationFile.filename)
-      .then((u) => { if (!cancelled) setPresentationUrl(u); })
-      .catch(() => { if (!cancelled) setPresentationFailed(true); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presentationFile?.storagePath, presentationFile?.filename]);
-
-  useEffect(() => {
-    if (!isQuizType) return;
-    let cancelled = false;
-    getQuizQuestions(db, stage.id)
-      .then((qs) => { if (!cancelled) setQuestions(qs); })
-      .catch(() => null)
-      .finally(() => { if (!cancelled) setLoadingQuiz(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage.id]);
-
-  useEffect(() => {
-    if (!isQuizType || lessonStatus !== "in_progress") return;
-    let cancelled = false;
-    const load = () => getKahootLeaderboard(db, stage.id).then((rows) => { if (!cancelled) setScores(rows); }).catch(() => null);
-    load();
-    const id = setInterval(load, LIVE_SCORES_POLL_MS);
-    return () => { cancelled = true; clearInterval(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage.id, lessonStatus]);
-
-  const config = stage.config as { url?: string };
-  const serviceMeta = isExternalService(stage.content_type) ? SERVICE_CONFIG[stage.content_type] : null;
-  // §9.1 — teacher's own read-only view falls back to the same default as
-  // the student-facing ExternalStageModal when no custom URL was set.
-  const serviceUrl = config?.url || (isExternalService(stage.content_type) ? DEFAULT_EXTERNAL_URLS[stage.content_type] : null);
 
   return createPortal(
     <div
@@ -130,179 +70,8 @@ export function StageViewModal({
         </div>
 
         {/* Body */}
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
-          {/* 08.08.2026 — при наличии слайдов картинка внутри слайда, здесь подавлена.
-              10.08.2026 — плюс общее правило: картинка только у объяснительных
-              этапов (lib/lesson-stage-media.ts). */}
-          {stageAllowsMedia(stage.content_type) && (
-            <StageMedia
-              image_url={hasSlidesHere ? null : ((stage as { image_url?: string | null }).image_url ?? null)}
-              media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
-              media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
-              isTeacher
-            />
-          )}
-
-          {stage.description && <MarkdownContent text={stage.description} className="text-sm text-slate-700" />}
-
-          {stage.slides && stage.slides.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-slate-100">
-              {/* 07.08.2026 — презентация этапа открывается во весь экран,
-                  симметрично ученику (StudentPresentationViewer). Выход —
-                  Esc и кнопка закрытия, см. SlideViewer.tsx.
-                  isTeacher: без него SlideViewer считал листание разрешённым
-                  только при lessonStatus completed/in_progress, и учитель,
-                  открывший презентацию ДО начала урока, не мог пролистать
-                  дальше первого слайда. Трансляции отсюда нет и не было —
-                  stageId не передаётся, значит ни записи current_slide_index,
-                  ни подписки: этот модал целиком локальный просмотр. */}
-              <SlideViewer slides={stage.slides} canExport={false} onExportPptx={() => {}} lessonStatus={lessonStatus} isTeacher autoFullscreen stageImageUrl={(stage as { image_url?: string | null }).image_url ?? null} />
-            </div>
-          )}
-
-          {presentationFile && (
-            presentationFailed ? (
-              <div className="flex h-[50vh] min-h-[360px] items-center justify-center rounded-xl border border-orange-100 bg-orange-50 text-sm text-orange-700">
-                {d.common.error}
-              </div>
-            ) : !presentationUrl ? (
-              <div className="flex h-[50vh] min-h-[360px] items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-sm text-slate-400">
-                {d.common.loading}
-              </div>
-            ) : (
-              <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
-                <iframe
-                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(presentationUrl)}`}
-                  title={presentationFile.filename}
-                  className="h-full w-full border-0 bg-white"
-                />
-              </div>
-            )
-          )}
-
-          {stage.content_type === "code" && (
-            <div className="space-y-3">
-              {stage.programming_language && (
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  {stage.programming_language}
-                </p>
-              )}
-              <pre className="overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100">
-                <code>{stage.starter_code || "—"}</code>
-              </pre>
-              {stage.expected_output && (
-                <div>
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    {dl.code.expectedOutput}
-                  </p>
-                  <pre className="overflow-x-auto rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-                    {stage.expected_output}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-
-          {stage.content_type === "code_completion" && (() => {
-            const payload = (stage.config ?? null) as { code_template?: string; gaps?: { id: string; correct: string }[]; language?: string } | null;
-            if (!payload?.code_template) return null;
-            const preview = payload.gaps?.reduce(
-              (acc, g) => acc.replaceAll(`__${g.id}__`, `[${g.correct}]`),
-              payload.code_template,
-            ) ?? payload.code_template;
-            return (
-              <div className="space-y-3">
-                {payload.language && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{payload.language}</p>
-                )}
-                <pre className="overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100">
-                  <code>{preview}</code>
-                </pre>
-                <p className="text-xs text-slate-400">Пропуски (в скобках — правильный вариант): {payload.gaps?.length ?? 0}</p>
-              </div>
-            );
-          })()}
-
-          {serviceMeta && serviceUrl && (
-            <div className="space-y-2">
-              <div className="h-[50vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-100">
-                <iframe
-                  src={serviceUrl}
-                  title={serviceMeta.name}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-presentation"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  className="h-full w-full border-0 bg-white"
-                />
-              </div>
-              <a
-                href={serviceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:underline"
-              >
-                <ExternalLink className="h-4 w-4" /> {serviceMeta.name}
-              </a>
-            </div>
-          )}
-
-          {isQuizType && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">{dl.quiz.test}</h3>
-              {loadingQuiz ? (
-                <p className="text-sm text-slate-400">…</p>
-              ) : questions.length === 0 ? (
-                <p className="text-sm text-slate-400">—</p>
-              ) : (
-                // 08.08.2026 — общий вид разбора (QuizReviewList): карточка на
-                // вопрос с крупным номером, варианты плитками, правильный со
-                // значком. Раньше тут был свой список — такой же, как ещё в
-                // трёх местах, и расходиться ему было делом времени.
-                <QuizReviewList
-                  questions={questions.map((q) => ({
-                    key: q.id,
-                    text: q.question_text,
-                    options: q.options.map((opt, oi) => ({
-                      text: opt,
-                      correct: oi === q.correct_option_index,
-                    })),
-                  }))}
-                />
-              )}
-
-              {lessonStatus === "in_progress" && (
-                <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-violet-700">{dl.liveScores.title}</h3>
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-violet-500">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500" /> {dl.liveScores.updating}
-                    </span>
-                  </div>
-                  {scores.length === 0 ? (
-                    <p className="text-sm text-violet-400">{dl.liveScores.empty}</p>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-violet-500">
-                          <th className="pb-2">{dl.liveScores.student}</th>
-                          <th className="pb-2">{dl.liveScores.correct}</th>
-                          <th className="pb-2">{dl.liveScores.grade}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-violet-100">
-                        {scores.map((s) => (
-                          <tr key={s.student_id}>
-                            <td className="py-2 font-semibold text-slate-800">{s.full_name}</td>
-                            <td className="py-2 text-slate-600">{s.correct_count}/{questions.length || "—"}</td>
-                            <td className="py-2 font-bold text-violet-700">{s.total_score}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+          <StageContentPreview stage={stage} lessonStatus={lessonStatus} />
         </div>
       </div>
     </div>,

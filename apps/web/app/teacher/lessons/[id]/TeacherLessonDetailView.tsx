@@ -75,6 +75,7 @@ import { ClassworkModal } from "./ClassworkModal";
 const CLASSWORK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_CLASSWORK === "1";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
+import { StageContentPreview } from "@/components/lesson-stages/StageContentPreview";
 import { KnowledgeBaseFilePicker, LESSON_ATTACH_MIME, LESSON_ATTACH_ACCEPT, type PickedKnowledgeBaseFile } from "@/components/KnowledgeBaseFilePicker";
 import { StageMedia } from "@/components/lesson-stages/StageMedia";
 import { stageAllowsMedia } from "@/lib/lesson-stage-media";
@@ -804,6 +805,25 @@ export function TeacherLessonDetailView({
   const [stageActivationError, setStageActivationError] = useState<string | null>(null);
   const [stageModal, setStageModal] = useState<StageModalState>({ mode: "closed" });
   const [viewStage, setViewStage] = useState<LessonStage | null>(null);
+  // Какие этапы раскрыты врезкой. Множество, а не один id: учитель может
+  // сравнить два этапа рядом, и схлопывать предыдущий за него — лишняя опека.
+  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+  // Активный этап раскрывается САМ. Ради этого всё и делалось: во время урока
+  // учитель должен видеть, что сейчас на экране у класса, не нажимая ничего.
+  // Раскрывается один раз при смене активного этапа — если учитель потом
+  // свернёт врезку руками, она останется свёрнутой до следующего этапа.
+  useEffect(() => {
+    if (!activeStageId) return;
+    setExpandedStages((cur) => (cur.has(activeStageId) ? cur : new Set(cur).add(activeStageId)));
+  }, [activeStageId]);
+
+  function toggleStagePreview(id: string) {
+    setExpandedStages((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
   const [startingLesson, setStartingLesson] = useState(false);
   const [endingLesson, setEndingLesson] = useState(false);
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
@@ -1646,6 +1666,7 @@ export function TeacherLessonDetailView({
               const isActivating = activatingStageId === stage.id;
               const hasSlides = isActive && stage.slides && stage.slides.length > 0;
               const hasLiveCode = isActive && stage.content_type === "code";
+              const isExpanded = expandedStages.has(stage.id);
               // Управление активацией — только там, где оно и было: живой или
               // ещё не начатый урок, не куратор (для него это мутация).
               const canActivate = (status === "in_progress" || status === "scheduled") && !isCurator;
@@ -1655,7 +1676,7 @@ export function TeacherLessonDetailView({
               <div
                 onClick={() => setViewStage(stage)}
                 className={`flex cursor-pointer items-start gap-3 border px-4 py-4 transition-colors ${
-                  isActive || hasSlides || hasLiveCode ? "rounded-t-xl" : "rounded-xl"
+                  isActive || hasSlides || hasLiveCode || isExpanded ? "rounded-t-xl" : "rounded-xl"
                 } ${
                   isActive
                     ? "border-violet-300 bg-violet-50 hover:bg-violet-100/60 dark:border-violet-500/40 dark:bg-violet-500/10"
@@ -1759,6 +1780,24 @@ export function TeacherLessonDetailView({
                     </button>
                   )
                 )}
+
+                {/* Что внутри — врезка с содержимым этапа прямо в списке.
+                    Раньше единственным способом посмотреть было окно поверх
+                    урока, по одному этапу за раз. stopPropagation обязателен:
+                    клик по строке открывает то же содержимое окном, и без него
+                    нажатие делало бы сразу оба действия. */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleStagePreview(stage.id); }}
+                  aria-expanded={isExpanded}
+                  className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
+                    isExpanded
+                      ? "border-slate-300 bg-slate-100 text-slate-700 dark:border-white/20 dark:bg-white/10 dark:text-slate-200"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                  }`}
+                >
+                  {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  {isExpanded ? dl.stagePreviewHide : dl.stagePreviewShow}
+                </button>
 
                 {/* Review submissions — always available, incl. after the lesson ends.
                     07.08.2026: было только `code` + внешние сервисы. Добавлены
@@ -1871,9 +1910,51 @@ export function TeacherLessonDetailView({
                 </div>
               )}
 
+              {/* Содержимое этапа — то же, что показывает окно просмотра:
+                  один компонент на оба места (StageContentPreview).
+
+                  У АКТИВНОГО этапа картинка и слайды подавлены: они уже
+                  нарисованы выше, причём слайды с трансляцией классу. Иначе
+                  учитель увидел бы две презентации, из которых листается
+                  только одна.
+
+                  Живой счёт по тесту — только у активного этапа: у остальных
+                  строк он ни о чём не говорит, а опрос каждые 12 секунд гонял
+                  бы зря. */}
+              {isExpanded && (
+                <div className={`border-x border-b p-4 ${
+                  isActive
+                    ? "border-violet-300 bg-white dark:border-violet-500/40 dark:bg-slate-900"
+                    : "border-slate-100 bg-slate-50/60 dark:border-white/10 dark:bg-white/5"
+                }`}>
+                  {isActive && (
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-violet-600">
+                      {dl.stagePreviewLiveHint}
+                    </p>
+                  )}
+                  <StageContentPreview
+                    stage={stage}
+                    lessonStatus={status}
+                    compact
+                    skipMedia={isActive}
+                    skipSlides={!!hasSlides}
+                    showLiveScores={isActive}
+                  />
+                  {/* Правильные ответы видны только учителю — подпись, чтобы он
+                      не решил, что класс видит то же самое. */}
+                  {(isQuizType(stage.content_type) || stage.content_type === "code_completion") && (
+                    <p className="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400 dark:border-white/10">
+                      {dl.stagePreviewTeacherOnly}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Скругление нижней кромки у последнего подблока активного этапа. */}
-              {(isActive || hasSlides || hasLiveCode) && (
-                <div className="h-0 rounded-b-xl border-x border-b border-violet-300 dark:border-violet-500/40" />
+              {(isActive || hasSlides || hasLiveCode || isExpanded) && (
+                <div className={`h-0 rounded-b-xl border-x border-b ${
+                  isActive ? "border-violet-300 dark:border-violet-500/40" : "border-slate-100 dark:border-white/10"
+                }`} />
               )}
               </div>
               );

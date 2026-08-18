@@ -1791,6 +1791,12 @@ export const ru: Dictionary = {
     downloadReference: "Скачать справочник",
   },
   lesson: {
+    stagePreviewShow: "Что внутри",
+    stagePreviewHide: "Свернуть",
+    stagePreviewGaps: "Пропуски (в скобках — правильный вариант): {n}",
+    stagePreviewEmpty: "В этом этапе пока ничего нет",
+    stagePreviewLiveHint: "Это сейчас на экране у класса",
+    stagePreviewTeacherOnly: "Видно только вам: у учеников правильные ответы закрыты",
     markLockedTitle: "Изменить нельзя",
     markLockedBody: "Прошло больше 15 минут с выставления. Исправить может администратор школы — обратитесь к нему.",
     markWindowLeft: "Исправить можно ещё {n} мин",

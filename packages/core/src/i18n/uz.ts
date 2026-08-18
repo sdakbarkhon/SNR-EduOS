@@ -1788,6 +1788,12 @@ export const uz: Dictionary = {
     downloadReference: "Ma'lumotnoma yuklab olish",
   },
   lesson: {
+    stagePreviewShow: "Ichida nima bor",
+    stagePreviewHide: "Yig‘ish",
+    stagePreviewGaps: "Bo‘sh joylar (qavs ichida — to‘g‘ri variant): {n}",
+    stagePreviewEmpty: "Bu bosqichda hozircha hech nima yo‘q",
+    stagePreviewLiveHint: "Hozir sinf ekranida shu turibdi",
+    stagePreviewTeacherOnly: "Faqat sizga ko‘rinadi: o‘quvchilarda to‘g‘ri javoblar yopiq",
     markLockedTitle: "O‘zgartirib bo‘lmaydi",
     markLockedBody: "Qo‘yilganiga 15 daqiqadan ko‘p vaqt o‘tdi. Uni maktab ma’muriyati tuzatishi mumkin — ularga murojaat qiling.",
     markWindowLeft: "Yana {n} daqiqa tuzatish mumkin",

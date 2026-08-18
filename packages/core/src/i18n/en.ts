@@ -1788,6 +1788,12 @@ export const en: Dictionary = {
     downloadReference: "Download reference",
   },
   lesson: {
+    stagePreviewShow: "What's inside",
+    stagePreviewHide: "Collapse",
+    stagePreviewGaps: "Gaps (the correct option is in brackets): {n}",
+    stagePreviewEmpty: "This stage has nothing in it yet",
+    stagePreviewLiveHint: "This is on the class screen right now",
+    stagePreviewTeacherOnly: "Visible to you only: students do not see the correct answers",
     markLockedTitle: "Cannot be changed",
     markLockedBody: "More than 15 minutes have passed since this was set. A school administrator can correct it — please ask them.",
     markWindowLeft: "{n} min left to correct",
