@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Upload, X, FileText, AlertTriangle, Search, ChevronRight, BookOpen } from "lucide-react";
-import { uploadCurriculumPlanFile, getCurriculumPlanForGroupSubject, getDictionary } from "@snr/core";
-import type { CurriculumPlanWithTopics, Locale } from "@snr/core";
+import { uploadCurriculumPlanFile, getCurriculumPlanForGroupSubject, getDictionary, format } from "@snr/core";
+import type { CurriculumPlanWithTopics, Dictionary, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { PageContainer } from "@/components/PageContainer";
@@ -59,7 +59,7 @@ export function CurriculumPlansView({
             type="text"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
-            placeholder="Поиск по группе или предмету…"
+            placeholder={d.searchPlaceholder}
             className="w-full rounded-xl border border-slate-200 bg-white/60 py-2.5 pl-11 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>
@@ -81,7 +81,7 @@ export function CurriculumPlansView({
 
       {filteredPlans.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-10 text-center text-sm text-slate-400">
-          {plans.length === 0 ? "Пока нет ни одного плана. Загрузите первый — AI разложит его на темы." : "Ничего не найдено"}
+          {plans.length === 0 ? d.listEmpty : d.noResults}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -94,7 +94,7 @@ export function CurriculumPlansView({
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{p.subject_name}</p>
                 <h3 className="mt-1 truncate text-base font-bold text-slate-900">{p.group_name}</h3>
-                <p className="mt-2 text-sm text-slate-500">{p.topics.length} {topicWord(p.topics.length)}</p>
+                <p className="mt-2 text-sm text-slate-500">{p.topics.length} {topicWord(p.topics.length, d)}</p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
             </Link>
@@ -122,11 +122,14 @@ export function CurriculumPlansView({
   );
 }
 
-function topicWord(n: number): string {
+// 19.08.2026 — сами слова переехали в словарь, правило склонения осталось
+// прежним и не тронуто: узбекский и английский подставят свои формы (у них
+// она одна на все числа), русский — три как было.
+function topicWord(n: number, d: Dictionary["curriculum"]): string {
   const mod10 = n % 10, mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "тема";
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "темы";
-  return "тем";
+  if (mod10 === 1 && mod100 !== 11) return d.topicWordOne;
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return d.topicWordFew;
+  return d.topicWordMany;
 }
 
 // ── Upload modal ──────────────────────────────────────────────────────────
@@ -192,16 +195,19 @@ function UploadPlanModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           groupId, subjectId, storagePath, sourceFileType,
+          // НЕ ПЕРЕВОДИТСЯ НАМЕРЕННО: значение уходит в базу названием плана.
+          // Переведи — и заголовок в базе станет зависеть от языка того, кто
+          // загружал, а у соседа по школе тот же план назовётся иначе.
           title: `${subject?.name ?? "Предмет"} — ${group?.name ?? "Группа"}`,
           replaceExistingId: replaceExisting?.id ?? null,
         }),
       });
       const json = await res.json();
-      if (!res.ok) { setUploadError(json.error || "Ошибка сохранения"); return; }
+      if (!res.ok) { setUploadError(json.error || d.saveError); return; }
       onClose();
       router.push(`/teacher/curriculum/${json.id}`);
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "Ошибка сохранения");
+      setUploadError(e instanceof Error ? e.message : d.saveError);
     } finally {
       setUploading(false);
       setConfirmReplace(null);
@@ -229,28 +235,28 @@ function UploadPlanModal({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="space-y-4">
             <div>
-              <label className={labelCls}>Группа *</label>
+              <label className={labelCls}>{d.fieldGroup}</label>
               <select value={groupId} onChange={(e) => { setGroupId(e.target.value); setSubjectId(""); }} className={inputCls}>
-                <option value="">Выберите группу</option>
+                <option value="">{d.selectGroupPlaceholder}</option>
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
             {groupId && (
               <div>
-                <label className={labelCls}>Предмет *</label>
+                <label className={labelCls}>{d.fieldSubject}</label>
                 <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
-                  <option value="">— выберите предмет —</option>
+                  <option value="">{d.selectSubjectPlaceholder}</option>
                   {groupSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
             )}
             <div>
-              <label className={labelCls}>Файл плана (PDF/DOCX, макс. 20 МБ) *</label>
+              <label className={labelCls}>{d.fieldPlanFile}</label>
               <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleFileChange} />
               <button onClick={() => fileRef.current?.click()}
                 className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-6 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500">
                 <FileText className="h-5 w-5" />
-                {file ? file.name : "Выбрать PDF или DOCX файл"}
+                {file ? file.name : d.pickFileBtn}
               </button>
               {fileError && <p className="mt-1.5 text-[12px] text-red-500">{fileError}</p>}
             </div>
@@ -260,10 +266,10 @@ function UploadPlanModal({
               disabled={uploading || !groupId || !subjectId || !file}
               className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {uploading ? "Загружаем…" : d.uploadPlan}
+              {uploading ? d.uploading : d.uploadPlan}
             </button>
             <p className="text-center text-[11px] text-slate-400">
-              AI разберёт план на темы в фоне — можно закрыть вкладку, мы уведомим, когда план будет готов.
+              {d.uploadHint}
             </p>
           </div>
         </div>
@@ -277,13 +283,13 @@ function UploadPlanModal({
               <h3 className="text-base font-bold">{d.planExistsWarning}</h3>
             </div>
             <p className="text-sm text-slate-600">
-              У этой группы и предмета уже есть план ({confirmReplace.topics.length} {topicWord(confirmReplace.topics.length)}). Заменить его новым?
-              Уже созданные уроки не удаляются — просто отвяжутся от старых тем.
+              {format(d.replaceConfirm, { n: confirmReplace.topics.length, word: topicWord(confirmReplace.topics.length, d) })}
+              {" "}{d.replaceNote}
             </p>
             <div className="mt-4 flex gap-3">
-              <button onClick={() => setConfirmReplace(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Отмена</button>
+              <button onClick={() => setConfirmReplace(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{d.cancel}</button>
               <button onClick={() => startUpload(confirmReplace)} disabled={uploading} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {uploading ? "Заменяем…" : "Заменить"}
+                {uploading ? d.replacing : d.replace}
               </button>
             </div>
           </div>

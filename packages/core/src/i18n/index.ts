@@ -1,12 +1,34 @@
 import type { Dictionary, Locale } from "./types";
+import { defaultLocale } from "./runtime";
 import { ru } from "./ru";
 import { uz } from "./uz";
 import { en } from "./en";
 
-export type { Dictionary, Locale };
+/**
+ * Словари всех языков сразу — синхронно и без условий.
+ *
+ * ЭТОТ ФАЙЛ ОСТАЁТСЯ ТАКИМ РАДИ МОБИЛЬНОГО ПРИЛОЖЕНИЯ, и это не небрежность.
+ * apps/mobile-parent определяет язык телефона на ПЕРВОМ ЖЕ рендере
+ * (src/i18n/LocaleContext.tsx: useState(detectDeviceLocale)) и тут же зовёт
+ * getDictionary(locale). Родитель с узбекским телефоном должен увидеть
+ * узбекский сразу, а не русский, который потом ничем не заменится: у Metro
+ * нет разделения на чанки, и экономить там всё равно нечего — весь код и так
+ * в одном файле.
+ *
+ * ВЕБУ ЭТОТ ФАЙЛ НЕ ДОСТАЁТСЯ. В браузерной сборке он подменяется на
+ * apps/web/lib/i18n-lazy.ts (см. apps/web/next.config.mjs): там грузится
+ * только активный язык, остальные два — в момент переключения. Замер до
+ * подмены: один чанк на 599 447 байт распакованных / 175 063 сжатых, в нём
+ * 9 433 русских слова, и это словари ВСЕГО приложения на трёх языках на
+ * каждом экране.
+ *
+ * ЕСЛИ ДОБАВЛЯЕШЬ СЮДА ЭКСПОРТ — добавь его и в i18n-lazy.ts, иначе в
+ * браузере его просто не станет. Общие имена (список языков, язык по
+ * умолчанию, теги Intl, format) намеренно вынесены в runtime.ts и берутся
+ * обеими сборками оттуда, чтобы расходиться было нечему.
+ */
 
-export const defaultLocale: Locale = "ru";
-export const locales: Locale[] = ["ru", "uz", "en"];
+export * from "./runtime";
 
 export const dictionaries: Record<Locale, Dictionary> = { ru, uz, en };
 
@@ -14,23 +36,25 @@ export function getDictionary(locale: Locale): Dictionary {
   return dictionaries[locale] ?? dictionaries[defaultLocale];
 }
 
-/** Locale → BCP-47 тег для Intl/toLocaleDateString (formatDate/formatTime
- *  и подобных вызовов, которым нужен реальный локаль-тег, не короткий код
- *  приложения). Долги, проход 1 — до этого экраны mobile-parent хардкодили
- *  "ru-RU" напрямую вместо текущего языка. */
-export const LOCALE_TAG: Record<Locale, string> = {
-  ru: "ru-RU",
-  uz: "uz-Latn-UZ",
-  en: "en-US",
-};
+/**
+ * Заглушки ради ОДНОГО ИСТОЧНИКА В БРАУЗЕРЕ, а не ради красоты.
+ *
+ * Здесь грузить нечего: все три словаря выше подключены статически. Но эти же
+ * имена обязана отдавать браузерная замена (apps/web/lib/i18n-lazy.ts), и звать
+ * их LocaleProvider должен ИЗ "@snr/core" — то есть из того же самого модуля,
+ * откуда getDictionary берут экраны.
+ *
+ * Найдено замером 19.08.2026: сперва LocaleProvider импортировал loadDictionary
+ * напрямую по пути lib/i18n-lazy, и webpack собрал ДВА экземпляра модуля —
+ * один под своим путём, другой под подменённым. Узбекский догружался в первый,
+ * а экраны спрашивали второй, и после переключения языка весь интерфейс
+ * оставался русским. В консоли при этом честно висело «словарь uz запрошен
+ * раньше, чем загружен» — проверка сработала, но чинить надо было импорт.
+ */
+export async function loadDictionary(_locale: Locale): Promise<void> {
+  // Уже загружено: см. статические import выше.
+}
 
-/** Подстановка {placeholders}: format("Привет, {name}", { name: "Адилбек" }). */
-export function format(
-  template: string,
-  vars?: Record<string, string | number>,
-): string {
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (_, k: string) =>
-    k in vars ? String(vars[k]) : `{${k}}`,
-  );
+export function isDictionaryLoaded(_locale: Locale): boolean {
+  return true;
 }

@@ -11,20 +11,21 @@ import {
 import {
   getCurriculumTopicsWithUsage, updateCurriculumPlanTopic,
   reorderCurriculumPlanTopics, deleteCurriculumPlanTopic, createLesson,
-  createCurriculumPlanTopic, getDictionary,
+  createCurriculumPlanTopic, getDictionary, format,
 } from "@snr/core";
-import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage, Locale } from "@snr/core";
+import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage, Dictionary, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { PageContainer } from "@/components/PageContainer";
 import { useRealtimeChannel } from "@/lib/realtime";
 
-function topicWord(n: number): string {
+// 19.08.2026 — слова переехали в словарь, правило склонения не тронуто.
+function topicWord(n: number, d: Dictionary["curriculum"]): string {
   const mod10 = n % 10, mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "тема";
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "темы";
-  return "тем";
+  if (mod10 === 1 && mod100 !== 11) return d.topicWordOne;
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return d.topicWordFew;
+  return d.topicWordMany;
 }
 
 type GenerateLessonsResult = {
@@ -88,12 +89,12 @@ export function CurriculumPlanDetailView({
     try {
       const res = await fetch(`/api/curriculum-plans/${plan.id}/retry-parse`, { method: "POST" });
       const json = await res.json();
-      if (!res.ok) { setErrorMessage(json.error || "Не удалось перезапустить"); return; }
+      if (!res.ok) { setErrorMessage(json.error || tc.retryFailed); return; }
       setPlanStatus("processing");
       setProgressPercent(10);
       setErrorMessage(null);
     } catch {
-      setErrorMessage("Ошибка сети");
+      setErrorMessage(tc.networkError);
     } finally {
       setRetrying(false);
     }
@@ -141,7 +142,7 @@ export function CurriculumPlanDetailView({
       await updateCurriculumPlanTopic(db, topicId, { title: trimmed });
     } catch (e) {
       setTopics(prev);
-      setRowError({ id: topicId, message: e instanceof Error ? e.message : "Не удалось сохранить" });
+      setRowError({ id: topicId, message: e instanceof Error ? e.message : tc.renameFailed });
     }
   }
 
@@ -160,7 +161,7 @@ export function CurriculumPlanDetailView({
       await reorderCurriculumPlanTopics(db, next.map((t) => t.id));
     } catch (e) {
       setTopics(prev);
-      setRowError({ id: a.id, message: e instanceof Error ? e.message : "Не удалось переставить" });
+      setRowError({ id: a.id, message: e instanceof Error ? e.message : tc.reorderFailed });
     } finally {
       setReordering(false);
     }
@@ -177,7 +178,7 @@ export function CurriculumPlanDetailView({
       setTopics((cur) => cur.filter((t) => t.id !== confirmDelete.id));
       setConfirmDelete(null);
     } catch (e) {
-      setRowError({ id: confirmDelete.id, message: e instanceof Error ? e.message : "Не удалось удалить" });
+      setRowError({ id: confirmDelete.id, message: e instanceof Error ? e.message : tc.deleteTopicFailed });
     } finally {
       setDeleting(false);
     }
@@ -198,7 +199,7 @@ export function CurriculumPlanDetailView({
         if (fresh) setTopics(fresh);
       }
     } catch {
-      setAutoResult({ created: 0, error: "Ошибка сети" });
+      setAutoResult({ created: 0, error: tc.networkError });
     } finally {
       setAutoCreating(false);
     }
@@ -216,7 +217,7 @@ export function CurriculumPlanDetailView({
   async function handleCreateOne(t: CurriculumTopicWithUsage) {
     const draft = oneByOneDraft[t.id];
     if (!draft?.date || !draft?.time) {
-      setOneByOneError({ id: t.id, message: "Укажите дату и время" });
+      setOneByOneError({ id: t.id, message: tc.oneByOneNoDateTime });
       return;
     }
     setOneByOneBusy(t.id);
@@ -226,6 +227,9 @@ export function CurriculumPlanDetailView({
         groupId: plan.group_id,
         startsAt: `${draft.date}T${draft.time}:00+05:00`,
         durationMinutes: 45,
+        // НЕ ПЕРЕВОДИТСЯ: это значение поля урока в базе, а не подпись на
+        // экране. Заодно и не наше дело — значение по умолчанию относится к
+        // данным, которые в этом заходе трогать нельзя.
         room: "Кабинет 101",
         title: t.title,
         description: t.description,
@@ -239,7 +243,7 @@ export function CurriculumPlanDetailView({
       if (fresh) setTopics(fresh);
       else setTopics((cur) => cur.map((x) => (x.id === t.id ? { ...x, used_in_lessons: x.used_in_lessons + 1 } : x)));
     } catch (e) {
-      setOneByOneError({ id: t.id, message: e instanceof Error ? e.message : "Не удалось создать урок" });
+      setOneByOneError({ id: t.id, message: e instanceof Error ? e.message : tc.createLessonFailed });
     } finally {
       setOneByOneBusy(null);
     }
@@ -255,11 +259,11 @@ export function CurriculumPlanDetailView({
         body: JSON.stringify({ accept }),
       });
       const json = await res.json();
-      if (!res.ok) { setErrorMessage(json.error || "Не получилось"); return; }
+      if (!res.ok) { setErrorMessage(json.error || tc.confirmFailed); return; }
       if (json.deleted) router.push("/teacher/curriculum");
       else setPlanStatus("ready");
     } catch {
-      setErrorMessage("Ошибка сети");
+      setErrorMessage(tc.networkError);
     } finally {
       setConfirming(null);
     }
@@ -291,7 +295,7 @@ export function CurriculumPlanDetailView({
       });
       const json = (await res.json()) as GenerateLessonsResult;
       if (!res.ok) {
-        setCreateError({ id: t.id, message: json.error || "Не удалось создать урок" });
+        setCreateError({ id: t.id, message: json.error || tc.createLessonFailed });
         return;
       }
       // Перечитываем темы, а не дорисовываем счётчик в состоянии: ссылка на
@@ -300,7 +304,7 @@ export function CurriculumPlanDetailView({
       const fresh = await getCurriculumTopicsWithUsage(db, plan.id).catch(() => null);
       if (fresh) setTopics(fresh);
     } catch {
-      setCreateError({ id: t.id, message: "Ошибка сети" });
+      setCreateError({ id: t.id, message: tc.networkError });
     } finally {
       setCreatingFor(null);
     }
@@ -355,14 +359,14 @@ export function CurriculumPlanDetailView({
     <PageContainer className="space-y-6">
       <div>
         <Link href="/teacher/curriculum" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600">
-          <ArrowLeft className="h-3.5 w-3.5" /> Учебные планы
+          <ArrowLeft className="h-3.5 w-3.5" /> {tc.title}
         </Link>
         <div className="mt-2 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{plan.subject_name}</p>
             <h1 className="mt-0.5 text-xl font-bold text-slate-900">{plan.group_name}</h1>
             {(planStatus === "ready" || planStatus === "preview") && (
-              <p className="mt-1 text-sm text-slate-500">{topics.length} {topicWord(topics.length)}</p>
+              <p className="mt-1 text-sm text-slate-500">{topics.length} {topicWord(topics.length, tc)}</p>
             )}
           </div>
         </div>
@@ -375,10 +379,10 @@ export function CurriculumPlanDetailView({
             {progressStage
               ? ({ queued: tc.stageQueued, download: tc.stageDownload, extract: tc.stageExtract,
                    outline: tc.stageOutline, model: tc.stageModel, save: tc.stageSave } as Record<string, string>)[progressStage]
-                ?? "План готовится — AI разбирает файл на темы…"
-              : "План готовится — AI разбирает файл на темы…"}
+                ?? tc.processingTitle
+              : tc.processingTitle}
           </p>
-          <p className="mt-1 text-xs text-slate-400">Можно закрыть эту вкладку — мы покажем уведомление, когда план будет готов.</p>
+          <p className="mt-1 text-xs text-slate-400">{tc.processingHint}</p>
           <div className="mx-auto mt-5 h-2 w-full max-w-sm overflow-hidden rounded-full bg-blue-100">
             <div
               className="h-full rounded-full bg-blue-600 transition-all duration-700 ease-out"
@@ -392,7 +396,7 @@ export function CurriculumPlanDetailView({
       {planStatus === "error" && (
         <div className="rounded-2xl border border-red-100 bg-red-50/60 p-8 text-center">
           <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
-          <p className="text-sm font-bold text-red-700">Ошибка</p>
+          <p className="text-sm font-bold text-red-700">{tc.errorTitle}</p>
           {errorMessage && <p className="mx-auto mt-1 max-w-md text-xs text-red-500">{errorMessage}</p>}
           {isOwner && (
             <button
@@ -400,7 +404,7 @@ export function CurriculumPlanDetailView({
               disabled={retrying}
               className="mt-4 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {retrying ? "Пробуем снова…" : "Попробовать снова"}
+              {retrying ? tc.retrying : tc.retry}
             </button>
           )}
         </div>
@@ -440,7 +444,7 @@ export function CurriculumPlanDetailView({
       {!isOwner && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Этот план принадлежит другому учителю — доступен только просмотр.
+          {tc.readOnlyOtherTeacher}
         </div>
       )}
 
@@ -485,7 +489,7 @@ export function CurriculumPlanDetailView({
                   {t.used_in_lessons > 0 ? (
                     <>
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        Урок создан{t.used_in_lessons > 1 ? ` (${t.used_in_lessons})` : ""}
+                        {tc.topicLessonCreated}{t.used_in_lessons > 1 ? ` (${t.used_in_lessons})` : ""}
                       </span>
                       {/* Урок уже есть — ведём К НЕМУ, а не создаём второй.
                           Рядом стоит когда он: без этого «урок создан» не
@@ -500,7 +504,7 @@ export function CurriculumPlanDetailView({
                     </>
                   ) : usageLoaded && (
                     <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
-                      Урок не создан
+                      {tc.topicLessonNotCreated}
                     </span>
                   )}
                 </div>
@@ -527,7 +531,7 @@ export function CurriculumPlanDetailView({
                       className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                       <CalendarPlus className="h-3.5 w-3.5" />
-                      {oneByOneBusy === t.id ? "Создаём…" : "Создать урок"}
+                      {oneByOneBusy === t.id ? tt.curTopicCreating : tt.curTopicCreateLesson}
                     </button>
                     {oneByOneError?.id === t.id && <span className="text-[11px] text-red-500">{oneByOneError.message}</span>}
                   </div>
@@ -604,7 +608,7 @@ export function CurriculumPlanDetailView({
                   onClick={() => { setAdding(false); setAddError(null); }}
                   className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  Отмена
+                  {tc.cancel}
                 </button>
                 <button
                   onClick={handleAddTopic}
@@ -630,7 +634,7 @@ export function CurriculumPlanDetailView({
       {/* Часть 2 — три способа создания уроков */}
       {isOwner && (
         <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-bold text-slate-900">Создать уроки из тем плана</h2>
+          <h2 className="text-sm font-bold text-slate-900">{tc.createLessonsHeading}</h2>
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             <button
@@ -639,8 +643,8 @@ export function CurriculumPlanDetailView({
               className="flex flex-col items-start gap-1.5 rounded-xl border border-violet-100 bg-violet-50/60 p-3 text-left hover:border-violet-300 disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4 text-violet-600" />
-              <span className="text-xs font-bold text-slate-900">{autoCreating ? "Создаём…" : "Создать все автоматически"}</span>
-              <span className="text-[11px] text-slate-500">По одной теме в день с 1 августа 2026</span>
+              <span className="text-xs font-bold text-slate-900">{autoCreating ? tc.autoCreateBusy : tc.autoCreateAll}</span>
+              <span className="text-[11px] text-slate-500">{tc.autoCreateHint}</span>
             </button>
 
             <button
@@ -648,8 +652,8 @@ export function CurriculumPlanDetailView({
               className={`flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left ${oneByOneMode ? "border-blue-300 bg-blue-50" : "border-blue-100 bg-blue-50/60 hover:border-blue-300"}`}
             >
               <ListPlus className="h-4 w-4 text-blue-600" />
-              <span className="text-xs font-bold text-slate-900">{oneByOneMode ? "Скрыть форму" : "Создать по одному"}</span>
-              <span className="text-[11px] text-slate-500">Дата и время вручную для каждой темы</span>
+              <span className="text-xs font-bold text-slate-900">{oneByOneMode ? tc.oneByOneHide : tc.oneByOne}</span>
+              <span className="text-[11px] text-slate-500">{tc.oneByOneHint}</span>
             </button>
 
             <Link
@@ -657,8 +661,8 @@ export function CurriculumPlanDetailView({
               className="flex flex-col items-start gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-left hover:border-emerald-300"
             >
               <LayoutTemplate className="h-4 w-4 text-emerald-600" />
-              <span className="text-xs font-bold text-slate-900">Использовать как заготовки</span>
-              <span className="text-[11px] text-slate-500">Выбрать тему при обычном создании урока</span>
+              <span className="text-xs font-bold text-slate-900">{tc.asTemplates}</span>
+              <span className="text-[11px] text-slate-500">{tc.asTemplatesHint}</span>
             </Link>
           </div>
 
@@ -667,13 +671,13 @@ export function CurriculumPlanDetailView({
               {autoResult.error ? (
                 <p>{autoResult.error}</p>
               ) : autoResult.created === 0 ? (
-                <p>{autoResult.message ?? "Все темы уже созданы как уроки"}</p>
+                <p>{autoResult.message ?? tc.autoResultNothing}</p>
               ) : (
                 <>
-                  <p className="font-semibold">Создано уроков: {autoResult.created}{autoResult.skipped ? ` (пропущено уже созданных: ${autoResult.skipped})` : ""}</p>
+                  <p className="font-semibold">{format(tc.autoResultCreated, { n: autoResult.created })}{autoResult.skipped ? format(tc.autoResultSkipped, { n: autoResult.skipped }) : ""}</p>
                   <ul className="mt-1.5 space-y-0.5">
                     {autoResult.lessons?.map((l) => (
-                      <li key={l.topicId}>{l.date} в {l.time} — {l.title}</li>
+                      <li key={l.topicId}>{format(tc.autoResultLine, { date: l.date, time: l.time, title: l.title })}</li>
                     ))}
                   </ul>
                 </>
@@ -690,16 +694,16 @@ export function CurriculumPlanDetailView({
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-3 flex items-center gap-2 text-amber-600">
               <AlertTriangle className="h-5 w-5" />
-              <h3 className="text-base font-bold">Удалить тему?</h3>
+              <h3 className="text-base font-bold">{tc.deleteTopicTitle}</h3>
             </div>
             <p className="text-sm text-slate-600">
               «{confirmDelete.title}»
-              {confirmDelete.used_in_lessons > 0 && ` уже использована в ${confirmDelete.used_in_lessons} уроке(ах) — сами уроки не удалятся, просто отвяжутся от темы.`}
+              {confirmDelete.used_in_lessons > 0 && format(tc.deleteTopicUsedNote, { n: confirmDelete.used_in_lessons })}
             </p>
             <div className="mt-4 flex gap-3">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Отмена</button>
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">{tc.cancel}</button>
               <button onClick={handleDelete} disabled={deleting} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {deleting ? "Удаляем…" : "Удалить"}
+                {deleting ? tc.deleting : tc.deleteTopicSubmit}
               </button>
             </div>
           </div>

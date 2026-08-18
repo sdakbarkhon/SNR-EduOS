@@ -4,6 +4,8 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { useRealtimeChannel, type RealtimePayload } from "@/lib/realtime";
 
 type ReadyEvent = { planId: string; title: string; kind: "ready" | "error" };
@@ -21,6 +23,11 @@ type ReadyEvent = { planId: string; title: string; kind: "ready" | "error" };
 export function CurriculumReadyModal({ teacherId }: { teacherId: string }) {
   const router = useRouter();
   const pathname = usePathname();
+  // 19.08.2026 — подписи этого окна были зашиты в код по-русски, и при
+  // узбекском с английским оно оставалось русским. Словарь берётся так же,
+  // как на всех остальных экранах.
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale).curriculum;
   const [event, setEvent] = useState<ReadyEvent | null>(null);
 
   useRealtimeChannel(
@@ -33,7 +40,7 @@ export function CurriculumReadyModal({ teacherId }: { teacherId: string }) {
       if (!wasProcessing || !nowStatus || nowStatus === "processing") return;
       const planId = payload.new?.id as string | undefined;
       if (!planId || pathname === `/teacher/curriculum/${planId}`) return;
-      setEvent({ planId, title: (payload.new?.title as string) ?? "План", kind: nowStatus === "ready" ? "ready" : "error" });
+      setEvent({ planId, title: (payload.new?.title as string) ?? d.readyFallbackTitle, kind: nowStatus === "ready" ? "ready" : "error" });
     },
   );
 
@@ -52,19 +59,19 @@ export function CurriculumReadyModal({ teacherId }: { teacherId: string }) {
               ? <CheckCircle2 className="h-7 w-7 text-emerald-600" />
               : <AlertTriangle className="h-7 w-7 text-red-600" />}
           </div>
-          <h2 className="mb-1 text-lg font-bold text-slate-900">{isReady ? "План готов!" : "Ошибка разбора плана"}</h2>
+          <h2 className="mb-1 text-lg font-bold text-slate-900">{isReady ? d.readyTitle : d.readyErrorTitle}</h2>
           <p className="mb-6 text-sm text-slate-500">
-            «{event.title}»{isReady ? " — AI разложил файл на темы." : " — не удалось разобрать файл."}
+            «{event.title}»{isReady ? d.readyDescOk : d.readyDescError}
           </p>
           <div className="flex w-full gap-2">
             <button onClick={() => setEvent(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
-              Закрыть
+              {d.readyClose}
             </button>
             <button
               onClick={() => { router.push(`/teacher/curriculum/${event.planId}`); setEvent(null); }}
               className={`flex-1 rounded-xl py-2.5 text-sm font-bold text-white ${isReady ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
             >
-              Показать план
+              {d.readyOpen}
             </button>
           </div>
         </div>

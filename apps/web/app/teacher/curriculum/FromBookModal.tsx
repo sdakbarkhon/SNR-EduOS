@@ -85,16 +85,20 @@ export function FromBookModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           groupId, subjectId, bookId,
+          // НЕ ПЕРЕВОДИТСЯ НАМЕРЕННО: это значение уходит в тело запроса и ложится
+          // в базу названием плана. Переведи его — и заголовок в базе станет
+          // зависеть от языка того, кто загружал, а у соседа по школе план
+          // назовётся иначе. Текст на экране и данные в базе — разные вещи.
           title: `${subject?.name ?? book?.title ?? "Предмет"} — ${group?.name ?? "Группа"}`,
           replaceExistingId: existing?.id ?? null,
         }),
       });
       const json = await res.json();
-      if (!res.ok) { setError(json.error || "Не получилось"); return; }
+      if (!res.ok) { setError(json.error || d.fromBookFailed); return; }
       onClose();
       router.push(`/teacher/curriculum/${json.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка сети");
+      setError(e instanceof Error ? e.message : d.fromBookNetworkError);
     } finally {
       setBusy(false);
     }
@@ -156,7 +160,7 @@ export function FromBookModal({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-800">{b.title}</span>
                       <span className="block truncate text-[11px] text-slate-400">
-                        {[b.author, b.subject, b.file_size_bytes ? `${Math.round(b.file_size_bytes / 1024 / 1024 * 10) / 10} МБ` : null]
+                        {[b.author, b.subject, b.file_size_bytes ? `${Math.round(b.file_size_bytes / 1024 / 1024 * 10) / 10} ${d.fromBookSizeMb}` : null]
                           .filter(Boolean).join(" · ")}
                       </span>
                     </span>
