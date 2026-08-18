@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  createSchoolAdmin, changeOwnPassword, createSchool,
+  createSchoolAdmin, changeOwnPassword, createSchool, updateSchoolCard,
   updateSchoolAdmin, deleteSchoolAdmin, resetSchoolAdminPassword,
   assertSchoolIsManageable, assertAdminIsManageable,
 } from "@/lib/admin-api";
@@ -10,6 +10,9 @@ import {
   type SchoolWipePreview, type WipeResult,
 } from "@/lib/school-lifecycle";
 import { createClient } from "@/lib/supabase/server";
+import {
+  readCardFields, removeSchoolLogo, uploadSchoolLogo,
+} from "@/lib/school-card";
 import { revalidatePath } from "next/cache";
 
 async function verifySuperAdmin() {
@@ -31,9 +34,60 @@ export async function actionCreateSchool(formData: FormData) {
   const autostart_enabled = formData.get("autostart_enabled") === "on";
   if (!name || !code) throw new Error("Missing fields");
   const id = await createSchool({ name, code, autostart_enabled });
+
+  // Карточка заполняется тем же действием, что и создание: заводить школу, а
+  // потом отдельно открывать её на правку ради адреса — лишний шаг на ровном
+  // месте. Логотип грузится ПОСЛЕ создания, потому что путь к файлу содержит
+  // идентификатор школы, а до вставки его не существует.
+  await saveSchoolCard(id, formData);
+
   revalidatePath("/superadmin/schools");
   revalidatePath("/superadmin/dashboard");
   return id;
+}
+
+/** Общая часть создания и правки: поля организации плюс логотип.
+ *
+ *  Логотип пишется ПЕРЕД обновлением строки, а путь сохраняется только после
+ *  успешной загрузки. Иначе в logo_path оказалась бы ссылка на файл, которого
+ *  нет, и экраны показывали бы битую картинку вместо честного «логотипа нет».
+ */
+async function saveSchoolCard(schoolId: string, formData: FormData): Promise<void> {
+  const fields = readCardFields(formData);
+  const patch: Record<string, unknown> = { ...fields };
+
+  const file = formData.get("logo");
+  const hasFile = file instanceof File && file.size > 0;
+
+  if (formData.get("logo_remove") === "on") {
+    await removeSchoolLogo(schoolId);
+    patch.logo_path = null;
+  } else if (hasFile) {
+    patch.logo_path = await uploadSchoolLogo(schoolId, file as File);
+  }
+
+  await updateSchoolCard(schoolId, patch);
+}
+
+/** Правка карточки существующей школы. */
+export async function actionUpdateSchool(schoolId: string, formData: FormData) {
+  await verifySuperAdmin();
+  await assertSchoolIsManageable(schoolId);
+
+  const name = String(formData.get("name") ?? "").trim();
+  const code = String(formData.get("code") ?? "").trim();
+  if (!name || !code) throw new Error("Missing fields");
+
+  await updateSchoolCard(schoolId, {
+    name,
+    code,
+    autostart_enabled: formData.get("autostart_enabled") === "on",
+  });
+  await saveSchoolCard(schoolId, formData);
+
+  revalidatePath("/superadmin/schools");
+  revalidatePath("/admin");
+  revalidatePath("/admin/profile");
 }
 
 /**

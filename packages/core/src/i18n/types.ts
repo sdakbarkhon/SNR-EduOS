@@ -263,6 +263,8 @@ export interface Dictionary {
     teacherLegendNone: string;
   };
   admin: {
+    greeting: string;
+    profileSchoolLogo: string;
     hints: {
       dashboard: string;
       subjects: string;
@@ -531,6 +533,25 @@ export interface Dictionary {
     subjectsOwnNameWarning: string;
   };
   superadmin: {
+    schoolCardTitle: string;
+    schoolEditBtn: string;
+    schoolSaveBtn: string;
+    schoolSaving: string;
+    fieldLogo: string;
+    logoHint: string;
+    logoChoose: string;
+    logoReplace: string;
+    logoRemove: string;
+    logoNone: string;
+    fieldAddress: string;
+    fieldPhone: string;
+    fieldEmail: string;
+    fieldDirector: string;
+    fieldWebsite: string;
+    fieldLegalDetails: string;
+    legalDetailsHint: string;
+    sectionOrg: string;
+    schoolUpdatedMsg: string;
     title: string;
     role: string;
     navDashboard: string;
@@ -776,6 +797,10 @@ export interface Dictionary {
   /** П.3 Заход 2 — человеческие сообщения об ошибках для админ-форм
    *  (apps/web/lib/admin-error-messages.ts), заменяют сырой Postgres-текст. */
   adminErrors: {
+    logoTooBig: string;
+    logoBadType: string;
+    logoEmpty: string;
+    logoUploadFailed: string;
     usernameTaken: string;
     phoneTaken: string;
     demoSchoolProtected: string;

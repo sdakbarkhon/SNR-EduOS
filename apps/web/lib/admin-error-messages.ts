@@ -18,6 +18,23 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
 
   if (PASSTHROUGH_MESSAGES.has(raw)) return raw;
 
+  // Логотип школы: код отказа приходит из lib/school-card.ts вместе с числами,
+  // потому что фраза живёт в словарях, а сервер языка вызывающего не знает.
+  const logo = raw.match(/^LOGO_([A-Z_]+):(.*)$/);
+  if (logo) {
+    const kind = logo[1]!;
+    let info: { maxMb?: number; gotMb?: number; got?: string } = {};
+    try { info = JSON.parse(logo[2]!); } catch { /* без чисел — фраза всё равно понятна */ }
+    if (kind === "TOO_BIG") {
+      return t.logoTooBig
+        .replace("{got}", String(info.gotMb ?? "?"))
+        .replace("{max}", String(info.maxMb ?? 2));
+    }
+    if (kind === "BAD_TYPE") return t.logoBadType.replace("{got}", String(info.got ?? "?"));
+    if (kind === "EMPTY") return t.logoEmpty;
+    return t.logoUploadFailed;
+  }
+
   // Z.2.3 — гварды удаления. Причина отказа приходит из admin-api.ts кодом с
   // числами; собираем из них фразу, объясняющую ЧТО мешает, вместо «нельзя».
   const blocked = raw.match(/^BLOCKED_([A-Z_]+):(.*)$/);

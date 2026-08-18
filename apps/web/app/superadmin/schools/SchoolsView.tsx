@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Archive, ArchiveRestore, Plus, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ImageOff, Pencil, Plus, Trash2, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
@@ -11,7 +11,9 @@ import {
   actionDeleteSchoolForever,
   actionSchoolWipePreview,
   actionSetSchoolArchived,
+  actionUpdateSchool,
 } from "../actions";
+import { SchoolCardForm } from "./SchoolCardForm";
 import type { SchoolWipePreview } from "@/lib/school-lifecycle";
 
 type School = {
@@ -19,6 +21,17 @@ type School = {
   autostart_enabled: boolean; created_at: string;
   /** false — школа в архиве (миграция 202). */
   is_active: boolean;
+  /** Карточка школы (миграция 210). Всё необязательное: школы заведены раньше
+   *  этих полей, и пустая карточка — законное состояние. */
+  logo_path: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  director_name: string | null;
+  website: string | null;
+  legal_details: string | null;
+  /** Подписанная на час ссылка, подготовленная на сервере. */
+  logoUrl: string | null;
 };
 
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
@@ -36,7 +49,7 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
 
 function ModalCard({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-lg font-bold text-gray-800">{title}</h2>
         <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"><X className="h-5 w-5" /></button>
@@ -70,6 +83,11 @@ export function SchoolsView({ schools }: { schools: School[] }) {
   const t = d.superadmin;
 
   const [showAdd, setShowAdd] = useState(false);
+  /** Школа, открытая на правку карточки. */
+  const [editing, setEditing] = useState<School | null>(null);
+  /** Отказ, замеченный формой до отправки (негодный файл). Показывается там же,
+   *  где и отказы сервера. */
+  const [formError, setFormError] = useState<string | null>(null);
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -113,7 +131,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
           <p className="mt-1 text-sm text-gray-500">{t.schoolsSubtitle}</p>
         </div>
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={() => { setFormError(null); setShowAdd(true); }}
           className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900"
         >
           <Plus className="h-4 w-4" />
@@ -132,6 +150,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <th className="w-14 px-4 py-3">&nbsp;</th>
                 <th className="px-4 py-3">{t.schoolsTableName}</th>
                 <th className="px-4 py-3">{t.schoolsTableCode}</th>
                 <th className="px-4 py-3">{t.autostartLabel}</th>
@@ -142,11 +161,23 @@ export function SchoolsView({ schools }: { schools: School[] }) {
             <tbody className="divide-y divide-gray-50">
               {schools.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{t.noSchools}</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t.noSchools}</td>
                 </tr>
               ) : (
                 schools.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50/60">
+                    {/* Логотипа может не быть — тогда рамка со значком, а не
+                        пустая ячейка: иначе строка выглядит поехавшей. */}
+                    <td className="px-4 py-3">
+                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                        {s.logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={s.logoUrl} alt="" className="h-full w-full object-contain" />
+                        ) : (
+                          <ImageOff className="h-4 w-4 text-gray-300" />
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 font-medium text-gray-800">
                       {s.name}
                       {!s.is_active && (
@@ -168,6 +199,13 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => { setFormError(null); setEditing(s); }}
+                          title={t.schoolEditBtn}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
                         {s.is_active ? (
                           <button
                             onClick={() => openWipe(s)}
@@ -209,33 +247,67 @@ export function SchoolsView({ schools }: { schools: School[] }) {
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
+                setFormError(null);
                 startTransition(async () => {
                   try {
                     await actionCreateSchool(fd);
                     flash(t.schoolCreatedMsg.replace("{name}", String(fd.get("name"))));
                     setShowAdd(false);
                   } catch (err) {
-                    flash(humanizeAdminError(err, locale as Locale));
+                    setFormError(humanizeAdminError(err, locale as Locale));
                   }
                 });
               }}
               className="space-y-4"
             >
-              <Field label={t.fieldSchoolName}><Input name="name" required placeholder="SNR International School" /></Field>
-              <Field label={t.fieldSchoolCode}><Input name="code" required placeholder="SNR-REAL" autoCapitalize="none" /></Field>
-              <label className="flex items-center gap-2.5 pt-1 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  name="autostart_enabled"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-gray-300 text-slate-700 focus:ring-slate-400"
-                />
-                {t.autostartLabel}
-              </label>
+              <SchoolCardForm values={{}} onLocalError={setFormError} />
+              {formError && (
+                <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700 ring-1 ring-red-200">
+                  {formError}
+                </p>
+              )}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAdd(false)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">
                   {isPending ? t.creating : t.createBtn}
+                </button>
+              </div>
+            </form>
+          </ModalCard>
+        </Backdrop>
+      )}
+
+      {/* Правка карточки. Та же форма, что и при создании — см. SchoolCardForm. */}
+      {editing && (
+        <Backdrop onClose={() => setEditing(null)}>
+          <ModalCard title={t.schoolCardTitle.replace("{name}", editing.name)} onClose={() => setEditing(null)}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                setFormError(null);
+                startTransition(async () => {
+                  try {
+                    await actionUpdateSchool(editing.id, fd);
+                    flash(t.schoolUpdatedMsg.replace("{name}", String(fd.get("name"))));
+                    setEditing(null);
+                  } catch (err) {
+                    setFormError(humanizeAdminError(err, locale as Locale));
+                  }
+                });
+              }}
+              className="space-y-4"
+            >
+              <SchoolCardForm values={editing} onLocalError={setFormError} />
+              {formError && (
+                <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700 ring-1 ring-red-200">
+                  {formError}
+                </p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditing(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
+                <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">
+                  {isPending ? t.schoolSaving : t.schoolSaveBtn}
                 </button>
               </div>
             </form>

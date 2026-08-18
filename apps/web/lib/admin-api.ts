@@ -1102,6 +1102,23 @@ export async function createSchool(data: {
   return (school as { id: string }).id;
 }
 
+/** Обновить карточку школы. Принимает ЧАСТИЧНЫЙ набор полей: вызывающий шлёт
+ *  только то, что менял, и не обязан знать про остальные колонки. Пустой набор
+ *  ничего не делает — это законный случай (правка без единого изменения). */
+export async function updateSchoolCard(
+  schoolId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  if (Object.keys(patch).length === 0) return;
+  const sb = getServiceClient();
+  const { error } = await sb
+    .from("schools")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(patch as any)
+    .eq("id", schoolId);
+  if (error) throw error;
+}
+
 // ── SUPER ADMIN: SCHOOL ADMINS ───────────────────────────────────────────────
 
 export async function createSchoolAdmin(data: {
