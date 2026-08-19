@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Play, Clock, ChevronDown } from "lucide-react";
 import {
   getDictionary,
-  getTestQuestions,
+  getTestPaper,
   getTestSubmission,
   getTestAnswersForSubmission,
   startHomeworkTest,
@@ -203,7 +203,7 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
       setSubmission(sub);
       // Questions are only readable (RLS) once the student has started.
       if (sub?.started_at) {
-        setQuestions(await getTestQuestions(sb, hw.id));
+        setQuestions(await getTestPaper(sb, hw.id));
       }
       // Уже сдан → подтягиваем разбор ответов по вопросам.
       if (sub?.score != null) {
@@ -231,7 +231,7 @@ export function TestPlayer({ hw }: { hw: HomeworkWithSubmission }) {
     try {
       const s = await startHomeworkTest(sb, hw.id, studentId);
       setSubmission(s);
-      setQuestions(await getTestQuestions(sb, hw.id));
+      setQuestions(await getTestPaper(sb, hw.id));
     } catch (e) {
       setError((e as Error).message ?? d.common.error);
     } finally {

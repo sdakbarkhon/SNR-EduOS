@@ -925,6 +925,45 @@ export const getTestQuestions = async (db: Db, homeworkId: string): Promise<Test
   return (data as unknown as TestQuestion[]) ?? [];
 };
 
+/**
+ * «Функции ещё нет в базе» — миграция 215 применяется вручную через Dashboard,
+ * то есть код приезжает на прод РАНЬШЕ неё. В этом промежутке тест обязан
+ * работать по-старому, а не падать: ниже все три вызова сперва пробуют
+ * серверную функцию и, не найдя её, честно откатываются на прежний путь и
+ * пишут об этом в консоль.
+ *
+ * После применения миграции откат становится недостижим: функция есть, а
+ * прямая запись ученику всё равно уже закрыта.
+ */
+const isMissingFunction = (e: unknown): boolean => {
+  const code = (e as { code?: string } | null)?.code ?? "";
+  const msg = (e as { message?: string } | null)?.message ?? "";
+  // PGRST202 — PostgREST не нашёл функцию; 42883 — то же самое от Postgres.
+  return code === "PGRST202" || code === "42883" || /Could not find the function/i.test(msg);
+};
+
+/**
+ * Бланк теста для УЧЕНИКА: вопросы и варианты БЕЗ признака правильности.
+ *
+ * Отдельная функция, а не getTestQuestions с узким select: узкий select был бы
+ * косметикой. Запрос делает браузер под ключом ученика, и тот же запрос можно
+ * послать руками из консоли — правила доступа в Postgres построчные, они
+ * пускают строку целиком со всеми колонками. Поэтому бланк собирает сервер
+ * (функция get_test_paper, миграция 215), и признак правильности он кладёт в
+ * ответ только после сдачи — на нём держится разбор ошибок.
+ *
+ * getTestQuestions рядом остаётся и НЕ меняется: её зовут экраны учителя, и
+ * там правильные ответы нужны по делу.
+ */
+export const getTestPaper = async (db: Db, homeworkId: string): Promise<TestQuestion[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).rpc("get_test_paper", { p_homework_id: homeworkId });
+  if (!error) return ((data as unknown as TestQuestion[]) ?? []);
+  if (!isMissingFunction(error)) throw error;
+  console.warn("[tests] get_test_paper нет в базе — миграция 215 ещё не применена, работаем по-старому");
+  return getTestQuestions(db, homeworkId);
+};
+
 /** Сдача теста ученика (null если ещё не сдавал). */
 export const getTestSubmission = async (db: Db, homeworkId: string): Promise<TestSubmission | null> => {
   const { data, error } = await db
@@ -1895,6 +1934,16 @@ export const startHomeworkTest = async (
 ): Promise<TestSubmission> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+
+  // Сначала — серверная функция (миграция 215). Прежний путь ниже остаётся
+  // только на промежуток, пока миграция не применена; после неё прямая запись
+  // ученику закрыта политикой, и сюда уже не дойдёт.
+  {
+    const { data, error } = await db2.rpc("start_test", { p_homework_id: homeworkId });
+    if (!error) return data as TestSubmission;
+    if (!isMissingFunction(error)) throw error;
+    console.warn("[tests] start_test нет в базе — миграция 215 ещё не применена, работаем по-старому");
+  }
   const existing = await db2
     .from("test_submissions")
     .select("*")
@@ -1932,6 +1981,25 @@ export const submitTest = async (
   const { homeworkId, studentId, answers } = input;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+
+  // БАЛЛ СЧИТАЕТ СЕРВЕР. Наружу уходят только ответы — ни балла, ни признака
+  // правильности в p_answers передать негде, а лишние ключи функция не читает.
+  // Прежний подсчёт ниже сохранён на промежуток, пока миграция 215 не
+  // применена вручную; после неё ученик всё равно не сможет писать в
+  // test_submissions напрямую.
+  {
+    const { data, error } = await db2.rpc("submit_test", {
+      p_homework_id: homeworkId,
+      p_answers: answers.map((a) => ({
+        questionId: a.questionId,
+        selectedOptionId: a.selectedOptionId ?? null,
+        openText: a.openText ?? null,
+      })),
+    });
+    if (!error) return data as TestSubmission;
+    if (!isMissingFunction(error)) throw error;
+    console.warn("[tests] submit_test нет в базе — миграция 215 ещё не применена, считаем по-старому");
+  }
 
   // homework auto-grade flag
   const { data: hwRow } = await db2
