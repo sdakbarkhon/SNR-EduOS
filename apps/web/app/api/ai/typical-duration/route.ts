@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AI_TASK_VALUES } from "@/lib/ai/usage";
+import { denied } from "@/lib/api-guard";
 
 // Сколько обычно занимает задача ИИ — по НАСТОЯЩИМ замерам.
 //
@@ -25,7 +26,12 @@ const MAX_SAMPLES = 40;
 export async function GET(req: NextRequest) {
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // 19.08.2026 — сама проверка стояла здесь и раньше и работала; изменилась
+  // только форма отказа: она стала общей для всех маршрутов и, главное,
+  // попадает в лог сервера. Прежний молчаливый 401 в выдаче не был виден
+  // никак, и отличить «никто не ходит» от «ходят и получают отказ» было
+  // нечем.
+  if (!user) return denied("/api/ai/typical-duration", "сессии нет", 401);
 
   const task = req.nextUrl.searchParams.get("task") ?? "";
   if (!(AI_TASK_VALUES as string[]).includes(task)) {

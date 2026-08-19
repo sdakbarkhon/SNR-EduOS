@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getStudentAiUsage } from "@/lib/ai/student-daily-limit";
+import { denied } from "@/lib/api-guard";
 
 const AI_USAGE_DAILY_LIMIT = 250;
 
@@ -18,11 +19,21 @@ export async function GET() {
   // а не квота человека, и путать их под одной подписью нельзя.
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
-  if (user) {
-    const usage = await getStudentAiUsage(db, user.id);
-    if (usage.studentId) {
-      return NextResponse.json({ used: usage.used, limit: usage.limit, remaining: usage.remaining });
-    }
+
+  // 19.08.2026 — БЕЗ СЕССИИ ОТВЕТА НЕТ.
+  //
+  // Раньше отсутствие сессии просто пропускалось мимо: ветка ниже отдавала
+  // анониму ОБЩИЙ счётчик установки — сколько обращений к модели сделано
+  // сегодня по всем школам. Наружу это знать незачем.
+  //
+  // Роль по-прежнему не проверяется, и это важно: ученик обязан увидеть свою
+  // квоту (десять в сутки), учитель и остальные — общий счётчик. Оба ответа
+  // остались ровно такими, как были.
+  if (!user) return denied("/api/ai/usage", "сессии нет", 401);
+
+  const usage = await getStudentAiUsage(db, user.id);
+  if (usage.studentId) {
+    return NextResponse.json({ used: usage.used, limit: usage.limit, remaining: usage.remaining });
   }
 
   const admin = createAdminClient();

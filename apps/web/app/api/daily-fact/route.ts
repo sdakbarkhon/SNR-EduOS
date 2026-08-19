@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateText } from "@/lib/ai/gemini-client";
+import { requireSignedIn } from "@/lib/api-guard";
 import { AI_TASKS } from "@/lib/ai/usage";
 
 /**
@@ -108,6 +109,19 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 }
 
 export async function GET() {
+  // 19.08.2026 — МАРШРУТ БОЛЬШЕ НЕ ОТВЕЧАЕТ АНОНИМУ.
+  //
+  // Раньше GET() не принимал даже запроса: ни сессии, ни роли, ни школы. Любой
+  // из интернета дёргал его curl'ом. Деньги при этом спасал не доступ, а кэш
+  // ниже (daily_facts по дате): модель зовётся один раз в сутки, дальше отдаётся
+  // готовая строка. Но «один раз в сутки платно» и «кто угодно может это
+  // запустить» — разные вещи, и вторая закрывается здесь.
+  //
+  // Роль не проверяется намеренно: факт дня показывается на главной ученика, а
+  // никакой чужой информации в нём нет. Закрыт ровно аноним.
+  const gate = await requireSignedIn("/api/daily-fact");
+  if (!gate.ok) return gate.response;
+
   const today = getTashkentDate();
 
   try {
