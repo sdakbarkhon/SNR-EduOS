@@ -1170,9 +1170,20 @@ export async function updateSchoolAdmin(
   data: { full_name: string; school_id: string; google_email?: string | null },
 ) {
   const sb = getServiceClient();
+
+  // google_email пишется, только если ключ ПРИСУТСТВУЕТ. Без этого условия
+  // отсутствие поля в объекте означало бы undefined → normalizeSocialEmail
+  // вернул бы null → почта затиралась бы при каждом сохранении. Ровно это и
+  // происходило до 19.08.2026; вызывающий теперь передаёт ключ лишь тогда,
+  // когда поле действительно правили (см. lib/form-patch.ts).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: Record<string, any> = { full_name: data.full_name, school_id: data.school_id };
+  if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+
   const { error } = await sb
     .from("admins")
-    .update({ full_name: data.full_name, school_id: data.school_id, google_email: normalizeSocialEmail(data.google_email) })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(patch as any)
     .eq("id", adminId);
   if (error) throw error;
 }

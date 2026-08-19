@@ -14,6 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   readCardFields, removeSchoolLogo, uploadSchoolLogo,
 } from "@/lib/school-card";
+import { changedFields, ADMIN_GUARDED_FIELDS } from "@/lib/form-patch";
 import { revalidatePath } from "next/cache";
 
 async function verifySuperAdmin() {
@@ -163,8 +164,11 @@ export async function actionUpdateSchoolAdmin(formData: FormData) {
   // кого-либо В демо-школу.
   await assertAdminIsManageable({ adminId: admin_id });
   await assertSchoolIsManageable(school_id);
-  const google_email = String(formData.get("google_email") ?? "").trim() || null;
-  await updateSchoolAdmin(admin_id, { full_name, school_id, google_email });
+  // Почта пишется, ТОЛЬКО если её правда меняли. Разбор — lib/form-patch.ts.
+  // Раньше здесь пустая строка превращалась в null и уезжала в базу поверх
+  // заполненной почты при каждом сохранении.
+  const changed = changedFields(formData, ADMIN_GUARDED_FIELDS);
+  await updateSchoolAdmin(admin_id, { full_name, school_id, ...changed });
   revalidatePath("/superadmin/admins");
 }
 

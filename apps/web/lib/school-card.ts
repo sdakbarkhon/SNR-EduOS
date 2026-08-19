@@ -6,6 +6,7 @@
 
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { schoolStoragePath } from "@snr/core";
+import { changedFields, SCHOOL_CARD_FIELDS } from "@/lib/form-patch";
 
 export const LOGO_BUCKET = "school-logos";
 
@@ -125,17 +126,20 @@ export type SchoolCardFields = {
   legal_details: string | null;
 };
 
-export function readCardFields(fd: FormData): SchoolCardFields {
-  const get = (k: string) => {
-    const v = String(fd.get(k) ?? "").trim();
-    return v === "" ? null : v;
-  };
-  return {
-    address: get("address"),
-    phone: get("phone"),
-    email: get("email"),
-    director_name: get("director_name"),
-    website: get("website"),
-    legal_details: get("legal_details"),
-  };
+/** Поля карточки, которые ЧЕЛОВЕК ПРАВДА МЕНЯЛ.
+ *
+ *  19.08.2026 — было иначе: возвращались все шесть, и очищенное поле уезжало
+ *  в базу как NULL. То есть стёр адрес по невнимательности, нажал «Сохранить»
+ *  — и прежний адрес пропал, ничего не спросив. Теперь колонка попадает в
+ *  запрос, только если её значение отличается от того, с которым форму
+ *  открыли; сравнение идёт по скрытым полям, их кладёт SchoolCardForm.
+ *  Разбор приёма — lib/form-patch.ts.
+ *
+ *  При СОЗДАНИИ школы скрытых полей нет, сравнивать не с чем, и возвращаются
+ *  все шесть — ровно как раньше.
+ *
+ *  Название и код школы сюда не входят и не входили: они обязательные,
+ *  проверяются отдельно в actions.ts и пустыми не сохраняются вовсе. */
+export function readCardFields(fd: FormData): Partial<SchoolCardFields> {
+  return changedFields(fd, SCHOOL_CARD_FIELDS);
 }

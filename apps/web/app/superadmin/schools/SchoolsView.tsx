@@ -98,6 +98,18 @@ export function SchoolsView({ schools }: { schools: School[] }) {
   const [mode, setMode] = useState<"choose" | "delete">("choose");
   const [confirmText, setConfirmText] = useState("");
 
+  // 19.08.2026 — ВОЗВРАТ ИЗ АРХИВА ТЕПЕРЬ СПРАШИВАЕТ.
+  //
+  // Срабатывал с первого клика: попал по иконке — и школа снова на экране
+  // входа, вход в неё открыт. Соседняя иконка в той же строке ведёт к
+  // удалению, промахнуться легко.
+  //
+  // Спрашиваем ПРОСТО: два варианта и никакого набора названия руками. Ввод
+  // названия стоит на удалении, потому что там вернуть нечего; здесь действие
+  // обратимо тем же кликом, и требовать за него ту же цену — учить человека
+  // отмахиваться от подтверждений.
+  const [restore, setRestore] = useState<School | null>(null);
+
   function openWipe(school: School) {
     setWipe(school);
     setMode("choose");
@@ -216,14 +228,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                           </button>
                         ) : (
                           <button
-                            onClick={() => startTransition(async () => {
-                              try {
-                                await actionSetSchoolArchived(s.id, false);
-                                flash(t.schoolRestoredMsg.replace("{name}", s.name));
-                              } catch (err) {
-                                flash(humanizeAdminError(err, locale as Locale));
-                              }
-                            })}
+                            onClick={() => setRestore(s)}
                             title={t.schoolRestoreBtn}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600"
                           >
@@ -415,6 +420,44 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 </div>
               </div>
             )}
+          </ModalCard>
+        </Backdrop>
+      )}
+
+      {/* Вернуть из архива: одно окно, два ответа. */}
+      {restore && (
+        <Backdrop onClose={() => setRestore(null)}>
+          <ModalCard title={t.schoolRestoreConfirmTitle} onClose={() => setRestore(null)}>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {t.schoolRestoreConfirmText.replace("{name}", restore.name)}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRestore(null)}
+                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  {t.cancelBtn}
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => startTransition(async () => {
+                    try {
+                      await actionSetSchoolArchived(restore.id, false);
+                      flash(t.schoolRestoredMsg.replace("{name}", restore.name));
+                      setRestore(null);
+                    } catch (err) {
+                      flash(humanizeAdminError(err, locale as Locale));
+                    }
+                  })}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+                >
+                  {t.schoolRestoreConfirmBtn}
+                </button>
+              </div>
+            </div>
           </ModalCard>
         </Backdrop>
       )}

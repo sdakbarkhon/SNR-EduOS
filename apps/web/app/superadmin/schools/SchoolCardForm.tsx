@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ImageOff, Upload, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
+import { origName, SCHOOL_CARD_FIELDS } from "@/lib/form-patch";
 
 /**
  * Поля карточки школы — одна форма на создание и на правку.
@@ -169,6 +170,13 @@ export function SchoolCardForm({
       <p className="pt-1 text-xs font-bold uppercase tracking-wide text-gray-400">{t.sectionOrg}</p>
 
       <Field label={t.fieldDirector}>
+        {/* Скрытые исходные значения: по ним сервер отличит «не трогал» от
+            «стёр нарочно» и не затрёт заполненное поле пустым. Разбор —
+            lib/form-patch.ts. При создании школы values пуст, скрытые поля
+            уезжают пустыми, и все шесть колонок пишутся как раньше. */}
+        {SCHOOL_CARD_FIELDS.map((f) => (
+          <input key={f} type="hidden" name={origName(f)} defaultValue={values[f] ?? ""} />
+        ))}
         <input name="director_name" defaultValue={values.director_name ?? ""} className={inputCls} />
       </Field>
       <Field label={t.fieldAddress}>

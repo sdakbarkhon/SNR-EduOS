@@ -848,6 +848,9 @@ export interface Dictionary {
     schoolWipeBtn: string;
     schoolRestoreBtn: string;
     schoolRestoredMsg: string;
+    schoolRestoreConfirmTitle: string;
+    schoolRestoreConfirmText: string;
+    schoolRestoreConfirmBtn: string;
     schoolArchivedMsg: string;
     schoolWipeTitle: string;
     schoolWipeIntro: string;

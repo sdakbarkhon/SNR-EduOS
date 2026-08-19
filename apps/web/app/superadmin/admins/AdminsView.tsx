@@ -6,6 +6,7 @@ import { Plus, X, RefreshCw, Pencil, Trash2, KeyRound } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
+import { origName } from "@/lib/form-patch";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import {
   actionCreateSchoolAdmin, actionUpdateSchoolAdmin,
@@ -19,7 +20,20 @@ type Admin = {
   school_id: string;
   created_at: string;
   /** Почта Google для входа (миграция 213). */
-  googleEmail?: string | null;
+  // 19.08.2026 — БЫЛО googleEmail, И ЭТО ПОРТИЛО ДАННЫЕ.
+  //
+  // Страница отдаёт строку как есть из базы, там колонка называется
+  // google_email (admins/page.tsx:37). Тип здесь объявлен руками, и в нём
+  // стояло camelCase — поэтому modal.admin.googleEmail всегда было undefined,
+  // поле в форме рисовалось пустым, а сохранение писало эту пустоту поверх
+  // настоящей почты. Каждое «Сохранить» отвязывало вход через Google.
+  //
+  // TypeScript такое не ловит: тип написан вручную и компилятор верит ему на
+  // слово, а объект приходит переменной, а не литералом, так что проверка
+  // лишних свойств не срабатывает. Единственная защита — совпадение имён с
+  // тем, что реально приходит из базы. Остальные поля тут в snake_case ровно
+  // поэтому.
+  google_email?: string | null;
 };
 
 type School = { id: string; name: string };
@@ -302,7 +316,11 @@ export function AdminsView({
                   ))}
                 </select>
               </Field>
-              <GoogleEmailField defaultValue={modal.admin.googleEmail} placeholder="admin@gmail.com" />
+              {/* Скрытое поле с исходным значением — по нему сервер поймёт,
+                  трогали почту или нет, и не станет писать колонку впустую.
+                  Разбор приёма: lib/form-patch.ts. */}
+              <input type="hidden" name={origName("google_email")} defaultValue={modal.admin.google_email ?? ""} />
+              <GoogleEmailField defaultValue={modal.admin.google_email} placeholder="admin@gmail.com" />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModal({ kind: "none" })} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60">
