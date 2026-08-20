@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createSbClient } from "@supabase/supabase-js";
+import { clientIp, rateLimit, retryHeaders } from "@/lib/rate-limit";
 
 // Демо-вход родителя для мобильного приложения.
 //
@@ -36,7 +37,30 @@ interface ClaimRow {
  *  пароль, которым учётка не открывается, и следующий слот обычно рабочий. */
 const ATTEMPTS = 3;
 
-export async function POST() {
+/**
+ * ЧАСТОТА: 10 обращений с одного адреса в час (миграция 219).
+ *
+ * Здесь порог ниже, чем у входа родителя, и это осознанно: каждый вызов
+ * ЗАНИМАЕТ демо-слот из общего пула, а слотов конечное число. Один бот без
+ * ограничения способен разобрать весь пул и оставить настоящих посетителей
+ * без демо. Десять за час — это десять просмотров демо с одного адреса, чего
+ * живому человеку с запасом хватает.
+ *
+ * Закрытого списка кодов здесь нет: приложение показывает любой отказ одним и
+ * тем же сообщением (AuthSessionContext.tsx — «error» без разбора), поэтому
+ * код можно назвать своими словами.
+ */
+const ПОРОГ = 10;
+const ОКНО_С = 3600;
+
+export async function POST(req: NextRequest) {
+  const частота = await rateLimit(clientIp(req.headers), "demo_claim_parent", ПОРОГ, ОКНО_С);
+  if (!частота.allowed) {
+    return NextResponse.json(
+      { error: "too_many_requests" }, { status: 429, headers: retryHeaders(частота) },
+    );
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {

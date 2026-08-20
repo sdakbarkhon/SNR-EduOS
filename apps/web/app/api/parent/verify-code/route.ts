@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { verifyParentCode } from "@/lib/parent-sms";
+import { clientIp, rateLimit, retryHeaders } from "@/lib/rate-limit";
 
 /**
  * Проверка кода входа родителя для мобильного приложения.
@@ -26,7 +27,25 @@ import { verifyParentCode } from "@/lib/parent-sms";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * ЧАСТОТА: 30 обращений с одного адреса в час (миграция 219). Порог выше, чем
+ * у выдачи кода, намеренно: у действующего кода пять попыток, человек может
+ * ошибиться, попросить новый и ошибиться снова — и всё это в пределах одного
+ * честного входа. Лимит попыток на сам код не меняется, он живёт отдельно в
+ * verifyParentCode.
+ *
+ * Отказ отдаётся кодом too_soon: приложение знает закрытый список кодов, и
+ * новый оно показало бы как «нет сети».
+ */
+const ПОРОГ = 30;
+const ОКНО_С = 3600;
+
 export async function POST(req: NextRequest) {
+  const частота = await rateLimit(clientIp(req.headers), "parent_verify_code", ПОРОГ, ОКНО_С);
+  if (!частота.allowed) {
+    return NextResponse.json({ error: "too_soon" }, { status: 429, headers: retryHeaders(частота) });
+  }
+
   const body = (await req.json().catch(() => null)) as { phone?: string; code?: string } | null;
   const phone = String(body?.phone ?? "").trim();
   const code = String(body?.code ?? "").trim();
