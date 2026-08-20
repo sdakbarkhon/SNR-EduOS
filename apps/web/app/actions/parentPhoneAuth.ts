@@ -1,11 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { normalizeUzPhone } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO_SESSION_COOKIE } from "@/lib/single-session";
 import { registerSession } from "@/lib/register-session";
 import { issueParentCode, verifyParentCode } from "@/lib/parent-sms";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 /**
  * Z.2.8 — вход родителя по телефону с настоящим кодом подтверждения.
@@ -34,9 +36,51 @@ export type CodeRequestResult =
   | { ok: true; delivered: boolean }
   | { ok: false; error: "invalid_phone" | "not_found" | "too_soon" | "failed" };
 
+/**
+ * ЧАСТОТА СЧИТАЕТСЯ И ЗДЕСЬ, В ОДИН СЧЁТЧИК С /api/parent/request-code.
+ *
+ * ЗАЧЕМ. Маршрут закрыли счётчиком по адресу (миграция 219), а эта дверь
+ * оставалась открытой: веб-форма ходит не через маршрут, а сюда, и
+ * идентификатор серверного действия виден в HTML страницы — то есть позвать
+ * его снаружи можно, а счётчик при этом не срабатывал.
+ *
+ * ПОЧЕМУ СЧЁТЧИК ОБЩИЙ, А НЕ СВОЙ. Защищаем мы не дверь, а то, что за ней:
+ * отправку SMS за наши деньги и список настоящих номеров. Заведи мы здесь
+ * второе имя действия — и потолок с одного адреса стал бы 120 вместо 60,
+ * причём ровно тем способом, который мы только что закрывали. Один человек
+ * пользуется одной дверью, поэтому общий счётчик его не ужимает.
+ *
+ * ПОРОГ И КОД ОТКАЗА ТЕ ЖЕ. 60 в час; отказ уходит как too_soon — он уже есть
+ * в типе результата и уже показывается формой как «код запрашивали слишком
+ * часто», новых строк заводить не нужно.
+ */
+const ПОРОГ_КОДА = 60;
+const ОКНО_С = 3600;
+
 export async function requestParentCode(nationalDigits: string): Promise<CodeRequestResult> {
+  const адрес = clientIp(await headers());
+
+  const частота = await rateLimit(адрес, "parent_request_code", ПОРОГ_КОДА, ОКНО_С);
+  if (!частота.allowed) return { ok: false, error: "too_soon" };
+
   const result = await issueParentCode(nationalDigits);
-  if (!result.ok) return result;
+
+  if (!result.ok) {
+    // ПОВТОРНЫЙ СТУК В НЕСУЩЕСТВУЮЩИЙ НОМЕР ОТВЕЧАЕТ КАК В НАСТОЯЩИЙ —
+    // то же самое, что на маршруте. Без этого обе двери вели бы себя
+    // по-разному, и перебирать номера начали бы через ту, где проще:
+    // у настоящего номера второй запрос за минуту упирается в кулдаун и даёт
+    // too_soon, а у несуществующего кулдауну не за что зацепиться — строки в
+    // parent_phone_codes не появляется.
+    if (result.error === "not_found") {
+      const канон = normalizeUzPhone(nationalDigits);
+      if (канон) {
+        const повтор = await rateLimit(`phone:${канон}`, "parent_unknown_probe", 1, 60);
+        if (!повтор.allowed) return { ok: false, error: "too_soon" };
+      }
+    }
+    return result;
+  }
   return { ok: true, delivered: result.delivered };
 }
 
