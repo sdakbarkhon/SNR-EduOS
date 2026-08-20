@@ -3773,6 +3773,102 @@ export const finalizeQuizAttempt = async (
   return { correct, total, grade };
 };
 
+/**
+ * ── QIA-КВИЗ ЧЕРЕЗ СЕРВЕР (миграция 216) ────────────────────────────────────
+ *
+ * Четыре обёртки ниже — единственный путь, которым ходит экран QIA-квиза.
+ * Каждая сперва зовёт серверную функцию и, не найдя её, откатывается на
+ * прежний путь: миграция применяется вручную и приезжает ПОЗЖЕ кода, а квиз в
+ * этом промежутке ломаться не должен.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНЫЕ ФУНКЦИИ, А НЕ ПРАВКА СУЩЕСТВУЮЩИХ. getQuizQuestions,
+ * startQuizAttempt, submitQuizAnswer и finalizeQuizAttempt делит с квизом
+ * KAHOOT — и экран учителя, и живая игра. Kahoot в этом заходе трогать нельзя
+ * ни строкой, поэтому старые функции остались байт в байт прежними, а сюда
+ * ходит только QiaQuizModal.
+ */
+
+/** «Функции ещё нет в базе» — миграция 216 применяется вручную. */
+const isMissingQuizFn = (e: unknown): boolean => {
+  const code = (e as { code?: string } | null)?.code ?? "";
+  const msg = (e as { message?: string } | null)?.message ?? "";
+  return code === "PGRST202" || code === "42883" || /Could not find the function/i.test(msg);
+};
+
+export type QuizPaper = {
+  questions: QuizQuestion[];
+  answers: QuizAnswer[];
+  finalized: boolean;
+};
+
+/**
+ * Бланк квиза для УЧЕНИКА: вопросы, варианты и уже сохранённые ответы.
+ * Номер правильного варианта приходит ТОЛЬКО после сдачи — на нём держится
+ * разбор ошибок, и он же был утечкой до неё.
+ *
+ * Ответы отдаются вместе с вопросами намеренно: экран умеет возвращаться к
+ * незаконченной попытке, а собрать их сам ученик после сужения правил доступа
+ * уже не может.
+ */
+export const getQuizPaper = async (db: Db, stageId: string, studentId: string): Promise<QuizPaper> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).rpc("get_quiz_paper", { p_stage_id: stageId });
+  if (!error) {
+    const d = data as { questions?: QuizQuestion[]; answers?: QuizAnswer[]; finalized?: boolean };
+    return { questions: d.questions ?? [], answers: d.answers ?? [], finalized: !!d.finalized };
+  }
+  if (!isMissingQuizFn(error)) throw error;
+  console.warn("[quiz] get_quiz_paper нет в базе — миграция 216 ещё не применена, работаем по-старому");
+
+  const questions = await getQuizQuestions(db, stageId);
+  const attempt = await getStudentQuizAttempt(db, stageId, studentId);
+  if (!attempt) return { questions, answers: [], finalized: false };
+  const res = await getQuizAttemptResults(db, attempt.id);
+  return { questions: res.questions, answers: res.answers, finalized: !!attempt.is_finalized };
+};
+
+/** Открыть попытку. Отдельно от startQuizAttempt, которую делит Kahoot. */
+export const startQuizServer = async (
+  db: Db, stageId: string, studentId: string, totalQuestions: number,
+): Promise<QuizAttempt> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).rpc("start_quiz", { p_stage_id: stageId });
+  if (!error) return data as QuizAttempt;
+  if (!isMissingQuizFn(error)) throw error;
+  console.warn("[quiz] start_quiz нет в базе — миграция 216 ещё не применена, работаем по-старому");
+  return startQuizAttempt(db, stageId, studentId, totalQuestions);
+};
+
+/**
+ * Сохранить ОДИН ответ. Уходит только номер выбранного варианта: признак
+ * правильности и балл эта функция не принимает и принимать не должна — их
+ * ставит сдача, и только сервер.
+ */
+export const saveQuizAnswerServer = async (
+  db: Db, stageId: string, attemptId: string, questionId: string, selectedIndex: number | null,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).rpc("save_quiz_answer", {
+    p_stage_id: stageId, p_question_id: questionId, p_selected: selectedIndex,
+  });
+  if (!error) return;
+  if (!isMissingQuizFn(error)) throw error;
+  console.warn("[quiz] save_quiz_answer нет в базе — миграция 216 ещё не применена, работаем по-старому");
+  await submitQuizAnswer(db, attemptId, questionId, selectedIndex);
+};
+
+/** Сдача. Сервер сам сверяет ответы с эталоном, считает балл и пишет оценку. */
+export const submitQuizServer = async (
+  db: Db, stageId: string, attemptId: string, studentId: string,
+): Promise<{ correct: number; total: number; grade: number }> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).rpc("submit_quiz", { p_stage_id: stageId });
+  if (!error) return data as { correct: number; total: number; grade: number };
+  if (!isMissingQuizFn(error)) throw error;
+  console.warn("[quiz] submit_quiz нет в базе — миграция 216 ещё не применена, считаем по-старому");
+  return finalizeQuizAttempt(db, attemptId, studentId);
+};
+
 /** Детали попытки: вопросы + ответы ученика (для экрана результата / read-only). */
 export const getQuizAttemptResults = async (
   db: Db, attemptId: string,

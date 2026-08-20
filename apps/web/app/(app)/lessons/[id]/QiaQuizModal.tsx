@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Check, X, Clock, Loader2, PartyPopper, Lightbulb } from "lucide-react";
 import {
-  getDictionary, getQuizQuestions, getStudentQuizAttempt, startQuizAttempt,
-  submitQuizAnswer, finalizeQuizAttempt, getQuizAttemptResults,
+  getDictionary, getStudentQuizAttempt,
+  getQuizPaper, startQuizServer, saveQuizAnswerServer, submitQuizServer,
 } from "@snr/core";
 import type {
   Locale, LessonStageWithProgress, LessonStageProgress, QuizQuestion, QuizAttempt, QuizConfigForStage,
@@ -91,23 +91,28 @@ export function QiaQuizModal({
   // initial load
   useEffect(() => {
     (async () => {
-      const qs = await getQuizQuestions(db, stage.id);
-      setQuestions(qs);
+      // 19.08.2026 — ОДИН ПУТЬ ЗАГРУЗКИ ВМЕСТО ДВУХ.
+      //
+      // Было: вопросы отдельным запросом (select("*") — вместе с номером
+      // правильного варианта, до первого клика), ответы ещё одним. Стало: бланк
+      // приходит целиком от сервера, и номер правильного в нём появляется
+      // только после сдачи. Разбор ошибок от этого не страдает — там как раз
+      // «после сдачи». Подробности — миграция 216.
+      // Бланк первым: он приходит и до открытия попытки, а число вопросов из
+      // него нужно, чтобы прежний путь (пока миграция не применена) записал в
+      // попытку правильный total_questions, а не ноль.
+      const paper = await getQuizPaper(db, stage.id, studentId);
+      setQuestions(paper.questions);
+
       let att = await getStudentQuizAttempt(db, stage.id, studentId);
+      if (!att) att = await startQuizServer(db, stage.id, studentId, paper.questions.length);
+
+      const map: Record<string, number | null> = {};
+      paper.answers.forEach((a) => { map[a.question_id] = a.selected_option_index; });
+      setAnswers(map);
+      setAttempt(att);
       if (att?.is_finalized) {
-        const res = await getQuizAttemptResults(db, att.id);
-        const map: Record<string, number | null> = {};
-        res.answers.forEach((a) => { map[a.question_id] = a.selected_option_index; });
-        setAnswers(map);
-        setAttempt(att);
         setResult({ correct: att.correct_count, total: att.total_questions, grade: stage.progress?.grade ?? 0 });
-      } else {
-        if (!att) att = await startQuizAttempt(db, stage.id, studentId, qs.length);
-        setAttempt(att);
-        const res = await getQuizAttemptResults(db, att.id);
-        const map: Record<string, number | null> = {};
-        res.answers.forEach((a) => { map[a.question_id] = a.selected_option_index; });
-        setAnswers(map);
       }
       setLoading(false);
     })().catch(() => setLoading(false));
@@ -145,14 +150,14 @@ export function QiaQuizModal({
     let att = attempt;
     if (!att) {
       try {
-        att = await startQuizAttempt(db, stage.id, studentId, questions.length);
+        att = await startQuizServer(db, stage.id, studentId, questions.length);
         setAttempt(att);
       } catch {
         return;
       }
     }
     setAnswers((a) => ({ ...a, [q.id]: optIdx }));
-    await submitQuizAnswer(db, att.id, q.id, optIdx).catch(() => null);
+    await saveQuizAnswerServer(db, stage.id, att.id, q.id, optIdx).catch(() => null);
   }
 
   async function doFinalize() {
@@ -160,7 +165,11 @@ export function QiaQuizModal({
     setConfirmStep(false);
     setFinalizing(true);
     try {
-      const r = await finalizeQuizAttempt(db, attempt.id, studentId);
+      const r = await submitQuizServer(db, stage.id, attempt.id, studentId);
+      // Бланк перечитываем: до сдачи сервер номера правильных вариантов не
+      // отдавал, а разбор ошибок ниже рисуется именно по ним.
+      const after = await getQuizPaper(db, stage.id, studentId);
+      setQuestions(after.questions);
       setResult(r);
       const now = new Date().toISOString();
       onSubmitted({
