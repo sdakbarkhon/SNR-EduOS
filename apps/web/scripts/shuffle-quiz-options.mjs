@@ -198,18 +198,29 @@ async function main() {
         moves.push({ answerId: a.id, from: a.selected_option_index, to });
       }
 
+      // Совпадает ли задуманное с тем, что уже лежит в базе. Нужно, чтобы
+      // повторный запуск честно говорил «работы нет», а не пересчитывал план
+      // как работу: порядок-то он выдаст тот же самый (см. шапку про
+      // повторяемость), и без этой проверки отличить «сделано» от «предстоит»
+      // было бы нечем.
+      const sameOptions = opts.length === fresh.length && opts.every((o, i) => o === fresh[i]);
+      const already = sameOptions && oldIdx === newIdx && moves.every((m) => m.to === m.from);
+
       plan.push({
         id: q.id, questionText: q.question_text,
         oldOptions: opts, newOptions: fresh,
-        oldIdx, newIdx, moves,
+        oldIdx, newIdx, moves, already,
         school: key,
       });
     }
 
     // ── показ ──────────────────────────────────────────────────────────────
+    const toChange = plan.filter((p) => !p.already);
     console.log(`Вопросов всего: ${questions.length}`);
-    console.log(`Будет затронуто: ${plan.length}`);
+    console.log(`Изменится: ${toChange.length}`);
+    console.log(`Уже на месте: ${plan.length - toChange.length}`);
     console.log(`Пропущено: ${skipped.length}`);
+    if (toChange.length === 0) console.log("РАБОТЫ НЕТ — порядок уже такой, какой нужен.");
     for (const s of skipped.slice(0, 10)) console.log(`   • ${s.id} — ${s.why}`);
     console.log("\nПо школам:");
     for (const [school, n] of [...bySchool].sort((a, b) => b[1] - a[1])) {
@@ -230,7 +241,7 @@ async function main() {
     console.log(`Из них сменят номер: ${answersMoved}`);
 
     console.log("\nПримеры (было → стало):");
-    for (const p of plan.slice(0, 4)) {
+    for (const p of toChange.slice(0, 4)) {
       console.log(`\n  ── ${p.school}`);
       console.log(`  Вопрос: ${p.questionText.slice(0, 90)}`);
       console.log("  БЫЛО:");
@@ -249,7 +260,7 @@ async function main() {
     console.log("\nЗапись…");
     await client.query("BEGIN");
     let wroteQ = 0, wroteA = 0;
-    for (const p of plan) {
+    for (const p of toChange) {
       const res = await client.query(
         `UPDATE public.quiz_questions SET options = $2::jsonb, correct_option_index = $3 WHERE id = $1`,
         [p.id, JSON.stringify(p.newOptions), p.newIdx],
