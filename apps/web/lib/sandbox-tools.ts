@@ -13,46 +13,17 @@ export type SandboxToolId =
   | "wokwi" | "codesandbox" | "code"
   | "geogebra" | "phet" | "desmos" | "blockly_games" | "visualgo"
   | "p5js" | "excalidraw" | "learningapps" | "sqlonline" | "typerun"
-  | "scratch" | "polotno"
+  | "scratch"
   | "google_docs" | "google_sheets" | "google_slides";
 
 export type SandboxTool = {
   id: SandboxToolId;
-  /**
-   * "iframe" → embed the editor; "code" → in-app Monaco runner;
-   * "editor"  → редактор собран в наш бандл и рисуется прямо на странице
-   *             (Polotno, проба 16.08.2026) — рамки и чужого адреса нет.
-   */
-  kind: "iframe" | "code" | "editor";
+  /** "iframe" → embed the editor; "code" → in-app Monaco runner. */
+  kind: "iframe" | "code";
   /** Fresh-editor URL for iframe tools. */
   embedUrl?: string;
   Icon: LucideIcon;
   gradient: string;        // tailwind gradient classes for the card icon tile
-};
-
-/**
- * Пробная карточка Polotno — ВЫКЛЮЧЕНА на живом сайте.
- *
- * ПОЧЕМУ. Их лицензия требует подписку с первого дня работы: «Production use
- * requires a valid Polotno subscription at any time … including a tool that
- * only your own employees use». Школьная песочница — это работа, а не оценка
- * продукта, и 60 дней «на попробовать» её не покрывают. Пока вопрос оплаты не
- * решён, ученикам карточку показывать нельзя.
- *
- * КОД НЕ УДАЛЁН: экран, сохранение работ и наши шаблоны остаются на месте —
- * если заказчик решит платить, включение стоит одну переменную.
- *
- * КАК ВКЛЮЧИТЬ ЛОКАЛЬНО: в apps/web/.env.local дописать строку
- *     NEXT_PUBLIC_ENABLE_POLOTNO=1
- * и перезапустить `pnpm dev`. На проде переменной нет — карточки нет.
- */
-const POLOTNO_ENABLED = process.env.NEXT_PUBLIC_ENABLE_POLOTNO === "1";
-
-const POLOTNO_TOOL: SandboxTool = {
-  id: "polotno",
-  kind: "editor",
-  Icon: Palette,
-  gradient: "from-fuchsia-500 to-rose-500",
 };
 
 export const SANDBOX_TOOLS: SandboxTool[] = [
@@ -193,11 +164,6 @@ export const SANDBOX_TOOLS: SandboxTool[] = [
     gradient: "from-amber-500 to-yellow-600",
   },
 ];
-
-/** Итоговый список: пробная карточка появляется только при включённом флаге. */
-export const SANDBOX_TOOLS_VISIBLE: SandboxTool[] = POLOTNO_ENABLED
-  ? [...SANDBOX_TOOLS, POLOTNO_TOOL]
-  : SANDBOX_TOOLS;
 
 /** Инструмент по id. Единственный источник иконки и градиента: списки
  *  вроде «внешних проектов» на /projects обязаны брать оформление отсюда,
