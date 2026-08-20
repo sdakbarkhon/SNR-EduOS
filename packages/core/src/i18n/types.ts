@@ -2431,6 +2431,10 @@ export interface Dictionary {
       winner: string;
       points: string;
       leaderboard: string;
+      waitingQuestion: string;
+      waitingQuestionHint: string;
+      restartGame: string;
+      restartGameConfirm: string;
       close: string;
       launchGame: string;
       results: string;

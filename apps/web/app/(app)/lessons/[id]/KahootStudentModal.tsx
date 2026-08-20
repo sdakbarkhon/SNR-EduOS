@@ -3,12 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, Loader2, Trophy, Hourglass, Gamepad2, Triangle, Diamond, Circle, Square, Flame, Medal } from "lucide-react";
 import {
-  getDictionary, getQuizQuestions, getKahootSession, startQuizAttempt,
-  submitKahootAnswer, getKahootLeaderboard, gradeFromPercent,
+  getDictionary, getKahootState, submitKahootAnswerServer, gradeFromPercent,
 } from "@snr/core";
 import type {
-  Locale, LessonStageWithProgress, LessonStageProgress, QuizQuestion, KahootSession,
-  QuizAttempt, QuizLeaderboardEntry,
+  Locale, LessonStageWithProgress, LessonStageProgress,
+  KahootState, KahootQuestionView, QuizLeaderboardEntry,
 } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { MarkdownInline } from "@/components/markdown-plugins";
@@ -46,25 +45,36 @@ export function KahootStudentModal({
   const dq = getDictionary(locale as Locale).lesson.quiz;
   const db = createClient();
 
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [session, setSession] = useState<KahootSession | null>(null);
-  const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [loading, setLoading] = useState(true);
-  // answers this student gave, keyed by question index: { selected, score, correct }
-  const [answered, setAnswered] = useState<Record<number, { selected: number; score: number; correct: boolean }>>({});
-  const [board, setBoard] = useState<QuizLeaderboardEntry[]>([]);
+  // 19.08.2026 — ОДНО СОСТОЯНИЕ ИГРЫ С СЕРВЕРА вместо трёх кусков в памяти.
+  //
+  // Было: все вопросы разом (вместе с правильными ответами — ещё в лобби),
+  // сессия отдельно, а «я уже отвечал» жило только в React. Обновил страницу
+  // после показа ответа — состояние пустое, отвечай заново с нулевым временем.
+  // Стало: сервер отдаёт текущий вопрос без правильного, свои ответы и, в
+  // конце, таблицу лидеров. Разбор — в миграции 217.
+  const [gs, setGs] = useState<KahootState | null>(null);
+  // Локальная отметка «только что ответил»: сервер подтвердит на следующем
+  // обновлении, а экран не должен ждать круга, чтобы сказать «ответ записан».
+  const [justAnswered, setJustAnswered] = useState<Record<string, number>>({});
   const [nowMs, setNowMs] = useState<number | null>(null);
   const finishedNotified = useRef(false);
+  // Упреждающе загруженный следующий вопрос: лежит здесь с экрана показа
+  // ответа, чтобы на смене вопроса не было сетевого круга — там идёт счёт
+  // скорости, и лишние полсекунды у одного против другого нечестны.
+  const prefetched = useRef<KahootQuestionView | null>(null);
+  const [shownQ, setShownQ] = useState<KahootQuestionView | null>(null);
+
+  const refresh = async (prefetch = false) => {
+    const s = await getKahootState(db, stage.id, prefetch);
+    setGs(s);
+    prefetched.current = s.next_question;
+    if (s.question) setShownQ(s.question);
+    return s;
+  };
 
   useEffect(() => {
-    (async () => {
-      const qs = await getQuizQuestions(db, stage.id);
-      setQuestions(qs);
-      const att = await startQuizAttempt(db, stage.id, studentId, qs.length);
-      setAttempt(att);
-      setSession(await getKahootSession(db, stage.id));
-      setLoading(false);
-    })().catch(() => setLoading(false));
+    refresh().catch(() => null).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,19 +84,42 @@ export function KahootStudentModal({
     return () => clearInterval(t);
   }, []);
 
-  // realtime: react to teacher-driven session changes
-  useRealtimeChannel(`kahoot-student-${stage.id}`, "kahoot_sessions", `stage_id=eq.${stage.id}`, () => {
-    getKahootSession(db, stage.id).then((s) => setSession(s)).catch(() => null);
+  // Живой канал: учитель сдвинул игру. Если следующий вопрос уже лежит в руках
+  // (упреждающая загрузка на экране показа ответа) — показываем его немедленно,
+  // а состояние догоняем следом. Иначе между «сессия сказала вопрос №3» и
+  // «вопрос №3 на экране» вставал бы круг до сервера.
+  useRealtimeChannel(`kahoot-student-${stage.id}`, "kahoot_sessions", `stage_id=eq.${stage.id}`, (payload) => {
+    const nextIdx = (payload.new as { current_question_index?: number } | null)?.current_question_index;
+    const held = prefetched.current;
+    if (held && typeof nextIdx === "number" && held.position === nextIdx) {
+      setShownQ(held);
+      prefetched.current = null;
+    }
+    refresh(false).catch(() => null);
   });
 
+  const session = gs?.session ?? null;
   const status = session?.status ?? "lobby";
   const qIdx = session?.current_question_index ?? -1;
-  const currentQ = qIdx >= 0 ? questions[qIdx] : undefined;
+  const total = gs?.total_questions ?? 0;
+  const board: QuizLeaderboardEntry[] = gs?.leaderboard ?? [];
+  // Показываем либо то, что пришло с сервера, либо упреждённое — что новее.
+  const currentQ = (shownQ && shownQ.position === qIdx) ? shownQ : (gs?.question ?? undefined);
 
-  // on reveal / finished → refresh leaderboard (for my total + place)
+  // Свои ответы: с сервера плюс только что отправленный.
+  const answeredMap: Record<string, { selected: number; correct?: boolean; score?: number }> = {};
+  for (const a of gs?.my_answers ?? []) {
+    answeredMap[a.question_id] = { selected: a.selected_option_index, correct: a.is_correct, score: a.score };
+  }
+  for (const [qid, sel] of Object.entries(justAnswered)) {
+    if (!answeredMap[qid]) answeredMap[qid] = { selected: sel };
+  }
+
+  // Показ ответа — самое время попросить следующий вопрос заранее. Таблица
+  // лидеров приезжает тем же вызовом, отдельного запроса больше нет.
   useEffect(() => {
     if (status === "question_revealed" || status === "finished") {
-      getKahootLeaderboard(db, stage.id).then(setBoard).catch(() => null);
+      refresh(status === "question_revealed").catch(() => null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, qIdx]);
@@ -95,7 +128,6 @@ export function KahootStudentModal({
   useEffect(() => {
     if (status === "finished" && !finishedNotified.current) {
       finishedNotified.current = true;
-      const total = questions.length;
       const me = board.find((e) => e.student_id === studentId);
       const correct = me?.correct_count ?? 0;
       const grade = gradeFromPercent(total > 0 ? (correct / total) * 100 : 0);
@@ -115,39 +147,39 @@ export function KahootStudentModal({
   const secsLeft = status === "question_active" && startedMs != null && nowMs != null
     ? Math.max(0, Math.ceil((startedMs + limitS * 1000 - nowMs) / 1000)) : null;
 
-  // Real streak: consecutive correct answers ending at the most recently answered question.
-  const answeredIdxs = Object.keys(answered).map(Number).sort((a, b) => a - b);
+  // Серия верных подряд — по ответам, которые подтвердил сервер. Сервер
+  // отдаёт их по порядку вопросов, поэтому достаточно пройти с конца.
+  const confirmed = (gs?.my_answers ?? []).filter((a) => a.is_correct !== undefined);
   let streak = 0;
-  for (let i = answeredIdxs.length - 1; i >= 0; i--) {
-    const key = answeredIdxs[i];
-    if (key === undefined) break;
-    if (answered[key]?.correct) streak++; else break;
+  for (let i = confirmed.length - 1; i >= 0; i--) {
+    if (confirmed[i]!.is_correct) streak++; else break;
   }
 
+  // ОТПРАВЛЯЕТСЯ ТОЛЬКО НОМЕР ВАРИАНТА. Правильность, время и балл считает
+  // сервер: раньше их присылал этот же браузер, и сервер верил на слово.
+  // Поля ниже нужны лишь пути отката (пока миграция 217 не применена) — тогда
+  // всё считается по-старому, как и считалось.
   async function answer(optIdx: number) {
-    if (!currentQ || answered[qIdx]) return;
-    // Defensive (Iter5 hotfix P14.2): see QiaQuizModal's choose() for why
-    // `attempt` can still be null right after the stage becomes active.
-    let att = attempt;
-    if (!att) {
-      try {
-        att = await startQuizAttempt(db, stage.id, studentId, questions.length);
-        setAttempt(att);
-      } catch {
-        return;
-      }
+    if (!currentQ || answeredMap[currentQ.id]) return;
+    const qid = currentQ.id;
+    setJustAnswered((a) => ({ ...a, [qid]: optIdx }));
+    try {
+      await submitKahootAnswerServer(db, {
+        stageId: stage.id, attemptId: "", questionId: qid, selectedIndex: optIdx,
+        isCorrect: optIdx === currentQ.correct_option_index,
+        responseTimeMs: startedMs != null ? Date.now() - startedMs : limitS * 1000,
+        timeLimitSeconds: limitS,
+      });
+    } catch {
+      // Отказ (опоздал, уже отвечал) — снимаем местную отметку, чтобы экран
+      // не врал, будто ответ принят.
+      setJustAnswered((a) => { const n = { ...a }; delete n[qid]; return n; });
+      return;
     }
-    const correct = optIdx === currentQ.correct_option_index;
-    const responseTimeMs = startedMs != null ? Date.now() - startedMs : limitS * 1000;
-    const score = await submitKahootAnswer(db, {
-      stageId: stage.id, attemptId: att.id, questionId: currentQ.id,
-      selectedIndex: optIdx, isCorrect: correct, responseTimeMs, timeLimitSeconds: limitS,
-    }).catch(() => 0);
-    setAnswered((a) => ({ ...a, [qIdx]: { selected: optIdx, score, correct } }));
+    refresh(false).catch(() => null);
   }
 
-  const total = questions.length;
-  const myAns = answered[qIdx];
+  const myAns = currentQ ? answeredMap[currentQ.id] : undefined;
   const me = board.find((e) => e.student_id === studentId);
   const myPlace = me ? board.findIndex((e) => e.student_id === studentId) + 1 : null;
   const myName = me?.full_name ?? "";
@@ -169,6 +201,25 @@ export function KahootStudentModal({
         <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2 text-sm font-extrabold text-emerald-700">
           <Gamepad2 className="h-4 w-4" /> {dq.ready}
         </span>
+      </div>
+    );
+  }
+
+  // ЭКРАН ОЖИДАНИЯ. Его не было вовсе, и это было опасно: цепочка условий
+  // проваливалась мимо всех веток на финальный экран «Игра окончена» —
+  // посреди игры. Теперь, если игра идёт, а вопрос ещё не в руках (сеть
+  // моргнула, упреждающая загрузка не успела), человек видит честное «ждём».
+  if ((status === "question_active" || status === "question_revealed") && !currentQ) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 rounded-[24px] border border-[#ECEDF4] bg-white p-10 text-center shadow-sm">
+        <Hourglass className="h-12 w-12 animate-pulse text-[#6A4FE6]" />
+        <h2 className="text-2xl font-black text-[#242A45]">{dq.waitingQuestion}</h2>
+        <p className="text-sm text-[#9CA0B4]">{dq.waitingQuestionHint}</p>
+        {total > 0 && (
+          <span className="text-sm font-bold text-[#9CA0B4]">
+            {dq.questionOf.replace("{n}", String(qIdx + 1)).replace("{total}", String(total))}
+          </span>
+        )}
       </div>
     );
   }
@@ -264,7 +315,7 @@ export function KahootStudentModal({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[24px] border border-[#ECEDF4] bg-white p-10 text-center shadow-sm">
         <p className="text-sm font-extrabold uppercase tracking-widest text-[#9CA0B4]">{dq.correctAnswer}</p>
-        <MarkdownInline text={currentQ.options[currentQ.correct_option_index] ?? ""} className="block text-2xl font-black text-emerald-700" />
+        <MarkdownInline text={currentQ.correct_option_index != null ? (currentQ.options[currentQ.correct_option_index] ?? "") : ""} className="block text-2xl font-black text-emerald-700" />
         {myAns ? (
           myAns.correct ? (
             <p className="text-lg font-extrabold text-emerald-600">{dq.correctPlus.replace("{n}", String(myAns.score))}</p>

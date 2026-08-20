@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Play, ChevronRight, Trophy, Clock, Users, User, Loader2, Triangle, Diamond, Circle, Square, Medal } from "lucide-react";
 import {
-  getDictionary, getQuizQuestions, createKahootSession, getKahootSession,
-  startKahootGame, showNextKahootQuestion, revealKahootAnswer, finishKahootGame,
+  getDictionary, getQuizQuestions, openKahootSession, getKahootSession,
+  startKahootServer, nextKahootServer, revealKahootServer, finishKahootServer,
   getKahootParticipants, getKahootAnswerCount, getKahootLeaderboard, gradeFromPercent,
 } from "@snr/core";
 import type { Locale, LessonStage, QuizQuestion, KahootSession, QuizLeaderboardEntry } from "@snr/core";
@@ -42,7 +42,12 @@ export function KahootTeacherModal({
   // init
   useEffect(() => {
     (async () => {
-      const [qs, s] = await Promise.all([getQuizQuestions(db, stage.id), createKahootSession(db, stage.id)]);
+      // 19.08.2026 — ПОДХВАТЫВАЕМ ИДУЩУЮ ИГРУ, а не заводим новую.
+      // Раньше открытие окна делало DELETE и создавало сессию заново:
+      // учитель, случайно закрывший вкладку посреди урока, терял игру вместе
+      // с очками всего класса. Новая заводится только если игры нет, она
+      // завершена, или нажали «Начать заново» (кнопка в лобби).
+      const [qs, s] = await Promise.all([getQuizQuestions(db, stage.id), openKahootSession(db, stage.id, false)]);
       setQuestions(qs);
       setSession(s);
       // If reopening a finished session, pre-populate leaderboard
@@ -104,16 +109,27 @@ export function KahootTeacherModal({
     if (s) setSession(s);
   }
 
+  async function doRestart() {
+    if (!window.confirm(dq.restartGameConfirm)) return;
+    setBusy(true);
+    try {
+      setSession(await openKahootSession(db, stage.id, true));
+      setBoard([]);
+      setAnswered(0);
+      revealedRef.current = -1;
+    } finally { setBusy(false); }
+  }
+
   async function doStart() {
     if (!session) return;
     setBusy(true);
-    try { await startKahootGame(db, session.id); await refetchSession(); } finally { setBusy(false); }
+    try { await startKahootServer(db, stage.id, session.id); await refetchSession(); } finally { setBusy(false); }
   }
   async function doReveal() {
     if (!session) return;
     setBusy(true);
     try {
-      await revealKahootAnswer(db, session.id);
+      await revealKahootServer(db, stage.id, session.id);
       setBoard(await getKahootLeaderboard(db, stage.id));
       await refetchSession();
     } finally { setBusy(false); }
@@ -123,11 +139,11 @@ export function KahootTeacherModal({
     setBusy(true);
     try {
       if (qIdx + 1 < questions.length) {
-        await showNextKahootQuestion(db, session.id, qIdx + 1);
+        await nextKahootServer(db, stage.id, session.id, qIdx + 1);
         revealedRef.current = -1;
         setAnswered(0);
       } else {
-        await finishKahootGame(db, session.id);
+        await finishKahootServer(db, stage.id, session.id);
         setBoard(await getKahootLeaderboard(db, stage.id));
       }
       await refetchSession();
@@ -171,6 +187,12 @@ export function KahootTeacherModal({
               <button onClick={doStart} disabled={busy || total === 0}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-8 py-3 text-base font-bold text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-700 active:scale-95 disabled:opacity-50">
                 {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />} {dq.startGame}
+              </button>
+              {/* «Начать заново» — единственный способ обнулить партию. Раньше
+                  это делало само открытие окна, молча и без спроса. */}
+              <button onClick={doRestart} disabled={busy}
+                className="text-sm font-semibold text-slate-400 underline hover:text-slate-600 disabled:opacity-50">
+                {dq.restartGame}
               </button>
             </div>
           ) : status === "question_active" && currentQ ? (

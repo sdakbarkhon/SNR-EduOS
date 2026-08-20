@@ -3954,6 +3954,175 @@ export const submitKahootAnswer = async (
   return score;
 };
 
+/**
+ * ── KAHOOT ЧЕРЕЗ СЕРВЕР (миграция 217) ──────────────────────────────────────
+ *
+ * Обёртки ниже — единственный путь, которым ходят экраны Kahoot. Каждая сперва
+ * зовёт серверную функцию и, не найдя её, откатывается на прежний путь:
+ * миграция применяется вручную и приезжает ПОЗЖЕ кода, а игра на живом уроке
+ * ломаться не должна.
+ *
+ * Старые функции ниже (getKahootSession, startKahootGame, submitKahootAnswer и
+ * прочие) оставлены нетронутыми — они и есть путь отката.
+ */
+
+/** «Функции ещё нет в базе» — миграция 217 применяется вручную. */
+const isMissingKahootFn = (e: unknown): boolean => {
+  const code = (e as { code?: string } | null)?.code ?? "";
+  const msg = (e as { message?: string } | null)?.message ?? "";
+  return code === "PGRST202" || code === "42883" || /Could not find the function/i.test(msg);
+};
+
+export type KahootQuestionView = {
+  id: string; position: number; question_text: string; options: string[];
+  time_per_question_seconds: number;
+  /** Приходит ТОЛЬКО после показа ответа. */
+  correct_option_index?: number;
+};
+
+export type KahootMyAnswer = {
+  question_id: string; selected_option_index: number;
+  /** Только по уже показанным вопросам. */
+  is_correct?: boolean; score?: number;
+};
+
+export type KahootState = {
+  session: KahootSession | null;
+  total_questions: number;
+  question: KahootQuestionView | null;
+  next_question: KahootQuestionView | null;
+  my_answers: KahootMyAnswer[];
+  leaderboard: QuizLeaderboardEntry[] | null;
+};
+
+/**
+ * Всё состояние игры одним вызовом: сессия, текущий вопрос, свои ответы, а в
+ * конце — таблица лидеров.
+ *
+ * Один вызов вместо трёх не ради красоты: он же закрывает перезагрузку
+ * страницы. Раньше «я уже отвечал» жило в памяти вкладки — обновил страницу
+ * после показа правильного ответа, ответил заново с нулевым временем, получил
+ * тысячу. Теперь это приходит с сервера.
+ *
+ * prefetch — попросить заодно следующий вопрос. Клиент просит его на экране
+ * показа ответа, чтобы на смене вопроса не было сетевого круга: там идёт счёт
+ * скорости, и лишние полсекунды у одного ученика против другого нечестны.
+ */
+export const getKahootState = async (
+  db: Db, stageId: string, prefetch = false,
+): Promise<KahootState> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).rpc("kahoot_state", { p_stage_id: stageId, p_prefetch: prefetch });
+  if (!error) {
+    const d = data as KahootState;
+    return {
+      session: d.session ?? null, total_questions: d.total_questions ?? 0,
+      question: d.question ?? null, next_question: d.next_question ?? null,
+      my_answers: d.my_answers ?? [], leaderboard: d.leaderboard ?? null,
+    };
+  }
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] kahoot_state нет в базе — миграция 217 ещё не применена, работаем по-старому");
+
+  // Прежний путь: сессия отдельно, ВСЕ вопросы разом (включая правильные
+  // ответы — та самая дыра, которую закрывает миграция).
+  const session = await getKahootSession(db, stageId);
+  const questions = await getQuizQuestions(db, stageId);
+  const idx = session?.current_question_index ?? -1;
+  const view = (q: QuizQuestion | undefined): KahootQuestionView | null => q ? ({
+    id: q.id, position: q.position, question_text: q.question_text,
+    options: q.options, time_per_question_seconds: q.time_per_question_seconds,
+    correct_option_index: q.correct_option_index,
+  }) : null;
+  return {
+    session, total_questions: questions.length,
+    question: idx >= 0 ? view(questions[idx]) : null,
+    next_question: prefetch && idx >= 0 ? view(questions[idx + 1]) : null,
+    my_answers: [],
+    leaderboard: session?.status === "finished" ? await getKahootLeaderboard(db, stageId) : null,
+  };
+};
+
+/**
+ * Отправить ответ. Уходит ТОЛЬКО номер варианта: правильность, время и балл
+ * считает сервер. Раньше клиент присылал всё это готовым, и сервер верил.
+ */
+export const submitKahootAnswerServer = async (
+  db: Db,
+  { stageId, attemptId, questionId, selectedIndex, isCorrect, responseTimeMs, timeLimitSeconds }: {
+    stageId: string; attemptId: string; questionId: string; selectedIndex: number;
+    isCorrect: boolean; responseTimeMs: number; timeLimitSeconds: number;
+  },
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).rpc("submit_kahoot_answer", {
+    p_stage_id: stageId, p_question_id: questionId, p_selected: selectedIndex,
+  });
+  if (!error) return;
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] submit_kahoot_answer нет в базе — миграция 217 ещё не применена, считаем по-старому");
+  await submitKahootAnswer(db, { stageId, attemptId, questionId, selectedIndex, isCorrect, responseTimeMs, timeLimitSeconds });
+};
+
+/**
+ * Открыть окно игры у учителя.
+ *
+ * ГЛАВНОЕ ОТЛИЧИЕ ОТ ПРЕЖНЕГО: идущая игра ПОДХВАТЫВАЕТСЯ. Раньше открытие
+ * окна делало DELETE и заводило новую сессию — учитель, случайно закрывший
+ * вкладку посреди урока, терял игру вместе с очками всего класса. Новая
+ * заводится только если игры нет, она завершена, или нажали «Начать заново».
+ */
+export const openKahootSession = async (
+  db: Db, stageId: string, restart = false,
+): Promise<KahootSession> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (db as any).rpc("kahoot_open_session", { p_stage_id: stageId, p_restart: restart });
+  if (!error) return data as KahootSession;
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] kahoot_open_session нет в базе — миграция 217 ещё не применена, работаем по-старому");
+  return createKahootSession(db, stageId);
+};
+
+/** Ведение игры: те же четыре шага, но решает сервер. */
+export const startKahootServer = async (db: Db, stageId: string, sessionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).rpc("kahoot_start", { p_stage_id: stageId });
+  if (!error) return;
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] kahoot_start нет в базе — миграция 217 ещё не применена, работаем по-старому");
+  await startKahootGame(db, sessionId);
+};
+
+export const revealKahootServer = async (db: Db, stageId: string, sessionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).rpc("kahoot_reveal", { p_stage_id: stageId });
+  if (!error) return;
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] kahoot_reveal нет в базе — миграция 217 ещё не применена, работаем по-старому");
+  await revealKahootAnswer(db, sessionId);
+};
+
+export const nextKahootServer = async (
+  db: Db, stageId: string, sessionId: string, nextIndex: number,
+): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).rpc("kahoot_next", { p_stage_id: stageId });
+  if (!error) return;
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] kahoot_next нет в базе — миграция 217 ещё не применена, работаем по-старому");
+  await showNextKahootQuestion(db, sessionId, nextIndex);
+};
+
+/** Завершение. Итог считается ПО ЗАПИСЯМ СЕРВЕРА, а не по сумме присланного. */
+export const finishKahootServer = async (db: Db, stageId: string, sessionId: string): Promise<void> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (db as any).rpc("kahoot_finish", { p_stage_id: stageId });
+  if (!error) return;
+  if (!isMissingKahootFn(error)) throw error;
+  console.warn("[kahoot] kahoot_finish нет в базе — миграция 217 ещё не применена, считаем по-старому");
+  await finishKahootGame(db, sessionId);
+};
+
 /** Участники игры (ученики, у которых есть попытка на этапе) — для лобби. */
 export const getKahootParticipants = async (
   db: Db, stageId: string,
