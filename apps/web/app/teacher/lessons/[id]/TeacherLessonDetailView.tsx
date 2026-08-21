@@ -10,7 +10,7 @@ import {
   TestTube2, Gamepad2, Presentation, BookOpen, ListChecks, Loader2, Lock, Globe, Sparkles, Monitor, Type,
   Minimize2, Maximize2, FolderSearch,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database, Hand, Play, Link2,
-  Keyboard, Blocks, ClipboardList,} from "lucide-react";
+  Keyboard, Blocks, } from "lucide-react";
 import {
   getLessonStages, addLessonStage, updateLessonStage,
   deleteLessonStage, reorderLessonStages,
@@ -61,18 +61,7 @@ import { resolveMaterialUrl } from "@/lib/material-url";
 import { ExternalSubmissionsModal } from "./ExternalSubmissionsModal";
 import { KahootTeacherModal } from "./KahootTeacherModal";
 import { QuizResultsModal } from "./QuizResultsModal";
-import { ClassworkModal } from "./ClassworkModal";
 
-/**
- * Классная работа спрятана 17.08.2026 по решению заказчика: раздел дублирует
- * домашние задания, за всё время им не воспользовались ни разу — в базе ноль
- * заданий и ноль сдач. Код и таблицы НЕ удалены: вернуть можно одной
- * переменной окружения.
- *
- * КАК ВЕРНУТЬ: NEXT_PUBLIC_ENABLE_CLASSWORK=1 и пересборка (значение
- * подставляется на этапе сборки, существующее развёртывание его не увидит).
- */
-const CLASSWORK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_CLASSWORK === "1";
 import { AiGenerateStagesModal } from "./AiGenerateStagesModal";
 import { StageViewModal } from "./StageViewModal";
 import { StageContentPreview } from "@/components/lesson-stages/StageContentPreview";
@@ -832,7 +821,6 @@ export function TeacherLessonDetailView({
    * монтировался — учитель физически не мог увидеть, кто сдал работу. Точка
    * входа рядом с этапами: классная работа принадлежит уроку, а не заданию.
    */
-  const [classworkOpen, setClassworkOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<LessonStage | null>(null);
   const [reviewStage, setReviewStage] = useState<LessonStage | null>(null);
   const [kahootStage, setKahootStage] = useState<LessonStage | null>(null);
@@ -1583,14 +1571,6 @@ export function TeacherLessonDetailView({
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">{dl.stagesTitle}</h2>
           {!readOnly && (
             <div className="flex items-center gap-2">
-              {CLASSWORK_ENABLED && (
-              <button
-                onClick={() => setClassworkOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95"
-              >
-                <ClipboardList className="h-4 w-4" /> {d.teacher.classworkBtn}
-              </button>
-              )}
               <button
                 onClick={() => setAiGenerateOpen(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-violet-300 bg-gradient-to-r from-blue-50 to-violet-50 px-4 py-2 text-sm font-bold text-violet-700 shadow-sm hover:from-blue-100 hover:to-violet-100 active:scale-95 dark:border-violet-500/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-300"
@@ -2342,16 +2322,6 @@ export function TeacherLessonDetailView({
         )
       )}
 
-      {/* Классная работа: задание и сдачи учеников. */}
-      {CLASSWORK_ENABLED && mounted && classworkOpen && (
-        <ClassworkModal
-          open
-          onClose={() => setClassworkOpen(false)}
-          lessonId={lesson.id}
-          teacherId={teacher.id}
-          groupId={lesson.group_id}
-        />
-      )}
 
       {/* Kahoot live game control panel */}
       {mounted && kahootStage && (

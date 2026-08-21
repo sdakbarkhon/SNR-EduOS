@@ -56,7 +56,7 @@
   --cell-pending-bg: rgba(138,147,168,0.10);
   --cell-pending-fg: #8A93A8;
   /* Семантические токены поверхностей/текста/границ (lessons + модалки).
-     Используются в ClassworkModal / ClassworkBlock и т.п. Без них фон
+     Используются в модальных окнах учителя и ученика. Без них фон
      bg-[var(--surface-1)] был прозрачным. */
   --surface-1: #ffffff;
   --surface-2: #f1f5f9;

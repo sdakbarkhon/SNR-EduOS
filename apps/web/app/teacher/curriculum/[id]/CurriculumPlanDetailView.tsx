@@ -227,10 +227,11 @@ export function CurriculumPlanDetailView({
         groupId: plan.group_id,
         startsAt: `${draft.date}T${draft.time}:00+05:00`,
         durationMinutes: 45,
-        // НЕ ПЕРЕВОДИТСЯ: это значение поля урока в базе, а не подпись на
-        // экране. Заодно и не наше дело — значение по умолчанию относится к
-        // данным, которые в этом заходе трогать нельзя.
-        room: "Кабинет 101",
+        // Кабинет не подставляем: брать его неоткуда (колонки кабинета нет ни
+        // у группы, ни у школы, ни в учебном плане), а выдуманный «Кабинет 101»
+        // и врал про место урока, и читался на экранах как «Каб. Кабинет 101».
+        // Разбор — в шапке lib/curriculum-lesson-planner.ts.
+        room: null,
         title: t.title,
         description: t.description,
         subjectId: plan.subject_id,

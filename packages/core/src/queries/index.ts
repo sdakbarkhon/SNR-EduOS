@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, Classwork, ClassworkQuestion, ClassworkSubmission, ClassworkSubmissionWithStudent, ClassworkType, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
+import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 import { getSubjectKeyByLabel } from "../config/subjects";
@@ -1029,7 +1029,7 @@ export const getTeacherAttendance = (db: Db) =>
  *  Все/За задания/За урок (gradeCategory), чтобы не путаться в kind
  *  "programming", который бывает из ДВУХ разных источников (см. ниже). */
 export type GradeSourceTable =
-  | "homework_submissions" | "test_submissions" | "classwork_submissions"
+  | "homework_submissions" | "test_submissions"
   | "project_submissions" | "lesson_stage_progress" | "lesson_grades";
 
 export type StudentGradeItem = {
@@ -1040,7 +1040,7 @@ export type StudentGradeItem = {
    *  по ученику — без этого поля ей пришлось бы завести второй сбор оценок,
    *  который неминуемо разошёлся бы с этим в правилах нормировки. */
   studentId: string;
-  kind: "file" | "test" | "classwork" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson" | "code_completion";
+  kind: "file" | "test" | "programming" | "project" | "quiz" | "kahoot" | "external" | "lesson" | "code_completion";
   sourceTable: GradeSourceTable;
   title: string;
   subject: string;
@@ -1138,32 +1138,6 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       display: hasGrade ? `${r.grade}/5` : `${r.score}/${max || "?"}`,
       comment: null,
     });
-  }
-  // Classwork submissions with grades
-  {
-    const cwSel =
-      "id, student_id, grade, teacher_comment, submitted_at, classwork:classwork!inner(title, lesson:lessons!inner(subject_id, group:groups!inner(name), subject:subjects(name)))";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let cwQuery: any = (db as any).from("classwork_submissions").select(cwSel).not("grade", "is", null);
-    if (studentId) cwQuery = cwQuery.eq("student_id", studentId);
-    const cwRes = await cwQuery;
-    const cwData = unwrap(cwRes);
-    for (const r of cwData as unknown as Array<{
-      id: string; student_id: string; grade: number; teacher_comment: string | null; submitted_at: string;
-      classwork: { title: string; lesson: { group: { name: string } | null; subject: { name: string } | null } | null } | null;
-    }>) {
-      items.push({
-        id: r.id, studentId: r.student_id, kind: "classwork",
-        sourceTable: "classwork_submissions",
-        title: r.classwork?.title ?? "Классная работа",
-        subject: getSubjectKeyByLabel(r.classwork?.lesson?.subject?.name) ?? "",
-        groupName: r.classwork?.lesson?.group?.name ?? "",
-        date: r.submitted_at,
-        grade5: r.grade,
-        display: `${r.grade}/5`,
-        comment: r.teacher_comment,
-      });
-    }
   }
 
   // Project submissions with grades (migration 33). NB: projects.subject —
@@ -1333,26 +1307,6 @@ export const getGradeSubmissionDetail = async (
           .select("score, max_score").eq("id", id).maybeSingle();
         if (error) throw error;
         return { ...EMPTY_GRADE_DETAIL, testScore: data?.score ?? null, testMaxScore: data?.max_score ?? null };
-      }
-      case "classwork_submissions": {
-        const { data, error } = await db2.from("classwork_submissions")
-          .select("text_answer, file_storage_path, file_original_name, test_score, test_max")
-          .eq("id", id).maybeSingle();
-        if (error) throw error;
-        if (!data) return EMPTY_GRADE_DETAIL;
-        let fileUrl: string | null = null;
-        if (data.file_storage_path) {
-          try { fileUrl = await getClassworkFileUrl(db, data.file_storage_path); }
-          catch (e) { console.error("[getGradeSubmissionDetail] classwork file url failed:", (e as Error)?.message); }
-        }
-        return {
-          ...EMPTY_GRADE_DETAIL,
-          answerText: data.text_answer ?? null,
-          fileName: data.file_original_name ?? null,
-          fileUrl,
-          testScore: data.test_score ?? null,
-          testMaxScore: data.test_max ?? null,
-        };
       }
       case "project_submissions":
         // project_attachments/бакет project-files нигде в приложении сейчас
@@ -4905,216 +4859,6 @@ export const getTeacherBooks = async (db: Db, teacherId: string): Promise<Book[]
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as Book[];
-};
-
-// ─── CLASSWORK ────────────────────────────────────────────────────────────────
-
-/** Получить classwork для урока (+ вопросы для теста). */
-export const getClasswork = async (db: Db, lessonId: string): Promise<Classwork | null> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db2 = db as any;
-  const { data, error } = await db2.from("classwork").select("*").eq("lesson_id", lessonId).maybeSingle();
-  if (error || !data) return null;
-  const cw = data as Classwork;
-  const { data: qs } = await db2.from("classwork_questions").select("*").eq("classwork_id", cw.id).order("position");
-  return {
-    ...cw,
-    questions: ((qs ?? []) as ClassworkQuestion[]).map((q) => ({
-      ...q,
-      options: Array.isArray(q.options) ? q.options : [],
-    })),
-  };
-};
-
-/** Создать classwork (без вопросов). */
-export const createClasswork = async (
-  db: Db,
-  { lessonId, teacherId, title, description, workType, durationSeconds }: {
-    lessonId: string; teacherId: string; title: string;
-    description?: string; workType: ClassworkType; durationSeconds?: number;
-  },
-): Promise<string> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any).from("classwork").insert({
-    lesson_id: lessonId,
-    title,
-    description: description ?? null,
-    work_type: workType,
-    created_by: teacherId,
-    duration_seconds: durationSeconds ?? null,
-  }).select("id").single();
-  if (error) throw error;
-  return (data as { id: string }).id;
-};
-
-/** Создать вопросы теста для classwork. */
-export const createClassworkQuestions = async (
-  db: Db,
-  classworkId: string,
-  questions: Array<{ questionText: string; options: string[]; correctIndex: number; position: number }>,
-): Promise<void> => {
-  if (questions.length === 0) return;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (db as any).from("classwork_questions").insert(
-    questions.map((q) => ({
-      classwork_id: classworkId,
-      position: q.position,
-      question_text: q.questionText,
-      options: q.options,
-      correct_index: q.correctIndex,
-    })),
-  );
-  if (error) throw error;
-};
-
-/** Загрузить attachment учителя к classwork. */
-export const uploadClassworkAttachment = async (
-  db: Db,
-  { teacherId, classworkId, file }: { teacherId: string; classworkId: string; file: File },
-): Promise<{ path: string; sizeByte: number }> => {
-  const ext = file.name.split(".").pop() ?? "bin";
-  const path = await mySchoolStoragePath(db, teacherId, classworkId, "attachment", `${Date.now()}.${ext}`);
-  const { error } = await db.storage.from("classwork-files").upload(path, file, { upsert: true });
-  if (error) throw error;
-  return { path, sizeByte: file.size };
-};
-
-/** Получить signed URL для attachment classwork. */
-export const getClassworkAttachmentUrl = async (db: Db, storagePath: string): Promise<string> => {
-  const { data, error } = await db.storage.from("classwork-files").createSignedUrl(storagePath, 3600);
-  if (error) throw error;
-  return data!.signedUrl;
-};
-
-/** Удалить classwork (каскадно удаляет вопросы и сдачи через ON DELETE CASCADE). */
-export const deleteClasswork = async (db: Db, classworkId: string, teacherId: string): Promise<void> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (db as any).from("classwork").delete()
-    .eq("id", classworkId).eq("created_by", teacherId);
-  if (error) throw error;
-};
-
-/** Сдать classwork (ученик). UPSERT — можно переотправить если не оценено. */
-export const submitClasswork = async (
-  db: Db,
-  {
-    classworkId, studentId,
-    textAnswer, file, testAnswers, questions,
-  }: {
-    classworkId: string; studentId: string;
-    textAnswer?: string | null;
-    file?: File | null;
-    testAnswers?: number[] | null;
-    questions?: ClassworkQuestion[];
-  },
-): Promise<void> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db2 = db as any;
-
-  // Пересдача без нового файла не стирает прежний — тот же принцип, что в
-  // submitHomeworkWithFile выше: upsert перезаписывает строку целиком.
-  const { data: prevSub } = await db2
-    .from("classwork_submissions")
-    .select("file_storage_path, file_original_name, file_size_bytes")
-    .eq("classwork_id", classworkId)
-    .eq("student_id", studentId)
-    .maybeSingle();
-  const prevRow = prevSub as
-    | { file_storage_path: string | null; file_original_name: string | null; file_size_bytes: number | null }
-    | null;
-
-  let filePath: string | null = prevRow?.file_storage_path ?? null;
-  let fileName: string | null = prevRow?.file_original_name ?? null;
-  let fileSize: number | null = prevRow?.file_size_bytes ?? null;
-
-  if (file) {
-    const ext = file.name.split(".").pop() ?? "bin";
-    filePath = await mySchoolStoragePath(db, "submissions", classworkId, studentId, `${Date.now()}.${ext}`);
-    const { error } = await db.storage.from("classwork-files").upload(filePath, file, { upsert: true });
-    if (error) throw error;
-    fileName = file.name;
-    fileSize = file.size;
-  }
-
-  // Auto-score test
-  let testScore: number | null = null;
-  let testMax: number | null = null;
-  if (testAnswers && questions && questions.length > 0) {
-    testMax = questions.length;
-    testScore = questions.reduce((sum, q, i) => sum + (testAnswers[i] === q.correct_index ? 1 : 0), 0);
-  }
-
-  const { error } = await db2.from("classwork_submissions").upsert(
-    {
-      classwork_id: classworkId,
-      student_id: studentId,
-      text_answer: textAnswer ?? null,
-      file_storage_path: filePath,
-      file_original_name: fileName,
-      file_size_bytes: fileSize,
-      test_answers: testAnswers ?? null,
-      test_score: testScore,
-      test_max: testMax,
-      submitted_at: new Date().toISOString(),
-    },
-    { onConflict: "classwork_id,student_id" },
-  );
-  if (error) throw error;
-};
-
-/** Получить свою сдачу classwork (ученик). */
-export const getMyClassworkSubmission = async (
-  db: Db, classworkId: string,
-): Promise<ClassworkSubmission | null> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (db as any).from("classwork_submissions")
-    .select("*").eq("classwork_id", classworkId).maybeSingle();
-  return (data as ClassworkSubmission | null) ?? null;
-};
-
-/** Все сдачи classwork для учителя. */
-export const getClassworkSubmissions = async (
-  db: Db, classworkId: string, groupStudents: Array<{ id: string; full_name: string; avatar_url: string | null }>,
-): Promise<ClassworkSubmissionWithStudent[]> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (db as any).from("classwork_submissions")
-    .select("*").eq("classwork_id", classworkId);
-  const submissionsByStudent = new Map<string, ClassworkSubmission>();
-  for (const s of ((data ?? []) as ClassworkSubmission[])) submissionsByStudent.set(s.student_id, s);
-  return groupStudents.map((s) => ({
-    ...(submissionsByStudent.get(s.id) ?? {
-      id: "", classwork_id: classworkId, student_id: s.id,
-      text_answer: null, file_storage_path: null, file_original_name: null, file_size_bytes: null,
-      test_answers: null, test_score: null, test_max: null,
-      submitted_at: "", grade: null, teacher_comment: null, graded_at: null, graded_by: null,
-      is_demo: false,
-    }),
-    student: s,
-  }));
-};
-
-/** Signed URL для файла из classwork-files bucket. */
-export const getClassworkFileUrl = async (db: Db, storagePath: string): Promise<string> => {
-  const { data, error } = await db.storage.from("classwork-files").createSignedUrl(storagePath, 3600);
-  if (error) throw error;
-  return data!.signedUrl;
-};
-
-/** Выставить оценку за классную работу (учитель). */
-export const gradeClasswork = async (
-  db: Db,
-  { submissionId, teacherId, grade, comment }: {
-    submissionId: string; teacherId: string; grade: number; comment: string;
-  },
-): Promise<void> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (db as any).from("classwork_submissions").update({
-    grade,
-    teacher_comment: comment || null,
-    graded_at: new Date().toISOString(),
-    graded_by: teacherId,
-  }).eq("id", submissionId);
-  if (error) throw error;
 };
 
 // ─── LESSON EXCUSE REQUESTS (migration 30) ──────────────────────────────────────

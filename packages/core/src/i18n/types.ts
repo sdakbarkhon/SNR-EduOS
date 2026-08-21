@@ -2878,33 +2878,14 @@ export interface Dictionary {
     incompleteAttendanceTitle: string;
     incompleteAttendanceMsg: string;
     rollCallUnmarked: string;
-    // Classwork
-    classworkBtn: string;
-    classworkModalTitle: string;
-    classworkTabTask: string;
-    classworkTabSubmissions: string;
-    classworkTypeFile: string;
-    classworkTypeTest: string;
-    classworkTypeLearning: string;
-    classworkTypeProgramming: string;
-    classworkTitleLabel: string;
-    classworkDescLabel: string;
-    classworkTypeLabel: string;
-    classworkSaveBtn: string;
-    classworkSavingBtn: string;
-    classworkDeleteBtn: string;
-    classworkDeleteConfirm: string;
-    classworkAddQuestion: string;
-    classworkQuestionText: string;
-    classworkQuestionOption: string;
-    classworkMarkCorrect: string;
-    classworkNoSubmissions: string;
-    classworkSubmittedLabel: string;
-    classworkGradeLabel: string;
+    // Проверка задания по программированию у учителя. Имена ключей —
+    // наследие классной работы, которой больше нет: сам раздел удалён
+    // 20.08.2026, а эти три подписи живут на другом экране
+    // (teacher/homework/[id]/TeacherProgrammingSubmissions.tsx), поэтому
+    // и остались. Переименование тронуло бы экран домашних заданий.
     classworkCommentLabel: string;
     classworkGradeBtn: string;
     classworkGradedLabel: string;
-    classworkTestScore: string;
     projects: {
       nav: string;              // "Проекты"
       title: string;
@@ -2974,26 +2955,6 @@ export interface Dictionary {
       scopeStudentFallback: string;
       scopeAllGroups: string;
     };
-  };
-  classwork: {
-    title: string;
-    submitBtn: string;
-    submittedTitle: string;
-    yourGrade: string;
-    teacherComment: string;
-    textAnswerLabel: string;
-    textAnswerPlaceholder: string;
-    attachFileLabel: string;
-    submitError: string;
-    testComplete: string;
-    testResultsTitle: string;
-    testScore: string;
-    questionOf: string;    // "{n} из {total}"
-    noClasswork: string;
-    typeFile: string;
-    typeTest: string;
-    typeLearning: string;
-    typeProgramming: string;
   };
   submission: {
     dropAction: string;

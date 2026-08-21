@@ -147,6 +147,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Создание ───────────────────────────────────────────────────────────────
+  // Учитель вписал кабинет — берём его; не вписал — остаётся пустым: ROOM
+  // теперь null, и подставлять выдуманный «Кабинет 101» мы перестали.
+  // Разбор — в шапке lib/curriculum-lesson-planner.ts.
   const room = body.room?.trim() || ROOM;
   const created: Array<{ id: string; date: string; time: string; topicTitle: string | null }> = [];
 

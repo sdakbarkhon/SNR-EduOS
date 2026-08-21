@@ -39,7 +39,6 @@ export function kindLabel(kind: StudentGradeItem["kind"], d: Dictionary): string
     case "test": return d.homework.typeTest;
     case "programming": return d.homework.typeProgramming;
     case "code_completion": return d.homework.typeCodeCompletion;
-    case "classwork": return d.classwork.title;
     case "project": return d.projects.badge;
     case "quiz": return d.lesson.quiz.kindQuiz;
     case "kahoot": return d.lesson.quiz.kindKahoot;
@@ -50,7 +49,6 @@ export function kindLabel(kind: StudentGradeItem["kind"], d: Dictionary): string
 }
 
 export const KIND_BADGE: Record<StudentGradeItem["kind"], string> = {
-  classwork: "bg-purple-100 text-purple-700",
   test: "bg-violet-100 text-violet-700",
   programming: "bg-emerald-100 text-emerald-700",
   project: "bg-orange-100 text-orange-700",
