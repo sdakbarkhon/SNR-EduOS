@@ -36,7 +36,9 @@ export type JournalAction =
   | "admin.reset_password"
   | "self.google_email"
   | "self.password"
-  | "access.denied";
+  | "access.denied"
+  /** Вход в школу на просмотр (миграция 221). */
+  | "school.visit";
 
 export type JournalOutcome = "started" | "done" | "failed" | "denied";
 
@@ -168,6 +170,41 @@ export async function withJournal<T>(
       details: { ...(entry.details ?? {}), reason: текстОшибки(e).slice(0, 300) },
     }).catch(() => null);
     throw e;
+  }
+}
+
+/**
+ * Вход суперадмина в школу на просмотр.
+ *
+ * ЕДИНСТВЕННОЕ ДЕЙСТВИЕ, КОТОРОЕ НЕ ОТМЕНЯЕТСЯ ИЗ-ЗА ЖУРНАЛА, и это осознанно.
+ * Правило «не легло — не выполняем» защищает от бесследных ИЗМЕНЕНИЙ; здесь же
+ * человек ничего не меняет, а только смотрит. Запереть просмотр из-за того, что
+ * не записалась строка, значило бы поменять работающий надзор на молчаливый
+ * журнал — обмен не в нашу пользу.
+ *
+ * До применения миграции 221 вид действия 'school.visit' проверке в таблице
+ * незнаком, и запись отобьётся ПОНЯТНОЙ ошибкой (superadmin_journal_action_check),
+ * а не тихо. Мы её ловим, пишем в лог и пускаем человека смотреть.
+ */
+export async function journalSchoolVisit(
+  actor: { id: string; name: string },
+  school: { id: string; name: string | null },
+): Promise<void> {
+  try {
+    await journalWrite({
+      action: "school.visit",
+      outcome: "started",
+      actorUserId: actor.id,
+      actorName: actor.name,
+      targetType: "school",
+      targetId: school.id,
+      targetName: school.name,
+    });
+  } catch (e) {
+    console.warn(
+      "[journal] вход в школу не записан (миграция 221 ещё не применена?): " +
+      (текстОшибки(e) || "неизвестно") + ". Просмотр при этом разрешён.",
+    );
   }
 }
 

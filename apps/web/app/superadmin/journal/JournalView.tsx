@@ -25,7 +25,7 @@ export type JournalRow = {
 const ACTIONS = [
   "school.create", "school.update", "school.archive", "school.delete",
   "admin.create", "admin.update", "admin.delete", "admin.reset_password",
-  "self.google_email", "self.password", "access.denied",
+  "self.google_email", "self.password", "access.denied", "school.visit",
 ] as const;
 
 /**
@@ -72,6 +72,7 @@ export function JournalView({
     "self.google_email": t.jActSelfGoogleEmail,
     "self.password": t.jActSelfPassword,
     "access.denied": t.jActAccessDenied,
+    "school.visit": t.jActSchoolVisit,
   }), [t]);
 
   const цель: Record<string, string> = useMemo(() => ({

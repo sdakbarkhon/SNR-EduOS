@@ -15,8 +15,9 @@ import {
   readCardFields, removeSchoolLogo, uploadSchoolLogo,
 } from "@/lib/school-card";
 import { changedFields, ADMIN_GUARDED_FIELDS } from "@/lib/form-patch";
-import { withJournal, journalAccessDenied } from "@/lib/superadmin-journal";
+import { withJournal, journalAccessDenied, journalSchoolVisit } from "@/lib/superadmin-journal";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 /**
  * Кто перед нами — и единственное место, где отказ по роли попадает в журнал.
@@ -254,6 +255,26 @@ export async function actionDeleteSchoolForever(
   revalidatePath("/superadmin/schools");
   revalidatePath("/superadmin/dashboard");
   return result;
+}
+
+/**
+ * Войти в школу на просмотр.
+ *
+ * ЧТО ЭТО ДЕЛАЕТ И ЧЕГО НЕ ДЕЛАЕТ. Записывает вход в журнал и переводит на
+ * экраны просмотра. Никаких прав человеку не выдаёт и ничего в базе не
+ * меняет: «где я сейчас» будет написано в адресе, а не в куке и не в строке
+ * какой-нибудь таблицы. Поэтому закрытая вкладка не оставляет за собой
+ * ничего, а две вкладки с разными школами не путаются между собой.
+ *
+ * ЗАПИСЬ НЕ ОТМЕНЯЕТ ВХОД — единственное отступление от правила «не легло,
+ * значит не делаем». Правило защищает от бесследных ИЗМЕНЕНИЙ, а здесь
+ * человек ничего не меняет. Запереть просмотр из-за несработавшей строки
+ * значило бы обменять работающий надзор на молчащий журнал.
+ */
+export async function actionEnterSchool(schoolId: string) {
+  const actor = await verifySuperAdmin();
+  await journalSchoolVisit(actor, { id: schoolId, name: await schoolNameFor(schoolId) });
+  redirect(`/superadmin/schools/${schoolId}/view`);
 }
 
 // ── SCHOOL ADMINS ────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Archive, ArchiveRestore, ImageOff, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, Eye, ImageOff, Pencil, Plus, Trash2, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
@@ -11,6 +11,7 @@ import {
   actionDeleteSchoolForever,
   actionSchoolWipePreview,
   actionSetSchoolArchived,
+  actionEnterSchool,
   actionUpdateSchool,
 } from "../actions";
 import { SchoolCardForm } from "./SchoolCardForm";
@@ -211,6 +212,19 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {/* ВХОД В ШКОЛУ НА ПРОСМОТР. Не ссылка, а действие:
+                            вход обязан оставить след в журнале (school.visit),
+                            а перевести человека на адрес можно и после
+                            записи. Само действие — app/superadmin/actions.ts. */}
+                        <form action={actionEnterSchool.bind(null, s.id)}>
+                          <button
+                            type="submit"
+                            title={t.svEnterBtn}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-700"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </form>
                         <button
                           onClick={() => { setFormError(null); setEditing(s); }}
                           title={t.schoolEditBtn}
