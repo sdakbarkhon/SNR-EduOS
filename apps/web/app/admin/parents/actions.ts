@@ -1,6 +1,7 @@
 "use server";
 
 import { createParent, deleteParent, updateParent, resetParentPassword } from "@/lib/admin-api";
+import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
 import { pendingCodeFor } from "@/lib/parent-sms";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -78,7 +79,10 @@ export async function actionUpdateParent(formData: FormData) {
       phone: phone || undefined,
       student_ids,
       school_id: schoolId,
-      google_email: String(formData.get("google_email") ?? ""),
+      // Почта пишется, только если её правда меняли (lib/form-patch.ts) — как
+      // у ученика, учителя и администратора. apple_email сюда не попадает
+      // вовсе: её нет на экране, а значит и трогать её нечем.
+      ...changedFields(formData, GOOGLE_EMAIL_FIELDS),
     },
     schoolId,
     isSuperAdmin,

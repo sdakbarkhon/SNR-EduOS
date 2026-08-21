@@ -7,6 +7,7 @@ import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
+import { origName } from "@/lib/form-patch";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
@@ -94,8 +95,17 @@ type Teacher = {
   user_id: string | null;
   full_name: string;
   username: string | null;
-  /** Почта Google для входа (миграция 213). */
-  googleEmail?: string | null;
+  /**
+   * Почта Google для входа (миграция 213).
+   *
+   * 20.08.2026 — БЫЛО googleEmail, ровно та же беда, что на экране учеников и
+   * что была у администраторов (коммит 6b57543). Страница отдаёт строку как
+   * есть из базы, там колонка google_email; тип здесь написан руками, и
+   * camelCase давал вечный undefined: поле рисовалось пустым, а сохранение
+   * писало пустоту поверх настоящей почты, отвязывая учителю вход через
+   * Google. Компилятор молчит — тип рукописный, объект приходит переменной.
+   */
+  google_email?: string | null;
   created_at: string;
 };
 
@@ -392,7 +402,10 @@ export function TeachersView({
             >
               <Field label={t.fieldFullName}><Input name="full_name" required defaultValue={modal.teacher.full_name} /></Field>
               <Field label={t.fieldUsername}><Input name="username" required defaultValue={modal.teacher.username ?? ""} autoCapitalize="none" /></Field>
-              <GoogleEmailField defaultValue={modal.teacher.googleEmail} placeholder="anna@gmail.com" />
+              {/* Скрытое поле с исходным значением: по нему сервер отличит
+                  «не трогал» от «стёр нарочно». Разбор — lib/form-patch.ts. */}
+              <input type="hidden" name={origName("google_email")} defaultValue={modal.teacher.google_email ?? ""} />
+              <GoogleEmailField defaultValue={modal.teacher.google_email} placeholder="anna@gmail.com" />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60">

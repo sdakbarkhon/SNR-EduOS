@@ -48,8 +48,18 @@ export const SCHOOL_CARD_FIELDS = [
   "address", "phone", "email", "director_name", "website", "legal_details",
 ] as const;
 
-/** У администратора защищена одна колонка — та самая, что затиралась. */
-export const ADMIN_GUARDED_FIELDS = ["google_email"] as const;
+/**
+ * Почта Google — одна и та же колонка у администратора, ученика и учителя, и
+ * защищена она у всех троих ОДНИМ списком. Экраны разные, болезнь одна:
+ * значение не доезжало до формы, поле рисовалось пустым, а сохранение писало
+ * колонку безусловно.
+ */
+export const GOOGLE_EMAIL_FIELDS = ["google_email"] as const;
+
+/** Прежнее имя того же списка: под ним его зовёт экран суперадмина
+ *  (superadmin/actions.ts). Второго списка не заводим — это буквально та же
+ *  константа, просто её нельзя переименовать, не трогая починенный экран. */
+export const ADMIN_GUARDED_FIELDS = GOOGLE_EMAIL_FIELDS;
 
 /** Приставка скрытого поля с исходным значением. */
 export const ORIG_PREFIX = "__orig_";

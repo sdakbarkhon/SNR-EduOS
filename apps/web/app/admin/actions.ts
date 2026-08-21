@@ -13,6 +13,7 @@ import type {
   SchoolSubjectDeletionImpact, SubjectDeletionImpact, TeacherDeletionImpact,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
+import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
 import { getSubjectKeyByLabel } from "@snr/core";
 import { revalidatePath } from "next/cache";
 
@@ -60,8 +61,11 @@ export async function actionUpdateStudent(formData: FormData) {
   const username = String(formData.get("username") ?? "").trim();
   const group_id = String(formData.get("group_id") ?? "").trim();
   const old_group_id = String(formData.get("old_group_id") ?? "").trim();
-  const google_email = String(formData.get("google_email") ?? "").trim() || null;
-  await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id, google_email }, schoolId, isSuperAdmin);
+  // Почта пишется, ТОЛЬКО если её правда меняли. Разбор — lib/form-patch.ts.
+  // Раньше здесь пустая строка превращалась в null и уезжала в базу поверх
+  // заполненной почты при каждом сохранении.
+  const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
+  await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id, ...changed }, schoolId, isSuperAdmin);
   revalidatePath("/admin/students");
 }
 
@@ -100,8 +104,9 @@ export async function actionUpdateTeacher(formData: FormData) {
   const user_id = String(formData.get("user_id") ?? "");
   const full_name = String(formData.get("full_name") ?? "").trim();
   const username = String(formData.get("username") ?? "").trim();
-  const google_email = String(formData.get("google_email") ?? "").trim() || null;
-  await updateTeacher(teacher_id, user_id, { full_name, username, google_email }, schoolId, isSuperAdmin);
+  // То же, что у ученика: пишем почту, только если её правда меняли.
+  const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
+  await updateTeacher(teacher_id, user_id, { full_name, username, ...changed }, schoolId, isSuperAdmin);
   revalidatePath("/admin/teachers");
 }
 

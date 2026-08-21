@@ -6,6 +6,7 @@ import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
+import { origName } from "@/lib/form-patch";
 import { gradeFromGroupName } from "@/lib/group-grade";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
@@ -22,8 +23,26 @@ type Student = {
   user_id: string;
   full_name: string;
   username: string;
-  /** Почта Google для входа (миграция 213). */
-  googleEmail?: string | null;
+  /**
+   * Почта Google для входа (миграция 213).
+   *
+   * 20.08.2026 — БЫЛО googleEmail, И ЭТО ПОРТИЛО ДАННЫЕ. Страница отдаёт
+   * строку как есть из базы, там колонка называется google_email. Тип здесь
+   * объявлен руками, и в нём стояло camelCase — значит student.googleEmail
+   * всегда было undefined, поле в форме рисовалось пустым, а сохранение
+   * писало эту пустоту поверх настоящей почты. Каждое «Сохранить» отвязывало
+   * ученику вход через Google.
+   *
+   * TypeScript такое не ловит: тип написан вручную и компилятор верит ему на
+   * слово, а объект приходит переменной, а не литералом, поэтому проверка
+   * лишних свойств не срабатывает. Единственная защита — совпадение имён с
+   * тем, что реально приходит из базы. Остальные поля тут в snake_case ровно
+   * поэтому.
+   *
+   * Вторая половина починки — в actions.ts: запись идёт только если почту
+   * правда меняли (lib/form-patch.ts).
+   */
+  google_email?: string | null;
   created_at: string;
   student_groups: Array<{ group_id: string; groups: { id: string; name: string; subject: string } | null }>;
 };
@@ -456,7 +475,11 @@ function EditStudentModal({
         <Field label={t.fieldUsername}>
           <Input name="username" required defaultValue={student.username} autoCapitalize="none" />
         </Field>
-        <GoogleEmailField defaultValue={student.googleEmail} placeholder="alisher@gmail.com" />
+        {/* Скрытое поле с исходным значением — по нему сервер поймёт, трогали
+            почту или нет, и не станет писать колонку впустую. Разбор приёма:
+            lib/form-patch.ts. */}
+        <input type="hidden" name={origName("google_email")} defaultValue={student.google_email ?? ""} />
+        <GoogleEmailField defaultValue={student.google_email} placeholder="alisher@gmail.com" />
         <Field label={t.fieldGroup}>
           <Select name="group_id" defaultValue={currentGroupId}>
             <option value="">{t.noGroupOption}</option>

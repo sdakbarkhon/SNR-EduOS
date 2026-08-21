@@ -180,9 +180,19 @@ export async function updateStudent(
   const sb = getServiceClient();
   await assertSameSchool(sb, "students", studentId, callerSchoolId, callerIsSuperAdmin);
 
+  // google_email пишется, только если ключ ПРИСУТСТВУЕТ. Без этого условия
+  // отсутствие поля в объекте означало бы undefined → normalizeSocialEmail
+  // вернул бы null → почта затиралась бы при каждом сохранении. Вызывающий
+  // передаёт ключ лишь тогда, когда поле действительно правили
+  // (см. lib/form-patch.ts). Тот же приём, что в updateSchoolAdmin.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: Record<string, any> = { full_name: data.full_name, username: data.username };
+  if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+
   const { error } = await sb
     .from("students")
-    .update({ full_name: data.full_name, username: data.username, google_email: normalizeSocialEmail(data.google_email) })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(patch as any)
     .eq("id", studentId);
   if (error) throw error;
 
@@ -302,7 +312,13 @@ export async function updateTeacher(
   const sb = getServiceClient();
   await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
 
-  const { error } = await sb.from("teachers").update({ full_name: data.full_name, username: data.username, google_email: normalizeSocialEmail(data.google_email) }).eq("id", teacherId);
+  // Почта — только если ключ присутствует, см. пояснение в updateStudent.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: Record<string, any> = { full_name: data.full_name, username: data.username };
+  if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await sb.from("teachers").update(patch as any).eq("id", teacherId);
   if (error) throw error;
   await sb.auth.admin.updateUserById(userId, {
     email: `${data.username.trim().toLowerCase()}@teachers.snr.local`,
@@ -1386,14 +1402,31 @@ export async function updateParent(
   const sb = getServiceClient();
   await assertSameSchool(sb, "parents", parentId, callerSchoolId, callerIsSuperAdmin);
 
+  // Обе почты пишутся, ТОЛЬКО если ключ присутствует — тот же приём, что у
+  // ученика, учителя и администратора школы.
+  //
+  // 20.08.2026 — apple_email ЗАТИРАЛАСЬ ПРИ КАЖДОМ СОХРАНЕНИИ. Колонки нет ни
+  // в запросе страницы, ни в типе ParentsView, ни в форме — Apple ID убрали с
+  // экрана 18.08.2026, а строку в этом UPDATE оставили. Значит data.apple_email
+  // всегда undefined, normalizeSocialEmail превращает его в null, и любая
+  // правка ФИО стирала родителю вход через Apple. Ровно та же механика, что у
+  // почты Google в коммите 6b57543, только без единого экрана, где это можно
+  // было бы заметить.
+  //
+  // google_email здесь подставляется честно (страница переименовывает колонку
+  // явно), но запись была безусловной — теперь и она под защитой.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: Record<string, any> = {
+    full_name: data.full_name,
+    phone: data.phone || null,
+  };
+  if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+  if ("apple_email" in data) patch.apple_email = normalizeSocialEmail(data.apple_email);
+
   const { error: pErr } = await sb
     .from("parents")
-    .update({
-      full_name: data.full_name,
-      phone: data.phone || null,
-      google_email: normalizeSocialEmail(data.google_email),
-      apple_email: normalizeSocialEmail(data.apple_email),
-    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(patch as any)
     .eq("id", parentId);
   if (pErr) throw pErr;
 

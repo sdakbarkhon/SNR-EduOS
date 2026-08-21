@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { origName } from "@/lib/form-patch";
 import { AdminPhoneInput, digitsFromStored, storedFromDigits } from "@/components/admin/PhoneInput";
 import { actionParentPendingCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
 
@@ -92,6 +93,11 @@ function EditParentModal({
         fd.set("full_name", fullName.trim());
         fd.set("phone", storedFromDigits(phoneDigits));
         fd.set("google_email", googleEmail.trim());
+        // Исходное значение почты — по нему сервер отличит «не трогал» от
+        // «стёр нарочно» и не запишет колонку впустую. Здесь форма собирается
+        // руками, поэтому не скрытое поле, а просто ещё одна пара. Разбор
+        // приёма и его причина: lib/form-patch.ts.
+        fd.set(origName("google_email"), parent.googleEmail ?? "");
         selectedIds.forEach((id) => fd.append("student_ids", id));
         await actionUpdateParent(fd);
         onSaved();

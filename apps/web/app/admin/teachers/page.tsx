@@ -9,9 +9,21 @@ export default async function AdminTeachersPage({
   const { action } = await searchParams;
   const supabase = await createClient();
 
-  const { data: teachers, error: teachersError } = await supabase
+  // google_email добавлена 20.08.2026 — та же беда, что на экране учеников:
+  // колонки не было в запросе, поле почты рисовалось пустым, и сохранение
+  // писало пустоту поверх настоящей почты.
+  //
+  // Приведение к any здесь по той же причине, что на странице админов
+  // суперадмина (superadmin/admins/page.tsx): в сгенерированном
+  // packages/core/src/database.types.ts колонки google_email нет ни у одной
+  // таблицы — файл не пересобирали с миграции 213. Без приведения компилятор
+  // считает запрос ошибочным, хотя в базе колонка есть. Пересобирать типы
+  // ради одной колонки в этом заходе не стали: схему не трогаем, а диф вышел
+  // бы на весь файл.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: teachers, error: teachersError } = await (supabase as any)
     .from("teachers")
-    .select("id, user_id, full_name, username, created_at")
+    .select("id, user_id, full_name, username, google_email, created_at")
     .order("full_name");
   if (teachersError) console.error("[AdminTeachersPage] teachers query failed:", teachersError.message);
 
