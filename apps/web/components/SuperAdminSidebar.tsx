@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, School, UserCog, Settings, Coins,
+  LayoutDashboard, School, UserCog, Settings, Coins, ScrollText,
   LogOut, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
@@ -55,6 +55,7 @@ export function SuperAdminSidebar() {
     { key: "schools",   href: "/superadmin/schools",   icon: School,         label: dsa.navSchools },
     { key: "admins",    href: "/superadmin/admins",    icon: UserCog,        label: dsa.navAdmins },
     { key: "ai-costs",  href: "/superadmin/ai-costs",  icon: Coins,          label: dsa.navAiCosts },
+    { key: "journal",   href: "/superadmin/journal",   icon: ScrollText,     label: dsa.navJournal },
     { key: "settings",  href: "/superadmin/settings",  icon: Settings,       label: dsa.navSettings },
   ];
 
