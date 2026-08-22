@@ -19,7 +19,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Trophy } from "lucide-react";
-import { getDictionary, getKahootLeaderboard, gradeFromPercent } from "@snr/core";
+import { getDictionary, getKahootLeaderboard, getQuizQuestions, gradeFromPercent } from "@snr/core";
 import type { Locale, LessonStage, QuizLeaderboardEntry } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -37,13 +37,18 @@ export function QuizResultsModal({
   const db = createClient();
 
   const [rows, setRows] = useState<QuizLeaderboardEntry[]>([]);
+  // Сколько вопросов в квизе — знаменатель процента. Лидерборд его не
+  // приносит (см. тип QuizLeaderboardEntry: там только сумма баллов и число
+  // верных), поэтому берём отдельным запросом. Ровно так же считает
+  // finishKahootGame, когда выставляет настоящие оценки.
+  const [totalQuestions, setTotalQuestions] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    getKahootLeaderboard(db, stage.id)
-      .then((r) => { if (!cancelled) setRows(r); })
-      .catch(() => { if (!cancelled) setRows([]); })
+    Promise.all([getKahootLeaderboard(db, stage.id), getQuizQuestions(db, stage.id)])
+      .then(([r, qs]) => { if (!cancelled) { setRows(r); setTotalQuestions(qs.length); } })
+      .catch(() => { if (!cancelled) { setRows([]); setTotalQuestions(0); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,11 +93,21 @@ export function QuizResultsModal({
             <div className="flex flex-col gap-2">
               {rows.map((r, i) => {
                 // total_score — сумма баллов, correct_count — верных ответов.
-                // Процент считаем от максимума по группе: у quiz_attempts нет
-                // total_questions в лидерборде, а показывать «сырой» балл без
-                // шкалы учителю бесполезно.
-                const best = Math.max(...rows.map((x) => x.correct_count), 1);
-                const pct = Math.round((r.correct_count / best) * 100);
+                //
+                // 22.08.2026 — ПРОЦЕНТ СЧИТАЛСЯ ОТ ЛУЧШЕГО В ГРУППЕ, и это
+                // была ошибка, а не задумка: делили на максимум по строкам
+                // (`Math.max(...rows)`), поэтому первый в списке ВСЕГДА
+                // получал 100% и пятёрку — даже ответив верно на один вопрос
+                // из десяти, если остальные ответили хуже. А последний
+                // получал долю не от знаний, а от чужого результата.
+                // Прежняя причина («в лидерборде нет числа вопросов») снята:
+                // число вопросов запрашивается выше отдельно.
+                //
+                // Теперь знаменатель — сколько вопросов в квизе, то есть та
+                // же шкала, по которой ставится настоящая оценка.
+                const pct = totalQuestions > 0
+                  ? Math.round((r.correct_count / totalQuestions) * 100)
+                  : 0;
                 return (
                   <div
                     key={r.student_id}
@@ -104,11 +119,14 @@ export function QuizResultsModal({
                       {i === 0 ? <Trophy className="h-3.5 w-3.5" /> : i + 1}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{r.full_name}</span>
+                    {/* Знаменатель показан рядом с числом верных: без него
+                        «3 · 5» ничего не говорит, а теперь по нему видно, из
+                        скольких. Оценка справа считается от того же числа. */}
                     <span className="shrink-0 text-xs font-semibold text-slate-500">
-                      {r.correct_count} · {r.total_score}
+                      {totalQuestions > 0 ? `${r.correct_count}/${totalQuestions}` : r.correct_count} · {r.total_score}
                     </span>
                     <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-bold text-violet-700">
-                      {gradeFromPercent(pct)}
+                      {totalQuestions > 0 ? gradeFromPercent(pct) : "—"}
                     </span>
                   </div>
                 );
