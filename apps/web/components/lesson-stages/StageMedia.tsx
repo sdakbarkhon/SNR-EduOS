@@ -9,6 +9,21 @@
 // оставалась на экране у ученика. Убрано целиком, вместе с зависимостью.
 // Подключается между заголовком этапа и его содержимым в StageViewModal,
 // LessonWorkspaceView (ученик), TeacherLessonDetailView (учитель).
+//
+// 22.08.2026 — КНОПКА «ПЕРЕЗАПУСТИТЬ» ПОДКЛЮЧЕНА. До этого дня она была
+// нарисована, но обработчика не имела, и подсказка честно об этом
+// предупреждала. Подключена, а не убрана, по простой причине: это
+// единственный способ вернуться к этапу, у которого генерация не удалась.
+// Страховочного крона в проекте нет (снят 08.08), а обработчик пропускает
+// уже обработанный этап — то есть без кнопки «не сгенерилось» означало бы
+// «навсегда».
+//
+// Права. Кнопка рисуется только учителю (isTeacher), но настоящая проверка
+// не здесь: маршрут /api/stage-media/generate требует учительскую сессию и
+// спрашивает у базы teacher_can_write_lesson — то есть ведёт ли этот учитель
+// именно этот урок. Спрятанная кнопка ничего не защищает, защищает маршрут.
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ImageOff, Loader2, RotateCcw } from "lucide-react";
 
 export type StageMediaStatus = "pending" | "generated" | "failed" | null;
@@ -16,9 +31,11 @@ export type StageMediaStatus = "pending" | "generated" | "failed" | null;
 export type StageMediaProps = {
   image_url: string | null;
   media_status: StageMediaStatus;
-  /** Кнопка "Перезапустить" при failed видна только учителю. Пока без
-   *  обработчика (TODO) — по спеке backfill'а это просто заглушка кнопки. */
+  /** Кнопка «Перезапустить» при failed видна только учителю. */
   isTeacher?: boolean;
+  /** Нужен кнопке перезапуска. Без него кнопка не рисуется вовсе — дёргать
+   *  маршрут не с чем. */
+  stageId?: string;
   /** Момент постановки в очередь (миграция 168). Нужен, чтобы отличить этап,
    *  который РЕАЛЬНО генерируется прямо сейчас, от осиротевшего маркера
    *  media_status='pending' без записи в очередь — такой остался от
@@ -26,7 +43,38 @@ export type StageMediaProps = {
   media_queued_at?: string | null;
 };
 
-export function StageMedia({ image_url, media_status, isTeacher, media_queued_at }: StageMediaProps) {
+export function StageMedia({ image_url, media_status, isTeacher, stageId, media_queued_at }: StageMediaProps) {
+  const router = useRouter();
+  const [running, setRunning] = useState(false);
+  const [failedAgain, setFailedAgain] = useState(false);
+
+  async function regenerate() {
+    if (!stageId || running) return;
+    setRunning(true);
+    setFailedAgain(false);
+    try {
+      const res = await fetch("/api/stage-media/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // force — иначе обработчик увидит media_status='failed' и вернёт
+        // «уже обработан», ничего не сделав.
+        body: JSON.stringify({ stageId, force: true }),
+      });
+      const answer = (await res.json().catch(() => null)) as { status?: string } | null;
+      if (!res.ok || answer?.status === "failed") {
+        setFailedAgain(true);
+        return;
+      }
+      // Данные перечитывает сервер: этап и его картинка приходят с серверного
+      // экрана, поэтому обновляем страницу, а не правим состояние руками.
+      router.refresh();
+    } catch {
+      setFailedAgain(true);
+    } finally {
+      setRunning(false);
+    }
+  }
+
   if (media_status === "pending") {
     // Осиротевший маркер: статус pending, но в очередь этап так и не попал.
     // Такой остался в демо-школе от прерванного backfill'а (этап
@@ -49,16 +97,18 @@ export function StageMedia({ image_url, media_status, isTeacher, media_queued_at
       <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
         <span className="flex items-center gap-2">
           <ImageOff className="h-4 w-4 shrink-0" />
-          Изображение не сгенерилось
+          {failedAgain ? "Снова не получилось" : "Изображение не сгенерилось"}
         </span>
-        {isTeacher && (
+        {isTeacher && stageId && (
           <button
             type="button"
-            title="Перезапуск генерации медиа пока не подключён"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            onClick={regenerate}
+            disabled={running}
+            title="Сгенерировать изображение заново"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Перезапустить
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            {running ? "Генерирую..." : "Перезапустить"}
           </button>
         )}
       </div>

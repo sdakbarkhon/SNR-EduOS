@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
 import { getGroupPerformance, groupPerformancePromptSection } from "@/lib/ai/group-performance";
@@ -8,6 +7,7 @@ import { getMySchoolNow } from "@/lib/school-time-server";
 import { getSubjectKeyByLabel } from "@snr/core";
 import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
+import { uploadImageAndSign } from "@/lib/ai/stage-media-prompts";
 import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
 import { schoolStoragePath } from "@snr/core";
 
@@ -483,30 +483,28 @@ export async function POST(req: NextRequest) {
   }
 
   if (slideTasks.length > 0) {
-    let admin: ReturnType<typeof createAdminClient> | null = null;
-    try { admin = createAdminClient(); } catch { admin = null; }
-
-    if (admin) {
-      const adminClient = admin;
-      await Promise.all(
-        slideTasks.map(async (slide, idx) => {
-          try {
-            const base64 = await generateSlideImage(slide.image_prompt!);
-            if (!base64) return;
-            const buffer = Buffer.from(base64, "base64");
-            const filename = schoolStoragePath(lessonSchoolId, body.lesson_id, `${Date.now()}-${idx}.png`);
-            const { error: upErr } = await adminClient.storage
-              .from("slide-images")
-              .upload(filename, buffer, { contentType: "image/png", upsert: false });
-            if (upErr) { console.warn("[ai-generate] slide upload failed:", upErr.message); return; }
-            const { data: pub } = adminClient.storage.from("slide-images").getPublicUrl(filename);
-            if (pub?.publicUrl) slide.image_url = pub.publicUrl;
-          } catch (e) {
-            console.warn("[ai-generate] slide image error:", (e as Error)?.message);
-          }
-        }),
-      );
-    }
+    // Служебный клиент здесь больше не заводится: его заводит внутри себя
+    // общая функция загрузки с подписью (lib/ai/stage-media-prompts).
+    await Promise.all(
+      slideTasks.map(async (slide, idx) => {
+        try {
+          const base64 = await generateSlideImage(slide.image_prompt!);
+          if (!base64) return;
+          const buffer = Buffer.from(base64, "base64");
+          const filename = schoolStoragePath(lessonSchoolId, body.lesson_id, `${Date.now()}-${idx}.png`);
+          // 22.08.2026 — ССЫЛКА БЫЛА ПУБЛИЧНОЙ, А БАКЕТ ЗАКРЫТ С 13.08.
+          // Здесь стоял getPublicUrl, а миграция 195 сделала slide-images
+          // приватным: адрес вида /object/public/… отдаёт «Bucket not
+          // found». Картинка честно рисовалась и загружалась, а на экране
+          // было пусто — проверено живьём на обеих сохранённых ссылках.
+          // Теперь тот же способ, что у картинки этапа: подписанная ссылка
+          // на десять лет, общая функция на обе картинки.
+          slide.image_url = await uploadImageAndSign("slide-images", filename, buffer, { upsert: false });
+        } catch (e) {
+          console.warn("[ai-generate] slide image error:", (e as Error)?.message);
+        }
+      }),
+    );
   }
 
   return NextResponse.json({ ...result, external: EXTERNAL });

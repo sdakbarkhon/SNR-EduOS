@@ -54,7 +54,11 @@ async function isAuthorized(req: NextRequest, stageId: string): Promise<boolean>
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as { stageId?: string } | null;
+  // 22.08.2026 — force: заход по кнопке «Перезапустить» у учителя. Без него
+  // обработчик пропускает уже обработанный этап, а кнопка показывается ровно
+  // на таком — и потому была бы пустышкой. Проверка прав от флага не зависит:
+  // она выше и одна на оба случая — учитель и именно своего урока.
+  const body = (await req.json().catch(() => null)) as { stageId?: string; force?: boolean } | null;
   if (!body?.stageId) {
     return NextResponse.json({ error: "Missing stageId" }, { status: 400 });
   }
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const admin = createAdminClient();
-    const result = await processStageMediaForStage(admin, body.stageId);
+    const result = await processStageMediaForStage(admin, body.stageId, { force: body.force === true });
     return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ error: (e as Error)?.message ?? String(e) }, { status: 500 });

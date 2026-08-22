@@ -1,8 +1,15 @@
 // K.2, 05.08.2026 — общая логика обработки ОДНОГО этапа (в отличие от
 // stage-media-prompts.ts, где живут только сами Gemini-примитивы). Решает,
-// нужна ли этапу картинка (только Programming/Robotics — остальные
-// предметы молча помечаются media_status='generated' и пропускаются),
-// генерирует, пишет в lesson_stages.
+// нужна ли этапу картинка, генерирует, пишет в lesson_stages.
+//
+// 22.08.2026 — ОГРАНИЧЕНИЕ ПО ПРЕДМЕТУ СНЯТО ЦЕЛИКОМ. Здесь стоял список из
+// двух названий («Программирование», «Робототехника»), и этап любого другого
+// предмета молча помечался обработанным без единой попытки. По живым данным
+// это было 304 презентации из 408: русский, английский и математика не
+// получали картинок никогда, и внешне это не отличалось от успеха. Заодно
+// ушла сама сверка по НАЗВАНИЮ предмета: она ломалась от переименования
+// предмета в справочнике. Название предмета по-прежнему читается — но только
+// затем, чтобы передать его модели в описание картинки.
 //
 // Используется в двух местах — /api/stage-media/generate (одиночный вызов
 // сразу после создания этапа) и /api/cron/stage-media-backfill (safety-net
@@ -18,13 +25,8 @@
 import { decideStageMedia, generateStageImage, uploadStageImageToStorage } from "./stage-media-prompts";
 import { AI_FALLBACK_GRADE, gradeFromGroupName } from "@/lib/group-grade";
 
-// Те же 2 строки, что backfill-stage-media-jul29-aug1.mjs::SUBJECT_NAMES —
-// subjects.name (RU), НЕ groups.subject (захардкоженная placeholder-
-// константа 'programming' для всех групп, миграция 97 full reset).
-const IN_SCOPE_SUBJECTS = ["Программирование", "Робототехника"];
-
 export type ProcessStageMediaResult =
-  | { status: "skipped"; reason: "stage_not_found" | "lesson_not_found" | "already_processed" | "subject_not_in_scope" }
+  | { status: "skipped"; reason: "stage_not_found" | "lesson_not_found" | "already_processed" }
   | { status: "generated"; hadImage: boolean }
   | { status: "failed"; error: string };
 
@@ -35,6 +37,11 @@ export async function processStageMediaForStage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   stageId: string,
+  /** force — заход по кнопке «Перезапустить» у учителя. Обычный вызов
+   *  пропускает уже обработанный этап (иначе повторное создание этапа
+   *  перерисовывало бы картинку и тратило деньги), а кнопка ровно за тем и
+   *  нужна, чтобы пройти этап заново. */
+  opts?: { force?: boolean },
 ): Promise<ProcessStageMediaResult> {
   const { data: stage, error: stageErr } = await db
     .from("lesson_stages")
@@ -43,7 +50,7 @@ export async function processStageMediaForStage(
     .maybeSingle();
   if (stageErr || !stage) return { status: "skipped", reason: "stage_not_found" };
 
-  if (stage.media_status === "generated" || stage.media_status === "failed") {
+  if (!opts?.force && (stage.media_status === "generated" || stage.media_status === "failed")) {
     return { status: "skipped", reason: "already_processed" };
   }
 
@@ -73,14 +80,6 @@ export async function processStageMediaForStage(
     subjectName = subjectRow?.name ?? null;
   }
 
-  if (!subjectName || !IN_SCOPE_SUBJECTS.includes(subjectName)) {
-    // Помечаем 'generated' (не 'pending'/'failed') — семантика та же, что
-    // backfill: "решение принято (без медиа)", просто причина — предмет вне
-    // скоупа, а не decideStageMedia() вернувший false/false.
-    await db.from("lesson_stages").update({ media_status: "generated" }).eq("id", stageId);
-    return { status: "skipped", reason: "subject_not_in_scope" };
-  }
-
   const grade = gradeFromGroupName(lesson.group?.name) ?? AI_FALLBACK_GRADE;
 
   // Ревью K.2: атомарный claim — UPDATE условен на ТОМ ЖЕ media_status, что
@@ -105,10 +104,19 @@ export async function processStageMediaForStage(
 
   const decision = await decideStageMedia(
     { title: stage.title, description: stage.description, content_type: stage.content_type },
-    { subject: subjectName, grade, lesson_title: lesson.title },
+    // Предмет мог не проставиться у урока вовсе — раньше такой этап
+    // отсекался вместе со «списком разрешённых предметов», теперь он идёт в
+    // работу. Модели в этом случае честно сообщаем прочерк: тема этапа и
+    // название урока у неё всё равно есть, и решение она примет по ним.
+    { subject: subjectName ?? "—", grade, lesson_title: lesson.title },
   );
 
-  let errorText: string | null = null;
+  // 22.08.2026 — сбой решения больше не притворяется ответом «не нужна».
+  // Модель могла не ответить за все три попытки; раньше это выглядело точно
+  // так же, как честное «картинка не нужна», и этап помечался обработанным с
+  // пустым полем ошибки. Отличить одно от другого было нечем — потому у всех
+  // строк в базе media_error и пуст.
+  let errorText: string | null = decision.error ?? null;
   let hadImage = false;
 
   if (decision.need_image && decision.image_prompt) {

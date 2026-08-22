@@ -43,6 +43,7 @@ import { GoogleGenerativeAI, GoogleGenerativeAIFetchError } from "@google/genera
 import { createClient } from "@supabase/supabase-js";
 import { generateLessonContent, type LessonContent, type LessonFormat } from "../lib/ai/generate-lesson-content";
 import { generateSlideImage } from "../lib/ai-imagen";
+import { uploadImageAndSign } from "../lib/ai/stage-media-prompts";
 
 // ── env + clients (service-role) ────────────────────────────────────────
 function loadEnvFallback(): Record<string, string> {
@@ -216,16 +217,18 @@ async function resolveImagePlaceholders(
         if (!base64) { imagesFailed++; continue; }
         const buffer = Buffer.from(base64, "base64");
         const filename = `${lessonId}/${Date.now()}-${callCount}.png`;
-        const { error: upErr } = await db.storage
-          .from("slide-images")
-          .upload(filename, buffer, { contentType: "image/png", upsert: false });
-        if (upErr) { console.warn(`  !! slide image upload failed: ${upErr.message}`); imagesFailed++; continue; }
-        const { data: pub } = db.storage.from("slide-images").getPublicUrl(filename);
-        if (pub?.publicUrl) {
-          content = content.replace(m[0], `![${description}](${pub.publicUrl})`);
+        // 22.08.2026 — здесь тоже стоял публичный адрес закрытого бакета
+        // (второе такое место в проекте, первое — /api/ai/generate-stages).
+        // Скрипт разовый, но при следующем запуске он насыпал бы новых битых
+        // ссылок. Способ теперь общий, тот же что у картинки этапа.
+        try {
+          const signedUrl = await uploadImageAndSign("slide-images", filename, buffer, { upsert: false });
+          content = content.replace(m[0], `![${description}](${signedUrl})`);
           imagesGenerated++;
-        } else {
+        } catch (upErr) {
+          console.warn(`  !! slide image upload failed: ${(upErr as Error)?.message}`);
           imagesFailed++;
+          continue;
         }
       } catch (e) {
         console.warn(`  !! image generation error for "${description}": ${(e as Error)?.message}`);

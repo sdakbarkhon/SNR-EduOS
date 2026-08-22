@@ -16,6 +16,16 @@ import { schoolStoragePath } from "@snr/core";
 export type StageMediaDecision = {
   need_image: boolean;
   image_prompt: string | null;
+  /** Заполнено, только если решение НЕ получено: модель не ответила за все
+   *  попытки. Пустое поле означает «модель ответила», в том числе ответила
+   *  «картинка не нужна».
+   *
+   *  22.08.2026, ЗАЧЕМ ЭТО ПОЛЕ. Раньше сбой и честное «не нужна» выглядели
+   *  одинаково — обе ветки возвращали need_image: false, и вызывающий помечал
+   *  этап обработанным. Отличить «не получилось» от «не потребовалось» было
+   *  нечем: поле ошибки у всех этапов пустое. Теперь причина доходит до
+   *  вызывающего и попадает в media_error. */
+  error?: string | null;
 };
 
 // 08.08.2026 — картинка ставится ТОЛЬКО на этапы-объяснения. Раньше решение
@@ -86,23 +96,49 @@ export async function decideStageMedia(
 Верни ТОЛЬКО JSON без markdown, ровно такой формы (пустая строка "" вместо null, если need_image — false):
 { "need_image": boolean, "image_prompt": "английский промпт: конкретное существительное + узнаваемые детали предмета, по требованиям выше" }`;
 
-  const { data, error } = await generateJSON<{
-    need_image?: boolean;
-    image_prompt?: string;
-  }>(prompt, null, {
-    temperature: 0.4,
-    usage: { task: AI_TASKS.stageImage },
-  });
+  // 22.08.2026 — ПОВТОРЫ. Раньше одного неудачного ответа хватало, чтобы этап
+  // остался без картинки навсегда: ветка возвращала «не нужна», вызывающий
+  // помечал этап обработанным, и второго захода не случалось никогда —
+  // страховочный крон снят в августе. Теперь тот же приём, что уже работает
+  // у самой генерации картинки ниже: три попытки, паузы 2 и 4 секунды.
+  //
+  // Своего повтора на сетевые сбои и перегрузку модели здесь заводить не
+  // нужно — generateJSON внутри уже повторяет на 429 и 5xx
+  // (gemini-client::withRetry). Этот слой ловит то, что тот слой пропускает:
+  // ответ пришёл, но разобрать его не удалось.
+  let lastError = "decideStageMedia failed";
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const { data, error } = await generateJSON<{
+      need_image?: boolean;
+      image_prompt?: string;
+    }>(prompt, null, {
+      temperature: 0.4,
+      usage: { task: AI_TASKS.stageImage },
+    });
 
-  if (error || !data) {
-    console.warn("[stage-media-prompts] decideStageMedia failed, defaulting to no media:", error);
-    return { need_image: false, image_prompt: null };
+    if (data && !error) {
+      return {
+        need_image: data.need_image === true && !!data.image_prompt?.trim(),
+        image_prompt: data.image_prompt?.trim() || null,
+        error: null,
+      };
+    }
+
+    lastError = error || "пустой ответ модели";
+    if (attempt < MAX_RETRIES - 1) {
+      const delay = IMAGE_BASE_DELAY_MS * 2 ** attempt; // 2 с, 4 с
+      console.warn(
+        `[stage-media-prompts] decideStageMedia попытка ${attempt + 1}/${MAX_RETRIES} не удалась, повтор через ${delay} мс:`,
+        lastError,
+      );
+      await sleep(delay);
+    }
   }
 
-  return {
-    need_image: data.need_image === true && !!data.image_prompt?.trim(),
-    image_prompt: data.image_prompt?.trim() || null,
-  };
+  // Все попытки исчерпаны. Картинку не заказываем — но и молчать больше не
+  // будем: причина уходит наверх и попадёт в media_error.
+  console.warn("[stage-media-prompts] decideStageMedia: попытки исчерпаны:", lastError);
+  return { need_image: false, image_prompt: null, error: `decide: ${lastError}` };
 }
 
 // Спека называла "gemini-2.5-flash-image-preview" — этот id 404-ит
@@ -196,6 +232,40 @@ export async function generateStageImage(image_prompt: string): Promise<StageIma
 // требуется.
 const SIGNED_URL_TTL_SECONDS = 10 * 365 * 24 * 60 * 60; // 10 лет
 
+/**
+ * Загрузить картинку в ЗАКРЫТЫЙ бакет и вернуть подписанную ссылку.
+ *
+ * 22.08.2026 — ОБЩИЙ СПОСОБ ДЛЯ ОБЕИХ КАРТИНОК. Картинок в проекте две:
+ * одна на этап (бакет lesson-stage-images) и одна внутри слайда (бакет
+ * slide-images). Первая всегда сохранялась подписанной ссылкой и работала.
+ * Вторая брала ПУБЛИЧНЫЙ адрес — а бакет slide-images закрыт с 13.08.2026
+ * (миграция 195), и такой адрес отдаёт «Bucket not found». Файл при этом
+ * лежал в хранилище: модель отработала, деньги потрачены, на экране пусто.
+ *
+ * Теперь способ один на обе. Заводить второй нельзя: разойдутся ровно так же.
+ */
+export async function uploadImageAndSign(
+  bucket: string,
+  path: string,
+  imageBuffer: Buffer,
+  opts?: { upsert?: boolean },
+): Promise<string> {
+  const admin = createAdminClient();
+
+  const { error: upErr } = await admin.storage
+    .from(bucket)
+    .upload(path, imageBuffer, { contentType: "image/png", upsert: opts?.upsert ?? true });
+  if (upErr) throw new Error(`upload в ${bucket}: ${upErr.message}`);
+
+  const { data: signed, error: signErr } = await admin.storage
+    .from(bucket)
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (signErr || !signed?.signedUrl) {
+    throw new Error(`подпись ссылки в ${bucket}: ${signErr?.message ?? "ссылка не выдана"}`);
+  }
+  return signed.signedUrl;
+}
+
 /** uploadStageImageToStorage: загрузка в приватный bucket lesson-stage-images
  *  (миграция 165), путь `${stageId}.png`, возвращает signed URL. */
 export async function uploadStageImageToStorage(
@@ -203,21 +273,8 @@ export async function uploadStageImageToStorage(
   stageId: string,
   schoolId: string,
 ): Promise<string> {
-  const admin = createAdminClient();
   // Школа передаётся аргументом: под служебным ключом current_school_id()
   // пуст, а путь обязан начинаться со школы (миграции 188/189).
   const path = schoolStoragePath(schoolId, `${stageId}.png`);
-
-  const { error: upErr } = await admin.storage
-    .from("lesson-stage-images")
-    .upload(path, imageBuffer, { contentType: "image/png", upsert: true });
-  if (upErr) throw new Error(`uploadStageImageToStorage upload: ${upErr.message}`);
-
-  const { data: signed, error: signErr } = await admin.storage
-    .from("lesson-stage-images")
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
-  if (signErr || !signed?.signedUrl) {
-    throw new Error(`uploadStageImageToStorage sign: ${signErr?.message ?? "no signedUrl"}`);
-  }
-  return signed.signedUrl;
+  return uploadImageAndSign("lesson-stage-images", path, imageBuffer);
 }

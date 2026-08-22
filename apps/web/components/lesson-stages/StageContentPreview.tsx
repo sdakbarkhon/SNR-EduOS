@@ -152,6 +152,7 @@ export function StageContentPreview({
           media_status={(stage as { media_status?: "pending" | "generated" | "failed" | null }).media_status ?? null}
           media_queued_at={(stage as { media_queued_at?: string | null }).media_queued_at ?? null}
           isTeacher
+          stageId={stage.id}
         />
       )}
 
