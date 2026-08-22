@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           full_name: string
+          google_email: string | null
           id: string
           school_id: string
           user_id: string
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string
           full_name?: string
+          google_email?: string | null
           id?: string
           school_id?: string
           user_id: string
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           created_at?: string
           full_name?: string
+          google_email?: string | null
           id?: string
           school_id?: string
           user_id?: string
@@ -54,7 +57,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
-          lesson_id: string
+          lesson_id: string | null
           role: string
           school_id: string
           stage_id: string | null
@@ -65,7 +68,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
-          lesson_id: string
+          lesson_id?: string | null
           role: string
           school_id?: string
           stage_id?: string | null
@@ -76,7 +79,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
-          lesson_id?: string
+          lesson_id?: string | null
           role?: string
           school_id?: string
           stage_id?: string | null
@@ -142,6 +145,76 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: true
             referencedRelation: "homework_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_events: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error_reason: string | null
+          id: string
+          input_tokens: number | null
+          model: string
+          ok: boolean
+          output_tokens: number | null
+          school_id: string | null
+          student_id: string | null
+          task: string
+          teacher_id: string | null
+          total_tokens: number | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error_reason?: string | null
+          id?: string
+          input_tokens?: number | null
+          model: string
+          ok: boolean
+          output_tokens?: number | null
+          school_id?: string | null
+          student_id?: string | null
+          task: string
+          teacher_id?: string | null
+          total_tokens?: number | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error_reason?: string | null
+          id?: string
+          input_tokens?: number | null
+          model?: string
+          ok?: boolean
+          output_tokens?: number | null
+          school_id?: string | null
+          student_id?: string | null
+          task?: string
+          teacher_id?: string | null
+          total_tokens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_events_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_events_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_events_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
         ]
@@ -266,6 +339,7 @@ export type Database = {
           target_student_id: string | null
           title: string
           valid_until: string | null
+          admin_name: string | null
         }
         Insert: {
           admin_id?: string | null
@@ -1078,33 +1152,48 @@ export type Database = {
       curriculum_plans: {
         Row: {
           created_at: string
+          error_message: string | null
           group_id: string
           id: string
+          progress_percent: number
+          progress_stage: string | null
           school_id: string
+          source_book_id: string | null
           source_file_type: string | null
           source_file_url: string | null
+          status: string
           subject_id: string
           teacher_id: string
           title: string
         }
         Insert: {
           created_at?: string
+          error_message?: string | null
           group_id: string
           id?: string
+          progress_percent?: number
+          progress_stage?: string | null
           school_id?: string
+          source_book_id?: string | null
           source_file_type?: string | null
           source_file_url?: string | null
+          status?: string
           subject_id: string
           teacher_id: string
           title: string
         }
         Update: {
           created_at?: string
+          error_message?: string | null
           group_id?: string
           id?: string
+          progress_percent?: number
+          progress_stage?: string | null
           school_id?: string
+          source_book_id?: string | null
           source_file_type?: string | null
           source_file_url?: string | null
+          status?: string
           subject_id?: string
           teacher_id?: string
           title?: string
@@ -1122,6 +1211,13 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "curriculum_plans_source_book_id_fkey"
+            columns: ["source_book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
             referencedColumns: ["id"]
           },
           {
@@ -1165,6 +1261,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "daily_facts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demo_baseline: {
+        Row: {
+          entity_id: string
+          entity_type: string
+          school_id: string
+          taken_at: string
+        }
+        Insert: {
+          entity_id: string
+          entity_type: string
+          school_id: string
+          taken_at?: string
+        }
+        Update: {
+          entity_id?: string
+          entity_type?: string
+          school_id?: string
+          taken_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_baseline_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -1413,6 +1538,7 @@ export type Database = {
           attachment_source_url: string | null
           attachment_storage_path: string | null
           attachments: Json
+          code_completion_data: Json | null
           content_type: string
           created_at: string
           description: string | null
@@ -1446,6 +1572,7 @@ export type Database = {
           attachment_source_url?: string | null
           attachment_storage_path?: string | null
           attachments?: Json
+          code_completion_data?: Json | null
           content_type?: string
           created_at?: string
           description?: string | null
@@ -1479,6 +1606,7 @@ export type Database = {
           attachment_source_url?: string | null
           attachment_storage_path?: string | null
           attachments?: Json
+          code_completion_data?: Json | null
           content_type?: string
           created_at?: string
           description?: string | null
@@ -1549,6 +1677,7 @@ export type Database = {
           ai_review_status: string | null
           ai_reviewed_at: string | null
           answer_text: string | null
+          code_completion_answers: Json | null
           code_text: string | null
           file_original_name: string | null
           file_size_bytes: number | null
@@ -1573,6 +1702,7 @@ export type Database = {
           ai_review_status?: string | null
           ai_reviewed_at?: string | null
           answer_text?: string | null
+          code_completion_answers?: Json | null
           code_text?: string | null
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -1597,6 +1727,7 @@ export type Database = {
           ai_review_status?: string | null
           ai_reviewed_at?: string | null
           answer_text?: string | null
+          code_completion_answers?: Json | null
           code_text?: string | null
           file_original_name?: string | null
           file_size_bytes?: number | null
@@ -2241,10 +2372,16 @@ export type Database = {
           duration_min: number | null
           expected_output: string | null
           id: string
+          image_url: string | null
           is_completed: boolean
           is_live_active: boolean | null
           lesson_id: string
           live_code: string | null
+          media_error: string | null
+          media_queued_at: string | null
+          media_source: string | null
+          media_status: string | null
+          mermaid_code: string | null
           position: number
           programming_language: string | null
           school_id: string
@@ -2267,10 +2404,16 @@ export type Database = {
           duration_min?: number | null
           expected_output?: string | null
           id?: string
+          image_url?: string | null
           is_completed?: boolean
           is_live_active?: boolean | null
           lesson_id: string
           live_code?: string | null
+          media_error?: string | null
+          media_queued_at?: string | null
+          media_source?: string | null
+          media_status?: string | null
+          mermaid_code?: string | null
           position: number
           programming_language?: string | null
           school_id?: string
@@ -2293,10 +2436,16 @@ export type Database = {
           duration_min?: number | null
           expected_output?: string | null
           id?: string
+          image_url?: string | null
           is_completed?: boolean
           is_live_active?: boolean | null
           lesson_id?: string
           live_code?: string | null
+          media_error?: string | null
+          media_queued_at?: string | null
+          media_source?: string | null
+          media_status?: string | null
+          mermaid_code?: string | null
           position?: number
           programming_language?: string | null
           school_id?: string
@@ -2659,6 +2808,39 @@ export type Database = {
           },
         ]
       }
+      parent_phone_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          code_plain: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+          used_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          code_plain?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone: string
+          used_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          code_plain?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       parent_students: {
         Row: {
           created_at: string
@@ -2704,29 +2886,35 @@ export type Database = {
       }
       parents: {
         Row: {
+          apple_email: string | null
           created_at: string
           created_by: string | null
           full_name: string
+          google_email: string | null
           id: string
-          phone: string | null
+          phone: string
           school_id: string
           user_id: string | null
         }
         Insert: {
+          apple_email?: string | null
           created_at?: string
           created_by?: string | null
           full_name: string
+          google_email?: string | null
           id?: string
-          phone?: string | null
+          phone: string
           school_id?: string
           user_id?: string | null
         }
         Update: {
+          apple_email?: string | null
           created_at?: string
           created_by?: string | null
           full_name?: string
+          google_email?: string | null
           id?: string
-          phone?: string | null
+          phone?: string
           school_id?: string
           user_id?: string | null
         }
@@ -2852,6 +3040,7 @@ export type Database = {
           stage_id: string
           student_notes: string | null
           submission_id: string
+          teacher_comment: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -2861,6 +3050,7 @@ export type Database = {
           stage_id: string
           student_notes?: string | null
           submission_id: string
+          teacher_comment?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -2870,6 +3060,7 @@ export type Database = {
           stage_id?: string
           student_notes?: string | null
           submission_id?: string
+          teacher_comment?: string | null
         }
         Relationships: [
           {
@@ -3236,16 +3427,42 @@ export type Database = {
           },
         ]
       }
+      rate_limit_counters: {
+        Row: {
+          action: string
+          hits: number
+          subject: string
+          window_start: string
+        }
+        Insert: {
+          action: string
+          hits?: number
+          subject: string
+          window_start?: string
+        }
+        Update: {
+          action?: string
+          hits?: number
+          subject?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       sandbox_projects: {
         Row: {
           code: string | null
           created_at: string
           external_url: string | null
+          file_path: string | null
+          homework_id: string | null
           id: string
           is_autosave: boolean
+          lesson_stage_id: string | null
           name: string
+          origin: string
           school_id: string
           service_id: string
+          shared_with_class: boolean
           student_id: string
           updated_at: string
         }
@@ -3253,11 +3470,16 @@ export type Database = {
           code?: string | null
           created_at?: string
           external_url?: string | null
+          file_path?: string | null
+          homework_id?: string | null
           id?: string
           is_autosave?: boolean
+          lesson_stage_id?: string | null
           name?: string
+          origin?: string
           school_id?: string
           service_id: string
+          shared_with_class?: boolean
           student_id: string
           updated_at?: string
         }
@@ -3265,15 +3487,34 @@ export type Database = {
           code?: string | null
           created_at?: string
           external_url?: string | null
+          file_path?: string | null
+          homework_id?: string | null
           id?: string
           is_autosave?: boolean
+          lesson_stage_id?: string | null
           name?: string
+          origin?: string
           school_id?: string
           service_id?: string
+          shared_with_class?: boolean
           student_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sandbox_projects_homework_id_fkey"
+            columns: ["homework_id"]
+            isOneToOne: false
+            referencedRelation: "homework"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sandbox_projects_lesson_stage_id_fkey"
+            columns: ["lesson_stage_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_stages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sandbox_projects_school_id_fkey"
             columns: ["school_id"]
@@ -3290,24 +3531,133 @@ export type Database = {
           },
         ]
       }
-      schools: {
+      school_analytics_reviews: {
         Row: {
-          code: string | null
-          created_at: string
-          id: string
-          name: string
+          facts_hash: string
+          generated_at: string
+          model: string | null
+          review_text: string
+          school_id: string
         }
         Insert: {
-          code?: string | null
-          created_at?: string
-          id?: string
-          name: string
+          facts_hash: string
+          generated_at?: string
+          model?: string | null
+          review_text: string
+          school_id: string
         }
         Update: {
+          facts_hash?: string
+          generated_at?: string
+          model?: string | null
+          review_text?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_analytics_reviews_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_subjects: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string
+          id: string
+          is_active: boolean
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_subjects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schools: {
+        Row: {
+          address: string | null
+          autostart_enabled: boolean
+          code: string | null
+          created_at: string
+          director_name: string | null
+          email: string | null
+          frozen_date: string | null
+          id: string
+          is_active: boolean
+          is_demo: boolean
+          legal_details: string | null
+          logo_path: string | null
+          name: string
+          nightly_close_enabled: boolean
+          phone: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          autostart_enabled?: boolean
           code?: string | null
           created_at?: string
+          director_name?: string | null
+          email?: string | null
+          frozen_date?: string | null
           id?: string
+          is_active?: boolean
+          is_demo?: boolean
+          legal_details?: string | null
+          logo_path?: string | null
+          name: string
+          nightly_close_enabled?: boolean
+          phone?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          autostart_enabled?: boolean
+          code?: string | null
+          created_at?: string
+          director_name?: string | null
+          email?: string | null
+          frozen_date?: string | null
+          id?: string
+          is_active?: boolean
+          is_demo?: boolean
+          legal_details?: string | null
+          logo_path?: string | null
           name?: string
+          nightly_close_enabled?: boolean
+          phone?: string | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -3359,6 +3709,7 @@ export type Database = {
           created_at: string
           curator_id: string | null
           full_name: string
+          google_email: string | null
           grade: string | null
           id: string
           phone: string | null
@@ -3374,6 +3725,7 @@ export type Database = {
           created_at?: string
           curator_id?: string | null
           full_name: string
+          google_email?: string | null
           grade?: string | null
           id?: string
           phone?: string | null
@@ -3389,6 +3741,7 @@ export type Database = {
           created_at?: string
           curator_id?: string | null
           full_name?: string
+          google_email?: string | null
           grade?: string | null
           id?: string
           phone?: string | null
@@ -3416,6 +3769,7 @@ export type Database = {
       }
       subjects: {
         Row: {
+          catalog_id: string | null
           color: string
           created_at: string
           group_id: string
@@ -3429,6 +3783,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          catalog_id?: string | null
           color?: string
           created_at?: string
           group_id: string
@@ -3442,6 +3797,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          catalog_id?: string | null
           color?: string
           created_at?: string
           group_id?: string
@@ -3455,6 +3811,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subjects_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "school_subjects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subjects_group_id_fkey"
             columns: ["group_id"]
@@ -3482,22 +3845,179 @@ export type Database = {
         Row: {
           created_at: string
           full_name: string
+          google_email: string | null
           id: string
           user_id: string
         }
         Insert: {
           created_at?: string
           full_name?: string
+          google_email?: string | null
           id?: string
           user_id: string
         }
         Update: {
           created_at?: string
           full_name?: string
+          google_email?: string | null
           id?: string
           user_id?: string
         }
         Relationships: []
+      }
+      superadmin_journal: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_user_id: string | null
+          at: string
+          details: Json
+          id: number
+          outcome: string
+          ref: number | null
+          target_id: string | null
+          target_name: string | null
+          target_type: string | null
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          at?: string
+          details?: Json
+          id?: never
+          outcome: string
+          ref?: number | null
+          target_id?: string | null
+          target_name?: string | null
+          target_type?: string | null
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          at?: string
+          details?: Json
+          id?: never
+          outcome?: string
+          ref?: number | null
+          target_id?: string | null
+          target_name?: string | null
+          target_type?: string | null
+        }
+        Relationships: []
+      }
+      teacher_library_material_groups: {
+        Row: {
+          group_id: string
+          material_id: string
+          school_id: string
+        }
+        Insert: {
+          group_id: string
+          material_id: string
+          school_id?: string
+        }
+        Update: {
+          group_id?: string
+          material_id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_library_material_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_library_material_groups_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_library_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_library_material_groups_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teacher_library_materials: {
+        Row: {
+          author: string | null
+          content_type: string
+          created_at: string
+          description: string | null
+          external_url: string | null
+          file_size_bytes: number | null
+          file_type: string | null
+          id: string
+          kb_bucket: string | null
+          material_type: string | null
+          school_id: string
+          source_url: string | null
+          storage_path: string | null
+          subject_slug: string | null
+          title: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          author?: string | null
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          external_url?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
+          id?: string
+          kb_bucket?: string | null
+          material_type?: string | null
+          school_id?: string
+          source_url?: string | null
+          storage_path?: string | null
+          subject_slug?: string | null
+          title: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          author?: string | null
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          external_url?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
+          id?: string
+          kb_bucket?: string | null
+          material_type?: string | null
+          school_id?: string
+          source_url?: string | null
+          storage_path?: string | null
+          subject_slug?: string | null
+          title?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_library_materials_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_library_materials_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       teachers: {
         Row: {
@@ -3505,6 +4025,7 @@ export type Database = {
           bio: string | null
           created_at: string
           full_name: string
+          google_email: string | null
           id: string
           notification_preferences: Json | null
           phone: string | null
@@ -3518,6 +4039,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           full_name: string
+          google_email?: string | null
           id?: string
           notification_preferences?: Json | null
           phone?: string | null
@@ -3531,6 +4053,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           full_name?: string
+          google_email?: string | null
           id?: string
           notification_preferences?: Json | null
           phone?: string | null
@@ -3792,9 +4315,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      chat_parent_names: {
+        Row: {
+          full_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          full_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          full_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      admin_name: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      binary_quantize: {
+        Args: { "": string } | { "": unknown }
+        Returns: unknown
+      }
       can_manage_curriculum_plan: {
         Args: {
           p_group_id: string
@@ -3808,7 +4353,10 @@ export type Database = {
         Args: { p_group_id: string; p_school_id: string }
         Returns: boolean
       }
-      check_user_session: { Args: { p_session_id: string }; Returns: string }
+      check_user_session: {
+        Args: { p_session_id: string }
+        Returns: string
+      }
       claim_demo_slot: {
         Args: {
           p_grade_level?: number
@@ -3823,23 +4371,195 @@ export type Database = {
           username: string
         }[]
       }
-      current_admin_id: { Args: never; Returns: string }
-      current_parent_id: { Args: never; Returns: string }
-      current_school_id: { Args: never; Returns: string }
-      current_student_id: { Args: never; Returns: string }
-      current_teacher_id: { Args: never; Returns: string }
-      fn_ai_messages_today: { Args: { p_student_id: string }; Returns: number }
-      fn_auto_end_lessons: { Args: never; Returns: undefined }
-      fn_auto_start_lessons: { Args: never; Returns: undefined }
-      fn_cleanup_expired_announcements: { Args: never; Returns: undefined }
+      current_admin_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_parent_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_school_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_student_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_teacher_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      end_session: {
+        Args: { p_session_id: string }
+        Returns: string
+      }
+      enforce_max_two_parents_per_student: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_ai_messages_today: {
+        Args: { p_student_id: string }
+        Returns: number
+      }
+      fn_announce_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_auto_activate_first_stage: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_auto_end_lessons: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      fn_auto_start_lessons: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      fn_block_past_day_lesson_start: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_class_thread_id: {
+        Args: { p_group_id: string }
+        Returns: string
+      }
+      fn_classwork_grade_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_cleanup_expired_announcements: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      fn_clear_demo_on_complete: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_close_other_in_progress_lessons: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_compute_lesson_end: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_create_default_stages: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_email_is_taken: {
+        Args: { p_email: string; p_id: string; p_table: string }
+        Returns: boolean
+      }
+      fn_enqueue_homework_ai_review: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_enqueue_lesson_stage_embedding: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_enqueue_quiz_stage_embedding: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
       fn_ensure_direct_chat: {
         Args: { p_student_id: string; p_teacher_id: string }
         Returns: undefined
       }
-      fn_is_admin: { Args: { p_user_id?: string }; Returns: boolean }
+      fn_excuse_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_guard_parent_social_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_h5p_content_set_defaults: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_h5p_content_touch_updated_at: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_homework_grade_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_homework_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_homework_submission_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_is_admin: {
+        Args: { p_user_id?: string }
+        Returns: boolean
+      }
+      fn_kahoot_assert_teacher: {
+        Args: { p_stage_id: string }
+        Returns: undefined
+      }
+      fn_leave_decision_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_leave_request_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_lesson_day_index: {
+        Args: { p_lesson_id: string }
+        Returns: number
+      }
+      fn_lesson_grade_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_lesson_material_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
       fn_lesson_materials_to_kb: {
         Args: { p_lesson_id: string }
         Returns: undefined
+      }
+      fn_lesson_status_to_kb: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_lock_teacher_marks: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_login_is_taken: {
+        Args: { p_id: string; p_login: string; p_table: string }
+        Returns: boolean
+      }
+      fn_mark_stage_activated: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_my_subject_slugs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subject_slug: string
+        }[]
+      }
+      fn_no_student_self_grading: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_no_student_stage_self_grading: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
       }
       fn_notify_student_grade: {
         Args: {
@@ -3850,28 +4570,240 @@ export type Database = {
         }
         Returns: undefined
       }
-      get_ai_usage_today: { Args: never; Returns: number }
-      get_current_user_role: { Args: never; Returns: string }
+      fn_project_grade_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_protect_demo_school: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_sandbox_projects_updated_at: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_school_subjects_updated_at: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_set_homework_ai_review_pending: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_stage_grade_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_storage_path_visible: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      fn_storage_rel: {
+        Args: { p_name: string }
+        Returns: string
+      }
+      fn_subjects_updated_at: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_test_grade_notify: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      fn_validate_lesson_start: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      get_ai_usage_today: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_occupied_teacher_subjects: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           subject_slug: string
         }[]
+      }
+      get_quiz_paper: {
+        Args: { p_stage_id: string }
+        Returns: Json
+      }
+      get_test_paper: {
+        Args: { p_homework_id: string }
+        Returns: Json
+      }
+      halfvec_avg: {
+        Args: { "": number[] }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
       }
       heartbeat_demo_slot: {
         Args: { p_session_token: string }
         Returns: boolean
       }
-      increment_ai_usage: { Args: never; Returns: number }
-      is_curator_teacher: { Args: never; Returns: boolean }
-      is_my_child: { Args: { p_student_id: string }; Returns: boolean }
-      is_my_child_group: { Args: { p_group_id: string }; Returns: boolean }
-      is_my_child_lesson: { Args: { p_lesson_id: string }; Returns: boolean }
-      is_my_group: { Args: { p_group_id: string }; Returns: boolean }
-      is_my_teacher_group: { Args: { p_group_id: string }; Returns: boolean }
-      is_my_thread: { Args: { p_thread_id: string }; Returns: boolean }
-      is_subject_owner: { Args: { p_subject_id: string }; Returns: boolean }
-      is_super_admin: { Args: never; Returns: boolean }
+      hnsw_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      increment_ai_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      is_curator_teacher: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_my_child: {
+        Args: { p_student_id: string }
+        Returns: boolean
+      }
+      is_my_child_group: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
+      is_my_child_lesson: {
+        Args: { p_lesson_id: string }
+        Returns: boolean
+      }
+      is_my_group: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
+      is_my_teacher_group: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
+      is_my_thread: {
+        Args: { p_thread_id: string }
+        Returns: boolean
+      }
+      is_school_admin_of: {
+        Args: { p_school_id: string }
+        Returns: boolean
+      }
+      is_subject_owner: {
+        Args: { p_subject_id: string }
+        Returns: boolean
+      }
+      is_super_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      ivfflat_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      journal_assert_no_secrets: {
+        Args: { p_details: Json }
+        Returns: undefined
+      }
+      kahoot_finish: {
+        Args: { p_stage_id: string }
+        Returns: Json
+      }
+      kahoot_next: {
+        Args: { p_stage_id: string }
+        Returns: {
+          current_question_index: number
+          finished_at: string | null
+          id: string
+          question_started_at: string | null
+          school_id: string
+          stage_id: string
+          started_at: string | null
+          status: string
+        }
+      }
+      kahoot_open_session: {
+        Args: { p_restart?: boolean; p_stage_id: string }
+        Returns: {
+          current_question_index: number
+          finished_at: string | null
+          id: string
+          question_started_at: string | null
+          school_id: string
+          stage_id: string
+          started_at: string | null
+          status: string
+        }
+      }
+      kahoot_reveal: {
+        Args: { p_stage_id: string }
+        Returns: {
+          current_question_index: number
+          finished_at: string | null
+          id: string
+          question_started_at: string | null
+          school_id: string
+          stage_id: string
+          started_at: string | null
+          status: string
+        }
+      }
+      kahoot_start: {
+        Args: { p_stage_id: string }
+        Returns: {
+          current_question_index: number
+          finished_at: string | null
+          id: string
+          question_started_at: string | null
+          school_id: string
+          stage_id: string
+          started_at: string | null
+          status: string
+        }
+      }
+      kahoot_state: {
+        Args: { p_prefetch?: boolean; p_stage_id: string }
+        Returns: Json
+      }
+      l2_norm: {
+        Args: { "": unknown } | { "": unknown }
+        Returns: number
+      }
+      l2_normalize: {
+        Args: { "": string } | { "": unknown } | { "": unknown }
+        Returns: unknown
+      }
+      mark_edit_window: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
       match_lesson_stage_embeddings: {
         Args: { p_match_count?: number; p_query_embedding: string }
         Returns: {
@@ -3881,6 +4813,17 @@ export type Database = {
           lesson_topic: string
           similarity: number
           starts_at: string
+        }[]
+      }
+      my_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          id: string
+          ip: string
+          is_current: boolean
+          last_seen_at: string
+          user_agent: string
         }[]
       }
       notify_user_and_parents: {
@@ -3894,22 +4837,216 @@ export type Database = {
         }
         Returns: undefined
       }
-      release_demo_slot: { Args: { p_session_token: string }; Returns: boolean }
-      reset_demo_data: { Args: never; Returns: undefined }
-      sweep_expired_demo_leases: { Args: never; Returns: undefined }
+      rate_limit_hit: {
+        Args: {
+          p_action: string
+          p_limit: number
+          p_subject: string
+          p_window_seconds: number
+        }
+        Returns: Json
+      }
+      rate_limit_sweep: {
+        Args: { p_max?: number }
+        Returns: number
+      }
+      release_demo_slot: {
+        Args: { p_session_token: string }
+        Returns: boolean
+      }
+      sa_write_allowed: {
+        Args: { p_table: string }
+        Returns: boolean
+      }
+      save_quiz_answer: {
+        Args: { p_question_id: string; p_selected: number; p_stage_id: string }
+        Returns: undefined
+      }
+      school_is_active: {
+        Args: { p_school_id: string }
+        Returns: boolean
+      }
+      school_is_active_for_me: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      set_grading_meta: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      set_lesson_grade_updated_at: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      sparsevec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
+      start_quiz: {
+        Args: { p_stage_id: string }
+        Returns: {
+          correct_count: number
+          finished_at: string | null
+          id: string
+          is_finalized: boolean
+          school_id: string
+          stage_id: string
+          started_at: string
+          student_id: string
+          total_questions: number
+          total_score: number
+        }
+      }
+      start_test: {
+        Args: { p_homework_id: string }
+        Returns: {
+          grade: number | null
+          graded_at: string | null
+          graded_by: string | null
+          homework_id: string
+          id: string
+          max_score: number | null
+          school_id: string
+          score: number | null
+          started_at: string | null
+          student_id: string
+          submitted_at: string
+        }
+      }
+      submit_kahoot_answer: {
+        Args: { p_question_id: string; p_selected: number; p_stage_id: string }
+        Returns: Json
+      }
+      submit_quiz: {
+        Args: { p_stage_id: string }
+        Returns: Json
+      }
+      submit_test: {
+        Args: { p_answers: Json; p_homework_id: string }
+        Returns: {
+          grade: number | null
+          graded_at: string | null
+          graded_by: string | null
+          homework_id: string
+          id: string
+          max_score: number | null
+          school_id: string
+          score: number | null
+          started_at: string | null
+          student_id: string
+          submitted_at: string
+        }
+      }
+      superadmin_journal_write: {
+        Args: {
+          p_action: string
+          p_actor_name?: string
+          p_actor_user_id?: string
+          p_details?: Json
+          p_outcome: string
+          p_ref?: number
+          p_target_id?: string
+          p_target_name?: string
+          p_target_type?: string
+        }
+        Returns: number
+      }
+      sweep_expired_demo_leases: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       teacher_can_write_lesson: {
         Args: { p_lesson_id: string }
         Returns: boolean
       }
-      touch_user_session: { Args: never; Returns: undefined }
+      tg_add_parent_to_group_thread: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_check_login_and_email_unique: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_check_parent_email_unique: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_check_superadmin_email_unique: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_group_created: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_group_curator_changed: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_group_curator_direct_chats: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_student_group_added_direct_chats: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_student_group_chat: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_subject_teacher_chat: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      tg_subject_teacher_direct_chats: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      touch_user_session: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_thread_updated_at: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      vector_avg: {
+        Args: { "": number[] }
+        Returns: string
+      }
+      vector_dims: {
+        Args: { "": string } | { "": unknown }
+        Returns: number
+      }
+      vector_norm: {
+        Args: { "": string }
+        Returns: number
+      }
+      vector_out: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: { "": string }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
     }
     Enums: {
       announcement_category:
-        | "general"
-        | "academic"
-        | "event"
-        | "urgent"
-        | "reminder"
+        "general" | "academic" | "event" | "urgent" | "reminder"
       homework_source: "curriculum" | "teacher"
       payment_kind: "subscription" | "one_time"
       payment_status: "completed" | "pending" | "canceled"
@@ -3930,12 +5067,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3957,13 +5094,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3982,13 +5118,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4007,13 +5142,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4026,11 +5160,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

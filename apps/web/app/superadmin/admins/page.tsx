@@ -9,8 +9,10 @@ export default async function SuperAdminAdminsPage({
 }) {
   const { action } = await searchParams;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
+  // 22.08.2026 — приведение к any убрано: типы пересобраны из живой базы.
+  // Этот каст закрывал сразу две дыры — schools.is_demo/is_active и
+  // admins.google_email; в пересобранных типах есть и то и другое.
+  const sb = supabase;
 
   // Z.1, 06.08.2026 — демо-школа невидима для суперадмина (schools.is_demo,
   // миграция 170). Раньше здесь было два НЕзависимых запроса — список админов
