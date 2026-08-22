@@ -18,6 +18,27 @@ import { normalizeUzPhone } from "@snr/core";
  * провайдера он оказался бы непротестированным — а до тех пор это открытая
  * дверь, про которую все забудут. Здесь работают срок жизни, лимит попыток
  * и одноразовость.
+ *
+ * ПРАВИЛО ОТКРЫТОЙ КОПИИ (22.08.2026). Колонка `code_plain` существует
+ * потому, что провайдера нет и админ диктует код голосом: прочитать его
+ * больше неоткуда. Но раньше открытая копия ПЕРЕЖИВАЛА сам код — код
+ * протух или был использован, а его четыре цифры лежали в базе дальше, без
+ * срока. Теперь правило простое и держится в одном месте: ОТКРЫТАЯ КОПИЯ
+ * УМИРАЕТ ВМЕСТЕ С КОДОМ. Гашение кода — это ровно пять мест в этом файле, и
+ * в каждом из них рядом с `used_at` теперь стоит `code_plain: null`:
+ *   1) выдан новый код на тот же номер — прошлый гаснет;
+ *   2) при проверке оказался просроченным;
+ *   3) при проверке кончились попытки;
+ *   4) успешный вход;
+ *   5) карточка админа наткнулась на истёкший — единственный тихий случай,
+ *      когда о коде больше никто бы не вспомнил.
+ * Живой неиспользованный код открытым лежит по-прежнему: без этого админу
+ * нечего диктовать. Срок жизни у него пять минут.
+ *
+ * КОМУ ВИДНО. Таблица закрыта от браузера (правила доступа включены, политик
+ * ноль), читает её только служебный ключ через `pendingCodeFor`, а тот
+ * зовётся из одного места — действия админа, где проверяется и роль, и
+ * совпадение школы (app/admin/parents/actions.ts). Чужой код админ не увидит.
  */
 
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -62,6 +83,9 @@ function hashCode(code: string, phone: string): string {
 // родителю приходит не код, а разрешённая фраза, и продиктовать код из
 // карточки админа — единственный рабочий путь. Снимается отдельной задачей
 // после перевода в «Активный».
+//
+// 22.08.2026 — с оговоркой: открытым лежит только ЖИВОЙ код, см. «правило
+// открытой копии» в шапке файла. Запись в лог осталась как была.
 
 const ESKIZ_BASE = "https://notify.eskiz.uz/api";
 /** Разрешённые в тестовом статусе фразы. Русская — наша по умолчанию. */
@@ -264,8 +288,9 @@ export async function issueParentCode(
   if (!parent) return { ok: false, error: "not_found" };
 
   // Прошлые коды этого номера гасим: одновременно живым может быть один.
+  // Вместе с кодом гасится и его открытая копия — см. правило в шапке файла.
   await anySb.from("parent_phone_codes")
-    .update({ used_at: new Date().toISOString() })
+    .update({ used_at: new Date().toISOString(), code_plain: null })
     .eq("phone", phone).is("used_at", null);
 
   const code = String(randomInt(0, 10000)).padStart(4, "0");
@@ -327,11 +352,13 @@ export async function verifyParentCode(rawPhone: string, code: string): Promise<
   if (!row) return { ok: false, error: "no_code" };
 
   if (Date.parse(row.expires_at as string) < Date.now()) {
-    await anySb.from("parent_phone_codes").update({ used_at: new Date().toISOString() }).eq("id", row.id);
+    await anySb.from("parent_phone_codes")
+      .update({ used_at: new Date().toISOString(), code_plain: null }).eq("id", row.id);
     return { ok: false, error: "expired" };
   }
   if ((row.attempts as number) >= MAX_ATTEMPTS) {
-    await anySb.from("parent_phone_codes").update({ used_at: new Date().toISOString() }).eq("id", row.id);
+    await anySb.from("parent_phone_codes")
+      .update({ used_at: new Date().toISOString(), code_plain: null }).eq("id", row.id);
     return { ok: false, error: "too_many" };
   }
 
@@ -343,7 +370,8 @@ export async function verifyParentCode(rawPhone: string, code: string): Promise<
   }
 
   // Гасим до выдачи сессии: код одноразовый даже если вход дальше не удастся.
-  await anySb.from("parent_phone_codes").update({ used_at: new Date().toISOString() }).eq("id", row.id);
+  await anySb.from("parent_phone_codes")
+    .update({ used_at: new Date().toISOString(), code_plain: null }).eq("id", row.id);
 
   const { data: parent } = await anySb
     .from("parents").select("id, user_id").eq("phone", phone).maybeSingle();
@@ -358,10 +386,18 @@ export async function pendingCodeFor(phone: string): Promise<{ code: string; exp
   const sb = serviceClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (sb as any)
-    .from("parent_phone_codes").select("code_plain, expires_at")
+    .from("parent_phone_codes").select("id, code_plain, expires_at")
     .eq("phone", canonical).is("used_at", null)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!data?.code_plain) return null;
-  if (Date.parse(data.expires_at as string) < Date.now()) return null;
+  if (Date.parse(data.expires_at as string) < Date.now()) {
+    // Пятый случай смерти кода, и единственный тихий: код истёк сам, его
+    // никто не проверял и нового не просил. Раньше такая строка так и лежала
+    // с открытой копией, потому что момента, в который её погасить, не
+    // наступало. Теперь этот момент — вот он: мы как раз о ней узнали.
+    await (sb as any).from("parent_phone_codes")
+      .update({ used_at: new Date().toISOString(), code_plain: null }).eq("id", data.id);
+    return null;
+  }
   return { code: data.code_plain as string, expiresAt: data.expires_at as string };
 }
