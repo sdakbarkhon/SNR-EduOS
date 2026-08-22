@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, Settings,
   LogOut, PanelLeftClose, PanelLeftOpen, Megaphone, Library, Heart, MessagesSquare,
-  Layers, ClipboardCheck, BarChart3,
+  Layers, ClipboardCheck, BarChart3, Sparkles,
 } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -66,6 +66,9 @@ export function AdminSidebar() {
     { key: "parents",        href: "/admin/parents",        icon: Heart,      label: da.navParents },
     { key: "profile",        href: "/admin/profile",        icon: Settings,   label: da.navProfile },
     { key: "chats",          href: "/admin/chats",          icon: MessagesSquare, label: da.navChats },
+    // Материалы для ИИ: сколько этапов ждёт отпечатка текста и кнопка
+    // посчитать. Раньше это делалось только запросом снаружи.
+    { key: "rag",            href: "/admin/rag",            icon: Sparkles,   label: da.navRag },
   ];
 
   return (

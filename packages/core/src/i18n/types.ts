@@ -458,6 +458,20 @@ export interface Dictionary {
     navParents: string;
     navProfile: string;
     navChats: string;
+    navRag: string;
+    ragTitle: string;
+    ragSubtitle: string;
+    ragQueued: string;
+    ragIndexed: string;
+    ragStuck: string;
+    ragStuckNote: string;
+    ragRun: string;
+    ragRunning: string;
+    ragProgress: string;
+    ragDone: string;
+    ragFailed: string;
+    ragEmpty: string;
+    ragNote: string;
     navMarks: string;
     // Заход «замок 15 минут» — правка запертых оценок администратором
     marks: {

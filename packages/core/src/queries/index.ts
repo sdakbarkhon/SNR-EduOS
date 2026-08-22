@@ -3153,6 +3153,43 @@ async function addAiPresentationToGroupMaterials(
   // напр. миграционный контекст), addLessonStage не должен падать из-за этого.
 }
 
+/** Типы этапов, у которых индексируемый текст лежит НЕ в lesson_stages, а в
+ *  таблице quiz_questions. Для них разбор запускает replaceQuizQuestions —
+ *  после того, как вопросы записаны. */
+const QUIZ_CONTENT_TYPES = new Set(["quiz_qia", "quiz_kahoot"]);
+
+/**
+ * Просит сервер посчитать векторы для этапа — то, из чего помощник ИИ берёт
+ * текст материалов.
+ *
+ * ЗАЧЕМ ОТДЕЛЬНАЯ ФУНКЦИЯ. Раньше этот вызов стоял ровно в одном месте —
+ * внутри addLessonStage, то есть разбирались только НОВЫЕ этапы. Правка
+ * существующего этапа ставила его в очередь (триггер в базе реагирует на
+ * UPDATE слайдов, описания и заметок) и на этом всё заканчивалось: очередь
+ * росла, а векторы оставались старыми. На 22.08.2026 так накопилось 186
+ * этапов с устаревшим текстом. Теперь вызов зовётся из трёх мест, поэтому он
+ * вынесен сюда, а не скопирован трижды.
+ *
+ * ТОЛЬКО ИЗ БРАУЗЕРА, и это осознанное ограничение, а не недосмотр: адрес
+ * относительный, в Node его не разрешить. Скрипты наполнения пишут в
+ * lesson_stages напрямую и сюда не заходят — их очередь разбирается отдельно
+ * (apps/web/scripts/drain-rag-queue.ts).
+ *
+ * Fire-and-forget: этап уже сохранён и возвращён вызывающему, ответ сервера
+ * никого не ждёт. keepalive держит запрос живым, если вкладка сразу
+ * закрывается. Ошибка глотается намеренно — не разобрали сейчас, разберут
+ * кнопкой в админке.
+ */
+function requestStageIndexing(stageId: string): void {
+  if (!(typeof globalThis !== "undefined" && "window" in globalThis)) return;
+  fetch("/api/rag/process-stage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stageId }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 /** Добавляет middle-этап в урок. position = max(middle positions)+1 (между 1 и 9998). */
 export const addLessonStage = async (
   db: Db,
@@ -3266,17 +3303,28 @@ export const addLessonStage = async (
       keepalive: true,
     }).catch(() => {});
 
-    // 08.08.2026 — тем же приёмом разбирается очередь эмбеддингов для
-    // помощника ИИ. Раньше это делал крон /api/cron/rag-process-queue, снятый
-    // вместе с ещё двумя: бесплатный тариф Vercel даёт два крона на проект, а
-    // их было пять. Событие покрывает НОВЫЕ этапы; накопившиеся 424 записи
-    // старой очереди этим не разгребаются — это отдельная разовая задача.
-    fetch("/api/rag/process-stage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stageId: (data as LessonStage).id }),
-      keepalive: true,
-    }).catch(() => {});
+  }
+
+  // 08.08.2026 — тем же приёмом разбирается очередь эмбеддингов для помощника
+  // ИИ. Раньше это делал крон /api/cron/rag-process-queue, снятый вместе с ещё
+  // двумя: бесплатный тариф Vercel даёт два крона на проект, а их было пять.
+  //
+  // 22.08.2026 — КВИЗЫ ЗДЕСЬ ПРОПУСКАЮТСЯ, и это исправление, а не сужение.
+  // Их текст лежит в quiz_questions и записывается вызывающим кодом СЛЕДОМ,
+  // уже после возврата отсюда. Прежний безусловный вызов уходил раньше
+  // вопросов, считать ему было нечего, запись очереди он снимал — а
+  // последующая вставка вопросов ставила этап в очередь заново, и разобрать
+  // её было некому. Отсюда 128 квизов, застрявших в очереди на 22.08. Теперь
+  // разбор квиза запускает replaceQuizQuestions, когда вопросы уже на месте.
+  //
+  // ОСТАЁТСЯ ОДИН ХВОСТ, и он безобиден: ИИ создаёт этап quiz_kahoot БЕЗ
+  // вопросов (учитель вписывает их потом руками), поэтому replaceQuizQuestions
+  // для него сразу не зовётся. Такой этап полежит в очереди до первой правки
+  // вопросов — или до нажатия кнопки на /admin/rag, которая снимет его из
+  // очереди за одно движение: индексировать в нём всё равно нечего, текста
+  // без вопросов у квиза нет.
+  if (!QUIZ_CONTENT_TYPES.has(input.contentType ?? "")) {
+    requestStageIndexing((data as LessonStage).id);
   }
 
   return data as LessonStage;
@@ -3311,7 +3359,24 @@ export const updateLessonStage = async (
     .select("*")
     .single();
   if (error) throw error;
-  return updated as LessonStage;
+
+  // 22.08.2026 — ВОТ ЧЕГО ЗДЕСЬ НЕ ХВАТАЛО. Триггер в базе ставит этап в
+  // очередь на переиндексацию при правке слайдов, описания и заметок, а
+  // разбирать её было некому: вызов стоял только в addLessonStage. Правки
+  // копились с 11.08, и к 22.08 у 186 этапов вектор не совпадал с текстом —
+  // помощник отвечал бы по стёртому слайду, а это хуже молчания.
+  //
+  // Квизы пропускаем: их текст лежит в quiz_questions, и его пишет следом
+  // replaceQuizQuestions — она и запускает разбор. Модалка этапа для квиза
+  // отдаёт вопросы ВСЕГДА (TeacherLessonDetailView::handleSave, ветка isQuiz),
+  // поэтому пропуск здесь не оставляет квиз неразобранным. Два вызова подряд
+  // на один этап нам не нужны: они пошли бы к модели одновременно и второй
+  // упёрся бы в UNIQUE (lesson_stage_id, chunk_index).
+  const updatedStage = updated as LessonStage;
+  if (!QUIZ_CONTENT_TYPES.has(updatedStage.content_type ?? "")) {
+    requestStageIndexing(updatedStage.id);
+  }
+  return updatedStage;
 };
 
 /** Удаляет middle-этап. start/summary удалить нельзя (защита через .neq). */
@@ -3604,6 +3669,9 @@ export const replaceQuizQuestions = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
   await db2.from("quiz_questions").delete().eq("stage_id", stageId);
+  // Вопросы убрали совсем: индексировать нечего. Разбор отсюда НЕ зовём —
+  // триггер в базе стоит на вставке и правке вопросов, на удалении он не
+  // срабатывает, значит записи в очереди нет и разбирать нечего.
   if (questions.length === 0) return;
   const rows = questions.map((q, i) => ({
     stage_id: stageId,
@@ -3616,6 +3684,14 @@ export const replaceQuizQuestions = async (
   }));
   const { error } = await db2.from("quiz_questions").insert(rows);
   if (error) throw error;
+
+  // Текст квиза для помощника ИИ живёт здесь, а не в lesson_stages: триггер в
+  // базе ставит РОДИТЕЛЬСКИЙ этап в очередь именно на эту вставку. Значит и
+  // разбор запускается отсюда — когда вопросы уже записаны. Раньше разбор
+  // уходил из addLessonStage ДО этой вставки, считать ему было нечего, а
+  // вставка ставила этап в очередь заново и он там оставался навсегда: на
+  // 22.08.2026 в очереди висели все 128 этапов с квизами.
+  requestStageIndexing(stageId);
 };
 
 // ── QIA: student self-paced attempt ──

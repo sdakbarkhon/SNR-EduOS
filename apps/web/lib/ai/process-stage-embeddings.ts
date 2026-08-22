@@ -102,7 +102,7 @@ export async function processStageEmbeddings(
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]!;
-      const embedding = await computeEmbedding(chunk);
+      const embedding = await computeEmbedding(chunk, { schoolId: row.school_id });
       const { error: insertErr } = await ragDb.from("lesson_stage_embeddings").insert({
         lesson_stage_id: stageId,
         chunk_index: i,

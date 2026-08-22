@@ -57,7 +57,15 @@ const BACKOFF_429_MS = [3000, 10000, 30000];
  *  gemini-embedding-001 (outputDimensionality:768, MRL-усечение с
  *  нативных 3072). Ретраи: 429 → экспоненциальный backoff 3с/10с/30с
  *  (макс. 3 попытки), прочие ошибки → 1 ретрай, затем throw. */
-export async function computeEmbedding(text: string): Promise<number[]> {
+export async function computeEmbedding(
+  text: string,
+  /** Кто платит. Только для учёта расходов, на сам вектор не влияет.
+   *  22.08.2026: до этого дня вектора писались в ai_usage_events всегда без
+   *  школы, и это было терпимо — их считали редко, разовыми прогонами. Теперь
+   *  вектор считается на КАЖДОЕ сообщение ученика помощнику, и школьный отчёт
+   *  о расходах молча терял бы половину обращений. */
+  ctx?: { schoolId?: string | null; studentId?: string | null },
+): Promise<number[]> {
   const apiKey = getApiKey();
 
   const startedAt = Date.now();
@@ -92,6 +100,7 @@ export async function computeEmbedding(text: string): Promise<number[]> {
       recordAiCall({
         task: AI_TASKS.embeddings, model: EMBEDDING_MODEL, ok: true,
         usage: null, durationMs: Date.now() - startedAt,
+        schoolId: ctx?.schoolId ?? null, studentId: ctx?.studentId ?? null,
       });
       return values;
     } catch (e) {
@@ -112,6 +121,7 @@ export async function computeEmbedding(text: string): Promise<number[]> {
         recordAiCall({
           task: AI_TASKS.embeddings, model: EMBEDDING_MODEL, ok: false,
           errorReason: `timeout ${GEMINI_TIMEOUT_MS}ms`, durationMs: Date.now() - startedAt,
+          schoolId: ctx?.schoolId ?? null, studentId: ctx?.studentId ?? null,
         });
         throw new Error(`embedContent timed out after ${GEMINI_TIMEOUT_MS}ms (2 attempts)`);
       }
@@ -123,6 +133,7 @@ export async function computeEmbedding(text: string): Promise<number[]> {
       recordAiCall({
         task: AI_TASKS.embeddings, model: EMBEDDING_MODEL, ok: false,
         errorReason: (e as Error)?.message ?? "unknown", durationMs: Date.now() - startedAt,
+        schoolId: ctx?.schoolId ?? null, studentId: ctx?.studentId ?? null,
       });
       throw e;
     } finally {

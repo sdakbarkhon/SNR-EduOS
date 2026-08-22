@@ -35,11 +35,19 @@ export async function processEmbeddingQueueBatch(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   batchLimit: number,
+  /** Ограничить школой. 22.08.2026: очередь общая на всю базу, и без этого
+   *  ограничения кнопка админа одной школы считала бы этапы чужой. Данных
+   *  чужой школы он при этом не увидел бы — но и делать за неё работу не его
+   *  дело. Пусто/не передано — вся очередь; так ходит разовый скрипт
+   *  scripts/drain-rag-queue.ts, у которого школы нет и не должно быть. */
+  schoolId?: string | null,
 ): Promise<ProcessQueueBatchResult> {
-  const { data: queueRows, error: queueErr } = await db
+  let queueQuery = db
     .from("lesson_stages_embedding_queue")
     .select("lesson_stage_id, school_id, attempts")
-    .lt("attempts", QUEUE_MAX_ATTEMPTS)
+    .lt("attempts", QUEUE_MAX_ATTEMPTS);
+  if (schoolId) queueQuery = queueQuery.eq("school_id", schoolId);
+  const { data: queueRows, error: queueErr } = await queueQuery
     .order("enqueued_at", { ascending: true })
     .limit(batchLimit);
   if (queueErr) throw new Error(queueErr.message);
@@ -93,7 +101,7 @@ export async function processEmbeddingQueueBatch(
 
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i]!; // guarded by i < chunks.length
-        const embedding = await computeEmbedding(chunk);
+        const embedding = await computeEmbedding(chunk, { schoolId: row.school_id });
         const { error: insertErr } = await db.from("lesson_stage_embeddings").insert({
           lesson_stage_id: row.lesson_stage_id,
           chunk_index: i,
