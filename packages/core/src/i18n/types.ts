@@ -1058,6 +1058,7 @@ export interface Dictionary {
     parentCreatedNext: string;
     copyPhone: string;
     parentPhoneRequired: string;
+    parentChildRequired: string;
     showCodeBtn: string;
     codeLabel: string;
     codeNone: string;

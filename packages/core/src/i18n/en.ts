@@ -1048,6 +1048,7 @@ export const en: Dictionary = {
     copyPhone: "Copy the number",
     parentCreatedNext: "Until SMS is connected, find the code on this page — the round arrow next to the parent's status in the list.",
     parentPhoneRequired: "Fill in the name, the phone and pick at least one child",
+    parentChildRequired: "Pick at least one child",
     showCodeBtn: "Login code",
     codeLabel: "Active code",
     codeNone: "No code requested, or it has expired",

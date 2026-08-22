@@ -1048,6 +1048,7 @@ export const uz: Dictionary = {
     copyPhone: "Raqamdan nusxa olish",
     parentCreatedNext: "SMS ulanmaguncha kodni shu sahifada ko‘ring — ro‘yxatdagi ota-ona holati yonidagi dumaloq strelka.",
     parentPhoneRequired: "Ism, telefon va kamida bitta farzandni tanlang",
+    parentChildRequired: "Kamida bitta farzandni tanlang",
     showCodeBtn: "Kirish kodi",
     codeLabel: "Amaldagi kod",
     codeNone: "Kod so'ralmagan yoki muddati o'tgan",

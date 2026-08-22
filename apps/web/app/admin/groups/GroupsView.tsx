@@ -107,13 +107,34 @@ function GroupForm({
   onSubmit: (fd: FormData) => void;
   submitLabel: string;
 }) {
+  // ЧТО ИМЕННО ЛЕЖИТ В groups.subject. Server action пишет туда
+  // `getSubjectKeyByLabel(имя) ?? имя` — то есть слаг, если предмет есть в
+  // захардкоженной карте, и САМО НАЗВАНИЕ, если его там нет. Второй случай
+  // настоящий: школа заводит свой предмет («Схемотехника»), в карте его нет,
+  // и в колонке оказывается русское слово.
+  //
+  // 22.08.2026 — ОТСЮДА И БРАЛАСЬ ПУСТОТА. Форма сравнивала только по слагу
+  // (`getSubjectKeyByLabel(c.name) === currentSlug`), для своего предмета
+  // получала null против «Схемотехника», совпадения не находила и открывала
+  // пустое поле выбора. Затирания не было — поле обязательное, — но админ,
+  // зашедший переименовать группу, выбирал предмет заново и мог промахнуться.
+  // Теперь сравнение повторяет запись сервера буква в букву.
+  const storedFor = (name: string) => getSubjectKeyByLabel(name) ?? name;
+
   // Скрытые предметы не предлагаем; но если у редактируемой группы стоит
   // именно скрытый — оставляем его в списке, иначе сохранение молча
   // переключило бы предмет на другой.
   const currentSlug = defaultValues?.subject ?? "";
-  const options = catalog.filter(
-    (c) => c.is_active || getSubjectKeyByLabel(c.name) === currentSlug,
-  );
+  const options = catalog.filter((c) => c.is_active || storedFor(c.name) === currentSlug);
+  const matched = options.find((c) => storedFor(c.name) === currentSlug);
+
+  // Предмет группы, которого в справочнике больше нет (переименовали, завели
+  // группу до справочника). Показываем его КАК ЕСТЬ вместо пустоты — иначе
+  // админ не видит, что вообще стоит у группы. Выбрать его снова нельзя:
+  // строка неактивна и её значение пустое, а поле обязательное, поэтому
+  // сохранить, не выбрав живой предмет, браузер не даст. Молча подменить
+  // предмет тоже невозможно.
+  const orphanSubject = currentSlug && !matched ? currentSlug : null;
 
   return (
     <form
@@ -130,10 +151,10 @@ function GroupForm({
         <Select
           name="subject_catalog_id"
           required
-          defaultValue={options.find((c) => getSubjectKeyByLabel(c.name) === currentSlug)?.id ?? ""}
+          defaultValue={matched?.id ?? ""}
         >
           <option value="" disabled>
-            {catalog.length === 0 ? t.groupsNoSubjectsYet : t.selectSubjectPlaceholder}
+            {orphanSubject ?? (catalog.length === 0 ? t.groupsNoSubjectsYet : t.selectSubjectPlaceholder)}
           </option>
           {options.map((c) => (
             <option key={c.id} value={c.id}>

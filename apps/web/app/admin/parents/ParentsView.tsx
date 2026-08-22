@@ -85,7 +85,23 @@ function EditParentModal({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fullName.trim()) return;
+    // 22.08.2026 — правка догнала форму создания по проверкам, их было две
+    // разных.
+    //
+    // ТЕЛЕФОН. В базе колонка обязательная, а поле здесь стояло без пометки:
+    // пустой телефон уезжал на сервер и возвращался технической ошибкой
+    // вместо подсказки. Пометка добавлена ниже, но одной её мало — браузер
+    // видит поле заполненным уже на первой цифре, а нужны все девять. Ровно
+    // так же считает форма создания.
+    //
+    // ДЕТИ. Проверки не было вовсе: можно было снять все галочки и сохранить,
+    // получив родителя без единого ребёнка и с пустым кабинетом. Родное
+    // средство браузера здесь не поможет — это список галочек, а не поле.
+    if (!fullName.trim() || phoneDigits.length !== 9) return;
+    if (selectedIds.length === 0) {
+      onError(t.parentChildRequired);
+      return;
+    }
     startTransition(async () => {
       try {
         const fd = new FormData();
@@ -123,7 +139,10 @@ function EditParentModal({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.fieldPhone}</label>
-            <AdminPhoneInput digits={phoneDigits} onChange={setPhoneDigits} />
+            {/* Пометка «обязательно» — как в форме создания. Колонка телефона
+                в базе не допускает пустоты, и без пометки человек узнавал об
+                этом из технической ошибки после отправки. */}
+            <AdminPhoneInput digits={phoneDigits} onChange={setPhoneDigits} required />
           </div>
           {/* Те же два адреса, что и в форме создания: одна логика на обе. */}
           <div className="flex flex-col gap-1 rounded-xl bg-gray-50/70 p-3">
