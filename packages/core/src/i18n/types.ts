@@ -2358,6 +2358,11 @@ export interface Dictionary {
     attendanceReminderHint: string;    // "Не забудьте сделать перекличку"
     attendanceReminderUrgent: string;  // "Скоро урок закончится — пожалуйста сделайте перекличку"
     attendanceMadeCheckOthers: string; // "Перекличка сделана. Проверьте оценки и задачи"
+    // 23.08.2026 (миграция 225) — запас времени после звонка и счёт неотмеченных.
+    attendanceGraceTitle: string;      // "Урок закончился. На перекличку осталось {minutes} мин."
+    attendanceUnmarkedCount: string;   // "Не отмечено: {count}"
+    attendanceAutoAbsentWarn: string;  // "Неотмеченным ученикам автоматически поставят пропуск"
+    reminderAndMore: string;           // "и ещё {count}"
     makeAttendance: string;            // "Сделать перекличку"
     openAttendance: string;            // "Открыть посещаемость"
     openGrades: string;                // "Оценки"
@@ -2883,6 +2888,8 @@ export interface Dictionary {
     rollCallTitle: string;
     rollCallSubtitle: string;
     rollCallFinalizedNote: string;
+    rollCallAutoFixNote: string;       // "Перекличка закрыта. Автоматические пропуски ещё можно исправить"
+    rollCallAutoMarked: string;        // "автоматически"
     rollCallPresent: string;
     rollCallExcused: string;
     rollCallUnexcused: string;

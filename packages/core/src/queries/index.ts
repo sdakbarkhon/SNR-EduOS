@@ -4428,13 +4428,18 @@ export const getTeacherLessonAttendance = async (
 
   const { data: records } = await db2
     .from("attendance")
-    .select("student_id, status, marked_at, is_finalized")
+    .select("student_id, status, marked_at, is_finalized, marked_by")
     .eq("lesson_id", lessonId);
 
-  const attMap = new Map<string, { status: string; marked_at: string; is_finalized: boolean }>(
-    ((records ?? []) as Array<{ student_id: string; status: string; marked_at: string; is_finalized: boolean }>)
-      .map((r) => [r.student_id, r]),
-  );
+  type AttRow = {
+    student_id: string;
+    status: string;
+    marked_at: string;
+    is_finalized: boolean;
+    marked_by: string | null;
+  };
+
+  const attMap = new Map<string, AttRow>(((records ?? []) as AttRow[]).map((r) => [r.student_id, r]));
 
   return ((enrollments ?? []) as Array<{ student_id: string; students: { id: string; full_name: string } }>)
     .map((e) => {
@@ -4445,6 +4450,8 @@ export const getTeacherLessonAttendance = async (
         status: (att?.status ?? null) as AttendanceStatus | null,
         marked_at: att?.marked_at ?? null,
         is_finalized: att?.is_finalized ?? false,
+        // null при заполненном status = отметку раздало автозавершение урока.
+        marked_by: att?.marked_by ?? null,
         // P2: is_demo убран из attendance миграцией 132. Оставляем null
         // для BC callers (AttendanceRollCall передаёт в useDemoEditBlocked,
         // который всегда false).

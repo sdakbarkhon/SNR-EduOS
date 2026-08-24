@@ -48,6 +48,7 @@ import { useRealtimeChannel } from "@/lib/realtime";
 import { useToast } from "@/components/Toast";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { AttendanceReminderBanner } from "./AttendanceReminderBanner";
+import { LessonEndReminderModal } from "./LessonEndReminderModal";
 import { CodeEditor } from "@/components/CodeEditor";
 import { CodeStageSubmissionsModal } from "./CodeStageSubmissionsModal";
 import { SlideViewer } from "@/components/lesson-stages/SlideViewer";
@@ -953,6 +954,13 @@ export function TeacherLessonDetailView({
   const db = createClient();
   const showToast = useToast();
   const rollCallRef = useRef<HTMLDivElement>(null);
+  const scrollToRollCall = () =>
+    rollCallRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // 23.08.2026. Кто ещё не отмечен. Знает это только сама перекличка — она одна
+  // видит состав группы, — поэтому список поднят сюда из неё и раздаётся двум
+  // напоминаниям: баннеру (счёт) и окну (имена). null = ещё не загрузилась.
+  const [unmarkedNames, setUnmarkedNames] = useState<string[] | null>(null);
   const [status] = useState<LessonStatus>(lesson.status);
   const [startedAt] = useState<string | null>(lesson.started_at);
   const [endedAt] = useState<string | null>(lesson.ended_at);
@@ -1460,12 +1468,22 @@ export function TeacherLessonDetailView({
       {/* Inline attendance reminder (5–15 min before end) */}
       {status === "in_progress" && (
         <AttendanceReminderBanner
-          lessonId={lesson.id}
           endsAt={lesson.ends_at}
           status={status}
-          onScrollToRollCall={() =>
-            rollCallRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
+          unmarkedCount={unmarkedNames === null ? null : unmarkedNames.length}
+          onScrollToRollCall={scrollToRollCall}
+        />
+      )}
+
+      {/* Окно со списком неотмеченных — за пять минут до звонка и весь запас
+          после него. Молчит, пока неотмеченных нет. */}
+      {status === "in_progress" && unmarkedNames !== null && (
+        <LessonEndReminderModal
+          lessonId={lesson.id}
+          endsAt={lesson.ends_at}
+          unmarkedNames={unmarkedNames}
+          status={status}
+          onScrollToRollCall={scrollToRollCall}
         />
       )}
 
@@ -1971,6 +1989,7 @@ export function TeacherLessonDetailView({
           teacherId={teacher.id}
           lessonStatus={status}
           excused={excusedMap}
+          onStatusChange={(_allMarked, names) => setUnmarkedNames(names)}
         />
         </div>
       )}

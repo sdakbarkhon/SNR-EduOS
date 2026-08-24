@@ -53,6 +53,19 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   const readOnly = isFinalized;
   // Grade button is ALWAYS active regardless of lesson status
 
+  // 23.08.2026 (миграция 225) — МАШИННЫЙ ПРОГУЛ.
+  // Закрывая урок, автозавершение ставит «Пропуск без причины» каждому
+  // неотмеченному и тут же запирает всю перекличку. Автора у такой строки нет:
+  // marked_by остаётся пустым, потому что её никто не нажимал. Для учителя это
+  // не чужая проверка, а всё тот же неотмеченный ученик — поэтому исправить её
+  // он вправе и после запирания. База разрешает по тому же признаку.
+  const isMachineMark = (r: AttendanceRollCallRow) => r.status !== null && r.marked_by === null;
+  // Заперта СТРОКА, а не весь список: запирать нечего там, где отметку никто не
+  // ставил. Иначе выходило так: учитель исправил машинный прогул, промахнулся
+  // кнопкой — и снова заперт, потому что вся перекличка помечена финализованной.
+  const rowLocked = (r: AttendanceRollCallRow) => r.is_finalized && !isMachineMark(r);
+  const hasFixableRows = readOnly && rows.some((r) => !rowLocked(r));
+
   // Notify parent whenever rows change. The callback is kept in a ref and is NOT
   // an effect dependency: callers often pass an inline arrow (new reference every
   // render), which — combined with the fresh `names` array we hand back — would
@@ -87,13 +100,26 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   async function setStatus(
     studentId: string, oldStatus: AttendanceStatus | null, next: AttendanceStatus,
   ) {
-    if (readOnly || next === oldStatus) return;
+    if (next === oldStatus) return;
     const current = rows.find((r) => r.student_id === studentId);
-    if (markLockState(current?.marked_at).locked) { setLockNotice(true); return; }
+    if (!current || rowLocked(current)) return;
+    // Часы замка машинной отметки завела машина — считать по ним нельзя, иначе
+    // прогул, поставленный час назад, оказывается запертым ещё до нажатия.
+    if (!isMachineMark(current) && markLockState(current.marked_at).locked) { setLockNotice(true); return; }
     setLockNotice(false);
     setRows((prev) =>
       prev.map((r) =>
-        r.student_id === studentId ? { ...r, status: next, marked_at: new Date(schoolNowMs()).toISOString() } : r,
+        r.student_id === studentId
+          ? {
+              ...r,
+              status: next,
+              marked_at: new Date(schoolNowMs()).toISOString(),
+              // Исправленная строка перестаёт быть машинной: у неё появляется
+              // автор, и дальше действует обычное правило пятнадцати минут.
+              marked_by: teacherId,
+              is_finalized: false,
+            }
+          : r,
       ),
     );
     try {
@@ -101,9 +127,9 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
       setSavedId(studentId);
       setTimeout(() => setSavedId(null), 1500);
     } catch (err) {
-      setRows((prev) =>
-        prev.map((r) => r.student_id === studentId ? { ...r, status: oldStatus, marked_at: null } : r),
-      );
+      // Возвращаем строку целиком, а не одно поле: иначе откат затирал бы
+      // marked_at и признак автора значениями, которых в базе не было.
+      setRows((prev) => prev.map((r) => (r.student_id === studentId ? current : r)));
       if (isMarkLockedError(err)) setLockNotice(true);
       else console.error("[AttendanceRollCall] отметка не сохранилась:", err);
     }
@@ -133,10 +159,15 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
             {dt.rollCallTitle}
           </h2>
           <p className="mt-0.5 text-xs text-gray-400">
-            {readOnly ? dt.rollCallFinalizedNote : dt.rollCallSubtitle}
+            {!readOnly
+              ? dt.rollCallSubtitle
+              : hasFixableRows
+                ? dt.rollCallAutoFixNote
+                : dt.rollCallFinalizedNote}
           </p>
         </div>
-        {readOnly && <Lock className="h-4 w-4 text-gray-400" />}
+        {/* Замок только там, где правда заперто: машинные прогулы ещё правятся. */}
+        {readOnly && !hasFixableRows && <Lock className="h-4 w-4 text-gray-400" />}
       </div>
 
       {/* Stats */}
@@ -157,7 +188,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
             <>
               <span className="text-gray-300">|</span>
               <span className="text-[12px] font-semibold text-gray-400">
-                Не отмечено: {unmarked}
+                {d.lesson.attendanceUnmarkedCount.replace("{count}", String(unmarked))}
               </span>
             </>
           )}
@@ -210,6 +241,12 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                   {st === null && !readOnly && (
                     <span className="ml-2 text-[10px] font-medium text-orange-400">не отмечен</span>
                   )}
+                  {/* Отметку поставила машина — учителю видно, что это не его рука. */}
+                  {isMachineMark(row) && (
+                    <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium bg-orange-50 text-orange-500">
+                      {dt.rollCallAutoMarked}
+                    </span>
+                  )}
                 </span>
                 {savedId === row.student_id && (
                   <span className="text-[11px] font-semibold text-emerald-500">{dt.rollCallSaved}</span>
@@ -241,42 +278,42 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                 <div className="flex shrink-0 gap-1">
                   <button
                     onClick={() => setStatus(row.student_id, st, "present")}
-                    disabled={readOnly}
+                    disabled={rowLocked(row)}
                     title={dt.rollCallPresent}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                       st === "present"
                         ? "bg-emerald-500 text-white shadow-sm"
                         : "bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-500",
-                      readOnly && "cursor-not-allowed opacity-60",
+                      rowLocked(row) && "cursor-not-allowed opacity-60",
                     )}
                   >
                     <Check className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => setStatus(row.student_id, st, "absent_excused")}
-                    disabled={readOnly}
+                    disabled={rowLocked(row)}
                     title={dt.rollCallExcused}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                       st === "absent_excused"
                         ? "bg-yellow-400 text-white shadow-sm"
                         : "bg-gray-100 text-gray-400 hover:bg-yellow-50 hover:text-yellow-500",
-                      readOnly && "cursor-not-allowed opacity-60",
+                      rowLocked(row) && "cursor-not-allowed opacity-60",
                     )}
                   >
                     <BookMarked className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => setStatus(row.student_id, st, "absent_unexcused")}
-                    disabled={readOnly}
+                    disabled={rowLocked(row)}
                     title={dt.rollCallUnexcused}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                       st === "absent_unexcused"
                         ? "bg-red-500 text-white shadow-sm"
                         : "bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500",
-                      readOnly && "cursor-not-allowed opacity-60",
+                      rowLocked(row) && "cursor-not-allowed opacity-60",
                     )}
                   >
                     <UserX className="h-3.5 w-3.5" />
