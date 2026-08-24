@@ -11,6 +11,7 @@ import {
   setHomeworkAttachment,
   deleteHomeworkAttachment,
   getHomeworkTestsUrl,
+  averageOf, testGrade5,
 } from "@snr/core";
 import { Code2 } from "lucide-react";
 import { TeacherProgrammingSubmissions } from "./TeacherProgrammingSubmissions";
@@ -303,14 +304,14 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
 
   const hasOpenQuestions = questions.some(q => q.question_type === "open");
 
+  // 24.08.2026 — нормировка теста общая (testGrade5 из @snr/core): сначала
+  // выставленная пятибалльная оценка, доля score/max_score только если оценки
+  // нет. Раньше здесь всегда делили балл на максимум, и карточка задания
+  // расходилась с тем, что за ту же работу видит ученик.
   const fileGrades = localSubs.filter(s => s.grade != null).map(s => Number(s.grade));
-  const testGrades = localTestSubs
-    .filter(s => s.max_score != null && s.max_score > 0)
-    .map(s => ((s.score ?? 0) / s.max_score!) * 5);
+  const testGrades = localTestSubs.map(testGrade5);
   const allGrades = [...fileGrades, ...testGrades];
-  const avgGrade = allGrades.length > 0
-    ? allGrades.reduce((a, b) => a + b, 0) / allGrades.length
-    : 0;
+  const avgGrade = averageOf(allGrades) ?? 0;
 
   const submittedCount = localSubs.length + localTestSubs.length;
   const gradedTestSubs = localTestSubs.filter(s =>

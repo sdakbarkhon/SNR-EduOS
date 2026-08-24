@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getDictionary, getSubjectConfig, pluralizeStudents } from "@snr/core";
+import { getDictionary, getSubjectConfig, pluralizeStudents, averageOf } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
@@ -45,9 +45,13 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
       const groupAtt = attendance.filter((a) => a.lesson?.group_id === group.id);
       const hasData = groupGrades.length > 0 || groupAtt.length > 0;
 
-      const avgGrade = groupGrades.length
-        ? (groupGrades.reduce((a, g) => a + g.score, 0) / groupGrades.length).toFixed(1)
-        : "—";
+      // 24.08.2026. Карточка считала средний балл только по оценкам за урок:
+      // у Камилы Юсуповой в 7-А выходило 3.91, тогда как по всем её работам
+      // того же предмета — 4.39. Теперь getTeacherGrades отдаёт четыре
+      // источника по единому правилу (см. utils/gradeAverage), уже суженные
+      // до предмета учителя, — здесь остаётся только усреднить.
+      const avg = averageOf(groupGrades.map((g) => g.score));
+      const avgGrade = avg != null ? avg.toFixed(1) : "—";
       const attended = groupAtt.filter((a) => a.status === "present").length;
       const attendancePct = groupAtt.length ? `${Math.round((attended / groupAtt.length) * 100)}%` : "—";
 

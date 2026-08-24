@@ -17,4 +17,5 @@ export * from "./utils/homework";
 export * from "./utils/plural";
 export * from "./utils/markLock";
 export * from "./utils/lessonTiming";
+export * from "./utils/gradeAverage";
 export * from "./mocks/payments";

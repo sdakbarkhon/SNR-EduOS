@@ -7,6 +7,7 @@ import type { Db } from "../supabase/factory";
 import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
+import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
 import { getSubjectKeyByLabel } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
 
@@ -993,26 +994,22 @@ export const getTeacherGroups = (db: Db) =>
     .order("name")
     .then(unwrap);
 
-/** Оценки в группах учителя (RLS ограничивает своими), для карточки "Средний
- *  балл" на дашборде. Ночной прогон, ЧАСТЬ 7 — раньше читал из `grades`
- *  (общая, ни разу не заполняемая таблица — 0 строк во всей БД), поэтому
- *  карточка всегда показывала "—". Реальные оценки лежат в `lesson_grades`
- *  (шкала 1-5, привязана к lesson_id/student_id, не к group_id напрямую —
- *  group_id берём через join на lessons); RLS "teacher reads lesson grades
- *  in own groups" уже ограничивает видимость своими группами, как и раньше
- *  с `grades`. grade переименован в score здесь же — вызывающий код
- *  (TeacherDashboardView.tsx) уже ожидает именно это имя поля. */
-export const getTeacherGrades = (db: Db) =>
-  db
-    .from("lesson_grades")
-    .select("grade, lesson:lessons!inner(group_id)")
-    .then(unwrap)
-    .then((rows) =>
-      (rows as unknown as Array<{ grade: number; lesson: { group_id: string | null } }>).map((r) => ({
-        group_id: r.lesson.group_id,
-        score: r.grade,
-      })),
-    );
+/**
+ * Оценки учителя по группам — для карточек «Мои классы».
+ *
+ * 24.08.2026. Раньше читал ТОЛЬКО lesson_grades, поэтому карточка группы
+ * показывала средний балл лишь по оценкам за уроки: у Камилы Юсуповой в 7-А
+ * это 3.91, тогда как по всем её работам того же предмета — 4.39. Теперь
+ * собирает по единому правилу (см. utils/gradeAverage) и с тем же сужением
+ * до предмета учителя, что и остальные его экраны.
+ *
+ * Имя поля `score` сохранено: его ждёт TeacherGroupsView, а переименование
+ * ради красоты в этом заходе только раздуло бы правку.
+ */
+export const getTeacherGrades = async (db: Db): Promise<Array<{ group_id: string | null; score: number }>> => {
+  const grades = await getTeacherGradesFull(db);
+  return grades.map((g) => ({ group_id: g.groupId, score: g.grade5 }));
+};
 
 /** Посещаемость в группах учителя — статус + group_id урока (для % по группе). */
 export const getTeacherAttendance = (db: Db) =>
@@ -1028,9 +1025,11 @@ export const getTeacherAttendance = (db: Db) =>
  *  где смотреть содержимое сдачи (getGradeSubmissionDetail), и фильтру
  *  Все/За задания/За урок (gradeCategory), чтобы не путаться в kind
  *  "programming", который бывает из ДВУХ разных источников (см. ниже). */
-export type GradeSourceTable =
-  | "homework_submissions" | "test_submissions"
-  | "project_submissions" | "lesson_stage_progress" | "lesson_grades";
+// 24.08.2026. Список источников переехал в utils/gradeAverage — туда же, где
+// живёт правило «идёт ли оценка в средний балл». Имя оставлено прежним: его
+// импортируют экраны, и разводить два одинаковых объединения по двум файлам —
+// ровно тот способ, каким правило и разъезжается.
+export type GradeSourceTable = GradeSource;
 
 export type StudentGradeItem = {
   id: string;
@@ -1349,6 +1348,11 @@ export type GradeMatrixFileSub = {
 export type GradeMatrixTestSub = {
   id: string; homework_id: string; student_id: string;
   score: number | null; max_score: number | null; submitted_at: string;
+  // 24.08.2026: готовая пятибалльная оценка теста (миграция 31). Без неё
+  // экран считал среднее по доле score/max_score, и одни и те же работы
+  // давали 4.57 у учителя против 4.74 у ученика. Нормировка теперь одна —
+  // testGrade5() из utils/gradeAverage.
+  grade: number | null;
 };
 export type GradeMatrixData = {
   students: Array<{ id: string; full_name: string; avatar_url: string | null }>;
@@ -1361,11 +1365,22 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
   const students = (await getGroupStudents(db, groupId)) as GradeMatrixData["students"];
   const hwRes = await db
     .from("homework")
-    .select("id, title, content_type, due_date")
+    .select("id, title, content_type, due_date, subject_id")
     .eq("group_id", groupId)
     .order("due_date", { ascending: false });
   if (hwRes.error) console.error("[getTeacherGradeMatrix] homework query failed:", hwRes.error.message);
-  const homework = (hwRes.data ?? []) as GradeMatrixData["homework"];
+  // 24.08.2026 — СУЖЕНИЕ ДО СВОЕГО ПРЕДМЕТА.
+  // Правило доступа на homework держится на is_my_teacher_group, а в
+  // group_teachers с миграции 109 записаны ВСЕ предметники всех групп —
+  // поэтому журнал робототехника показывал столбцами задания всех десяти
+  // предметов класса, а подвал «Средняя по классу» усреднял их вместе со
+  // своими. Тот же фильтр, что и у расписания: свои предметы, куратор
+  // (subject_slug пуст) по-прежнему видит всё.
+  const subjectFilter = await getTeacherSubjectFilter(db);
+  const homework = filterBySubject(
+    (hwRes.data ?? []) as Array<GradeMatrixData["homework"][number] & { subject_id?: string | null }>,
+    subjectFilter,
+  ) as GradeMatrixData["homework"];
   const hwIds = homework.map((h) => h.id);
   if (hwIds.length === 0) return { students, homework, fileSubs: [], testSubs: [] };
 
@@ -1374,7 +1389,7 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
       .select("id, homework_id, student_id, status, grade, teacher_comment, answer_text, submitted_at")
       .in("homework_id", hwIds),
     db.from("test_submissions")
-      .select("id, homework_id, student_id, score, max_score, submitted_at")
+      .select("id, homework_id, student_id, score, max_score, grade, submitted_at")
       .in("homework_id", hwIds),
   ]);
   if (fileRes.error) console.error("[getTeacherGradeMatrix] homework_submissions query failed:", fileRes.error.message);
@@ -1387,40 +1402,198 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
   };
 };
 
-/** KPI учителя для журнала: всего оценил, средний балл, оценено за неделю.
- *  totalGraded + avgGrade считаются БЕЗ graded_at → работают и без миграции 19.
- *  Нормализация: оценки файлов 1–5 как есть; тесты score/max_score → к шкале /5.
- *  RLS ограничивает выборку группами учителя — отдельный teacher_id не нужен. */
-export const getTeacherGradeStats = async (db: Db): Promise<{ totalGraded: number; avgGrade: number; weeklyGraded: number }> => {
-  const [fileRes, testRes] = await Promise.all([
-    db.from("homework_submissions").select("grade").not("grade", "is", null),
-    db.from("test_submissions").select("score, max_score").not("score", "is", null),
-  ]);
-  if (fileRes.error) console.error("[getTeacherGradeStats] homework_submissions query failed:", fileRes.error.message);
-  if (testRes.error) console.error("[getTeacherGradeStats] test_submissions query failed:", testRes.error.message);
-  const files = (fileRes.data ?? []) as Array<{ grade: number }>;
-  const tests = (testRes.data ?? []) as Array<{ score: number; max_score: number | null }>;
+/**
+ * Оценки учителя, приведённые к пятибалльной, — общий сбор для всех его
+ * экранов. 24.08.2026.
+ *
+ * ЧТО СОБИРАЕТ. Четыре источника, идущие в средний балл (см. правило в
+ * utils/gradeAverage): оценки за урок, за задания, за тесты, за проекты.
+ * Этапы урока не собираются вовсе — они пойдут отдельной таблицей.
+ *
+ * СУЖЕНИЕ ДО ПРЕДМЕТА — ГЛАВНОЕ ЗДЕСЬ, БЕЗ НЕГО ЧИСЛО БЕССМЫСЛЕННО.
+ * Правила доступа сужают два источника ПО-РАЗНОМУ: оценки за урок учитель
+ * видит только по своему предмету (политика на lessons держится на
+ * is_subject_owner), а сдачи заданий — по всей группе (политика держится на
+ * is_my_teacher_group, а в group_teachers с миграции 109 записаны все
+ * предметники всех групп). Замерено на живой базе: у Камилы Юсуповой в 7-А
+ * 47 своих оценок за урок и 200 чужих сдач заданий. Сложить их как есть —
+ * получить 4.62, число, где её уроки смешаны с работами девяти чужих
+ * предметов. Поэтому задания и тесты сужаются здесь тем же фильтром, что и
+ * расписание (getTeacherSubjectFilter), — по своему предмету.
+ *
+ * Куратор (subject_slug пуст) фильтра не получает и видит всё: это его роль.
+ *
+ * ПОСТРАНИЧНО. Postgrest молча отдаёт первую 1000 строк — этой мели проект
+ * уже касался 08.08 (авария с эталоном демо). Годовая школа переваливает за
+ * тысячу оценок легко, поэтому выборка идёт страницами.
+ */
+type TeacherGrade = {
+  /** Группа, к которой относится оценка. */
+  groupId: string | null;
+  /** Предмет; у проектов его нет (в таблице только текстовый слаг). */
+  subjectId: string | null;
+  source: GradeSource;
+  grade5: number;
+  /** Когда оценка выставлена; null — колонки нет или не заполнена. */
+  gradedAt: string | null;
+};
 
-  const normalized: number[] = [];
-  for (const f of files) normalized.push(f.grade);
-  for (const t of tests) { const m = t.max_score ?? 0; if (m > 0) normalized.push((t.score / m) * 5); }
+const PAGE = 1000;
 
-  // «Оценено за неделю» требует graded_at (миграция 19). Изолировано:
-  // если колонки на hosted ещё нет — запрос вернёт error, оставляем 0.
-  let weeklyGraded = 0;
-  try {
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-    const [f2, t2] = await Promise.all([
-      db.from("homework_submissions").select("id").not("grade", "is", null).gte("graded_at", weekAgo),
-      db.from("test_submissions").select("id").not("score", "is", null).gte("graded_at", weekAgo),
-    ]);
-    if (!f2.error && !t2.error) weeklyGraded = (f2.data?.length ?? 0) + (t2.data?.length ?? 0);
-  } catch { weeklyGraded = 0; }
+/** Читает выборку целиком, страницами по 1000. */
+async function fetchAllRows<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  build: () => any,
+  label: string,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const res = await build().range(from, from + PAGE - 1);
+    if (res.error) {
+      console.error(`[${label}] query failed:`, res.error.message);
+      break;
+    }
+    const rows = (res.data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+export const getTeacherGradesFull = async (db: Db): Promise<TeacherGrade[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const filter = await getTeacherSubjectFilter(db);
+  const mySubjects = filter?.subjectIds ?? null; // null = куратор, без сужения
+  const teacherId = filter?.teacherId ?? null;
+
+  const out: TeacherGrade[] = [];
+
+  // ── Оценки за урок. Правила доступа уже сузили их до своего предмета. ──
+  const lessonRows = await fetchAllRows<{
+    grade: number; graded_at: string | null;
+    lesson: { group_id: string | null; subject_id: string | null } | null;
+  }>(
+    () => db2.from("lesson_grades").select("grade, graded_at, lesson:lessons!inner(group_id, subject_id)"),
+    "getTeacherGradesFull.lesson_grades",
+  );
+  for (const r of lessonRows) {
+    if (r.grade == null) continue;
+    out.push({
+      groupId: r.lesson?.group_id ?? null,
+      subjectId: r.lesson?.subject_id ?? null,
+      source: "lesson_grades",
+      grade5: r.grade,
+      gradedAt: r.graded_at,
+    });
+  }
+
+  // ── Задания и тесты. Здесь сужение обязательно: правила доступа его не дают. ──
+  const inMySubjects = (subjectId: string | null) =>
+    mySubjects === null ? true : subjectId != null && mySubjects.includes(subjectId);
+
+  const fileRows = await fetchAllRows<{
+    grade: number | null; graded_at: string | null;
+    homework: { group_id: string | null; subject_id: string | null } | null;
+  }>(
+    () => db2.from("homework_submissions")
+      .select("grade, graded_at, homework:homework!inner(group_id, subject_id)")
+      .not("grade", "is", null),
+    "getTeacherGradesFull.homework_submissions",
+  );
+  for (const r of fileRows) {
+    if (r.grade == null || !inMySubjects(r.homework?.subject_id ?? null)) continue;
+    out.push({
+      groupId: r.homework?.group_id ?? null,
+      subjectId: r.homework?.subject_id ?? null,
+      source: "homework_submissions",
+      grade5: r.grade,
+      gradedAt: r.graded_at,
+    });
+  }
+
+  const testRows = await fetchAllRows<{
+    score: number | null; max_score: number | null; grade: number | null; graded_at: string | null;
+    homework: { group_id: string | null; subject_id: string | null } | null;
+  }>(
+    () => db2.from("test_submissions")
+      .select("score, max_score, grade, graded_at, homework:homework!inner(group_id, subject_id)")
+      .not("score", "is", null),
+    "getTeacherGradesFull.test_submissions",
+  );
+  for (const r of testRows) {
+    if (!inMySubjects(r.homework?.subject_id ?? null)) continue;
+    const g5 = testGrade5(r);
+    if (g5 == null) continue;
+    out.push({
+      groupId: r.homework?.group_id ?? null,
+      subjectId: r.homework?.subject_id ?? null,
+      source: "test_submissions",
+      grade5: g5,
+      gradedAt: r.graded_at,
+    });
+  }
+
+  // ── Проекты. Предмета у них нет вовсе: в projects только текстовый слаг,
+  // и он у каждого проекта равен 'programming' (тот же артефакт, что у
+  // groups.subject). Поэтому сужаем не по предмету, а по автору проекта —
+  // учитель отвечает за свои проекты. Куратор видит все.
+  const projectRows = await fetchAllRows<{
+    grade: number | null; graded_at: string | null;
+    project: { group_id: string | null; created_by: string | null } | null;
+  }>(
+    () => db2.from("project_submissions")
+      .select("grade, graded_at, project:projects!inner(group_id, created_by)")
+      .not("grade", "is", null),
+    "getTeacherGradesFull.project_submissions",
+  );
+  for (const r of projectRows) {
+    if (r.grade == null) continue;
+    if (mySubjects !== null && teacherId != null && r.project?.created_by !== teacherId) continue;
+    out.push({
+      groupId: r.project?.group_id ?? null,
+      subjectId: null,
+      source: "project_submissions",
+      grade5: r.grade,
+      gradedAt: r.graded_at,
+    });
+  }
+
+  return out;
+};
+
+/**
+ * KPI учителя на экране «Оценки»: всего оценил, средний балл, оценено за неделю.
+ *
+ * 24.08.2026 — переписан целиком. Было три ошибки сразу:
+ *   1. читал ТОЛЬКО задания и тесты, а оценки за урок не считал вовсе;
+ *   2. не сужал выборку ничем: правило доступа пускает предметника во все
+ *      группы, поэтому у всех шести демо-учителей KPI был ОДИН И ТОТ ЖЕ —
+ *      4.76. Школьное число стояло под подписью «Средний балл» на личном
+ *      экране учителя;
+ *   3. «Оценено за неделю» отсчитывал неделю от НАСТОЯЩИХ часов
+ *      (`Date.now()`), а у демо-школы время заморожено на 29.07 — окно
+ *      всегда приходилось на пустоту, и плитка показывала 0 при 310
+ *      проверенных работах внутри школьной недели.
+ *
+ * nowMs — школьное «сейчас», приходит из слоя приложения (packages/core не
+ * знает про заморозку). Параметр обязателен намеренно: значение по умолчанию
+ * `Date.now()` было бы ровно той ловушкой, которую этот фикс и убирает.
+ */
+export const getTeacherGradeStats = async (
+  db: Db,
+  nowMs: number,
+): Promise<{ totalGraded: number; avgGrade: number; weeklyGraded: number }> => {
+  const grades = await getTeacherGradesFull(db);
+  const weekAgo = new Date(nowMs - 7 * 86400000).toISOString();
+  const now = new Date(nowMs).toISOString();
 
   return {
-    totalGraded: files.length + tests.length,
-    avgGrade: normalized.length ? normalized.reduce((a, b) => a + b, 0) / normalized.length : 0,
-    weeklyGraded,
+    totalGraded: grades.length,
+    avgGrade: averageOf(grades.map((g) => g.grade5)) ?? 0,
+    // Неделя школы, а не браузера. Оценки без даты выставления в окно не
+    // попадают: «за неделю» про время, а у них времени нет.
+    weeklyGraded: grades.filter((g) => g.gradedAt != null && g.gradedAt >= weekAgo && g.gradedAt <= now).length,
   };
 };
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   getDictionary, getSubjectConfig, getTeacherGradeMatrix, getTestQuestions,
   getLessonGradesForGroup, type LessonGradeRow,
+  averageOf, testGrade5,
 } from "@snr/core";
 import type {
   Locale, GradeMatrixData, GradeMatrixFileSub, GradeMatrixTestSub,
@@ -46,10 +47,12 @@ function fileGrade5(s: GradeMatrixFileSub | undefined): number | null {
   if (!s || s.status !== "graded" || s.grade == null) return null;
   return s.grade;
 }
-function testGrade5(s: GradeMatrixTestSub | undefined): number | null {
-  if (!s || s.score == null) return null;
-  const m = s.max_score ?? 0;
-  return m > 0 ? (s.score / m) * 5 : null;
+/** 24.08.2026: нормировка теста больше не своя — общая, из @snr/core.
+ *  Раньше здесь делили балл на максимум, и одна и та же сдача давала 4.17 у
+ *  учителя против выставленной оценки 5 у ученика. */
+function testSubGrade5(s: GradeMatrixTestSub | undefined): number | null {
+  if (!s) return null;
+  return testGrade5(s);
 }
 
 function avgColor(avg: number | null): { bg: string; fg: string } {
@@ -116,15 +119,22 @@ export function TeacherGradesView({ groups, stats }: Props) {
     return matrix?.testSubs.find((t) => t.student_id === studentId && t.homework_id === hwId);
   }
 
-  function cellFor(studentId: string, hw: GradeMatrixData["homework"][number]): { state: CellState; label: string } {
+  function cellFor(
+    studentId: string, hw: GradeMatrixData["homework"][number],
+  ): { state: CellState; label: string; hint?: string } {
     const now = schoolNowIso;
     const overdue = !!hw.due_date && hw.due_date < now;
     if (hw.content_type === "test") {
       const t = findTest(studentId, hw.id);
       if (!t) return { state: overdue ? "missed" : "pending", label: overdue ? "не сдано" : "—" };
-      // Показываем score/max — иначе «2/2» (100%) читается как двойка.
-      const label = t.max_score != null ? `${t.score ?? 0}/${t.max_score}` : String(t.score ?? 0);
-      return { state: "graded", label };
+      // 24.08.2026: в клетке стоит ОЦЕНКА, а не доля правильных ответов.
+      // Прежняя подпись «10/12» спорила со средним в конце строки: среднее
+      // считается по выставленной оценке (5), а клетка показывала 4.17.
+      // Сырой балл никуда не делся — он в подсказке и в окне проверки.
+      const raw = t.max_score != null ? `${t.score ?? 0}/${t.max_score}` : String(t.score ?? 0);
+      if (t.grade != null) return { state: "graded", label: String(t.grade), hint: `Баллы: ${raw}` };
+      // Оценки нет (старая сдача) — показываем то единственное, что есть.
+      return { state: "graded", label: raw };
     }
     const f = findFile(studentId, hw.id);
     if (!f) return { state: overdue ? "missed" : "pending", label: overdue ? "не сдано" : "—" };
@@ -132,35 +142,56 @@ export function TeacherGradesView({ groups, stats }: Props) {
     return { state: "review", label: "на проверке" };
   }
 
-  function studentAvg(studentId: string): number | null {
-    if (!matrix) return null;
+  /**
+   * Все оценки ученика, идущие в средний балл. 24.08.2026.
+   *
+   * Столбец «Средний» считал только по работам матрицы и не видел оценок за
+   * урок, хотя они лежат на этом же экране секцией ниже. Теперь берёт оба
+   * источника — как того требует общее правило (utils/gradeAverage).
+   * Этапы урока сюда не приходят вовсе: их не отдаёт ни один из двух запросов.
+   */
+  function studentGrades(studentId: string): number[] {
+    if (!matrix) return [];
     const vals: number[] = [];
     matrix.homework.forEach((h) => {
       const g5 = h.content_type === "test"
-        ? testGrade5(findTest(studentId, h.id))
+        ? testSubGrade5(findTest(studentId, h.id))
         : fileGrade5(findFile(studentId, h.id));
       if (g5 != null) vals.push(g5);
     });
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    for (const r of lessonGrades) {
+      if (r.student_id === studentId && r.grade != null) vals.push(r.grade);
+    }
+    return vals;
+  }
+
+  function studentAvg(studentId: string): number | null {
+    return averageOf(studentGrades(studentId));
   }
 
   function assignmentAvg(hw: GradeMatrixData["homework"][number]): number | null {
     if (!matrix) return null;
-    const vals: number[] = [];
-    matrix.students.forEach((s) => {
-      const g5 = hw.content_type === "test"
-        ? testGrade5(findTest(s.id, hw.id))
-        : fileGrade5(findFile(s.id, hw.id));
-      if (g5 != null) vals.push(g5);
-    });
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    return averageOf(
+      matrix.students.map((s) =>
+        hw.content_type === "test"
+          ? testSubGrade5(findTest(s.id, hw.id))
+          : fileGrade5(findFile(s.id, hw.id)),
+      ),
+    );
   }
 
+  /**
+   * «Средняя по классу».
+   *
+   * 24.08.2026: было среднее из средних по ученикам. Разница вылезает, как
+   * только у учеников разное число работ, — а тогда это число перестаёт
+   * сходиться и с KPI наверху, и с карточкой той же группы в «Моих классах».
+   * Теперь честное среднее по всем оценкам класса, ровно то же правило, что
+   * и везде.
+   */
   function overallAvg(): number | null {
     if (!matrix) return null;
-    const vals: number[] = [];
-    matrix.students.forEach((s) => { const a = studentAvg(s.id); if (a != null) vals.push(a); });
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    return averageOf(matrix.students.flatMap((s) => studentGrades(s.id)));
   }
 
   async function onCellClick(studentId: string, hw: GradeMatrixData["homework"][number]) {
@@ -312,6 +343,7 @@ export function TeacherGradesView({ groups, stats }: Props) {
                       return (
                         <td key={hw.id} className="border-b border-slate-100 p-1.5 text-center">
                           <div
+                            title={cell.hint}
                             onClick={clickable ? () => onCellClick(s.id, hw) : undefined}
                             className={cn("mx-auto flex h-12 min-w-[72px] items-center justify-center rounded-[10px] font-bold",
                               cell.state === "graded" ? (cell.label.length <= 2 ? "text-[24px]" : "text-[16px]") : "text-[11px]",
