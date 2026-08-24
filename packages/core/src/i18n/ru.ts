@@ -2595,6 +2595,8 @@ export const ru: Dictionary = {
     kpiStudents: "Учеников",
     todayLessons: "Уроки сегодня",
     noLessons: "Уроков нет",
+    // 24.08.2026 — плитка «Уроков сегодня» на дашборде учителя.
+    kpiLessonsDone: "{done} из {total}",
     recentActivity: "Последние действия",
     noActivity: "Нет активности",
     homeworkTitle: "Задания",

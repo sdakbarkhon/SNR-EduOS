@@ -2591,6 +2591,7 @@ export const uz: Dictionary = {
     kpiStudents: "O'quvchilar",
     todayLessons: "Bugungi darslar",
     noLessons: "Dars yo'q",
+    kpiLessonsDone: "{total} tadan {done}",
     recentActivity: "So'nggi faollik",
     noActivity: "Faollik yo'q",
     homeworkTitle: "Topshiriqlar",

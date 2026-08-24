@@ -2689,6 +2689,7 @@ export interface Dictionary {
     kpiActive: string;
     kpiPending: string;
     kpiStudents: string;
+    kpiLessonsDone: string;      // "{done} из {total}" — плитка «Уроков сегодня»
     todayLessons: string;
     noLessons: string;
     recentActivity: string;

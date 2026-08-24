@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   getTeacherGroups, getTeacherHomework,
-  getTeacherTodayLessons, getTeacherRecentSubmissions, getTeacherGrades,
+  getTeacherTodayLessons, getTeacherRecentSubmissions,
   getTeacherAnnouncementsFeed,
 } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
@@ -17,14 +17,13 @@ export default async function TeacherDashboardPage() {
   // дедуплицирован на запрос (см. school-time-server.ts).
   const nowMs = await getMySchoolNowMs(supabase);
 
-  const [teacherRes, groupsRes, homeworkRes, todayLessonsRes, recentSubmissionsRes, gradesRes, announcementsRes] = await Promise.all([
+  const [teacherRes, groupsRes, homeworkRes, todayLessonsRes, recentSubmissionsRes, announcementsRes] = await Promise.all([
     safeQuery(getMyTeacher(supabase), null, "TeacherDashboardPage.teacher"),
     safeQuery(getTeacherGroups(supabase), [], "TeacherDashboardPage.groups"),
     safeQuery(getTeacherHomework(supabase), [], "TeacherDashboardPage.homework"),
     // 07.08.2026: «сегодня» — замороженная дата, а не реальные часы сервера.
     safeQuery(getTeacherTodayLessons(supabase, nowMs), [], "TeacherDashboardPage.todayLessons"),
     safeQuery(getTeacherRecentSubmissions(supabase, 8), [], "TeacherDashboardPage.recentSubmissions"),
-    safeQuery(getTeacherGrades(supabase), [], "TeacherDashboardPage.grades"),
     safeQuery(getTeacherAnnouncementsFeed(supabase, 8), [], "TeacherDashboardPage.announcements"),
   ]);
 
@@ -35,7 +34,6 @@ export default async function TeacherDashboardPage() {
       homework={homeworkRes.data as never[]}
       todayLessons={todayLessonsRes.data as never[]}
       recentSubmissions={recentSubmissionsRes.data as never[]}
-      grades={gradesRes.data as never[]}
       todayLessonsError={todayLessonsRes.failed}
       announcements={announcementsRes.data as never[]}
     />

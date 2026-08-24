@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  BookOpen, Calendar, CheckCircle2, Clock, FileText, Megaphone, Users,
+  Calendar, CheckCircle2, Clock, FileText, Megaphone, Users,
 } from "lucide-react";
 import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime } from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";
@@ -50,7 +50,6 @@ interface Props {
   }>;
   todayLessons: TodayLesson[];
   recentSubmissions: Submission[];
-  grades: Array<{ group_id: string | null; score: number }>;
   todayLessonsError?: boolean;
   announcements: Array<{
     id: string; title: string; body: string; created_at: string;
@@ -113,8 +112,13 @@ function pluralMin(n: number) {
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  title, value, icon: Icon, highlight,
-}: { title: string; value: string | number; icon: typeof Users; highlight?: boolean }) {
+  title, value, icon: Icon, highlight, compact,
+}: {
+  title: string; value: string | number; icon: typeof Users; highlight?: boolean;
+  /** Значение — фраза, а не число: печатаем мельче, иначе «No lessons today»
+   *  не влезает в карточку ни на одном языке кроме русского. */
+  compact?: boolean;
+}) {
   return (
     <div className={cn(
       "relative flex h-32 flex-col justify-between overflow-hidden rounded-[24px] p-5",
@@ -124,7 +128,11 @@ function KpiCard({
     )}>
       <div className="relative z-10">
         <div className={cn("mb-1 text-sm", highlight ? "opacity-80" : "text-slate-500")}>{title}</div>
-        <div className={cn("text-3xl font-bold", highlight ? "text-white" : "text-slate-800")}>{value}</div>
+        <div className={cn(
+          "font-bold",
+          compact ? "text-lg leading-snug" : "text-3xl",
+          highlight ? "text-white" : "text-slate-800",
+        )}>{value}</div>
       </div>
       {highlight && (
         <div className="absolute -bottom-2 -right-2 opacity-20"><Icon className="h-20 w-20" /></div>
@@ -259,7 +267,7 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TeacherDashboardView({
-  teacher, groups, homework, todayLessons, recentSubmissions, grades,
+  teacher, groups, homework, todayLessons, recentSubmissions,
   todayLessonsError = false, announcements,
 }: Props) {
   const { locale } = useLocale();
@@ -278,9 +286,29 @@ export function TeacherDashboardView({
   const checkedCount = homework.reduce(
     (acc, h) => acc + h.submissions.filter((s) => s.status === "graded").length, 0,
   );
-  const avgScore = grades.length
-    ? (grades.reduce((a, g) => a + g.score, 0) / grades.length).toFixed(1)
-    : "—";
+  // 24.08.2026 — вместо «Среднего балла».
+  //
+  // ПОЧЕМУ УБРАЛИ СРЕДНИЙ БАЛЛ. Плитка усредняла оценки за уроки СРАЗУ ПО ВСЕМ
+  // группам учителя. У третьего класса и у десятого разные предметы, разные
+  // темы и разные шкалы строгости — одно число по ним не значит ничего. На
+  // живых данных это видно прямо: у Камилы Юсуповой 3-А даёт 3.87, 7-А — 3.91,
+  // 10-А — 3.77, а плитка показывала 3.84, то есть число, которого нет ни у
+  // одной группы. Разбивка по группам осталась там, где ей место, — «Мои классы».
+  //
+  // КАК СЧИТАЕМ ТЕПЕРЬ. Уроки сегодняшнего дня уже пришли на дашборд
+  // (getTeacherTodayLessons, границы суток по Ташкенту от ШКОЛЬНОГО «сейчас»),
+  // второго запроса не нужно. Урок считается прошедшим, если он завершён ИЛИ
+  // время его окончания уже позади.
+  //
+  // ВРЕМЯ БЕРЁМ ШКОЛЬНОЕ, А НЕ БРАУЗЕРНОЕ. `now` приходит из useSchoolNow: у
+  // замороженной школы это неподвижная точка (29.07.2026, 10:15 по Ташкенту),
+  // у настоящей — живые часы. Сравниваем метки времени напрямую, без getHours():
+  // разбор по местным часам браузера сдвинул бы границу у любого, кто сидит не
+  // в Ташкенте. Той же ошибкой, кстати, болеет полоса расписания ниже.
+  const lessonsToday = todayLessons.length;
+  const lessonsPassed = todayLessons.filter(
+    (l) => l.status === "completed" || new Date(l.ends_at).getTime() <= now.getTime(),
+  ).length;
 
   // Timeline — current-time indicator
   const nowTop = useMemo(() => {
@@ -309,7 +337,16 @@ export function TeacherDashboardView({
         <KpiCard title="Всего учеников" value={totalStudents} icon={Users} />
         <KpiCard title="На проверке"    value={pendingCount}   icon={FileText}     highlight />
         <KpiCard title="Проверено"      value={checkedCount}   icon={CheckCircle2} />
-        <KpiCard title="Средний балл"   value={avgScore}       icon={BookOpen}     />
+        <KpiCard
+          title={d.teacher.todayLessons}
+          value={lessonsToday === 0
+            ? d.teacher.noLessons
+            : d.teacher.kpiLessonsDone
+                .replace("{done}", String(lessonsPassed))
+                .replace("{total}", String(lessonsToday))}
+          compact={lessonsToday === 0}
+          icon={Calendar}
+        />
       </div>
 
       {/* Hero: current / next lesson */}

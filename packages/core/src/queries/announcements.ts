@@ -132,9 +132,27 @@ export const getTeacherAnnouncements = async (db: Db, teacherId: string): Promis
 // что getParentAnnouncements. РАЗВЕДКА: до 158 у учителя вообще не было
 // SELECT-доступа к чужим/админским строкам (только created_by=self) — не
 // баг фильтра на клиенте, чинить было нечего без новой RLS-политики.
+// 24.08.2026 — ПОЧЕМУ ИМЯ СВЯЗИ ВПИСАНО ЯВНО.
+// Блок «Объявления» на дашборде учителя показывал «Пока нет объявлений» при
+// одиннадцати доступных объявлениях. Правила доступа были ни при чём: проверено
+// запросом от лица каждого демо-учителя — по политике «teacher reads
+// announcements for their groups» (миграция 158) каждый видит 11 строк, пятеро
+// школьных и шестеро классных.
+//
+// Ломалось раньше: у `announcements` ДВА внешних ключа на `groups` —
+// `group_id` (рабочий) и `target_group_id` (мёртвый остаток, заполнен в нуле
+// строк из одиннадцати). Короткая запись `group:groups(name)` не говорит, какой
+// из них имеется в виду, и PostgREST отвечает 300 PGRST201 «Could not embed
+// because more than one relationship was found». Ошибку глотал safeQuery и
+// подставлял пустой список — потому блок и молчал, ни разу не пожаловавшись.
+//
+// Проверено живым запросом к API: короткая запись → HTTP 300, запись с именем
+// ключа → HTTP 200. Другие экраны объявлений это не задевало: ни один из них
+// не встраивает группу (getStudentAnnouncements, getParentAnnouncements,
+// getTeacherAnnouncements — без такого вложения).
 export const getTeacherAnnouncementsFeed = async (db: Db, limit = 10): Promise<TeacherAnnouncementFeedItem[]> => {
   const { data, error } = await (db as any).from("announcements")
-    .select("*, teacher:teachers(full_name), admin:admins(full_name), group:groups(name)")
+    .select("*, teacher:teachers(full_name), admin:admins(full_name), group:groups!announcements_group_id_fkey(name)")
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
