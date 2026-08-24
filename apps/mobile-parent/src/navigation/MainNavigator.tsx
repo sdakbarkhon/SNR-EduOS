@@ -69,6 +69,14 @@ import TopUpScreen from "../screens/payments/TopUpScreen";
 import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
 import TransferScreen from "../screens/payments/TransferScreen";
 import LimitsScreen from "../screens/payments/LimitsScreen";
+import MealsScreen from "../screens/study/MealsScreen";
+import TransportScreen from "../screens/study/TransportScreen";
+import MedicalCardScreen from "../screens/study/MedicalCardScreen";
+import PortfolioScreen from "../screens/study/PortfolioScreen";
+import ApplicationsScreen from "../screens/study/ApplicationsScreen";
+import DocumentsScreen from "../screens/profile/DocumentsScreen";
+import ChatScreen from "../screens/messages/ChatScreen";
+import SupportScreen from "../screens/messages/SupportScreen";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -93,7 +101,7 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
   drev: ReviewsScreen,
   dtopics: TopicMasteryScreen,
   dteach: TeacherProfileScreen,
-  dmeals: comingSoon("meals", "food", ["#f472b6", "#db2777"]),
+  dmeals: demoOr(MealsScreen, "meals", "food", ["#f472b6", "#db2777"]),
 };
 
 /**
@@ -118,10 +126,10 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
  * Шторки НЕ в стеке — открываются локально из parent screens.
  */
 const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
-  d25: comingSoon("chat", "chat", ["#22d3ee", "#0891b2"]),
+  d25: demoOr(ChatScreen, "chat", "chat", ["#22d3ee", "#0891b2"]),
   d26: AnnouncementsScreen,
   d27: AdminNewsScreen,
-  d28: comingSoon("support", "chat", ["#60a5fa", "#2563eb"]),
+  d28: demoOr(SupportScreen, "support", "chat", ["#60a5fa", "#2563eb"]),
 };
 
 /**
@@ -131,7 +139,7 @@ const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
 const PROFILE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
   d29: ChildProfileScreen,
   d30: ParentDataScreen,
-  d31: comingSoon("documents", "doc", ["#60a5fa", "#2563eb"]),
+  d31: demoOr(DocumentsScreen, "documents", "doc", ["#60a5fa", "#2563eb"]),
   d32: NotifSettingsScreen,
   d34: LangSecurityScreen,
 };
@@ -145,10 +153,10 @@ const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   ddiary: DiaryScreen,
   dtests: TestsScreen,
   dlib: LibraryScreen,
-  dport: comingSoon("portfolio", "star", ["#2dd4bf", "#0d9488"]),
-  dapps: comingSoon("applications", "doc", ["#34d399", "#059669"]),
-  dmed: comingSoon("medcard", "plus", ["#fb7185", "#e11d48"]),
-  dtrans: comingSoon("transport", "clock", ["#fbbf24", "#f97316"]),
+  dport: demoOr(PortfolioScreen, "portfolio", "star", ["#2dd4bf", "#0d9488"]),
+  dapps: demoOr(ApplicationsScreen, "applications", "doc", ["#34d399", "#059669"]),
+  dmed: demoOr(MedicalCardScreen, "medcard", "plus", ["#fb7185", "#e11d48"]),
+  dtrans: demoOr(TransportScreen, "transport", "clock", ["#fbbf24", "#f97316"]),
   dchpass: ChangePasswordScreen,
   dsessions: ActiveSessionsScreen,
   // Заход 5 (заглушки): «О приложении» — единственный маршрут-заглушка, под

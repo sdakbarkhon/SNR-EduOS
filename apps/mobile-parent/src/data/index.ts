@@ -97,15 +97,33 @@ import {
   NOTIFICATION_CATEGORIES,
 } from "./fixtures/notifications";
 import {
+  CHAT_ATTACH_OPTIONS,
   MESSAGE_THREADS,
+  SUPPORT_CHAT,
+  SUPPORT_CHAT_HEADER,
+  SUPPORT_CHIPS,
+  TEACHER_CHAT,
+  TEACHER_CHAT_HEADER,
 } from "./fixtures/messages";
 import {
+  APPLICATIONS,
+  DEFAULT_MEAL_DAY_INDEX,
+  MEALS_DAY_PILLS,
+  MEALS_WEEK,
   MEDICAL_CARDS,
+  NO_ALLERGIES_TEXT,
+  PORTFOLIO_ACHIEVEMENTS,
+  PORTFOLIO_CERTIFICATES,
+  PORTFOLIO_WORKS,
+  TRANSPORT_NOTIFY_DEFAULTS,
+  TRANSPORT_STOPS,
+  VACCINATIONS,
 } from "./fixtures/services";
 import {
   AUTO_EXIT_OPTIONS,
   CONFIRM_DIALOGS,
   DEFAULT_AUTO_EXIT_VALUE,
+  DOCUMENTS,
 } from "./fixtures/profile";
 import {
   ASSISTANT_TEXT_TEMPLATES,
@@ -392,6 +410,25 @@ export function getNotificationCategories() {
 }
 
 // ─── Сообщения ───────────────────────────────────────────────────────────────
+//
+// 23.08.2026 — переписка с учителем и поддержка вернулись в демо (заход 2).
+// Чата родителя с учителем в базе школы не заведено вовсе, поэтому заменить
+// это настоящими данными пока нечем. Собеседники и содержание — школьные и
+// нейтральные, ничего личного про ребёнка.
+
+/** Список бесед вкладки «Сообщения». В демо строки собираются из настоящих
+ *  учителей ребёнка, отсюда берётся только текст превью. */
+export function getMessageThreads(): MessageThreadRow[] {
+  return MESSAGE_THREADS;
+}
+
+export function getTeacherChat() {
+  return { header: TEACHER_CHAT_HEADER, messages: TEACHER_CHAT, attach_options: CHAT_ATTACH_OPTIONS };
+}
+
+export function getSupportChat() {
+  return { header: SUPPORT_CHAT_HEADER, messages: SUPPORT_CHAT, chips: SUPPORT_CHIPS };
+}
 
 
 /**
@@ -407,6 +444,45 @@ export function getUnreadMessageThreadsCount(): number {
 
 
 // ─── Сервисы ─────────────────────────────────────────────────────────────────
+//
+// 23.08.2026 — вернулись вместе с разделами демо (заход 2). Как и оплаты,
+// показываются только в демо: гейт стоит в навигаторе (demoOr), слой данных
+// про демо не знает. Настоящих таблиц под питание, транспорт, медкарту,
+// портфолио и заявления в базе школы нет вовсе — заменить эти фикстуры
+// пока нечем.
+
+export function getMealsWeek() {
+  return { week: MEALS_WEEK, day_pills: MEALS_DAY_PILLS, default_day_index: DEFAULT_MEAL_DAY_INDEX };
+}
+
+export function getTransportRoute() {
+  return { stops: TRANSPORT_STOPS, notify_defaults: TRANSPORT_NOTIFY_DEFAULTS };
+}
+
+export function getVaccinations() {
+  return VACCINATIONS;
+}
+
+export function getNoAllergiesText() {
+  return NO_ALLERGIES_TEXT;
+}
+
+export function getPortfolio() {
+  return { works: PORTFOLIO_WORKS, achievements: PORTFOLIO_ACHIEVEMENTS, certificates: PORTFOLIO_CERTIFICATES };
+}
+
+export function getApplications(): ApplicationRow[] {
+  return APPLICATIONS;
+}
+
+/** Документы делятся по владельцу: карточка ребёнка и карточка родителя. */
+export function getChildDocuments() {
+  return DOCUMENTS.filter((doc) => doc.owner === "child");
+}
+
+export function getParentDocuments() {
+  return DOCUMENTS.filter((doc) => doc.owner === "parent");
+}
 
 
 

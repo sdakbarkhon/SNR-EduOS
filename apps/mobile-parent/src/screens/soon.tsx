@@ -43,12 +43,19 @@ export function SoonBody({
   gradient,
   iconPaths,
   itemKey,
+  badge,
 }: {
   title: string;
   gradient: [string, string];
   iconPaths: string[];
   /** Ключ в d.parentApp.soon.items; неизвестный ключ → общий честный текст. */
   itemKey: string;
+  /**
+   * Своя плашка вместо общей «Появится в будущих обновлениях».
+   * 23.08.2026: у юридических документов общая плашка неверна по смыслу —
+   * они ждут не обновления приложения, а утверждения школой.
+   */
+  badge?: string;
 }) {
   const { tokens } = useTheme();
   const { d } = useAppLocale();
@@ -107,7 +114,7 @@ export function SoonBody({
         }}
       >
         <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, color: tokens.status.violet.text }}>
-          {soon.badge}
+          {badge ?? soon.badge}
         </Text>
       </View>
 

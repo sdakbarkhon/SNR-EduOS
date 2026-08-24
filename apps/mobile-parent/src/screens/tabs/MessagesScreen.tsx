@@ -22,6 +22,10 @@ import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import { GlassCard, RootHeader, TabScreenScroll } from "../../ui";
 import { useAppLocale } from "../../i18n";
 import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
+import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useDemoSession } from "../../context/DemoSessionContext";
+import { getGroupSubjectTeachers } from "@snr/core";
+import { getMessageThreads } from "../../data";
 import { ICONS } from "../../navigation/routes";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
@@ -105,6 +109,21 @@ export default function MessagesScreen() {
 
   const soon = t.soon2.items.chatList ?? t.soon2.fallback;
 
+  // 23.08.2026. В демо вкладка не может быть полупустой: заказчик показывает,
+  // как приложение будет выглядеть. Поэтому под настоящими объявлениями и
+  // новостями появляется список личных переписок — но только в демо; у
+  // настоящего родителя ниже по-прежнему честная строка «Скоро».
+  // Собеседники — НАСТОЯЩИЕ учителя ребёнка, те же, что в «Предметах»:
+  // выдуманных имён в демо-переписке быть не должно.
+  const { isDemo } = useDemoSession();
+  const { child, childId } = useChildScope();
+  const teachers = useChildQuery(childId, (db) =>
+    child?.group_id ? getGroupSubjectTeachers(db, child.group_id) : Promise.resolve([]),
+  );
+  const chatPeers = (teachers.data ?? []).filter((x) => x.teacherName).slice(0, 3);
+  // Превью — первая реплика той же переписки, которую открывает строка.
+  const chatPreview = getMessageThreads().find((x) => x.category === "chats")?.preview ?? "";
+
   return (
     <AppBackground>
       <RootHeader
@@ -134,8 +153,24 @@ export default function MessagesScreen() {
           />
         </GlassCard>
 
-        {/* Личных переписок в школе пока нет — говорим об этом прямо, а не
-            показываем выдуманные диалоги, как было раньше. */}
+        {/* В демо — список личных переписок с настоящими учителями. Вне демо
+            личных переписок в школе нет, и мы говорим это прямо, а не
+            показываем выдуманные диалоги. */}
+        {isDemo && chatPeers.length > 0 ? (
+          <GlassCard radius={22} contentStyle={{ paddingHorizontal: 14, paddingVertical: 2 }}>
+            {chatPeers.map((peer, i) => (
+              <SectionRow
+                key={peer.subjectId}
+                icon="chat"
+                gradient={["#22d3ee", "#0891b2"]}
+                title={peer.teacherName ?? ""}
+                subtitle={`${peer.subjectName} · ${chatPreview}`}
+                onPress={() => navigation.navigate("d25")}
+                divider={i > 0}
+              />
+            ))}
+          </GlassCard>
+        ) : (
         <GlassCard radius={20} contentStyle={{ padding: 16, gap: 7, alignItems: "center" }}>
           <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1, textAlign: "center" }}>
             {soon.title}
@@ -159,6 +194,7 @@ export default function MessagesScreen() {
             </Text>
           </View>
         </GlassCard>
+        )}
       </TabScreenScroll>
     </AppBackground>
   );

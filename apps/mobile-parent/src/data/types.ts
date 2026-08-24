@@ -442,21 +442,24 @@ export interface ChatMessageRow {
 export interface PortfolioWorkRow {
   subject_id: BaseSubjectKey;
   name: string;
-  date_label: string;
+  /** День работы, «YYYY-MM-DD». Подпись собирает экран (dayMonth). */
+  date: string;
   grade: number;
 }
 
 export interface AchievementRow {
   name: string;
   subtitle: string;
-  date_label: string;
+  /** Месяц, «YYYY-MM»: числа у награды нет. Подпись — monthYear. */
+  month: string;
   gradient: Gradient;
 }
 
 export interface CertificateRow {
   name: string;
   org: string;
-  date_label: string;
+  /** Месяц выдачи, «YYYY-MM». Подпись — monthYear. */
+  month: string;
 }
 
 /** Детали работы портфолио (WORK_X), индекс = PORT_D.works. */
@@ -474,8 +477,10 @@ export interface ApplicationRow {
   status: ApplicationStatus;  // st
   name: string;
   number_label: string;       // num «№ 2026-07-016»
-  date_label: string;
-  ready_label?: string;       // «Готово к получению с 24 июля»
+  /** День подачи, «YYYY-MM-DD». Подпись — dayMonth. */
+  date: string;
+  /** С какого дня готово, «YYYY-MM-DD». Только у одобренных. */
+  ready_from?: string;
   gradient: Gradient;
 }
 
@@ -502,7 +507,9 @@ export interface MedicalCardRow {
 
 export interface VaccinationRow {
   name: string;
-  date_label: string;
+  /** Сделана: день «YYYY-MM-DD». Плановая: месяц «YYYY-MM» в month. */
+  date?: string;
+  month?: string;
   status: "ok" | "plan";
 }
 

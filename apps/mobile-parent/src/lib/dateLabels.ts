@@ -71,3 +71,16 @@ export function hexToRgbCsv(hex: string): string {
   const n = parseInt(full, 16);
   return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
 }
+
+/**
+ * «Май 2026» — подпись без числа, для достижений и сертификатов: там важен
+ * месяц, а не день. Ключ — «YYYY-MM»; привязывается к 15-му числу, чтобы
+ * никакое смещение внутри месяца не увело подпись на соседний.
+ */
+export function monthYear(monthKey: string, localeTag: string): string {
+  return new Date(`${monthKey}-15T12:00:00+05:00`).toLocaleDateString(localeTag, {
+    month: "long",
+    year: "numeric",
+    ...TZ,
+  });
+}

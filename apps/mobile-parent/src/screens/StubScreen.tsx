@@ -131,7 +131,16 @@ export default function StubScreen() {
           paddingBottom: 140,
         }}
       >
+        {/* 23.08.2026. У юридических документов общая плашка «Появится в
+            будущих обновлениях» вводит в заблуждение: приложение готово,
+            ждут документа от школы. Текст берём тот же, что показывает
+            экран входа под ссылками на документы. */}
         <SoonBody
+          badge={
+            stubKey === "terms" || stubKey === "privacy"
+              ? d.parentApp.auth.legalNotReady
+              : undefined
+          }
           title={title}
           gradient={stub.g}
           iconPaths={ICONS[stub.i] || ICONS.doc}
