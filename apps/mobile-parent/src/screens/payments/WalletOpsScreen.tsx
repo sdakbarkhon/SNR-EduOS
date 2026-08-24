@@ -250,7 +250,7 @@ export default function WalletOpsScreen() {
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
   const walletBalance = getWalletBalance(childId);
-  const groups: WalletOpsDayGroup[] = getWalletOps(childId);
+  const groups: WalletOpsDayGroup[] = getWalletOps(locale, childId);
 
   const pickerItems: ChildPickerItem[] = children.map((k) => ({
     id: k.id,

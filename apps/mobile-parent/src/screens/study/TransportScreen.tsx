@@ -18,7 +18,7 @@
  *           не хардкодится (правило data-слоя «не хардкодится, считается»).
  *  4. SectionLabel «ОСТАНОВКИ» (1711).
  *  5. StopsCard (1712–1716): glass r20 padding 12/14 — TimelineVertical,
- *     фид из getTransportRoute().stops (state=status, label=name, time=
+ *     фид из getTransportRoute(locale).stops (state=status, label=name, time=
  *     time_label, chipLabel=is_my_stop?«Ваша остановка»:undefined).
  *  6. SectionLabel «ВОДИТЕЛЬ И АВТОБУС» (1717).
  *  7. DriverCard (1718–1721): glass r20 padding 5/14 — весь блок литерал
@@ -36,7 +36,7 @@
  *     NotificationRow (паттерн 1:1 из LimitsScreen.tsx):
  *       9a. «Уведомить за 10 минут до прибытия» (без divider) — arrival.
  *       9b. «Уведомить о посадке и высадке» (divider сверху) — delays.
- *     Локальный state инициализирован из getTransportRoute().notify_defaults.
+ *     Локальный state инициализирован из getTransportRoute(locale).notify_defaults.
  * 10. InfoBanner (1728–1731): padding 12/14 r18, bg rgba(249,115,22,.1),
  *     border rgba(249,115,22,.3); bell-alert glyph 17 stroke #c2410c; текст
  *     10/600 LH 1.55 rgba(26,19,74,.7) с вложенным pressable-спаном
@@ -48,14 +48,14 @@
  * шапкой на каждом из 8 экранов. Верифицировано ПРЯМЫМ чтением исходного
  * mockup-файла (строки 1699–1732, дважды, включая omitted-строки через Read):
  * на экране «Транспорт» такого блока НЕТ — сразу после ScrollContainer идёт
- * RouteBanner. Данные маршрута (getTransportRoute()) тоже не зависят от
+ * RouteBanner. Данные маршрута (getTransportRoute(locale)) тоже не зависят от
  * childId — маршрут общий для всех детей на этом автобусе. Следуя правилу
  * метода №2 («implement EVERY block from your list… do not add anything not
  * in the mockup block»), ChildSwitcherCard/BottomSheetFrame НЕ добавлены —
  * это сознательное расхождение с batch-boilerplate, а не пропуск.
  * ────────────────────────────────────────────────────────────────────────────
  *
- * Данные — getTransportRoute() (TRANSPORT_STOPS + TRANSPORT_NOTIFY_DEFAULTS).
+ * Данные — getTransportRoute(locale) (TRANSPORT_STOPS + TRANSPORT_NOTIFY_DEFAULTS).
  * Тексты — d.parentApp.svc.transport (заголовок); литералы баннера/водителя —
  * дословно из макета (нет соответствующих fixture-полей). Обе темы —
  * useTheme(). iOS safe-area — из InnerHeader.
@@ -184,11 +184,11 @@ function NotificationRow({
 
 export default function TransportScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const navigation = useNavigation<Nav>();
 
-  const route = getTransportRoute();
+  const route = getTransportRoute(locale);
   const { stops, notify_defaults } = route;
 
   const [notifyArrival, setNotifyArrival] = useState<boolean>(notify_defaults.arrival);

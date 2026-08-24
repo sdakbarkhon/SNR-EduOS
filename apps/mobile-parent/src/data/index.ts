@@ -28,6 +28,8 @@ import {
   historyTotals,
   walletOpsFor,
 } from "./demoPayments";
+import type { Locale } from "@snr/core";
+import { trDeep } from "./i18n";
 import type {
   ApplicationDetailRow,
   ApplicationRow,
@@ -345,13 +347,13 @@ export function getHomeworkUploadFixture() {
 // иначе показывать нечего. Гейт стоит в навигаторе (demoOr), а не здесь:
 // слой данных про демо ничего не знает и знать не должен.
 
-export function getBills(): BillRow[] {
-  return BILLS;
+export function getBills(locale: Locale): BillRow[] {
+  return trDeep(BILLS, locale);
 }
 
 /** Счета основного списка «К оплате сейчас» (по умолчанию отмечены). */
-export function getDueBills(): BillRow[] {
-  return BILLS.filter((b) => b.in_main_list);
+export function getDueBills(locale: Locale): BillRow[] {
+  return trDeep(BILLS.filter((b) => b.in_main_list), locale);
 }
 
 /** «2 счёта» на Dashboard/П17 — считается, не хардкодится. */
@@ -364,8 +366,8 @@ export function getDueTotal(): number {
   return BILLS.filter((b) => b.in_main_list && b.checked_by_default).reduce((s, b) => s + b.amount, 0);
 }
 
-export function getPaymentsOverview() {
-  return PAYMENTS_OVERVIEW;
+export function getPaymentsOverview(locale: Locale) {
+  return trDeep(PAYMENTS_OVERVIEW, locale);
 }
 
 /**
@@ -389,8 +391,8 @@ export function getWalletBalance(_childId?: string): number {
   return WALLET_BALANCE;
 }
 
-export function getWalletOps(_childId?: string): WalletOpsDayGroup[] {
-  return walletOpsFor();
+export function getWalletOps(locale: Locale, _childId?: string): WalletOpsDayGroup[] {
+  return walletOpsFor(locale);
 }
 
 export function getTopupPresets(): readonly number[] {
@@ -418,16 +420,24 @@ export function getNotificationCategories() {
 
 /** Список бесед вкладки «Сообщения». В демо строки собираются из настоящих
  *  учителей ребёнка, отсюда берётся только текст превью. */
-export function getMessageThreads(): MessageThreadRow[] {
-  return MESSAGE_THREADS;
+export function getMessageThreads(locale: Locale): MessageThreadRow[] {
+  return trDeep(MESSAGE_THREADS, locale);
 }
 
-export function getTeacherChat() {
-  return { header: TEACHER_CHAT_HEADER, messages: TEACHER_CHAT, attach_options: CHAT_ATTACH_OPTIONS };
+export function getTeacherChat(locale: Locale) {
+  return {
+    header: trDeep(TEACHER_CHAT_HEADER, locale),
+    messages: trDeep(TEACHER_CHAT, locale),
+    attach_options: trDeep(CHAT_ATTACH_OPTIONS, locale),
+  };
 }
 
-export function getSupportChat() {
-  return { header: SUPPORT_CHAT_HEADER, messages: SUPPORT_CHAT, chips: SUPPORT_CHIPS };
+export function getSupportChat(locale: Locale) {
+  return {
+    header: trDeep(SUPPORT_CHAT_HEADER, locale),
+    messages: trDeep(SUPPORT_CHAT, locale),
+    chips: trDeep(SUPPORT_CHIPS, locale),
+  };
 }
 
 
@@ -451,37 +461,45 @@ export function getUnreadMessageThreadsCount(): number {
 // портфолио и заявления в базе школы нет вовсе — заменить эти фикстуры
 // пока нечем.
 
-export function getMealsWeek() {
-  return { week: MEALS_WEEK, day_pills: MEALS_DAY_PILLS, default_day_index: DEFAULT_MEAL_DAY_INDEX };
+export function getMealsWeek(locale: Locale) {
+  return {
+    week: trDeep(MEALS_WEEK, locale),
+    day_pills: trDeep(MEALS_DAY_PILLS, locale),
+    default_day_index: DEFAULT_MEAL_DAY_INDEX,
+  };
 }
 
-export function getTransportRoute() {
-  return { stops: TRANSPORT_STOPS, notify_defaults: TRANSPORT_NOTIFY_DEFAULTS };
+export function getTransportRoute(locale: Locale) {
+  return { stops: trDeep(TRANSPORT_STOPS, locale), notify_defaults: TRANSPORT_NOTIFY_DEFAULTS };
 }
 
-export function getVaccinations() {
-  return VACCINATIONS;
+export function getVaccinations(locale: Locale) {
+  return trDeep(VACCINATIONS, locale);
 }
 
-export function getNoAllergiesText() {
-  return NO_ALLERGIES_TEXT;
+export function getNoAllergiesText(locale: Locale) {
+  return trDeep(NO_ALLERGIES_TEXT, locale);
 }
 
-export function getPortfolio() {
-  return { works: PORTFOLIO_WORKS, achievements: PORTFOLIO_ACHIEVEMENTS, certificates: PORTFOLIO_CERTIFICATES };
+export function getPortfolio(locale: Locale) {
+  return {
+    works: trDeep(PORTFOLIO_WORKS, locale),
+    achievements: trDeep(PORTFOLIO_ACHIEVEMENTS, locale),
+    certificates: trDeep(PORTFOLIO_CERTIFICATES, locale),
+  };
 }
 
-export function getApplications(): ApplicationRow[] {
-  return APPLICATIONS;
+export function getApplications(locale: Locale): ApplicationRow[] {
+  return trDeep(APPLICATIONS, locale);
 }
 
 /** Документы делятся по владельцу: карточка ребёнка и карточка родителя. */
-export function getChildDocuments() {
-  return DOCUMENTS.filter((doc) => doc.owner === "child");
+export function getChildDocuments(locale: Locale) {
+  return trDeep(DOCUMENTS.filter((doc) => doc.owner === "child"), locale);
 }
 
-export function getParentDocuments() {
-  return DOCUMENTS.filter((doc) => doc.owner === "parent");
+export function getParentDocuments(locale: Locale) {
+  return trDeep(DOCUMENTS.filter((doc) => doc.owner === "parent"), locale);
 }
 
 
@@ -491,8 +509,8 @@ export function getParentDocuments() {
 
 
 
-export function getMedicalCard(childId?: string): MedicalCardRow {
-  return MEDICAL_CARDS[childIndex(childId)];
+export function getMedicalCard(locale: Locale, childId?: string): MedicalCardRow {
+  return trDeep(MEDICAL_CARDS[childIndex(childId)], locale);
 }
 
 

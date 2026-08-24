@@ -33,7 +33,7 @@
  * • Attach меню — только «Фото» и «Файл»;
  * • Teacher identity кликабельна → dteach; kebab → 'actions'.
  *
- * Данные — через getTeacherChat() и getSubject('math'). Тексты — из
+ * Данные — через getTeacherChat(locale) и getSubject('math'). Тексты — из
  * useAppLocale().d.parentApp.msg (online, typeMessage, attachPhoto, attachFile).
  * Обе темы — useTheme(); iOS safe-area — useSafeAreaInsets (top для шапки,
  * bottom для composer). d25 живёт в STACK_ROUTES → под композером нет
@@ -80,7 +80,7 @@ export default function ChatScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
 
-  const { header, messages } = getTeacherChat();
+  const { header, messages } = getTeacherChat(locale);
 
   // 23.08.2026. Собеседник — НАСТОЯЩИЙ учитель ребёнка, тот же, что в
   // разделах «Предметы» и «Учителя»: до этого в шапке стояло выдуманное
@@ -91,8 +91,10 @@ export default function ChatScreen() {
     child?.group_id ? getGroupSubjectTeachers(db, child.group_id) : Promise.resolve([]),
   );
   const realTeacher = (teachers.data ?? []).find((t) => t.teacherName);
-  const peerName = realTeacher?.teacherName ?? header.name;
-  const peerSubject = realTeacher?.subjectName ?? header.subject_chip;
+  // Пока учителя не приехали — пусто, а НЕ фикстурное имя: выдуманный
+  // собеседник в демо читается как настоящий человек школы.
+  const peerName = realTeacher?.teacherName ?? "";
+  const peerSubject = realTeacher?.subjectName ?? "";
   // Подпись дня — на языке интерфейса, из ключа даты.
   const dayLabel = `${d.parentApp.date.today}, ${dayMonth(header.day_divider_date, LOCALE_TAG[locale])}`;
   const subject = getSubject("math");

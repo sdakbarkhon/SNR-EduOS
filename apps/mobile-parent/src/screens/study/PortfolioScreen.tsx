@@ -39,7 +39,7 @@
  *             #6d28d9 — литеральные цвета в обеих темах, установленный
  *             паттерн, см. ReceiptsScreen.tsx) → stub «file».
  *
- * Данные — getPortfolio() (works/achievements/certificates, по 4 каждая,
+ * Данные — getPortfolio(locale) (works/achievements/certificates, по 4 каждая,
  * плоские списки без привязки к ребёнку — так задано фикстурой). Ребёнок —
  * getChildren() + getSelectedChildContext(childId). Тексты — d.parentApp.*;
  * литералы, которых нет в словаре (подписи статистики, названия табов,
@@ -323,7 +323,7 @@ type PortfolioTabKey = "works" | "ach" | "cert";
 
 export default function PortfolioScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProp<MainStackParamList, "dport">>();
@@ -342,7 +342,7 @@ export default function PortfolioScreen() {
     (route.params as { initialTab?: PortfolioTabKey } | undefined)?.initialTab ?? "works";
   const [activeTab, setActiveTab] = useState<PortfolioTabKey>(initialTab);
 
-  const portfolio = getPortfolio();
+  const portfolio = getPortfolio(locale);
   const avgGrade = portfolio.works.length
     ? portfolio.works.reduce((sum, w) => sum + w.grade, 0) / portfolio.works.length
     : 0;

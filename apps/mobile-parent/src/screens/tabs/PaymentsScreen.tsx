@@ -104,8 +104,8 @@ export default function PaymentsScreen() {
   const localeTag = LOCALE_TAG[locale];
   // Префикс подписи счёта — как на экране счетов, из настоящего ребёнка.
   const who = scopedChild ? `${scopedChild.first_name} · ${scopedChild.class_name}` : "";
-  const overview = getPaymentsOverview();
-  const dueBills = getDueBills();
+  const overview = getPaymentsOverview(locale);
+  const dueBills = getDueBills(locale);
   const dueTotal = getDueTotal();
   const dueCount = getDueBillsCount();
   const unread = useUnreadNotifications();

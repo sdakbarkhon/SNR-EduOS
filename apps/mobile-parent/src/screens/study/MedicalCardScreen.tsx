@@ -21,12 +21,12 @@
  *     см. заметку в структурированном отчёте.
  *  6. SectionCap «АЛЛЕРГИИ И ОСОБЕННОСТИ» (литерал).
  *  7. AllergiesCard — glass r20: если allergies.length===0 → одна строка
- *     getNoAllergiesText() с зелёной галочкой; иначе — по строке на пару
+ *     getNoAllergiesText(locale) с зелёной галочкой; иначе — по строке на пару
  *     [название, примечание] с янтарной иконкой-предупреждением; подпись
  *     красится иначе, если распознаётся как врачебная рекомендация
  *     (содержит «Рекомендация»), а не как ограничение по аллергии.
  *  8. SectionCap «ПРИВИВКИ» (литерал).
- *  9. VaccinationsCard — glass r20, getVaccinations(): имя + дата слева,
+ *  9. VaccinationsCard — glass r20, getVaccinations(locale): имя + дата слева,
  *     StatusChip справа («Сделана» зелёный / «Запланирована» оранжевый),
  *     hairline-разделители кроме первой строки.
  * 10. SectionCap «МЕДОСМОТРЫ» (литерал).
@@ -336,9 +336,9 @@ export default function MedicalCardScreen() {
 
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
-  const card = getMedicalCard(childId);
-  const noAllergies = getNoAllergiesText();
-  const vaccinations = getVaccinations();
+  const card = getMedicalCard(locale, childId);
+  const noAllergies = getNoAllergiesText(locale);
+  const vaccinations = getVaccinations(locale);
 
   const heroGradient = child.avatar_gradient;
   const heroShadowColor = `${heroGradient[1]}55`;

@@ -312,7 +312,7 @@ export default function ReceiptsScreen() {
   const isChecks = tabIndex === 0;
 
   // Фильтруем один раз (данные из фикстур — стабильны).
-  const bills = getBills();
+  const bills = getBills(locale);
   const localeTag = LOCALE_TAG[locale];
   const allReceipts = receiptsFor(localeTag, {
     check: d.parentApp.pay2.receiptsChecks,

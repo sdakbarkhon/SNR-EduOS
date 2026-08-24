@@ -102,7 +102,7 @@ function SectionRow({
 
 export default function MessagesScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const navigation = useNavigation<Nav>();
   const bellCount = useUnreadNotifications();
@@ -122,7 +122,7 @@ export default function MessagesScreen() {
   );
   const chatPeers = (teachers.data ?? []).filter((x) => x.teacherName).slice(0, 3);
   // Превью — первая реплика той же переписки, которую открывает строка.
-  const chatPreview = getMessageThreads().find((x) => x.category === "chats")?.preview ?? "";
+  const chatPreview = getMessageThreads(locale).find((x) => x.category === "chats")?.preview ?? "";
 
   return (
     <AppBackground>

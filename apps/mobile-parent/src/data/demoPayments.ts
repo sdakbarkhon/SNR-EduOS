@@ -39,6 +39,8 @@
  */
 import { BILLS, PAYMENTS_OVERVIEW } from "@snr/core";
 import type { Gradient } from "./types";
+import { trDeep } from "./i18n";
+import type { Locale } from "@snr/core";
 
 export { BILLS, PAYMENTS_OVERVIEW };
 
@@ -420,7 +422,7 @@ export function receiptsFor(
  * «сегодня», поэтому подпись «Сегодня / Вчера / 27 июля» собирается здесь и
  * не устаревает вместе с замороженной датой демо.
  */
-export function walletOpsFor(): WalletOpsDayGroup[] {
+export function walletOpsFor(locale: Locale): WalletOpsDayGroup[] {
   const KEY: WalletOpsDayGroup["day_key"][] = ["t", "y", "d21"];
   return WALLET_OPS.map((day, i) => ({
     day_key: KEY[i] ?? "d21",
@@ -434,7 +436,7 @@ export function walletOpsFor(): WalletOpsDayGroup[] {
       gradient: op.gradient,
       icon_paths: op.paths,
     })),
-  }));
+  })).map((g) => trDeep(g, locale));
 }
 
 /**
@@ -445,7 +447,7 @@ export function walletOpsFor(): WalletOpsDayGroup[] {
  * кошельке вчерашним днём, а в питании — 21 июля, да ещё и с другим
  * временем. Теперь оба раздела читают одни и те же строки.
  */
-export function foodPurchases(): {
+export function foodPurchases(locale: Locale): {
   title: string;
   via: string;
   days_ago: number;
@@ -460,7 +462,7 @@ export function foodPurchases(): {
       out.push({ title: op.title, via: op.via, days_ago: day.daysAgo, time: op.time, amount: -op.amount });
     }
   }
-  return out;
+  return trDeep(out, locale);
 }
 
 /** Лимиты в форме экрана; названия категорий — из словаря. */

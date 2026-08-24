@@ -28,7 +28,7 @@
  *     «Все» паддинга нет вовсе. Это несогласованность самого макета;
  *     реализовано единообразно — паддинг 9×12 у всех 4 пилюль (ближайший
  *     цельный эквивалент, см. поле deviations).
- *  5. Список заявлений (getApplications(), отфильтрован по activeFilter):
+ *  5. Список заявлений (getApplications(locale), отфильтрован по activeFilter):
  *     каждая строка — ОТДЕЛЬНАЯ glass-карточка r18 (не общий список с
  *     разделителями): слева — плитка 36×36 r12 (row.gradient, 135°) с
  *     doc-глифом (ICONS.doc); по центру — name (12/800) + number_label
@@ -46,7 +46,7 @@
  *  7. Шторка выбора ребёнка (BottomSheetFrame + ChildPickerSheetContent) —
  *     переиспользован паттерн ChildProfileScreen.tsx 1:1.
  *
- * Данные — ТОЛЬКО через getApplications()/getChildren()/
+ * Данные — ТОЛЬКО через getApplications(locale)/getChildren()/
  * getSelectedChildContext() из "../../data" (фикстуры уже готовы, не
  * трогаются). Тексты экрана берутся из d.parentApp.* там, где ключ есть
  * (заголовок, класс, «Сменить ›» через switchLabel-конвенцию); статусы
@@ -282,7 +282,7 @@ function ApplicationCard({ row, onPress }: { row: ApplicationRow; onPress: () =>
 }
 
 export default function ApplicationsScreen() {
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const navigation = useNavigation<Nav>();
   const session = useAuthSession();
@@ -297,7 +297,7 @@ export default function ApplicationsScreen() {
   const ctx = getSelectedChildContext(childId);
   const child = ctx.child;
 
-  const rows = getApplications().filter(
+  const rows = getApplications(locale).filter(
     (r) => activeFilter === "all" || r.status === activeFilter,
   );
 

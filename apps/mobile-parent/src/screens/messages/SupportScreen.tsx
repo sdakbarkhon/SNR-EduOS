@@ -36,7 +36,7 @@
  *              + TextInput + send 36 (accent-grad + paper-plane #fff).
  *              Микрофона и эмодзи-иконки в макете НЕТ (совпадает с UI-decision).
  *
- * Данные — через getSupportChat() (src/data). Тексты хедера / meta-card /
+ * Данные — через getSupportChat(locale) (src/data). Тексты хедера / meta-card /
  * плейсхолдер поля — из фикстуры и словаря d.parentApp.msg. Обе темы — через
  * useTheme(); iOS safe-area — вручную (шапка + KeyboardAvoidingView + inset
  * снизу). Экран стековый — FloatingTabBar здесь не рендерится.
@@ -101,17 +101,17 @@ const SUPPORT_ICON_PATHS = [
 
 export default function SupportScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
 
-  const chat = getSupportChat();
+  const chat = getSupportChat(locale);
 
   // 23.08.2026. В фикстуре стояли фикстурное имя ребёнка и сумма счёта
   // литералом. Имя убрано совсем, класс берётся у настоящего ребёнка, а
   // сумма — из тех же BILLS, что и раздел оплат: разойтись им негде.
   const { child } = useChildScope();
-  const dueLine = getDueBills()
+  const dueLine = getDueBills(locale)
     .map((b) => `${b.title.split(" · ")[0].toLowerCase()} — ${formatMoney(b.amount)}`)
     .join(", ");
   const messages = chat.messages.map((m) => ({

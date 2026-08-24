@@ -12,12 +12,12 @@
  *     с иконкой «shield-check» и двумя строками: «Мы защищаем ваши данные» +
  *     подтекст про шифрование.
  *  4. SectionLabel uppercase «ДОКУМЕНТЫ РЕБЁНКА» (10.5/800, letterSpacing .08em).
- *  5. GlassCard-list — строки из getChildDocuments(): 36×36 gradient-плитка с
+ *  5. GlassCard-list — строки из getChildDocuments(locale): 36×36 gradient-плитка с
  *     doc-иконкой + name + subtitle + шеврон. Клик по «Медицинская справка» /
  *     «Прививки» → dmed (Медкарта); остальные → stub 'file' (просмотр файла) —
  *     маппинг задокументирован в fixtures/profile.ts::DOCUMENTS.
  *  6. SectionLabel uppercase «ДОКУМЕНТЫ РОДИТЕЛЯ».
- *  7. GlassCard-list — строки из getParentDocuments(); клик → stub 'file'.
+ *  7. GlassCard-list — строки из getParentDocuments(locale); клик → stub 'file'.
  *  8. PrimaryButton «Добавить документ» с плюсом → stub 'adddoc'.
  *  9. Футнот «Поддерживаются файлы: PDF, JPG, PNG (до 10 МБ)» — 9/600 ink3,
  *     text-align center.
@@ -63,11 +63,11 @@ const DOC_ICON_PATHS = [
 /** Родительский экспорт. */
 export default function DocumentsScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
-  const childDocs = getChildDocuments();
-  const parentDocs = getParentDocuments();
+  const childDocs = getChildDocuments(locale);
+  const parentDocs = getParentDocuments(locale);
 
   // Роутинг кликов по строкам (см. fixtures/profile.ts коммент к DOCUMENTS).
   const openChildDoc = (doc: DocumentRow) => () => {

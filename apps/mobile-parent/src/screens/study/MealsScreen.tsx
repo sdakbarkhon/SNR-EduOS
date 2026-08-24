@@ -31,7 +31,7 @@
  *  11. InfoBanner              (строки 1504–1507): оранжевая полупрозрачная плашка
  *                              с иконкой лампочки и правилами школьного питания.
  *
- * Данные — из фикстур: getWalletBalance(childId) и getMealsWeek() (MEALS_WEEK
+ * Данные — из фикстур: getWalletBalance(childId) и getMealsWeek(locale) (MEALS_WEEK
  * + MEALS_DAY_PILLS + DEFAULT_MEAL_DAY_INDEX). Тексты хрома — d.parentApp.*.
  * Обе темы — useTheme(). iOS safe-area через InnerHeader.
  *
@@ -274,7 +274,7 @@ export default function MealsScreen() {
   const { tokens, scheme } = useTheme();
   const { d, locale } = useAppLocale();
   const localeTag = LOCALE_TAG[locale];
-  const purchases = foodPurchases();
+  const purchases = foodPurchases(locale);
   const navigation = useNavigation<Nav>();
   const auth = useAuthSession();
 
@@ -283,7 +283,7 @@ export default function MealsScreen() {
   const walletBalance = getWalletBalance(childId);
 
   // Меню недели: 6 пиллов + 4-элементный список блюд выбранного дня.
-  const { week, day_pills, default_day_index } = getMealsWeek();
+  const { week, day_pills, default_day_index } = getMealsWeek(locale);
   const [mealDay, setMealDay] = useState<number>(default_day_index);
   const dishes = week[mealDay] ?? [];
 
