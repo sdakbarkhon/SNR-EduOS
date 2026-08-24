@@ -12,14 +12,22 @@
  * Связанные числа считаются из ОДНОГО источника:
  *  - «К оплате» 4 950 000 = сумма отмеченных счетов основного списка (BILLS);
  *  - «2 счёта» = число отмеченных счетов основного списка;
- *  - кошелёк Малики 185 000 (Dashboard/П17/d6) = WALLETS[1] (getWalletBalance);
- *  - итоги «Истории оплат» 10 250 000 / 10 100 000 / 150 000 = из PAYMENT_HISTORY.
+ *  - кошелёк 185 000 (Dashboard/П17/d6) = WALLET_BALANCE (getWalletBalance);
+ *  - итоги «Истории оплат» 10 250 000 / 10 190 000 / 60 000 = из PAYMENT_HISTORY.
  *
  * 14.08.2026 — семь разделов ушли отсюда на настоящие данные: дневник,
  * тесты, библиотека, профиль учителя, объявления, новости администрации,
  * уведомления. Их фикстуры и аксессоры удалены; бэйдж колокольчика тоже
  * больше не считается здесь (см. hooks/useUnreadNotifications.ts).
  */
+import {
+  BILLS,
+  PAYMENTS_OVERVIEW,
+  TOPUP_PRESETS,
+  WALLET_BALANCE,
+  historyTotals,
+  walletOpsFor,
+} from "./demoPayments";
 import type {
   ApplicationDetailRow,
   ApplicationRow,
@@ -103,6 +111,7 @@ import {
   ASSISTANT_TEXT_TEMPLATES,
   DASHBOARD_CHILD_STATUS,
   DASHBOARD_GREETING,
+  DUE_CARD,
   NEXT_LESSON_CARD,
   QUICK_ACTIONS,
 } from "./fixtures/home";
@@ -181,10 +190,11 @@ function childIndex(childId?: string): number {
 export function getSelectedChildContext(childId?: string): {
   child: ChildRow;
   info: ChildInfoRow;
+  wallet_balance: number;
 } {
   const child = resolveChild(childId);
   const idx = childIndex(childId);
-  return { child, info: CHILD_INFO[idx] };
+  return { child, info: CHILD_INFO[idx], wallet_balance: getWalletBalance(child.id) };
 }
 
 export function getChildInfo(childId?: string): ChildInfoRow {
@@ -309,18 +319,65 @@ export function getHomeworkUploadFixture() {
 }
 
 // ─── Оплаты ──────────────────────────────────────────────────────────────────
+//
+// 23.08.2026 — вернулись после 16.08. Тогда их убрали вместе с экранами оплат:
+// платёжной системы нет, и выдуманный баланс у настоящего родителя честнее
+// не показывать вовсе. Решение заказчика от 23.08 разделило два случая: у
+// настоящего родителя по-прежнему «Скоро», а в демо разделы заполнены —
+// иначе показывать нечего. Гейт стоит в навигаторе (demoOr), а не здесь:
+// слой данных про демо ничего не знает и знать не должен.
 
+export function getBills(): BillRow[] {
+  return BILLS;
+}
 
+/** Счета основного списка «К оплате сейчас» (по умолчанию отмечены). */
+export function getDueBills(): BillRow[] {
+  return BILLS.filter((b) => b.in_main_list);
+}
 
+/** «2 счёта» на Dashboard/П17 — считается, не хардкодится. */
+export function getDueBillsCount(): number {
+  return BILLS.filter((b) => b.in_main_list && b.checked_by_default).length;
+}
 
+/** ЕДИНЫЙ источник суммы «К оплате» (4 950 000 = 4 500 000 + 450 000). */
+export function getDueTotal(): number {
+  return BILLS.filter((b) => b.in_main_list && b.checked_by_default).reduce((s, b) => s + b.amount, 0);
+}
 
+export function getPaymentsOverview() {
+  return PAYMENTS_OVERVIEW;
+}
 
-
+/**
+ * Итоги «Истории оплат» — считаются из demoPayments.PAYMENT_HISTORY, а не
+ * хардкодятся: правка одной строки не должна заставлять цифры внизу врать.
+ */
+export function getPaymentHistoryTotals(): { total: number; successful: number; refunds: number } {
+  const t = historyTotals();
+  return { total: t.total, successful: t.net, refunds: t.refunds };
+}
 
 // ─── Кошелёк ─────────────────────────────────────────────────────────────────
 
+/**
+ * ЕДИНЫЙ источник баланса кошелька. Раньше он брался из таблицы балансов ПО
+ * ИНДЕКСУ выдуманного ребёнка — после перехода семьи на настоящие данные
+ * индекс указывал не туда, и главная спорила с экраном кошелька. Теперь одно
+ * число из demoPayments — то же, что показывает веб-родитель.
+ */
+export function getWalletBalance(_childId?: string): number {
+  return WALLET_BALANCE;
+}
 
+export function getWalletOps(_childId?: string): WalletOpsDayGroup[] {
+  return walletOpsFor();
+}
 
+export function getTopupPresets(): readonly number[] {
+  return TOPUP_PRESETS;
+}
 
 // ─── Уведомления ─────────────────────────────────────────────────────────────
 //
@@ -415,6 +472,16 @@ export function getDashboard(childId?: string) {
     child_status: DASHBOARD_CHILD_STATUS,
     next_lesson: NEXT_LESSON_CARD,
     quick_actions: QUICK_ACTIONS,
+    // Плитка «К оплате» и баланс кошелька: показываются ТОЛЬКО в демо
+    // (гейт в HomeScreen). Сумма и число счетов считаются из тех же BILLS,
+    // что и экран оплат, — второго источника нет и не заводится.
+    due_card: {
+      amount: getDueTotal(),
+      bills_count: getDueBillsCount(),
+      until_label: DUE_CARD.until_label,
+      gradient: DUE_CARD.gradient,
+    },
+    wallet_balance: getWalletBalance(child.id),
   };
 }
 

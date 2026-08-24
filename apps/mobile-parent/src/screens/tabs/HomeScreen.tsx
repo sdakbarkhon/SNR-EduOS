@@ -72,6 +72,7 @@ import { useAppLocale } from "../../i18n";
 import { formatMoney } from "../../lib/format";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
+import { useDemoSession } from "../../context/DemoSessionContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
@@ -255,6 +256,7 @@ export default function HomeScreen() {
 
   const session = useAuthSession();
   const { data: parentData, selectedChildId, selectChild } = useParentData();
+  const { isDemo } = useDemoSession();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
   const realIndex = isRealFlow
     ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
@@ -409,6 +411,16 @@ export default function HomeScreen() {
       valueColor: tokens.status.orange.text,
     },
   ];
+
+  // Кошелёк — выдуманное число, поэтому только в демо. У настоящего
+  // родителя метрик по-прежнему четыре, как и вчера.
+  if (isDemo) {
+    metricCells.push({
+      label: d.parentApp.home.wallet,
+      value: `${formatMoney(dashboard.wallet_balance)} ${d.parentApp.pay.sum}`,
+      flex: 1.4,
+    });
+  }
 
   // Карточка «Следующий урок» (242–245): реальные предмет/время/кабинет/
   // учитель (fallback предметник → куратор группы), нейтральный placeholder
@@ -593,6 +605,40 @@ export default function HomeScreen() {
           <AccentGlyphTile gradient={dashboard.next_lesson.gradient} glyph={nextLessonView.tileLabel} />
         </AccentCard>
 
+        {/* Плитка «К оплате» (макет 246–249) — ТОЛЬКО в демо.
+            16.08.2026 её убрали вместе с суммами, которых в базе нет; с
+            23.08.2026 она вернулась, но лишь для демо-входа: у настоящего
+            родителя главная остаётся без выдуманных сумм. Сумма и число
+            счетов приходят из getDueTotal()/getDueBillsCount() — тех же
+            BILLS, что и экран оплат, поэтому разойтись им негде. Соседняя
+            плитка «Питание» вернётся вместе со своим разделом. */}
+        {isDemo ? (
+          <AccentCard
+            gradient={[dashboard.due_card.gradient[0], dashboard.due_card.gradient[1]]}
+            shadowRgb="244,63,94"
+            radius={18}
+            contentStyle={{ padding: 12, gap: 4 }}
+            onPress={() => navigation.navigate("p17")}
+          >
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 9,
+                letterSpacing: 9 * 0.08,
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.85)",
+              }}
+            >
+              {d.parentApp.status.due}
+            </Text>
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
+              {`${formatMoney(dashboard.due_card.amount)} ${d.parentApp.pay.sum}`}
+            </Text>
+            <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: "rgba(255,255,255,0.9)" }}>
+              {`${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`}
+            </Text>
+          </AccentCard>
+        ) : null}
         {/* 16.08.2026. Отсюда убраны три выдуманных блока: «К оплате» и
             «Питание» (суммы и счета, которых в базе нет), карточка помощника
             (заготовленный текст) и лента «Сегодня» (выдуманные события).

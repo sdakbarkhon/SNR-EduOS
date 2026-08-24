@@ -23,6 +23,7 @@ import { LocaleProvider } from "./src/i18n";
 import { ThemeProvider, useTheme } from "./src/theme";
 import { AuthSessionProvider } from "./src/context/AuthSessionContext";
 import { ParentDataProvider } from "./src/context/ParentDataContext";
+import { DemoSessionProvider } from "./src/context/DemoSessionContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -103,12 +104,19 @@ export default function App() {
       <LocaleProvider>
         <ThemeProvider>
           <SafeAreaProvider>
-            <ParentDataProvider>
-              <AuthSessionProvider>
-                <ThemedStatusBar />
-                <RootNavigator />
-              </AuthSessionProvider>
-            </ParentDataProvider>
+            {/* DemoSessionProvider ВЫШЕ AuthSessionProvider: signInAsDemo()
+                записывает сюда ключ аренды, а провайдер должен быть уже
+                смонтирован к этому моменту. Он же держит продление аренды
+                (см. DemoSessionContext) и отвечает на вопрос «мы в демо?»
+                для разделов, заполненных выдуманными данными. */}
+            <DemoSessionProvider>
+              <ParentDataProvider>
+                <AuthSessionProvider>
+                  <ThemedStatusBar />
+                  <RootNavigator />
+                </AuthSessionProvider>
+              </ParentDataProvider>
+            </DemoSessionProvider>
           </SafeAreaProvider>
         </ThemeProvider>
       </LocaleProvider>

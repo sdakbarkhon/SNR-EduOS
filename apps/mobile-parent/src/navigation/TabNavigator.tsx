@@ -22,7 +22,8 @@ import { useAppLocale } from "../i18n";
 import { FloatingTabBar, type FloatingTabItem } from "../ui/FloatingTabBar";
 import type { TabParamList, TabRouteName } from "./routes";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
-import { comingSoon } from "../screens/ComingSoonScreen";
+import { demoOr } from "../screens/ComingSoonScreen";
+import PaymentsScreen from "../screens/tabs/PaymentsScreen";
 
 /**
  * Обёртки считаются ОДИН раз на модуль, а не в разметке.
@@ -33,7 +34,7 @@ import { comingSoon } from "../screens/ComingSoonScreen";
 const HomeScreenTab = withScreenBoundary(HomeScreen);
 const ProgressScreenTab = withScreenBoundary(ProgressScreen);
 const PaymentsScreenTab = withScreenBoundary(
-  comingSoon("payments", "card", ["#7c3aed", "#4f6df5"], true),
+  demoOr(PaymentsScreen, "payments", "card", ["#7c3aed", "#4f6df5"], true),
 );
 const MessagesScreenTab = withScreenBoundary(MessagesScreen);
 const ProfileHubScreenTab = withScreenBoundary(ProfileHubScreen);

@@ -21,7 +21,7 @@
  */
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import StubScreen from "../screens/StubScreen";
-import { comingSoon } from "../screens/ComingSoonScreen";
+import { comingSoon, demoOr } from "../screens/ComingSoonScreen";
 import AboutScreen from "../screens/profile/AboutScreen";
 import TabNavigator from "./TabNavigator";
 import { STACK_ROUTES, type MainStackParamList, type StackRouteName } from "./routes";
@@ -60,6 +60,15 @@ import ChildProfileScreen from "../screens/profile/ChildProfileScreen";
 import ParentDataScreen from "../screens/profile/ParentDataScreen";
 import NotifSettingsScreen from "../screens/profile/NotifSettingsScreen";
 import LangSecurityScreen from "../screens/profile/LangSecurityScreen";
+import BillsScreen from "../screens/payments/BillsScreen";
+import PaymentHistoryScreen from "../screens/payments/PaymentHistoryScreen";
+import ReceiptsScreen from "../screens/payments/ReceiptsScreen";
+import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
+import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
+import TopUpScreen from "../screens/payments/TopUpScreen";
+import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
+import TransferScreen from "../screens/payments/TransferScreen";
+import LimitsScreen from "../screens/payments/LimitsScreen";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -93,15 +102,15 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
  * открываются как локальные BottomSheet внутри своих parent-экранов.
  */
 const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
-  d18: comingSoon("bills", "doc", ["#fb923c", "#ef4444"]),
-  d20: comingSoon("payHistory", "clock", ["#60a5fa", "#2563eb"]),
-  d21: comingSoon("receipts", "doc", ["#fbbf24", "#f97316"]),
-  d22: comingSoon("wallet", "wallet", ["#7c3aed", "#a855f7"]),
-  d33: comingSoon("payMethods", "card", ["#a78bfa", "#7c3aed"]),
-  dtop: comingSoon("topup", "plus", ["#34d399", "#059669"]),
-  dwops: comingSoon("walletOps", "clock", ["#fbbf24", "#f97316"]),
-  dtransfer: comingSoon("transfer", "card", ["#60a5fa", "#2563eb"]),
-  dlimits: comingSoon("limits", "grid", ["#a78bfa", "#7c3aed"]),
+  d18: demoOr(BillsScreen, "bills", "doc", ["#fb923c", "#ef4444"]),
+  d20: demoOr(PaymentHistoryScreen, "payHistory", "clock", ["#60a5fa", "#2563eb"]),
+  d21: demoOr(ReceiptsScreen, "receipts", "doc", ["#fbbf24", "#f97316"]),
+  d22: demoOr(ChildWalletScreen, "wallet", "wallet", ["#7c3aed", "#a855f7"]),
+  d33: demoOr(PayMethodsScreen, "payMethods", "card", ["#a78bfa", "#7c3aed"]),
+  dtop: demoOr(TopUpScreen, "topup", "plus", ["#34d399", "#059669"]),
+  dwops: demoOr(WalletOpsScreen, "walletOps", "clock", ["#fbbf24", "#f97316"]),
+  dtransfer: demoOr(TransferScreen, "transfer", "card", ["#60a5fa", "#2563eb"]),
+  dlimits: demoOr(LimitsScreen, "limits", "grid", ["#a78bfa", "#7c3aed"]),
 };
 
 /**

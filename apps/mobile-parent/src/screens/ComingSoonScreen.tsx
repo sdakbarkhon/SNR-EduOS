@@ -15,6 +15,7 @@
  * у стековых разделов сверху обычная шапка с «назад», у вкладки — корневая
  * шапка, а нижние вкладки рисует сам таб-навигатор.
  */
+import type { ComponentType } from "react";
 import { Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,6 +23,7 @@ import Svg, { Path } from "react-native-svg";
 import { AppBackground, fonts, gradPoints, useTheme } from "../theme";
 import { InnerHeader, RootHeader } from "../ui";
 import { useAppLocale } from "../i18n";
+import { useDemoSession } from "../context/DemoSessionContext";
 import { ICONS } from "../navigation/routes";
 
 export type ComingSoonProps = {
@@ -127,5 +129,40 @@ export function comingSoon(
     <ComingSoonScreen sectionKey={sectionKey} icon={icon} gradient={gradient} root={root} />
   );
   Screen.displayName = `ComingSoon(${sectionKey})`;
+  return Screen;
+}
+
+/**
+ * Раздел, у которого настоящих данных в базе нет.
+ *
+ * ЗАЧЕМ. 16.08.2026 такие разделы стали честным пустым экраном — родитель не
+ * должен принимать выдуманный баланс за свой. Но у демо задача другая: оно
+ * показывает, КАК приложение будет выглядеть, и пустой экран этого не
+ * показывает. Решение заказчика от 23.08: разница между демо и настоящим
+ * входом — не в правах, а в том, чем заполнены разделы без данных.
+ *
+ * ЧТО ДЕЛАЕТ. Вошли через кнопку «Демо» — показывает demoScreen с выдуманными
+ * данными. Вошли по номеру телефона — тот же самый ComingSoonScreen, что и
+ * вчера, слово в слово.
+ *
+ * ПОЧЕМУ ПРИЗНАК ИМЕННО ТАКОЙ. isDemo — это наличие ключа аренды демо-места,
+ * выданного сервером кнопке «Демо». Не «школа заморожена» и не «номер
+ * телефона такой-то»: заведут второго настоящего родителя в демо-школе — и
+ * он увидел бы выдуманное как своё.
+ */
+export function demoOr(
+  demoScreen: ComponentType<Record<string, never>>,
+  sectionKey: string,
+  icon: string,
+  gradient: [string, string],
+  root = false,
+) {
+  const DemoScreen = demoScreen;
+  const Screen = () => {
+    const { isDemo } = useDemoSession();
+    if (isDemo) return <DemoScreen />;
+    return <ComingSoonScreen sectionKey={sectionKey} icon={icon} gradient={gradient} root={root} />;
+  };
+  Screen.displayName = `DemoOr(${sectionKey})`;
   return Screen;
 }

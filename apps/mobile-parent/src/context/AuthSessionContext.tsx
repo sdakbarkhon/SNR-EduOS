@@ -27,6 +27,7 @@ import { NotParentError } from "../lib/auth";
 import { PhoneLoginFailure, requestPhoneCode, verifyPhoneCode, type PhoneLoginError } from "../lib/parentPhoneLogin";
 import { GoogleLoginFailure, loginParentWithGoogle, type GoogleLoginError } from "../lib/parentGoogleLogin";
 import { useParentData } from "./ParentDataContext";
+import { useDemoSession } from "./DemoSessionContext";
 
 export type AuthPhase = "onboarding" | "phone" | "sms" | "childPicker" | "app";
 
@@ -151,6 +152,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const { data: parentData, refresh: refreshParentData, selectChild: selectParentChild } = useParentData();
+  // 23.08.2026. Ключ аренды демо-места приходил из claimDemoParent() и
+  // ВЫБРАСЫВАЛСЯ: продление не шло, и слот отваливался посреди показа. Теперь
+  // он сохраняется — это же и есть признак «вошли через кнопку Демо», по
+  // которому разделы без настоящих данных показывают выдуманные. Поведение
+  // самого входа не меняется: тот же слот, те же токены, те же экраны.
+  const { setDemoSession, clearDemoSession } = useDemoSession();
   // Тот же приём, что и stateRef — verifyCode() читает это ПОСЛЕ await
   // refreshParentData(), поэтому нужен самый свежий parentData, а не тот,
   // что был захвачен замыканием при последнем создании useCallback.
@@ -417,6 +424,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         return "error";
       }
 
+      // Ключ аренды — до входа в приложение: разделы читают признак демо уже
+      // на первом кадре, и он должен быть выставлен раньше, чем phase="app".
+      await setDemoSession(claimed.session_token);
+
       await refreshParentData();
       const kids = parentDataRef.current?.children ?? [];
       setState((s) => ({
@@ -434,7 +445,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     } finally {
       demoBusyRef.current = false;
     }
-  }, [refreshParentData]);
+  }, [refreshParentData, setDemoSession]);
 
   const pickChildIndex = useCallback((i: number) => {
     setState((s) => ({ ...s, authSel: i }));
@@ -462,8 +473,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     // ParentDataContext сам переизберёт первого ребёнка НОВОЙ семьи, как
     // только refreshParentData() отработает при следующем логине.
     selectParentChild(null);
+    // 23.08.2026. Признак демо обязан гаснуть вместе с сессией. Без этого он
+    // пережил бы выход (ключ лежит в SecureStore), и следующий вход по номеру
+    // телефона — настоящий родитель — увидел бы выдуманные разделы как свои.
+    // Заодно отпускается само демо-место, а не ждёт истечения аренды.
+    void clearDemoSession();
     setState(INITIAL_STATE);
-  }, [selectParentChild]);
+  }, [selectParentChild, clearDemoSession]);
 
   const value = useMemo<AuthSessionCtx>(
     () => ({
