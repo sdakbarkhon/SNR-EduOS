@@ -97,8 +97,10 @@ export default function PaymentsScreen() {
   // вкладка спорила бы с экраном счетов об имени и классе. Баланс кошелька
   // берём оттуда же, где и раньше: он один на семью и от ребёнка не зависит.
   const { child: scopedChild } = useChildScope();
-  const { child: fallbackChild, wallet_balance } = getSelectedChildContext();
-  const child = scopedChild ?? fallbackChild;
+  // wallet_balance от ребёнка не зависит (одно число на семью) — берём его
+  // отсюда, а ИМЯ только из настоящего ребёнка: пока данные едут, лучше
+  // пустая подпись, чем мелькнувшее фикстурное «Малика».
+  const { wallet_balance } = getSelectedChildContext();
   const localeTag = LOCALE_TAG[locale];
   // Префикс подписи счёта — как на экране счетов, из настоящего ребёнка.
   const who = scopedChild ? `${scopedChild.first_name} · ${scopedChild.class_name}` : "";
@@ -377,12 +379,12 @@ export default function PaymentsScreen() {
               }}
             >
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#7c3aed" }}>
-                {child.first_name.slice(0, 1)}
+                {scopedChild ? scopedChild.first_name.slice(0, 1) : ""}
               </Text>
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: "#fff" }}>
-                {fillTemplate(d.parentApp.pay.walletTitle, { gen: child.first_name_gen })}
+                {fillTemplate(d.parentApp.pay.walletTitle, { gen: scopedChild?.first_name_gen ?? "" })}
               </Text>
               <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: "rgba(255,255,255,0.8)" }}>
                 {d.parentApp.pay.walletSub}

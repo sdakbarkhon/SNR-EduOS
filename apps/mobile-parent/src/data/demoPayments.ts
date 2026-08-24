@@ -159,16 +159,29 @@ export interface ReceiptRow {
 
 /** Чеки — к уже проведённым оплатам, суммы совпадают с историей строка в
  *  строку. Счета — то, что ещё предстоит; их сроки совпадают с BILL_META. */
+/** Номера счетов-фактур — из бумаг школы, не вычисляются. Порядок = BILLS. */
+const INVOICE_NUMBERS = ["INV-2026-07-001", "INV-2026-07-002", "INV-2026-07-003", "INV-2026-06-014"] as const;
+
 export const RECEIPTS: ReceiptRow[] = [
   { id: "rcp-18", kind: "check", visual: "edu", title: "Обучение · июль", number: "RCP-2026-07-018", date: "2026-07-03", amount: 4500000, paid: true },
   { id: "rcp-19", kind: "check", visual: "food", title: "Питание · июль", number: "RCP-2026-07-019", date: "2026-07-03", amount: 450000, paid: true },
   { id: "rcp-31", kind: "check", visual: "food", title: "Питание · перерасчёт", number: "RCP-2026-07-031", date: "2026-07-18", amount: 60000, paid: true },
   { id: "rcp-11", kind: "check", visual: "edu", title: "Обучение · июнь", number: "RCP-2026-06-011", date: "2026-06-04", amount: 4500000, paid: true },
   { id: "rcp-24", kind: "check", visual: "form", title: "Школьная форма", number: "RCP-2026-06-024", date: "2026-06-12", amount: 350000, paid: true },
-  { id: "inv-01", kind: "invoice", visual: "edu", title: "Обучение · август", number: "INV-2026-07-001", date: "2026-07-20", amount: 4500000, paid: false },
-  { id: "inv-02", kind: "invoice", visual: "food", title: "Питание · август", number: "INV-2026-07-002", date: "2026-07-20", amount: 450000, paid: false },
-  { id: "inv-03", kind: "invoice", visual: "form", title: "Школьная форма", number: "INV-2026-07-003", date: "2026-07-21", amount: 350000, paid: false },
-  { id: "inv-14", kind: "invoice", visual: "exc", title: "Экскурсия в музей", number: "INV-2026-06-014", date: "2026-06-28", amount: 150000, paid: false },
+  // 23.08.2026 (сквозная сверка). Четыре неоплаченных счёта-фактуры — это
+  // ровно те же четыре счёта, что показывает раздел «Счета к оплате», и их
+  // суммы стояли здесь вторыми литералами. Совпадали, но разошлись бы при
+  // первой же правке. Теперь берутся из BILLS — источник один.
+  ...BILLS.map((b, i) => ({
+    id: `inv-${b.id}`,
+    kind: "invoice" as const,
+    visual: b.id as ReceiptRow["visual"],
+    title: b.title,
+    number: INVOICE_NUMBERS[i] ?? `INV-2026-07-${String(i + 1).padStart(3, "0")}`,
+    date: BILL_META[b.id]?.dueDate ?? "2026-08-05",
+    amount: b.amount,
+    paid: false,
+  })),
 ];
 
 /* ── Карты и способы оплаты ───────────────────────────────────────────────── */
@@ -411,6 +424,7 @@ export function walletOpsFor(): WalletOpsDayGroup[] {
   const KEY: WalletOpsDayGroup["day_key"][] = ["t", "y", "d21"];
   return WALLET_OPS.map((day, i) => ({
     day_key: KEY[i] ?? "d21",
+    days_ago: day.daysAgo,
     ops: day.ops.map((op) => ({
       direction: op.direction,
       title: op.title,
@@ -421,6 +435,32 @@ export function walletOpsFor(): WalletOpsDayGroup[] {
       icon_paths: op.paths,
     })),
   }));
+}
+
+/**
+ * Покупки питания — ТОТ ЖЕ источник, что и операции кошелька.
+ *
+ * 23.08.2026. До этого экран питания держал свой список из трёх строк, и
+ * одна и та же покупка («Буфет · сок и булочка», 9 000) показывалась в
+ * кошельке вчерашним днём, а в питании — 21 июля, да ещё и с другим
+ * временем. Теперь оба раздела читают одни и те же строки.
+ */
+export function foodPurchases(): {
+  title: string;
+  via: string;
+  days_ago: number;
+  time: string;
+  amount: number;
+}[] {
+  const out: { title: string; via: string; days_ago: number; time: string; amount: number }[] = [];
+  for (const day of WALLET_OPS) {
+    for (const op of day.ops) {
+      if (op.direction !== "out") continue;
+      if (!op.title.startsWith("Столовая") && !op.title.startsWith("Буфет")) continue;
+      out.push({ title: op.title, via: op.via, days_ago: day.daysAgo, time: op.time, amount: -op.amount });
+    }
+  }
+  return out;
 }
 
 /** Лимиты в форме экрана; названия категорий — из словаря. */

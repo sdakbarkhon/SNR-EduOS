@@ -55,6 +55,8 @@ import {
 import type { WalletOpsDayGroup } from "../../data";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useAppLocale } from "../../i18n";
+import { LOCALE_TAG } from "@snr/core";
+import { dayMonth, schoolDayKey } from "../../lib/dateLabels";
 import { DemoBanner } from "./parts";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -233,7 +235,7 @@ function DayHeader({ text }: { text: string }) {
 
 export default function WalletOpsScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const navigation = useNavigation<Nav>();
   const session = useAuthSession();
@@ -261,20 +263,24 @@ export default function WalletOpsScreen() {
     statusTone: k.status_chip === "В школе" ? "green" : "gray",
   }));
 
-  // Заголовки групп по day_key (макет 1751/1753/1755). Ключи 't'/'y'/'d21'
-  // определены в WALLET_OPS (src/data/fixtures/wallet.ts) и всегда идут в
-  // этом порядке — сохраняем 1:1 без сортировки.
-  const dayTitles: Record<WalletOpsDayGroup["day_key"], string> = {
-    t: "СЕГОДНЯ",
-    y: "ВЧЕРА",
-    d21: "21 ИЮЛЯ",
-  };
+  // 23.08.2026. Было: три подписи русскими строками, включая «21 ИЮЛЯ» —
+  // на узбекском и английском экран печатал бы русский текст, а сама дата
+  // устаревала бы вместе с замороженной датой демо. Теперь день считается
+  // от школьного «сегодня» по смещению, а слова берутся из словаря.
+  const dayTitle = (daysAgo: number): string =>
+    (daysAgo === 0
+      ? d.parentApp.date.today
+      : daysAgo === 1
+        ? d.parentApp.date.yesterday
+        : dayMonth(schoolDayKey(daysAgo), LOCALE_TAG[locale])
+    ).toUpperCase();
 
   // Фильтрация операций внутри группы по активному табу.
   const filteredGroups = useMemo(
     () =>
       groups.map((g) => ({
         day_key: g.day_key,
+        days_ago: g.days_ago,
         ops:
           filter === "all"
             ? g.ops
@@ -390,7 +396,7 @@ export default function WalletOpsScreen() {
         {/* Блоки 6–11: три группы операций. */}
         {filteredGroups.map((group) => (
           <View key={group.day_key} style={{ gap: 8 }}>
-            <DayHeader text={dayTitles[group.day_key]} />
+            <DayHeader text={dayTitle(group.days_ago)} />
             {group.ops.map((op, i) => (
               <GlassCard
                 key={`${group.day_key}-${i}`}

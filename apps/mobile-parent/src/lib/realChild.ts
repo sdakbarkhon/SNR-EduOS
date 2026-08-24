@@ -23,6 +23,20 @@ export const REAL_CHILD_PALETTE: [Gradient, string][] = [
  *  появятся вместе с реальными data-экранами в следующих заходах, не сейчас:
  *  status_chip оставлен пустым намеренно — вызывающая сторона должна не
  *  рендерить статус-чип вовсе, а не показывать пустую пилюлю). */
+/**
+ * Группы в базе названы «10-А класс» — слово «класс» уже внутри названия.
+ * Экраны при этом дописывают его ещё раз («{класс} {слово}»), и подпись
+ * читалась как «10-А класс класс». Найдено сквозной сверкой 23.08.2026.
+ *
+ * Убираем слово из значения, а не из десяти мест сборки подписи: тогда
+ * подпись собирается на языке интерфейса («10-А класс» / «10-А sinf» /
+ * «10-A class»), а там, где класс показывают без слова, остаётся «10-А».
+ */
+function stripClassWord(name: string | null | undefined): string {
+  const clean = (name ?? "").replace(/s*(класс|sinf|class)s*$/i, "").trim();
+  return clean || name || "—";
+}
+
 export function toChildRow(c: ParentChildSummary, index: number): ChildRow {
   const firstName = c.fullName.split(" ")[0] ?? c.fullName;
   const [gradient, ring] = REAL_CHILD_PALETTE[index % REAL_CHILD_PALETTE.length];
@@ -32,7 +46,7 @@ export function toChildRow(c: ParentChildSummary, index: number): ChildRow {
     first_name: firstName,
     first_name_gen: firstName,
     is_female: false,
-    class_name: c.className ?? "—",
+    class_name: stripClassWord(c.className),
     group_id: c.groupId ?? "",
     status_chip: "",
     avatar_gradient: gradient,

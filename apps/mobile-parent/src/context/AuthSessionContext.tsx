@@ -10,11 +10,16 @@
  * проверяет его по-настоящему (срок жизни, лимит попыток, одноразовость) —
  * тот же механизм, что на вебе после ec41048, через /api/parent/*.
  *
- * ДЕМО-ВХОД УДАЛЁН целиком (решение заказчика): приложение только для
- * настоящих родителей. Вместе с ним ушли AuthDemoPickerSheet,
- * loginAsTestAccount и карта номеров. Поле isDemo осталось константой false
- * — на него завязан RootNavigator, и убирать его отсюда значило бы трогать
- * навигацию ради мёртвой ветки.
+ * ДЕМО-ВХОД. 10.08.2026 прежний демо-вход был удалён как дырявый (три
+ * зашитых номера, общий пароль открытым текстом, непроверяемый код).
+ * 18.08.2026 он вернулся по-другому: сервер входит сам и отдаёт пару
+ * токенов на час, привязанную к аренде места. С 23.08.2026 ключ этой
+ * аренды сохраняется — он же признак «мы в демо», по которому разделы без
+ * настоящих данных показывают выдуманные (см. demoOr).
+ *
+ * Поле isDemo в ЭТОМ состоянии осталось константой false и признаком не
+ * является — на него завязан только RootNavigator. Настоящий признак живёт
+ * в DemoSessionContext. Не путать их.
  *
  * Дети берутся из настоящей привязки родителя (getParentContext через
  * ParentDataContext), а не из фикстурного набора, подобранного по количеству.
@@ -315,6 +320,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         }));
         return "error";
       }
+      // 23.08.2026 (сквозная сверка захода 3). Признак демо живёт в защищённом
+      // хранилище телефона и переживает закрытие приложения. Если демо-сессию
+      // не завершили кнопкой «Выйти», а просто закрыли приложение, ключ
+      // остаётся — и следующий вход НАСТОЯЩЕГО родителя показал бы ему
+      // выдуманные оплаты, питание и портфолио как свои. Гасим явно.
+      await clearDemoSession();
+
       // Сессия установлена — ParentDataProvider должен перезапросить
       // getParentContext(): picker обязан смонтироваться уже с настоящими
       // детьми, без мелькания старых данных.
@@ -340,7 +352,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     } finally {
       verifyBusyRef.current = false;
     }
-  }, [refreshParentData]);
+  }, [refreshParentData, clearDemoSession]);
 
   /**
    * Вход через Google. Хвост после успеха — тот же, что у verifyCode: сессия
@@ -370,6 +382,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         }));
         return "error";
       }
+      // 23.08.2026 (сквозная сверка захода 3). Признак демо живёт в защищённом
+      // хранилище телефона и переживает закрытие приложения. Если демо-сессию
+      // не завершили кнопкой «Выйти», а просто закрыли приложение, ключ
+      // остаётся — и следующий вход НАСТОЯЩЕГО родителя показал бы ему
+      // выдуманные оплаты, питание и портфолио как свои. Гасим явно.
+      await clearDemoSession();
+
       await refreshParentData();
       const kids = parentDataRef.current?.children ?? [];
       setState((s) => ({
@@ -387,7 +406,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     } finally {
       googleBusyRef.current = false;
     }
-  }, [refreshParentData]);
+  }, [refreshParentData, clearDemoSession]);
 
   /**
    * Демо-вход родителем.
@@ -445,7 +464,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     } finally {
       demoBusyRef.current = false;
     }
-  }, [refreshParentData, setDemoSession]);
+  }, [refreshParentData, setDemoSession, clearDemoSession]);
 
   const pickChildIndex = useCallback((i: number) => {
     setState((s) => ({ ...s, authSel: i }));

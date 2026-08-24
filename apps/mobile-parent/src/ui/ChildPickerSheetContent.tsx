@@ -125,26 +125,31 @@ export function ChildPickerSheetContent({
                 {item.classLabel}
               </Text>
             </View>
-            <View
-              style={{
-                paddingVertical: 4,
-                paddingHorizontal: 9,
-                borderRadius: 999,
-                backgroundColor: chip.bg,
-                borderWidth: 1,
-                borderColor: chip.border,
-              }}
-            >
-              <Text
+            {/* 23.08.2026. Статуса «в школе / дома» в базе нет: у настоящего
+                ребёнка statusLabel приходит пустым, и плашка рисовалась
+                пустым цветным овалом. Пустую подпись не рисуем вовсе. */}
+            {item.statusLabel ? (
+              <View
                 style={{
-                  fontFamily: fonts.manrope800,
-                  fontSize: 9.5,
-                  color: st.text,
+                  paddingVertical: 4,
+                  paddingHorizontal: 9,
+                  borderRadius: 999,
+                  backgroundColor: chip.bg,
+                  borderWidth: 1,
+                  borderColor: chip.border,
                 }}
               >
-                {item.statusLabel}
-              </Text>
-            </View>
+                <Text
+                  style={{
+                    fontFamily: fonts.manrope800,
+                    fontSize: 9.5,
+                    color: st.text,
+                  }}
+                >
+                  {item.statusLabel}
+                </Text>
+              </View>
+            ) : null}
             {/* Галочка выбранного (строка 4381). */}
             {selected ? (
               <View

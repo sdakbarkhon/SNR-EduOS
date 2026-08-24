@@ -359,6 +359,8 @@ export interface WalletOpRow {
 /** Группа операций по дню: t — сегодня, y — вчера, d21 — 21 июля. */
 export interface WalletOpsDayGroup {
   day_key: "t" | "y" | "d21";
+  /** Сколько дней назад: 0 — сегодня. Подпись собирает экран. */
+  days_ago: number;
   ops: WalletOpRow[];
 }
 

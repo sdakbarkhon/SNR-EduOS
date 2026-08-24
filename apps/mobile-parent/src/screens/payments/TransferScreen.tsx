@@ -309,7 +309,9 @@ export default function TransferScreen() {
   const kids: ChildRow[] = getChildren();
 
   // Локальные балансы (в проде мутация уходит в БД; здесь — session-scoped).
-  const [balances, setBalances] = useState<Record<string, number>>(() =>
+  // 23.08.2026: сеттер убран — балансы больше не мутируются, перевод не
+  // изображается, а объясняется (см. handleTransfer ниже).
+  const [balances] = useState<Record<string, number>>(() =>
     Object.fromEntries(kids.map((k) => [k.id, getWalletBalance(k.id)])),
   );
 

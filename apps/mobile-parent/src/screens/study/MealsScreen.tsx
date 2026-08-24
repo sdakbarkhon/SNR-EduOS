@@ -55,9 +55,10 @@ import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../t
 import { AccentCard, GlassCard, GlassCircleButton, InnerHeader, SectionHeader } from "../../ui";
 import { DemoBanner } from "../../ui/notices";
 import { DEMO_TODAY, getMealsWeek, getWalletBalance } from "../../data";
+import { foodPurchases } from "../../data/demoPayments";
 import { useAppLocale } from "../../i18n";
 import { LOCALE_TAG } from "@snr/core";
-import { dayMonth } from "../../lib/dateLabels";
+import { dayMonth, schoolDayKey } from "../../lib/dateLabels";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { formatMoney } from "../../lib/format";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
@@ -113,22 +114,14 @@ const TODAY_COMPLEX = {
 /** Три транзакции «Последние покупки» (стр. 1500–1502) — суммы отрицательные,
  *  чтобы formatMoney напечатал их с «-» + NBSP-разрядами. */
 type PurchaseIconKind = "canteen" | "buffet-warm" | "buffet-cold";
-// 23.08.2026. Было: dateTime готовой русской строкой («21 июля, 10:20») —
-// на узбекском и английском экран печатал бы русский текст. Теперь день
-// хранится ключом, а подпись собирается на языке интерфейса; «сегодня»
-// берётся из школьного времени, поэтому не устаревает вместе с заморозкой.
-const RECENT_PURCHASES: {
-  title: string;
-  /** День покупки, «YYYY-MM-DD»; null — сегодня по школьному времени. */
-  date: string | null;
-  time: string;
-  amount: number;
-  iconKind: PurchaseIconKind;
-}[] = [
-  { title: "Столовая · обед", date: null, time: "12:40", amount: -18000, iconKind: "canteen" },
-  { title: "Буфет · сок и булочка", date: "2026-07-21", time: "10:20", amount: -9000, iconKind: "buffet-warm" },
-  { title: "Буфет · вода", date: "2026-07-18", time: "11:05", amount: -5000, iconKind: "buffet-cold" },
-];
+// 23.08.2026 (заход 3). Свой список покупок убран: он спорил с операциями
+// кошелька — одна и та же покупка стояла там вчерашним днём, а здесь 21 июля.
+// Теперь строки берутся из общего источника (foodPurchases), а иконка
+// подбирается по названию: «Столовая» — поднос, «Буфет» — стакан.
+function purchaseIconKind(title: string, via: string): PurchaseIconKind {
+  if (title.startsWith("Столовая")) return "canteen";
+  return /вод|сок|компот|чай/i.test(via) && /вод/i.test(via) ? "buffet-cold" : "buffet-warm";
+}
 
 const PURCHASE_ICONS: Record<
   PurchaseIconKind,
@@ -281,6 +274,7 @@ export default function MealsScreen() {
   const { tokens, scheme } = useTheme();
   const { d, locale } = useAppLocale();
   const localeTag = LOCALE_TAG[locale];
+  const purchases = foodPurchases();
   const navigation = useNavigation<Nav>();
   const auth = useAuthSession();
 
@@ -597,7 +591,7 @@ export default function MealsScreen() {
 
         {/* Блок 10 — RecentPurchasesCard (строки 1499–1503). */}
         <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
-          {RECENT_PURCHASES.map((p, i) => (
+          {purchases.map((p, i) => (
             <View
               key={p.title}
               style={{
@@ -609,7 +603,7 @@ export default function MealsScreen() {
                 borderTopColor: rowDivider,
               }}
             >
-              <PurchaseIcon kind={p.iconKind} />
+              <PurchaseIcon kind={purchaseIconKind(p.title, p.via)} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   numberOfLines={1}
@@ -629,7 +623,7 @@ export default function MealsScreen() {
                     color: dateSubInk,
                   }}
                 >
-                  {`${p.date ? dayMonth(p.date, localeTag) : d.parentApp.date.today}, ${p.time}`}
+                  {`${p.days_ago === 0 ? d.parentApp.date.today : dayMonth(schoolDayKey(p.days_ago), localeTag)}, ${p.time}`}
                 </Text>
               </View>
               <Text

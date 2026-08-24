@@ -10,6 +10,7 @@
  * Поэтому он привязывается к полудню Ташкента: любое смещение внутри суток
  * тогда безопасно, и подпись не съезжает на соседний день.
  */
+import { getAppNowMs } from "./appTime";
 import { APP_TIME_ZONE } from "@snr/core";
 
 const TZ = { timeZone: APP_TIME_ZONE } as const;
@@ -83,4 +84,17 @@ export function monthYear(monthKey: string, localeTag: string): string {
     year: "numeric",
     ...TZ,
   });
+}
+
+/**
+ * Ключ дня «YYYY-MM-DD» по школьному времени со сдвигом назад.
+ *
+ * 23.08.2026: заходы 1–2 оставили в демо две подписи дней, собранные руками —
+ * «21 ИЮЛЯ» в операциях кошелька и отдельный список дат в покупках питания.
+ * Из-за этого одна и та же покупка показывалась в двух разделах разными
+ * днями. Теперь обе стороны считают день отсюда, от школьного «сегодня».
+ */
+export function schoolDayKey(daysAgo = 0): string {
+  const at = new Date(getAppNowMs() - daysAgo * 86400000);
+  return new Intl.DateTimeFormat("en-CA", { ...TZ }).format(at);
 }
