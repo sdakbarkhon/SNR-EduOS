@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Calendar, CheckCircle2, Clock, FileText, Megaphone, Users,
 } from "lucide-react";
-import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime, formatDate, formatRoom } from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
@@ -57,38 +57,64 @@ interface Props {
   }>;
 }
 
-// ── Timeline constants ────────────────────────────────────────────────────────
+// ── Расписание дня ────────────────────────────────────────────────────────────
 
-const T_START = 8;
-const T_END = 18;
-const HOUR_PX = 52; // px per hour
-const TOTAL_H = (T_END - T_START) * HOUR_PX;
+// 24.08.2026 — ПОЧАСОВОЙ ШКАЛЫ БОЛЬШЕ НЕТ.
+// Блок рисовал сетку с 08:00 до 17:00 фиксированной высоты (520 px). Уроки
+// занимали четыре строки сверху, под ними стояло шесть часов пустоты — больше
+// половины блока. Теперь список карточек: блок ровно по содержимому, пустого
+// места нет вовсе.
 
-function minuteOffset(iso: string): number {
-  const d = new Date(iso);
-  return (d.getHours() - T_START) * 60 + d.getMinutes();
+/** Прошёл, идёт или ещё будет — по школьному времени. */
+type LessonPhase = "past" | "now" | "future";
+
+/**
+ * Фаза урока.
+ *
+ * Тот же счёт, что у плитки «Уроков сегодня» наверху: прошедшим считается
+ * завершённый ИЛИ тот, у кого время окончания позади. Два места на одном
+ * экране обязаны считать одинаково, иначе плитка скажет «2 из 6», а в списке
+ * выделенными окажутся три.
+ *
+ * Метки времени сравниваются напрямую, без разбора на часы: getHours() читает
+ * ЛОКАЛЬНЫЕ часы браузера, и у учителя не из Ташкента граница уезжала бы.
+ * Именно этим болела старая шкала — она ставила уроки по часам браузера.
+ */
+function lessonPhase(l: TodayLesson, now: Date): LessonPhase {
+  if (l.status === "in_progress") return "now";
+  if (l.status === "completed" || new Date(l.ends_at).getTime() <= now.getTime()) return "past";
+  return "future";
 }
 
-function lessonTop(l: TodayLesson): number {
-  return Math.max(0, minuteOffset(l.starts_at)) * HOUR_PX / 60;
-}
+type LessonTone = { card: string; time: string; title: string; sub: string; chip: string };
 
-function lessonHeight(l: TodayLesson): number {
-  const ms = new Date(l.ends_at).getTime() - new Date(l.starts_at).getTime();
-  return Math.max(38, (ms / 60000) * HOUR_PX / 60);
-}
-
-type LessonPalette = { bg: string; border: string; label: string; sub: string };
-
-// Решение 21.07 (отключение авто-режима, миграция 143): scheduled-урок,
-// чьё время уже прошло, но который не начали вручную, остаётся нейтральным
-// "Запланирован" (синий) — статуса "Пропущен"/красного больше нет нигде,
-// включая эту почасовую шкалу дня.
-function lessonPalette(status: string): LessonPalette {
-  if (status === "in_progress")  return { bg: "bg-yellow-50",  border: "border-l-yellow-400",  label: "text-yellow-900",  sub: "text-yellow-600" };
-  if (status === "completed")    return { bg: "bg-emerald-50", border: "border-l-emerald-400", label: "text-emerald-900", sub: "text-emerald-600" };
-  return                                { bg: "bg-blue-50",    border: "border-l-blue-400",    label: "text-blue-900",    sub: "text-blue-600"   };
-}
+// Решение 21.07 (отключение авто-режима, миграция 143): scheduled-урок, чьё
+// время уже прошло, но который не начали вручную, НЕ помечается «Пропущен» —
+// статуса и красного цвета для него нет нигде. Поэтому у прошедших только
+// приглушение, а подпись «Завершён» получает лишь по-настоящему завершённый.
+const LESSON_TONE: Record<LessonPhase, LessonTone> = {
+  now: {
+    card: "border-amber-300 bg-amber-50 shadow-md shadow-amber-500/10",
+    time: "text-amber-900",
+    title: "text-amber-950",
+    sub: "text-amber-700",
+    chip: "border-amber-200 bg-white/70 text-amber-800",
+  },
+  past: {
+    card: "border-slate-100 bg-slate-50/60",
+    time: "text-slate-400",
+    title: "text-slate-500",
+    sub: "text-slate-400",
+    chip: "border-slate-200 bg-white/60 text-slate-400",
+  },
+  future: {
+    card: "border-white bg-white shadow-sm",
+    time: "text-slate-700",
+    title: "text-slate-900",
+    sub: "text-slate-500",
+    chip: "border-slate-200 bg-slate-50 text-slate-600",
+  },
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -310,19 +336,9 @@ export function TeacherDashboardView({
     (l) => l.status === "completed" || new Date(l.ends_at).getTime() <= now.getTime(),
   ).length;
 
-  // Timeline — current-time indicator
-  const nowTop = useMemo(() => {
-    if (!now) return null;
-    const h = now.getHours(), m = now.getMinutes();
-    if (h < T_START || h >= T_END) return null;
-    return ((h - T_START) * 60 + m) * HOUR_PX / 60;
-  }, [now]);
-
   // Right column data
   const pendingReview = recentSubmissions.filter((s) => s.status === "submitted").slice(0, 5);
   const allActivity = recentSubmissions.slice(0, 5);
-
-  const hours = Array.from({ length: T_END - T_START }, (_, i) => T_START + i);
 
   return (
     <PageContainer className="space-y-6 pb-6">
@@ -355,88 +371,95 @@ export function TeacherDashboardView({
       {/* Two-column layout */}
       <div className="grid grid-cols-12 gap-6">
 
-        {/* LEFT: Day timeline (8 cols) */}
+        {/* СЛЕВА: расписание дня списком (8 из 12 колонок) */}
         <section className="col-span-8 rounded-[24px] border border-white bg-white/70 p-6 shadow-sm backdrop-blur-xl">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-800">Расписание сегодня</h2>
+            <h2 className="text-lg font-bold text-slate-800">{d.teacher.scheduleTitle}</h2>
             <span className="text-[13px] text-slate-400">
-              {now ? now.toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : ""}
+              {formatDate(now.toISOString(), locale)}
             </span>
           </div>
 
           {todayLessonsError ? (
             <div className="py-8"><ErrorState>{d.common.error}</ErrorState></div>
           ) : todayLessons.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-400">
-              <Calendar className="h-10 w-10 opacity-30" />
-              <p className="text-sm">Свободный день</p>
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <Calendar className="h-9 w-9 text-slate-300" />
+              <p className="text-[15px] font-semibold text-slate-500">{d.teacher.scheduleFreeDay}</p>
+              <p className="text-[13px] text-slate-400">{d.teacher.scheduleFreeDayHint}</p>
             </div>
           ) : (
-            <div className="overflow-y-auto" style={{ maxHeight: 540 }}>
-              <div className="relative" style={{ height: TOTAL_H }}>
-
-                {/* Hour rows */}
-                {hours.map((h) => (
-                  <div
-                    key={h}
-                    className="absolute left-0 right-0 flex items-start gap-3"
-                    style={{ top: (h - T_START) * HOUR_PX }}
+            /* Список карточек сверху вниз. Высота — по содержимому: ни сетки
+               часов слева, ни пустого хвоста под последним уроком.
+               Ограничение сверху нужно ровно одному случаю — куратору, который
+               видит все восемнадцать уроков дня: без него левая колонка
+               уезжала бы на километр ниже правой. При четырёх уроках высота
+               остаётся по четырём карточкам, прокрутки не появляется. */
+            <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+              {todayLessons.map((lesson) => {
+                const phase = lessonPhase(lesson, now);
+                const tone = LESSON_TONE[phase];
+                const cfg = getSubjectConfig(lesson.group.subject);
+                const room = formatRoom(lesson.room, d.teacher.lessonRoom);
+                return (
+                  <Link
+                    key={lesson.id}
+                    href={`/teacher/lessons/${lesson.id}`}
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl border px-4 py-3 transition-shadow hover:shadow-md",
+                      tone.card,
+                    )}
                   >
-                    <span className="w-11 shrink-0 pt-0.5 text-right text-[11px] font-medium leading-none text-slate-400">
-                      {String(h).padStart(2, "0")}:00
+                    {/* Время — одной строкой, моноширинными цифрами, чтобы
+                        колонка не прыгала от урока к уроку. */}
+                    <span className={cn("w-[104px] shrink-0 text-[13px] font-bold tabular-nums", tone.time)}>
+                      {formatTime(lesson.starts_at)} – {formatTime(lesson.ends_at)}
                     </span>
-                    <div className="mt-2 flex-1 border-t border-slate-100" />
-                  </div>
-                ))}
 
-                {/* Lesson blocks */}
-                {todayLessons.map((lesson) => {
-                  const top    = lessonTop(lesson);
-                  const height = lessonHeight(lesson);
-                  const pal    = lessonPalette(lesson.status);
-                  const cfg    = getSubjectConfig(lesson.group.subject);
-                  return (
-                    <Link
-                      key={lesson.id}
-                      href={`/teacher/lessons/${lesson.id}`}
-                      className={cn(
-                        "absolute left-14 right-1 overflow-hidden rounded-xl border-l-4 px-3 py-2 shadow-sm transition-shadow hover:shadow-md",
-                        pal.bg, pal.border,
-                      )}
-                      style={{ top, height: Math.max(36, height) }}
-                    >
-                      <div className={cn("truncate text-[13px] font-bold leading-tight", pal.label)}>
-                        {lesson.topic ?? cfg.label}
-                      </div>
-                      <div className={cn("mt-0.5 truncate text-[11px]", pal.sub)}>
-                        {formatTime(lesson.starts_at)}–{formatTime(lesson.ends_at)}
-                        {" · "}{lesson.group.name}
-                        {lesson.room ? ` · каб. ${lesson.room}` : ""}
-                      </div>
-                      {lesson.status === "in_progress" && (
-                        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-yellow-700">
-                          <span className="h-1.5 w-1.5 animate-ping rounded-full bg-yellow-500" />
-                          Идёт
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-
-                {/* Current-time red line */}
-                {nowTop != null && (
-                  <div
-                    className="pointer-events-none absolute left-0 right-0 flex items-center"
-                    style={{ top: nowTop }}
-                  >
-                    <span className="w-11 shrink-0 text-right text-[10px] font-bold leading-none text-red-500">
-                      {now!.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                    <span className={cn("shrink-0", phase === "past" && "opacity-50")}>
+                      <SubjectIcon subject={lesson.group.subject} size={34} />
                     </span>
-                    <div className="flex-1 border-t-2 border-red-400" />
-                    <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />
-                  </div>
-                )}
-              </div>
+
+                    {/* Предмет и тема делят остаток строки и обрезаются. Оба
+                        обязаны уметь сжиматься: экраны учителя начинаются с
+                        768, и при жёсткой ширине предмета строка переполнялась
+                        бы на узком краю — «Программирование» само по себе
+                        занимает треть доступного места. */}
+                    <span className={cn("min-w-0 flex-1 truncate text-[14px] font-bold", tone.title)}>
+                      {cfg.label}
+                    </span>
+                    {lesson.topic && (
+                      <span className={cn("min-w-0 flex-[2] truncate text-[13px]", tone.sub)}>
+                        {lesson.topic}
+                      </span>
+                    )}
+
+                    <span className={cn("shrink-0 rounded-lg border px-2 py-0.5 text-[11px] font-semibold", tone.chip)}>
+                      {lesson.group.name}
+                    </span>
+
+                    {/* Кабинет обычным текстом, а не плашкой: две плашки подряд
+                        не влезают в 768, а прятать кабинет нельзя — он часть
+                        сведений об уроке. */}
+                    {room && (
+                      <span className={cn("shrink-0 text-[11px] font-medium", tone.sub)}>
+                        {room}
+                      </span>
+                    )}
+
+                    {phase === "now" ? (
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-bold text-white">
+                        <span className="h-1.5 w-1.5 animate-ping rounded-full bg-white" />
+                        {d.teacher.lessonNow}
+                      </span>
+                    ) : lesson.status === "completed" ? (
+                      <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                        {d.teacher.lessonDone}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

@@ -2690,6 +2690,13 @@ export interface Dictionary {
     kpiPending: string;
     kpiStudents: string;
     kpiLessonsDone: string;      // "{done} из {total}" — плитка «Уроков сегодня»
+    // 24.08.2026 — расписание на дашборде учителя.
+    scheduleTitle: string;       // "Расписание сегодня"
+    scheduleFreeDay: string;     // "Свободный день"
+    scheduleFreeDayHint: string; // "Уроков на сегодня не запланировано"
+    lessonNow: string;           // "Идёт"
+    lessonDone: string;          // "Завершён"
+    lessonRoom: string;          // "Кабинет"
     todayLessons: string;
     noLessons: string;
     recentActivity: string;
