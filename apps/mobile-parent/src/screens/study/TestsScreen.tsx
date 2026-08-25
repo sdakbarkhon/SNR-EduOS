@@ -26,7 +26,7 @@ import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
-import { format, getChildTests, LOCALE_TAG, type ChildTestItem } from "@snr/core";
+import { format, getChildTests, LOCALE_TAG, averageOf, testGrade5, type ChildTestItem } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { Ring } from "../../ui/charts";
 import {
@@ -103,10 +103,14 @@ export default function TestsScreen() {
   const state = useChildQuery(childId, (db, id) => getChildTests(db, id));
   const tests = state.data ?? [];
 
-  const graded = tests.filter((x) => x.grade != null);
-  const avgGrade = graded.length > 0
-    ? (graded.reduce((s, x) => s + (x.grade ?? 0), 0) / graded.length).toFixed(1)
-    : "—";
+  // 25.08.2026, заход 2 — сдача без выставленной оценки больше не выпадает
+  // из счёта: для неё подставляется доля правильных ответов. Нормировка общая
+  // (testGrade5), та же, что у учителя, ученика и на вебе.
+  const gradedValues = tests
+    .map((x) => testGrade5({ grade: x.grade, score: x.score, max_score: x.maxScore }))
+    .filter((v): v is number => v != null);
+  const avgMean = averageOf(gradedValues);
+  const avgGrade = avgMean != null ? avgMean.toFixed(1) : "—";
   const pcts = tests.map(percentOf).filter((p): p is number => p != null);
   const donutPct = pcts.length > 0 ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
 

@@ -225,6 +225,12 @@ export default function SkillsScreen() {
                 <View style={{ alignSelf: "flex-start" }}>
                   <StatusChip label={LEVEL[levelOf(data!.overall).key]} family={levelOf(data!.overall).family} />
                 </View>
+                {/* 25.08.2026: общий уровень смешивает оценки с посещаемостью
+                    и сданными работами — говорим об этом прямо. Та же подпись,
+                    что на вебе, из общего словаря. */}
+                <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: "rgba(255,255,255,0.75)", lineHeight: 13 }}>
+                  {m3.skillOverallNote}
+                </Text>
               </View>
               <OverallSemicircle percent={data!.overall} />
             </AccentCard>

@@ -3906,6 +3906,7 @@ export interface Dictionary {
       skillCommunicationWhy: string;
       skillDisciplineWhy: string;
       skillOverall: string;
+      skillOverallNote: string;   // "Учитываются оценки, посещаемость и сданные работы"
       skillLevelHigh: string;
       skillLevelGood: string;
       skillLevelGrowing: string;

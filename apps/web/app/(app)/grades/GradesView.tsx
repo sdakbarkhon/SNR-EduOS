@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Star, BookOpen, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
-import { getDictionary, getSubjectConfig, gradeCategory } from "@snr/core";
+import { getDictionary, getSubjectConfig, gradeCategory, averageOf, countsTowardAverage } from "@snr/core";
 import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
@@ -181,11 +181,20 @@ export function GradesView({ grades, error = false }: Props) {
   const subjects = Array.from(new Set(grades.map((g) => g.subject)));
   const availableKinds = Array.from(new Set(grades.map((g) => g.kind)));
 
+  // 25.08.2026, заход 2 — в средний балл идут не все строки журнала.
+  // Оценки за этапы урока (квизы, Kahoot, машинные баллы внутри урока) в него
+  // не входят никогда: решает общее правило из utils/gradeAverage, и оно же
+  // работает у учителя, родителя и в мобильном. Сам СПИСОК оценок ниже
+  // по-прежнему показывает всё — из журнала ничего не пропадает, меняется
+  // только то, что попадает в среднее.
   const scoredAll = grades.filter((g) => g.grade5 != null);
-  const avgAll = scoredAll.length ? scoredAll.reduce((s, g) => s + (g.grade5 ?? 0), 0) / scoredAll.length : null;
+  // Списку оценок, кольцу распределения и столбикам достаётся ВЕСЬ журнал —
+  // из него ничего не пропадает. Отдельный набор только для средних.
+  const countedAll = scoredAll.filter((g) => countsTowardAverage(g.sourceTable));
+  const avgAll = averageOf(countedAll.map((g) => g.grade5));
 
   const bySubject = new Map<string, { sum: number; n: number }>();
-  scoredAll.forEach((g) => {
+  countedAll.forEach((g) => {
     const cur = bySubject.get(g.subject) ?? { sum: 0, n: 0 };
     cur.sum += g.grade5 ?? 0;
     cur.n += 1;

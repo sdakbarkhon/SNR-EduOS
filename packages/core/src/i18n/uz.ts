@@ -3757,6 +3757,7 @@ export const uz: Dictionary = {
       skillCommunicationWhy: "Til va gumanitar fanlar bo'yicha o'rtacha baho",
       skillDisciplineWhy: "Darslarga davomat",
       skillOverall: "Umumiy daraja",
+      skillOverallNote: "Baholar, davomat va topshirilgan ishlar hisobga olinadi",
       skillLevelHigh: "Yuqori",
       skillLevelGood: "Ishonchli",
       skillLevelGrowing: "Rivojlanmoqda",

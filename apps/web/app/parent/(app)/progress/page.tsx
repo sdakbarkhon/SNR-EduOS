@@ -7,7 +7,7 @@ import type {
   ProgressSubject,
   ProgressViewData,
 } from "./ProgressView";
-import { getSubjectStyle } from "@snr/core";
+import { getSubjectStyle, averageOf, countsTowardAverage } from "@snr/core";
 import { ProgressView } from "./ProgressView";
 import { getParentContext } from "@/lib/parent-context";
 import {
@@ -87,10 +87,8 @@ function subjectKeyOf(name: string): SubjectKey {
  * собирает ProgressView через `useDates()`; сюда уезжает только ключ «YYYY-MM».
  */
 
-function averageOf(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
+// 25.08.2026: локальная копия усреднения снесена — среднее одно,
+// в utils/gradeAverage (averageOf).
 
 function toGradient(g: readonly [string, string]): Gradient {
   return [g[0], g[1]];
@@ -138,8 +136,11 @@ export default async function ParentProgressPage() {
 
   /* ── Оценки: единственный источник всех средних на экране ───────────────── */
 
+  // 25.08.2026, заход 2 — ФИЛЬТР ПО ИСТОЧНИКУ СТОИТ ДО .map, И ЭТО ВАЖНО.
+  // Ниже строка сворачивается в {subject, grade5, month}, и признак источника
+  // теряется навсегда: после .map отсечь оценки за этапы урока уже нечем.
   const grades: ProgressGrade[] = rawGrades
-    .filter((g): g is typeof g & { grade5: number } => g.grade5 != null)
+    .filter((g): g is typeof g & { grade5: number } => g.grade5 != null && countsTowardAverage(g.sourceTable))
     // subject у getStudentGrades — СЛАГ («programming»), а у
     // getChildGradesSummary — русское название. Приводим к названию сразу
     // здесь, чтобы все производные срезы (список предметов, средние по

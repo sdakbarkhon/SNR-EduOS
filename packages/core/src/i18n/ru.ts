@@ -3774,6 +3774,8 @@ export const ru: Dictionary = {
       skillCommunicationWhy: "Средний балл по языкам и гуманитарным",
       skillDisciplineWhy: "Посещаемость уроков",
       skillOverall: "Общий уровень",
+      // 25.08.2026, заход 2 — под общим уровнем видно, из чего он сложился.
+      skillOverallNote: "Учитываются оценки, посещаемость и сданные работы",
       skillLevelHigh: "Высокий",
       skillLevelGood: "Уверенный",
       skillLevelGrowing: "Развивается",

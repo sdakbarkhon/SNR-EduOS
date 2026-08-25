@@ -89,6 +89,12 @@ export function SkillsView({ data, childName }: { data: ChildSkills; childName: 
                   <span>
                     <StatusChip label={LEVEL[overallLevel.key]!} family={overallLevel.family} />
                   </span>
+                  {/* 25.08.2026: общий уровень — среднее пяти плиток, и две из
+                      них не про оценки. Раз число смешанное, пусть об этом
+                      будет сказано прямо, а не догадками. */}
+                  <span style={{ fontSize: 10.5, fontWeight: 500, color: ink2, lineHeight: 1.35 }}>
+                    {m.skillOverallNote}
+                  </span>
                 </div>
               </div>
             </GlassCard>

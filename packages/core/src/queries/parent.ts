@@ -7,6 +7,7 @@
 import type { Db } from "../supabase/factory";
 import type { AttendanceStatus, LessonStatus, LessonWithSubject } from "../types";
 import { findNextLesson } from "../presenters/lessonNow";
+import { countsTowardAverage, testGrade5, type GradeSource } from "../utils/gradeAverage";
 
 // Тот же select, что LESSON_SUBJECT_SELECT в index.ts — не импортируем оттуда
 // напрямую, чтобы не создавать циклическую зависимость index.ts <-> parent.ts
@@ -290,35 +291,128 @@ export type ChildGradesSummary = {
   growthAreas: string[];
 };
 
-type LessonGradeRow = {
-  grade: number;
-  lesson: { subject: { id: string; name: string; icon: string | null; color: string | null } | null } | null;
+/** Одна оценка ребёнка, приведённая к пятибалльной, с предметом и датой. */
+export type ChildCountedGrade = {
+  grade5: number;
+  source: GradeSource;
+  /** null у проектов: своего предмета у них нет, только сломанный текстовый слаг. */
+  subjectId: string | null;
+  subjectName: string | null;
+  icon: string | null;
+  color: string | null;
+  /** День, к которому относится оценка. См. правило выбора даты ниже. */
+  date: string | null;
 };
 
-/** Оценки ребёнка по предметам (lesson_grades, не submission-журнал —
- *  тот использует устаревшее groups.subject, см. миграцию 107; здесь
- *  subject разрешается через lessons.subject_id -> subjects, надёжно). */
-export async function getChildGradesSummary(db: Db, studentId: string): Promise<ChildGradesSummary> {
-  const { data, error } = await db
-    .from("lesson_grades")
-    .select("grade, lesson:lessons!inner(subject:subjects(id, name, icon, color))")
-    .eq("student_id", studentId);
-  if (error) throw error;
+type SubjectJoin = { id: string; name: string; icon: string | null; color: string | null } | null;
 
-  const rows = (data ?? []) as unknown as LessonGradeRow[];
+/**
+ * ВСЕ оценки ребёнка, идущие в средний балл. 25.08.2026, заход 2.
+ *
+ * ЗАЧЕМ ОДИН СБОРЩИК. До этого захода родительские экраны читали ТОЛЬКО
+ * `lesson_grades`: главная показывала 3.5, тогда как по всем работам того же
+ * ребёнка выходило 4.2, а плитка «Знания» — 72 % вместо 83 %. Родитель не
+ * видел двух третей оценок своего ребёнка. Собирать источники по месту в
+ * каждой из трёх функций значило бы развести их снова, поэтому сбор один, и
+ * зовут его сводка, экран предмета и дневник.
+ *
+ * ЧТО ВХОДИТ — решает `countsTowardAverage` из utils/gradeAverage, ЕДИНСТВЕННОЕ
+ * место со списком источников. Оценки за этапы урока сюда не приходят вовсе:
+ * их таблица не запрашивается.
+ *
+ * КАКАЯ ДАТА У ОЦЕНКИ. Дневник раскладывает оценки по дням, и дата нужна
+ * каждой. Порядок: дата урока → дата выставления оценки → дата сдачи.
+ * Первая ветвь сегодня не срабатывает никогда: `homework.lesson_id` заполнен
+ * у НОЛЯ из 59 заданий, привязать работу к уроку нечем. Вторая закрывает
+ * 310 сдач ДЗ из 440 и 104 теста из 120. Третья нужна оставшимся 146 строкам:
+ * без неё 30 % оценок за работы молча выпали бы из дневника, и сумма по дням
+ * перестала бы сходиться с суммой за неделю. `submitted_at` заполнен у всех
+ * 560 строк, и ровно эту цепочку уже использует getStudentGrades.
+ */
+export async function getChildCountedGrades(db: Db, studentId: string): Promise<ChildCountedGrade[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db2 = db as any;
+  const out: ChildCountedGrade[] = [];
+
+  const [lgRes, hwRes, tsRes, prRes] = await Promise.all([
+    db2.from("lesson_grades")
+      .select("grade, graded_at, lesson:lessons!inner(starts_at, subject:subjects(id, name, icon, color))")
+      .eq("student_id", studentId),
+    db2.from("homework_submissions")
+      .select("grade, graded_at, submitted_at, homework:homework!inner(lesson_id, subject:subjects(id, name, icon, color))")
+      .eq("student_id", studentId).not("grade", "is", null),
+    db2.from("test_submissions")
+      .select("score, max_score, grade, graded_at, submitted_at, homework:homework!inner(lesson_id, subject:subjects(id, name, icon, color))")
+      .eq("student_id", studentId).not("score", "is", null),
+    db2.from("project_submissions")
+      .select("grade, graded_at, submitted_at")
+      .eq("student_id", studentId).not("grade", "is", null),
+  ]);
+  for (const res of [lgRes, hwRes, tsRes, prRes]) if (res.error) throw res.error;
+
+  const push = (grade5: number | null, source: GradeSource, s: SubjectJoin, date: string | null) => {
+    if (grade5 == null || !countsTowardAverage(source)) return;
+    out.push({
+      grade5,
+      source,
+      subjectId: s?.id ?? null,
+      subjectName: s?.name ?? null,
+      icon: s?.icon ?? null,
+      color: s?.color ?? null,
+      date,
+    });
+  };
+
+  type LgRow = { grade: number; graded_at: string | null; lesson: { starts_at: string | null; subject: SubjectJoin } | null };
+  for (const r of (lgRes.data ?? []) as LgRow[]) {
+    push(r.grade, "lesson_grades", r.lesson?.subject ?? null, r.lesson?.starts_at ?? r.graded_at);
+  }
+
+  type HwRow = { grade: number | null; graded_at: string | null; submitted_at: string | null; homework: { subject: SubjectJoin } | null };
+  for (const r of (hwRes.data ?? []) as HwRow[]) {
+    push(r.grade, "homework_submissions", r.homework?.subject ?? null, r.graded_at ?? r.submitted_at);
+  }
+
+  type TsRow = { score: number | null; max_score: number | null; grade: number | null; graded_at: string | null; submitted_at: string | null; homework: { subject: SubjectJoin } | null };
+  for (const r of (tsRes.data ?? []) as TsRow[]) {
+    push(testGrade5(r), "test_submissions", r.homework?.subject ?? null, r.graded_at ?? r.submitted_at);
+  }
+
+  type PrRow = { grade: number | null; graded_at: string | null; submitted_at: string | null };
+  for (const r of (prRes.data ?? []) as PrRow[]) {
+    // Предмета у проекта нет — в разбивку по предметам он не попадёт, только
+    // в общее среднее. Решение заказчика: пропускать молча, без «Прочего».
+    push(r.grade, "project_submissions", null, r.graded_at ?? r.submitted_at);
+  }
+
+  return out;
+}
+
+/**
+ * Оценки ребёнка по предметам.
+ *
+ * 25.08.2026 — читала ТОЛЬКО `lesson_grades`, теперь все четыре источника
+ * (см. getChildCountedGrades). Предмет по-прежнему разрешается через
+ * `subjects`, а не через устаревшее `groups.subject` (миграция 107).
+ *
+ * Проекты в разбивку по предметам не попадают — предмета у них нет; в общее
+ * среднее идут. Поэтому сумма `count` по предметам может быть меньше числа
+ * оценок, из которых сложилось `average`.
+ */
+export async function getChildGradesSummary(db: Db, studentId: string): Promise<ChildGradesSummary> {
+  const rows = await getChildCountedGrades(db, studentId);
   const bySubject = new Map<string, { name: string; icon: string | null; color: string | null; sum: number; count: number }>();
   let overallSum = 0;
   let overallCount = 0;
 
   for (const r of rows) {
-    const s = r.lesson?.subject;
-    overallSum += r.grade;
+    overallSum += r.grade5;
     overallCount += 1;
-    if (!s) continue;
-    const cur = bySubject.get(s.id) ?? { name: s.name, icon: s.icon, color: s.color, sum: 0, count: 0 };
-    cur.sum += r.grade;
+    if (!r.subjectId || !r.subjectName) continue;
+    const cur = bySubject.get(r.subjectId) ?? { name: r.subjectName, icon: r.icon, color: r.color, sum: 0, count: 0 };
+    cur.sum += r.grade5;
     cur.count += 1;
-    bySubject.set(s.id, cur);
+    bySubject.set(r.subjectId, cur);
   }
 
   const subjects: ChildSubjectGrade[] = Array.from(bySubject.entries())

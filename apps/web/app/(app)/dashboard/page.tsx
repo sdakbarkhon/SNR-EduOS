@@ -4,6 +4,7 @@ import {
   getMySubmissions,
   getMyTestSubmissions,
   getAttendanceWithLesson,
+  getStudentGrades,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
@@ -21,7 +22,7 @@ export default async function DashboardPage() {
   // молча оказывается пустым.
   const attendanceFrom = new Date((await getMySchoolNowMs(supabase)) - 35 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [student, lessons, homework, submissions, testSubmissions, groups, attRes] = await Promise.all([
+  const [student, lessons, homework, submissions, testSubmissions, groups, attRes, gradesRes] = await Promise.all([
     getMyStudent(supabase),
     getLessons(supabase),
     getHomework(supabase),
@@ -29,6 +30,11 @@ export default async function DashboardPage() {
     getMyTestSubmissions(supabase),
     getMyGroups(supabase),
     safeQuery(getAttendanceWithLesson(supabase, { from: attendanceFrom }), [], "DashboardPage.attendance"),
+    // 25.08.2026, заход 2 — средний балл на дашборде считался по ДЗ и тестам,
+    // а оценок за урок не видел вовсе: у sherzod_10 выходило ровно 5.00 при
+    // 4.24 на экране «Оценки». Теперь дашборду подаётся тот же полный журнал,
+    // что и экрану «Оценки», а лишнее отсекает общее правило.
+    safeQuery(getStudentGrades(supabase), [], "DashboardPage.grades"),
   ]);
 
   const attendance = attRes.data.map((a) => ({ status: a.status, startsAt: a.lesson.starts_at }));
@@ -42,6 +48,7 @@ export default async function DashboardPage() {
       testSubmissions={testSubmissions}
       groups={groups}
       attendance={attendance}
+      grades={gradesRes.data}
     />
   );
 }

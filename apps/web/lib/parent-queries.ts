@@ -301,7 +301,11 @@ export const childWeekActivity = cache(async (): Promise<ChildWeekActivity> => {
   const childId = await getSelectedChildId();
   if (!childId) return { thisWeek: 0, lastWeek: 0, deltaPct: null };
   const db = await createClient();
-  return getChildWeekActivity(db, childId);
+  // 25.08.2026, заход 2 — неделя считается от ШКОЛЬНОГО «сейчас».
+  // Было Date.now(): у демо-школы время заморожено на 29.07, окно приходилось
+  // на пустоту, и «Прогресс за неделю» показывал 0 при 19 оценках внутри той
+  // самой недели.
+  return getChildWeekActivity(db, childId, await getMySchoolNowMs(db));
 });
 
 // ── Посещаемость ─────────────────────────────────────────────────────────────

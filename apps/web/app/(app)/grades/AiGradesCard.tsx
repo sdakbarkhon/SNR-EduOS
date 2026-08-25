@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { getSubjectConfig } from "@snr/core";
+import { getSubjectConfig, averageOf, countsTowardAverage } from "@snr/core";
 import type { StudentGradeItem } from "@snr/core";
 import { getGradesAdvice } from "@/app/actions/ai";
 
 function buildSummary(grades: StudentGradeItem[]): string {
   if (!grades.length) return "";
+  // 25.08.2026, заход 2 — подсказка ИИ обязана видеть тот же набор, что и
+  // цифра над ней. Иначе модель считала бы средний по своему подмножеству и
+  // писала бы ученику про число, которого на экране нет.
   const recent = [...grades]
+    .filter((g) => countsTowardAverage(g.sourceTable))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 12);
+  if (!recent.length) return "";
   const bySub = new Map<string, StudentGradeItem[]>();
   for (const g of recent) {
     if (!bySub.has(g.subject)) bySub.set(g.subject, []);
@@ -20,9 +25,8 @@ function buildSummary(grades: StudentGradeItem[]): string {
   bySub.forEach((items, subject) => {
     const label = getSubjectConfig(subject).label;
     const vals = items.map((g) => g.grade5).filter((v): v is number => v != null);
-    const avg = vals.length
-      ? (vals.reduce((s, n) => s + n, 0) / vals.length).toFixed(1)
-      : "нет";
+    const mean = averageOf(vals);
+    const avg = mean != null ? mean.toFixed(1) : "нет";
     const gradeStr = items.map((g) => g.display).join(", ");
     const comment = items.flatMap((g) => (g.comment ? [g.comment] : [])).at(0);
     let line = `${label}: ${gradeStr} (средняя ${avg})`;

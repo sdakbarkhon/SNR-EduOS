@@ -57,6 +57,8 @@ import {
   type Dictionary,
   type StudentGradeItem,
   type ChildTeacherReview,
+  averageOf,
+  countsTowardAverage,
 } from "@snr/core";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
@@ -441,10 +443,16 @@ export default function ProgressScreen() {
     () => (gradesState.data ?? []).filter((g): g is StudentGradeItem & { grade5: number } => g.grade5 != null),
     [gradesState.data],
   );
-  const realAverage = useMemo(() => {
-    if (realGradedItems.length === 0) return null;
-    return realGradedItems.reduce((sum, g) => sum + g.grade5, 0) / realGradedItems.length;
-  }, [realGradedItems]);
+  // 25.08.2026, заход 2 — среднее по общему правилу: оценки за этапы урока
+  // в него не входят. Правило одно на весь продукт, utils/gradeAverage.
+  const realCountedItems = useMemo(
+    () => realGradedItems.filter((g) => countsTowardAverage(g.sourceTable)),
+    [realGradedItems],
+  );
+  const realAverage = useMemo(
+    () => averageOf(realCountedItems.map((g) => g.grade5)),
+    [realCountedItems],
+  );
   const realSubjectStats = useMemo(() => {
     const map = new Map<string, { sum: number; count: number }>();
     for (const g of realGradedItems) {

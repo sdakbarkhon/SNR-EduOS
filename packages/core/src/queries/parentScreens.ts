@@ -19,7 +19,8 @@
 import type { Db } from "../supabase/factory";
 import type { Book, LessonWithSubject } from "../types";
 import { tashkentDayKey } from "../utils/date";
-import { getChildGradesSummary } from "./parent";
+import { getChildCountedGrades, getChildGradesSummary } from "./parent";
+import { averageOf } from "../utils/gradeAverage";
 
 // ── Тесты ────────────────────────────────────────────────────────────────────
 
@@ -223,6 +224,24 @@ export async function getChildDiaryWeek(
     }
   }
 
+  // 25.08.2026, заход 2 — ОЦЕНКИ ЗА РАБОТЫ ТОЖЕ ИДУТ В ДНЕВНИК.
+  // Среднее дня и недели считалось только по оценкам за урок, и «средний за
+  // неделю» в дневнике не сходился со «Средним баллом» на главной у того же
+  // ребёнка. Теперь набор один — общий сборщик (getChildCountedGrades).
+  //
+  // Под уроками работы НЕ показываются: строка дневника — это урок, а работа
+  // к уроку не привязана (homework.lesson_id пуст у всех заданий). Они входят
+  // только в СРЕДНЕЕ дня, по дате из сборщика.
+  const workByDay = new Map<string, number[]>();
+  for (const g of await getChildCountedGrades(db, studentId)) {
+    if (g.source === "lesson_grades" || !g.date) continue;
+    const key = tashkentDayKey(g.date);
+    if (key < weekStart || key >= weekEndKey) continue;
+    const bucket = workByDay.get(key);
+    if (bucket) bucket.push(g.grade5);
+    else workByDay.set(key, [g.grade5]);
+  }
+
   // Сдано за неделю — по моменту сдачи, а не по сроку: в шапке недели стоит
   // «сдано работ», то есть сколько ребёнок сделал именно на этой неделе.
   const { count: hwCount } = await anyDb
@@ -250,26 +269,36 @@ export async function getChildDiaryWeek(
     else byDay.set(key, [row]);
   }
 
-  const days: DiaryDay[] = [...byDay.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([dateKey, rows]) => {
-      const marks = rows.map((r) => r.grade).filter((g): g is number => g != null);
+  // Дни, где есть уроки, — плюс дни, где уроков нет, а оценка за работу есть.
+  const dayKeys = new Set<string>([...byDay.keys(), ...workByDay.keys()]);
+
+  const days: DiaryDay[] = [...dayKeys]
+    .sort((a, b) => a.localeCompare(b))
+    .map((dateKey) => {
+      const rows = byDay.get(dateKey) ?? [];
+      const marks = [
+        ...rows.map((r) => r.grade).filter((g): g is number => g != null),
+        ...(workByDay.get(dateKey) ?? []),
+      ];
       return {
         dateKey,
         lessons: rows.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-        average: marks.length > 0 ? marks.reduce((a, b) => a + b, 0) / marks.length : null,
+        average: averageOf(marks),
       };
     });
 
-  const allMarks = days
-    .flatMap((d) => d.lessons.map((l) => l.grade))
-    .filter((g): g is number => g != null);
+  // Счёт и среднее за неделю — по тем же оценкам, что легли в дни. Раньше
+  // считалось по l.grade внутри уроков, и работы в число не попадали.
+  const allMarks = [
+    ...days.flatMap((d) => d.lessons.map((l) => l.grade)).filter((g): g is number => g != null),
+    ...[...workByDay.values()].flat(),
+  ];
 
   return {
     weekStart,
     days,
     gradeCount: allMarks.length,
-    average: allMarks.length > 0 ? allMarks.reduce((a, b) => a + b, 0) / allMarks.length : null,
+    average: averageOf(allMarks),
     homeworkSubmitted: hwCount ?? 0,
   };
 }
@@ -380,9 +409,8 @@ export type ChildSkills = {
 const EXACT_RE = /матем|алгебр|геометр|физик|информат|програм|робот|хими|matemat|fizika|dastur|robot|math|physic|program|robot|chemis|informat/i;
 const HUMANITIES_RE = /язык|литерат|истор|общество|англ|русск|til|adabiyot|tarix|ingliz|rus|langua|literat|histor|social/i;
 
-function avgOf(values: number[]): number | null {
-  return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
-}
+// 25.08.2026: локальная копия усреднения снесена — среднее одно, в
+// utils/gradeAverage. Копий этой функции в продукте было три.
 
 function pctOf5(avg: number | null): number {
   return avg == null ? 0 : Math.round((avg / 5) * 100);
@@ -417,12 +445,12 @@ export async function getChildSkills(
   const summary = await getChildGradesSummary(db, studentId);
 
   const subjects = summary.subjects;
-  const allAvg = avgOf(subjects.map((s) => s.average));
+  const allAvg = averageOf(subjects.map((s) => s.average));
 
   const exact = subjects.filter((s) => EXACT_RE.test(s.subjectName));
   const humanities = subjects.filter((s) => HUMANITIES_RE.test(s.subjectName));
-  const exactAvg = avgOf(exact.map((s) => s.average)) ?? allAvg;
-  const humanitiesAvg = avgOf(humanities.map((s) => s.average)) ?? allAvg;
+  const exactAvg = averageOf(exact.map((s) => s.average)) ?? allAvg;
+  const humanitiesAvg = averageOf(humanities.map((s) => s.average)) ?? allAvg;
 
   const attTotal = input.attendance.stats.total;
   const attPct = attTotal > 0 ? Math.round((input.attendance.stats.present / attTotal) * 100) : 0;
@@ -457,6 +485,9 @@ export async function getChildSkills(
       color: s.color,
     })),
     source: {
+      // Счёт по предметам, а не по всем оценкам: у проектов предмета нет, и в
+      // разбивку они не попадают (решение заказчика 25.08 — пропускать молча,
+      // без «Прочего»). В самом среднем они участвуют.
       gradeCount: subjects.reduce((a, b) => a + b.count, 0),
       average: allAvg,
       attendancePresent: input.attendance.stats.present,

@@ -20,6 +20,10 @@ import {
   type TestSubmission,
   type AttendanceStatus,
   type SubjectWithGroup,
+  type StudentGradeItem,
+  averageOf,
+  countsTowardAverage,
+  getSubjectKeyByLabel,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -75,6 +79,7 @@ export function DashboardView({
   testSubmissions,
   groups,
   attendance,
+  grades,
 }: {
   student: Student;
   lessons: Lesson[];
@@ -83,6 +88,8 @@ export function DashboardView({
   testSubmissions: TestSubmission[];
   groups: Group[];
   attendance: AttendanceDay[];
+  /** Полный журнал оценок ученика — тот же, что кормит экран «Оценки». */
+  grades: StudentGradeItem[];
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -218,12 +225,19 @@ export function DashboardView({
   const totalSubmittedCount = homework.filter((h) => submittedHomeworkIds.has(h.id)).length;
   const overallPercent = totalAssignedCount > 0 ? Math.round((totalSubmittedCount / totalAssignedCount) * 100) : 0;
   const remainingCount = Math.max(0, totalAssignedCount - totalSubmittedCount);
-  // Средний балл по всем оценённым сдачам (те же данные, что per-subject ниже).
-  const allGradeVals = [
-    ...submissions.filter((s) => s.grade != null).map((s) => s.grade as number),
-    ...testSubmissions.filter((ts) => ts.grade != null).map((ts) => ts.grade as number),
-  ];
-  const overallAvg = allGradeVals.length ? allGradeVals.reduce((a, b) => a + b, 0) / allGradeVals.length : null;
+  // 25.08.2026, заход 2 — СРЕДНИЙ БАЛЛ ПО ЕДИНОМУ ПРАВИЛУ.
+  //
+  // Было: только сдачи ДЗ и тестов, каждая по своей колонке `grade`. Оценок за
+  // урок дашборд не видел вовсе, поэтому у sherzod_10 показывал ровно 5.00
+  // (все его работы на пятёрки), тогда как на экране «Оценки» стояло 4.24 —
+  // там же есть и оценки за урок, среди которых тройки. Один ребёнок, два
+  // числа, и оба «средний балл».
+  //
+  // Стало: тот же журнал, что у экрана «Оценки», отфильтрованный общим
+  // правилом (utils/gradeAverage). Оценки за этапы урока отсекаются здесь же,
+  // так что дашборд и «Оценки» теперь обязаны совпадать до сотых.
+  const countedGrades = grades.filter((g) => countsTowardAverage(g.sourceTable));
+  const overallAvg = averageOf(countedGrades.map((g) => g.grade5));
 
   // Per-subject (используется В МОДАЛКЕ — НЕ удалять, даже что блок «Мои
   // предметы» с дашборда убран): сдано/выдано + средний балл в разрезе subject.
@@ -232,14 +246,13 @@ export function DashboardView({
     const total = subjectHomework.length;
     const done = subjectHomework.filter((h) => submittedHomeworkIds.has(h.id)).length;
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    const grades: number[] = [];
-    for (const s of submissions) {
-      if (s.grade != null && homeworkById.get(s.homework_id)?.subject_id === sub.id) grades.push(s.grade);
-    }
-    for (const ts of testSubmissions) {
-      if (ts.grade != null && homeworkById.get(ts.homework_id)?.subject_id === sub.id) grades.push(ts.grade);
-    }
-    const avgGrade = grades.length > 0 ? grades.reduce((a, b) => a + b, 0) / grades.length : null;
+    // Средний по предмету — из того же журнала, что и общий. Сопоставление
+    // идёт по слагу предмета: StudentGradeItem несёт именно его
+    // (getSubjectKeyByLabel от названия), а не идентификатор.
+    const slug = getSubjectKeyByLabel(sub.name);
+    const avgGrade = averageOf(
+      countedGrades.filter((g) => slug != null && g.subject === slug).map((g) => g.grade5),
+    );
     return { ...sub, percent, total, done, avgGrade };
   });
 

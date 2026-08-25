@@ -3756,6 +3756,7 @@ export const en: Dictionary = {
       skillCommunicationWhy: "Average grade in languages and humanities",
       skillDisciplineWhy: "Lesson attendance",
       skillOverall: "Overall level",
+      skillOverallNote: "Includes grades, attendance and submitted work",
       skillLevelHigh: "High",
       skillLevelGood: "Solid",
       skillLevelGrowing: "Growing",

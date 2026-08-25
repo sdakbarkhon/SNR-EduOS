@@ -39,7 +39,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getDictionary } from "@snr/core";
+import { getDictionary, averageOf } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "../v2/GlassCard";
 import { useDates } from "../_ui/dates";
@@ -798,10 +798,7 @@ interface SubjectStat {
   delta: number | null;
 }
 
-function averageOf(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
+// 25.08.2026: третья копия усреднения снесена — берётся общая из @snr/core.
 
 /** «оценка / оценки / оценок» — для подписи «N оценок за 7 дней». */
 function pluralGrades(n: number): string {

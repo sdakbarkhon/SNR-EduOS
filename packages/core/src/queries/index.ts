@@ -7,6 +7,9 @@ import type { Db } from "../supabase/factory";
 import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
+// Прямой импорт, а не через собственный `export * from "./parent"`: parent.ts
+// ничего из index.ts не берёт, поэтому кольца не возникает.
+import { getChildCountedGrades } from "./parent";
 import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
 import { getSubjectKeyByLabel } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
@@ -364,8 +367,21 @@ export type ChildWeekActivity = { thisWeek: number; lastWeek: number; deltaPct: 
  *  метрика "изменения активности" для карточки #10 (design: "Прогресс за
  *  неделю", ↑12%), без придуманных чисел. deltaPct=null, если на прошлой
  *  неделе не было ни одной оценки (не с чем сравнивать). */
-export const getChildWeekActivity = async (db: Db, studentId: string): Promise<ChildWeekActivity> => {
-  const now = Date.now();
+export const getChildWeekActivity = async (
+  db: Db,
+  studentId: string,
+  /**
+   * Школьное «сейчас» в миллисекундах. 25.08.2026 — параметр обязателен.
+   *
+   * Было `Date.now()`: у демо-школы время заморожено на 29.07, окно недели
+   * приходилось на пустоту, и «Прогресс за неделю» показывал 0 при 19 оценках
+   * внутри той самой недели. Ровно та же ошибка, что чинилась у учителя в
+   * заходе 1 («Оценено за неделю»). Значения по умолчанию здесь нет намеренно:
+   * `Date.now()` был бы той же ловушкой, только тише.
+   */
+  nowMs: number,
+): Promise<ChildWeekActivity> => {
+  const now = nowMs;
   const since14d = new Date(now - 14 * 86400000).toISOString();
   const { data, error } = await db
     .from("lesson_grades")
@@ -437,10 +453,10 @@ export const getChildSubjectDetail = async (db: Db, studentId: string, subjectId
     lesson: { topic: string | null; subject_id: string } | null;
   }>;
 
-  let sum = 0;
+  // Темы — только по урокам: у работ темы нет, привязать не к чему
+  // (решение заказчика 25.08). Средний балл — по всем четырём источникам.
   const topicMap = new Map<string, { sum: number; count: number }>();
   for (const r of rows) {
-    sum += r.grade;
     const topic = r.lesson?.topic;
     if (topic) {
       const cur = topicMap.get(topic) ?? { sum: 0, count: 0 };
@@ -449,7 +465,13 @@ export const getChildSubjectDetail = async (db: Db, studentId: string, subjectId
       topicMap.set(topic, cur);
     }
   }
-  const average = rows.length > 0 ? sum / rows.length : null;
+
+  // 25.08.2026, заход 2. Было среднее ТОЛЬКО по оценкам за урок этого
+  // предмета — экран предмета расходился с главной родителя и с экраном
+  // ученика. Теперь тот же набор, что везде: общий сборщик, сужённый до
+  // одного предмета. Проекты сюда не попадают — предмета у них нет.
+  const counted = (await getChildCountedGrades(db, studentId)).filter((g) => g.subjectId === subjectId);
+  const average = averageOf(counted.map((g) => g.grade5));
   const topics = Array.from(topicMap.entries())
     .map(([topic, v]) => ({ topic, average: v.sum / v.count, count: v.count }))
     .sort((a, b) => b.average - a.average);
@@ -498,7 +520,10 @@ export const getChildSubjectDetail = async (db: Db, studentId: string, subjectId
     teacherName,
     teacherAvatarUrl,
     average,
-    gradeCount: rows.length,
+    // Число оценок — то же, из которого сложилось среднее. Раньше здесь
+    // стояло rows.length (только оценки за урок), и подпись «из N оценок»
+    // спорила с самим средним.
+    gradeCount: counted.length,
     topics,
     lastGradedHomework,
     upcomingQuizLesson,
