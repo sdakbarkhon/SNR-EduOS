@@ -5,6 +5,7 @@
   "outputDirectory": ".next",
   "regions": ["fra1"],
   "crons": [
-    { "path": "/api/cron/restore-demo-lesson-shape", "schedule": "15 19 * * *" }
+    { "path": "/api/cron/restore-demo-lesson-shape", "schedule": "15 19 * * *" },
+    { "path": "/api/cron/rag-process-queue", "schedule": "0 2 * * *" }
   ]
 }
