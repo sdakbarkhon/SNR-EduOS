@@ -1,4 +1,5 @@
 import type { Attendance, AttendanceWithLesson, ContentType, Homework, HomeworkSubmission, HomeworkWithSubmission, Lesson, TestSubmission } from "../types";
+import { isSameTashkentDay } from "../utils/date";
 
 const DEFAULT_LESSON_MS = 45 * 60 * 1000;
 
@@ -95,13 +96,11 @@ export function attendanceForDay(
   rows: AttendanceWithLesson[],
   day: Date,
 ): AttendanceWithLesson[] {
-  const y = day.getFullYear();
-  const m = day.getMonth();
-  const d = day.getDate();
-  return rows.filter((r) => {
-    const dt = new Date(r.lesson.starts_at);
-    return dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d;
-  });
+  // 26.08.2026: сравнение дня — по Ташкенту, а не в поясе среды. Раньше обе
+  // стороны читались через getFullYear/getMonth/getDate, то есть на сервере
+  // сравнивались дни UTC. Сегодня это не проявлялось (уроки идут 09:00–14:30
+  // по Ташкенту и суток не пересекают), но правило то же, что и везде.
+  return rows.filter((r) => isSameTashkentDay(r.lesson.starts_at, day));
 }
 
 /** Цвет точки для дня: absent_* → warning, present → success, нет записей → null */
@@ -119,14 +118,9 @@ export function lessonsOnDay<T extends Pick<Lesson, "starts_at">>(
   lessons: T[],
   day: Date,
 ): T[] {
-  const y = day.getFullYear();
-  const m = day.getMonth();
-  const d = day.getDate();
+  // 26.08.2026: день считается по Ташкенту (см. attendanceForDay выше).
   return lessons
-    .filter((l) => {
-      const dt = new Date(l.starts_at);
-      return dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d;
-    })
+    .filter((l) => isSameTashkentDay(l.starts_at, day))
     .sort(
       (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
     );

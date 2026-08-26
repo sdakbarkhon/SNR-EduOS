@@ -11,6 +11,7 @@ import type { StudentLessonView, ExcuseRequest, Locale, LessonStagePreview } fro
 import { useIsPastDayLesson } from "@/components/SchoolTimeProvider";
 import {
   getMyExcuseRequest, createExcuseRequest, deleteExcuseRequest, getLessonStagesPreview,
+  tashkentDayBoundsUtc,
 } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
@@ -20,8 +21,9 @@ import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { lessonContentTypeIcon, lessonContentTypeLabel } from "@/lib/lesson-content-type";
 
 // Ташкентское смещение (UTC+5, фиксированное — не полагаемся на системный TZ
-// сервера/браузера). Совпадает с TZ_MS в apps/web/app/api/cron/*.
-const TZ_MS = 5 * 60 * 60 * 1000;
+// сервера/браузера).
+// 26.08.2026: своя копия смещения снесена — границы ташкентских суток считает
+// общий помощник, packages/core/src/utils/date.ts.
 
 function SubjectHeroIcon({ icon, className }: { icon: string | null; className?: string }) {
   const Icon = (icon && LUCIDE_ICONS[icon]) || BookOpen;
@@ -169,12 +171,9 @@ export function PreLessonView({
   // до 00:00 и снова к 45:00, бесконечно.
   const LOOP_MS = 45 * 60 * 1000;
   function anchor0955TashkentUtcMs(now: number): number {
-    // 09:55 Ташкент = 04:55 UTC. Строим "сегодня 09:55 Ташкент" через ту же
-    // арифметику TZ_MS, что и в close-past-lessons — не полагаемся на
-    // системный часовой пояс сервера/браузера.
-    const tashkentNow = new Date(now + TZ_MS);
-    const tashkentMidnightUtcMs =
-      Date.UTC(tashkentNow.getUTCFullYear(), tashkentNow.getUTCMonth(), tashkentNow.getUTCDate()) - TZ_MS;
+    // 09:55 Ташкент = 04:55 UTC. Полночь ташкентских суток берём у общего
+    // помощника: на системный часовой пояс не полагаемся.
+    const tashkentMidnightUtcMs = new Date(tashkentDayBoundsUtc(now).startIso).getTime();
     return tashkentMidnightUtcMs + 9 * 60 * 60 * 1000 + 55 * 60 * 1000;
   }
   const secsUntil: number | null = (() => {

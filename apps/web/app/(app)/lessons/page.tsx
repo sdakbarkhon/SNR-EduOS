@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getStudentLessonsForDate,
   getStudentLessonsForWeek,
+  tashkentDayKey,
+  tashkentWeekMonday,
 } from "@snr/core";
 import { getMyStudent } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
@@ -14,18 +16,11 @@ import { LessonsView } from "./LessonsView";
 // Z.3, заход 2 — «сейчас» приходит параметром, а не берётся глобально: эти
 // две функции лежат на уровне модуля и клиента базы не видят, а школа
 // известна только внутри страницы.
-function getTashkentToday(nowMs: number): string {
-  const tashkentMs = nowMs + 5 * 60 * 60 * 1000;
-  return new Date(tashkentMs).toISOString().slice(0, 10);
-}
+// 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
+// в одном месте, packages/core/src/utils/date.ts.
+const getTashkentToday = tashkentDayKey;
 
-function getTashkentWeekMonday(nowMs: number): string {
-  const base = new Date(nowMs + 5 * 60 * 60 * 1000);
-  const dow = base.getUTCDay(); // 0=Sun
-  const offset = dow === 0 ? -6 : 1 - dow;
-  base.setUTCDate(base.getUTCDate() + offset);
-  return base.toISOString().slice(0, 10);
-}
+const getTashkentWeekMonday = tashkentWeekMonday;
 
 // ─────────────────────────────────────────────────────────────────────────────
 

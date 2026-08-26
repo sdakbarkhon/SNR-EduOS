@@ -24,6 +24,8 @@ import {
   averageOf,
   countsTowardAverage,
   getSubjectKeyByLabel,
+  tashkentDayKey,
+  tashkentDayOfYear,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -42,18 +44,17 @@ type AttendanceDay = { status: AttendanceStatus; startsAt: string };
 
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
 
-function dayOfYear(d: Date): number {
-  return Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
-}
+// 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
+// в одном месте, packages/core/src/utils/date.ts.
+// День года считался в поясе среды — приветствие менялось на пять часов
+// раньше положенного.
+const dayOfYear = tashkentDayOfYear;
 
 // Школа работает в Ташкенте (UTC+5) — "сегодня" должно быть посчитано по
 // этому фиксированному смещению, а не по локальному часовому поясу
 // сервера/браузера (тот может отличаться от Ташкента). Тот же паттерн, что
 // уже используется в LessonsView.tsx (dateKey()) для той же задачи.
-const TZ_MS = 5 * 60 * 60 * 1000;
-function tashkentDateKey(d: Date): string {
-  return new Date(d.getTime() + TZ_MS).toISOString().slice(0, 10);
-}
+const tashkentDateKey = tashkentDayKey;
 // "YYYY-MM-DD" на i дней назад от опорного дня-ключа (UTC-арифметика по
 // дню-ключу, без TZ-дрейфа — Ташкент без переходов на летнее время).
 function dayKeyBack(baseKey: string, i: number): string {

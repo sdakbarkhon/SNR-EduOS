@@ -5,6 +5,7 @@ import {
   attendanceForDay,
   getDictionary,
   defaultLocale,
+  tashkentDayKey,
   type AttendanceWithLesson,
 } from "@snr/core";
 import { colors } from "@snr/ui-tokens";
@@ -21,22 +22,29 @@ function getBorderColor(dayRows: AttendanceWithLesson[]): string | null {
   return null;
 }
 
+// 26.08.2026 — СЕТКА СТРОИТСЯ В UTC, А НЕ В ПОЯСЕ СРЕДЫ.
+// Ячейка календаря — это не момент времени, а позиция в сетке. Раньше она
+// строилась через new Date(year, month, 1) и читалась через getDay()/
+// getMonth(), то есть в поясе сервера. На Vercel это UTC, и с 00:00 до 05:00
+// по Ташкенту вся сетка съезжала на день. Теперь ячейки — полночь UTC, а
+// принадлежность урока дню считает isSameTashkentDay по единому правилу
+// (packages/core/src/utils/date.ts).
 function getCalendarDays(year: number, month: number): Date[] {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const startDow = firstDay.getDay();
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  const startDow = firstDay.getUTCDay();
   const mondayOffset = startDow === 0 ? -6 : 1 - startDow;
   const start = new Date(firstDay);
-  start.setDate(start.getDate() + mondayOffset);
-  const endDow = lastDay.getDay();
+  start.setUTCDate(start.getUTCDate() + mondayOffset);
+  const endDow = lastDay.getUTCDay();
   const sundayOffset = endDow === 0 ? 0 : 7 - endDow;
   const end = new Date(lastDay);
-  end.setDate(end.getDate() + sundayOffset);
+  end.setUTCDate(end.getUTCDate() + sundayOffset);
   const days: Date[] = [];
   const cur = new Date(start);
   while (cur <= end) {
     days.push(new Date(cur));
-    cur.setDate(cur.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return days;
 }
@@ -56,7 +64,9 @@ export function AttendanceCalendar({
   // Z.3, заход 3 — «сегодня» из школы. Прежний null-до-маунта не нужен:
   // начальное значение приходит с сервера, гидратация не расходится.
   const schoolNowDate = useSchoolNow();
-  const todayKey = `${schoolNowDate.getFullYear()}-${schoolNowDate.getMonth()}-${schoolNowDate.getDate()}`;
+  // Ключ «сегодня» — по Ташкенту. Было getFullYear/getMonth/getDate: в те же
+  // ночные часы подсветка вставала на вчерашнюю клетку.
+  const todayKey = tashkentDayKey(schoolNowDate);
 
   const days = useMemo(() => getCalendarDays(year, month), [year, month]);
 
@@ -104,9 +114,8 @@ export function AttendanceCalendar({
 
         {/* Дни */}
         {days.map((day) => {
-          const inMonth = day.getMonth() === month;
-          const isToday =
-            `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}` === todayKey;
+          const inMonth = day.getUTCMonth() === month;
+          const isToday = tashkentDayKey(day) === todayKey;
           const dayRows = attendanceForDay(rows, day);
           const borderColor = inMonth ? getBorderColor(dayRows) : null;
 
@@ -143,7 +152,7 @@ export function AttendanceCalendar({
                 ].join(" ")}
                 style={cellStyle}
               >
-                {day.getDate()}
+                {day.getUTCDate()}
               </span>
             </div>
           );

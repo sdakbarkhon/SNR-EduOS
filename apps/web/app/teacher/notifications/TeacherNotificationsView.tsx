@@ -7,7 +7,7 @@ import {
   FolderOpen, Trash2, Check,
 } from "lucide-react";
 import {
-  getDictionary, getMyNotifications, markNotificationRead,
+  getDictionary, getMyNotifications, markNotificationRead, isSameTashkentDay,
   markAllNotificationsRead, deleteNotification,
   type Locale, type AppNotification, type NotificationKind, type TeacherAnnouncement,
 } from "@snr/core";
@@ -32,15 +32,15 @@ const ICONS: Record<NotificationKind, typeof Bell> = {
 
 const PAGE_SIZE = 20;
 
+// 26.08.2026 — «СЕГОДНЯ» И «ВЧЕРА» СЧИТАЮТСЯ ПО ТАШКЕНТУ.
+// Было сравнение getDate/getMonth/getFullYear — в поясе среды. На сервере
+// это UTC, и с 00:00 до 05:00 по Ташкенту сегодняшние уведомления
+// подписывались вчерашней датой, а вчерашние — позавчерашней.
 function isToday(iso: string, now: Date): boolean {
-  const d = new Date(iso);
-  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  return isSameTashkentDay(iso, now);
 }
 function isYesterday(iso: string, now: Date): boolean {
-  const d = new Date(iso);
-  const yest = new Date(now);
-  yest.setDate(yest.getDate() - 1);
-  return d.getDate() === yest.getDate() && d.getMonth() === yest.getMonth() && d.getFullYear() === yest.getFullYear();
+  return isSameTashkentDay(iso, now.getTime() - 86_400_000);
 }
 function dateLabel(iso: string, today: string, yesterday: string, now: Date | null): string {
   if (now) {

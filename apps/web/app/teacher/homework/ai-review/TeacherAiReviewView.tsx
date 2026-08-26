@@ -22,6 +22,7 @@
 // пятая копия классов не заводится.
 
 import { useMemo, useState } from "react";
+import { tashkentDayKey } from "@snr/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TeacherSubmissionForReview, TeacherAiPendingReview } from "@snr/core";
@@ -36,7 +37,8 @@ import {
 import { formatDayLabel } from "@/lib/material-filters";
 import { AI_REVIEW_MAX_PER_CALL } from "@/lib/ai-review-batch";
 
-const TZ_MS = 5 * 60 * 60 * 1000; // Ташкент, фиксированное смещение
+// 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
+// в одном месте, packages/core/src/utils/date.ts.
 
 type ReviewKind = "not_reviewed" | "ai_reviewed" | "confirmed";
 
@@ -74,7 +76,7 @@ function blockedReason(row: TeacherSubmissionForReview): string | null {
 }
 
 function dayKey(iso: string): string {
-  return new Date(new Date(iso).getTime() + TZ_MS).toISOString().slice(0, 10);
+  return tashkentDayKey(iso);
 }
 
 function Avatar({ name, url }: { name: string; url?: string | null }) {

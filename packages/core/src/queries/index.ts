@@ -11,6 +11,7 @@ import { unwrap } from "./helpers";
 // ничего из index.ts не берёт, поэтому кольца не возникает.
 import { getChildCountedGrades } from "./parent";
 import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
+import { tashkentDayKey, tashkentDayBoundsUtc, tashkentMonthBoundsUtc } from "../utils/date";
 import { getSubjectKeyByLabel } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
 
@@ -1985,19 +1986,17 @@ function filterBySubject<T extends { subject_id?: string | null }>(
  *  ученические страницы (getTashkentToday в app/(app)/lessons/page.tsx).
  *  Параметр НЕ сделан опциональным намеренно — дефолт `Date.now()` был бы
  *  ровно той ловушкой, которую этот фикс и устраняет. */
-const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
-
 export const getTeacherTodayLessons = async (db: Db, nowMs: number) => {
-  // Границы ташкентских суток, выраженные в UTC.
-  const t = new Date(nowMs + TASHKENT_OFFSET_MS);
-  const y = t.getUTCFullYear(), m = t.getUTCMonth(), d = t.getUTCDate();
-  const todayStart = new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - TASHKENT_OFFSET_MS);
-  const todayEnd = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - TASHKENT_OFFSET_MS);
+  // 26.08.2026: границы ташкентских суток считает общий помощник. Здесь счёт
+  // и раньше был верным (getUTC* после смещения), но это была вторая
+  // реализация одного и того же — а на разошедшихся копиях проект уже
+  // спотыкался. Смещение теперь записано в одном месте, utils/date.ts.
+  const { startIso: todayStartIso, endIso: todayEndIso } = tashkentDayBoundsUtc(nowMs);
   const { data, error } = await db
     .from("lessons")
     .select("*, group:groups!inner(id, name, subject)")
-    .gte("starts_at", todayStart.toISOString())
-    .lte("starts_at", todayEnd.toISOString())
+    .gte("starts_at", todayStartIso)
+    .lte("starts_at", todayEndIso)
     .order("starts_at");
   if (error) throw error;
   const filter = await getTeacherSubjectFilter(db);
@@ -4526,8 +4525,9 @@ export const getTeacherLessonsByMonth = async (
   // 00:00–05:00 первого числа следующего. Сейчас уроков в эти часы не бывает,
   // поэтому эффекта не было, — но это ровно та ловушка, что уже выстрелила в
   // getTeacherTodayLessons. Считаем границы явно по Ташкенту (UTC+5).
-  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - TASHKENT_OFFSET_MS).toISOString();
-  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999) - TASHKENT_OFFSET_MS).toISOString();
+  // 26.08.2026: счёт границ переехал в общий помощник — смещение записано в
+  // одном месте на весь продукт.
+  const { startIso: start, endIso: end } = tashkentMonthBoundsUtc(year, month);
   const { data, error } = await db
     .from("lessons")
     .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, subject_id, group:groups!inner(id, name, subject)")
@@ -5420,7 +5420,5 @@ export async function getNextStudentLessonDate(
   if (!data || data.length === 0) return null;
   const first = (data as Array<{ starts_at: string }>)[0];
   if (!first) return null;
-  const utcMs = new Date(first.starts_at).getTime();
-  const tashkentMs = utcMs + 5 * 60 * 60 * 1000;
-  return new Date(tashkentMs).toISOString().slice(0, 10);
+  return tashkentDayKey(first.starts_at);
 }

@@ -14,7 +14,7 @@
 // «1 августа» и школьного сегодня, см. startDateFor. Демо-школе это ничего не
 // меняет: она заморожена на 28 июля, для неё позднее — по-прежнему 1 августа.
 
-import { getGroupLessonsInDateRange } from "@snr/core";
+import { getGroupLessonsInDateRange, tashkentDayKey } from "@snr/core";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
 
@@ -61,7 +61,7 @@ export function addDaysUTC(dateStr: string, days: number): string {
 
 export function tashkentDateOf(iso: string): string {
   const utcMs = new Date(iso).getTime();
-  return new Date(utcMs + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return tashkentDayKey(utcMs);
 }
 
 function minutesToHHMM(mins: number): string {

@@ -13,7 +13,7 @@ import {
   parentToday,
   parentUnreadCount,
 } from "@/lib/parent-queries";
-import { findNextLesson } from "@snr/core";
+import { findNextLesson, tashkentHour } from "@snr/core";
 
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
 import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
@@ -150,7 +150,7 @@ function genitiveName(name: string): string {
  *  летнее время, поэтому сдвиг миллисекундами точен (тот же приём, что в
  *  lib/parent-queries.ts). */
 function greetingPrefix(nowMs: number): string {
-  const hour = new Date(nowMs + 5 * 60 * 60 * 1000).getUTCHours();
+  const hour = tashkentHour(nowMs);
   if (hour < 5) return "Доброй ночи";
   if (hour < 12) return "Доброе утро";
   if (hour < 18) return "Добрый день";

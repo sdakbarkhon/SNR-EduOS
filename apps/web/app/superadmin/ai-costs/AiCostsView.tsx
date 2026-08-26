@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Download, Info } from "lucide-react";
-import { getDictionary, type Locale } from "@snr/core";
+import { getDictionary, tashkentParts, tashkentMonthBoundsUtc, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { costUsd, PRICING_USD_PER_1M, GEMINI_MODEL_FLASH } from "@/lib/ai/config";
 import { AI_TASK_VALUES } from "@/lib/ai/usage";
@@ -69,11 +69,17 @@ export function AiCostsView({
     [events],
   );
 
+  // 26.08.2026: начало месяца считается по Ташкенту, а не в поясе браузера.
+  // Было new Date(now.getFullYear(), now.getMonth(), 1) — у смотрящего из
+  // другого пояса «этот месяц» начинался не тогда, когда у школы.
   const periodStart = useMemo(() => {
     const now = new Date();
     if (period === "7") return new Date(now.getTime() - 7 * 864e5);
     if (period === "30") return new Date(now.getTime() - 30 * 864e5);
-    if (period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
+    if (period === "month") {
+      const { year, month } = tashkentParts(now);
+      return new Date(tashkentMonthBoundsUtc(year, month).startIso);
+    }
     return new Date(0);
   }, [period]);
 
@@ -102,9 +108,15 @@ export function AiCostsView({
   // Этот месяц против прошлого — считается по всем данным, а не по фильтру
   // периода: иначе сравнение месяцев зависело бы от выбранного периода и
   // ничего не значило.
+  // Границы месяцев — тоже по Ташкенту (см. periodStart выше).
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const { year: nowYear, month: nowMonth } = tashkentParts(now);
+  const monthStart = new Date(tashkentMonthBoundsUtc(nowYear, nowMonth).startIso);
+  const prevStart = new Date(
+    nowMonth === 1
+      ? tashkentMonthBoundsUtc(nowYear - 1, 12).startIso
+      : tashkentMonthBoundsUtc(nowYear, nowMonth - 1).startIso,
+  );
   const scoped = rows.filter(
     (r) => (!school || r.school_id === school) && (!task || r.task === task),
   );

@@ -1,3 +1,4 @@
+import { tashkentDayKey, formatTime } from "@snr/core";
 // 07.08.2026 — фильтры материалов группы по дате урока, уроку и предмету.
 //
 // Зачем. После автопубликации (миграция 174) материалы группы наполняются
@@ -16,7 +17,8 @@
 // занятия отношения не имеет — у 30 записей ретроспективы он вообще один и
 // тот же.
 
-const TZ_MS = 5 * 60 * 60 * 1000; // Ташкент, фиксированное смещение
+// 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
+// в одном месте, packages/core/src/utils/date.ts.
 
 export type FilterableMaterial = {
   subject: string | null;
@@ -37,7 +39,7 @@ export const ALL_FILTERS: MaterialFilters = { date: "all", lesson: "all", subjec
 /** Ташкентская дата урока (YYYY-MM-DD) или null, если материал не привязан. */
 export function lessonDayKey(m: FilterableMaterial): string | null {
   if (!m.lesson?.starts_at) return null;
-  return new Date(new Date(m.lesson.starts_at).getTime() + TZ_MS).toISOString().slice(0, 10);
+  return tashkentDayKey(m.lesson.starts_at);
 }
 
 /** «29.07.2026» из YYYY-MM-DD. */
@@ -51,7 +53,7 @@ export function lessonLabel(m: FilterableMaterial): string {
   const l = m.lesson;
   if (!l) return "";
   const name = l.title ?? l.topic ?? "";
-  const time = new Date(new Date(l.starts_at).getTime() + TZ_MS).toISOString().slice(11, 16);
+  const time = formatTime(l.starts_at);
   const subj = m.subject ? ` · ${m.subject}` : "";
   return name ? `${time} — ${name}${subj}` : `${time}${subj}`;
 }

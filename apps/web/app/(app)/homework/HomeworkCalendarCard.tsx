@@ -8,15 +8,17 @@ import {
   homeworkCategory,
   type HomeworkWithSubmission,
   type Locale,
+  tashkentDayKey,
 } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { SubjectIcon, useLocale, useToast } from "@/components";
 
-const TZ_MS = 5 * 60 * 60 * 1000; // Asia/Tashkent (UTC+5), фиксировано как в остальных queries/страницах
+// 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
+// в одном месте, packages/core/src/utils/date.ts.
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
 
 function tk(dt: Date): Date {
-  return new Date(dt.getTime() + TZ_MS);
+  return new Date(`${tashkentDayKey(dt)}T00:00:00Z`);
 }
 function dateKey(dt: Date): string {
   return tk(dt).toISOString().slice(0, 10);

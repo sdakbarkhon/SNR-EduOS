@@ -32,6 +32,8 @@ import {
   getStudentLessonsForWeek,
   getThreadMessages,
   getUnreadCount,
+  tashkentDayKey,
+  tashkentWeekMonday,
 } from "@snr/core";
 import type {
   AppNotification,
@@ -113,16 +115,13 @@ export async function parentNowMs(): Promise<number> {
  */
 export async function parentToday(): Promise<string> {
   const db = await createClient();
-  return new Date((await getMySchoolNowMs(db)) + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return tashkentDayKey(await getMySchoolNowMs(db));
 }
 
 /** Понедельник недели, в которую попадает «сегодня», YYYY-MM-DD. */
 export async function parentWeekMonday(): Promise<string> {
   const db = await createClient();
-  const base = new Date((await getMySchoolNowMs(db)) + 5 * 60 * 60 * 1000);
-  const dow = base.getUTCDay(); // 0 = воскресенье
-  base.setUTCDate(base.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
-  return base.toISOString().slice(0, 10);
+  return tashkentWeekMonday(await getMySchoolNowMs(db));
 }
 
 /** Текущий месяц, YYYY-MM. */

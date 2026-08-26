@@ -6,6 +6,8 @@ import {
   getDictionary,
   getStudentAttendance,
   getSubjectStyle,
+  tashkentDayKey,
+  tashkentParts,
   type AttendanceStatus,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
@@ -51,20 +53,26 @@ function statusColor(status: AttendanceStatus): string {
   return "#ef4444";
 }
 
+// 26.08.2026 — СЕТКА СТРОИТСЯ В UTC, А НЕ В ПОЯСЕ СРЕДЫ.
+// Ячейка календаря — позиция в сетке, не момент времени. Раньше она строилась
+// через new Date(year, month, 1) и читалась через getDay()/getMonth(), то есть
+// в поясе сервера (на Vercel это UTC). Заодно чинится давняя мелочь: ключ дня
+// ниже берётся как day.toISOString().slice(0,10), и на полуночи ЛОКАЛЬНОЙ он
+// мог указывать на соседние сутки. У полуночи UTC такого не бывает.
 function getCalendarDays(year: number, month: number): Date[] {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const startDow = firstDay.getDay();
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  const startDow = firstDay.getUTCDay();
   const mondayOffset = startDow === 0 ? -6 : 1 - startDow;
   const start = new Date(firstDay);
-  start.setDate(start.getDate() + mondayOffset);
-  const endDow = lastDay.getDay();
+  start.setUTCDate(start.getUTCDate() + mondayOffset);
+  const endDow = lastDay.getUTCDay();
   const sundayOffset = endDow === 0 ? 0 : 7 - endDow;
   const end = new Date(lastDay);
-  end.setDate(end.getDate() + sundayOffset);
+  end.setUTCDate(end.getUTCDate() + sundayOffset);
   const days: Date[] = [];
   const cur = new Date(start);
-  while (cur <= end) { days.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
+  while (cur <= end) { days.push(new Date(cur)); cur.setUTCDate(cur.getUTCDate() + 1); }
   return days;
 }
 
@@ -102,9 +110,11 @@ function dayTextClass(status: "present" | "excused" | "unexcused" | "none", inMo
 function getMonthOptions(n: number, now: Date): Array<{ value: string; label: string }> {
   const opts: Array<{ value: string; label: string }> = [];
   for (let i = 0; i < n; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    opts.push({ value, label: `${MONTH_NAMES_RU[d.getMonth()]} ${d.getFullYear()}` });
+    // 26.08.2026: месяц отсчитывается от ташкентского, а не от месяца среды.
+    const { year, month } = tashkentParts(now);
+    const d = new Date(Date.UTC(year, month - 1 - i, 1));
+    const value = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    opts.push({ value, label: `${MONTH_NAMES_RU[d.getUTCMonth()]} ${d.getUTCFullYear()}` });
   }
   return opts;
 }
@@ -160,13 +170,16 @@ export function AttendanceView({
 
   // Z.3, заход 3 — «сейчас» из школы одним значением на весь компонент.
   const schoolNowDate = useSchoolNow();
-  const calYear = month ? parseInt(month.slice(0, 4)) : schoolNowDate.getFullYear();
-  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : schoolNowDate.getMonth();
+  // 26.08.2026: без выбранного месяца берём ташкентский, а не месяц среды.
+  const nowParts = tashkentParts(schoolNowDate);
+  const calYear = month ? parseInt(month.slice(0, 4)) : nowParts.year;
+  const calMonth = month ? parseInt(month.slice(5, 7)) - 1 : nowParts.month - 1;
   const calendarDays = useMemo(() => getCalendarDays(calYear, calMonth), [calYear, calMonth]);
 
   // Прежний null-до-маунта больше не нужен: начальное значение провайдер
   // берёт с сервера, поэтому гидратация не расходится.
-  const todayKey = schoolNowDate.toISOString().slice(0, 10);
+  // Было toISOString() без смещения — это день UTC, а не Ташкента.
+  const todayKey = tashkentDayKey(schoolNowDate);
 
   const monthOptions = useMemo(() => getMonthOptions(12, schoolNowDate), [schoolNowDate]);
 
@@ -194,8 +207,10 @@ export function AttendanceView({
 
   const selectedDayLabel = useMemo(() => {
     if (!selectedDate) return "";
-    const d2 = new Date(selectedDate);
-    return `${d2.getDate()} ${MONTH_NAMES_RU_SHORT[d2.getMonth()]} ${d2.getFullYear()}`;
+    // selectedDate — уже ключ дня «YYYY-MM-DD»; разбираем его как есть,
+    // не превращая в момент времени и обратно.
+    const [yy, mm, dd] = selectedDate.split("-").map(Number);
+    return `${dd} ${MONTH_NAMES_RU_SHORT[(mm ?? 1) - 1]} ${yy}`;
   }, [selectedDate]);
 
   return (
@@ -309,7 +324,7 @@ export function AttendanceView({
             {/* Calendar grid — glass squares */}
             <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day) => {
-                const inMonth = day.getMonth() === calMonth;
+                const inMonth = day.getUTCMonth() === calMonth;
                 const dayStr = day.toISOString().slice(0, 10);
                 const isToday = mounted && dayStr === todayKey;
                 const { status, dayRecords } = inMonth
@@ -333,7 +348,7 @@ export function AttendanceView({
                     )}
                   >
                     <span className={dayTextClass(inMonth ? status : "none", inMonth)}>
-                      {day.getDate()}
+                      {day.getUTCDate()}
                     </span>
                   </button>
                 );

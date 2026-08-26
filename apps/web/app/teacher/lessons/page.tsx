@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTeacherLessonsByMonth, getTeacherGroups } from "@snr/core";
+import { getTeacherLessonsByMonth, getTeacherGroups, tashkentParts } from "@snr/core";
 import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
@@ -32,9 +32,15 @@ export default async function TeacherLessonsPage() {
   // scales with total lesson count, unbounded) — fetch only the current
   // month up front instead, matching what's actually shown on first paint.
   // Z.3, заход 2 — «сегодня» в расписании учителя от времени его школы.
+  // 26.08.2026 — САМОЕ БОЛЕЗНЕННОЕ МЕСТО ЭТОГО ЗАХОДА. Момент приходил
+  // верный, но getFullYear()/getMonth() читали его в поясе сервера (UTC).
+  // Учитель, открывший расписание в 01:00 первого сентября, запрашивал
+  // уроки за АВГУСТ и видел пустой список: сентябрьских там ещё нет, а
+  // августовские уже кончились. Окно ошибки — пять часов каждые сутки.
   const now = await getMySchoolNow(db);
+  const { year, month } = tashkentParts(now);
   const [lessonsRes, groupsRes] = await Promise.all([
-    safeQuery(getTeacherLessonsByMonth(db, now.getFullYear(), now.getMonth() + 1), [], "TeacherLessonsPage.lessons"),
+    safeQuery(getTeacherLessonsByMonth(db, year, month), [], "TeacherLessonsPage.lessons"),
     safeQuery(Promise.resolve(getTeacherGroups(db)), [], "TeacherLessonsPage.groups"),
   ]);
   const lessons = lessonsRes.data;

@@ -1,4 +1,5 @@
 import type { Locale } from "../i18n/types";
+import { tashkentDayOfYear } from "./date";
 
 const TIPS: Record<Locale, string[]> = {
   ru: [
@@ -24,10 +25,10 @@ const TIPS: Record<Locale, string[]> = {
   ],
 };
 
+// 26.08.2026: день года считается по Ташкенту, а не в поясе среды. Совет дня
+// менялся на границе суток на пять часов раньше положенного.
 function getDayOfYear(): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
+  return tashkentDayOfYear(Date.now());
 }
 
 export function getDailyTip(locale: Locale = "ru"): string {

@@ -15,7 +15,7 @@ import {
   Smile,
   Star,
 } from "lucide-react";
-import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey } from "@snr/core";
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -36,11 +36,12 @@ const DEFAULT_LESSON_MIN = 45;
 
 // ── date helpers (fixed UTC+5, как в queries) ────────────────────────────────
 
-const TZ_MS = 5 * 60 * 60 * 1000;
+// 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
+// в одном месте, packages/core/src/utils/date.ts.
 const LOCALE_MAP: Record<string, string> = { ru: "ru-RU", en: "en-US", uz: "uz-UZ" };
 
 function tk(iso: string): Date {
-  return new Date(new Date(iso).getTime() + TZ_MS);
+  return new Date(`${tashkentDayKey(iso)}T00:00:00Z`);
 }
 function dateKey(iso: string): string {
   return tk(iso).toISOString().slice(0, 10);

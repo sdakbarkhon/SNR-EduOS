@@ -12,6 +12,7 @@ import {
   createLesson, updateLesson, deleteLesson,
   getTeacherLessonsByMonth, getDictionary, defaultLocale,
   getCurriculumPlanForGroupSubject, getCurriculumTopicsWithUsage,
+  tashkentDayKey, tashkentParts, tashkentMonthBoundsUtc,
 } from "@snr/core";
 import type { SubjectWithGroup, Locale, CurriculumTopicWithUsage } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -95,22 +96,25 @@ const DAY_BG: Record<NonNullable<DayStatus>, string> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function localDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${dd}`;
-}
-function lessonDateKey(iso: string): string { return localDateKey(new Date(iso)); }
+// 26.08.2026 — КЛЮЧ ДНЯ И СЕТКА БОЛЬШЕ НЕ ЗАВИСЯТ ОТ ПОЯСА СРЕДЫ.
+//
+// Было: localDateKey читал дату через getFullYear/getMonth/getDate, то есть в
+// поясе сервера — на Vercel это UTC. Каждые сутки с 00:00 до 05:00 по Ташкенту
+// ключ указывал на вчерашний день: подсветка «сегодня» стояла не на той
+// клетке, а уроки раскладывались по соседним дням.
+//
+// Ячейки сетки — позиции, а не моменты: строим их полуночью UTC, тогда
+// getUTC* читает ровно то, что положили, в любом поясе.
+function lessonDateKey(iso: string): string { return tashkentDayKey(iso); }
 
 function getCalendarGrid(year: number, month: number): Date[] {
-  const firstDay = new Date(year, month - 1, 1);
-  let dow = firstDay.getDay();
-  dow = dow === 0 ? 6 : dow - 1; // Mon=0 … Sun=6
+  const firstDay = new Date(Date.UTC(year, month - 1, 1));
+  let dow = firstDay.getUTCDay();
+  dow = dow === 0 ? 6 : dow - 1; // Пн=0 … Вс=6
   const days: Date[] = [];
-  const start = new Date(year, month - 1, 1 - dow);
+  const start = new Date(Date.UTC(year, month - 1, 1 - dow));
   for (let i = 0; i < 42; i++)
-    days.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    days.push(new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + i)));
   return days;
 }
 
@@ -131,12 +135,17 @@ function fmtDayHeader(key: string): string {
   const d = new Date(`${key}T12:00:00`);
   return d.toLocaleDateString("ru", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
 }
-function toLocalDateStr(iso: string): string { return localDateKey(new Date(iso)); }
+function toLocalDateStr(iso: string): string { return tashkentDayKey(iso); }
 function toLocalTimeStr(iso: string): string {
   return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tashkent" });
 }
+// 26.08.2026: дата и время из формы читаются КАК ТАШКЕНТСКИЕ.
+// Было new Date(`${date}T${time}:00`) — разбор в поясе браузера. Поле времени
+// при этом заполнялось через toLocalTimeStr с явным timeZone: Asia/Tashkent,
+// то есть два поля одной формы жили в разных поясах. У учителя из Ташкента
+// совпадало случайно; у любого другого урок уезжал на разницу поясов.
 function buildIso(date: string, time: string): string {
-  return new Date(`${date}T${time}:00`).toISOString();
+  return new Date(`${date}T${time}:00+05:00`).toISOString();
 }
 function emptyForm(groupId = ""): FormState {
   return { groupId, subjectId: "", date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "", curriculumTopicId: "" };
@@ -292,6 +301,10 @@ function DatePickerField({
             selected={selectedDate}
             onSelect={(d) => {
               if (!d) return;
+              // DayPicker отдаёт локальную полночь выбранной клетки — это
+              // календарная дата, а не момент. Читаем её теми же локальными
+              // полями, какими она и создана: подмешивать сюда пояс нельзя,
+              // иначе выбор съедет на день.
               const y = d.getFullYear();
               const m = String(d.getMonth() + 1).padStart(2, "0");
               const day = String(d.getDate()).padStart(2, "0");
@@ -578,14 +591,19 @@ export function TeacherLessonsView({
   // значение неподвижно: подсветка «Сейчас» в расписании не уезжает.
   const now = useSchoolNow(30_000);
   const schoolNowMs = useSchoolNowSnapshot();
-  const todayKey = localDateKey(now);
+  const todayKey = tashkentDayKey(now);
 
-  const [viewYear, setViewYear] = useState(now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-based
+  // 26.08.2026: начальный месяц — ташкентский. Было getFullYear()/getMonth():
+  // учитель, открывший расписание в 01:00 первого числа, попадал на прошлый
+  // месяц и видел пустой список.
+  const nowParts = tashkentParts(now);
+  const [viewYear, setViewYear] = useState(nowParts.year);
+  const [viewMonth, setViewMonth] = useState(nowParts.month); // 1-based
   const [selectedDayKey, setSelectedDayKey] = useState(todayKey);
   const [monthLessons, setMonthLessons] = useState<LessonItem[]>(() => {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const { startIso, endIso } = tashkentMonthBoundsUtc(nowParts.year, nowParts.month);
+    const start = new Date(startIso);
+    const end = new Date(endIso);
     return initialLessons.filter(l => {
       const d = new Date(l.starts_at);
       return d >= start && d <= end;
@@ -743,8 +761,8 @@ export function TeacherLessonsView({
             {/* Day grid */}
             <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day, i) => {
-                const key = localDateKey(day);
-                const isCurrentMonth = day.getMonth() === viewMonth - 1;
+                const key = tashkentDayKey(day);
+                const isCurrentMonth = day.getUTCMonth() === viewMonth - 1;
                 const isToday    = key === todayKey;
                 const isSelected = key === selectedDayKey;
                 const dayData    = byDay.get(key) ?? [];
@@ -776,8 +794,8 @@ export function TeacherLessonsView({
                       // Баг проявлялся как "нет уроков" на 1-2 августа при
                       // просмотре июля.
                       if (!isCurrentMonth) {
-                        setViewYear(day.getFullYear());
-                        setViewMonth(day.getMonth() + 1);
+                        setViewYear(day.getUTCFullYear());
+                        setViewMonth(day.getUTCMonth() + 1);
                       }
                       setSelectedDayKey(key);
                     }}
@@ -788,7 +806,7 @@ export function TeacherLessonsView({
                       : isCurrentMonth ? "text-[#1D1D1F]"
                       : "text-gray-300"
                     }`}>
-                      {day.getDate()}
+                      {day.getUTCDate()}
                     </span>
                     {/* Per-lesson dots with individual effective-status colours */}
                     {dayData.length > 0 && (
