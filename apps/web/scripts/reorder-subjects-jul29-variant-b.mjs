@@ -45,6 +45,7 @@
 // Идемпотентен: если расклад уже целевой — выходит, ничего не трогая.
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -58,7 +59,10 @@ for (const line of envText.split("\n")) {
 }
 
 const APPLY = process.argv.includes("--apply");
-const DEMO_SCHOOL = "a0a0a0a0-0000-0000-0000-000000000001";
+// 26.08.2026: школа приходит аргументом --school, а не вписана сюда.
+// Прежнее значение осталось как pinned: если указать другую школу, скрипт
+// выйдет с ошибкой, а не применится молча не туда.
+const DEMO_SCHOOL = resolveSchoolId({ pinned: "a0a0a0a0-0000-0000-0000-000000000001" });
 const DAY_FROM = "2026-07-29T00:00:00+05";
 const DAY_TO = "2026-07-30T00:00:00+05";
 

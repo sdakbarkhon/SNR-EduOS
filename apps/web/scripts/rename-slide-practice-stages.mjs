@@ -23,6 +23,7 @@
 // Идемпотентен: повторный прогон найдёт 0 строк.
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -36,7 +37,10 @@ for (const line of envText.split("\n")) {
 }
 
 const APPLY = process.argv.includes("--apply");
-const DEMO_SCHOOL = "a0a0a0a0-0000-0000-0000-000000000001";
+// 26.08.2026: школа приходит аргументом --school, а не вписана сюда.
+// Прежнее значение осталось как pinned: если указать другую школу, скрипт
+// выйдет с ошибкой, а не применится молча не туда.
+const DEMO_SCHOOL = resolveSchoolId({ pinned: "a0a0a0a0-0000-0000-0000-000000000001" });
 
 /** Предметы, у которых практика остаётся слайдами и просто честно называется.
  *  Программирование и робототехника сюда НЕ входят — они получают настоящее

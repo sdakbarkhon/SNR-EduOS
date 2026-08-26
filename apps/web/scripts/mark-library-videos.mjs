@@ -19,6 +19,7 @@
 //   node scripts/mark-library-videos.mjs --apply   # запись
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -64,10 +65,15 @@ console.table(
 
 await client.query("BEGIN");
 
+// 26.08.2026: школа приходит аргументом --school и подставляется в правки.
+// Раньше их не было вовсе — UPDATE шёл по всей таблице, то есть по обеим
+// школам сразу.
+const SCHOOL_ID = resolveSchoolId();
 const res = await client.query(
   `UPDATE teacher_library_materials
       SET material_type = 'видео'
-    WHERE material_type IS NULL AND ${IS_VIDEO}`,
+    WHERE material_type IS NULL AND ${IS_VIDEO} AND school_id = $1`,
+  [SCHOOL_ID],
 );
 console.log(`\nПомечено видом «видео»: ${res.rowCount}`);
 

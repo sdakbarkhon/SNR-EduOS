@@ -55,6 +55,7 @@
 //   node --env-file=.env.local scripts/clean-all-lesson-data.mjs --confirm   — реальное удаление
 
 import { createClient } from "@supabase/supabase-js";
+import { resolveSchoolId } from "./_school-arg.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -78,7 +79,10 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 }
 const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
-const DEMO_SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+// 26.08.2026: школа приходит аргументом --school. Прежнее значение осталось
+// как pinned — указать другую школу этому скрипту нельзя: он перечисляет
+// 25 таблиц демо поимённо и на боевой означал бы совсем другое.
+const DEMO_SCHOOL_ID = resolveSchoolId({ pinned: "a0a0a0a0-0000-0000-0000-000000000001" });
 const REAL_SCHOOL_ID = "b0b0b0b0-0000-0000-0000-000000000001"; // только для sanity-проверки в конце, не трогаем
 
 const argv = process.argv.slice(2);

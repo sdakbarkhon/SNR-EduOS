@@ -4,6 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
+import { resolveSchoolId, assertSchoolExists } from "./_school-arg.mjs";
 
 export function loadEnvLocal() {
   const text = fs.readFileSync(path.resolve(process.cwd(), ".env.local"), "utf8");
@@ -23,7 +24,21 @@ export function makeServiceRoleClient() {
   });
 }
 
-export const SCHOOL_ID = "a0a0a0a0-0000-0000-0000-000000000001";
+// 26.08.2026 — ШКОЛА БОЛЬШЕ НЕ КОНСТАНТА.
+//
+// Было: `export const SCHOOL_ID = "a0a0a0a0-…"` — идентификатор демо-школы,
+// вписанный намертво. Школ теперь две, и любой из тридцати трёх скриптов,
+// импортирующих отсюда SCHOOL_ID, молча правил ту, что вписана здесь.
+//
+// Стало: значение приходит из аргумента --school и проверяется по базе ПРЯМО
+// ПРИ ЗАГРУЗКЕ модуля. Поскольку импорт стоит в шапке каждого скрипта,
+// проверка случается раньше любой его строки: забыл аргумент — вышел, не
+// тронув ничего. Ожидание верхнего уровня здесь законно, файл — ESM (.mjs).
+//
+// Скрипты, которые импортируют отсюда только pick/randomInt, тоже потребуют
+// аргумент. Это сознательно: все они школьные, и «безобидных» среди них нет.
+export const SCHOOL_ID = resolveSchoolId();
+await assertSchoolExists(makeServiceRoleClient(), SCHOOL_ID);
 
 // Пачка «240 пустых уроков», ЧАСТЬ 3 — RU-название предмета урока
 // (lessons.subject_id -> subjects.name) -> slug books.subject. Зеркалит

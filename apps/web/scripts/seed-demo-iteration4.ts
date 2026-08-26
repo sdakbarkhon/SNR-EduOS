@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
+import { requireTypedPhrase } from "./_confirm.mjs";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -21,6 +22,21 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 const PASSWORD = "password123";
 
 const DEMO_GROUPS = ["3-А класс", "7-А класс", "10-А класс"];
+
+/** Хранилища, которые скрипт вычищает ЦЕЛИКОМ. Список поднят в константу,
+ *  чтобы предупреждение и сама чистка не могли разойтись. */
+const STORAGE_BUCKETS = [
+  "lesson-materials",
+  "course-materials",
+  "materials",
+  "homework-files",
+  "homework-submissions",
+  "homework-tests",
+  "avatars",
+  "books",
+  "project-files",
+  "stage-attachments",
+];
 const DEMO_STUDENTS = ["Aziz_03", "Nodira_07", "Sherzod_10"];
 
 async function getExistingGroupIds(): Promise<string[]> {
@@ -31,7 +47,69 @@ async function getExistingGroupIds(): Promise<string[]> {
   return (data ?? []).map((g: { id: string }) => g.id);
 }
 
+/**
+ * ЧТО БУДЕТ УНИЧТОЖЕНО — живыми числами, посчитанными на месте. 26.08.2026.
+ *
+ * Раньше скрипт запускался одной командой `pnpm seed:demo-iter4`, без единого
+ * предупреждения, и первым делом вычищал десять хранилищ целиком. Строка из
+ * package.json убрана, а перед работой человек видит, что именно исчезнет, и
+ * печатает фразу руками.
+ *
+ * Числа НЕ вписаны константами: считаются запросом каждый раз, иначе через
+ * месяц они соврут.
+ */
+async function showDamageAndConfirm() {
+  console.log("\n" + "=".repeat(72));
+  console.log("ПОЛНОЕ ПЕРЕСОЗДАНИЕ ДЕМО-ШКОЛЫ — ЧТО БУДЕТ УНИЧТОЖЕНО");
+  console.log("=".repeat(72));
+
+  console.log("\n1. ФАЙЛЫ В ХРАНИЛИЩАХ (удаление НЕОБРАТИМО, версий нет):\n");
+  let filesTotal = 0;
+  for (const bucket of STORAGE_BUCKETS) {
+    const files = await listAllFiles(bucket);
+    filesTotal += files.length;
+    console.log(`   ${bucket.padEnd(24)} ${String(files.length).padStart(4)}`);
+  }
+  console.log(`   ${"ИТОГО ФАЙЛОВ".padEnd(24)} ${String(filesTotal).padStart(4)}`);
+  console.log("\n   Файлы других хранилищ (картинки этапов, слайды, видео,");
+  console.log("   учебные планы, логотипы) НЕ трогаются.");
+
+  console.log("\n2. СТРОКИ В БАЗЕ:\n");
+  const groupIds = await getExistingGroupIds();
+  const count = async (table: string, col: string, vals: string[]) => {
+    if (vals.length === 0) return 0;
+    const { count: c } = await supabase.from(table).select("id", { count: "exact", head: true }).in(col, vals);
+    return c ?? 0;
+  };
+  const lessons = await count("lessons", "group_id", groupIds);
+  const homework = await count("homework", "group_id", groupIds);
+  const enrolled = await count("student_groups", "group_id", groupIds);
+  console.log(`   группы ${DEMO_GROUPS.join(", ")}: ${groupIds.length}`);
+  console.log(`   уроки в них (уйдут каскадом): ${lessons}`);
+  console.log(`   домашние задания: ${homework}`);
+  console.log(`   связки ученик–группа: ${enrolled}`);
+  console.log("\n   За уроками каскадом уходят этапы, посещаемость, оценки за");
+  console.log("   урок, материалы, поднятые руки и заявки — то есть всё");
+  console.log("   содержимое демо-школы.");
+
+  console.log("\n3. УЧЁТНЫЕ ЗАПИСИ:\n");
+  const { data: t } = await supabase.from("teachers").select("id").eq("username", "teacher_karim").maybeSingle();
+  const { data: st } = await supabase.from("students").select("id").in("username", DEMO_STUDENTS);
+  console.log(`   учитель teacher_karim: ${t ? 1 : 0}`);
+  console.log(`   ученики ${DEMO_STUDENTS.join(", ")}: ${st?.length ?? 0}`);
+  console.log("   вместе с ними удаляются их записи входа (auth.users).");
+
+  console.log("\n" + "=".repeat(72));
+  console.log("ОБРАТИМО ЛИ: строки — частично (есть снимок эталона и ночной");
+  console.log("откат формы уроков). ФАЙЛЫ — НЕТ. Удалённое из хранилища не");
+  console.log("восстанавливается ничем.");
+  console.log("=".repeat(72));
+
+  await requireTypedPhrase("ПЕРЕСОЗДАТЬ ДЕМО ПОЛНОСТЬЮ");
+}
+
 async function main() {
+  await showDamageAndConfirm();
   console.log("=== Seeding demo data for Iteration 4 ===");
 
   // ─── 0. PRE-CLEANUP (idempotent — можно перезапускать) ────────────────────
@@ -96,20 +174,7 @@ async function main() {
 
   // ─── 1. STORAGE CLEANUP ───────────────────────────────────────────────────
   console.log("\n[1/8] Cleaning storage buckets...");
-  const buckets = [
-    "lesson-materials",
-    "course-materials",
-    "materials",
-    "homework-files",
-    "homework-submissions",
-    "homework-tests",
-    "avatars",
-    "books",
-    "project-files",
-    "stage-attachments",
-  ];
-
-  for (const bucket of buckets) {
+  for (const bucket of STORAGE_BUCKETS) {
     try {
       const { data: files } = await supabase.storage
         .from(bucket)

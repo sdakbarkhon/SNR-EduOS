@@ -24,6 +24,11 @@
 //   node --env-file=.env.local scripts/resign-slide-images.mjs --confirm  ← запись
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
+
+// 26.08.2026: школа приходит аргументом --school. Раньше отбор слайдов
+// шёл по обеим школам сразу, без разбора, чьи это строки.
+const SCHOOL_ID = resolveSchoolId();
 import path from "node:path";
 import { createRequire } from "node:module";
 import { createClient } from "@supabase/supabase-js";
@@ -91,12 +96,17 @@ if (brokenElsewhere.length) {
 // ── 2. СЛАЙДЫ: что чиним ────────────────────────────────────────────────────
 line("2. СЛАЙДЫ С ПУБЛИЧНЫМ АДРЕСОМ");
 
+// SCHOOL_ID подставляется строкой, а не параметром: помощник q() параметров
+// не принимает. Безопасно — значение прошло проверку на форму uuid в
+// resolveSchoolId, ничего кроме шестнадцатеричных цифр и дефисов туда не
+// пройдёт.
 const rows = await q(`
   SELECT ls.id, ls.title, ls.slides::text AS slides_text, l.title AS lesson_title, s.name AS school
     FROM lesson_stages ls
     JOIN lessons l ON l.id = ls.lesson_id
     JOIN schools s ON s.id = ls.school_id
    WHERE ls.slides::text LIKE '%${PUBLIC_MARK}%'
+     AND ls.school_id = '${SCHOOL_ID}'
    ORDER BY ls.created_at`);
 
 console.log(`строк со слайдами, где есть публичный адрес: ${rows.length}`);

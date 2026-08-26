@@ -29,6 +29,7 @@
 //   node --env-file=.env.local scripts/fix-demo-name-order.mjs --confirm  ← запись
 
 import { createRequire } from "node:module";
+import { resolveSchoolId, assertSchoolExists } from "./_school-arg.mjs";
 
 const require = createRequire("C:/SNR EduOS/package.json");
 const { Client } = require("pg");
@@ -58,7 +59,11 @@ await db.connect();
 const q = async (sql, params) => (await db.query(sql, params)).rows;
 const line = (t) => console.log("\n── " + t + " " + "─".repeat(Math.max(0, 62 - t.length)));
 
-const [{ id: demoSchool }] = await q(`SELECT id FROM schools WHERE is_demo`);
+// 26.08.2026: школа приходит аргументом --school, а не «та, у которой стоит
+// признак демо». Список ФИО ниже составлен под демо-школу, поэтому pinned
+// удерживает её: указать другую — выход с ошибкой.
+const demoSchool = resolveSchoolId({ pinned: "a0a0a0a0-0000-0000-0000-000000000001" });
+await assertSchoolExists(db, demoSchool);
 
 // ── 1. Что найдено ───────────────────────────────────────────────────────────
 line("1. ЧТО НАЙДЕНО");

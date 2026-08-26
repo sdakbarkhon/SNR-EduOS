@@ -43,6 +43,11 @@
 // идти ОДНОЙ транзакцией, а сверка «до/после» — внутри неё же.
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
+
+// 26.08.2026: школа приходит аргументом --school. Раньше обнуление отметок
+// шёл по обеим школам сразу, без разбора, чьи это строки.
+const SCHOOL_ID = resolveSchoolId();
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -302,7 +307,8 @@ async function main() {
     for (const { цель } of план) {
       const r = await c.query(`
         UPDATE public.${цель.table} SET ${цель.stamp} = NULL
-         WHERE ${цель.stamp} IS NOT NULL AND ${цель.author} IS NULL`);
+         WHERE ${цель.stamp} IS NOT NULL AND ${цель.author} IS NULL
+           AND school_id = $1`, [SCHOOL_ID]);
       итоги[цель.table] = r.rowCount;
       line(`${цель.подпись}: обнулено ${r.rowCount}`);
     }

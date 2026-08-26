@@ -18,6 +18,7 @@
 // Идемпотентен: повторный прогон найдёт 0 слайдов и ничего не сделает.
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -69,6 +70,9 @@ await client.query("BEGIN");
 
 // jsonb_agg по элементам массива с вырезанным ключом. WHERE по EXISTS —
 // трогаем только те этапы, где опрос реально есть.
+// 26.08.2026: школа приходит аргументом --school и подставляется в правку.
+// Раньше UPDATE шёл по всей таблице, то есть по обеим школам сразу.
+const SCHOOL_ID = resolveSchoolId();
 const res = await client.query(`
   UPDATE lesson_stages st
      SET slides = sub.new_slides
@@ -77,10 +81,11 @@ const res = await client.query(`
              jsonb_agg(sl - 'mini_quiz' ORDER BY ord) AS new_slides
         FROM lesson_stages s2, jsonb_array_elements(s2.slides) WITH ORDINALITY AS a(sl, ord)
        WHERE s2.slides IS NOT NULL
+         AND s2.school_id = $1
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(s2.slides) x WHERE x ? 'mini_quiz')
        GROUP BY s2.id
     ) AS sub
-   WHERE st.id = sub.id`);
+   WHERE st.id = sub.id`, [SCHOOL_ID]);
 console.log(`\nЭтапов обновлено: ${res.rowCount}`);
 
 const after = (await client.query(COUNT_SQL)).rows[0].n;

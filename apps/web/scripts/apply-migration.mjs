@@ -48,6 +48,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
 
+import { requireYes } from "./_confirm.mjs";
+
 const { Client } = pg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -128,6 +130,38 @@ async function main() {
     }
 
     const rawSql = fs.readFileSync(sqlFilePath, "utf8");
+
+    // 26.08.2026 — ПОКАЗАТЬ И СПРОСИТЬ.
+    // Скрипт применяет любой SQL к ПРОДУ одной командой. Флага у него не было
+    // вовсе: опечатка в имени файла означала применённую не ту миграцию.
+    // Теперь перед работой видно, что именно поедет, и нужен ответ «да».
+    //
+    // Флага «пропустить подтверждение» намеренно НЕТ: по всему репозиторию
+    // этот скрипт не зовёт ни другой скрипт, ни маршрут приложения, ни крон —
+    // его запускает только человек руками. Флаг был бы дверью, которой некому
+    // пользоваться, кроме случайности.
+    {
+      const lines = rawSql.split("\n");
+      const head = lines.filter((l) => l.trim().startsWith("--")).slice(0, 12);
+      const statements = (rawSql.match(/^\s*(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|GRANT|REVOKE)\b/gim) ?? [])
+        .map((x) => x.trim().toUpperCase());
+      const counts = {};
+      for (const st of statements) counts[st] = (counts[st] ?? 0) + 1;
+
+      console.log("\n" + "=".repeat(72));
+      console.log("ПРИМЕНЕНИЕ МИГРАЦИИ К ПРОДУ");
+      console.log("=".repeat(72));
+      console.log(`  файл:    ${sqlFilePath}`);
+      console.log(`  версия:  ${version}`);
+      console.log(`  строк:   ${lines.length}`);
+      console.log(`  команды: ${Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(", ") || "(не распознаны)"}`);
+      if (head.length) {
+        console.log("\n  из шапки файла:");
+        for (const l of head) console.log("    " + l.trim().slice(0, 90));
+      }
+      console.log("=".repeat(72));
+      await requireYes("Применить эту миграцию к боевой базе?");
+    }
     const body = stripOwnTransactionControl(rawSql);
 
     await client.query("BEGIN");

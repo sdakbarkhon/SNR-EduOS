@@ -51,6 +51,11 @@
 // выразить.
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
+
+// 26.08.2026: школа приходит аргументом --school. Раньше отбор вопросов
+// шёл по обеим школам сразу, без разбора, чьи это строки.
+const SCHOOL_ID = resolveSchoolId();
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -139,8 +144,9 @@ async function main() {
              s.name AS school_name, s.is_demo
         FROM public.quiz_questions q
         JOIN public.schools s ON s.id = q.school_id
+       WHERE q.school_id = $1
        ORDER BY s.name, q.stage_id, q.position
-    `)).rows;
+    `, [SCHOOL_ID])).rows;
 
     const answers = (await client.query(`
       SELECT id, question_id, selected_option_index FROM public.quiz_answers

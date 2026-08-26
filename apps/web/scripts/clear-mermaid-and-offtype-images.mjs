@@ -23,6 +23,7 @@
 // Идемпотентен: повторный прогон найдёт 0 строк и ничего не сделает.
 
 import fs from "node:fs";
+import { resolveSchoolId } from "./_school-arg.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -69,17 +70,23 @@ console.table(
 
 await client.query("BEGIN");
 
+// 26.08.2026: школа приходит аргументом --school и подставляется в правки.
+// Раньше их не было вовсе — UPDATE шёл по всей таблице, то есть по обеим
+// школам сразу.
+const SCHOOL_ID = resolveSchoolId();
 const mermaidRes = await client.query(
   `UPDATE lesson_stages SET mermaid_code = NULL
-    WHERE mermaid_code IS NOT NULL AND mermaid_code <> ''`,
+    WHERE mermaid_code IS NOT NULL AND mermaid_code <> '' AND school_id = $1`,
+  [SCHOOL_ID],
 );
 console.log(`\nСхем очищено: ${mermaidRes.rowCount}`);
 
 const imgRes = await client.query(
   `UPDATE lesson_stages SET image_url = NULL
     WHERE image_url IS NOT NULL
-      AND (content_type IS NULL OR content_type <> ALL($1::text[]))`,
-  [EXPLANATION_TYPES],
+      AND (content_type IS NULL OR content_type <> ALL($1::text[]))
+      AND school_id = $2`,
+  [EXPLANATION_TYPES, SCHOOL_ID],
 );
 console.log(`Картинок снято с неподходящих этапов: ${imgRes.rowCount}`);
 
