@@ -13,7 +13,7 @@ import {
   parentToday,
   parentUnreadCount,
 } from "@/lib/parent-queries";
-import { findNextLesson, tashkentHour } from "@snr/core";
+import { findNextLesson, tashkentHour, subjectDisplay } from "@snr/core";
 
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
 import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
@@ -327,11 +327,15 @@ export default async function ParentHomePage() {
     feed.push({
       id: `sub-${h.id}`,
       title: h.title,
-      subtitle: h.subjectName ?? h.group.name,
+      // 26.08.2026. В строке предмета печаталось НАЗВАНИЕ КЛАССА — «10-А
+      // класс», — а значок и цвет рядом выводились из ЗАГОЛОВКА задания:
+      // иконка и подпись одной карточки говорили про разное. Теперь оба из
+      // одного источника, а если предмета нет — прочерк, а не подмена.
+      subtitle: subjectDisplay(h.subjectName),
       href: "/parent/homework",
       icon: {
-        gradient: subjectGradient(h.subjectName ?? h.title),
-        glyph: SUBJECT_GLYPH[subjectKeyOf(h.subjectName ?? h.title)],
+        gradient: subjectGradient(h.subjectName ?? ""),
+        glyph: SUBJECT_GLYPH[subjectKeyOf(h.subjectName ?? "")],
       },
       badge: graded
         ? { kind: "grade", value: h.submission?.grade ?? 0 }
@@ -361,11 +365,15 @@ export default async function ParentHomePage() {
     feed.push({
       id: `hw-${h.id}`,
       title: h.title,
-      subtitle: h.subjectName ?? h.group.name,
+      // 26.08.2026. В строке предмета печаталось НАЗВАНИЕ КЛАССА — «10-А
+      // класс», — а значок и цвет рядом выводились из ЗАГОЛОВКА задания:
+      // иконка и подпись одной карточки говорили про разное. Теперь оба из
+      // одного источника, а если предмета нет — прочерк, а не подмена.
+      subtitle: subjectDisplay(h.subjectName),
       href: "/parent/homework",
       icon: {
-        gradient: subjectGradient(h.subjectName ?? h.title),
-        glyph: SUBJECT_GLYPH[subjectKeyOf(h.subjectName ?? h.title)],
+        gradient: subjectGradient(h.subjectName ?? ""),
+        glyph: SUBJECT_GLYPH[subjectKeyOf(h.subjectName ?? "")],
       },
       badge: { kind: "due", due, tone },
     });

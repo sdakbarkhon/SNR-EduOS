@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { subjectDisplay } from "@snr/core";
 import { childHomeworkDetail, getSelectedChild } from "@/lib/parent-queries";
 import { HomeworkDetailView } from "./HomeworkDetailView";
 import {
@@ -43,8 +44,8 @@ export default async function ParentHomeworkDetailPage({
     <HomeworkDetailView
       childName={child?.full_name ?? "Ребёнок"}
       childClass={child?.className ?? null}
-      subjectName={hw.subjectName ?? hw.group.subject ?? "Предмет"}
-      subjectGlyph={subjectGlyph(hw.subjectName ?? hw.group.subject)}
+      subjectName={subjectDisplay(hw.subjectName)}
+      subjectGlyph={subjectGlyph(hw.subjectName)}
       color={subjectColor(hw.subjectColor)}
       title={hw.title}
       description={hw.description}

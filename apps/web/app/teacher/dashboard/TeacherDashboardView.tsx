@@ -7,14 +7,14 @@ import {
 } from "lucide-react";
 import {
   findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig,
-  formatTime, formatDate, formatRoom,
+  formatTime, formatDate, formatRoom, subjectDisplay,
   pendingReviewCount, checkedCountOf, isFileSubmissionPending,
 } from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
 import { Avatar } from "@/components/Avatar";
-import { SubjectIcon } from "@/components/SubjectIcon";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { ErrorState } from "@/components/ErrorState";
 import { PageContainer } from "@/components/PageContainer";
 import { cn } from "@/lib/cn";
@@ -29,6 +29,9 @@ type TodayLesson = {
   room: string | null;
   topic: string | null;
   group: { id: string; name: string; subject: string };
+  // 26.08.2026: настоящий предмет урока. group.subject — заглушка 'programming'
+  // у всех групп, из-за неё урок английского подписывался программированием.
+  subject: { name: string; icon: string | null; color: string | null } | null;
 };
 
 type Submission = {
@@ -219,7 +222,7 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
   }
 
   const { lesson, mode } = hit;
-  const cfg = getSubjectConfig(lesson.group.subject);
+  const subjectLabel = subjectDisplay(lesson.subject?.name);
 
   // "soon" ловит и уже просроченные-но-не-начатые уроки (см. findHeroLesson)
   // — tillMin отрицателен в этом случае, что нельзя показывать как обратный
@@ -269,14 +272,14 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
   return (
     <div className={cn("flex items-center justify-between gap-6 rounded-[20px] border p-6 backdrop-blur-xl", containerCls)}>
       <div className="flex items-start gap-4">
-        <SubjectIcon subject={lesson.group.subject} size={56} />
+        <LessonSubjectIcon icon={lesson.subject?.icon} color={lesson.subject?.color} size={56} />
         <div>
           {badge}
           <h2 className="mt-2 text-[20px] font-bold text-slate-800">
-            {lesson.topic ?? `${cfg.label} — ${lesson.group.name}`}
+            {lesson.topic ?? `${subjectLabel} — ${lesson.group.name}`}
           </h2>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-slate-500">
-            <span>{cfg.label}</span>
+            <span>{subjectLabel}</span>
             <span>·</span>
             <span>{lesson.group.name}</span>
             {lesson.room && <><span>·</span><span>Кабинет {lesson.room}</span></>}
@@ -406,7 +409,6 @@ export function TeacherDashboardView({
               {todayLessons.map((lesson) => {
                 const phase = lessonPhase(lesson, now);
                 const tone = LESSON_TONE[phase];
-                const cfg = getSubjectConfig(lesson.group.subject);
                 const room = formatRoom(lesson.room, d.teacher.lessonRoom);
                 return (
                   <Link
@@ -424,7 +426,7 @@ export function TeacherDashboardView({
                     </span>
 
                     <span className={cn("shrink-0", phase === "past" && "opacity-50")}>
-                      <SubjectIcon subject={lesson.group.subject} size={34} />
+                      <LessonSubjectIcon icon={lesson.subject?.icon} color={lesson.subject?.color} size={34} />
                     </span>
 
                     {/* Предмет и тема делят остаток строки и обрезаются. Оба
@@ -433,7 +435,7 @@ export function TeacherDashboardView({
                         бы на узком краю — «Программирование» само по себе
                         занимает треть доступного места. */}
                     <span className={cn("min-w-0 flex-1 truncate text-[14px] font-bold", tone.title)}>
-                      {cfg.label}
+                      {subjectDisplay(lesson.subject?.name)}
                     </span>
                     {lesson.topic && (
                       <span className={cn("min-w-0 flex-[2] truncate text-[13px]", tone.sub)}>

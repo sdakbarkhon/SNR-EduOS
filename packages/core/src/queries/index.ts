@@ -4,7 +4,7 @@
  * RLS гарантирует, что ученик получает только свои строки.
  */
 import type { Db } from "../supabase/factory";
-import type { AiReviewStatus, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
+import type { AiReviewStatus, Group, AttendanceRollCallRow, AttendanceWithLesson, AttendanceStatus, StudentStatus, Book, BookFavorite, ContentType, CourseMaterial, ExcuseRequest, ExcuseRequestWithStudent, Homework, HomeworkAttachment, HomeworkAttachmentContentType, HomeworkSource, HomeworkSubmission, HomeworkSubtask, HomeworkSubtaskSubmission, HomeworkSubtaskType, HomeworkWithSubmission, LeaveRequest, LeaveRequestWithStudent, LibraryMaterial, Lesson, LessonContentType, LessonDetail, LessonMaterial, LessonSlide, LessonStage, LessonStageProgress, LessonStageType, LessonStageWithProgress, LessonGrade, StageDifficulty, LessonWithSubject, ProgrammingLanguage, RaisedHand, RaisedHandWithStudent, StudentLessonView, SubmissionStatus, TeacherLessonView, TestAnswer, TestQuestion, TestQuestionOption, TestSubmission, QuizQuestion, QuizAttempt, QuizAnswer, KahootSession, QuizQuestionInput, QuizLeaderboardEntry, CodeCompletionPayload, CodeCompletionAnswers } from "../types";
 import type { SubmissionInput, NotificationSettingsInput } from "../schemas";
 import { unwrap } from "./helpers";
 // Прямой импорт, а не через собственный `export * from "./parent"`: parent.ts
@@ -12,7 +12,7 @@ import { unwrap } from "./helpers";
 import { getChildCountedGrades } from "./parent";
 import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
 import { tashkentDayKey, tashkentDayBoundsUtc, tashkentMonthBoundsUtc } from "../utils/date";
-import { getSubjectKeyByLabel } from "../config/subjects";
+import { getSubjectKeyByLabel, subjectFilterKey } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
 import { getSubjects } from "./subjects";
 
@@ -36,8 +36,31 @@ export const getMyStudent = async (db: Db) => {
   return db.from("students").select("*").eq("user_id", user.id).limit(1).single().then(unwrap);
 };
 
-export const getMyGroups = (db: Db) =>
-  db.from("groups").select("*").order("name").then(unwrap);
+/**
+ * Группы ученика. 26.08.2026 — вместе с настоящими предметами.
+ *
+ * В профиле блок «Мои группы» подписывался из groups.subject и показывал
+ * «Программирование» у всех трёх групп. Предметов у группы несколько, поэтому
+ * приходит список: экран сам решает, сколько уместить (joinSubjectNames).
+ * Заглушки каталога (is_stub) отсеиваются — это не то, что в группе ведут.
+ */
+export type GroupWithSubjects = Group & { subjectNames: string[] };
+
+export const getMyGroups = async (db: Db): Promise<GroupWithSubjects[]> => {
+  const rows = await db
+    .from("groups")
+    .select("*, subjects:subjects(name, is_stub, is_active)")
+    .order("name")
+    .then(unwrap);
+  type Raw = Group & { subjects?: Array<{ name: string; is_stub: boolean | null; is_active: boolean | null }> | null };
+  return (rows as unknown as Raw[]).map((g) => ({
+    ...g,
+    subjectNames: (g.subjects ?? [])
+      .filter((s) => s.is_stub !== true && s.is_active !== false)
+      .map((s) => s.name)
+      .sort((x, y) => x.localeCompare(y)),
+  }));
+};
 
 // --- Расписание / уроки / преподаватели ---
 export const getLessons = (db: Db) =>
@@ -96,7 +119,10 @@ export const getStudentAttendance = async (
   let attQuery = db
     .from("attendance")
     .select(
-      "id, lesson_id, status, marked_at, lesson:lessons!inner(topic, starts_at, group:groups!inner(subject, name))",
+      // 26.08.2026: предмет берётся из lessons.subject_id, а не из
+      // groups.subject — там у всех групп заглушка 'programming', и карточки
+      // посещаемости подписывались «Программирование» подряд.
+      "id, lesson_id, status, marked_at, lesson:lessons!inner(topic, starts_at, subject:subjects(name), group:groups!inner(name))",
     )
     .order("marked_at", { ascending: false });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,10 +134,10 @@ export const getStudentAttendance = async (
     lesson_id: string;
     status: AttendanceStatus;
     marked_at: string | null;
-    lesson: { topic: string | null; starts_at: string; group: { subject: string; name: string } };
+    lesson: { topic: string | null; starts_at: string; subject: { name: string } | null; group: { name: string } };
   }>);
 
-  if (filters?.subject) rows = rows.filter((r) => r.lesson.group.subject === filters.subject);
+  if (filters?.subject) rows = rows.filter((r) => subjectFilterKey(r.lesson.subject?.name) === filters.subject);
   if (filters?.month) {
     rows = rows.filter((r) => r.lesson.starts_at.slice(0, 7) === filters.month);
   }
@@ -128,7 +154,7 @@ export const getStudentAttendance = async (
       lesson_id: r.lesson_id,
       lesson_title: r.lesson.group.name,
       lesson_topic: r.lesson.topic ?? "",
-      subject: r.lesson.group.subject,
+      subject: subjectFilterKey(r.lesson.subject?.name),
       lesson_date: r.lesson.starts_at,
       status: r.status,
       marked_at: r.marked_at,
@@ -1178,7 +1204,10 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         : "file",
       sourceTable: "homework_submissions",
       title: r.homework?.title ?? "",
-      subject: getSubjectKeyByLabel(r.homework?.subject?.name) ?? "",
+      // 26.08.2026: было `?? ""` — предмет вне канонического списка молча
+      // исчезал вместе со всеми своими оценками. subjectFilterKey пропускает
+      // его под собственным именем, конфиг при этом не расширяется.
+      subject: subjectFilterKey(r.homework?.subject?.name),
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
       grade5: r.grade,
@@ -1196,7 +1225,10 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
       id: r.id, studentId: r.student_id, kind: "test",
       sourceTable: "test_submissions",
       title: r.homework?.title ?? "",
-      subject: getSubjectKeyByLabel(r.homework?.subject?.name) ?? "",
+      // 26.08.2026: было `?? ""` — предмет вне канонического списка молча
+      // исчезал вместе со всеми своими оценками. subjectFilterKey пропускает
+      // его под собственным именем, конфиг при этом не расширяется.
+      subject: subjectFilterKey(r.homework?.subject?.name),
       groupName: r.homework?.group?.name ?? "",
       date: r.submitted_at,
       grade5: hasGrade ? r.grade : (max > 0 ? (r.score / max) * 5 : null),
@@ -1230,7 +1262,9 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
         id: r.id, studentId: r.student_id, kind: "project",
         sourceTable: "project_submissions",
         title: r.project?.title ?? "Проект",
-        subject: r.project?.subject ?? "",
+        // 26.08.2026: у projects нет subject_id, а текстовая колонка subject
+        // хранит слаг группы — ту же заглушку. Предмета у проекта нет.
+        subject: "",
         groupName: r.project?.group?.name ?? "",
         date: r.submitted_at ?? r.graded_at ?? "",
         grade5: r.grade,
@@ -1675,7 +1709,10 @@ export const getTeacherHomework = (db: Db) =>
       // непроверенной и считала «на проверке» ВСЕ попытки тестов подряд —
       // 120 при верном ответе ноль.
       "submissions:homework_submissions(id, status, grade), " +
-      "test_subs:test_submissions(id, student_id, grade)",
+      "test_subs:test_submissions(id, student_id, grade), " +
+      // 26.08.2026: настоящий предмет задания. Подпись под каждой карточкой
+      // читалась «Программирование», включая «Present Perfect vs Past Simple».
+      "subject:subjects(name, icon, color)",
     )
     .order("due_date", { ascending: false })
     .then(unwrap);
@@ -1684,7 +1721,7 @@ export const getTeacherHomework = (db: Db) =>
 export const getTeacherHomeworkDetail = (db: Db, id: string) =>
   db
     .from("homework")
-    .select("*, group:groups!inner(id, name, subject)")
+    .select("*, group:groups!inner(id, name, subject), subject:subjects(name, icon, color)")
     .eq("id", id)
     .single()
     .then(unwrap);
@@ -2038,7 +2075,9 @@ export const getTeacherTodayLessons = async (db: Db, nowMs: number) => {
   const { startIso: todayStartIso, endIso: todayEndIso } = tashkentDayBoundsUtc(nowMs);
   const { data, error } = await db
     .from("lessons")
-    .select("*, group:groups!inner(id, name, subject)")
+    // 26.08.2026: настоящий предмет урока. Дашборд подписывал урок английского
+    // словом «Программирование» — подпись бралась из groups.subject.
+    .select("*, group:groups!inner(id, name, subject), subject:subjects(name, icon, color)")
     .gte("starts_at", todayStartIso)
     .lte("starts_at", todayEndIso)
     .order("starts_at");
@@ -4544,13 +4583,15 @@ type TeacherLessonListItem = {
   is_demo?: boolean;
   subject_id: string | null;
   group: { id: string; name: string; subject: string };
+  // 26.08.2026: настоящий предмет урока. group.subject — заглушка.
+  subject: { name: string; icon: string | null; color: string | null } | null;
 };
 
 /** Все уроки в группах учителя — для страницы /teacher/lessons. */
 export const getTeacherAllLessons = async (db: Db): Promise<TeacherLessonListItem[]> => {
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, subject_id, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, subject_id, group:groups!inner(id, name, subject), subject:subjects(name, icon, color)")
     .order("starts_at", { ascending: false });
   if (error) throw error;
   const filter = await getTeacherSubjectFilter(db);
@@ -4574,7 +4615,7 @@ export const getTeacherLessonsByMonth = async (
   const { startIso: start, endIso: end } = tashkentMonthBoundsUtc(year, month);
   const { data, error } = await db
     .from("lessons")
-    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, subject_id, group:groups!inner(id, name, subject)")
+    .select("id, group_id, lesson_no, topic, title, starts_at, ends_at, started_at, ended_at, status, room, subject_id, group:groups!inner(id, name, subject), subject:subjects(name, icon, color)")
     .gte("starts_at", start)
     .lte("starts_at", end)
     .order("starts_at");

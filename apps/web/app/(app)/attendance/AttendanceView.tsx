@@ -9,6 +9,7 @@ import {
   tashkentDayKey,
   tashkentParts,
   type AttendanceStatus,
+  subjectLabelOf,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -227,7 +228,7 @@ export function AttendanceView({
           >
             <option value="">{d.attendance.filterAllSubjects}</option>
             {subjectOptions.map((s) => (
-              <option key={s} value={s}>{getSubjectStyle(s).label}</option>
+              <option key={s} value={s}>{subjectLabelOf(s)}</option>
             ))}
           </select>
           <ChevronRight className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rotate-90 h-3.5 w-3.5 text-gray-400" />

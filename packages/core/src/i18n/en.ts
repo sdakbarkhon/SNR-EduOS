@@ -16,6 +16,7 @@ export const en: Dictionary = {
     seconds: "seconds",
     download: "Download",
     loggingOut: "Signing out...",
+    andMore: "+{n} more",
   },
   status: {
     now: "Now",

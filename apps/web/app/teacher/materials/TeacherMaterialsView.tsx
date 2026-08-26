@@ -7,7 +7,7 @@ import {
   CalendarDays, ChevronDown, Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { insertMaterial, getDictionary, type Locale } from "@snr/core";
+import { insertMaterial, getDictionary, type Locale, subjectLabelOf } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import type { MaterialWithGroup, LessonSlide } from "@snr/core";
 import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
@@ -650,7 +650,10 @@ export function TeacherMaterialsView({
   }, [menuOpenId]);
 
   const subjects = useMemo(() => {
-    const set = new Set(materials.map((m) => m.subject ?? m.group.subject).filter(Boolean));
+    // 26.08.2026: запасной путь на m.group.subject убран. Он подмешивал в
+    // список фильтра лишний пункт «Программирование», не относящийся ни к
+    // какому предмету: у самой записи материала предмет заполнен всегда.
+    const set = new Set(materials.map((m) => m.subject).filter(Boolean));
     return Array.from(set) as string[];
   }, [materials]);
 
@@ -761,10 +764,9 @@ export function TeacherMaterialsView({
     }
   }
 
-  const subjectLabel: Record<string, string> = {
-    robotics: "Робототехника", math: "Математика", english: "Английский",
-    informatics: "Информатика", chemistry: "Химия", programming: "Программирование",
-  };
+  // 26.08.2026: своя карта «слаг → название» снесена. Она была четвёртой
+  // копией канонического списка (config/subjects.ts) и вдобавок расходилась
+  // с ним подписью: здесь «Английский», там «Английский язык».
 
   return (
     <>
@@ -912,7 +914,7 @@ export function TeacherMaterialsView({
             >
               <option value="all">Все предметы</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{subjectLabel[s] ?? s}</option>
+                <option key={s} value={s}>{subjectLabelOf(s)}</option>
               ))}
             </select>
             <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />

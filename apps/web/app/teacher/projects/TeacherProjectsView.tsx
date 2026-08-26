@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Briefcase, Calendar, Layers, Users, Search } from "lucide-react";
-import { getDictionary, getSubjectStyle, type Locale, type TeacherProjectListItem } from "@snr/core";
-import { SubjectIcon, useLocale } from "@/components";
+import { getDictionary, type Locale, type TeacherProjectListItem } from "@snr/core";
+import { useLocale } from "@/components";
+import { FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
 import { TeacherProjectFormModal } from "./TeacherProjectFormModal";
 import { TeacherScratchWorksView } from "./TeacherScratchWorksView";
 import type { ClassScratchWork } from "@/app/(app)/projects/scratch/actions";
@@ -43,8 +44,9 @@ export function TeacherProjectsView({
     if (!q) return projects;
     return projects.filter((p) =>
       p.title.toLowerCase().includes(q) ||
-      p.group.name.toLowerCase().includes(q) ||
-      p.subject.toLowerCase().includes(q),
+      // Поиска по предмету здесь больше нет: запрос «программирование»
+      // находил все девять проектов подряд, каким бы предмет ни был.
+      p.group.name.toLowerCase().includes(q),
     );
   }, [projects, query]);
 
@@ -99,17 +101,17 @@ export function TeacherProjectsView({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredProjects.map((p) => {
-            const style = getSubjectStyle(p.subject);
             const due = fmtDate(p.deadline);
             return (
               <Link key={p.id} href={`/teacher/projects/${p.id}`}
                 className="group flex flex-col gap-3 rounded-[20px] border border-white/80 bg-white/70 p-5 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: `${style.color}1a` }}>
-                    <SubjectIcon subject={p.subject} size={22} />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl"
+                    style={{ background: `${FALLBACK_SUBJECT_COLOR}1a`, color: FALLBACK_SUBJECT_COLOR }}>
+                    <Briefcase size={22} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: style.color }}>{p.group.name}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: FALLBACK_SUBJECT_COLOR }}>{p.group.name}</p>
                     <h3 className="truncate text-[15px] font-bold text-brand-ink">{p.title}</h3>
                   </div>
                 </div>

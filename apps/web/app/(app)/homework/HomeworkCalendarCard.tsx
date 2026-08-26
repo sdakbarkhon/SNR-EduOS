@@ -9,9 +9,11 @@ import {
   type HomeworkWithSubmission,
   type Locale,
   tashkentDayKey,
+  subjectDisplay,
 } from "@snr/core";
 import { cn } from "@/lib/cn";
-import { SubjectIcon, useLocale, useToast } from "@/components";
+import { useLocale, useToast } from "@/components";
+import { LessonSubjectIcon, FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
 
 // 26.08.2026: своя копия смещения снесена — счёт по Ташкенту живёт
 // в одном месте, packages/core/src/utils/date.ts.
@@ -103,7 +105,9 @@ export function HomeworkCalendarCard({ rows, now }: { rows: HomeworkWithSubmissi
       ) : (
         <div className="mt-1">
           {upcoming.map((hw, i) => {
-            const style = getSubjectStyle(hw.group.subject);
+            // 26.08.2026: было hw.group.subject — заглушка группы. Под каждым
+            // заданием стояло «Программирование», ею же красилась дата справа.
+            const subjectTone = hw.subjectColor ?? FALLBACK_SUBJECT_COLOR;
             const dateLabel = new Date(hw.due_date as string).toLocaleDateString(localeStr, {
               day: "numeric",
               month: "long",
@@ -111,12 +115,12 @@ export function HomeworkCalendarCard({ rows, now }: { rows: HomeworkWithSubmissi
             });
             return (
               <div key={hw.id} className={cn("flex items-center gap-3 py-3", i > 0 && "border-t border-slate-100")}>
-                <SubjectIcon subject={hw.group.subject} size={40} />
+                <LessonSubjectIcon icon={hw.subjectIcon} color={hw.subjectColor} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-extrabold text-slate-800 truncate">{hw.title}</div>
-                  <div className="text-xs font-semibold text-slate-400 truncate">{style.label}</div>
+                  <div className="text-xs font-semibold text-slate-400 truncate">{subjectDisplay(hw.subjectName)}</div>
                 </div>
-                <span className="text-xs font-extrabold whitespace-nowrap" style={{ color: style.color }}>
+                <span className="text-xs font-extrabold whitespace-nowrap" style={{ color: subjectTone }}>
                   {d.homework.dueUntil.replace("{date}", dateLabel)}
                 </span>
               </div>

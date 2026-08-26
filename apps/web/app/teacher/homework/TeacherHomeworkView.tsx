@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  getDictionary, getSubjectConfig, deleteHomework,
+  getDictionary, deleteHomework, subjectDisplay,
   checkedCountOf, pendingReviewCountOf,
 } from "@snr/core";
 import type { Locale, CodeCompletionPayload } from "@snr/core";
@@ -14,7 +14,7 @@ import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { PageContainer } from "@/components/PageContainer";
 import { Plus, Filter, MoreHorizontal, Trash2, Copy, Pencil, X, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { SubjectIcon } from "@/components/SubjectIcon";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
 
 // 26.08.2026: у сдач появились оценки. Без них очередь проверки не могла
@@ -25,6 +25,7 @@ type HomeworkItem = {
   id: string; title: string; due_date: string | null;
   content_type: "file" | "test" | "programming" | "bundle" | "code_completion";
   teacher_id: string | null;
+  subject_id: string | null;
   // Аудит Пачки A: getTeacherHomework() уже делал select("*", ...) — колонка
   // всегда была в ответе, просто не было в этом локальном типе (как и
   // "code_completion" в content_type выше). Нужна для копирования в
@@ -35,6 +36,8 @@ type HomeworkItem = {
     id: string; name: string; subject: string;
     enrolled: Array<{ student_id: string }>;
   };
+  // 26.08.2026: настоящий предмет задания из homework.subject_id.
+  subject: { name: string; icon: string | null; color: string | null } | null;
   submissions: Submission[];
   test_subs: TestSub[];
 };
@@ -187,7 +190,9 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
       items = items.filter((hw) =>
         hw.title.toLowerCase().includes(q) ||
         hw.group.name.toLowerCase().includes(q) ||
-        getSubjectConfig(hw.group.subject).label.toLowerCase().includes(q),
+        // 26.08.2026: искали по заглушке — «английский» не находил ничего,
+        // «программирование» находило все задания подряд.
+        (hw.subject?.name ?? "").toLowerCase().includes(q),
       );
     }
     return items;
@@ -244,6 +249,11 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
         .insert({
           group_id: hw.group.id, title: hw.title + " (копия)", description: null,
           due_date: hw.due_date, content_type: hw.content_type, source: "teacher", teacher_id: hw.teacher_id,
+          // 26.08.2026: копия создавалась БЕЗ предмета. Оригинал подписан
+          // «Английский язык», дубль оставался без subject_id и подписывался
+          // запасным путём — сырым 'programming' у родителя и «Предмет» у
+          // остальных. Это была причина будущих пустых предметов, а не подпись.
+          subject_id: hw.subject_id,
           // Аудит Пачки A: у "test" своя копия в test_questions ниже; у
           // "code_completion" вся суть задания — в этой JSONB-колонке самой
           // строки (нет child-таблицы, см. create-code-completion-homework.mjs)
@@ -365,7 +375,6 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
           <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {urgencyFiltered.map((hw) => {
-              const cfg = getSubjectConfig(hw.group.subject);
               const total = hw.group.enrolled?.length ?? 0;
               const submitted = hw.submissions.length + hw.test_subs.length;
               const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
@@ -380,10 +389,10 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
                   )}>
                   <div className="mb-4 flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <SubjectIcon subject={hw.group.subject} size={48} />
+                      <LessonSubjectIcon icon={hw.subject?.icon} color={hw.subject?.color} size={48} />
                       <div className="min-w-0">
                         <h3 className="text-lg font-bold leading-tight text-gray-900">{hw.title}</h3>
-                        <p className="text-sm font-medium text-gray-500">{cfg.label}</p>
+                        <p className="text-sm font-medium text-gray-500">{subjectDisplay(hw.subject?.name)}</p>
                       </div>
                     </div>
                     <CardMenu hw={hw} onDelete={() => deleteHW(hw)} onDuplicate={() => duplicateHW(hw)} />

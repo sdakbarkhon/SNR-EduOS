@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Trash2, Calendar, Check, Download, Pencil, ChevronDown, FileText } from "lucide-react";
+import { Briefcase, ChevronLeft, Trash2, Calendar, Check, Download, Pencil, ChevronDown, FileText } from "lucide-react";
+import { FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
 import {
   getDictionary, getSubjectStyle, deleteProject, gradeProjectSubmission, getProjectAttachmentUrl,
   type Locale, type ProjectWithStages, type ProjectSubmissionWithStudent,
@@ -33,7 +34,11 @@ export function TeacherProjectDetailView({
   const t = d.teacher.projects;
   const router = useRouter();
   const db = createClient();
-  const style = getSubjectStyle(project.subject);
+// 26.08.2026. Подпись предмета с проектов снята совсем — решение заказчика.
+// У таблицы projects нет subject_id: есть только текстовая колонка subject, и
+// в неё при создании кладётся слаг группы, то есть та же заглушка
+// 'programming'. Резолвить не через что, а выдумывать предмет проекта нельзя.
+// Остаются название проекта и группа — то, что в базе правда.
 
   const [subs, setSubs] = useState(initialSubs);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -91,11 +96,12 @@ export function TeacherProjectDetailView({
       <section className="rounded-2xl border border-white/70 bg-white/70 p-6 shadow-sm backdrop-blur-xl">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: `${style.color}1a` }}>
-              <SubjectIcon subject={project.subject} size={24} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl"
+              style={{ background: `${FALLBACK_SUBJECT_COLOR}1a`, color: FALLBACK_SUBJECT_COLOR }}>
+              <Briefcase size={24} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: style.color }}>{style.label} · {project.group.name}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: FALLBACK_SUBJECT_COLOR }}>{project.group.name}</p>
               <h1 className="text-xl font-bold text-brand-ink">{project.title}</h1>
               {due && <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><Calendar size={13} /> {t.deadline}: {due}</p>}
             </div>

@@ -19,7 +19,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { IosTimePicker } from "@/components/IosTimePicker";
 import { PageContainer } from "@/components/PageContainer";
-import { SubjectIcon } from "@/components/SubjectIcon";
+import { LessonSubjectIcon } from "@/components/LessonSubjectIcon";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
@@ -34,6 +34,9 @@ type LessonItem = {
   starts_at: string; ends_at: string | null; room: string | null;
   status: string; started_at: string | null; ended_at: string | null;
   group: { id: string; name: string; subject: string };
+  // 26.08.2026: иконка на карточке — единственный признак предмета в этом
+  // списке, и она бралась из заглушки group.subject.
+  subject?: { name: string; icon: string | null; color: string | null } | null;
 };
 type FormState = {
   groupId: string; subjectId: string; date: string; startTime: string;
@@ -222,7 +225,7 @@ function LessonCard({
   return (
     <div className={`flex items-center gap-3 rounded-2xl border border-white/60 p-3 pl-4 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-l-4 ${EFF_CARD_BG[eff]} ${EFF_BORDER[eff]}`}>
       <Link href={`/teacher/lessons/${lesson.id}`} className="flex flex-1 items-center gap-3 min-w-0">
-        <SubjectIcon subject={lesson.group.subject} size={36} />
+        <LessonSubjectIcon icon={lesson.subject?.icon} color={lesson.subject?.color} size={36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="truncate text-xs font-bold text-[#1D1D1F]">{displayTitle}</p>

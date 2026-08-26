@@ -26,6 +26,7 @@ import {
   getSubjectKeyByLabel,
   tashkentDayKey,
   tashkentDayOfYear,
+  subjectFilterKey,
 } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -250,9 +251,14 @@ export function DashboardView({
     // Средний по предмету — из того же журнала, что и общий. Сопоставление
     // идёт по слагу предмета: StudentGradeItem несёт именно его
     // (getSubjectKeyByLabel от названия), а не идентификатор.
-    const slug = getSubjectKeyByLabel(sub.name);
+    // 26.08.2026: было getSubjectKeyByLabel — предмет вне канонического
+    // списка давал null, и средний по нему считался по пустому множеству,
+    // то есть «—» вместо настоящего балла. subjectFilterKey пропускает его
+    // под собственным именем — ровно тем же ключом, что кладёт в оценки
+    // getStudentGrades.
+    const slug = subjectFilterKey(sub.name);
     const avgGrade = averageOf(
-      countedGrades.filter((g) => slug != null && g.subject === slug).map((g) => g.grade5),
+      countedGrades.filter((g) => slug !== "" && g.subject === slug).map((g) => g.grade5),
     );
     return { ...sub, percent, total, done, avgGrade };
   });

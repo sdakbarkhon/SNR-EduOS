@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Star, BookOpen, ClipboardCheck, Trophy, ChevronRight, CheckCircle2, ArrowUpDown } from "lucide-react";
-import { getDictionary, getSubjectConfig, gradeCategory, averageOf, countsTowardAverage } from "@snr/core";
+import { getDictionary, getSubjectConfig, gradeCategory, averageOf, countsTowardAverage, subjectLabelOf } from "@snr/core";
 import type { Dictionary, Locale, StudentGradeItem } from "@snr/core";
 import { resolveSubjectIcon } from "@/components/SubjectIcon";
 import { useLocale } from "@/components/LocaleProvider";
@@ -73,7 +73,7 @@ function sortGrades(items: StudentGradeItem[], sort: SortValue): StudentGradeIte
     case "date_asc": arr.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")); break;
     case "grade_desc": arr.sort((a, b) => (b.grade5 ?? -1) - (a.grade5 ?? -1)); break;
     case "grade_asc": arr.sort((a, b) => (a.grade5 ?? -1) - (b.grade5 ?? -1)); break;
-    case "subject": arr.sort((a, b) => getSubjectConfig(a.subject).label.localeCompare(getSubjectConfig(b.subject).label)); break;
+    case "subject": arr.sort((a, b) => subjectLabelOf(a.subject).localeCompare(subjectLabelOf(b.subject))); break;
     default: arr.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")); break;
   }
   return arr;
@@ -296,7 +296,7 @@ export function GradesView({ grades, error = false }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[18px] font-black leading-tight text-slate-900">
-              {bestSubject ? getSubjectConfig(bestSubject.subject).label : t.noSubjectYet}
+              {bestSubject ? subjectLabelOf(bestSubject.subject) : t.noSubjectYet}
             </p>
             <p className="mt-1 text-[13px] font-bold text-slate-500">{t.bestSubjectLabel}</p>
           </div>
@@ -382,7 +382,7 @@ export function GradesView({ grades, error = false }: Props) {
                         <p className="truncate text-[14.5px] font-extrabold text-slate-900">
                           {g.kind === "lesson" ? `${d.lesson.kindLesson}: ${g.title}` : g.title}
                         </p>
-                        <p className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-400">{getSubjectConfig(g.subject).label}</p>
+                        <p className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-400">{subjectLabelOf(g.subject)}</p>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3">
                         <span className={cn("inline-flex rounded-[9px] px-2.5 py-1 text-[11.5px] font-bold", KIND_BADGE[g.kind])}>{kindLabel(g.kind, d)}</span>

@@ -32,6 +32,9 @@ export function TeacherProjectFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Значение по-прежнему уходит в projects.subject при создании: колонку в
+  // базе мы не трогаем, на ней может висеть что-то ещё. Но ПОКАЗЫВАТЬ его
+  // учителю как «Предмет» нельзя — это слаг группы, у всех 'programming'.
   const subject = groups.find((g) => g.id === groupId)?.subject ?? "";
 
   function addStage() {
@@ -86,10 +89,6 @@ export function TeacherProjectFormModal({
                 className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500">
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-500">{t.subject}</span>
-              <input value={subject} disabled className="rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" />
             </label>
           </div>
           <label className="flex flex-col gap-1.5">

@@ -45,3 +45,70 @@ export function getSubjectKeyByLabel(label: string | null | undefined): string |
   }
   return null;
 }
+
+/**
+ * ПОДПИСЬ ПРЕДМЕТА, КОТОРАЯ НЕ ВРЁТ И НЕ ТЕРЯЕТ. 26.08.2026.
+ *
+ * Прочерк, а не «Предмет» и не пустое место. `getSubjectStyle` для неизвестного
+ * ключа отдаёт defaultSubjectStyle с подписью «Предмет» — это годится для цвета
+ * и иконки, но на месте названия читается как утверждение. Если предмета нет,
+ * человек должен видеть прочерк и понимать, что здесь пусто.
+ *
+ * Колонки lessons.subject_id и homework.subject_id обе nullable. Сегодня пустых
+ * нет ни одной (128 уроков и 59 заданий, все с предметом), но код обязан уметь
+ * пустоту, иначе первая же строка без предмета подпишется чужим словом.
+ */
+export function subjectDisplay(name: string | null | undefined): string {
+  const clean = (name ?? "").trim();
+  return clean || "—";
+}
+
+/**
+ * Ключ предмета для группировки и фильтров.
+ *
+ * ЗАЧЕМ. `getSubjectKeyByLabel` знает только канонические предметы и на всё
+ * остальное отдаёт null. Вызывающие писали `?? ""`, и предмет вне списка молча
+ * исчезал: «Схемотехника» из боевой школы пропадала из фильтров аналитики
+ * вместе со всеми своими оценками — не «прочие», а вообще нигде.
+ *
+ * КАНОНИЧЕСКИЙ СПИСОК НЕ РАСШИРЯЕТСЯ. «Схемотехника» не становится шестым
+ * предметом конфига, у неё по-прежнему нет ни цвета, ни иконки отсюда. Она
+ * просто проходит через фильтр под собственным именем вместо пустой строки.
+ *
+ * Для пяти канонических предметов поведение прежнее до буквы: «Английский
+ * язык» → "english", как и раньше.
+ */
+export function subjectFilterKey(label: string | null | undefined): string {
+  const clean = (label ?? "").trim();
+  if (!clean) return "";
+  return getSubjectKeyByLabel(clean) ?? clean;
+}
+
+/**
+ * Обратная сторона `subjectFilterKey`: подпись по ключу. Канонический слаг
+ * разворачивается в русское название, всё остальное показывается как есть —
+ * а не подменяется словом «Предмет», как это делает getSubjectStyle().label.
+ */
+export function subjectLabelOf(key: string | null | undefined): string {
+  const clean = (key ?? "").trim();
+  if (!clean) return "—";
+  return subjects[clean]?.label ?? clean;
+}
+
+/**
+ * Несколько предметов одной строкой: «Английский язык, Математика, Русский
+ * язык + ещё 2». Группу ведут несколько учителей, и один предмет в колонке
+ * «Предмет» был бы такой же неправдой, как заглушка.
+ *
+ * moreTemplate приходит из словаря — «+ ещё {n}» / «+ yana {n}» / «+{n} more».
+ */
+export function joinSubjectNames(
+  names: ReadonlyArray<string | null | undefined>,
+  moreTemplate: string,
+  max = 3,
+): string {
+  const clean = names.map((n) => (n ?? "").trim()).filter(Boolean);
+  if (clean.length === 0) return "—";
+  if (clean.length <= max) return clean.join(", ");
+  return `${clean.slice(0, max).join(", ")} ${moreTemplate.replace("{n}", String(clean.length - max))}`;
+}

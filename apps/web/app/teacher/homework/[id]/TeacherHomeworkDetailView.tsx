@@ -301,7 +301,8 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
   const [localSubs, setLocalSubs] = useState(submissions);
   const [localTestSubs, setLocalTestSubs] = useState(testSubs);
 
-  const cfg = getSubjectConfig(hw.group.subject);
+  // 26.08.2026: getSubjectConfig(hw.group.subject) снят — переменная нигде не
+  // читалась, но считала «Программирование» на каждом задании.
 
   const hasOpenQuestions = questions.some(q => q.question_type === "open");
 

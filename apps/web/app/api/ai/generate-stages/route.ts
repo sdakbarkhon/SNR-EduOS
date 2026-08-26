@@ -4,7 +4,7 @@ import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
 import { getGroupPerformance, groupPerformancePromptSection } from "@/lib/ai/group-performance";
 import { getMySchoolNow } from "@/lib/school-time-server";
-import { getSubjectKeyByLabel } from "@snr/core";
+import { getSubjectKeyByLabel, subjectDisplay } from "@snr/core";
 import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 import { uploadImageAndSign } from "@/lib/ai/stage-media-prompts";
@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: lesson } = await (db as any)
     .from("lessons")
-    .select("group_id, curriculum_topic_id, subject_id, school_id, group:groups!inner(teacher_id, name, subject)")
+    .select("group_id, curriculum_topic_id, subject_id, school_id, group:groups!inner(teacher_id, name, subject), subject:subjects(name)")
     .eq("id", body.lesson_id)
     .single();
   const group = lesson?.group as { teacher_id: string; name: string | null; subject: string | null } | null;
@@ -279,7 +279,13 @@ export async function POST(req: NextRequest) {
   }
 
   const grade = gradeFromGroupName(group.name) ?? body.grade ?? 7;
-  const subject = group.subject ?? "—";
+  // 26.08.2026. Правка одной строки, точечно разрешённая заказчиком: остальное
+  // в этом маршруте — промт, логика генерации, модель — не тронуто.
+  //
+  // Было group.subject — заглушка 'programming' у всех групп: ИИ получал
+  // «программирование» на уроке английского и строил этапы не про тот предмет.
+  // Настоящий предмет урока приходит из lessons.subject_id.
+  const subject = subjectDisplay((lesson as { subject?: { name: string } | null }).subject?.name);
   const durationMin = Math.max(5, Math.min(240, body.duration_min ?? 45));
   const overallDifficulty = ["easy", "medium", "hard"].includes(body.overall_difficulty ?? "")
     ? (body.overall_difficulty as string) : "medium";

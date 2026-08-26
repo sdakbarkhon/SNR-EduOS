@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText, Download, ExternalLink } from "lucide-react";
-import { getSubjectConfig, getGradeSubmissionDetail } from "@snr/core";
+import { getSubjectConfig, getGradeSubmissionDetail, subjectLabelOf } from "@snr/core";
 import type { Dictionary, StudentGradeItem, GradeSubmissionDetail } from "@snr/core";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { createClient } from "@/lib/supabase/client";
@@ -32,7 +32,7 @@ export function GradeDetailModal({
   kindBadgeClass: string;
   onClose: () => void;
 }) {
-  const cfg = getSubjectConfig(grade.subject);
+  const subjectLabel = subjectLabelOf(grade.subject);
   const category = grade.sourceTable === "homework_submissions" || grade.sourceTable === "test_submissions" || grade.sourceTable === "project_submissions"
     ? "assignment" as const
     : "lesson" as const;
@@ -70,7 +70,7 @@ export function GradeDetailModal({
             <SubjectIcon subject={grade.subject} size={44} />
             <div>
               <p className="text-[15px] font-extrabold leading-tight text-slate-900">{grade.title}</p>
-              <p className="text-[13px] font-semibold text-slate-400">{cfg.label}</p>
+              <p className="text-[13px] font-semibold text-slate-400">{subjectLabel}</p>
             </div>
           </div>
           <button

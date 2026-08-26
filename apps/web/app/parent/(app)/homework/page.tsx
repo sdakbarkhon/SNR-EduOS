@@ -1,4 +1,5 @@
 import { childHomework, getSelectedChild, parentToday } from "@/lib/parent-queries";
+import { subjectDisplay } from "@snr/core";
 import { HomeworkListView, type HomeworkCardVM, type HomeworkDue } from "./HomeworkListView";
 import {
   homeworkGradeDisplay,
@@ -48,8 +49,11 @@ export default async function ParentHomeworkPage() {
 
     return {
       id: hw.id,
-      subjectName: hw.subjectName ?? hw.group.subject ?? "Предмет",
-      subjectGlyph: subjectGlyph(hw.subjectName ?? hw.group.subject),
+      // 26.08.2026: запасной путь на hw.group.subject убран. Он не «почти
+      // никогда» — дублирование задания (TeacherHomeworkView) создавало копию
+      // БЕЗ subject_id, и у неё подпись становилась сырым 'programming'.
+      subjectName: subjectDisplay(hw.subjectName),
+      subjectGlyph: subjectGlyph(hw.subjectName),
       color: subjectColor(hw.subjectColor),
       title: hw.title,
       due,

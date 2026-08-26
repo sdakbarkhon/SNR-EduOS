@@ -20,7 +20,7 @@ import {
   getQuizQuestions, replaceQuizQuestions,
   setActiveStage, setDemoMaterial, lowerHand,
   uploadPresentationFile, isPptxFile,
-  endLesson,
+  endLesson, subjectDisplay,
 } from "@snr/core";
 import type {
   TeacherLessonView, LessonStatus, LessonStage, LessonContentType,
@@ -1331,7 +1331,10 @@ export function TeacherLessonDetailView({
   // контролы тем же способом, что для завершённого урока; настоящий
   // enforcement — subject-scope RLS (миграция 131).
   const readOnly = isLessonCompleted || isCurator;
-  const style = getSubjectStyle(lesson.group.subject);
+  // 26.08.2026: getSubjectStyle(lesson.group.subject) снят. Он существовал
+  // ради одной подписи-запасного варианта, а отдавал «Программирование» на
+  // любом уроке — настоящий предмет (lesson.subjectName/Icon/Color) лежал
+  // рядом и уже передавался в шапку и в модалку этапа.
   const timeRange = lesson.ends_at
     ? `${fmtTime(lesson.starts_at)} – ${fmtTime(lesson.ends_at)}`
     : fmtTime(lesson.starts_at);
@@ -1377,7 +1380,7 @@ export function TeacherLessonDetailView({
       <LessonHeaderBar
         subjectIcon={lesson.subjectIcon}
         subjectColor={lesson.subjectColor}
-        subjectName={lesson.subjectName ?? style.label}
+        subjectName={subjectDisplay(lesson.subjectName)}
         title={lesson.title ?? lesson.topic ?? `Урок от ${fmtDate(lesson.starts_at)}`}
         actions={
           <>

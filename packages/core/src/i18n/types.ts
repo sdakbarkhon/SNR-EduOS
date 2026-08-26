@@ -22,6 +22,8 @@ export interface Dictionary {
     seconds: string;
     download: string;
     loggingOut: string; // "Выход из системы..." — полноэкранный оверлей при клике "Выйти"
+    /** «+ ещё {n}» — хвост перечисления, когда всё не влезает. */
+    andMore: string;
   };
   status: Record<StatusKey, string>;
   nav: {

@@ -16,6 +16,7 @@ export const ru: Dictionary = {
     seconds: "секунд",
     download: "Скачать",
     loggingOut: "Выход из системы...",
+    andMore: "+ ещё {n}",
   },
   status: {
     now: "Сейчас",

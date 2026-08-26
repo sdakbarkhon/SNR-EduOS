@@ -8,22 +8,21 @@ import {
 import {
   defaultLocale,
   getDictionary,
-  getSubjectStyle,
+  joinSubjectNames,
   uploadAvatar,
   updateStudentAvatar,
   upsertNotificationSettings,
 } from "@snr/core";
-import type { Database } from "@snr/core";
+import type { Database, GroupWithSubjects } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { GlassCard } from "@/components";
-import { SubjectIcon } from "@/components";
+import { FALLBACK_SUBJECT_COLOR } from "@/components/LessonSubjectIcon";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import { useLogout, LogoutOverlay } from "@/components/LogoutOverlay";
 import type { Locale } from "@snr/core";
 
 type Student = Database["public"]["Tables"]["students"]["Row"];
-type Group = Database["public"]["Tables"]["groups"]["Row"];
 type NotifSettings = Database["public"]["Tables"]["notification_settings"]["Row"];
 
 type ProfileTab = "profile" | "security" | "notifications" | "interface";
@@ -59,7 +58,7 @@ export function ProfileView({
   curatorName,
 }: {
   student: Student;
-  groups: Group[];
+  groups: GroupWithSubjects[];
   notifSettings: NotifSettings | null;
   curatorName: string;
 }) {
@@ -231,16 +230,23 @@ export function ProfileView({
         <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-5">{d.profile.groups}</p>
         <div className="flex flex-col gap-4">
           {groups.map((g) => {
-            const style = getSubjectStyle(g.subject);
+            // 26.08.2026. Блок подписывался из g.subject — заглушки
+            // 'programming', одинаковой у всех групп: ученик видел три
+            // «Программирования» вместо своих предметов. Предметов у группы
+            // несколько, поэтому перечисляем их, а название группы ставим
+            // заголовком: оно и есть то, чем группа отличается от соседней.
+            const subjectLine = joinSubjectNames(g.subjectNames, d.common.andMore);
             return (
               <div
                 key={g.id}
                 className="flex items-center justify-between bg-white/50 dark:bg-slate-600/30 p-5 rounded-2xl transition-transform hover:-translate-y-0.5"
-                style={{ borderLeft: `4px solid ${style.color}` }}
+                style={{ borderLeft: `4px solid ${FALLBACK_SUBJECT_COLOR}` }}
               >
-                <div className="flex items-center gap-3">
-                  <SubjectIcon subject={g.subject} size={20} />
-                  <span className="text-slate-800 dark:text-slate-200 font-bold text-lg">{style.label}</span>
+                <div className="min-w-0">
+                  <span className="block text-slate-800 dark:text-slate-200 font-bold text-lg">{g.name}</span>
+                  <span className="block truncate text-slate-500 dark:text-slate-400 text-sm" title={subjectLine}>
+                    {subjectLine}
+                  </span>
                 </div>
                 {g.schedule_days && (
                   <span className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider bg-white/50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg border border-white/60 dark:border-slate-600/40">

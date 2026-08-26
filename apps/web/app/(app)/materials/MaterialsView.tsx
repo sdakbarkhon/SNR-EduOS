@@ -5,7 +5,7 @@ import {
   Search, FileText, BookOpen, Link as LinkIcon,
   Video, FileImage, File, FolderOpen, X, CalendarDays, ChevronDown,
 } from "lucide-react";
-import { getDictionary, type Locale, type MaterialWithGroup, type LessonSlide } from "@snr/core";
+import { getDictionary, type Locale, type MaterialWithGroup, type LessonSlide, subjectLabelOf, subjectDisplay } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { buildFilterOptions, matchesFilters, groupByDay } from "@/lib/material-filters";
 import {
@@ -75,11 +75,9 @@ function formatDate(iso: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────
 
-const SUBJECT_LABELS: Record<string, string> = {
-  robotics: "Робототехника", math: "Математика", english: "Английский",
-  informatics: "Информатика", chemistry: "Химия", programming: "Программирование",
-  physics: "Физика", biology: "Биология", history: "История",
-};
+// 26.08.2026: своя карта «слаг → название» снесена — пятая копия канонического
+// списка (config/subjects.ts), да ещё и с другими подписями («Английский»
+// против «Английский язык»). Разворачивает ключ subjectLabelOf.
 
 export function MaterialsView({ materials, hideHeading }: { materials: MaterialWithGroup[]; hideHeading?: boolean }) {
   // 10.08.2026 — экран не знал словаря вовсе: сообщения об ошибках открытия
@@ -331,7 +329,7 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
             >
               <option value="all">Все предметы</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{SUBJECT_LABELS[s] ?? s}</option>
+                <option key={s} value={s}>{subjectLabelOf(s)}</option>
               ))}
             </select>
             <ChevronDown className={`${FILTER_CHEVRON} ${filterSubject !== "all" ? "text-blue-400" : "text-slate-400"}`} />
@@ -450,7 +448,10 @@ export function MaterialsView({ materials, hideHeading }: { materials: MaterialW
                 </div>
                 <div className="z-10 mt-auto flex w-full items-end justify-between">
                   <div className="mr-2 truncate text-[10px] text-slate-400">
-                    {mat.group.subject} · {TYPE_LABEL[mat._type]}
+                    {/* 26.08.2026: было mat.group.subject — заглушка группы,
+                        из-за которой у каждого материала стояло
+                        «programming». У самой записи предмет верный. */}
+                    {subjectDisplay(mat.subject)} · {TYPE_LABEL[mat._type]}
                     {mat.file_size_bytes ? ` · ${formatSize(mat.file_size_bytes)}` : ""}
                   </div>
                   <div className="whitespace-nowrap text-[10px] text-slate-400">

@@ -8,6 +8,7 @@ import {
   filterByPeriod,
   MIN_GRADES_FOR_VERDICT, EXCELLENT_FROM, LOW_GRADE_BELOW, OVERDUE_FROM,
   TREND_DELTA, MIN_GRADES_PER_HALF, ATTENDANCE_LOW_THRESHOLD,
+  subjectLabelOf,
 } from "@snr/core";
 import type { Locale, AnalyticsInput, RiskFlag, StudentStat } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -193,8 +194,10 @@ export function AnalyticsView({ facts }: { facts: AnalyticsFacts }) {
         ]} />
         <Select value={group} onChange={setGroup} placeholder={t.anAllGroups}
           options={groupNames.map((g) => ({ value: g, label: g }))} />
+        {/* 26.08.2026: в списке стояли слаги латиницей — «english», «math»,
+            «programming». Значение остаётся ключом, показывается название. */}
         <Select value={subject} onChange={setSubject} placeholder={t.anAllSubjects}
-          options={subjectNames.map((s) => ({ value: s, label: s }))} />
+          options={subjectNames.map((s) => ({ value: s, label: subjectLabelOf(s) }))} />
         <button
           onClick={exportCsv}
           disabled={stats.length === 0}
@@ -277,7 +280,7 @@ export function AnalyticsView({ facts }: { facts: AnalyticsFacts }) {
           <Table
             title={t.anSubjects} firstCol={t.anFilterSubject} labels={t}
             rows={subjectStats.map((s) => ({
-              key: s.subject, name: s.subject,
+              key: s.subject, name: subjectLabelOf(s.subject),
               cells: [fmt1(s.avgGrade), fmtPct(s.attendance), String(s.gradeCount), ""],
             }))}
             cols={[t.anColAvg, t.anColAttendance, t.anColGrades, ""]}

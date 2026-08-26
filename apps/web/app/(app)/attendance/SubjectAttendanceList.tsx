@@ -4,6 +4,7 @@ import {
   getDictionary,
   getSubjectStyle,
   type AttendanceWithLesson,
+  subjectLabelOf,
 } from "@snr/core";
 import { SubjectIcon } from "@/components";
 
@@ -30,7 +31,9 @@ export function SubjectAttendanceList({ rows }: { rows: AttendanceWithLesson[] }
               </div>
               {/* Название */}
               <span className="flex-1 text-[14px] font-medium text-gray-800">
-                {style.label}
+                {/* 26.08.2026: было style.label — «Предмет» для всего, чего
+                    нет в каноническом списке. Теперь предмет проходит как есть. */}
+                {subjectLabelOf(subject)}
               </span>
               {/* % */}
               <span
