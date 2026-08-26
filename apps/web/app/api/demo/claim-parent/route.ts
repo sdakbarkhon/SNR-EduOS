@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { clientIp, rateLimit, retryHeaders } from "@/lib/rate-limit";
+import { issueDemoOtpHash } from "@/lib/demo-otp";
 
 // Демо-вход родителя для мобильного приложения.
 //
@@ -18,6 +19,13 @@ import { clientIp, rateLimit, retryHeaders } from "@/lib/rate-limit";
 // кладёт её через setSession. Токен живёт час и привязан к этой аренде, пароль
 // же дал бы бессрочный доступ любому, кто прочитал ответ.
 //
+// 26.08.2026 — ПАРОЛЬ УБРАН И ИЗ САМОГО ВХОДА. Раньше сервер звал
+// signInWithPassword паролем-литералом, который claim_demo_slot возвращает не
+// проверяя. Теперь служебный клиент выпускает одноразовый token_hash и тут же
+// меняет его на сессию (lib/demo-otp.ts) — как это делает веб. Ответ наружу не
+// изменился: те же access_token, refresh_token и ключ аренды, поэтому
+// приложение править не пришлось и выкладывать обновление не нужно.
+//
 // ЗАЩИТУ ОДНОЙ СЕССИИ НЕ ЗАДЕВАЕТ. Демо-вход не регистрируется в user_sessions
 // (как и на вебе: registerSession зовётся только в finishLogin обычного входа),
 // поэтому вход в демо не выкидывает настоящего пользователя с другого
@@ -33,8 +41,11 @@ interface ClaimRow {
   user_id: string;
 }
 
-/** Столько же попыток, сколько у веб-версии: часть аккаунтов пула отдаёт
- *  пароль, которым учётка не открывается, и следующий слот обычно рабочий. */
+/** Столько же попыток, сколько у веб-версии. С 26.08 защищают уже не от
+ *  битого пароля (его больше нет в обмене), а от аккаунта, под которым сессия
+ *  не выдаётся в принципе: бан, пометка удаления, пустой адрес, отсутствие
+ *  записи в auth.identities. У родителя в демо аккаунт один, поэтому здесь
+ *  повтор берёт тот же слот — но он же ловит и разовый сбой службы. */
 const ATTEMPTS = 3;
 
 /**
@@ -93,14 +104,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Вход выполняется здесь, на сервере: наружу уйдут токены, не пароль.
+    const otp = await issueDemoOtpHash(admin, row.email);
+    if (!otp.ok) {
+      lastReason = otp.reason;
+      console.error("[demo/claim-parent] ссылка не выпущена:", otp.reason);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin.rpc as any)("release_demo_slot", { p_session_token: row.session_token }).catch(() => null);
+      continue;
+    }
+
     const sb = createSbClient(url, anon, { auth: { persistSession: false } });
-    const { data: signed, error: signErr } = await sb.auth.signInWithPassword({
-      email: row.email,
-      password: row.password,
+    const { data: signed, error: signErr } = await sb.auth.verifyOtp({
+      type: "email",
+      token_hash: otp.tokenHash,
     });
 
     if (signErr || !signed.session) {
-      lastReason = signErr?.message ?? "не удалось войти под выданным аккаунтом";
+      lastReason = signErr?.message ?? "одноразовая ссылка не принята";
+      console.error("[demo/claim-parent] ссылка не принята:", lastReason);
       // Слот негодный — освобождаем и берём следующий.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin.rpc as any)("release_demo_slot", { p_session_token: row.session_token }).catch(() => null);

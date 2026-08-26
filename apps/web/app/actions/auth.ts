@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { issueDemoOtpHash } from "@/lib/demo-otp";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { signInWithUsername } from "@snr/core";
@@ -317,30 +318,34 @@ export async function demoLogin(
   // ученик берётся ТОЛЬКО из этого класса (миграция 135, students.grade).
   const gradeLevel = target.kind === "student" ? target.gradeLevel ?? null : null;
 
-  // 07.08.2026 — повтор с ДРУГИМ слотом вместо ошибки на первой попытке.
+  // 26.08.2026 — ПАРОЛЬ ИЗ ДЕМО-ВХОДА УБРАН СОВСЕМ.
   //
-  // Симптом заказчика: «иногда пишет "не удалось войти в демо-режим", со
-  // второго раза заходит», в консоли браузера пусто. Механизм виден прямо в
-  // demo_leases: часть аккаунтов пула откатывается через доли секунды после
-  // выдачи и НИКОГДА не даёт рабочую сессию (у одного 3 аренды из 3 такие),
-  // а следующий клик берёт другой аккаунт и заходит. То есть claim проходит,
-  // а signInWithPassword под выданной учёткой не проходит — функция
-  // claim_demo_slot возвращает пароль литералом и не проверяет, что аккаунт
-  // им действительно открывается.
+  // Было: claim_demo_slot возвращает пароль литералом ('password123' /
+  // 'parent2026') и никак не проверяет, что аккаунт им открывается, а здесь
+  // этим паролем звался signInWithPassword. Пока литерал совпадает с тем, что
+  // в auth.users, всё работает; в день, когда пароль в проде поменяют, он
+  // разойдётся с кодом — и вылезет посреди показа заказчику.
   //
-  // Пустая консоль объясняется отдельно: server action не бросает, а
-  // ВОЗВРАЩАЕТ { ok: false } — единственный console.error на клиенте лежит в
-  // catch, который на этом пути недостижим. Диагностика уходила только в лог
-  // сервера, поэтому «в консоли пусто».
+  // Стало: служебный клиент выпускает одноразовый token_hash (generateLink),
+  // и он тут же обменивается на сессию через verifyOtp. Пароль в обмене не
+  // участвует, расходиться нечему. Приём не новый — ровно так с 08.08 работает
+  // демо-родитель на вебе (demoParentLogin), общая часть вынесена в
+  // lib/demo-otp.ts. Литерал в функции базы оставлен как есть: он просто
+  // перестаёт использоваться, миграции для этого не нужно.
   //
-  // Чинить сам пароль отсюда нельзя (это правка учётных данных в проде, шаг
-  // заказчика — см. отчёт). Но пользователю видеть эту ошибку незачем:
-  // берём следующий слот. Плохой аккаунт при этом уже освобождён, а выбор
-  // ученика идёт ORDER BY random(), так что повтор почти всегда попадает в
-  // другой.
+  // ЧТО ПОКАЗАЛА СВЕРКА 26.08. Расхождения сегодня НЕТ ни у одного из 36
+  // аккаунтов пула, и последний отказ входа случился 08.08 — с тех пор 39
+  // аренд без единой неудачи. Чинится мина, а не сегодняшний отказ.
+  //
+  // ПОВТОР ОСТАВЛЕН — но защищает уже другое. Пароля больше нет, поэтому от
+  // «битого пароля» защищать нечего. Осталось то, из-за чего сессия не
+  // выдаётся ПО КОНКРЕТНОМУ АККАУНТУ: бан, пометка удаления, пустой или
+  // испорченный адрес, отсутствие записи в auth.identities. Сегодня таких
+  // нет ни одного (проверено), но один такой аккаунт в пуле снова ронял бы
+  // демо через раз, а повтор стоит ноль, когда первая попытка удалась.
   const ATTEMPTS = 3;
   let row: ClaimSlotRow | null = null;
-  let signedIn: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"] | null = null;
+  let signedIn: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>["data"] | null = null;
   let lastReason = "";
 
   for (let attempt = 0; attempt < ATTEMPTS && !signedIn; attempt++) {
@@ -373,19 +378,33 @@ export async function demoLogin(
     const candidate = (claimed as ClaimSlotRow[] | null)?.[0];
     if (!candidate) return { ok: false, error: "all_busy" };
 
-    // 2) signIn под этим email — Supabase server client ставит auth cookies.
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: candidate.email,
-      password: candidate.password,
-    });
-    if (error || !data.session) {
-      // Rollback lease чтобы не залипло на 15 мин И чтобы следующая попытка
-      // не считала этот аккаунт занятым.
+    // 2) Одноразовый token_hash вместо пароля.
+    const otp = await issueDemoOtpHash(admin, candidate.email);
+    if (!otp.ok) {
+      // Слот освобождаем ровно так же, как это делалось при отказе пароля:
+      // иначе он залипнет на 15 минут, а следующая попытка сочтёт аккаунт
+      // занятым и уйдёт впустую.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin.rpc as any)("release_demo_slot", { p_session_token: candidate.session_token });
-      lastReason = "signin_rejected";
+      lastReason = "otp_not_issued";
       console.error(
-        `[demoLogin] попытка ${attempt + 1}/${ATTEMPTS}: аккаунт ${candidate.username} не пускает —`,
+        `[demoLogin] попытка ${attempt + 1}/${ATTEMPTS}: ссылка для ${candidate.username} не выпущена —`,
+        otp.reason,
+      );
+      continue;
+    }
+
+    // 3) Обмен на сессию. Клиент привязан к запросу, поэтому cookies ставит он.
+    const { data, error } = await supabase.auth.verifyOtp({
+      type: "email",
+      token_hash: otp.tokenHash,
+    });
+    if (error || !data.session || !data.user) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin.rpc as any)("release_demo_slot", { p_session_token: candidate.session_token });
+      lastReason = "otp_rejected";
+      console.error(
+        `[demoLogin] попытка ${attempt + 1}/${ATTEMPTS}: ссылка для ${candidate.username} не принята —`,
         error?.message ?? "нет сессии",
       );
       continue;
@@ -399,6 +418,10 @@ export async function demoLogin(
     return { ok: false, error: "failed", reason: lastReason || "signin_rejected" };
   }
   const data = signedIn;
+  if (!data.user || !data.session) {
+    console.error("[demoLogin] обмен прошёл, но сессии нет — этого быть не должно");
+    return { ok: false, error: "failed", reason: "otp_rejected" };
+  }
 
   await registerSession({
     userId: data.user.id,

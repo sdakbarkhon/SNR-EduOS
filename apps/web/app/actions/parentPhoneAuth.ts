@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { issueDemoOtpHash } from "@/lib/demo-otp";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { normalizeUzPhone } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
@@ -123,17 +124,27 @@ export async function demoParentLogin(): Promise<PhoneLoginResult> {
   const email = authUser?.user?.email;
   if (!email) return { ok: false, error: "failed" };
 
-  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-    type: "magiclink", email,
-  });
-  const tokenHash = link?.properties?.hashed_token;
-  if (linkErr || !tokenHash) return { ok: false, error: "failed" };
+  // 26.08.2026: выпуск одноразового токена переехал в lib/demo-otp.ts — тот же
+  // приём теперь зовут три демо-входа (кнопка на /login, мобильный маршрут и
+  // этот), и копий у него быть не должно. Обмен verifyOtp остаётся здесь: он у
+  // каждого свой — вебу нужны cookies, мобильному маршруту пара токенов.
+  //
+  // Вход родителя ПО КОДУ ниже намеренно не тронут: он не демо-вход, и заход
+  // его не касается. Там остаётся своя копия выпуска токена.
+  const otp = await issueDemoOtpHash(admin, email);
+  if (!otp.ok) {
+    console.error("[demoParentLogin] ссылка не выпущена:", otp.reason);
+    return { ok: false, error: "failed" };
+  }
 
   const supabase = await createClient();
   const { data: session, error: otpErr } = await supabase.auth.verifyOtp({
-    type: "email", token_hash: tokenHash,
+    type: "email", token_hash: otp.tokenHash,
   });
-  if (otpErr || !session.user || !session.session) return { ok: false, error: "failed" };
+  if (otpErr || !session.user || !session.session) {
+    console.error("[demoParentLogin] ссылка не принята:", otpErr?.message ?? "нет сессии");
+    return { ok: false, error: "failed" };
+  }
 
   await registerSession({
     userId: session.user.id,
