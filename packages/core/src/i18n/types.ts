@@ -1117,6 +1117,7 @@ export interface Dictionary {
     socialEmailInvalid: string; // адрес не похож на почту
     schoolCodeTaken: string;
     foreignKeyBlocked: string;
+    subjectHasLessons: string;
     requiredField: string;   // "Обязательное поле: {field}"
     invalidCredentials: string;
     rateLimited: string;

@@ -1098,6 +1098,7 @@ export const en: Dictionary = {
     socialEmailInvalid: "Check the address: it should look like name@mail.com, with no spaces",
     schoolCodeTaken: "This school code already exists",
     foreignKeyBlocked: "Can't delete: related records exist",
+    subjectHasLessons: "Cannot delete the subject: lessons are attached to it. Move them to another subject or delete them, or hide the subject instead.",
     requiredField: "Required field: {field}",
     invalidCredentials: "Incorrect username or password",
     rateLimited: "Too many attempts, please wait",

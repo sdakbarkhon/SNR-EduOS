@@ -1098,6 +1098,7 @@ export const uz: Dictionary = {
     socialEmailInvalid: "Pochta manzilini tekshiring: ism@pochta.uz ko‘rinishida, probelsiz",
     schoolCodeTaken: "Bunday maktab kodi allaqachon mavjud",
     foreignKeyBlocked: "O'chirib bo'lmaydi: bog'liq yozuvlar mavjud",
+    subjectHasLessons: "Fanni o'chirib bo'lmaydi: unga darslar bog'langan. Darslarni boshqa fanga ko'chiring yoki o'chiring, yoki fanni yashiring.",
     requiredField: "Majburiy maydon: {field}",
     invalidCredentials: "Login yoki parol noto'g'ri",
     rateLimited: "Juda ko'p urinish, biroz kuting",

@@ -131,6 +131,14 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (raw === "GROUP_NAME_TAKEN") {
     return t.groupNameTaken;
   }
+  // Миграция 226 — у урока обязан быть предмет, а внешний ключ стал
+  // RESTRICT. Гвард в admin-api.ts ловит это раньше и объясняет числами; сюда
+  // отказ доходит, только если удаление пошло мимо гварда. Общая фраза «есть
+  // связанные записи» в этом случае не подсказывает ничего, поэтому
+  // разбираем отдельно.
+  if (/lessons_subject_id_fkey/i.test(raw)) {
+    return t.subjectHasLessons;
+  }
   if (/violates foreign key constraint/i.test(raw)) {
     return t.foreignKeyBlocked;
   }

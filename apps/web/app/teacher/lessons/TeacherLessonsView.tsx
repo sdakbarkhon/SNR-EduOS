@@ -703,10 +703,16 @@ export function TeacherLessonsView({
     const startsAt = buildIso(form.date, form.startTime);
     const durationMinutes = Math.max(5, Math.min(240, parseInt(form.durationMinutes, 10) || 45));
     if (formModal === "create") {
+      // 26.08.2026, миграция 226: у урока обязан быть предмет. Селектор
+      // предмета в форме обязателен и при одном предмете в группе
+      // проставляется сам, так что сюда пустое значение приходит только при
+      // обходе формы — но отказ должен быть внятным, а не текстом Postgres
+      // про not-null constraint.
+      if (!form.subjectId) throw new Error("Выберите предмет урока");
       const created = await createLesson(db, {
         groupId: form.groupId, startsAt, durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
-        subjectId: form.subjectId || null,
+        subjectId: form.subjectId,
         curriculumTopicId: form.curriculumTopicId || null,
       }, schoolNowMs());
       setFormModal(null);

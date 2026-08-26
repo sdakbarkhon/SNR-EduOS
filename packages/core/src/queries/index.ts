@@ -3079,7 +3079,19 @@ export const createLesson = async (
     room: string | null;
     title: string | null;
     description: string | null;
-    subjectId?: string | null;
+    /**
+     * ПРЕДМЕТ ОБЯЗАТЕЛЕН. 26.08.2026, миграция 226.
+     *
+     * Было `subjectId?: string | null`, а в теле `input.subjectId ?? null` —
+     * общий слой сам умел создать урок без предмета. Такой урок не исчезает и
+     * ошибки не даёт, он просто перестаёт быть виден УЧИТЕЛЮ, и только ему:
+     * правила доступа сужают уроки предметника через subject_id, а ученик,
+     * родитель и администратор видят его как ни в чём не бывало.
+     *
+     * Тип сделан обязательным намеренно: с вопросительным знаком любой новый
+     * вызывающий мог бы молча уронить предмет, а компилятор промолчал бы.
+     */
+    subjectId: string;
     curriculumTopicId?: string | null;
   },
   /** 07.08.2026 — момент «сейчас» из слоя приложения (getDemoNowMs()).
@@ -3097,6 +3109,10 @@ export const createLesson = async (
   nowMs: number,
 ): Promise<{ id: string }> => {
   const dur = input.durationMinutes ?? 45;
+  // Отказ, а не подстановка «какого-нибудь» предмета: угадать предмет за
+  // человека нельзя, а после миграции 226 база всё равно откажет — пусть
+  // отказ будет внятным и по-русски, а не текстом про not-null constraint.
+  if (!input.subjectId) throw new Error("У урока должен быть предмет");
   if (new Date(input.startsAt).getTime() < nowMs) throw new Error("Нельзя создать урок в прошедшее время");
   if (dur < 5 || dur > 240) throw new Error("Некорректная длительность");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3112,7 +3128,7 @@ export const createLesson = async (
       description: input.description,
       topic: null,
       status: "scheduled",
-      subject_id: input.subjectId ?? null,
+      subject_id: input.subjectId,
       curriculum_topic_id: input.curriculumTopicId ?? null,
     })
     .select("id")
