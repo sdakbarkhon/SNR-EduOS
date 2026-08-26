@@ -2,17 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getDictionary, getSubjectConfig, pluralizeStudents, averageOf } from "@snr/core";
-import type { Locale } from "@snr/core";
+import { getDictionary, getSubjectConfig, pluralizeStudents, averageOf, groupClassLabel } from "@snr/core";
+import type { Locale, TeacherGroupSubject } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
-import { resolveSubjectIcon } from "@/components/SubjectIcon";
+import { subjectIconByName } from "@/lib/subject-icons";
 import { Users, MoreVertical, Search } from "lucide-react";
+import { cn } from "@/lib/cn";
 
 interface Props {
   groups: Array<{ id: string; name: string; subject: string; schedule_days: string | null; enrolled: Array<{ student_id: string }> }>;
   homework: Array<{ group: { id: string } }>;
   grades: Array<{ group_id: string | null; score: number }>;
   attendance: Array<{ status: string; lesson: { group_id: string } | null }>;
+  /** Настоящие предметы текущего учителя по группам — см. getTeacherGroupSubjects. */
+  subjects: TeacherGroupSubject[];
 }
 
 const GRADIENTS = [
@@ -20,17 +23,27 @@ const GRADIENTS = [
   "linear-gradient(135deg,#8B5CF6,#6D28D9)",
 ];
 
-/** Short class badge from group name, e.g. "Programming 7A" → "7A". */
-function classBadge(name: string): string {
-  const last = name.trim().split(/\s+/).pop() ?? name;
-  return last.length <= 4 ? last : name.slice(0, 2).toUpperCase();
-}
+// 26.08.2026. Своя classBadge снесена: она брала последнее слово названия, а
+// у всех групп это слово «класс» — не проходило по длине, и вместо класса
+// печатались два первых символа имени («3-А класс» → «3-», «SNR
+// Схемотехника» → «SN»). Правило переехало в @snr/core (utils/groupName):
+// либо целое обозначение, либо ничего.
 
-export function TeacherGroupsView({ groups, grades, attendance }: Props) {
+export function TeacherGroupsView({ groups, grades, attendance, subjects }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
+
+  /** Предметы этого учителя по группам. У куратора их в группе несколько. */
+  const subjectsByGroup = useMemo(() => {
+    const m = new Map<string, TeacherGroupSubject[]>();
+    for (const s of subjects) {
+      const list = m.get(s.groupId);
+      if (list) list.push(s); else m.set(s.groupId, [s]);
+    }
+    return m;
+  }, [subjects]);
 
   useEffect(() => {
     const t = setTimeout(() => setQuery(rawQuery), 300);
@@ -62,12 +75,14 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
   const filteredCards = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return cards;
+    // 26.08.2026: поиск по расписанию убран вместе с обещанием в подсказке —
+    // schedule_days пуст у всех семи групп обеих школ, искать там нечего.
+    // Предмет ищется по настоящему названию, а не по заглушке groups.subject.
     return cards.filter(({ group }) =>
       group.name.toLowerCase().includes(q) ||
-      getSubjectConfig(group.subject).label.toLowerCase().includes(q) ||
-      (group.schedule_days ?? "").toLowerCase().includes(q),
+      (subjectsByGroup.get(group.id) ?? []).some((s) => s.name.toLowerCase().includes(q)),
     );
-  }, [cards, query]);
+  }, [cards, query, subjectsByGroup]);
 
   return (
     <div className="max-w-6xl space-y-8">
@@ -77,7 +92,7 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
           type="text"
           value={rawQuery}
           onChange={(e) => setRawQuery(e.target.value)}
-          placeholder="Поиск по классу, предмету или расписанию…"
+          placeholder={d.teacher.groupsSearchPlaceholder}
           className="w-full rounded-[16px] border border-white/50 bg-white/60 py-3 pl-11 pr-4 text-sm font-medium text-gray-700 shadow-sm backdrop-blur outline-none transition-all placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
         />
       </div>
@@ -89,10 +104,22 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredCards.map(({ group, studentCount, avgGrade, attendancePct }, idx) => {
-            const cfg = getSubjectConfig(group.subject);
-            const { Icon: GroupSubjectIcon } = resolveSubjectIcon(group.subject);
-            const badge = classBadge(group.name);
-            const schedule = group.schedule_days?.trim();
+            const groupSubjects = subjectsByGroup.get(group.id) ?? [];
+            // Один предмет — карточка про него. Несколько (куратор) — карточка
+            // про класс, а предметы перечислены подписью. Ни одного — только класс.
+            const single = groupSubjects.length === 1 ? groupSubjects[0] : null;
+            const cls = groupClassLabel(group.name);
+            const color = single?.color ?? getSubjectConfig(null).color;
+            const GroupSubjectIcon = subjectIconByName(single?.icon);
+            const title = single ? single.name : group.name;
+            // У куратора настоящих предметов в группе нет вовсе (все его
+            // тринадцать строк в subjects — заглушки каталога), поэтому
+            // подписи у него не будет: класс и так стоит на плашке.
+            const subtitle = groupSubjects.length > 1
+              ? groupSubjects.map((s) => s.name).join(", ")
+              : single
+              ? (cls ? `${d.teacher.groupClassPrefix} ${cls}` : group.name)
+              : "";
 
             return (
               <Link key={group.id} href={`/teacher/groups/${group.id}`}
@@ -101,20 +128,34 @@ export function TeacherGroupsView({ groups, grades, attendance }: Props) {
                   <MoreVertical className="h-5 w-5" />
                 </div>
 
-                {/* Header: class tile (with subject emoji) + subject name + schedule */}
+                {/* Шапка: плашка класса с иконкой предмета + название предмета */}
                 <div className="mb-5 flex items-center gap-4">
-                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-xl font-bold text-white shadow-lg shadow-blue-500/20"
+                  <div className={cn(
+                    "relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] font-bold text-white shadow-lg shadow-blue-500/20",
+                    // «10-А» — четыре символа, в 20px шрифте они выходили за плашку.
+                    (cls?.length ?? 0) > 3 ? "text-base" : "text-xl",
+                  )}
                     style={{ background: GRADIENTS[idx % GRADIENTS.length] }}>
-                    {badge}
-                    <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm" style={{ color: cfg.color }}>
-                      <GroupSubjectIcon className="h-3.5 w-3.5" />
-                    </span>
+                    {cls ? (
+                      <>
+                        {cls}
+                        <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm" style={{ color }}>
+                          <GroupSubjectIcon className="h-3.5 w-3.5" />
+                        </span>
+                      </>
+                    ) : (
+                      // Класса в названии нет — вместо огрызка вроде «SN»
+                      // плашка показывает иконку предмета во всю ширину.
+                      <GroupSubjectIcon className="h-7 w-7" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-lg font-bold leading-tight text-gray-900">{cfg.label}</h3>
-                    <p className="mt-1 truncate text-xs font-medium text-gray-500">
-                      Класс {badge}{schedule ? ` · ${schedule}` : ""}
-                    </p>
+                    <h3 className="truncate text-lg font-bold leading-tight text-gray-900">{title}</h3>
+                    {subtitle && subtitle !== title && (
+                      <p className="mt-1 truncate text-xs font-medium text-gray-500" title={subtitle}>
+                        {subtitle}
+                      </p>
+                    )}
                   </div>
                 </div>
 

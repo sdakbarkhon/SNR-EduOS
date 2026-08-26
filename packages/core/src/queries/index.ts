@@ -14,6 +14,7 @@ import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
 import { tashkentDayKey, tashkentDayBoundsUtc, tashkentMonthBoundsUtc } from "../utils/date";
 import { getSubjectKeyByLabel } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
+import { getSubjects } from "./subjects";
 
 export * from "./projects";
 export * from "./announcements";
@@ -1012,6 +1013,45 @@ export const getMyTeacher = async (db: Db) => {
   return db.from("teachers").select("*").eq("user_id", user.id).single().then(unwrap);
 };
 
+/**
+ * Предмет, который текущий учитель ведёт в каждой из своих групп.
+ *
+ * 26.08.2026. Карточки «Моих классов» подписывались из groups.subject, а там
+ * у КАЖДОЙ группы стоит 'programming' с ресета Этапа 1 (см. комментарий
+ * миграции 107) — учитель английского видел три карточки «Программирование».
+ * Настоящий предмет лежит в subjects: строка на пару (группа, учитель), с
+ * названием, иконкой и цветом. Отсюда же берут предмет оценки и уроки
+ * (subject:subjects(name) в getStudentGrades и getTeacherLessonsForGroup) —
+ * заводить ещё один способ его узнать было бы четвёртым.
+ *
+ * У куратора (teachers.subject_slug = NULL) предметов в группе может быть
+ * НЕСКОЛЬКО — у Карима Ботирова их пять в 10-А и три в 3-А. Поэтому
+ * возвращается список, а не одна запись: выбирать подпись — дело экрана.
+ */
+export type TeacherGroupSubject = {
+  groupId: string;
+  subjectId: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+};
+
+export const getTeacherGroupSubjects = async (db: Db): Promise<TeacherGroupSubject[]> => {
+  const filter = await getTeacherSubjectFilter(db);
+  if (!filter) return [];
+  // Своего запроса к subjects здесь нет намеренно: getSubjects уже умеет
+  // отбирать по учителю, и второй способ прочитать ту же таблицу — ровно тот
+  // приём, каким в этом проекте уже расходились средний балл и разбор даты.
+  const rows = await getSubjects(db, { teacherId: filter.teacherId, activeOnly: true });
+  return rows.map((r) => ({
+    groupId: r.group_id,
+    subjectId: r.id,
+    name: r.name,
+    icon: r.icon,
+    color: r.color,
+  }));
+};
+
 /** Группы учителя (текущего) с количеством зачисленных учеников. */
 export const getTeacherGroups = (db: Db) =>
   db
@@ -1453,7 +1493,7 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
  * уже касался 08.08 (авария с эталоном демо). Годовая школа переваливает за
  * тысячу оценок легко, поэтому выборка идёт страницами.
  */
-type TeacherGrade = {
+export type TeacherGrade = {
   /** Группа, к которой относится оценка. */
   groupId: string | null;
   /** Предмет; у проектов его нет (в таблице только текстовый слаг). */
@@ -1630,8 +1670,12 @@ export const getTeacherHomework = (db: Db) =>
     .select(
       "*, " +
       "group:groups!inner(id, name, subject, enrolled:student_groups(student_id)), " +
-      "submissions:homework_submissions(id, status), " +
-      "test_subs:test_submissions(id, student_id)",
+      // 26.08.2026: в выборку добавлены оценки. Без них очередь проверки
+      // (utils/reviewQueue) не могла отличить проверенную работу от
+      // непроверенной и считала «на проверке» ВСЕ попытки тестов подряд —
+      // 120 при верном ответе ноль.
+      "submissions:homework_submissions(id, status, grade), " +
+      "test_subs:test_submissions(id, student_id, grade)",
     )
     .order("due_date", { ascending: false })
     .then(unwrap);

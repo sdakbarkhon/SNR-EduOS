@@ -40,3 +40,10 @@ export const LUCIDE_ICONS: Record<string, LucideIcon> = {
   BookText, Globe, Map, Dumbbell, Music, Palette, Hammer, TreePine, Users,
   Lightbulb, Target, Rocket, Library,
 };
+
+/** Иконка предмета по строке subjects.icon. Неизвестное имя — книжка.
+ *  Отдельная функция, чтобы запасной вариант был записан один раз, а не по
+ *  «?? BookOpen» на каждом экране. */
+export function subjectIconByName(name: string | null | undefined): LucideIcon {
+  return LUCIDE_ICONS[name ?? ""] ?? BookOpen;
+}

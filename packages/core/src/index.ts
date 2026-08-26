@@ -19,4 +19,6 @@ export * from "./utils/markLock";
 export * from "./utils/lessonTiming";
 export * from "./utils/gradeAverage";
 export * from "./utils/room";
+export * from "./utils/groupName";
+export * from "./utils/reviewQueue";
 export * from "./mocks/payments";

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   getDictionary, getSubjectConfig, getTeacherGradeMatrix, getTestQuestions,
   getLessonGradesForGroup, type LessonGradeRow,
-  averageOf, testGrade5,
+  averageOf, testGrade5, formatDate, tashkentDayKey,
 } from "@snr/core";
 import type {
   Locale, GradeMatrixData, GradeMatrixFileSub, GradeMatrixTestSub,
@@ -19,6 +19,7 @@ import { LessonGradeDetailModal } from "./LessonGradeDetailModal";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
+import { downloadCsv, csvFileNamePart } from "@/lib/csv";
 
 type CategoryFilter = "all" | "assignment" | "lesson";
 
@@ -225,6 +226,75 @@ export function TeacherGradesView({ groups, stats }: Props) {
   const overall = overallAvg();
   const stickyBg = "var(--glass-bg)";
 
+  /**
+   * Выгрузка того, что видно на экране. 26.08.2026 — вместо
+   * alert("Экспорт — доступно скоро").
+   *
+   * Отбор тот же, что и у экрана: выбранная группа и переключатель
+   * Все/За задания/За урок. Секции идут в том же порядке и с теми же
+   * заголовками, что на странице, — файл должен читаться как снимок экрана,
+   * а не как отдельная выгрузка со своей логикой.
+   *
+   * Оценки за уроки выгружаются ВСЕ, а не первые пять: «Показать все» —
+   * это сворачивание длинного списка, а не фильтр.
+   */
+  const hasAssignments = categoryFilter !== "lesson" && !!matrix && matrix.students.length > 0 && matrix.homework.length > 0;
+  const hasLessonGrades = categoryFilter !== "assignment" && lessonGrades.length > 0;
+
+  function exportCsv() {
+    const rows: string[][] = [];
+
+    if (hasAssignments && matrix) {
+      rows.push([d.teacher.gradesExportAssignments]);
+      rows.push([
+        d.teacher.gradesExportStudent,
+        d.teacher.groupAvgScore,
+        ...matrix.homework.map((hw) =>
+          hw.due_date ? `${hw.title} (${formatDate(hw.due_date, locale)})` : hw.title),
+      ]);
+      for (const s of matrix.students) {
+        const a = studentAvg(s.id);
+        rows.push([
+          s.full_name,
+          a != null ? a.toFixed(2) : "",
+          // Прочерк на экране означает «работы нет» — в таблице это пустая
+          // ячейка, иначе Excel посчитает прочерк значением.
+          ...matrix.homework.map((hw) => { const l = cellFor(s.id, hw).label; return l === "—" ? "" : l; }),
+        ]);
+      }
+      rows.push([
+        d.teacher.gradesExportClassAvg,
+        overall != null ? overall.toFixed(2) : "",
+        ...matrix.homework.map((hw) => { const a = assignmentAvg(hw); return a != null ? a.toFixed(2) : ""; }),
+      ]);
+    }
+
+    if (hasLessonGrades) {
+      if (rows.length > 0) rows.push([]);
+      rows.push([d.teacher.gradesExportLessonGrades]);
+      rows.push([
+        d.teacher.gradesExportStudent,
+        d.teacher.gradesExportLesson,
+        d.teacher.gradesExportTopic,
+        d.teacher.reviewGrade,
+        d.teacher.reviewComment,
+      ]);
+      for (const r of lessonGrades) {
+        rows.push([
+          r.student_name,
+          r.lesson_no ? `${d.teacher.gradesExportLesson} ${r.lesson_no}` : formatDate(r.lesson_starts_at, locale),
+          r.lesson_topic ?? "",
+          r.grade != null ? String(r.grade) : "",
+          r.comment ?? "",
+        ]);
+      }
+    }
+
+    if (rows.length === 0) return;
+    const groupName = groups.find((g) => g.id === groupId)?.name ?? "";
+    downloadCsv(`grades-${csvFileNamePart(groupName)}-${tashkentDayKey(schoolNowIso)}.csv`, rows);
+  }
+
   return (
     <div className="space-y-5">
       {/* KPI — max-w здесь, а не на всей странице: у экрана и так нет своего
@@ -272,8 +342,8 @@ export function TeacherGradesView({ groups, stats }: Props) {
           {groups.length === 0 && <option value="">Нет групп</option>}
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
-        <button onClick={() => alert("Экспорт — доступно скоро")}
-          className="flex items-center gap-2 rounded-[12px] border border-white/80 bg-white/70 px-4 py-2 text-[14px] font-semibold text-brand-ink-muted transition-colors hover:text-brand-ink">
+        <button onClick={exportCsv} disabled={!hasAssignments && !hasLessonGrades}
+          className="flex items-center gap-2 rounded-[12px] border border-white/80 bg-white/70 px-4 py-2 text-[14px] font-semibold text-brand-ink-muted transition-colors hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-brand-ink-muted">
           <Download size={16} /> Экспорт
         </button>
       </div>

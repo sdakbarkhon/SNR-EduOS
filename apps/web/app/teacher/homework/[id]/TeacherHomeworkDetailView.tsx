@@ -12,6 +12,7 @@ import {
   deleteHomeworkAttachment,
   getHomeworkTestsUrl,
   averageOf, testGrade5,
+  checkedCountOf, pendingReviewCountOf, isTestSubmissionChecked,
 } from "@snr/core";
 import { Code2 } from "lucide-react";
 import { TeacherProgrammingSubmissions } from "./TeacherProgrammingSubmissions";
@@ -313,11 +314,13 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
   const allGrades = [...fileGrades, ...testGrades];
   const avgGrade = averageOf(allGrades) ?? 0;
 
+  // 26.08.2026. «Проверено» считалось здесь третьим способом: файловые по
+  // статусу, тесты — по совпадению max_score с числом вопросов. Признак один
+  // на весь продукт (utils/reviewQueue): проверено то, у чего есть оценка.
   const submittedCount = localSubs.length + localTestSubs.length;
-  const gradedTestSubs = localTestSubs.filter(s =>
-    !hasOpenQuestions || s.max_score === questions.length
-  ).length;
-  const gradedCount = localSubs.filter(s => s.status === "graded").length + gradedTestSubs;
+  const work = { submissions: localSubs, test_subs: localTestSubs };
+  const gradedCount = checkedCountOf(work);
+  const pendingCount = pendingReviewCountOf(work);
 
   function statusChip(status: string, isTest = false, pending = false) {
     if (isTest) {
@@ -392,11 +395,7 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
         {[
           { label: d.teacher.detailSubmitted, value: submittedCount },
           { label: d.teacher.detailAvgScore, value: avgGrade > 0 ? avgGrade.toFixed(1) : "—" },
-          {
-            label: d.teacher.statsPending,
-            value: localSubs.filter(s => s.status === "submitted").length
-              + localTestSubs.filter(s => hasOpenQuestions && s.max_score !== questions.length).length
-          },
+          { label: d.teacher.statsPending, value: pendingCount },
         ].map((item) => (
           <div key={item.label} className="rounded-[16px] bg-white/70 border border-white/80 p-4 text-center"
             style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
@@ -560,7 +559,9 @@ export function TeacherHomeworkDetailView({ hw: initialHw, submissions, testSubs
             })}
 
             {localTestSubs.map((sub) => {
-              const isGraded = !hasOpenQuestions || sub.max_score === questions.length;
+              // 26.08.2026: чип попытки теста — по тому же признаку, что и
+              // числа наверху (utils/reviewQueue): есть оценка или нет.
+              const isGraded = isTestSubmissionChecked(sub);
               const needsReview = !isGraded;
               return (
                 <div key={sub.id}

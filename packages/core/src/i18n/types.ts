@@ -2780,6 +2780,16 @@ export interface Dictionary {
     groupStudents: string;
     groupAttendance: string;
     groupAvgScore: string;
+    groupClassPrefix: string;
+    groupsSearchPlaceholder: string;
+    groupRecentLessons: string;
+    groupGradesCounted: string;
+    gradesExportStudent: string;
+    gradesExportClassAvg: string;
+    gradesExportAssignments: string;
+    gradesExportLessonGrades: string;
+    gradesExportLesson: string;
+    gradesExportTopic: string;
     profileTitle: string;
     profileSubjects: string;
     profileGroups: string;

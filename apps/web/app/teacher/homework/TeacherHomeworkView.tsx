@@ -3,7 +3,10 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getDictionary, getSubjectConfig, deleteHomework } from "@snr/core";
+import {
+  getDictionary, getSubjectConfig, deleteHomework,
+  checkedCountOf, pendingReviewCountOf,
+} from "@snr/core";
 import type { Locale, CodeCompletionPayload } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -14,8 +17,10 @@ import { cn } from "@/lib/cn";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
 
-type Submission = { id: string; status: string };
-type TestSub = { id: string; student_id: string };
+// 26.08.2026: у сдач появились оценки. Без них очередь проверки не могла
+// отличить проверенную работу от непроверенной — см. utils/reviewQueue.
+type Submission = { id: string; status: string; grade: number | null };
+type TestSub = { id: string; student_id: string; grade: number | null };
 type HomeworkItem = {
   id: string; title: string; due_date: string | null;
   content_type: "file" | "test" | "programming" | "bundle" | "code_completion";
@@ -190,18 +195,33 @@ export function TeacherHomeworkView({ homework, groups }: Props) {
   }, [filtered, urgencyFilter, nowIso, query]);
 
 
-  // Tri-color donut over all works (file submissions + test attempts)
-  let checked = 0, pending = 0, overdue = 0;
-  localHW.forEach((hw) => {
-    const isOverdue = !!hw.due_date && nowIso !== null && hw.due_date < nowIso;
-    hw.submissions.forEach((s) => {
-      if (s.status === "graded") checked++;
-      else if (isOverdue) overdue++;
-      else pending++;
+  /**
+   * Пончик «Статистика проверок». 26.08.2026 — две правки сразу.
+   *
+   * ПЕРВАЯ: считал по localHW, то есть по ВСЕМУ списку заданий. Учитель менял
+   * группу, срок или статус — таблица слева перестраивалась, а пончик справа
+   * оставался прежним. Теперь он считает по urgencyFiltered — ровно по тому,
+   * что видно на экране.
+   *
+   * ВТОРАЯ: «на проверке» складывалось из файловых сдач без статуса graded И
+   * ВСЕХ попыток тестов подряд, оценённых в том числе, — выходило 120 при
+   * верном ответе ноль. Признак проверки теперь один на весь продукт
+   * (utils/reviewQueue): работа проверена, если у неё есть оценка.
+   *
+   * Черновики учеников (in_progress) в пончик не попадают вовсе: их никто не
+   * сдавал, и держать их в «Всего работ» значит обещать проверку того, чего
+   * учителю не отдавали.
+   */
+  const { checked, pending, overdue } = useMemo(() => {
+    let checked = 0, pending = 0, overdue = 0;
+    urgencyFiltered.forEach((hw) => {
+      const isOverdue = !!hw.due_date && hw.due_date < nowIso;
+      checked += checkedCountOf(hw);
+      const waiting = pendingReviewCountOf(hw);
+      if (isOverdue) overdue += waiting; else pending += waiting;
     });
-    // test attempts awaiting review
-    hw.test_subs.forEach(() => { if (isOverdue) overdue++; else pending++; });
-  });
+    return { checked, pending, overdue };
+  }, [urgencyFiltered, nowIso]);
 
   async function deleteHW(hw: HomeworkItem) {
     setBusyId(hw.id);

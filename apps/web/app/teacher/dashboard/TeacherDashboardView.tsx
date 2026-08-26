@@ -5,7 +5,11 @@ import Link from "next/link";
 import {
   Calendar, CheckCircle2, Clock, FileText, Megaphone, Users,
 } from "lucide-react";
-import { findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig, formatTime, formatDate, formatRoom } from "@snr/core";
+import {
+  findCurrentLesson, findNextLesson, getDictionary, getSubjectConfig,
+  formatTime, formatDate, formatRoom,
+  pendingReviewCount, checkedCountOf, isFileSubmissionPending,
+} from "@snr/core";
 import type { Locale, LessonStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNow } from "@/components/SchoolTimeProvider";
@@ -44,8 +48,10 @@ interface Props {
   }>;
   homework: Array<{
     id: string; title: string; due_date: string | null;
-    submissions: Array<{ status: string }>;
-    test_subs: Array<{ id: string }>;
+    // 26.08.2026: оценки в выборке — признак проверки теперь один на продукт
+    // (utils/reviewQueue), а он смотрит на оценку, а не на статус.
+    submissions: Array<{ status: string; grade: number | null }>;
+    test_subs: Array<{ id: string; grade: number | null }>;
     teacher_id: string | null;
   }>;
   todayLessons: TodayLesson[];
@@ -306,12 +312,11 @@ export function TeacherDashboardView({
   const studentIds = new Set<string>();
   groups.forEach((g) => g.enrolled?.forEach((e) => studentIds.add(e.student_id)));
   const totalStudents = studentIds.size;
-  const pendingCount = homework.reduce(
-    (acc, h) => acc + h.submissions.filter((s) => s.status === "submitted").length, 0,
-  );
-  const checkedCount = homework.reduce(
-    (acc, h) => acc + h.submissions.filter((s) => s.status === "graded").length, 0,
-  );
+  // 26.08.2026. Было: только файловые сдачи со статусом submitted, тесты не
+  // смотрели вовсе — дашборд показывал 0, а пончик на «Заданиях» про те же
+  // работы показывал 120. Теперь оба зовут одно правило (utils/reviewQueue).
+  const pendingCount = pendingReviewCount(homework);
+  const checkedCount = homework.reduce((acc, h) => acc + checkedCountOf(h), 0);
   // 24.08.2026 — вместо «Среднего балла».
   //
   // ПОЧЕМУ УБРАЛИ СРЕДНИЙ БАЛЛ. Плитка усредняла оценки за уроки СРАЗУ ПО ВСЕМ
@@ -337,7 +342,9 @@ export function TeacherDashboardView({
   ).length;
 
   // Right column data
-  const pendingReview = recentSubmissions.filter((s) => s.status === "submitted").slice(0, 5);
+  // Список под плиткой — по тому же признаку, что и её число: иначе «0 на
+  // проверке» соседствовало бы с непустым списком работ на проверку.
+  const pendingReview = recentSubmissions.filter(isFileSubmissionPending).slice(0, 5);
   const allActivity = recentSubmissions.slice(0, 5);
 
   return (

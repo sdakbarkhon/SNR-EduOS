@@ -30,9 +30,17 @@ export const SUBJECT_DEFAULTS: Record<string, { icon: string; color: string }> =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
 
+/**
+ * activeOnly — 26.08.2026. У куратора в базе тринадцать строк subjects
+ * («Биология», «ИЗО», «Музыка», «Обществознание»…), и все они помечены
+ * is_stub=true / is_active=false: это наполнение каталога классов
+ * (миграции 98 и 108), а не предметы, которые он ведёт. Экран расписания
+ * учителя отсеивал их своим запросом с .eq("is_stub", false); флаг переносит
+ * то же правило сюда, чтобы отбор жил в одном месте.
+ */
 export async function getSubjects(
   db: Db,
-  opts?: { groupId?: string; teacherId?: string },
+  opts?: { groupId?: string; teacherId?: string; activeOnly?: boolean },
 ): Promise<SubjectWithGroup[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q = (db as AnyDb)
@@ -41,6 +49,7 @@ export async function getSubjects(
     .order("name");
   if (opts?.groupId)   q = q.eq("group_id",   opts.groupId);
   if (opts?.teacherId) q = q.eq("teacher_id", opts.teacherId);
+  if (opts?.activeOnly) q = q.eq("is_stub", false).eq("is_active", true);
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as unknown as SubjectWithGroup[];
