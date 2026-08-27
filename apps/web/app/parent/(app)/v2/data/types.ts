@@ -379,12 +379,14 @@ export interface PaymentsFaqItem {
   answer: string;
 }
 
-/** Карточка баланса П17 + автоплатёж (C3). */
+/** Карточка баланса П17 (C3).
+ *
+ *  27.08.2026: убраны autopay_enabled / autopay_note. Автоплатежа в
+ *  утверждённой модели оплаты нет вовсе — счёт выставляется 1 числа и гасится
+ *  с баланса ребёнка, привязанных карт и автосписания не предусмотрено. */
 export interface PaymentsOverview {
   total_balance: number;      // 1 250 000
   overpayment: number;        // 120 000
-  autopay_enabled: boolean;
-  autopay_note: string;       // «1-го числа · Uzcard ····8341»
 }
 
 // ─── wallet ──────────────────────────────────────────────────────────────────
@@ -412,15 +414,8 @@ export interface WalletOpsDayGroup {
   ops: WalletOpRow[];
 }
 
-/** Лимиты расходов (B6). */
-export interface WalletLimits {
-  daily_limit: number;        // 50 000
-  spent_today: number;        // 32 000
-  presets: number[];          // [20000, 30000, 50000] (+ «Без лимита» = 0)
-  categories: { id: "caf" | "shop" | "stat"; name: string; limit: number; enabled: boolean }[];
-  notify_ops: boolean;        // limN1
-  notify_limit: boolean;      // limN2
-}
+// 27.08.2026: WalletLimits убран вместе с экраном «Лимиты» — экрана нет,
+// ограничивать по утверждённой модели нечего.
 
 // ─── notifications ───────────────────────────────────────────────────────────
 

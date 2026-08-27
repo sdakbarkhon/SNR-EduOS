@@ -3322,7 +3322,6 @@ export interface Dictionary {
       adminNews: string;
       support: string;
       bills: string;
-      payMethod: string;
       payHistory: string;
       receipts: string;
       childWallet: string;
@@ -3338,8 +3337,6 @@ export interface Dictionary {
       topics: string;
       teacherProfile: string;
       walletOps: string;
-      transfer: string;
-      limits: string;
       testReview: string;
       work: string;
       application: string;
@@ -3469,21 +3466,12 @@ export interface Dictionary {
       axisTeamwork: string;      // «Команда»
     };
     pay: {
-      autopay: string;
-      on: string;
-      off: string;
-      payNow: string;
-      downloadReceipt: string;
       balance: string;
       topupBtn: string;
-      transferBtn: string;
       all: string;
       refunds: string;
       total: string;
       sum: string;
-      chooseMethod: string;
-      mainCard: string;
-      otherCards: string;
       otherMethods: string;
       lastOps: string;
       // Заход 4: экран П17 «Оплаты» — дополнительные подписи макета.
@@ -3500,23 +3488,8 @@ export interface Dictionary {
       walletSub: string;          // «На питание и покупки в школе»
       // Заход 6: доп. ключи для ветки «Оплаты» — экраны d17-limits,
       // d17-transfer, d17-addcard, d17-topup, paySheet-успехи, helpSheet.
-      limits: string;             // «Лимиты расходов» (заголовок секции)
-      limitDay: string;           // «Лимит в день»
-      limitCafeteria: string;     // «Столовая» (категория лимита)
-      transferFrom: string;       // «ОТКУДА»
-      transferTo: string;         // «КУДА»
-      addCardTitle: string;       // «Добавить карту»
-      cardNumber: string;         // «Номер карты»
-      cardExpiry: string;         // «Срок действия»
-      cardCvv: string;            // «CVV»
-      cardHolder: string;         // «Имя держателя»
       topupInputPlaceholder: string;  // «0» (плейсхолдер суммы)
       topupChooseAmount: string;      // «Сумма пополнения»
-      howItWorks: string;             // «Как работают оплаты» (заголовок helpSheet)
-      successBillTitle: string;       // paySheet.kind==='bill' → «Платёж проведён»
-      successTopupTitle: string;      // paySheet.kind==='top' → «Баланс пополнен»
-      successTransferTitle: string;   // paySheet.kind==='tr'  → «Перевод выполнен»
-      successCardTitle: string;       // paySheet.kind==='card'→ «Карта добавлена»
     };
     /** Веб-родитель, экран «Оплаты» — мок, не подключён к БД. Пара новых
      *  строк, которых не хватало среди уже существующих pay.* ключей:
@@ -3877,11 +3850,6 @@ export interface Dictionary {
       demoBanner: string;
       soon: string;
       soonFile: string;
-      cardsNote: string;
-      addCard: string;
-      addCardWhy: string;
-      cardValidThru: string;
-      methodLinked: string;
       methodNotLinked: string;
       billsDueCap: string;
       billsLaterCap: string;
@@ -3900,10 +3868,6 @@ export interface Dictionary {
       topUpAmount: string;
       topUpFrom: string;
       topUpAction: string;
-      limitCafeteria: string;
-      limitShop: string;
-      limitStationery: string;
-      limitOf: string;
       walletOpsIn: string;
       walletOpsOut: string;
     };
@@ -3943,32 +3907,12 @@ export interface Dictionary {
       supportDemoNote: string;
       walletBalance: string;
       walletTopUp: string;
-      walletTransfer: string;
-      walletLimits: string;
       walletOps: string;
       walletRecentCap: string;
       walletSpent: string;
       walletTopped: string;
       walletOpsCount: string;
       walletDemoNote: string;
-      walletDemoNoteShort: string;
-      limitsDaily: string;
-      limitsSpentToday: string;
-      limitsLeft: string;
-      limitsPresetsCap: string;
-      limitsNoLimit: string;
-      limitsCategoriesCap: string;
-      limitsNotifyCap: string;
-      limitsNotifyOps: string;
-      limitsNotifyLimit: string;
-      limitsSave: string;
-      transferFrom: string;
-      transferTo: string;
-      transferFromParent: string;
-      transferAmount: string;
-      transferAll: string;
-      transferSend: string;
-      transferNotEnough: string;
       opsAllCap: string;
       opsFilterAll: string;
       opsFilterOut: string;

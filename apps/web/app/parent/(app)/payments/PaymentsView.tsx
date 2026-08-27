@@ -14,19 +14,35 @@
  *     «К ОПЛАТЕ» / «ПЕРЕПЛАТА».
  *  3. Section «К оплате сейчас» + chip «2 счёта» (orange) + «Смотреть все ›».
  *  4. GlassCard с двумя ListRow счетов (BILLS.in_main_list).
- *  5. GlassCard-строка «Автоплатёж» с Toggle (локальный state; initial из
- *     PAYMENTS_OVERVIEW.autopay_enabled).
- *  6. PrimaryButton «Оплатить всё — {sum}».
- *  7. QuickActionsGrid 4 колонки: Пополнить / История оплат / Счета и чеки /
+ *  5. PrimaryButton «Оплатить всё — {sum}» — ПОГАШЕНА, см. ниже.
+ *  6. QuickActionsGrid 4 колонки: Пополнить / История оплат / Счета и чеки /
  *     Способы оплаты.
- *  8. AccentCard «Кошелёк {gen}».
+ *  7. AccentCard «Кошелёк {gen}».
+ *
+ * 27.08.2026 — ЭКРАН ОБЕЩАЛ ТО, ЧЕГО НЕТ.
+ *
+ * Убрана строка «Автоплатёж · 1-го числа · Uzcard ····8341» с рабочим
+ * переключателем. Автоплатежа в утверждённой модели нет вовсе: счёт
+ * выставляется 1 числа и гасится с баланса ребёнка, привязанных карт и
+ * автосписания не предусмотрено. Карты «····8341» тоже не существует —
+ * приложение не хранит ни одной. Переключатель к тому же ничего не сохранял.
+ * Убрано целиком, а не спрятано за условием.
+ *
+ * «Оплатить всё» больше не выглядит рабочей кнопкой: платить нечем, пока нет
+ * провайдера. Она приглушена, помечена «Скоро» и не нажимается, а объяснение
+ * стоит под ней постоянно, а не раскрывается по щелчку — раскрыть его никто
+ * не догадается, а кнопка тем временем выглядит боевой.
+ *
+ * Сверху добавлена та же плашка «данных нет, это пример», что давно стоит в
+ * мобильном экране: суммы на этом экране — из заготовки, а не из базы, и об
+ * этом надо говорить прямо. Два экрана обязаны говорить одно и то же.
  *
  * Данные — ТОЛЬКО через аксессоры ../v2/data (точная копия data-слоя мобилки):
  * getPaymentsOverview, getDueBills, getDueTotal, getDueBillsCount,
  * getSelectedChildContext, getUnreadNotificationsCount, getParent.
  *
  * Платформенные отличия от RN (осознанные):
- *  * RN-компоненты UI-кита (AccentCard/AccentInset/ListRow/Toggle/
+ *  * RN-компоненты UI-кита (AccentCard/AccentInset/ListRow/
  *    PrimaryButton/QuickActionTile/RootHeader) в вебе ещё не выделены в
  *    общий слой — они воспроизведены локально в этом файле с теми же
  *    размерами/радиусами/тенями (см. src/ui/* на ветке мобилки);
@@ -41,14 +57,15 @@
  *    карточка кошелька (тоже с шевроном) → /parent/payments/top-up. Экраны
  *    деталей счёта и кошелька (d19/d22) в веб не портированы, поэтому шеврон
  *    ведёт на ближайший реальный экран той же сущности, а не в никуда;
- *  * «Оплатить всё» — единственное действие без назначения: оно упирается в
- *    отсутствующего платёжного провайдера. Кнопка не молчит, а раскрывает
- *    SoonNote с объяснением — тот же приём, что в TopUpView/PayMethodsView;
+ *  * «Оплатить всё» упирается в отсутствующего платёжного провайдера, поэтому
+ *    показана неактивной с меткой «Скоро» — тот же приём, что в PayMethodsView;
  *  * только светлая тема (токены ../v2/tokens.ts).
  */
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 import { GlassCard } from "../v2/GlassCard";
 import { CHEVRON, DIVIDER, SECTION_CAP } from "../_ui/screen-tokens";
 import {
@@ -96,7 +113,6 @@ const T = {
   billsChip: "{n} счёта",
   viewAll: "Смотреть все",
   billDueBy: "до {date}",
-  autopay: "Автоплатёж",
   payAllBtn: "Оплатить всё — {sum}",
   topupBtn: "Пополнить",
   payHistory: "История оплат",
@@ -133,8 +149,6 @@ const ICON = {
   plus: ["M12 5v14", "M5 12h14"],
   clock: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"],
   doc: ["M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z", "M14 3v5h5", "M9 13h6", "M9 17h4"],
-  /** Автоплатёж — round-arrow (задан прямо в RN-экране, не из ICONS). */
-  autopay: ["M21 12a9 9 0 1 1-3-6.7", "M21 4v5h-5"],
 } as const;
 
 /** Иконка-глиф (белая) — RN WhiteGlyph: stroke #fff, strokeWidth 1.8. */
@@ -312,92 +326,65 @@ function ListRow({
   );
 }
 
-/**
- * Off-трек тумблера. Своей переменной не заводим: в parent-theme.css уже есть
- * --p-control-off ровно с этим светлым значением (её же использует Toggle из
- * `_ui/screen-kit`), а второй токен под тот же цвет — это будущее расхождение.
- */
-const TOGGLE_OFF = "var(--p-control-off, rgba(23,18,67,0.14))";
-
-/** Toggle 44×26 r13: off-трек TOGGLE_OFF, on — accent-градиент, кноб 20 (ход 18). */
-function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (next: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      aria-label={T.autopay}
-      onClick={() => onValueChange(!value)}
-      className="relative shrink-0"
-      style={{
-        width: 44,
-        height: 26,
-        borderRadius: 13,
-        background: TOGGLE_OFF,
-        boxShadow: value ? "0 4px 10px rgba(124,58,237,0.35)" : undefined,
-      }}
-    >
-      {/* on-состояние: accent-градиент, плавное появление (transition .22s). */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          borderRadius: 13,
-          background: accentGrad,
-          opacity: value ? 1 : 0,
-          transition: "opacity 0.22s ease",
-        }}
-      />
-      <span
-        aria-hidden
-        className="absolute"
-        style={{
-          top: 3,
-          left: 3,
-          width: 20,
-          height: 20,
-          borderRadius: 10,
-          background: "#FFFFFF",
-          transform: value ? "translateX(18px)" : "translateX(0px)",
-          transition: "transform 0.22s ease",
-        }}
-      />
-    </button>
-  );
-}
-
-/** PrimaryButton: accent-градиент, r16, padding 15, gap 8, текст 14/800, тень 0 14 32. */
+/** PrimaryButton: accent-градиент, r16, padding 15, gap 8, текст 14/800, тень 0 14 32.
+ *
+ *  27.08.2026 добавлен неактивный вид (inactive): та же форма, но приглушённая,
+ *  без тени, без нажатия и с меткой «Скоро». Это не <button> вовсе — нажимать
+ *  нечего, пока нет платёжного провайдера, и «кнопка, которая ничего не
+ *  делает» здесь и была болезнью экрана. Тот же приём, что на экране способов
+ *  оплаты (PayMethodsView). */
 function PrimaryButton({
   label,
   icon,
-  onClick,
+  inactive,
+  soonLabel,
 }: {
   label: string;
   icon?: ReactNode;
-  onClick?: () => void;
+  inactive?: boolean;
+  soonLabel?: string;
 }) {
+  const Tag = inactive ? "div" : "button";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative flex w-full items-center justify-center overflow-hidden transition-transform active:scale-[0.99]"
+    <Tag
+      {...(inactive ? {} : { type: "button" as const })}
+      aria-disabled={inactive ? true : undefined}
+      className={
+        "relative flex w-full items-center justify-center overflow-hidden" +
+        (inactive ? "" : " transition-transform active:scale-[0.99]")
+      }
       style={{
         gap: 8,
         padding: 15,
         borderRadius: 16,
         background: accentGrad,
-        boxShadow: "0 14px 32px rgba(124,58,237,0.4)",
+        boxShadow: inactive ? undefined : "0 14px 32px rgba(124,58,237,0.4)",
+        opacity: inactive ? 0.55 : 1,
       }}
     >
       {icon}
       <span style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF" }}>{label}</span>
+      {inactive && soonLabel ? (
+        <span
+          style={{
+            padding: "3px 9px",
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.22)",
+            fontSize: 9.5,
+            fontWeight: 800,
+            color: "#FFFFFF",
+          }}
+        >
+          {soonLabel}
+        </span>
+      ) : null}
       {/* inset-блик W35 → верхняя hairline-полоска (макет строка 397). */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0"
         style={{ height: 1.5, background: "rgba(255,255,255,0.35)" }}
       />
-    </button>
+    </Tag>
   );
 }
 
@@ -644,10 +631,11 @@ export function PaymentsView({
   const dueCount = getDueBillsCount();
   const unread = getUnreadNotificationsCount();
 
-  const [autopay, setAutopay] = useState<boolean>(overview.autopay_enabled);
-  // «Оплатить всё» упирается в отсутствующего провайдера — объясняем это прямо
-  // под кнопкой (тот же приём, что в TopUpView и PayMethodsView).
-  const [paySoon, setPaySoon] = useState(false);
+  // Плашка «данных нет» и метка «Скоро» — из словаря: экран показывают
+  // родителям на трёх языках, а остальные подписи здесь исторически русские
+  // литералы (это отдельная задача, её здесь не решаем).
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
 
   const orangeChip = chip(status.orange.rgb);
 
@@ -665,6 +653,10 @@ export function PaymentsView({
         className="flex flex-col"
         style={{ gap: 12, paddingLeft: 18, paddingRight: 18, paddingTop: 4, paddingBottom: 8 }}
       >
+        {/* 1. Плашка «данных нет, это пример» — ровно та же, что в мобильном
+            экране. Суммы ниже приходят из заготовки, а не из базы школы. */}
+        <SoonNote text={d.parentApp.pay2.demoBanner} />
+
         {/* 2. Карточка баланса (три-стоп-градиент, макет 383–386). */}
         <AccentCard
           gradient={["#ec4899", "#f97316", "#4f86f6"]}
@@ -798,33 +790,26 @@ export function PaymentsView({
           ))}
         </GlassCard>
 
-        {/* 5. Автоплатёж (Toggle). */}
-        <GlassCard style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 14, paddingRight: 14 }}>
-          <ListRow
-            left={
-              <BillIconTile gradient={["#34d399", "#059669"]} paths={ICON.autopay} size={36} radius={12} />
-            }
-            title={T.autopay}
-            subtitle={overview.autopay_note}
-            right={<Toggle value={autopay} onValueChange={setAutopay} />}
-            gap={11}
-            verticalPadding={10}
-          />
-        </GlassCard>
-
-        {/* 6. Главная CTA. */}
+        {/* 5. Главная CTA — ПОГАШЕНА. 27.08.2026: раньше это была боевая
+            фиолетовая кнопка, а объяснение появлялось только по щелчку.
+            Платить нечем, пока нет провайдера, поэтому кнопка приглушена,
+            помечена «Скоро», не нажимается, а объяснение стоит под ней
+            всегда. Строка автоплатежа, стоявшая выше, снесена целиком:
+            автоплатежа в модели нет, карты «····8341» не существует, а
+            переключатель ничего не сохранял. */}
         <div>
           <PrimaryButton
             label={fillTemplate(T.payAllBtn, {
               sum: formatMoney(dueTotal, { withCurrency: true, currency: T.sum }),
             })}
             icon={<WhiteGlyph paths={ICON.card} size={16} />}
-            onClick={() => setPaySoon((v) => !v)}
+            inactive
+            soonLabel={d.status.soon}
           />
-          {paySoon ? <SoonNote text={SOON_PAYMENTS} /> : null}
+          <SoonNote text={SOON_PAYMENTS} />
         </div>
 
-        {/* 7. Быстрые действия — 4 колонки (gap 8). */}
+        {/* 6. Быстрые действия — 4 колонки (gap 8). */}
         <div
           className="grid"
           style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 4 }}
@@ -859,9 +844,10 @@ export function PaymentsView({
           />
         </div>
 
-        {/* 8. Кошелёк ребёнка. 12.08.2026 — экран деталей кошелька появился,
+        {/* 7. Кошелёк ребёнка. 12.08.2026 — экран деталей кошелька появился,
             поэтому карточка ведёт на него, а не сразу на пополнение: оттуда
-            доступны и пополнение, и перевод, и лимиты, и все операции. */}
+            доступны и пополнение, и все операции. (27.08.2026 — «перевод» и
+            «лимиты» из этого перечня убраны вместе с самими экранами.) */}
         <AccentCard
           gradient={["#7c3aed", "#a855f7"]}
           angle={135}

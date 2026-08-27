@@ -8,7 +8,7 @@
  * питания» d6 читают его через getWalletBalance() (см. ../index.ts).
  * walletBal: 185000 из initial state макета — легаси (аномалия №9).
  */
-import type { WalletLimits, WalletOpsDayGroup, WalletRow } from "../types";
+import type { WalletOpsDayGroup, WalletRow } from "../types";
 import { CHILDREN } from "./family";
 
 /** wallets: [92000, 185000, 240000] — Азиз / Малика / Фаррух.
@@ -124,23 +124,8 @@ export const WALLET_OPS: WalletOpsDayGroup[] = [
   },
 ];
 
-/** Лимиты расходов (B6). Пресет «Без лимита» = 0. */
-export const WALLET_LIMITS: WalletLimits = {
-  daily_limit: 50000,
-  spent_today: 32000,
-  presets: [20000, 30000, 50000, 0],
-  categories: [
-    { id: "caf", name: "Столовая", limit: 20000, enabled: true },
-    { id: "shop", name: "Школьный магазин", limit: 15000, enabled: true },
-    { id: "stat", name: "Канцелярия", limit: 10000, enabled: true },
-  ],
-  notify_ops: true,
-  notify_limit: false,
-};
-
 /** Пресеты пополнения (topChips); ввод до 9 цифр. */
 export const TOPUP_PRESETS = [50000, 100000, 200000, 500000] as const;
 
-/** Пресеты перевода (trChips); «Всё» = весь баланс (null). */
-export const TRANSFER_PRESETS: (number | null)[] = [10000, 25000, 50000, null];
-export const TRANSFER_INSUFFICIENT_TEXT = "Недостаточно средств";
+// 27.08.2026: TRANSFER_PRESETS и TRANSFER_INSUFFICIENT_TEXT убраны вместе с
+// экраном «Перевод между детьми» — деньги между балансами детей не ходят.

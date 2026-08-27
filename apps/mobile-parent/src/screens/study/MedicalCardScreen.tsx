@@ -357,7 +357,8 @@ export default function MedicalCardScreen() {
   const goProfMenu = () => navigation.navigate("stub", { stubKey: "profmenu" });
   const goDocs = () => navigation.navigate("d31");
 
-  // Текст InfoBanner (Блок 14) — прецедент LimitsScreen.bannerText / мокап light=rgba(26,19,74,.7).
+  // Текст InfoBanner (Блок 14) — цвет взят с экрана «Лимиты» (удалён 27.08.2026),
+  // мокап light=rgba(26,19,74,.7).
   const bannerText = scheme === "light" ? "rgba(26,19,74,0.7)" : "rgba(255,255,255,0.78)";
   const green = tokens.status.green;
   const orange = tokens.status.orange;

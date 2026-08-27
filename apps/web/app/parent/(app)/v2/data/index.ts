@@ -118,14 +118,7 @@ import {
   PAY_SHEET_TEXTS,
   RECEIPTS,
 } from "./fixtures/payments";
-import {
-  TOPUP_PRESETS,
-  TRANSFER_INSUFFICIENT_TEXT,
-  TRANSFER_PRESETS,
-  WALLETS,
-  WALLET_LIMITS,
-  WALLET_OPS,
-} from "./fixtures/wallet";
+import { TOPUP_PRESETS, WALLETS, WALLET_OPS } from "./fixtures/wallet";
 import {
   NOTIFICATIONS,
   NOTIFICATIONS_MASTER_DEFAULT,
@@ -476,16 +469,8 @@ export function getWalletOps(_childId?: string): WalletOpsDayGroup[] {
   return WALLET_OPS;
 }
 
-export function getWalletLimits() {
-  return WALLET_LIMITS;
-}
-
 export function getTopupPresets() {
   return TOPUP_PRESETS;
-}
-
-export function getTransferFixture() {
-  return { presets: TRANSFER_PRESETS, insufficient_text: TRANSFER_INSUFFICIENT_TEXT };
 }
 
 // ─── Уведомления ─────────────────────────────────────────────────────────────
