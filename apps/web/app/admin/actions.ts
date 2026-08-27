@@ -15,6 +15,7 @@ import type {
 import { createClient } from "@/lib/supabase/server";
 import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
 import { parseCoursePrice } from "@/lib/course-price";
+import { guard, type ActionResult } from "@/lib/action-result";
 import { getSubjectKeyByLabel } from "@snr/core";
 import { revalidatePath } from "next/cache";
 
@@ -41,106 +42,126 @@ async function verifyAdmin(): Promise<{ schoolId: string; isSuperAdmin: boolean 
 // ── STUDENTS ─────────────────────────────────────────────────────────────────
 
 export async function actionCreateStudent(formData: FormData) {
-  const { schoolId } = await verifyAdmin();
-  const full_name = String(formData.get("full_name") ?? "").trim();
-  const username = String(formData.get("username") ?? "").trim();
-  const password = String(formData.get("password") ?? "").trim();
-  const group_id = String(formData.get("group_id") ?? "").trim();
-  if (!full_name || !username || !password || !group_id) throw new Error("Missing fields");
-  const google_email = String(formData.get("google_email") ?? "").trim() || null;
-  const result = await createStudent({ full_name, username, password, group_id, school_id: schoolId, google_email });
-  revalidatePath("/admin/students");
-  revalidatePath("/admin");
-  return result;
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const full_name = String(formData.get("full_name") ?? "").trim();
+    const username = String(formData.get("username") ?? "").trim();
+    const password = String(formData.get("password") ?? "").trim();
+    const group_id = String(formData.get("group_id") ?? "").trim();
+    if (!full_name || !username || !password || !group_id) throw new Error("Missing fields");
+    const google_email = String(formData.get("google_email") ?? "").trim() || null;
+    const result = await createStudent({ full_name, username, password, group_id, school_id: schoolId, google_email });
+    revalidatePath("/admin/students");
+    revalidatePath("/admin");
+    return result;
+  });
 }
 
 export async function actionUpdateStudent(formData: FormData) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const student_id = String(formData.get("student_id") ?? "");
-  const user_id = String(formData.get("user_id") ?? "");
-  const full_name = String(formData.get("full_name") ?? "").trim();
-  const username = String(formData.get("username") ?? "").trim();
-  const group_id = String(formData.get("group_id") ?? "").trim();
-  const old_group_id = String(formData.get("old_group_id") ?? "").trim();
-  // Почта пишется, ТОЛЬКО если её правда меняли. Разбор — lib/form-patch.ts.
-  // Раньше здесь пустая строка превращалась в null и уезжала в базу поверх
-  // заполненной почты при каждом сохранении.
-  const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
-  await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id, ...changed }, schoolId, isSuperAdmin);
-  revalidatePath("/admin/students");
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const student_id = String(formData.get("student_id") ?? "");
+    const user_id = String(formData.get("user_id") ?? "");
+    const full_name = String(formData.get("full_name") ?? "").trim();
+    const username = String(formData.get("username") ?? "").trim();
+    const group_id = String(formData.get("group_id") ?? "").trim();
+    const old_group_id = String(formData.get("old_group_id") ?? "").trim();
+    // Почта пишется, ТОЛЬКО если её правда меняли. Разбор — lib/form-patch.ts.
+    // Раньше здесь пустая строка превращалась в null и уезжала в базу поверх
+    // заполненной почты при каждом сохранении.
+    const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
+    await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id, ...changed }, schoolId, isSuperAdmin);
+    revalidatePath("/admin/students");
+  });
 }
 
 export async function actionResetStudentPassword(userId: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const newPassword = await resetStudentPassword(userId, schoolId, isSuperAdmin);
-  revalidatePath("/admin/students");
-  return newPassword;
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const newPassword = await resetStudentPassword(userId, schoolId, isSuperAdmin);
+    revalidatePath("/admin/students");
+    return newPassword;
+  });
 }
 
 export async function actionDeleteStudent(userId: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  await deleteStudent(userId, schoolId, isSuperAdmin);
-  revalidatePath("/admin/students");
-  revalidatePath("/admin");
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    await deleteStudent(userId, schoolId, isSuperAdmin);
+    revalidatePath("/admin/students");
+    revalidatePath("/admin");
+  });
 }
 
 // ── TEACHERS ─────────────────────────────────────────────────────────────────
 
 export async function actionCreateTeacher(formData: FormData) {
-  const { schoolId } = await verifyAdmin();
-  const full_name = String(formData.get("full_name") ?? "").trim();
-  const username = String(formData.get("username") ?? "").trim();
-  const password = String(formData.get("password") ?? "").trim();
-  if (!full_name || !username || !password) throw new Error("Missing fields");
-  const google_email = String(formData.get("google_email") ?? "").trim() || null;
-  const result = await createTeacher({ full_name, username, password, school_id: schoolId, google_email });
-  revalidatePath("/admin/teachers");
-  revalidatePath("/admin");
-  return result;
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const full_name = String(formData.get("full_name") ?? "").trim();
+    const username = String(formData.get("username") ?? "").trim();
+    const password = String(formData.get("password") ?? "").trim();
+    if (!full_name || !username || !password) throw new Error("Missing fields");
+    const google_email = String(formData.get("google_email") ?? "").trim() || null;
+    const result = await createTeacher({ full_name, username, password, school_id: schoolId, google_email });
+    revalidatePath("/admin/teachers");
+    revalidatePath("/admin");
+    return result;
+  });
 }
 
 export async function actionUpdateTeacher(formData: FormData) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const teacher_id = String(formData.get("teacher_id") ?? "");
-  const user_id = String(formData.get("user_id") ?? "");
-  const full_name = String(formData.get("full_name") ?? "").trim();
-  const username = String(formData.get("username") ?? "").trim();
-  // То же, что у ученика: пишем почту, только если её правда меняли.
-  const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
-  await updateTeacher(teacher_id, user_id, { full_name, username, ...changed }, schoolId, isSuperAdmin);
-  revalidatePath("/admin/teachers");
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const teacher_id = String(formData.get("teacher_id") ?? "");
+    const user_id = String(formData.get("user_id") ?? "");
+    const full_name = String(formData.get("full_name") ?? "").trim();
+    const username = String(formData.get("username") ?? "").trim();
+    // То же, что у ученика: пишем почту, только если её правда меняли.
+    const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
+    await updateTeacher(teacher_id, user_id, { full_name, username, ...changed }, schoolId, isSuperAdmin);
+    revalidatePath("/admin/teachers");
+  });
 }
 
 export async function actionResetTeacherPassword(userId: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const newPassword = await resetTeacherPassword(userId, schoolId, isSuperAdmin);
-  revalidatePath("/admin/teachers");
-  return newPassword;
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const newPassword = await resetTeacherPassword(userId, schoolId, isSuperAdmin);
+    revalidatePath("/admin/teachers");
+    return newPassword;
+  });
 }
 
 /** Что удаление затронет — для честного текста в подтверждении. Z.2.3. */
-export async function actionTeacherDeletionImpact(teacherId: string): Promise<TeacherDeletionImpact> {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  return getTeacherDeletionImpact(teacherId, schoolId, isSuperAdmin);
+export async function actionTeacherDeletionImpact(teacherId: string): Promise<ActionResult<TeacherDeletionImpact>> {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    return getTeacherDeletionImpact(teacherId, schoolId, isSuperAdmin);
+  });
 }
 
 export async function actionDeleteTeacher(teacherId: string, userId: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  await deleteTeacher(teacherId, userId, schoolId, isSuperAdmin);
-  revalidatePath("/admin/teachers");
-  revalidatePath("/admin/subject-assignments");
-  revalidatePath("/admin/groups");
-  revalidatePath("/admin");
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    await deleteTeacher(teacherId, userId, schoolId, isSuperAdmin);
+    revalidatePath("/admin/teachers");
+    revalidatePath("/admin/subject-assignments");
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin");
+  });
 }
 
 /** Z.2.4 — назначить или снять учителя одним действием: subjects.teacher_id,
  *  group_teachers и (в реальных школах) subject_slug. */
 export async function actionSetAssignmentTeacher(assignmentId: string, teacherId: string | null) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const result = await setAssignmentTeacher(assignmentId, teacherId, schoolId, isSuperAdmin);
-  revalidatePath("/admin/teachers");
-  revalidatePath("/admin/subject-assignments");
-  return result;
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const result = await setAssignmentTeacher(assignmentId, teacherId, schoolId, isSuperAdmin);
+    revalidatePath("/admin/teachers");
+    revalidatePath("/admin/subject-assignments");
+    return result;
+  });
 }
 
 // ── GROUPS ────────────────────────────────────────────────────────────────────
@@ -187,38 +208,44 @@ function readCoursePrice(formData: FormData): number | undefined {
 }
 
 export async function actionCreateGroup(formData: FormData) {
-  const { schoolId } = await verifyAdmin();
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Missing fields");
-  const subject = await resolveGroupSubject(formData, schoolId);
-  const id = await createGroup({
-    name, subject, teacher_id: readCuratorId(formData) ?? null, school_id: schoolId,
-    course_price: readCoursePrice(formData),
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const name = String(formData.get("name") ?? "").trim();
+    if (!name) throw new Error("Missing fields");
+    const subject = await resolveGroupSubject(formData, schoolId);
+    const id = await createGroup({
+      name, subject, teacher_id: readCuratorId(formData) ?? null, school_id: schoolId,
+      course_price: readCoursePrice(formData),
+    });
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin");
+    return id;
   });
-  revalidatePath("/admin/groups");
-  revalidatePath("/admin");
-  return id;
 }
 
 export async function actionUpdateGroup(formData: FormData) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const group_id = String(formData.get("group_id") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-  const subject = await resolveGroupSubject(formData, schoolId);
-  await updateGroup(
-    group_id,
-    { name, subject, teacher_id: readCuratorId(formData), course_price: readCoursePrice(formData) },
-    schoolId,
-    isSuperAdmin,
-  );
-  revalidatePath("/admin/groups");
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const group_id = String(formData.get("group_id") ?? "");
+    const name = String(formData.get("name") ?? "").trim();
+    const subject = await resolveGroupSubject(formData, schoolId);
+    await updateGroup(
+      group_id,
+      { name, subject, teacher_id: readCuratorId(formData), course_price: readCoursePrice(formData) },
+      schoolId,
+      isSuperAdmin,
+    );
+    revalidatePath("/admin/groups");
+  });
 }
 
 export async function actionDeleteGroup(groupId: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  await deleteGroup(groupId, schoolId, isSuperAdmin);
-  revalidatePath("/admin/groups");
-  revalidatePath("/admin");
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    await deleteGroup(groupId, schoolId, isSuperAdmin);
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin");
+  });
 }
 
 // ── SCHOOL SUBJECTS: справочник (Z.2.2) ──────────────────────────────────────
@@ -233,44 +260,54 @@ function revalidateSubjects() {
 }
 
 export async function actionCreateSchoolSubject(formData: FormData) {
-  const { schoolId } = await verifyAdmin();
-  const name = String(formData.get("name") ?? "").trim();
-  const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
-  const color = String(formData.get("color") ?? "").trim() || "#64748B";
-  if (!name) throw new Error("Missing fields");
-  const id = await createSchoolSubject({ name, icon, color, school_id: schoolId });
-  revalidateSubjects();
-  return id;
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const name = String(formData.get("name") ?? "").trim();
+    const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
+    const color = String(formData.get("color") ?? "").trim() || "#64748B";
+    if (!name) throw new Error("Missing fields");
+    const id = await createSchoolSubject({ name, icon, color, school_id: schoolId });
+    revalidateSubjects();
+    return id;
+  });
 }
 
 export async function actionUpdateSchoolSubject(formData: FormData) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const id = String(formData.get("id") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-  const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
-  const color = String(formData.get("color") ?? "").trim() || "#64748B";
-  if (!id || !name) throw new Error("Missing fields");
-  await updateSchoolSubject(id, { name, icon, color }, schoolId, isSuperAdmin);
-  revalidateSubjects();
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const id = String(formData.get("id") ?? "");
+    const name = String(formData.get("name") ?? "").trim();
+    const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
+    const color = String(formData.get("color") ?? "").trim() || "#64748B";
+    if (!id || !name) throw new Error("Missing fields");
+    await updateSchoolSubject(id, { name, icon, color }, schoolId, isSuperAdmin);
+    revalidateSubjects();
+  });
 }
 
 export async function actionSetSchoolSubjectActive(id: string, isActive: boolean) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  await setSchoolSubjectActive(id, isActive, schoolId, isSuperAdmin);
-  revalidateSubjects();
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    await setSchoolSubjectActive(id, isActive, schoolId, isSuperAdmin);
+    revalidateSubjects();
+  });
 }
 
 /** Z.2.3 — что мешает удалить предмет справочника. Питает диалог, который
  *  вместо «вы уверены» показывает числа и предлагает скрыть. */
-export async function actionSchoolSubjectImpact(id: string): Promise<SchoolSubjectDeletionImpact> {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  return getSchoolSubjectImpact(id, schoolId, isSuperAdmin);
+export async function actionSchoolSubjectImpact(id: string): Promise<ActionResult<SchoolSubjectDeletionImpact>> {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    return getSchoolSubjectImpact(id, schoolId, isSuperAdmin);
+  });
 }
 
 export async function actionDeleteSchoolSubject(id: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  await deleteSchoolSubject(id, schoolId, isSuperAdmin);
-  revalidateSubjects();
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    await deleteSchoolSubject(id, schoolId, isSuperAdmin);
+    revalidateSubjects();
+  });
 }
 
 // ── SUBJECT ASSIGNMENTS: предмет × группа × учитель (Z.2.2) ──────────────────
@@ -279,38 +316,46 @@ export async function actionDeleteSchoolSubject(id: string) {
 // есть подсказка под полем учителя.
 
 export async function actionCreateSubjectAssignment(formData: FormData) {
-  const { schoolId } = await verifyAdmin();
-  const catalog_id = String(formData.get("catalog_id") ?? "").trim();
-  const group_id = String(formData.get("group_id") ?? "").trim();
-  const teacher_id = String(formData.get("teacher_id") ?? "").trim();
-  if (!catalog_id || !group_id) throw new Error("Missing fields");
-  const id = await createSubjectAssignment({
-    catalog_id, group_id, teacher_id: teacher_id || null, school_id: schoolId,
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const catalog_id = String(formData.get("catalog_id") ?? "").trim();
+    const group_id = String(formData.get("group_id") ?? "").trim();
+    const teacher_id = String(formData.get("teacher_id") ?? "").trim();
+    if (!catalog_id || !group_id) throw new Error("Missing fields");
+    const id = await createSubjectAssignment({
+      catalog_id, group_id, teacher_id: teacher_id || null, school_id: schoolId,
+    });
+    revalidateSubjects();
+    return id;
   });
-  revalidateSubjects();
-  return id;
 }
 
 export async function actionUpdateSubjectAssignment(formData: FormData) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  const id = String(formData.get("id") ?? "");
-  const catalog_id = String(formData.get("catalog_id") ?? "").trim();
-  const group_id = String(formData.get("group_id") ?? "").trim();
-  const teacher_id = String(formData.get("teacher_id") ?? "").trim();
-  if (!id || !catalog_id || !group_id) throw new Error("Missing fields");
-  await updateSubjectAssignment(
-    id, { catalog_id, group_id, teacher_id: teacher_id || null }, schoolId, isSuperAdmin,
-  );
-  revalidateSubjects();
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const id = String(formData.get("id") ?? "");
+    const catalog_id = String(formData.get("catalog_id") ?? "").trim();
+    const group_id = String(formData.get("group_id") ?? "").trim();
+    const teacher_id = String(formData.get("teacher_id") ?? "").trim();
+    if (!id || !catalog_id || !group_id) throw new Error("Missing fields");
+    await updateSubjectAssignment(
+      id, { catalog_id, group_id, teacher_id: teacher_id || null }, schoolId, isSuperAdmin,
+    );
+    revalidateSubjects();
+  });
 }
 
-export async function actionSubjectAssignmentImpact(id: string): Promise<SubjectDeletionImpact> {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  return getSubjectAssignmentImpact(id, schoolId, isSuperAdmin);
+export async function actionSubjectAssignmentImpact(id: string): Promise<ActionResult<SubjectDeletionImpact>> {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    return getSubjectAssignmentImpact(id, schoolId, isSuperAdmin);
+  });
 }
 
 export async function actionDeleteSubjectAssignment(id: string) {
-  const { schoolId, isSuperAdmin } = await verifyAdmin();
-  await deleteSubjectAssignment(id, schoolId, isSuperAdmin);
-  revalidateSubjects();
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    await deleteSubjectAssignment(id, schoolId, isSuperAdmin);
+    revalidateSubjects();
+  });
 }

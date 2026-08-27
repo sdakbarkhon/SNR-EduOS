@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import {
   actionCreateSubjectAssignment,
   actionUpdateSubjectAssignment,
@@ -125,7 +126,7 @@ export function AssignmentsView({
         if (creatingNew) {
           const nf = new FormData();
           nf.set("name", formNewName.trim());
-          catalogId = await actionCreateSchoolSubject(nf);
+          catalogId = await unwrap(actionCreateSchoolSubject(nf));
         }
 
         const fd = new FormData();
@@ -134,9 +135,9 @@ export function AssignmentsView({
         fd.set("teacher_id", formTeacherId);
         if (modal.mode === "edit") {
           fd.set("id", modal.row.id);
-          await actionUpdateSubjectAssignment(fd);
+          await unwrap(actionUpdateSubjectAssignment(fd));
         } else {
-          await actionCreateSubjectAssignment(fd);
+          await unwrap(actionCreateSubjectAssignment(fd));
         }
         setModal({ mode: "none" });
       } catch (e) {
@@ -150,7 +151,7 @@ export function AssignmentsView({
     const id = modal.row.id;
     startTransition(async () => {
       try {
-        await actionDeleteSubjectAssignment(id);
+        await unwrap(actionDeleteSubjectAssignment(id));
         setModal({ mode: "none" });
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));

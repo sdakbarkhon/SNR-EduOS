@@ -10,8 +10,23 @@ const PASSTHROUGH_MESSAGES = new Set([
 /** Converts a raw Postgres/Supabase/auth error into a short, human-readable
  *  message in the caller's locale — the customer's school admin should never
  *  see "duplicate key value violates unique constraint ..." on screen. */
+/** Текст ошибки из чего угодно. Ошибки Supabase — обычные объекты
+ *  `{ message, details, hint, code }`, а не `Error`, и прежнее
+ *  `String(err)` превращало их в «[object Object]». Имя нарушенного
+ *  ограничения лежит в `details`, поэтому берём и его. */
+function rawTextOf(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    const parts = [o.message, o.details, o.hint, o.code]
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (parts.length) return parts.join(" | ");
+  }
+  return String(err);
+}
+
 export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string {
-  const raw = err instanceof Error ? err.message : String(err);
+  const raw = rawTextOf(err);
   const status = (err as { status?: number; code?: number } | null)?.status
     ?? (err as { status?: number; code?: number } | null)?.code;
   const t = getDictionary(locale).adminErrors;

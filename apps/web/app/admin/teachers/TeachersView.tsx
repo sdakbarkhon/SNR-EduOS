@@ -9,6 +9,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { origName } from "@/lib/form-patch";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
   actionCreateTeacher,
@@ -39,7 +40,7 @@ function DeleteTeacherImpact({
   useEffect(() => {
     let alive = true;
     onLoaded(null);
-    actionTeacherDeletionImpact(teacherId)
+    unwrap(actionTeacherDeletionImpact(teacherId))
       .then((res) => { if (alive) { setImpact(res); onLoaded(res); } })
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
@@ -319,7 +320,7 @@ export function TeachersView({
                         disabled={isPending}
                         onUnassign={(assignmentId) => startTransition(async () => {
                           try {
-                            await actionSetAssignmentTeacher(assignmentId, null);
+                            await unwrap(actionSetAssignmentTeacher(assignmentId, null));
                             flash(t.teacherUpdatedMsg);
                           } catch (e) {
                             flash(humanizeAdminError(e, locale as Locale));
@@ -362,7 +363,7 @@ export function TeachersView({
               onSubmit={(fd) => {
                 guard(() => startTransition(async () => {
                   try {
-                    await actionCreateTeacher(fd);
+                    await unwrap(actionCreateTeacher(fd));
                     flash(
                       t.createdMsg
                         .replace("{username}", String(fd.get("username")))
@@ -390,7 +391,7 @@ export function TeachersView({
                 fd.append("user_id", modal.teacher.user_id ?? "");
                 startTransition(async () => {
                   try {
-                    await actionUpdateTeacher(fd);
+                    await unwrap(actionUpdateTeacher(fd));
                     flash(t.teacherUpdatedMsg);
                     setModal(null);
                   } catch (e) {
@@ -427,7 +428,7 @@ export function TeachersView({
                 onClick={() => startTransition(async () => {
                   try {
                     if (!modal.teacher.user_id) throw new Error("No user_id");
-                    const pwd = await actionResetTeacherPassword(modal.teacher.user_id);
+                    const pwd = await unwrap(actionResetTeacherPassword(modal.teacher.user_id));
                     flash(t.passwordResetMsg.replace("{name}", modal.teacher.full_name).replace("{password}", pwd));
                     setModal(null);
                   } catch (e) {
@@ -455,7 +456,7 @@ export function TeachersView({
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    await actionDeleteTeacher(modal.teacher.id, modal.teacher.user_id ?? "");
+                    await unwrap(actionDeleteTeacher(modal.teacher.id, modal.teacher.user_id ?? ""));
                     flash(t.teacherDeletedMsg);
                     setModal(null);
                   } catch (e) {

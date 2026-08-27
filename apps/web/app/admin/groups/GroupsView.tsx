@@ -12,6 +12,7 @@ import { Pencil, Trash2, Plus, X } from "lucide-react";
 import { getDictionary, getSubjectKeyByLabel, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import { formatCoursePrice, formatCoursePriceInput } from "@/lib/course-price";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
@@ -374,7 +375,7 @@ export function GroupsView({
               onClose={() => setModal(null)}
               onSubmit={(fd) => guard(() => startTransition(async () => {
                 try {
-                  await actionCreateGroup(fd);
+                  await unwrap(actionCreateGroup(fd));
                   flash(t.groupCreatedMsg.replace("{name}", String(fd.get("name"))));
                   setModal(null);
                 } catch (e) {
@@ -402,7 +403,7 @@ export function GroupsView({
                 fd.append("group_id", modal.group.id);
                 startTransition(async () => {
                   try {
-                    await actionUpdateGroup(fd);
+                    await unwrap(actionUpdateGroup(fd));
                     flash(t.groupUpdatedMsg);
                     setModal(null);
                   } catch (e) {
@@ -428,7 +429,7 @@ export function GroupsView({
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    await actionDeleteGroup(modal.group.id);
+                    await unwrap(actionDeleteGroup(modal.group.id));
                     flash(t.groupDeletedMsg);
                     setModal(null);
                   } catch (e) {

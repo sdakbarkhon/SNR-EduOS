@@ -9,6 +9,7 @@ import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { origName } from "@/lib/form-patch";
 import { gradeFromGroupName } from "@/lib/group-grade";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import {
   actionCreateStudent,
@@ -228,7 +229,7 @@ export function StudentsView({
             onSubmit={async (fd) => {
               guard(() => startTransition(async () => {
                 try {
-                  await actionCreateStudent(fd);
+                  await unwrap(actionCreateStudent(fd));
                   flash(
                     t.createdMsg
                       .replace("{username}", String(fd.get("username")))
@@ -256,7 +257,7 @@ export function StudentsView({
             onSubmit={async (fd) => {
               startTransition(async () => {
                 try {
-                  await actionUpdateStudent(fd);
+                  await unwrap(actionUpdateStudent(fd));
                   flash(t.studentUpdatedMsg);
                   setModal(null);
                 } catch (e) {
@@ -279,7 +280,7 @@ export function StudentsView({
             onConfirm={() => {
               startTransition(async () => {
                 try {
-                  const newPwd = await actionResetStudentPassword(modal.student.user_id);
+                  const newPwd = await unwrap(actionResetStudentPassword(modal.student.user_id));
                   flash(t.passwordResetMsg.replace("{name}", modal.student.full_name).replace("{password}", newPwd));
                   setModal(null);
                 } catch (e) {
@@ -302,7 +303,7 @@ export function StudentsView({
             onConfirm={() => {
               startTransition(async () => {
                 try {
-                  await actionDeleteStudent(modal.student.user_id);
+                  await unwrap(actionDeleteStudent(modal.student.user_id));
                   flash(t.deletedMsg);
                   setModal(null);
                 } catch (e) {

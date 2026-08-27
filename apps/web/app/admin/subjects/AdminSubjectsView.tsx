@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import {
   actionCreateSchoolSubject,
   actionUpdateSchoolSubject,
@@ -104,8 +105,8 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
 
     startTransition(async () => {
       try {
-        if (modal.mode === "add") await actionCreateSchoolSubject(fd);
-        else if (modal.mode === "edit") await actionUpdateSchoolSubject(fd);
+        if (modal.mode === "add") await unwrap(actionCreateSchoolSubject(fd));
+        else if (modal.mode === "edit") await unwrap(actionUpdateSchoolSubject(fd));
         setModal({ mode: "none" });
       } catch (e) {
         setFormError(humanizeAdminError(e, locale as Locale));
@@ -116,7 +117,7 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
   function toggleActive(row: CatalogRow) {
     startTransition(async () => {
       try {
-        await actionSetSchoolSubjectActive(row.id, !row.is_active);
+        await unwrap(actionSetSchoolSubjectActive(row.id, !row.is_active));
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));
       }
@@ -130,7 +131,7 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
   function removeSubject(row: CatalogRow) {
     startTransition(async () => {
       try {
-        const impact = await actionSchoolSubjectImpact(row.id);
+        const impact = await unwrap(actionSchoolSubjectImpact(row.id));
         if (impact.blocked) {
           alert(d.catalogSubjectInUseHint
             .replace("{assignments}", String(impact.assignments))
@@ -140,7 +141,7 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
           return;
         }
         if (!confirm(`${d.catalogSubjectDeleteTitle}: «${row.name}». ${d.catalogSubjectDeleteClean}`)) return;
-        await actionDeleteSchoolSubject(row.id);
+        await unwrap(actionDeleteSchoolSubject(row.id));
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));
       }

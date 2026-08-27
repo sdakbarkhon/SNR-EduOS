@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import { origName } from "@/lib/form-patch";
 import { AdminPhoneInput, digitsFromStored, storedFromDigits } from "@/components/admin/PhoneInput";
 import { actionParentPendingCode, actionDeleteParent, actionUpdateParent, actionResetParentPassword } from "./actions";
@@ -115,7 +116,7 @@ function EditParentModal({
         // приёма и его причина: lib/form-patch.ts.
         fd.set(origName("google_email"), parent.googleEmail ?? "");
         selectedIds.forEach((id) => fd.append("student_ids", id));
-        await actionUpdateParent(fd);
+        await unwrap(actionUpdateParent(fd));
         onSaved();
       } catch (err) {
         onError(humanizeAdminError(err, locale));
@@ -309,7 +310,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                           <button
                             onClick={() => startTransition(async () => {
                               try {
-                                const code = await actionParentPendingCode(p.id);
+                                const code = await unwrap(actionParentPendingCode(p.id));
                                 flash(code ? `${t.codeLabel}: ${code.code}` : t.codeNone);
                               } catch (err) {
                                 flash(humanizeAdminError(err, locale as Locale));
@@ -395,7 +396,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                   if (!userId) { flash(t.resetPasswordNotRegistered); setModal({ kind: "none" }); return; }
                   startTransition(async () => {
                     try {
-                      const newPassword = await actionResetParentPassword(userId);
+                      const newPassword = await unwrap(actionResetParentPassword(userId));
                       flash(t.newPasswordFlash.replace("{name}", modal.parent.full_name).replace("{password}", newPassword));
                       setModal({ kind: "none" });
                     } catch (err) {
@@ -427,7 +428,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    await actionDeleteParent(modal.parent.id);
+                    await unwrap(actionDeleteParent(modal.parent.id));
                     flash(t.deleteBtn + " ✓");
                     setModal({ kind: "none" });
                   } catch (err) {

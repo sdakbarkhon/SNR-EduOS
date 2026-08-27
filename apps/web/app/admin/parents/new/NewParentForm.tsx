@@ -8,6 +8,7 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import { AdminPhoneInput, storedFromDigits } from "@/components/admin/PhoneInput";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
 import { actionCreateParent } from "../actions";
@@ -58,7 +59,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
         fd.set("phone", storedFromDigits(phoneDigits));
         fd.set("google_email", googleEmail.trim());
         selectedIds.forEach((id) => fd.append("student_ids", id));
-        const res = await actionCreateParent(fd);
+        const res = await unwrap(actionCreateParent(fd));
         setResult({ phone: storedFromDigits(phoneDigits) });
       } catch (err) {
         setError(humanizeAdminError(err, locale as Locale));
