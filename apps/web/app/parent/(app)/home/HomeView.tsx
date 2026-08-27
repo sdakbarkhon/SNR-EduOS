@@ -100,7 +100,6 @@ export interface HomeViewData {
     lessonsTotal: string;
     attended: string;
     homework: string;
-    walletLabel: string;
   };
   nextLesson: {
     subjectName: string;
@@ -188,7 +187,6 @@ const T = {
   lessons: "Уроков", // home.lessons
   attended: "Посещено", // home.attended
   hw: "ДЗ", // home.hw
-  wallet: "Кошелёк", // home.wallet
   pay: "Оплатить", // home.pay
   hwShort: "Дом. задания", // home.hwShort
   services: "Все сервисы", // scr.services
@@ -710,13 +708,18 @@ export function HomeView({ data }: { data: HomeViewData }) {
     router.prefetch(R.profile);
   }, [router]);
 
-  // 5 колонок метрики-сплит (макет 230–240).
+  // Четыре колонки метрики-сплит (в макете было пять).
+  //
+  // 27.08.2026: пятая, «Кошелёк», убрана. Там стояла выдуманная сумма денег —
+  // 185 000 из заготовки питания, — и это первое, что человек видит после
+  // входа. Пометить её здесь негде: строка метрик не держит подписей. Та же
+  // причина, по которой из раздела оплаты убрали поддельные чеки. Появится
+  // школьный кошелёк таблицей — вернём плитку.
   const metricCells: MetricCell[] = [
     { label: T.atSchoolSince, value: data.metrics.atSchoolSince ? dt.time(data.metrics.atSchoolSince) : "—" },
     { label: T.lessons, value: data.metrics.lessonsTotal },
     { label: T.attended, value: data.metrics.attended, valueColor: status.green.text },
     { label: T.hw, value: data.metrics.homework, valueColor: status.orange.text },
-    { label: T.wallet, value: data.metrics.walletLabel, flex: 1.4 },
   ];
 
   // Быстрые действия (макет 256–263). Иконки из ICONS + inline paths.

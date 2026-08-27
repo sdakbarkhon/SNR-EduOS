@@ -17,7 +17,6 @@ import {
 import { findNextLesson, tashkentHour, subjectDisplay } from "@snr/core";
 
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
-import { getSelectedChildContext } from "../v2/data";
 import { billsCountLabel } from "../_demo/demo-data";
 import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
 
@@ -37,9 +36,10 @@ import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
  * /parent/payments: две плитки в одном тапе друг от друга обязаны показывать
  * под одним ярлыком одно число. Долгов нет — так и написано, а не «0 сум».
  *
- * Что остаётся моком: «Кошелёк» и «Питание» — школьного кошелька и сервиса
- * питания в проекте нет вовсе, ни таблицей, ни core-запросом. Питание помечено
- * константой MOCK_* ниже, чтобы его было видно грепом.
+ * Что остаётся моком: «Питание» — сервиса питания в проекте нет вовсе, ни
+ * таблицей, ни core-запросом; помечено константой MOCK_* ниже, чтобы его было
+ * видно грепом. Плитка «Кошелёк» с выдуманными 185 000 убрана 27.08.2026: это
+ * первое, что видит человек после входа, и пометить её в строке метрик негде.
  *
  * Все производные строки (время, даты, инициалы) считаются ЗДЕСЬ, на сервере:
  * клиентский `new Date()` дал бы другой результат (часовой пояс браузера +
@@ -48,19 +48,6 @@ import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
 
 /* ─── Мок-значения: бэкенда нет ───────────────────────────────────────────── */
 
-/**
- * Баланс кошелька — из той же фикстуры, что и экраны /parent/payments и
- * /parent/payments/top-up, а не своей константой.
- *
- * Раньше здесь лежало `185 000`, тогда как оба экрана оплат показывали баланс
- * из `getSelectedChildContext().wallet_balance`. Это ровно тот же дефект, что
- * был у «К оплате» ниже: два экрана в одном тапе друг от друга под одной
- * подписью показывали разные числа. Платёжного бэкенда по-прежнему нет (см.
- * заголовок файла) — но фикстура должна быть ОДНА.
- */
-function walletBalance(): number {
-  return getSelectedChildContext().wallet_balance;
-}
 /**
  * «К оплате» — настоящий долг ребёнка: сумма его ОТКРЫТЫХ счетов.
  *
@@ -192,7 +179,7 @@ export default async function ParentHomePage() {
           : "Профиль ученика ещё не привязан к вашему аккаунту",
       },
       statusChip: null,
-      metrics: { atSchoolSince: null, lessonsTotal: "0", attended: "0/0", homework: "0", walletLabel: "—" },
+      metrics: { atSchoolSince: null, lessonsTotal: "0", attended: "0/0", homework: "0" },
       nextLesson: null,
       due: { amountLabel: "—", subtitle: "" },
       meals: { statusLabel: "—", untilLabel: "" },
@@ -420,7 +407,6 @@ export default async function ParentHomePage() {
       lessonsTotal: String(dayStatus.totalLessons),
       attended: `${dayStatus.attendedCount}/${dayStatus.totalLessons}`,
       homework: String(pendingHomework.length),
-      walletLabel: `${formatMoney(walletBalance())} сум`,
     },
     nextLesson,
     // Ноль здесь значит «ничего не должны», а не «данных нет»: фразу для
