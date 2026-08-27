@@ -25,11 +25,17 @@ import { ink1, ink2, ink3, radius, shCard } from "../../v2/tokens";
 
 const BALANCE_CARD: readonly [string, string] = ["#7C3AED", "#A855F7"];
 
-/** Четыре быстрых действия под балансом — те же, что в мобильном экране. */
+/**
+ * Быстрые действия под балансом.
+ *
+ * 27.08.2026: было четыре, стало два. «Перевод между детьми» снят заказчиком —
+ * по утверждённой модели деньги между балансами детей не ходят вовсе.
+ * «Лимиты» противоречат модели: баланс минус счёт за обучение, ограничивать
+ * нечего. Оба экрана удалены целиком, а не спрятаны за условием: спрятанный
+ * мёртвый код через полгода принимают за рабочий.
+ */
 const ACTIONS = [
   { key: "topUp", href: "/parent/payments/top-up", paths: ICON.wallet },
-  { key: "transfer", href: "/parent/payments/transfer", paths: ICON.send },
-  { key: "limits", href: "/parent/payments/limits", paths: ICON.shield },
   { key: "ops", href: "/parent/payments/wallet/ops", paths: ICON.doc },
 ] as const;
 
@@ -53,8 +59,6 @@ export function WalletView({
 
   const actionLabel: Record<string, string> = {
     topUp: m.walletTopUp,
-    transfer: m.walletTransfer,
-    limits: m.walletLimits,
     ops: m.walletOps,
   };
 

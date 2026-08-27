@@ -67,8 +67,6 @@ import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
 import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
 import TopUpScreen from "../screens/payments/TopUpScreen";
 import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
-import TransferScreen from "../screens/payments/TransferScreen";
-import LimitsScreen from "../screens/payments/LimitsScreen";
 import MealsScreen from "../screens/study/MealsScreen";
 import TransportScreen from "../screens/study/TransportScreen";
 import MedicalCardScreen from "../screens/study/MedicalCardScreen";
@@ -117,8 +115,6 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   d33: demoOr(PayMethodsScreen, "payMethods", "card", ["#a78bfa", "#7c3aed"]),
   dtop: demoOr(TopUpScreen, "topup", "plus", ["#34d399", "#059669"]),
   dwops: demoOr(WalletOpsScreen, "walletOps", "clock", ["#fbbf24", "#f97316"]),
-  dtransfer: demoOr(TransferScreen, "transfer", "card", ["#60a5fa", "#2563eb"]),
-  dlimits: demoOr(LimitsScreen, "limits", "grid", ["#a78bfa", "#7c3aed"]),
 };
 
 /**

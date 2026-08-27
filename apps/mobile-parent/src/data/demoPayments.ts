@@ -14,16 +14,18 @@
  *   PAYMENT_HISTORY               → таблица проведённых платежей (payments);
  *   RECEIPTS                      → фискальные документы провайдера, файлы
  *                                   чеков вместо кнопки «скачать»;
- *   MAIN_CARD / OTHER_CARDS /     → токены карт у платёжного шлюза
- *   OTHER_METHODS                   (Payme Merchant, Uzcard PSP). Реквизиты
+ *   MAIN_CARD / OTHER_METHODS     → токены карт у платёжного шлюза
+ *                                   (Payme Merchant, Uzcard PSP). Реквизиты
  *                                   карт в приложении не хранятся и не
  *                                   вводятся — их принимает страница шлюза;
  *   WALLET_BALANCE, WALLET_OPS    → таблица операций кошелька и терминал в
  *                                   столовой;
- *   WALLET_LIMITS                 → таблица лимитов на ребёнка (сейчас их
- *                                   негде хранить);
- *   TOPUP_PRESETS,                → останутся настройкой интерфейса: это не
- *   TRANSFER_PRESETS                данные, а быстрые кнопки сумм.
+ *   TOPUP_PRESETS                 → останется настройкой интерфейса: это не
+ *                                   данные, а быстрые кнопки сумм.
+ *
+ * 27.08.2026 сняты заготовки снесённых экранов «Перевод» и «Лимиты»
+ * (WALLET_LIMITS, walletLimitsFor, TRANSFER_PRESETS) и список сохранённых карт
+ * (SavedCard, OTHER_CARDS): экранов больше нет, карт проект не хранит.
  *
  * ДО ТЕХ ПОР НИ ОДНА КНОПКА ЭТИХ ЭКРАНОВ НИЧЕГО НЕ СОХРАНЯЕТ. Действие
  * показывает пояснение (`SoonNote`), а не делает вид, что сработало.
@@ -188,16 +190,6 @@ export const RECEIPTS: ReceiptRow[] = [
 
 /* ── Карты и способы оплаты ───────────────────────────────────────────────── */
 
-export interface SavedCard {
-  id: string;
-  brand: string;
-  gradient: Gradient;
-  /** Маскированный номер — единственное, что приложение видит о карте. */
-  masked: string;
-  /** «ММ/ГГ» строкой: это не дата события, а надпись на карте. */
-  validThru: string;
-}
-
 /**
  * Основная карта — та же, что названа картой автоплатежа в
  * `PAYMENTS_OVERVIEW.autopay_note`: иначе у родителя было бы две разные
@@ -209,11 +201,6 @@ export const MAIN_CARD = {
   validThru: "09/28",
 } as const;
 
-export const OTHER_CARDS: SavedCard[] = [
-  { id: "humo", brand: "HUMO", gradient: ["#22d3ee", "#0891b2"], masked: "···· 5519", validThru: "04/27" },
-  { id: "visa", brand: "VISA", gradient: ["#334155", "#0f172a"], masked: "···· 4242", validThru: "11/26" },
-];
-
 export interface PayMethodItem {
   id: string;
   tag: string;
@@ -224,8 +211,8 @@ export interface PayMethodItem {
 }
 
 export const OTHER_METHODS: PayMethodItem[] = [
-  { id: "payme", tag: "PAYME", gradient: ["#2dd4bf", "#0d9488"], title: "Payme", linked: true },
-  { id: "click", tag: "CLICK", gradient: ["#38bdf8", "#0284c7"], title: "Click", linked: true },
+  { id: "payme", tag: "PAYME", gradient: ["#2dd4bf", "#0d9488"], title: "Payme", linked: false },
+  { id: "click", tag: "CLICK", gradient: ["#38bdf8", "#0284c7"], title: "Click", linked: false },
   { id: "uzum", tag: "UZUM", gradient: ["#a78bfa", "#7c3aed"], title: "Uzum Bank", linked: false },
 ];
 
@@ -314,45 +301,10 @@ export function walletTotals(days: WalletOpDay[] = WALLET_OPS): {
   return { spent, topped, opsCount };
 }
 
-/* ── Лимиты ───────────────────────────────────────────────────────────────── */
-
-export interface WalletCategoryLimit {
-  id: string;
-  /** Ключ подписи в словаре — сама подпись переводится. */
-  nameKey: "cafeteria" | "shop" | "stationery";
-  limit: number;
-  enabled: boolean;
-}
-
-export interface WalletLimits {
-  dailyLimit: number;
-  spentToday: number;
-  /** Пресеты дневного лимита; 0 — «без лимита». */
-  presets: number[];
-  categories: WalletCategoryLimit[];
-  notifyEveryOp: boolean;
-  notifyOnLimit: boolean;
-}
-
-export const WALLET_LIMITS: WalletLimits = {
-  dailyLimit: 50000,
-  spentToday: 32000,
-  presets: [20000, 30000, 50000, 0],
-  categories: [
-    { id: "caf", nameKey: "cafeteria", limit: 20000, enabled: true },
-    { id: "shop", nameKey: "shop", limit: 15000, enabled: true },
-    { id: "stat", nameKey: "stationery", limit: 10000, enabled: true },
-  ],
-  notifyEveryOp: true,
-  notifyOnLimit: false,
-};
-
 /* ── Быстрые суммы ────────────────────────────────────────────────────────── */
 
 export const TOPUP_PRESETS: readonly number[] = [50000, 100000, 200000, 500000];
 
-/** «Всё» — весь баланс, поэтому null: конкретная сумма считается на месте. */
-export const TRANSFER_PRESETS: readonly (number | null)[] = [10000, 25000, 50000, null];
 
 /* ══════════════════════════════════════════════════════════════════════════
  * ПЕРЕХОДНИКИ ПОД СУЩЕСТВУЮЩУЮ ВЁРСТКУ
@@ -366,7 +318,7 @@ export const TRANSFER_PRESETS: readonly (number | null)[] = [10000, 25000, 50000
  * ══════════════════════════════════════════════════════════════════════════ */
 
 import { formatDate, formatDateTime } from "@snr/core";
-import type { PaymentHistoryRow, ReceiptRow as LegacyReceiptRow, WalletLimits as LegacyWalletLimits, WalletOpsDayGroup } from "./types";
+import type { PaymentHistoryRow, ReceiptRow as LegacyReceiptRow, WalletOpsDayGroup } from "./types";
 
 /** «3 июля» на языке интерфейса. */
 function dayMonthLabel(iso: string, localeTag: string): string {
@@ -463,27 +415,6 @@ export function foodPurchases(locale: Locale): {
     }
   }
   return trDeep(out, locale);
-}
-
-/** Лимиты в форме экрана; названия категорий — из словаря. */
-export function walletLimitsFor(names: {
-  cafeteria: string;
-  shop: string;
-  stationery: string;
-}): LegacyWalletLimits {
-  return {
-    daily_limit: WALLET_LIMITS.dailyLimit,
-    spent_today: WALLET_LIMITS.spentToday,
-    presets: WALLET_LIMITS.presets,
-    categories: WALLET_LIMITS.categories.map((c) => ({
-      id: c.id as "caf" | "shop" | "stat",
-      name: names[c.nameKey],
-      limit: c.limit,
-      enabled: c.enabled,
-    })),
-    notify_ops: WALLET_LIMITS.notifyEveryOp,
-    notify_limit: WALLET_LIMITS.notifyOnLimit,
-  };
 }
 
 /** Дата+время документа — для мест, где нужна полная отметка. */

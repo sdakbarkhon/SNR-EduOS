@@ -12,8 +12,8 @@
  *   (goTopup). Нижний ряд: столбик «БАЛАНС» (9/800 caps) + число
  *   (Unbounded 25/600) и outline-wallet-icon 40×40.
  *  1046–1051 Quick Actions Grid — 4 колонки, каждая ячейка — круглая
- *   иконка 46×46 с градиентом и подпись 9/700. goTopup/goTransfer/
- *   goHistory/goLimits.
+ *   иконка 46×46 с градиентом и подпись 9/700. goTopup/goHistory.
+ *   27.08.2026: «Перевести» и «Лимиты» убраны — см. комментарий у действий.
  *  1052 Section Header «Последние операции» + link «Смотреть все ›»
  *   (goWalletOps). Никаких фильтров/чипов/поиска — их в макете нет.
  *  1053–1058 Operations List — glass-карточка r20, padding 5/14; 4 строки
@@ -342,9 +342,7 @@ export default function ChildWalletScreen() {
   // пополнить, перевести, лимиты, все операции.
 
   const goTopup = go("dtop");
-  const goTransfer = go("dtransfer");
   const goHistory = go("d20");
-  const goLimits = go("dlimits");
   const goWalletOps = go("dwops");
   const goBack = () => navigation.goBack();
 
@@ -530,7 +528,13 @@ export default function ChildWalletScreen() {
           </LinearGradient>
         </View>
 
-        {/* BLOCK 3 — Quick Actions Grid (4 колонки). */}
+        {/* BLOCK 3 — Quick Actions Grid.
+            27.08.2026: было четыре действия, стало два. «Перевести» снят
+            заказчиком: по утверждённой модели оплаты деньги между балансами
+            детей не ходят вовсе. «Лимиты» противоречат модели — баланс минус
+            счёт за обучение, ограничивать нечего. Оба экрана удалены целиком,
+            а не спрятаны: спрятанный мёртвый код через полгода принимают за
+            рабочий. */}
         <View style={{ flexDirection: "row", gap: 8 }}>
           <QuickCircle
             label={d.parentApp.pay.topupBtn}
@@ -542,42 +546,11 @@ export default function ChildWalletScreen() {
             labelColor={tokens.ink1}
           />
           <QuickCircle
-            label={d.parentApp.pay.transferBtn}
-            gradient={["#60a5fa", "#2563eb"]}
-            shadowRgb="37,99,235"
-            iconPaths={[
-              "m17 2 4 4-4 4",
-              "M3 11v-1a4 4 0 0 1 4-4h14",
-              "m7 22-4-4 4-4",
-              "M21 13v1a4 4 0 0 1-4 4H3",
-            ]}
-            onPress={goTransfer}
-            labelColor={tokens.ink1}
-          />
-          <QuickCircle
             label={d.parentApp.scr.payHistory.split(" ")[0]}
             gradient={["#fbbf24", "#f97316"]}
             shadowRgb="249,115,22"
             iconPaths={["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"]}
             onPress={goHistory}
-            labelColor={tokens.ink1}
-          />
-          <QuickCircle
-            label={d.parentApp.scr.limits.split(" ")[0]}
-            gradient={["#a78bfa", "#7c3aed"]}
-            shadowRgb="124,58,237"
-            iconPaths={[
-              "M21 4h-7",
-              "M10 4H3",
-              "M21 12h-9",
-              "M8 12H3",
-              "M21 20h-5",
-              "M12 20H3",
-              "M14 2v4",
-              "M8 10v4",
-              "M16 18v4",
-            ]}
-            onPress={goLimits}
             labelColor={tokens.ink1}
           />
         </View>

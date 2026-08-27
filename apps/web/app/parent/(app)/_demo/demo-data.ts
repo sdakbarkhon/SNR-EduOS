@@ -59,6 +59,10 @@
  *     картой автоплатежа («1-го числа · Uzcard ····8341»), поэтому в «Способах
  *     оплаты» она же основная (в макете там стояла ···· 4242 — это дало бы
  *     родителю две разные «главные» карты).
+ *
+ * 27.08.2026: снесены заготовки экранов «Перевод» и «Лимиты» (WALLET_LIMITS,
+ * TRANSFER_PRESETS) и сохранённых карт (SavedCard, MAIN_CARD, OTHER_CARDS) —
+ * сами экраны удалены, карт в проекте не хранится, потребителей не осталось.
  */
 
 /* ── Деньги ─────────────────────────────────────────────────────────────── */
@@ -502,61 +506,31 @@ export function unpaidGroupNote(rows: readonly ReceiptRow[]): string | null {
 
 /* ── Способы оплаты ─────────────────────────────────────────────────────── */
 
-export interface SavedCard {
-  id: string;
-  brand: string;
-  masked: string;
-  validThru: string;
-  gradient: readonly [string, string];
-}
-
-/** Основная карта — та же, что списывает автоплатёж на /parent/payments. */
-export const MAIN_CARD = {
-  brand: "UZCARD",
-  masked: "•••• 8341",
-  validThru: "06/27",
-  note: "Автоплатёж 1-го числа",
-} as const;
-
-export const OTHER_CARDS: SavedCard[] = [
-  { id: "humo", brand: "HUMO", masked: "•••• 8812", validThru: "09/26", gradient: ["#f59e0b", "#ef4444"] },
-  { id: "visa", brand: "VISA", masked: "•••• 1034", validThru: "03/28", gradient: ["#0ea5e9", "#1d4ed8"] },
-];
+// 27.08.2026: MAIN_CARD и OTHER_CARDS снесены. Ни одной карты в проекте не
+// хранится, провайдера нет, а экран показывал «UZCARD •••• 8341, автоплатёж
+// 1-го числа» и два сохранённых пластика со сроками действия — то есть
+// выглядел подключённым. Заказчик показывает приложение клиентам, и всё, что
+// выглядит рабочим, он нажимает.
 
 export interface PayMethodItem {
   id: string;
   tag: string;
   title: string;
-  subtitle: string;
+  /** 27.08.2026: подписи в заготовке больше нет — её даёт словарь на языке
+   *  интерфейса. Раньше здесь лежало русское «Привязан аккаунт», которое
+   *  узбек и англичанин видели по-русски и вдобавок неправдой. */
   linked: boolean;
   gradient: readonly [string, string];
 }
 
+// 27.08.2026: три способа из утверждённой модели, все НЕ привязаны. Было:
+// Click и Payme значились «Привязан аккаунт» зелёным, хотя платить ими нечем;
+// Apple Pay в модели нет вовсе, зато не было Uzum. Поле linked оставлено —
+// оно ещё понадобится, когда провайдер подключится по-настоящему.
 export const OTHER_METHODS: PayMethodItem[] = [
-  {
-    id: "click",
-    tag: "CLICK",
-    title: "Click",
-    subtitle: "Привязан аккаунт",
-    linked: true,
-    gradient: ["#38bdf8", "#0284c7"],
-  },
-  {
-    id: "payme",
-    tag: "PAYME",
-    title: "Payme",
-    subtitle: "Привязан аккаунт",
-    linked: true,
-    gradient: ["#2dd4bf", "#0d9488"],
-  },
-  {
-    id: "apple",
-    tag: "PAY",
-    title: "Apple Pay",
-    subtitle: "Не подключено",
-    linked: false,
-    gradient: ["#334155", "#0f172a"],
-  },
+  { id: "payme", tag: "PAYME", title: "Payme", linked: false, gradient: ["#2dd4bf", "#0d9488"] },
+  { id: "click", tag: "CLICK", title: "Click", linked: false, gradient: ["#38bdf8", "#0284c7"] },
+  { id: "uzum",  tag: "UZUM",  title: "Uzum",  linked: false, gradient: ["#a78bfa", "#7c3aed"] },
 ];
 
 /* ── Единый текст «пока не работает» ────────────────────────────────────── */
@@ -569,7 +543,6 @@ export const SOON_PAYMENTS =
   "Онлайн-оплата пока не подключена: школа принимает платежи напрямую. Раздел заработает сразу после подключения платёжного провайдера.";
 export const SOON_FILE =
   "Скачивание документов появится вместе с онлайн-оплатой — файлы чеков и счетов формирует платёжный провайдер.";
-
 
 /* ══════════════════════════════════════════════════════════════════════════
  * КОШЕЛЁК РЕБЁНКА, ЛИМИТЫ, ПЕРЕВОД, ОПЕРАЦИИ  (12.08.2026)
@@ -662,39 +635,6 @@ export function walletTotals(): { spent: number; topped: number; opsCount: numbe
   }
   return { spent, topped, opsCount };
 }
-
-export interface WalletCategoryLimit {
-  id: string;
-  name: string;
-  limit: number;
-  enabled: boolean;
-}
-
-export interface WalletLimits {
-  dailyLimit: number;
-  spentToday: number;
-  /** Пресет 0 означает «без лимита». */
-  presets: readonly number[];
-  categories: WalletCategoryLimit[];
-  notifyEveryOp: boolean;
-  notifyOnLimit: boolean;
-}
-
-export const WALLET_LIMITS: WalletLimits = {
-  dailyLimit: 50000,
-  spentToday: 25000,
-  presets: [20000, 30000, 50000, 0],
-  categories: [
-    { id: "caf", name: "Столовая", limit: 20000, enabled: true },
-    { id: "shop", name: "Школьный магазин", limit: 15000, enabled: true },
-    { id: "stat", name: "Канцелярия", limit: 10000, enabled: false },
-  ],
-  notifyEveryOp: true,
-  notifyOnLimit: false,
-};
-
-/** Пресеты перевода; null — «весь остаток». */
-export const TRANSFER_PRESETS: readonly (number | null)[] = [10000, 25000, 50000, null];
 
 /* ══════════════════════════════════════════════════════════════════════════
  * ПОДДЕРЖКА  (12.08.2026)
