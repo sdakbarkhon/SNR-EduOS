@@ -164,6 +164,19 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
     return t.lastSchoolAdmin;
   }
 
+  // Заход 3 по платежам — разбор суммы ручного пополнения баланса.
+  if (raw === "BAD_TOPUP_AMOUNT" || raw === "BAD_PRICE_TOPUP") {
+    return t.topUpAmountInvalid;
+  }
+  if (raw === "TOPUP_REASON_REQUIRED") {
+    return t.topUpReasonRequired;
+  }
+  // Последний рубеж баланса — проверка из 227. Сюда отказ доходит, если
+  // списание пошло мимо расчёта; человеку важно, что денег не хватило.
+  if (/students_balance_not_negative/i.test(raw)) {
+    return t.topUpAmountInvalid;
+  }
+
   // Миграция 222 — суперадмин не пишет в школьные таблицы под своим токеном.
   // Ограничительное правило отвергает вставку с кодом 42501; на изменении и
   // удалении оно не бросается вовсе, а просто не находит строк, и туда эта

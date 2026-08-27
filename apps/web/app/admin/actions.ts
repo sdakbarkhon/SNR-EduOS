@@ -7,7 +7,7 @@ import {
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
   createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
   deleteSchoolSubject, getSchoolSubjectImpact, getSubjectAssignmentImpact,
-  getTeacherDeletionImpact, setAssignmentTeacher,
+  getTeacherDeletionImpact, setAssignmentTeacher, topUpStudentBalance,
 } from "@/lib/admin-api";
 import type {
   SchoolSubjectDeletionImpact, SubjectDeletionImpact, TeacherDeletionImpact,
@@ -81,6 +81,27 @@ export async function actionResetStudentPassword(userId: string) {
     const newPassword = await resetStudentPassword(userId, schoolId, isSuperAdmin);
     revalidatePath("/admin/students");
     return newPassword;
+  });
+}
+
+/**
+ * Пополнение баланса ученика рукой админа. Заход 3 по платежам: это
+ * единственный способ наполнить баланс, пока кассы нет, и им же проверяется
+ * вся цепочка «цена → счёт → погашение».
+ *
+ * Сумма разбирается тем же кодом, что цена группы (lib/course-price.ts):
+ * человек пишет деньги с пробелами, и правило чтения должно быть одно.
+ */
+export async function actionTopUpStudentBalance(formData: FormData) {
+  return guard(async () => {
+    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const studentId = String(formData.get("student_id") ?? "");
+    const amount = parseCoursePrice(String(formData.get("amount") ?? ""));
+    const note = String(formData.get("note") ?? "");
+    await topUpStudentBalance({
+      studentId, amount, note, callerSchoolId: schoolId, callerIsSuperAdmin: isSuperAdmin,
+    });
+    revalidatePath("/admin/students");
   });
 }
 

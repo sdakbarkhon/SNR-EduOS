@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw } from "lucide-react";
+import { Pencil, KeyRound, Trash2, Plus, X, RefreshCw, Wallet } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { origName } from "@/lib/form-patch";
 import { gradeFromGroupName } from "@/lib/group-grade";
+import { formatCoursePriceInput, formatSum } from "@/lib/course-price";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
@@ -15,6 +16,7 @@ import {
   actionCreateStudent,
   actionUpdateStudent,
   actionResetStudentPassword,
+  actionTopUpStudentBalance,
   actionDeleteStudent,
 } from "../actions";
 
@@ -44,6 +46,9 @@ type Student = {
    * правда меняли (lib/form-patch.ts).
    */
   google_email?: string | null;
+  /** Баланс ученика. Из базы приходит строкой: numeric(…, 2) в JSON —
+   *  строка, а не число, иначе длинные суммы теряли бы точность. */
+  balance: string | number;
   created_at: string;
   student_groups: Array<{ group_id: string; groups: { id: string; name: string; subject: string } | null }>;
 };
@@ -52,6 +57,7 @@ type Modal =
   | { kind: "add" }
   | { kind: "edit"; student: Student }
   | { kind: "reset"; student: Student }
+  | { kind: "topup"; student: Student }
   | { kind: "delete"; student: Student };
 
 function generatePassword(len = 8) {
@@ -156,6 +162,7 @@ export function StudentsView({
                 <th className="px-4 py-3">{t.tableUsername}</th>
                 <th className="px-4 py-3">{t.tableGroup}</th>
                 <th className="px-4 py-3">{t.tableGrade}</th>
+                <th className="px-4 py-3">{t.tableBalance}</th>
                 <th className="px-4 py-3">{t.tableCreated}</th>
                 <th className="px-4 py-3 text-right">{t.tableActions}</th>
               </tr>
@@ -163,7 +170,7 @@ export function StudentsView({
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                     {emptyText}
                   </td>
                 </tr>
@@ -181,6 +188,11 @@ export function StudentsView({
                       <td className="px-4 py-3 text-gray-500">@{s.username}</td>
                       <td className="px-4 py-3 text-gray-500">{groupName}</td>
                       <td className="px-4 py-3 text-gray-500">{grade ?? t.gradeFromGroupUnknown}</td>
+                      {/* Ноль здесь значит ровно ноль денег, а не «не задано»
+                          (в отличие от цены класса), поэтому пишем числом. */}
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                        {formatSum(Number(s.balance ?? 0))} {t.sumUnit}
+                      </td>
                       <td className="px-4 py-3 text-gray-400">
                         {new Date(s.created_at).toLocaleDateString("ru-RU")}
                       </td>
@@ -199,6 +211,13 @@ export function StudentsView({
                             title={t.resetPasswordBtn}
                           >
                             <KeyRound className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setModal({ kind: "topup", student: s })}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600"
+                            title={t.topUpBalanceBtn}
+                          >
+                            <Wallet className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setModal({ kind: "delete", student: s })}
@@ -292,6 +311,36 @@ export function StudentsView({
         </Backdrop>
       )}
 
+      {/* TOP-UP MODAL — заход 3 по платежам. */}
+      {modal?.kind === "topup" && (
+        <Backdrop onClose={() => setModal(null)}>
+          <ModalCard
+            title={t.topUpBalanceTitle.replace("{name}", modal.student.full_name)}
+            onClose={() => setModal(null)}
+          >
+            <TopUpForm
+              student={modal.student}
+              t={t}
+              isPending={isPending}
+              onClose={() => setModal(null)}
+              onSubmit={(fd) => startTransition(async () => {
+                try {
+                  await unwrap(actionTopUpStudentBalance(fd));
+                  flash(
+                    t.balanceToppedUpMsg
+                      .replace("{name}", modal.student.full_name)
+                      .replace("{amount}", `${String(fd.get("amount"))} ${t.sumUnit}`),
+                  );
+                  setModal(null);
+                } catch (e) {
+                  flash(humanizeAdminError(e, locale as Locale));
+                }
+              })}
+            />
+          </ModalCard>
+        </Backdrop>
+      )}
+
       {/* DELETE MODAL */}
       {modal?.kind === "delete" && (
         <Backdrop onClose={() => setModal(null)}>
@@ -321,6 +370,66 @@ export function StudentsView({
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 type AdminDict = ReturnType<typeof getDictionary>["admin"];
+
+/**
+ * Пополнение баланса рукой админа. Заход 3 по платежам: пока кассы нет, это
+ * единственный способ положить деньги на баланс, и им же проверяется вся
+ * цепочка «цена класса → счёт → погашение».
+ *
+ * Сумма набирается тем же полем, что цена группы: всё, кроме цифр, в него не
+ * попадает, а «500 000» с пробелами читается верно. Правило чтения одно —
+ * lib/course-price.ts, и сервер разбирает строку тем же кодом.
+ *
+ * Причина обязательна. Движение по балансу отменить нельзя — журнал только
+ * пополняется (миграция 227), — и через месяц «откуда эти деньги» будет
+ * некому объяснить, если причину не записать сейчас.
+ */
+function TopUpForm({
+  student,
+  t,
+  isPending,
+  onClose,
+  onSubmit,
+}: {
+  student: Student;
+  t: ReturnType<typeof getDictionary>["admin"];
+  isPending: boolean;
+  onClose: () => void;
+  onSubmit: (fd: FormData) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); onSubmit(new FormData(e.currentTarget)); }}
+      className="space-y-4"
+    >
+      <input type="hidden" name="student_id" value={student.id} />
+      <Field label={t.fieldTopUpAmount}>
+        <Input
+          name="amount"
+          value={amount}
+          onChange={(e) => setAmount(formatCoursePriceInput(e.target.value))}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="500 000"
+          required
+        />
+        <p className="text-xs text-gray-400">{t.topUpHint}</p>
+      </Field>
+      <Field label={t.fieldTopUpReason}>
+        <Input name="note" required placeholder={t.topUpReasonPlaceholder} />
+      </Field>
+      <div className="flex gap-3 pt-2">
+        <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
+          {t.cancelBtn}
+        </button>
+        <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
+          {isPending ? "…" : t.topUpBtn}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function ModalCard({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (

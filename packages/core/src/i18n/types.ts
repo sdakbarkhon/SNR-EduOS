@@ -661,6 +661,15 @@ export interface Dictionary {
     coursePriceHint: string;
     tableCoursePrice: string;
     coursePriceNotSet: string;
+    tableBalance: string;
+    topUpBalanceBtn: string;
+    topUpBalanceTitle: string;
+    fieldTopUpAmount: string;
+    fieldTopUpReason: string;
+    topUpReasonPlaceholder: string;
+    topUpHint: string;
+    topUpBtn: string;
+    balanceToppedUpMsg: string;
     sumUnit: string;
     fieldDescription: string;
     tableStudentCount: string;
@@ -1141,6 +1150,8 @@ export interface Dictionary {
     superadminWriteBlocked: string;
     rlsWriteBlocked: string;
     lastSchoolAdmin: string;
+    topUpAmountInvalid: string;
+    topUpReasonRequired: string;
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"

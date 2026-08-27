@@ -1244,6 +1244,52 @@ export async function updateSchoolAdmin(
 }
 
 /** Hard delete — cascades to the `admins` row via ON DELETE CASCADE (migration 42). */
+/**
+ * Пополнение баланса ученика рукой администратора. Заход 3 по платежам.
+ *
+ * ПОЧЕМУ ВИД ДВИЖЕНИЯ — `adjustment`, А НЕ `topup`. Ограничение
+ * `balance_entries_topup_shape` из миграции 227 требует у `topup` ссылку на
+ * транзакцию провайдера: `topup` означает «деньги пришли из кассы». У
+ * пополнения рукой такой транзакции нет и быть не может. Вид `adjustment`
+ * заведён ровно для движений, у которых источник — решение человека, а не
+ * платёж; причина обязана быть записана в `note`, иначе через месяц никто не
+ * вспомнит, откуда на балансе сумма.
+ *
+ * Баланс в `students` меняет не этот код, а триггер `trg_apply_balance_entry`
+ * из 227: здесь пишется только строка журнала. Так баланс и журнал не могут
+ * разойтись.
+ */
+export async function topUpStudentBalance(data: {
+  studentId: string;
+  amount: number;
+  note: string;
+  callerSchoolId: string;
+  callerIsSuperAdmin: boolean;
+}): Promise<void> {
+  if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error("BAD_TOPUP_AMOUNT");
+  if (!data.note.trim()) throw new Error("TOPUP_REASON_REQUIRED");
+
+  const sb = getServiceClient();
+  await assertSameSchool(sb, "students", data.studentId, data.callerSchoolId, data.callerIsSuperAdmin);
+
+  // school_id берём у самого ученика, а не у вызывающего: у суперадмина
+  // school_id нет вовсе, а колонка обязательна и без умолчания (227).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: row, error: readErr } = await (sb as any)
+    .from("students").select("school_id").eq("id", data.studentId).single();
+  if (readErr || !row) throw readErr ?? new Error("students: запись не найдена");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any).from("balance_entries").insert({
+    school_id: (row as { school_id: string }).school_id,
+    student_id: data.studentId,
+    amount: data.amount,
+    kind: "adjustment",
+    note: data.note.trim(),
+  });
+  if (error) throw error;
+}
+
 export async function deleteSchoolAdmin(userId: string) {
   const sb = getServiceClient();
   // Проверка стоит ЗДЕСЬ, а не в действии: так её получает любой вызывающий,
