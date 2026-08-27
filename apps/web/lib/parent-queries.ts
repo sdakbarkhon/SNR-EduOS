@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
+import { safeQuery } from "@/lib/safe-query";
 import {
   getChildAttendanceDetail,
   getChildDailyStats,
@@ -391,6 +392,135 @@ export const childMaterials = cache(async (): Promise<MaterialWithGroup[]> => {
   if (!childId) return [];
   const db = await createClient();
   return getChildMaterials(db, childId);
+});
+
+// ── Оплаты: счета, баланс, движения (заход 4 по платежам) ───────────────────
+//
+// ПОЧЕМУ ЗДЕСЬ ЕСТЬ safeQuery, А ВЫШЕ ЕГО НЕТ. Остальные аксессоры этого файла
+// намеренно не глотают ошибку: расписание или оценки, не приехавшие с сервера,
+// — это сломанный экран, и страница обязана показать ErrorState. С деньгами
+// иначе: экран оплаты собирается из ТРЁХ независимых запросов (баланс, счета,
+// движения), и падение одного не должно уносить два других. Поэтому каждый
+// аксессор ловит свою ошибку сам и отдаёт признак `failed` — экран решает,
+// показать пустоту или «не удалось загрузить». Пустой список без признака был
+// бы правдоподобной ложью: «счетов нет» вместо «мы их не смогли прочитать».
+//
+// Таблиц 227-й миграции нет в сгенерированном Database-типе (он намеренно не
+// перегенерирован, см. resheniya_2.md Z.2.1), поэтому `as any` на .from().
+
+/** Счёт за месяц, как его видит родитель. */
+export type ChildInvoice = {
+  id: string;
+  /** Первое число месяца, YYYY-MM-DD. */
+  period_month: string;
+  amount: number;
+  status: "open" | "paid" | "canceled";
+  paid_at: string | null;
+  /** `admin_adjusted` — сумму правил админ школы; тогда есть и причина. */
+  amount_source: "group_price" | "admin_adjusted";
+  adjust_reason: string | null;
+};
+
+/** Движение по балансу. Журнал только пополняется (миграция 227). */
+export type ChildBalanceEntry = {
+  id: string;
+  /** Со знаком: пополнение положительное, погашение отрицательное. */
+  amount: number;
+  kind: "topup" | "invoice_charge" | "adjustment" | "refund";
+  note: string | null;
+  created_at: string;
+};
+
+/** Баланс выбранного ребёнка. Ноль здесь значит ровно ноль денег. */
+export const childBalance = cache(async (): Promise<{ balance: number; failed: boolean }> => {
+  const childId = await getSelectedChildId();
+  if (!childId) return { balance: 0, failed: false };
+  const db = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const q = (db as any).from("students").select("balance").eq("id", childId).single();
+  const { data, failed } = await safeQuery<{ balance: number | string } | null>(
+    q.then((r: { data: unknown; error: unknown }) => {
+      if (r.error) throw r.error;
+      return r.data as { balance: number | string } | null;
+    }),
+    null,
+    "parent childBalance",
+  );
+  return { balance: Number(data?.balance ?? 0), failed };
+});
+
+/** Счета выбранного ребёнка, новые сверху. */
+export const childInvoices = cache(async (): Promise<{ items: ChildInvoice[]; failed: boolean }> => {
+  const childId = await getSelectedChildId();
+  if (!childId) return { items: [], failed: false };
+  const db = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const q = (db as any)
+    .from("tuition_invoices")
+    .select("id, period_month, amount, status, paid_at, amount_source, adjust_reason")
+    .eq("student_id", childId)
+    .order("period_month", { ascending: false });
+  const { data, failed } = await safeQuery<ChildInvoice[]>(
+    q.then((r: { data: unknown; error: unknown }) => {
+      if (r.error) throw r.error;
+      return ((r.data ?? []) as ChildInvoice[]).map((row) => ({ ...row, amount: Number(row.amount) }));
+    }),
+    [],
+    "parent childInvoices",
+  );
+  return { items: data, failed };
+});
+
+/** Движения по балансу выбранного ребёнка, новые сверху. */
+export const childBalanceEntries = cache(
+  async (limit = 100): Promise<{ items: ChildBalanceEntry[]; failed: boolean }> => {
+    const childId = await getSelectedChildId();
+    if (!childId) return { items: [], failed: false };
+    const db = await createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q = (db as any)
+      .from("balance_entries")
+      .select("id, amount, kind, note, created_at")
+      .eq("student_id", childId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    const { data, failed } = await safeQuery<ChildBalanceEntry[]>(
+      q.then((r: { data: unknown; error: unknown }) => {
+        if (r.error) throw r.error;
+        return ((r.data ?? []) as ChildBalanceEntry[]).map((row) => ({ ...row, amount: Number(row.amount) }));
+      }),
+      [],
+      "parent childBalanceEntries",
+    );
+    return { items: data, failed };
+  },
+);
+
+/**
+ * Сводка для карточки баланса и главной: сколько на балансе и сколько
+ * осталось доплатить.
+ *
+ * «К оплате» — сумма ОТКРЫТЫХ счетов, а не всех: оплаченный счёт долгом не
+ * является. Переплата — то, что лежит на балансе сверх долга; отрицательной
+ * она быть не может, потому что баланс в минус не уходит (проверка из 227).
+ */
+export const childPaymentsSummary = cache(async (): Promise<{
+  balance: number;
+  dueTotal: number;
+  dueCount: number;
+  overpayment: number;
+  failed: boolean;
+}> => {
+  const [bal, inv] = await Promise.all([childBalance(), childInvoices()]);
+  const open = inv.items.filter((i) => i.status === "open");
+  const dueTotal = open.reduce((sum, i) => sum + i.amount, 0);
+  return {
+    balance: bal.balance,
+    dueTotal,
+    dueCount: open.length,
+    overpayment: Math.max(0, bal.balance - dueTotal),
+    failed: bal.failed || inv.failed,
+  };
 });
 
 // ── Объявления / уведомления / чаты (скоуп родителя, не ребёнка) ─────────────

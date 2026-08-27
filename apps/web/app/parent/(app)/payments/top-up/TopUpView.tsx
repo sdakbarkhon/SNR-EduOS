@@ -20,8 +20,10 @@
  * визуально работает и ничего не делает, читается как баг. Поэтому нажатие
  * показывает SoonNote с объяснением, почему пополнение недоступно.
  *
- * Баланс кошелька берётся ТЕМ ЖЕ аксессором, что и на /parent/payments
- * (getSelectedChildContext), — иначе два экрана показывали бы разные числа.
+ * 27.08.2026, заход 4 по платежам: БАЛАНС НАСТОЯЩИЙ — из students.balance,
+ * приходит пропсом со страницы. Он же показан на /parent/payments: два экрана
+ * в одном тапе друг от друга обязаны показывать одно число. Само пополнение
+ * по-прежнему невозможно — платёжной системы нет, и кнопка об этом говорит.
  */
 
 import { useState } from "react";
@@ -29,28 +31,27 @@ import Link from "next/link";
 import { GlassCard } from "../../v2/GlassCard";
 import { Glyph, ScreenScroll, SectionCap, WHITE } from "../../_ui/screen-kit";
 import { accent, accentGrad, fontDisplay, ink1, ink2, ink3, status } from "../../v2/tokens";
-import { getSelectedChildContext } from "../../v2/data";
 import {
   CURRENCY,
   TOPUP_PRESETS,
   formatMoney,
   givenNameOf,
-  walletTitleOf,
   SOON_PAYMENTS,
 } from "../../_demo/demo-data";
 import { BrandChip, NoticeBanner, PAY_GLYPH, SoonNote } from "../parts";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
 
 const MAX_DIGITS = 9;
 
-export function TopUpView({ childName }: { childName: string | null }) {
-  // Баланс — фикстура (кошелька в БД нет), но ЕДИНАЯ с карточкой на /parent/payments.
-  const { wallet_balance: balance } = getSelectedChildContext();
+export function TopUpView({ childName, balance }: { childName: string | null; balance: number }) {
 
   const given = givenNameOf(childName);
   const initial = (given[0] ?? "—").toUpperCase();
   // Заголовок — общий хелпер: /parent/payments рисует ту же карточку кошелька
   // и обязан называть её теми же словами.
-  const walletTitle = walletTitleOf(childName);
+  const { locale } = useLocale();
+  const p2 = getDictionary(locale as Locale).parentApp.pay2;
 
   const [amount, setAmount] = useState("");
   const [soon, setSoon] = useState(false);
@@ -82,7 +83,7 @@ export function TopUpView({ childName }: { childName: string | null }) {
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-              {walletTitle}
+              {p2.balanceTitle.replace("{name}", given)}
             </span>
             <span style={{ fontSize: 10, fontWeight: 600, color: ink2 }}>Текущий баланс</span>
           </span>
@@ -153,25 +154,11 @@ export function TopUpView({ childName }: { childName: string | null }) {
         </div>
       </GlassCard>
 
-      {/* 3. Способ оплаты. */}
-      <GlassCard radius={20} style={{ padding: "12px 14px" }}>
-        <div className="flex items-center" style={{ gap: 11 }}>
-          <BrandChip gradient={["#2dd4bf", "#0d9488"]} label="PAYME" />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>Payme</span>
-            <span style={{ fontSize: 9.5, fontWeight: 600, color: ink2 }}>
-              Мгновенное зачисление
-            </span>
-          </span>
-          <Link
-            href="/parent/payments/methods"
-            className="shrink-0"
-            style={{ fontSize: 11, fontWeight: 800, color: status.violet.text }}
-          >
-            Изменить
-          </Link>
-        </div>
-      </GlassCard>
+      {/* 3. Способ оплаты — СНЯТ 27.08.2026, заход 4. Здесь стояла строка
+          «PAYME · Мгновенное зачисление» со ссылкой «Изменить». Ни один
+          провайдер не подключён, все три помечены «Скоро» на своём экране —
+          значит и выбирать нечего, и обещать мгновенное зачисление нельзя.
+          Вернём вместе с кассой. */}
 
       {/* 4. CTA. Пустое поле → серая и некликабельная (правило макета). */}
       <div>
@@ -212,16 +199,11 @@ export function TopUpView({ childName }: { childName: string | null }) {
         {soon ? <SoonNote text={SOON_PAYMENTS} /> : null}
       </div>
 
-      {/* 5. Плашка про мгновенное зачисление. */}
-      <NoticeBanner
-        family="green"
-        paths={PAY_GLYPH.bolt}
-        text="Зачисление мгновенное: деньги появятся на кошельке ребёнка сразу после оплаты и будут доступны в столовой уже на следующей перемене."
-      />
-
-      <span style={{ fontSize: 9, fontWeight: 600, color: ink3, textAlign: "center" }}>
-        Кошелёк тратится только на питание и покупки в школе.
-      </span>
+      {/* 5. Правда о том, как деньги попадают на баланс сегодня. Прежняя
+          плашка обещала «мгновенное зачисление» и «столовую на следующей
+          перемене» — это про школьный кошелёк, которого в схеме нет, а число
+          над ней теперь настоящий баланс обучения. */}
+      <NoticeBanner family="blue" paths={PAY_GLYPH.bolt} text={p2.topUpNotConnected} />
     </ScreenScroll>
   );
 }

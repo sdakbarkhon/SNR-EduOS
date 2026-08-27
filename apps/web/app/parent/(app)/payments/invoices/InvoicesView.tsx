@@ -1,172 +1,156 @@
 "use client";
 
 /**
- * Экран «Счета и чеки» (d21) — веб-порт
- * apps/mobile-parent/src/screens/payments/ReceiptsScreen.tsx (макет
- * «SNR EduOS v2 Light.dc.html», строки 995–1031).
+ * Экран «Счета» (d21).
  *
- * Композиция:
- *  1. Два таба «Чеки» / «Счета» (SegmentPills из общего screen-kit).
- *  2. Группы: заголовок + строки. Строка — плитка категории 38, название и
- *     дата, номер документа, сумма (у счетов — ещё чип статуса «Оплачен» /
- *     «К оплате до …») и круглая кнопка скачивания.
- *     Чеки сгруппированы по месяцам, счета — ПО СРОКУ («К оплате сейчас» /
- *     «Позже» / «Оплаченные»), и у групп с долгом справа стоит их итог. Это
- *     не косметика: экран открывается по ссылке «Смотреть все ›» с карточки
- *     «К оплате сейчас» на /parent/payments, и группа с тем же названием
- *     обязана показывать ровно те же два счёта и ту же сумму 4 950 000.
- *  3. Синяя info-плашка про электронное хранение документов.
+ * 27.08.2026, ЗАХОД 4 ПО ПЛАТЕЖАМ — ЭКРАН ПЕРЕВЕДЁН НА НАСТОЯЩИЕ СЧЕТА и
+ * переписан. Счета приходят из `tuition_invoices` (миграции 227/229) через
+ * `childInvoices()`.
  *
- * ЧТО ОТЛИЧАЕТСЯ ОТ МОБИЛКИ. Там кнопка скачивания вела на stub-экран «file»,
- * здесь файлов нет вообще (их формирует платёжный провайдер, которого нет),
- * поэтому нажатие раскрывает под самой строкой SoonNote с объяснением —
- * родитель видит ответ там, где нажал. Кнопок «Поиск» и «Фильтры» в шапке
- * нет: в мобилке они вели на несуществующие в вебе экраны, а список из
- * 5–6 строк в поиске не нуждается.
+ * ЧЕКИ УБРАНЫ ЦЕЛИКОМ, И ЭТО ГЛАВНОЕ. Раньше здесь было два таба, и в табе
+ * «Чеки» лежали ВЫДУМАННЫЕ фискальные документы — с номерами, суммами и
+ * кнопкой «скачать». Поддельный чек хуже любой другой подделки на экране: это
+ * финансовый документ, его несут бухгалтеру. Чеки выдаёт платёжная система,
+ * которой нет, поэтому вместо них — прямая фраза о том, когда они появятся.
+ *
+ * Кнопки «скачать» тоже нет: скачивать нечего, файлов не существует. Кнопка,
+ * которая на нажатие отвечает «пока нельзя», — та же «кнопка в никуда», от
+ * которой мы избавлялись во всём разделе.
+ *
+ * Группы те же две, что и раньше по смыслу: «К оплате сейчас» и «Оплаченные».
+ * Первая обязана показывать ровно те же счета и ту же сумму, что карточка
+ * «К оплате сейчас» на /parent/payments — экран открывается оттуда ссылкой
+ * «Смотреть все ›».
  */
 
-import { useState } from "react";
+import { getDictionary, type Locale } from "@snr/core";
+import { useLocale } from "@/components/LocaleProvider";
+import type { ChildInvoice } from "@/lib/parent-queries";
 import { GlassCard } from "../../v2/GlassCard";
-import {
-  Glyph,
-  IconTile,
-  ScreenScroll,
-  SectionCap,
-  SegmentPills,
-  StatusChip,
-} from "../../_ui/screen-kit";
-import { chip, ink1, ink2, ink3, status } from "../../v2/tokens";
-import {
-  CHECK_MONTHS,
-  INVOICE_MONTHS,
-  PAY_VISUAL,
-  SOON_FILE,
-  formatMoney,
-  unpaidGroupNote,
-  type ReceiptRow,
-} from "../../_demo/demo-data";
-import { PAY_GLYPH, NoticeBanner, SoonNote } from "../parts";
+import { ICON, IconTile, ScreenScroll, SectionCap, StatusChip } from "../../_ui/screen-kit";
+import { ink1, ink2, ink3 } from "../../v2/tokens";
+import { formatMoney } from "../../_demo/demo-data";
+import { useDates } from "../../_ui/dates";
+import { NoticeBanner } from "../parts";
 
-const TABS = ["Чеки", "Счета"] as const;
+/** Плитка счёта: фиолетовый документ — тот же вид, что у строки счёта на
+ *  корневом экране раздела. */
+const INVOICE_GRADIENT: readonly [string, string] = ["#a78bfa", "#7c3aed"];
 
-function ReceiptCard({
-  row,
-  soon,
-  onDownload,
+function InvoiceCard({
+  title,
+  subtitle,
+  amountLabel,
+  statusLabel,
+  paid,
 }: {
-  row: ReceiptRow;
-  soon: boolean;
-  onDownload: () => void;
+  title: string;
+  subtitle: string | null;
+  amountLabel: string;
+  statusLabel: string;
+  paid: boolean;
 }) {
-  const visual = PAY_VISUAL[row.visual];
-  const violetChip = chip(status.violet.rgb);
-
   return (
-    <div>
-      <GlassCard variant="glass2" radius={16} style={{ padding: 12 }}>
-        <div className="flex items-center" style={{ gap: 10 }}>
-          <IconTile gradient={visual.gradient} paths={visual.paths} size={38} glyphSize={18} />
+    <GlassCard variant="glass2" radius={16} style={{ padding: 12 }}>
+      <div className="flex items-center" style={{ gap: 10 }}>
+        <IconTile gradient={INVOICE_GRADIENT} paths={ICON.doc} size={38} glyphSize={18} />
 
-          <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 1 }}>
-            <div className="flex items-center justify-between" style={{ gap: 8 }}>
-              <span
-                className="min-w-0 truncate"
-                style={{ fontSize: 12, fontWeight: 800, color: ink1 }}
-              >
-                {row.title}
-              </span>
-              <span className="shrink-0" style={{ fontSize: 9, fontWeight: 700, color: ink3 }}>
-                {row.dateLabel}
-              </span>
-            </div>
-            <span className="truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink2 }}>
-              {row.numberLabel}
+        <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 1 }}>
+          <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+            {title}
+          </span>
+          {subtitle ? (
+            <span className="truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
+              {subtitle}
             </span>
-            <div className="flex items-center" style={{ gap: 8, marginTop: 2 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>
-                {formatMoney(row.amount, { withCurrency: true })}
-              </span>
-              {row.statusLabel ? (
-                <StatusChip
-                  label={row.statusLabel}
-                  family={row.statusPaid ? "green" : "orange"}
-                  fontSize={8.5}
-                />
-              ) : null}
-            </div>
+          ) : null}
+          <div className="flex items-center" style={{ gap: 8, marginTop: 2 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: ink1 }}>{amountLabel}</span>
+            <StatusChip label={statusLabel} family={paid ? "green" : "orange"} fontSize={8.5} />
           </div>
-
-          <button
-            type="button"
-            onClick={onDownload}
-            aria-label={`Скачать: ${row.numberLabel}`}
-            className="flex shrink-0 items-center justify-center rounded-full"
-            style={{
-              width: 32,
-              height: 32,
-              background: violetChip.background,
-              border: `1px solid ${violetChip.borderColor}`,
-            }}
-          >
-            <Glyph
-              paths={PAY_GLYPH.download}
-              size={13}
-              color={status.violet.text}
-              strokeWidth={2}
-            />
-          </button>
         </div>
-      </GlassCard>
-      {soon ? <SoonNote text={SOON_FILE} /> : null}
-    </div>
+      </div>
+    </GlassCard>
   );
 }
 
-export function InvoicesView() {
-  const [tabIndex, setTabIndex] = useState(0);
-  const [soonId, setSoonId] = useState<string | null>(null);
+export function InvoicesView({
+  invoices,
+  failed,
+}: {
+  invoices: ChildInvoice[];
+  /** Прочитать не удалось — это НЕ то же самое, что «счетов нет». */
+  failed: boolean;
+}) {
+  const { locale } = useLocale();
+  const d = getDictionary(locale as Locale);
+  const p2 = d.parentApp.pay2;
+  const dates = useDates();
 
-  const months = tabIndex === 0 ? CHECK_MONTHS : INVOICE_MONTHS;
+  /** «Июль 2026» из первого числа месяца, YYYY-MM-DD. */
+  const monthLabel = (periodMonth: string) => {
+    const [y, m] = periodMonth.split("-");
+    return dates.monthYear(Number(y), Number(m));
+  };
+
+  const open = invoices.filter((i) => i.status === "open");
+  const paid = invoices.filter((i) => i.status === "paid");
+  const openTotal = open.reduce((sum, i) => sum + i.amount, 0);
+
+  const groups: Array<{ id: string; label: string; note: string | null; rows: ChildInvoice[] }> = [
+    {
+      id: "open",
+      label: p2.billsDueCap,
+      note: open.length ? formatMoney(openTotal, { withCurrency: true }) : null,
+      rows: open,
+    },
+    { id: "paid", label: p2.historyTotal, note: null, rows: paid },
+  ].filter((g) => g.rows.length > 0);
 
   return (
     <ScreenScroll gap={11}>
-      <SegmentPills
-        items={TABS}
-        activeIndex={tabIndex}
-        onChange={(i) => {
-          setTabIndex(i);
-          setSoonId(null);
-        }}
-      />
-
-      {months.map((month) => (
-        <div key={`${tabIndex}-${month.id}`} className="flex flex-col" style={{ gap: 11 }}>
-          <div className="flex items-baseline justify-between" style={{ gap: 8 }}>
-            <SectionCap label={month.label} tone="ink3" />
-            {(() => {
-              const note = unpaidGroupNote(month.rows);
-              return note ? (
-                <span className="shrink-0" style={{ fontSize: 9.5, fontWeight: 800, color: ink2 }}>
-                  {note}
-                </span>
-              ) : null;
-            })()}
+      {failed ? (
+        <GlassCard variant="glass2" radius={16} style={{ padding: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>{p2.loadFailed}</span>
+        </GlassCard>
+      ) : groups.length === 0 ? (
+        // Пусто значит пусто — и объясняем, когда появится. Пустой белый экран
+        // человек читает как поломку.
+        <GlassCard variant="glass2" radius={16} style={{ padding: 14 }}>
+          <div className="flex flex-col" style={{ gap: 4 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>{p2.billsEmpty}</span>
+            <span style={{ fontSize: 10.5, fontWeight: 600, color: ink2 }}>
+              {p2.invoicesEmptyHint}
+            </span>
           </div>
-          {month.rows.map((row) => (
-            <ReceiptCard
-              key={row.id}
-              row={row}
-              soon={soonId === row.id}
-              onDownload={() => setSoonId(soonId === row.id ? null : row.id)}
-            />
-          ))}
-        </div>
-      ))}
+        </GlassCard>
+      ) : (
+        groups.map((group) => (
+          <div key={group.id} className="flex flex-col" style={{ gap: 11 }}>
+            <div className="flex items-baseline justify-between" style={{ gap: 8 }}>
+              <SectionCap label={group.label} tone="ink3" />
+              {group.note ? (
+                <span className="shrink-0" style={{ fontSize: 9.5, fontWeight: 800, color: ink2 }}>
+                  {group.note}
+                </span>
+              ) : null}
+            </div>
+            {group.rows.map((row) => (
+              <InvoiceCard
+                key={row.id}
+                title={`${p2.tuitionInvoice} · ${monthLabel(row.period_month)}`}
+                subtitle={row.amount_source === "admin_adjusted" ? p2.adjustedByAdmin : null}
+                amountLabel={formatMoney(row.amount, { withCurrency: true })}
+                statusLabel={row.status === "paid" ? p2.receiptPaid : p2.receiptUnpaid}
+                paid={row.status === "paid"}
+              />
+            ))}
+          </div>
+        ))
+      )}
 
-      <NoticeBanner
-        family="blue"
-        text="Все документы хранятся в электронном виде и доступны в любой момент. Любой чек или счёт можно будет скачать в PDF и отправить на почту."
-      />
+      {/* Про чеки — прямо и без обещаний кнопкой. */}
+      <NoticeBanner family="blue" text={p2.receiptsSoon} />
     </ScreenScroll>
   );
 }

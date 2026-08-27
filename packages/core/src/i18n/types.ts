@@ -3878,6 +3878,15 @@ export interface Dictionary {
       billsDueCap: string;
       billsLaterCap: string;
       billsEmpty: string;
+      noDebt: string;
+      tuitionInvoice: string;
+      balanceTitle: string;
+      topUpNotConnected: string;
+      invoicesEmptyHint: string;
+      receiptsSoon: string;
+      walletIsExample: string;
+      adjustedByAdmin: string;
+      loadFailed: string;
       payAll: string;
       historyCap: string;
       historyTotal: string;

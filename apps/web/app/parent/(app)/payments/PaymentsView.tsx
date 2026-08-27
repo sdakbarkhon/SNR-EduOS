@@ -37,9 +37,21 @@
  * мобильном экране: суммы на этом экране — из заготовки, а не из базы, и об
  * этом надо говорить прямо. Два экрана обязаны говорить одно и то же.
  *
- * Данные — ТОЛЬКО через аксессоры ../v2/data (точная копия data-слоя мобилки):
- * getPaymentsOverview, getDueBills, getDueTotal, getDueBillsCount,
- * getSelectedChildContext, getUnreadNotificationsCount, getParent.
+ * 27.08.2026, ЗАХОД 4 ПО ПЛАТЕЖАМ — ЭКРАН ПЕРЕВЕДЁН НА НАСТОЯЩИЕ ДАННЫЕ.
+ *
+ * Баланс, счета, долг и переплата приходят пропсами со страницы, а она берёт
+ * их из `students.balance` и `tuition_invoices` (миграции 227/229). Раньше
+ * тут стояли заготовки: «ОБЩИЙ БАЛАНС 1 250 000», два выдуманных счёта и долг
+ * 4 950 000 — числа, которых нет ни в одной таблице. Плашка «данных нет, это
+ * пример» ушла отсюда вместе с ними.
+ *
+ * Что осталось заготовкой и почему: карточка КОШЕЛЬКА на питание внизу. Под
+ * школьный кошелёк в схеме нет ни одной таблицы — ни баланса, ни операций.
+ * Поэтому карточка помечена отдельной строкой прямо под собой, а её экраны
+ * держат свои плашки.
+ *
+ * Данные ребёнка и шапка — по-прежнему через ../v2/data
+ * (getSelectedChildContext, getUnreadNotificationsCount, getParent).
  *
  * Платформенные отличия от RN (осознанные):
  *  * RN-компоненты UI-кита (AccentCard/AccentInset/ListRow/
@@ -80,17 +92,10 @@ import {
   shColor,
   status,
 } from "../v2/tokens";
+import { getParent, getSelectedChildContext, getUnreadNotificationsCount } from "../v2/data";
+import { useDates } from "../_ui/dates";
+import type { ChildInvoice } from "@/lib/parent-queries";
 import {
-  getDueBills,
-  getDueBillsCount,
-  getDueTotal,
-  getParent,
-  getPaymentsOverview,
-  getSelectedChildContext,
-  getUnreadNotificationsCount,
-} from "../v2/data";
-import {
-  BILL_NOTE_TAIL,
   SOON_PAYMENTS,
   givenNameOf,
   rowNote,
@@ -116,7 +121,7 @@ const T = {
   payAllBtn: "Оплатить всё — {sum}",
   topupBtn: "Пополнить",
   payHistory: "История оплат",
-  billsReceipts: "Счета и чеки",
+  billsReceipts: "Счета",
   payMethods: "Способы оплаты",
   // walletTitle («Кошелёк {gen}») здесь больше нет: заголовок кошелька строит
   // общий walletTitleOf() из mock-data — им же пользуется /parent/payments/top-up,
@@ -607,14 +612,20 @@ const capsLabel: CSSProperties = {
 export function PaymentsView({
   childName,
   childClassName,
+  summary,
+  invoices,
 }: {
-  /** Реальный ребёнок с сервера (см. page.tsx). Суммы ниже — мок. */
+  /** Реальный ребёнок с сервера (см. page.tsx). */
   childName: string | null;
   childClassName: string | null;
+  /** Баланс и долг — из базы. `failed` значит «прочитать не удалось», и это
+   *  НЕ то же самое, что «ноль»: экран обязан сказать разное. */
+  summary: { balance: number; dueTotal: number; dueCount: number; overpayment: number; failed: boolean };
+  /** Открытые счета ребёнка, новые сверху. */
+  invoices: ChildInvoice[];
 }) {
-  // Суммы/кошелёк — по-прежнему фикстуры (платёжного бэкенда нет), но
-  // ИМЯ ребёнка берём настоящее: раньше здесь стоял DEFAULT_CHILD_INDEX
-  // фикстур и экран показывал чужую семью.
+  // Кошелёк на питание — единственное, что здесь осталось заготовкой:
+  // таблицы под него в схеме нет вовсе.
   const { wallet_balance } = getSelectedChildContext();
   // Имя и заголовок кошелька — через общие хелперы mock-data: их же зовут
   // /parent/payments/top-up и /parent/payments/history. Раньше здесь имя
@@ -625,17 +636,24 @@ export function PaymentsView({
   // «Шерзод · 10-А» — префикс подписей строк счетов.
   const who = whoLabel(childName, childClassName);
   const parent = getParent();
-  const overview = getPaymentsOverview();
-  const dueBills = getDueBills();
-  const dueTotal = getDueTotal();
-  const dueCount = getDueBillsCount();
   const unread = getUnreadNotificationsCount();
+  const dueBills = invoices.filter((i) => i.status === "open");
+  const dueTotal = summary.dueTotal;
+  const dueCount = summary.dueCount;
 
   // Плашка «данных нет» и метка «Скоро» — из словаря: экран показывают
   // родителям на трёх языках, а остальные подписи здесь исторически русские
   // литералы (это отдельная задача, её здесь не решаем).
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
+  const dates = useDates();
+  const p2 = d.parentApp.pay2;
+
+  /** «Июль 2026» из первого числа месяца, YYYY-MM-DD. */
+  const monthLabel = (periodMonth: string) => {
+    const [y, m] = periodMonth.split("-");
+    return dates.monthYear(Number(y), Number(m));
+  };
 
   const orangeChip = chip(status.orange.rgb);
 
@@ -653,9 +671,9 @@ export function PaymentsView({
         className="flex flex-col"
         style={{ gap: 12, paddingLeft: 18, paddingRight: 18, paddingTop: 4, paddingBottom: 8 }}
       >
-        {/* 1. Плашка «данных нет, это пример» — ровно та же, что в мобильном
-            экране. Суммы ниже приходят из заготовки, а не из базы школы. */}
-        <SoonNote text={d.parentApp.pay2.demoBanner} />
+        {/* 1. Отказ чтения. Пустой экран и «не смогли прочитать» — разные
+            вещи, и молчать про второе нельзя: человек решит, что долгов нет. */}
+        {summary.failed && <SoonNote text={p2.loadFailed} />}
 
         {/* 2. Карточка баланса (три-стоп-градиент, макет 383–386). */}
         <AccentCard
@@ -671,7 +689,7 @@ export function PaymentsView({
               <span style={capsLabel}>{T.balanceTotalCap}</span>
               <div className="flex items-end" style={{ gap: 4, marginTop: 4 }}>
                 <span style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: "#fff" }}>
-                  {formatMoney(overview.total_balance)}
+                  {formatMoney(summary.balance)}
                 </span>
                 <span
                   style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.85)", marginBottom: 4 }}
@@ -701,13 +719,13 @@ export function PaymentsView({
             <AccentInset radius={12} className="flex flex-1 flex-col" style={{ padding: 10, gap: 3 }}>
               <span style={capsLabel}>{T.balanceDueCap}</span>
               <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>
-                {formatMoney(dueTotal, { withCurrency: true, currency: T.sum })}
+                {dueCount === 0 ? p2.noDebt : formatMoney(dueTotal, { withCurrency: true, currency: T.sum })}
               </span>
             </AccentInset>
             <AccentInset radius={12} className="flex flex-1 flex-col" style={{ padding: 10, gap: 3 }}>
               <span style={capsLabel}>{T.balanceOverpaidCap}</span>
               <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>
-                {formatMoney(overview.overpayment, { withCurrency: true, currency: T.sum })}
+                {formatMoney(summary.overpayment, { withCurrency: true, currency: T.sum })}
               </span>
             </AccentInset>
           </div>
@@ -727,23 +745,27 @@ export function PaymentsView({
             >
               {T.dueNow}
             </span>
-            <span
-              className="shrink-0"
-              style={{
-                paddingTop: 3,
-                paddingBottom: 3,
-                paddingLeft: 8,
-                paddingRight: 8,
-                borderRadius: 999,
-                background: orangeChip.background,
-                border: `1px solid ${orangeChip.borderColor}`,
-                fontSize: 9.5,
-                fontWeight: 800,
-                color: status.orange.text,
-              }}
-            >
-              {fillTemplate(T.billsChip, { n: String(dueCount) })}
-            </span>
+            {/* Долгов нет — чипа нет. «0 счёта» это и неправда по смыслу, и
+                просто безграмотно. */}
+            {dueCount > 0 && (
+              <span
+                className="shrink-0"
+                style={{
+                  paddingTop: 3,
+                  paddingBottom: 3,
+                  paddingLeft: 8,
+                  paddingRight: 8,
+                  borderRadius: 999,
+                  background: orangeChip.background,
+                  border: `1px solid ${orangeChip.borderColor}`,
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                  color: status.orange.text,
+                }}
+              >
+                {fillTemplate(T.billsChip, { n: String(dueCount) })}
+              </span>
+            )}
           </div>
           {/* «Смотреть все» — тот же экран, что и плитка «Счета и чеки»
               (в мобилке это был d21). Раньше кнопка тоже вела в никуда. */}
@@ -756,38 +778,46 @@ export function PaymentsView({
           </Link>
         </div>
 
-        {/* 4. Счета «К оплате сейчас». */}
+        {/* 4. Счета «К оплате сейчас» — настоящие. Пусто значит пусто: так и
+            пишем словами, «0 сум» человек читает как поломку. */}
         <GlassCard style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 14, paddingRight: 14 }}>
-          {dueBills.map((bill, i) => (
-            <ListRow
-              key={bill.id}
-              left={<BillIconTile gradient={bill.gradient} paths={bill.icon_paths} />}
-              title={bill.title}
-              // НЕ bill.note: в фикстуре там подпись мобильного макета с чужим
-              // ребёнком и чужим классом. Собираем из настоящего ребёнка и
-              // «хвоста» счёта (см. BILL_NOTE_TAIL в mock-data).
-              subtitle={rowNote(who, BILL_NOTE_TAIL[bill.id] ?? "")}
-              right={
-                <div className="flex flex-col items-end" style={{ gap: 2 }}>
+          {dueBills.length === 0 ? (
+            <div className="flex flex-col" style={{ gap: 4, paddingTop: 14, paddingBottom: 14 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>
+                {summary.failed ? p2.loadFailed : p2.billsEmpty}
+              </span>
+              {!summary.failed && (
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: ink2 }}>
+                  {p2.invoicesEmptyHint}
+                </span>
+              )}
+            </div>
+          ) : (
+            dueBills.map((bill, i) => (
+              <ListRow
+                key={bill.id}
+                left={<BillIconTile gradient={["#a78bfa", "#7c3aed"]} paths={ICON.doc} />}
+                title={`${p2.tuitionInvoice} · ${monthLabel(bill.period_month)}`}
+                subtitle={
+                  bill.amount_source === "admin_adjusted"
+                    ? rowNote(who, p2.adjustedByAdmin)
+                    : who
+                }
+                right={
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: ink1 }}>
                     {formatMoney(bill.amount)}
                   </span>
-                  <span style={{ fontSize: 9.5, fontWeight: 800, color: status.orange.text }}>
-                    {fillTemplate(T.billDueBy, { date: bill.due_date_label })}
-                  </span>
-                </div>
-              }
-              // Шеврон обещает переход — значит переход должен быть. Экран
-              // деталей счёта (d19) в веб не портирован, ближайший реальный —
-              // «Счета и чеки», где этот же счёт лежит в группе
-              // «К оплате сейчас».
-              href="/parent/payments/invoices"
-              chevron
-              divider={i > 0}
-              gap={11}
-              verticalPadding={10}
-            />
-          ))}
+                }
+                // Шеврон обещает переход — значит переход есть: «Счета и чеки»,
+                // где этот же счёт лежит в списке.
+                href="/parent/payments/invoices"
+                chevron
+                divider={i > 0}
+                gap={11}
+                verticalPadding={10}
+              />
+            ))
+          )}
         </GlassCard>
 
         {/* 5. Главная CTA — ПОГАШЕНА. 27.08.2026: раньше это была боевая
@@ -797,17 +827,19 @@ export function PaymentsView({
             всегда. Строка автоплатежа, стоявшая выше, снесена целиком:
             автоплатежа в модели нет, карты «····8341» не существует, а
             переключатель ничего не сохранял. */}
-        <div>
-          <PrimaryButton
-            label={fillTemplate(T.payAllBtn, {
-              sum: formatMoney(dueTotal, { withCurrency: true, currency: T.sum }),
-            })}
-            icon={<WhiteGlyph paths={ICON.card} size={16} />}
-            inactive
-            soonLabel={d.status.soon}
-          />
-          <SoonNote text={SOON_PAYMENTS} />
-        </div>
+        {dueCount > 0 && (
+          <div>
+            <PrimaryButton
+              label={fillTemplate(T.payAllBtn, {
+                sum: formatMoney(dueTotal, { withCurrency: true, currency: T.sum }),
+              })}
+              icon={<WhiteGlyph paths={ICON.card} size={16} />}
+              inactive
+              soonLabel={d.status.soon}
+            />
+            <SoonNote text={SOON_PAYMENTS} />
+          </div>
+        )}
 
         {/* 6. Быстрые действия — 4 колонки (gap 8). */}
         <div
@@ -884,6 +916,12 @@ export function PaymentsView({
             <Chevron color="rgba(255,255,255,0.85)" width={2.4} />
           </Link>
         </AccentCard>
+        {/* Единственная заготовка, оставшаяся на этом экране. Молчать про неё
+            нельзя: всё остальное вокруг стало настоящим, и человек примет за
+            настоящее и её. */}
+        <p style={{ fontSize: 10.5, fontWeight: 600, color: ink2, paddingLeft: 2 }}>
+          {p2.walletIsExample}
+        </p>
       </div>
     </div>
   );

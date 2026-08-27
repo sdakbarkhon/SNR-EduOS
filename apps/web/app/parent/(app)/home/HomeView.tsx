@@ -113,6 +113,9 @@ export interface HomeViewData {
     gradient: Gradient;
   } | null;
   /** Мок: платёжного бэкенда нет (см. page.tsx). */
+  /** Что показывать в плитке «К оплате»: числа, «долгов нет» или отказ.
+   *  Фразы живут здесь, потому что словарь есть только у клиента. */
+  dueState: "ok" | "none" | "failed";
   due: { amountLabel: string; subtitle: string };
   /** Мок: сервиса питания нет (см. page.tsx). */
   meals: { statusLabel: string; untilLabel: string };
@@ -880,9 +883,15 @@ export function HomeView({ data }: { data: HomeViewData }) {
                 >
                   {T.due}
                 </span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>{data.due.amountLabel}</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>
+                  {data.dueState === "ok" ? data.due.amountLabel
+                    : data.dueState === "none" ? dict.parentApp.pay2.noDebt
+                    : "—"}
+                </span>
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
-                  {data.due.subtitle}
+                  {data.dueState === "ok" ? data.due.subtitle
+                    : data.dueState === "failed" ? dict.parentApp.pay2.loadFailed
+                    : ""}
                 </span>
               </AccentCard>
               <AccentCard
