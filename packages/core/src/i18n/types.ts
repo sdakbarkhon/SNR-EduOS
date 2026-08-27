@@ -662,6 +662,46 @@ export interface Dictionary {
     tableCoursePrice: string;
     coursePriceNotSet: string;
     tableBalance: string;
+    navPayments: string;
+    paymentsTitle: string;
+    paymentsInvoicesCap: string;
+    paymentsBlockersCap: string;
+    paymentsIssueBtn: string;
+    paymentsIssuing: string;
+    paymentsIssueTitle: string;
+    paymentsIssueBody: string;
+    paymentsIssueNothing: string;
+    paymentsIssuedMsg: string;
+    paymentsEmptyInvoices: string;
+    paymentsEmptyInvoicesHint: string;
+    paymentsEmptyBlockers: string;
+    paymentsAllBilled: string;
+    tableStudent: string;
+    tableMonth: string;
+    tableAmount: string;
+    tableInvoiceStatus: string;
+    tableReason: string;
+    invoiceOpen: string;
+    invoicePaid: string;
+    invoiceCanceled: string;
+    invoiceAdjusted: string;
+    reasonNoPrice: string;
+    reasonManyGroups: string;
+    reasonNoGroup: string;
+    adjustInvoiceBtn: string;
+    adjustInvoiceTitle: string;
+    fieldInvoiceAmount: string;
+    fieldInvoiceReason: string;
+    invoiceReasonPlaceholder: string;
+    adjustInvoiceHint: string;
+    adjustInvoiceSave: string;
+    invoiceAdjustedMsg: string;
+    cancelInvoiceBtn: string;
+    cancelInvoiceTitle: string;
+    cancelInvoiceHint: string;
+    invoiceCanceledMsg: string;
+    restoreInvoiceBtn: string;
+    invoiceRestoredMsg: string;
     topUpBalanceBtn: string;
     topUpBalanceTitle: string;
     fieldTopUpAmount: string;
@@ -1152,6 +1192,11 @@ export interface Dictionary {
     lastSchoolAdmin: string;
     topUpAmountInvalid: string;
     topUpReasonRequired: string;
+    invoiceNotOpen: string;
+    invoiceNotCanceled: string;
+    invoiceNotFound: string;
+    invoiceAmountInvalid: string;
+    invoiceReasonRequired: string;
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"

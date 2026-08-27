@@ -171,6 +171,16 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (raw === "TOPUP_REASON_REQUIRED") {
     return t.topUpReasonRequired;
   }
+
+  // Заход 5 по платежам — правка и отмена счетов.
+  if (raw === "INVOICE_NOT_OPEN") return t.invoiceNotOpen;
+  if (raw === "INVOICE_NOT_CANCELED") return t.invoiceNotCanceled;
+  if (raw === "INVOICE_NOT_FOUND") return t.invoiceNotFound;
+  if (raw === "BAD_INVOICE_AMOUNT") return t.invoiceAmountInvalid;
+  if (raw === "INVOICE_REASON_REQUIRED") return t.invoiceReasonRequired;
+  // Последний рубеж: проверка из 227 не даст пометить счёт «поправлен админом» без автора и времени.
+  if (/tuition_invoices_adjusted_has_author/i.test(raw)) return t.invoiceReasonRequired;
+  if (/tuition_invoices_amount_not_negative/i.test(raw)) return t.invoiceAmountInvalid;
   // Последний рубеж баланса — проверка из 227. Сюда отказ доходит, если
   // списание пошло мимо расчёта; человеку важно, что денег не хватило.
   if (/students_balance_not_negative/i.test(raw)) {

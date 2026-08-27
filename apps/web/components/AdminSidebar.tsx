@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, Settings,
   LogOut, PanelLeftClose, PanelLeftOpen, Megaphone, Library, Heart, MessagesSquare,
-  Layers, ClipboardCheck, BarChart3, Sparkles,
-} from "lucide-react";
+  Layers, ClipboardCheck, BarChart3, Sparkles, Wallet } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -62,6 +61,7 @@ export function AdminSidebar() {
     // Замок 15 минут: правка того, что учитель уже не может изменить сам.
     { key: "marks",          href: "/admin/marks",          icon: ClipboardCheck, label: da.navMarks },
     { key: "analytics",      href: "/admin/analytics",      icon: BarChart3,  label: da.navAnalytics },
+    { key: "payments",       href: "/admin/payments",       icon: Wallet,     label: da.navPayments },
     { key: "announcements",  href: "/admin/announcements",  icon: Megaphone,  label: da.navAnnouncements },
     { key: "parents",        href: "/admin/parents",        icon: Heart,      label: da.navParents },
     { key: "profile",        href: "/admin/profile",        icon: Settings,   label: da.navProfile },
