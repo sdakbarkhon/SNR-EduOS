@@ -1118,6 +1118,7 @@ export const en: Dictionary = {
     coursePriceTooBig: "Tuition is too large: 2,147,483,647 UZS at most.",
     superadminWriteBlocked: "A super admin cannot change school data. This is the customer's decision of 20.08.2026: oversight yes, editing no. Changes are made by the school admin.",
     rlsWriteBlocked: "Not enough rights for this write: the database access rules rejected it.",
+    lastSchoolAdmin: "This is the school's last administrator — it cannot be deleted. Assign another administrator to the school first, then delete this one.",
     teacherHasLessons: "Cannot delete: the teacher runs {count} lessons. Hand the subjects over to someone else first.",
     teacherHasGrades: "Cannot delete: {count} grades and decisions are signed by this teacher and cannot be left without an author.",
     subjectInUse: "Cannot delete: {lessons} lessons, {homework} assignments, {plans} curriculum plans. Remove them or hide the subject.",

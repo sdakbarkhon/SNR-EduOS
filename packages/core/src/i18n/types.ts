@@ -1140,6 +1140,7 @@ export interface Dictionary {
     coursePriceTooBig: string;
     superadminWriteBlocked: string;
     rlsWriteBlocked: string;
+    lastSchoolAdmin: string;
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"

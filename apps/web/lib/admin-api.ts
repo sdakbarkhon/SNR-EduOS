@@ -1112,6 +1112,38 @@ export async function assertAdminIsManageable(
   return row.school_id;
 }
 
+/**
+ * Последнего администратора школы удалять нельзя — школа осталась бы без
+ * управления, а завести нового умеет только суперадмин.
+ *
+ * ПЕРВЫЙ РУБЕЖ, И ОН ЗДЕСЬ РАДИ ТЕКСТА. Само правило держит база (миграция
+ * 228, триггер на `admins`), но её отказ до человека доедет плохо: удаление
+ * идёт через Auth API, а он подменяет ошибку базы своим «Database error
+ * deleting user». Отсюда же отказ уходит машинным кодом, который
+ * humanizeAdminError превращает во фразу, и доезжает через guard()/unwrap().
+ *
+ * Признака активности у администраторов нет — в `admins` нет ни `is_active`,
+ * ни `archived_at`, — поэтому «последний» значит последний вообще.
+ */
+export async function assertNotLastSchoolAdmin(userId: string): Promise<void> {
+  const sb = getServiceClient();
+  const { data: me, error: meErr } = await sb
+    .from("admins").select("id, school_id").eq("user_id", userId).maybeSingle();
+  if (meErr) throw meErr;
+  const row = me as { id: string; school_id: string } | null;
+  // Строки нет — удалять нечего, и это не наша забота: пусть отвечает
+  // вызывающий, у него своя проверка «администратор не найден».
+  if (!row) return;
+
+  const { count, error } = await sb
+    .from("admins")
+    .select("id", { count: "exact", head: true })
+    .eq("school_id", row.school_id)
+    .neq("id", row.id);
+  if (error) throw error;
+  if ((count ?? 0) === 0) throw new Error("LAST_SCHOOL_ADMIN");
+}
+
 // ── SUPER ADMIN: SCHOOLS ──────────────────────────────────────────────────────
 
 export async function createSchool(data: {
@@ -1214,6 +1246,9 @@ export async function updateSchoolAdmin(
 /** Hard delete — cascades to the `admins` row via ON DELETE CASCADE (migration 42). */
 export async function deleteSchoolAdmin(userId: string) {
   const sb = getServiceClient();
+  // Проверка стоит ЗДЕСЬ, а не в действии: так её получает любой вызывающий,
+  // включая тот, которого ещё нет. Второй рубеж — триггер из миграции 228.
+  await assertNotLastSchoolAdmin(userId);
   const { error } = await sb.auth.admin.deleteUser(userId);
   if (error) throw error;
 }

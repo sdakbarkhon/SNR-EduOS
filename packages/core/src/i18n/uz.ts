@@ -1118,6 +1118,7 @@ export const uz: Dictionary = {
     coursePriceTooBig: "O‘qish narxi juda katta: 2 147 483 647 so‘mdan oshmasin.",
     superadminWriteBlocked: "Superadministrator maktab ma'lumotlarini o'zgartira olmaydi. Bu buyurtmachining 20.08.2026 dagi qarori: nazorat — ha, tahrir — yo'q. O'zgartirishlarni maktab administratori kiritadi.",
     rlsWriteBlocked: "Bu yozuv uchun huquq yetarli emas: baza kirish qoidalari uni o'tkazmadi.",
+    lastSchoolAdmin: "Bu maktabning oxirgi administratori — uni o'chirib bo'lmaydi. Avval maktabga boshqa administrator tayinlang, keyin buni o'chiring.",
     teacherHasLessons: "O'chirib bo'lmaydi: o'qituvchi {count} ta dars olib boradi. Avval fanlarni boshqasiga topshiring.",
     teacherHasGrades: "O'chirib bo'lmaydi: {count} ta baho va qaror shu o'qituvchi nomida — ularni muallifsiz qoldirib bo'lmaydi.",
     subjectInUse: "O'chirib bo'lmaydi: {lessons} dars, {homework} topshiriq, {plans} o'quv reja. Ularni olib tashlang yoki fanni yashiring.",

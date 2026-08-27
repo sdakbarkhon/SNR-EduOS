@@ -155,6 +155,14 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (raw === "PRICE_TOO_BIG" || /integer out of range/i.test(raw)) {
     return t.coursePriceTooBig;
   }
+  // Миграция 228 — последнего администратора школы удалять нельзя. Код
+  // LAST_SCHOOL_ADMIN бросает первый рубеж (admin-api.ts) и именно он доезжает
+  // до человека; last_school_admin — второй рубеж, триггер в базе: он до
+  // экрана добирается редко, потому что удаление идёт через Auth API, а тот
+  // подменяет ошибку базы своим текстом. Ловим оба на случай, если доберётся.
+  if (raw === "LAST_SCHOOL_ADMIN" || /last_school_admin/i.test(raw)) {
+    return t.lastSchoolAdmin;
+  }
 
   // Миграция 222 — суперадмин не пишет в школьные таблицы под своим токеном.
   // Ограничительное правило отвергает вставку с кодом 42501; на изменении и
