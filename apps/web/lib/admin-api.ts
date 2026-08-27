@@ -522,6 +522,9 @@ export async function createGroup(data: {
   subject: string;
   teacher_id: string | null;
   school_id: string;
+  /** Заход 2 по платежам. undefined — формы без поля цены: тогда за значение
+   *  отвечает DEFAULT 0 в базе, а не мы. */
+  course_price?: number;
 }): Promise<string> {
   const sb = getServiceClient();
   await assertGroupNameFree(sb, data.name, data.school_id);
@@ -536,7 +539,7 @@ export async function createGroup(data: {
 
 export async function updateGroup(
   groupId: string,
-  data: { name: string; subject: string; teacher_id?: string | null },
+  data: { name: string; subject: string; teacher_id?: string | null; course_price?: number },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
@@ -549,6 +552,10 @@ export async function updateGroup(
   // не должен молча обнуляться при переименовании группы.
   const patch: Record<string, unknown> = { name: data.name, subject: data.subject };
   if (data.teacher_id !== undefined) patch.teacher_id = data.teacher_id || null;
+  // Цена — по тому же правилу, что куратор: пишем, только если форма её
+  // прислала. Пустое поле формы — это ноль и он приедет числом; молчание
+  // формы не должно обнулять уже заданную цену.
+  if (data.course_price !== undefined) patch.course_price = data.course_price;
 
   const { error } = await sb.from("groups").update(patch).eq("id", groupId);
   if (error) throw error;

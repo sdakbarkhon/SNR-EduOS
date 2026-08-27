@@ -13,6 +13,7 @@ import { getDictionary, getSubjectKeyByLabel, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
+import { formatCoursePrice, formatCoursePriceInput } from "@/lib/course-price";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
 
 type Teacher = { id: string; full_name: string };
@@ -22,6 +23,9 @@ type Group = {
   name: string;
   subject: string;
   teacher_id: string | null;
+  /** Цена обучения в месяц, сумы, целое. НОЛЬ ЗНАЧИТ «не задана», а не
+   *  «бесплатно» — см. lib/course-price.ts. */
+  course_price: number;
   teachers: { id: string; full_name: string } | null;
   student_groups: { student_id: string }[];
 };
@@ -70,6 +74,34 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+    />
+  );
+}
+
+/**
+ * Поле цены обучения.
+ *
+ * НЕ type="number" — сознательно. Числовое поле браузера не даёт вставить
+ * «4 500 000» с пробелами (а деньги пишут именно так), зато пропускает «e»,
+ * «-» и дробную точку. Здесь наоборот: поле текстовое, но на каждом нажатии
+ * из него выбрасывается всё, кроме цифр, и разряды собираются заново. Буква,
+ * точка, запятая и минус в поле просто не появляются, а вставленное из буфера
+ * «4 500 000» читается верно.
+ *
+ * Пустое поле — это ноль, то есть «цена не задана». При нуле поле и
+ * открывается пустым: иначе админ не отличит «мы решили не брать денег» от
+ * «мы ещё не заполнили».
+ */
+function CoursePriceInput({ defaultValue }: { defaultValue: number }) {
+  const [value, setValue] = useState(defaultValue > 0 ? formatCoursePrice(defaultValue) : "");
+  return (
+    <Input
+      name="course_price"
+      value={value}
+      onChange={(e) => setValue(formatCoursePriceInput(e.target.value))}
+      inputMode="numeric"
+      autoComplete="off"
+      placeholder="0"
     />
   );
 }
@@ -176,6 +208,13 @@ function GroupForm({
           </Select>
         </Field>
       )}
+      {/* Заход 2 по платежам. Цену задаёт ТОЛЬКО админ школы: у учителя и
+          куратора этой формы нет вовсе, а правило доступа на groups даёт
+          запись одному fn_is_admin() своей школы. */}
+      <Field label={t.fieldCoursePrice}>
+        <CoursePriceInput defaultValue={defaultValues?.course_price ?? 0} />
+        <p className="text-xs text-gray-400">{t.coursePriceHint}</p>
+      </Field>
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
         <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60">
@@ -279,13 +318,14 @@ export function GroupsView({
                 <th className="px-4 py-3">{t.fieldSubject}</th>
                 <th className="px-4 py-3">{t.tableTeacher}</th>
                 <th className="px-4 py-3">{t.tableStudentCount}</th>
+                <th className="px-4 py-3">{t.tableCoursePrice}</th>
                 <th className="px-4 py-3 text-right">{t.tableActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
                 </tr>
               ) : (
                 filtered.map((g) => {
@@ -296,6 +336,13 @@ export function GroupsView({
                       <td className="px-4 py-3 text-gray-500">{subjectLabel}</td>
                       <td className="px-4 py-3 text-gray-500">{g.teachers?.full_name ?? "—"}</td>
                       <td className="px-4 py-3 text-gray-500">{g.student_groups.length}</td>
+                      {/* «0 сум» здесь был бы неправдой: ноль означает, что
+                          цену ещё не заполнили. Так и пишем. */}
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                        {g.course_price > 0
+                          ? `${formatCoursePrice(g.course_price)} ${t.sumUnit}`
+                          : <span className="text-gray-300">{t.coursePriceNotSet}</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setModal({ kind: "edit", group: g })} className="rounded-lg p-1.5 text-gray-400 hover:bg-violet-50 hover:text-violet-600" title={t.editBtn}>

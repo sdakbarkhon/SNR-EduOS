@@ -131,6 +131,15 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (raw === "GROUP_NAME_TAKEN") {
     return t.groupNameTaken;
   }
+  // Заход 2 по платежам. BAD_PRICE / PRICE_TOO_BIG бросает разбор формы
+  // (lib/course-price.ts), а groups_course_price_not_negative — проверка из
+  // миграции 227: последний рубеж, если запись пойдёт мимо разбора.
+  if (raw === "BAD_PRICE" || /groups_course_price_not_negative/i.test(raw)) {
+    return t.coursePriceInvalid;
+  }
+  if (raw === "PRICE_TOO_BIG" || /integer out of range/i.test(raw)) {
+    return t.coursePriceTooBig;
+  }
   // Миграция 226 — у урока обязан быть предмет, а внешний ключ стал
   // RESTRICT. Гвард в admin-api.ts ловит это раньше и объясняет числами; сюда
   // отказ доходит, только если удаление пошло мимо гварда. Общая фраза «есть

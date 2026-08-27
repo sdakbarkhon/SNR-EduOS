@@ -14,6 +14,7 @@ import type {
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
 import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
+import { parseCoursePrice } from "@/lib/course-price";
 import { getSubjectKeyByLabel } from "@snr/core";
 import { revalidatePath } from "next/cache";
 
@@ -172,6 +173,19 @@ function readCuratorId(formData: FormData): string | null | undefined {
   return String(formData.get("teacher_id") ?? "").trim() || null;
 }
 
+/**
+ * Цена из формы — заход 2 по платежам.
+ *
+ * Возвращает undefined, если поля в FormData НЕТ вовсе. Это не то же самое,
+ * что пустое поле: пустое — осознанный ноль («цена не задана»), отсутствие —
+ * форма, которая про цену не знает, и её молчание не должно обнулять уже
+ * заданную цену. Тот же приём, что у куратора выше.
+ */
+function readCoursePrice(formData: FormData): number | undefined {
+  const raw = formData.get("course_price");
+  return raw === null ? undefined : parseCoursePrice(String(raw));
+}
+
 export async function actionCreateGroup(formData: FormData) {
   const { schoolId } = await verifyAdmin();
   const name = String(formData.get("name") ?? "").trim();
@@ -179,6 +193,7 @@ export async function actionCreateGroup(formData: FormData) {
   const subject = await resolveGroupSubject(formData, schoolId);
   const id = await createGroup({
     name, subject, teacher_id: readCuratorId(formData) ?? null, school_id: schoolId,
+    course_price: readCoursePrice(formData),
   });
   revalidatePath("/admin/groups");
   revalidatePath("/admin");
@@ -190,7 +205,12 @@ export async function actionUpdateGroup(formData: FormData) {
   const group_id = String(formData.get("group_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const subject = await resolveGroupSubject(formData, schoolId);
-  await updateGroup(group_id, { name, subject, teacher_id: readCuratorId(formData) }, schoolId, isSuperAdmin);
+  await updateGroup(
+    group_id,
+    { name, subject, teacher_id: readCuratorId(formData), course_price: readCoursePrice(formData) },
+    schoolId,
+    isSuperAdmin,
+  );
   revalidatePath("/admin/groups");
 }
 

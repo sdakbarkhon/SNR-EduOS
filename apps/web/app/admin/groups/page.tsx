@@ -26,7 +26,9 @@ export default async function AdminGroupsPage({
         // PostgREST отказывается угадывать и валит ВЕСЬ запрос ошибкой
         // PGRST201, а страница показывает «Групп пока нет» — потому что
         // groups приходит null и превращается в пустой массив ниже.
-        "id, name, subject, teacher_id, teachers!groups_teacher_id_fkey(id, full_name), student_groups(student_id)",
+        // course_price — заход 2 по платежам: колонка была в базе с самого
+        // начала, но её не выбирал и не правил ни один экран.
+        "id, name, subject, teacher_id, course_price, teachers!groups_teacher_id_fkey(id, full_name), student_groups(student_id)",
       )
       .order("name"),
     supabase.from("teachers").select("id, full_name").order("full_name"),

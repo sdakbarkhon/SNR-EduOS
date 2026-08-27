@@ -657,6 +657,11 @@ export interface Dictionary {
     fieldGroupName: string;
     fieldSubject: string;
     fieldTeacher: string;
+    fieldCoursePrice: string;
+    coursePriceHint: string;
+    tableCoursePrice: string;
+    coursePriceNotSet: string;
+    sumUnit: string;
     fieldDescription: string;
     tableStudentCount: string;
     tableTeacher: string;
@@ -1128,6 +1133,8 @@ export interface Dictionary {
     assignmentExists: string;
     phoneInvalid: string;
     groupNameTaken: string;
+    coursePriceInvalid: string;
+    coursePriceTooBig: string;
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"
