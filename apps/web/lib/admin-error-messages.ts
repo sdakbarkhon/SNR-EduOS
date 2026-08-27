@@ -7,9 +7,6 @@ const PASSTHROUGH_MESSAGES = new Set([
   "Нельзя привязать ученика чужой школы",
 ]);
 
-/** Converts a raw Postgres/Supabase/auth error into a short, human-readable
- *  message in the caller's locale — the customer's school admin should never
- *  see "duplicate key value violates unique constraint ..." on screen. */
 /** Текст ошибки из чего угодно. Ошибки Supabase — обычные объекты
  *  `{ message, details, hint, code }`, а не `Error`, и прежнее
  *  `String(err)` превращало их в «[object Object]». Имя нарушенного
@@ -25,6 +22,9 @@ function rawTextOf(err: unknown): string {
   return String(err);
 }
 
+/** Converts a raw Postgres/Supabase/auth error into a short, human-readable
+ *  message in the caller's locale — the customer's school admin should never
+ *  see "duplicate key value violates unique constraint ..." on screen. */
 export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string {
   const raw = rawTextOf(err);
   const status = (err as { status?: number; code?: number } | null)?.status
@@ -154,6 +154,24 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   }
   if (raw === "PRICE_TOO_BIG" || /integer out of range/i.test(raw)) {
     return t.coursePriceTooBig;
+  }
+
+  // Миграция 222 — суперадмин не пишет в школьные таблицы под своим токеном.
+  // Ограничительное правило отвергает вставку с кодом 42501; на изменении и
+  // удалении оно не бросается вовсе, а просто не находит строк, и туда эта
+  // ветка не попадёт — но там и сообщать не о чем.
+  //
+  // Из интерфейса суперадмин сюда не приходит: его собственные экраны пишут
+  // служебным ключом, а на админские он не попадает — middleware уводит его на
+  // свою панель. Ветка нужна на случай запроса в обход экранов: показывать
+  // человеку английский текст Postgres нечего.
+  if (/row-level security policy/i.test(raw) || /42501/.test(raw)) {
+    // Различаем по самому тексту: имя сторожевой функции попадает в
+    // сообщение, только если отказ поднят ею. Гадать по роли не из чего —
+    // на клиенте её нет.
+    return /is_super_admin|sa_write_allowed/i.test(raw)
+      ? t.superadminWriteBlocked
+      : t.rlsWriteBlocked;
   }
   // Миграция 226 — у урока обязан быть предмет, а внешний ключ стал
   // RESTRICT. Гвард в admin-api.ts ловит это раньше и объясняет числами; сюда

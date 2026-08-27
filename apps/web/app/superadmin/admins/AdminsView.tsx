@@ -8,6 +8,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 import { origName } from "@/lib/form-patch";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import {
   actionCreateSchoolAdmin, actionUpdateSchoolAdmin,
   actionDeleteSchoolAdmin, actionResetSchoolAdminPassword,
@@ -221,7 +222,7 @@ export function AdminsView({
                 const fd = new FormData(e.currentTarget);
                 startTransition(async () => {
                   try {
-                    await actionCreateSchoolAdmin(fd);
+                    await unwrap(actionCreateSchoolAdmin(fd));
                     flash(
                       t.createdMsg
                         .replace("{username}", String(fd.get("username")))
@@ -292,7 +293,7 @@ export function AdminsView({
                 const fd = new FormData(e.currentTarget);
                 startTransition(async () => {
                   try {
-                    await actionUpdateSchoolAdmin(fd);
+                    await unwrap(actionUpdateSchoolAdmin(fd));
                     flash(t.adminUpdatedMsg);
                     setModal({ kind: "none" });
                   } catch (err) {
@@ -348,7 +349,7 @@ export function AdminsView({
                   if (!userId) { flash(t.noAccountError); setModal({ kind: "none" }); return; }
                   startTransition(async () => {
                     try {
-                      const newPassword = await actionResetSchoolAdminPassword(userId);
+                      const newPassword = await unwrap(actionResetSchoolAdminPassword(userId));
                       flash(t.newPasswordFlash.replace("{name}", modal.admin.full_name).replace("{password}", newPassword));
                       setModal({ kind: "none" });
                     } catch (err) {
@@ -382,7 +383,7 @@ export function AdminsView({
                   if (!userId) { flash(t.noAccountError); setModal({ kind: "none" }); return; }
                   startTransition(async () => {
                     try {
-                      await actionDeleteSchoolAdmin(userId);
+                      await unwrap(actionDeleteSchoolAdmin(userId));
                       flash(t.adminDeletedMsg);
                       setModal({ kind: "none" });
                     } catch (err) {

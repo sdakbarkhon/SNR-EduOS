@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import { actionChangeOwnPassword, actionSetOwnGoogleEmail } from "../actions";
 import { GoogleEmailField } from "@/components/admin/GoogleEmailField";
 
@@ -45,7 +46,7 @@ export function SettingsView({ googleEmail }: { googleEmail?: string | null }) {
             const fd = new FormData(e.currentTarget);
             startTransition(async () => {
               try {
-                await actionSetOwnGoogleEmail(fd);
+                await unwrap(actionSetOwnGoogleEmail(fd));
                 flash(t.googleEmailSavedMsg);
               } catch (err) {
                 flash(humanizeAdminError(err, locale as Locale));
@@ -73,7 +74,7 @@ export function SettingsView({ googleEmail }: { googleEmail?: string | null }) {
             const fd = new FormData(e.currentTarget);
             startTransition(async () => {
               try {
-                await actionChangeOwnPassword(fd);
+                await unwrap(actionChangeOwnPassword(fd));
                 flash(t.passwordChangedMsg);
                 (e.target as HTMLFormElement).reset();
               } catch (err) {

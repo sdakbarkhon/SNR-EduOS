@@ -680,6 +680,7 @@ export interface Dictionary {
     groupDeletedMsg: string;
     teacherUpdatedMsg: string;
     teacherDeletedMsg: string;
+    teacherCreatedMsg: string;
     studentUpdatedMsg: string;
     dashboardTitle: string;
     dashboardSubtitle: string;
@@ -1096,6 +1097,8 @@ export interface Dictionary {
     resetPasswordBtn: string;
     resetPasswordConfirm: string;
     resetPasswordNotRegistered: string;
+    parentSavedMsg: string;
+    parentDeletedMsg: string;
     newPasswordFlash: string;
     emptyParentsNeedStudents: string;
     needStudentsFirst: string;
@@ -1135,6 +1138,8 @@ export interface Dictionary {
     groupNameTaken: string;
     coursePriceInvalid: string;
     coursePriceTooBig: string;
+    superadminWriteBlocked: string;
+    rlsWriteBlocked: string;
     teacherHasLessons: string;      // "{count}"
     teacherHasGrades: string;       // "{count}"
     subjectInUse: string;           // "{lessons} {homework} {plans}"

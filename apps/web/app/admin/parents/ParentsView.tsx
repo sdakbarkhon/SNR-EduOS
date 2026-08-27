@@ -372,7 +372,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
           parent={modal.parent}
           allStudents={allStudents}
           onClose={() => setModal({ kind: "none" })}
-          onSaved={() => { flash(t.saveBtn + " ✓"); setModal({ kind: "none" }); }}
+          onSaved={() => { flash(t.parentSavedMsg); setModal({ kind: "none" }); }}
           onError={(msg) => flash(msg)}
           locale={locale as Locale}
           t={t}
@@ -429,7 +429,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                 onClick={() => startTransition(async () => {
                   try {
                     await unwrap(actionDeleteParent(modal.parent.id));
-                    flash(t.deleteBtn + " ✓");
+                    flash(t.parentDeletedMsg);
                     setModal({ kind: "none" });
                   } catch (err) {
                     flash(humanizeAdminError(err, locale as Locale));

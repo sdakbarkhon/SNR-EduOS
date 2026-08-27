@@ -365,7 +365,7 @@ export function TeachersView({
                   try {
                     await unwrap(actionCreateTeacher(fd));
                     flash(
-                      t.createdMsg
+                      t.teacherCreatedMsg
                         .replace("{username}", String(fd.get("username")))
                         .replace("{password}", String(fd.get("password"))),
                     );

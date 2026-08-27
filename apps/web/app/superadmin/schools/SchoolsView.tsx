@@ -6,6 +6,7 @@ import { Archive, ArchiveRestore, Eye, ImageOff, Pencil, Plus, Trash2, X } from 
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
+import { unwrap } from "@/lib/action-result";
 import {
   actionCreateSchool,
   actionDeleteSchoolForever,
@@ -118,7 +119,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
     setPreview(null);
     startTransition(async () => {
       try {
-        setPreview(await actionSchoolWipePreview(school.id));
+        setPreview(await unwrap(actionSchoolWipePreview(school.id)));
       } catch (err) {
         flash(humanizeAdminError(err, locale as Locale));
       }
@@ -269,7 +270,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 setFormError(null);
                 startTransition(async () => {
                   try {
-                    await actionCreateSchool(fd);
+                    await unwrap(actionCreateSchool(fd));
                     flash(t.schoolCreatedMsg.replace("{name}", String(fd.get("name"))));
                     setShowAdd(false);
                   } catch (err) {
@@ -307,7 +308,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 setFormError(null);
                 startTransition(async () => {
                   try {
-                    await actionUpdateSchool(editing.id, fd);
+                    await unwrap(actionUpdateSchool(editing.id, fd));
                     flash(t.schoolUpdatedMsg.replace("{name}", String(fd.get("name"))));
                     setEditing(null);
                   } catch (err) {
@@ -345,7 +346,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                 <button
                   onClick={() => startTransition(async () => {
                     try {
-                      await actionSetSchoolArchived(wipe.id, true);
+                      await unwrap(actionSetSchoolArchived(wipe.id, true));
                       flash(t.schoolArchivedMsg.replace("{name}", wipe.name));
                       closeWipe();
                     } catch (err) {
@@ -415,7 +416,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                     disabled={isPending || confirmText.trim() !== wipe.name.trim()}
                     onClick={() => startTransition(async () => {
                       try {
-                        const res = await actionDeleteSchoolForever(wipe.id, confirmText);
+                        const res = await unwrap(actionDeleteSchoolForever(wipe.id, confirmText));
                         flash(
                           t.schoolDeletedMsg
                             .replace("{name}", wipe.name)
@@ -459,7 +460,7 @@ export function SchoolsView({ schools }: { schools: School[] }) {
                   disabled={isPending}
                   onClick={() => startTransition(async () => {
                     try {
-                      await actionSetSchoolArchived(restore.id, false);
+                      await unwrap(actionSetSchoolArchived(restore.id, false));
                       flash(t.schoolRestoredMsg.replace("{name}", restore.name));
                       setRestore(null);
                     } catch (err) {
