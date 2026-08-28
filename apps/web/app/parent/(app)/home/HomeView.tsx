@@ -100,6 +100,7 @@ export interface HomeViewData {
     lessonsTotal: string;
     attended: string;
     homework: string;
+    walletLabel: string;
   };
   nextLesson: {
     subjectName: string;
@@ -112,9 +113,6 @@ export interface HomeViewData {
     gradient: Gradient;
   } | null;
   /** Мок: платёжного бэкенда нет (см. page.tsx). */
-  /** Что показывать в плитке «К оплате»: числа, «долгов нет» или отказ.
-   *  Фразы живут здесь, потому что словарь есть только у клиента. */
-  dueState: "ok" | "none" | "failed";
   due: { amountLabel: string; subtitle: string };
   /** Мок: сервиса питания нет (см. page.tsx). */
   meals: { statusLabel: string; untilLabel: string };
@@ -187,6 +185,7 @@ const T = {
   lessons: "Уроков", // home.lessons
   attended: "Посещено", // home.attended
   hw: "ДЗ", // home.hw
+  wallet: "Кошелёк", // home.wallet
   pay: "Оплатить", // home.pay
   hwShort: "Дом. задания", // home.hwShort
   services: "Все сервисы", // scr.services
@@ -708,18 +707,13 @@ export function HomeView({ data }: { data: HomeViewData }) {
     router.prefetch(R.profile);
   }, [router]);
 
-  // Четыре колонки метрики-сплит (в макете было пять).
-  //
-  // 27.08.2026: пятая, «Кошелёк», убрана. Там стояла выдуманная сумма денег —
-  // 185 000 из заготовки питания, — и это первое, что человек видит после
-  // входа. Пометить её здесь негде: строка метрик не держит подписей. Та же
-  // причина, по которой из раздела оплаты убрали поддельные чеки. Появится
-  // школьный кошелёк таблицей — вернём плитку.
+  // 5 колонок метрики-сплит (макет 230–240).
   const metricCells: MetricCell[] = [
     { label: T.atSchoolSince, value: data.metrics.atSchoolSince ? dt.time(data.metrics.atSchoolSince) : "—" },
     { label: T.lessons, value: data.metrics.lessonsTotal },
     { label: T.attended, value: data.metrics.attended, valueColor: status.green.text },
     { label: T.hw, value: data.metrics.homework, valueColor: status.orange.text },
+    { label: T.wallet, value: data.metrics.walletLabel, flex: 1.4 },
   ];
 
   // Быстрые действия (макет 256–263). Иконки из ICONS + inline paths.
@@ -886,15 +880,9 @@ export function HomeView({ data }: { data: HomeViewData }) {
                 >
                   {T.due}
                 </span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>
-                  {data.dueState === "ok" ? data.due.amountLabel
-                    : data.dueState === "none" ? dict.parentApp.pay2.noDebt
-                    : "—"}
-                </span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#FFFFFF" }}>{data.due.amountLabel}</span>
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
-                  {data.dueState === "ok" ? data.due.subtitle
-                    : data.dueState === "failed" ? dict.parentApp.pay2.loadFailed
-                    : ""}
+                  {data.due.subtitle}
                 </span>
               </AccentCard>
               <AccentCard

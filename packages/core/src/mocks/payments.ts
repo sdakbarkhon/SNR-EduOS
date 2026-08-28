@@ -16,12 +16,11 @@ export interface BillRow {
   checked_by_default: boolean;
 }
 
-/** 27.08.2026: autopay_enabled / autopay_note убраны. Автоплатежа в
- *  утверждённой модели оплаты нет — счёт выставляется 1 числа и гасится с
- *  баланса ребёнка, привязанных карт и автосписания не предусмотрено. */
 export interface PaymentsOverview {
   total_balance: number;
   overpayment: number;
+  autopay_enabled: boolean;
+  autopay_note: string;
 }
 
 export interface WalletRow {
@@ -80,10 +79,12 @@ export const BILLS: BillRow[] = [
   },
 ];
 
-/** Карточка баланса П17 (C3). */
+/** Карточка баланса П17 (C3) + автоплатёж (initial state: autopay true). */
 export const PAYMENTS_OVERVIEW: PaymentsOverview = {
   total_balance: 1250000,
   overpayment: 120000,
+  autopay_enabled: true,
+  autopay_note: "1-го числа · Uzcard ····8341",
 };
 
 /** wallets: [92000, 185000, 240000, 65000, 145000, 210000] — порядок совпадает

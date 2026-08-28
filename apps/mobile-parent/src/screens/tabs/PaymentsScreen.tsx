@@ -9,35 +9,23 @@
  *     на glass-квадрате; внизу два AccentInset sub-tile: «К ОПЛАТЕ»/«ПЕРЕПЛАТА».
  *  3. SectionHeader «К оплате сейчас» + chip «2 счёта» (orange) + «Смотреть все ›» → d18.
  *  4. GlassCard с двумя ListRow счетов (BILLS.in_main_list) → d18.
- *  5. PrimaryButton «Оплатить всё — {sum}» — ПОГАШЕНА, см. ниже.
- *  6. QuickActionsGrid 4 колонки: Пополнить (dtop) / История (d20) / Счета и чеки (d21) / Способы оплаты (d33).
- *  7. AccentCard «Кошелёк {gen}» → d22.
+ *  5. GlassCard-строка «Автоплатёж» с Toggle (локальный state; initial из PAYMENTS_OVERVIEW.autopay_enabled).
+ *  6. PrimaryButton «Оплатить всё — {sum}» → d19.
+ *  7. QuickActionsGrid 4 колонки: Пополнить (dtop) / История (d20) / Счета и чеки (d21) / Способы оплаты (d33).
+ *  8. AccentCard «Кошелёк {gen}» → d22.
  *
  * Данные полностью из фикстур: getPaymentsOverview, getDueBills, getDueTotal,
  * getDueBillsCount, getSelectedChildContext (для gen-имени и баланса кошелька).
  * Никаких Ring/RingSegmented на этом экране не используется — только карточки,
- * ListRow, PrimaryButton, QuickActionTile и AccentInset.
+ * ListRow, Toggle, PrimaryButton, QuickActionTile и AccentInset.
  *
  * 15.08.2026 (оплаты). Сверху — плашка «данных нет, это пример». «Оплатить
  * всё» больше не ведёт на выдуманный checkout, а объясняет отсутствие
- * платёжной системы. Экраны d19 (checkout), dcarddet (детали карты) и
- * daddcard (форма привязки карты) удалены целиком.
- *
- * 27.08.2026 — ЭКРАН ОБЕЩАЛ ТО, ЧЕГО НЕТ.
- *
- * Убрана строка «Автоплатёж · 1-го числа · Uzcard ····8341» с переключателем.
- * Автоплатежа в утверждённой модели нет вовсе: счёт выставляется 1 числа и
- * гасится с баланса ребёнка, привязанных карт и автосписания не
- * предусмотрено. Карты «····8341» тоже не существует — приложение не хранит
- * ни одной. Тумблер к тому же ничего не сохранял и лишь показывал пояснение
- * после нажатия. Убрано целиком, а не спрятано за условием.
- *
- * «Оплатить всё» больше не выглядит рабочей кнопкой: она приглушена, помечена
- * «Скоро» и не нажимается, а объяснение стоит под ней постоянно, а не
- * раскрывается по щелчку — раскрыть его никто не догадается, а кнопка тем
- * временем выглядит боевой. Ровно то же сделано у веб-родителя
- * (apps/web/app/parent/(app)/payments/PaymentsView.tsx).
+ * платёжной системы; тумблер автоплатежа говорит, что сохранять настройку
+ * некуда. Экраны d19 (checkout), dcarddet (детали карты) и daddcard
+ * (форма привязки карты) удалены целиком.
  */
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
@@ -52,6 +40,7 @@ import {
   QuickActionTile,
   RootHeader,
   TabScreenScroll,
+  Toggle,
 } from "../../ui";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import { useAppLocale } from "../../i18n";
@@ -121,6 +110,9 @@ export default function PaymentsScreen() {
   const dueCount = getDueBillsCount();
   const unread = useUnreadNotifications();
 
+  const [autopay, setAutopay] = useState<boolean>(overview.autopay_enabled);
+  const [paySoon, setPaySoon] = useState(false);
+  const [autopaySoon, setAutopaySoon] = useState(false);
 
   // Уместные caps-стили для «ОБЩИЙ БАЛАНС» / «К ОПЛАТЕ» / «ПЕРЕПЛАТА».
   const capsLabelStyle = {
@@ -282,50 +274,55 @@ export default function PaymentsScreen() {
           ))}
         </GlassCard>
 
-        {/* 5. Главная CTA — ПОГАШЕНА. Раньше вела на выдуманный checkout с
-            поддельной шторкой «Платёж проведён»; потом стала раскрывать
-            пояснение по нажатию. Платёжной системы нет — кнопка приглушена,
-            помечена «Скоро», не нажимается, а пояснение стоит под ней всегда.
-            Строка автоплатежа, стоявшая выше, снесена целиком. */}
-        <View>
-          <View>
-            <PrimaryButton
-              label={fillTemplate(d.parentApp.pay.payAllBtn, {
-                sum: formatMoney(dueTotal, { withCurrency: true, currency: d.parentApp.pay.sum }),
-              })}
-              disabled
-              icon={<WhiteGlyph paths={ICONS.card} size={16} />}
-            />
-            {/* Метка «Скоро» поверх кнопки: приглушения одного мало — на
-                градиенте оно читается как «просто такой оттенок». */}
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                right: 14,
-                top: 0,
-                bottom: 0,
-                justifyContent: "center",
-              }}
-            >
-              <View
-                style={{
-                  paddingHorizontal: 9,
-                  paddingVertical: 3,
-                  borderRadius: 8,
-                  backgroundColor: "rgba(255,255,255,0.22)",
+        {/* 5. Автоплатёж (Toggle). */}
+        <GlassCard contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+          <ListRow
+            left={
+              <BillIconTile
+                gradient={["#34d399", "#059669"]}
+                paths={[
+                  "M21 12a9 9 0 1 1-3-6.7",
+                  "M21 4v5h-5",
+                ]}
+                size={36}
+                radius={12}
+              />
+            }
+            title={d.parentApp.pay.autopay}
+            subtitle={overview.autopay_note}
+            right={
+              <Toggle
+                value={autopay}
+                onValueChange={(v) => {
+                  // Тумблер переключается, но сохранять его некуда: автоплатёж
+                  // живёт у платёжной системы, а её нет. Говорим об этом, а не
+                  // делаем вид, что настройка запомнена.
+                  setAutopay(v);
+                  setAutopaySoon(true);
                 }}
-              >
-                <Text style={{ fontFamily: fonts.manrope800, fontSize: 9.5, color: "#FFFFFF" }}>
-                  {d.status.soon}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <SoonNote text={d.parentApp.pay2.soon} />
+              />
+            }
+            gap={11}
+            verticalPadding={10}
+          />
+          {autopaySoon ? <SoonNote text={d.parentApp.pay2.soon} /> : null}
+        </GlassCard>
+
+        {/* 6. Главная CTA. Раньше вела на выдуманный checkout, который
+            заканчивался поддельной шторкой «Платёж проведён». Платёжной
+            системы нет — кнопка объясняет это прямо под собой. */}
+        <View>
+          <PrimaryButton
+            label={fillTemplate(d.parentApp.pay.payAllBtn, {
+              sum: formatMoney(dueTotal, { withCurrency: true, currency: d.parentApp.pay.sum }),
+            })}
+            onPress={() => setPaySoon((v) => !v)}
+            icon={<WhiteGlyph paths={ICONS.card} size={16} />}
+          />
+          {paySoon ? <SoonNote text={d.parentApp.pay2.soon} /> : null}
         </View>
 
-        {/* 6. Быстрые действия — 4 колонки. */}
+        {/* 7. Быстрые действия — 4 колонки. */}
         <QuickActionsGrid columns={4} style={{ marginTop: 4 }}>
           <QuickActionTile
             size="sm"
@@ -361,7 +358,7 @@ export default function PaymentsScreen() {
           />
         </QuickActionsGrid>
 
-        {/* 7. Кошелёк ребёнка. */}
+        {/* 8. Кошелёк ребёнка. */}
         <AccentCard
           gradient={["#7c3aed", "#a855f7"]}
           angle={135}

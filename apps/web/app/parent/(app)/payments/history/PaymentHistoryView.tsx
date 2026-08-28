@@ -1,183 +1,169 @@
 "use client";
 
 /**
- * Экран «История оплат» (d20).
+ * Экран «История оплат» (d20) — веб-порт
+ * apps/mobile-parent/src/screens/payments/PaymentHistoryScreen.tsx (макет
+ * «SNR EduOS v2 Light.dc.html», строки 969–994).
  *
- * 27.08.2026, ЗАХОД 4 ПО ПЛАТЕЖАМ — ЭКРАН ПЕРЕВЕДЁН НА НАСТОЯЩИЕ ДАННЫЕ и
- * переписан. Показывает журнал движений по балансу ребёнка
- * (`balance_entries`, миграции 227/229): пополнения, погашения счетов,
- * поправки школы, возвраты. Раньше здесь лежали выдуманные платежи.
+ * Композиция:
+ *  1. Четыре чипа-фильтра «Все / Обучение / Питание / Другое» (SegmentPills
+ *     из общего screen-kit — в мобилке этот компонент был продублирован
+ *     вручную внутри экрана, в вебе он уже есть в ките).
+ *  2. Группы по месяцам: заголовок «ИЮЛЬ 2026» + карточки-строки.
+ *     Строка: плитка категории 38, название + дата, подпись, статус
+ *     «Успешно»/«Возврат» и сумма (возврат — красный, со знаком «−»).
+ *  3. Фиолетовая сводная карточка: всего оплат / списано / возвраты.
  *
- * ЧЕТЫРЁХ ФИЛЬТРОВ «Все / Обучение / Питание / Другое» БОЛЬШЕ НЕТ. Они делили
- * выдуманные платежи по выдуманным категориям; у настоящего движения категории
- * нет вовсе — есть ВИД (`kind`), и видов ровно четыре, причём «питание» среди
- * них не значится: школьного кошелька в схеме не существует. Фильтр по полю,
- * которого нет, — обещание, которого мы не сдержим.
- *
- * ЗНАК СУММЫ БЕРЁТСЯ ИЗ ДАННЫХ, А НЕ ИЗ ВИДА. В журнале пополнение
- * положительное, погашение отрицательное — так его и рисуем. Считать знак по
- * виду значило бы завести второе правило рядом с первым.
- *
- * Строки никуда не ведут: экрана деталей движения не спроектировано, а шеврон
- * без перехода — обещание в никуда.
+ * Единственный интерактив — фильтр (как в мобилке): строки истории никуда не
+ * ведут, детали платежа отдельным экраном не спроектированы. Пустой результат
+ * фильтра показывает EmptyState вместо молчаливо пустого экрана.
  */
 
-import { getDictionary, type Locale } from "@snr/core";
-import { useLocale } from "@/components/LocaleProvider";
-import type { ChildBalanceEntry } from "@/lib/parent-queries";
+import { useState } from "react";
 import { GlassCard } from "../../v2/GlassCard";
-import { EmptyState, ICON, IconTile, ScreenScroll, SectionCap } from "../../_ui/screen-kit";
+import {
+  EmptyState,
+  IconTile,
+  ScreenScroll,
+  SectionCap,
+  SegmentPills,
+  WHITE,
+} from "../../_ui/screen-kit";
 import { ink1, ink2, ink3, status } from "../../v2/tokens";
-import { formatMoney, rowNote } from "../../_demo/demo-data";
-import { useDates } from "../../_ui/dates";
+import {
+  PAYMENT_HISTORY,
+  PAY_VISUAL,
+  formatMoney,
+  historyTotals,
+  rowNote,
+  type HistoryCategory,
+  type HistoryRow,
+} from "../../_demo/demo-data";
 
-/** Вид движения → как он выглядит. Ключи — значения `balance_entry_kind`
- *  из миграции 227, других не бывает. */
-const KIND_VISUAL: Record<
-  ChildBalanceEntry["kind"],
-  { gradient: readonly [string, string]; paths: readonly string[] }
-> = {
-  topup: { gradient: ["#34d399", "#059669"], paths: ICON.wallet },
-  adjustment: { gradient: ["#34d399", "#059669"], paths: ICON.wallet },
-  invoice_charge: { gradient: ["#a78bfa", "#7c3aed"], paths: ICON.doc },
-  refund: { gradient: ["#fbbf24", "#f97316"], paths: ICON.clock },
-};
+/** Порядок важен: индекс SegmentPills → категория. */
+const FILTERS: readonly { key: HistoryCategory | "all"; label: string }[] = [
+  { key: "all", label: "Все" },
+  { key: "edu", label: "Обучение" },
+  { key: "food", label: "Питание" },
+  { key: "other", label: "Другое" },
+];
 
-function EntryCard({
-  kind,
-  title,
-  note,
-  timeLabel,
-  amount,
-}: {
-  kind: ChildBalanceEntry["kind"];
-  title: string;
-  note: string | null;
-  timeLabel: string;
-  amount: number;
-}) {
-  const visual = KIND_VISUAL[kind];
-  const negative = amount < 0;
+function HistoryCard({ row, who }: { row: HistoryRow; who: string }) {
+  const visual = PAY_VISUAL[row.visual];
+  const sumColor = row.isRefund ? status.red.text : ink1;
+  const stateColor = row.isRefund ? status.red.text : status.green.text;
+
   return (
-    <GlassCard variant="glass2" radius={16} style={{ padding: 12 }}>
-      <div className="flex items-center" style={{ gap: 10 }}>
-        <IconTile gradient={visual.gradient} paths={visual.paths} size={38} glyphSize={18} />
+    <GlassCard radius={18} style={{ padding: "11px 13px" }}>
+      <div className="flex items-start" style={{ gap: 11 }}>
+        <IconTile gradient={visual.gradient} paths={visual.paths} size={38} glyphSize={16} />
         <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 1 }}>
-          <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-            {title}
-          </span>
-          {note ? (
-            <span className="truncate" style={{ fontSize: 9.5, fontWeight: 700, color: ink3 }}>
-              {note}
+          <div className="flex items-center justify-between" style={{ gap: 8 }}>
+            <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
+              {row.title}
             </span>
-          ) : null}
-          <span style={{ fontSize: 9, fontWeight: 700, color: ink3, marginTop: 2 }}>
-            {timeLabel}
+            <span className="shrink-0" style={{ fontSize: 9, fontWeight: 700, color: ink3 }}>
+              {row.dateLabel}
+            </span>
+          </div>
+          <span className="truncate" style={{ fontSize: 10, fontWeight: 600, color: ink2 }}>
+            {rowNote(who, row.via)}
           </span>
+          <div className="flex items-center justify-between" style={{ gap: 8, marginTop: 2 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 800, color: stateColor }}>
+              {row.isRefund ? "Возврат" : "Успешно"}
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: sumColor }}>
+              {row.isRefund ? "−" : ""}
+              {formatMoney(row.amount, { withCurrency: true })}
+            </span>
+          </div>
         </div>
-        <span
-          className="shrink-0"
-          style={{
-            fontSize: 12.5,
-            fontWeight: 800,
-            color: negative ? ink1 : status.green.text,
-          }}
-        >
-          {negative ? "−" : "+"}
-          {formatMoney(Math.abs(amount), { withCurrency: true })}
-        </span>
       </div>
     </GlassCard>
   );
 }
 
-export function PaymentHistoryView({
-  entries,
-  failed,
-  who,
-}: {
-  entries: ChildBalanceEntry[];
-  /** Прочитать не удалось — это НЕ «движений нет». */
-  failed: boolean;
-  /** «Шерзод · 10-А» — подпись строк, чтобы у родителя с двумя детьми было
-   *  видно, чей это журнал. */
-  who: string;
-}) {
-  const { locale } = useLocale();
-  const d = getDictionary(locale as Locale);
-  const p2 = d.parentApp.pay2;
-  const dates = useDates();
+function TotalsColumn({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 2 }}>
+      <span
+        style={{
+          fontSize: 8,
+          fontWeight: 800,
+          letterSpacing: 0.48,
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,0.75)",
+        }}
+      >
+        {label}
+      </span>
+      <span className="truncate" style={{ fontSize: 12.5, fontWeight: 800, color: WHITE }}>
+        {value}
+      </span>
+    </div>
+  );
+}
 
-  const titleOf = (kind: ChildBalanceEntry["kind"]) => {
-    if (kind === "invoice_charge") return p2.tuitionInvoice;
-    if (kind === "refund") return p2.historyRefunds;
-    return p2.historyTotal;
-  };
+export function PaymentHistoryView({ who }: { who: string }) {
+  const [filterIndex, setFilterIndex] = useState(0);
+  const activeKey = FILTERS[filterIndex]?.key ?? "all";
 
-  // Группировка по месяцу движения: «ИЮЛЬ 2026» над своими строками.
-  const groups: Array<{ key: string; label: string; rows: ChildBalanceEntry[] }> = [];
-  for (const row of entries) {
-    const dt = new Date(row.created_at);
-    const key = `${dt.getFullYear()}-${dt.getMonth() + 1}`;
-    const last = groups[groups.length - 1];
-    if (last && last.key === key) last.rows.push(row);
-    else groups.push({ key, label: dates.monthYear(dt.getFullYear(), dt.getMonth() + 1), rows: [row] });
-  }
+  const months = PAYMENT_HISTORY.map((month) => ({
+    ...month,
+    rows: month.rows.filter((row) => activeKey === "all" || row.category === activeKey),
+  })).filter((month) => month.rows.length > 0);
 
-  const toppedUp = entries.filter((e) => e.amount > 0).reduce((s, e) => s + e.amount, 0);
-  const spent = entries.filter((e) => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
-
-  if (failed) {
-    return (
-      <ScreenScroll gap={11}>
-        <EmptyState title={p2.loadFailed} />
-      </ScreenScroll>
-    );
-  }
-
-  if (entries.length === 0) {
-    return (
-      <ScreenScroll gap={11}>
-        <EmptyState title={p2.historyEmpty} />
-      </ScreenScroll>
-    );
-  }
+  const totals = historyTotals();
 
   return (
     <ScreenScroll gap={11}>
-      {groups.map((group) => (
-        <div key={group.key} className="flex flex-col" style={{ gap: 11 }}>
-          <SectionCap label={group.label} tone="ink3" />
-          {group.rows.map((row) => (
-            <EntryCard
-              key={row.id}
-              kind={row.kind}
-              title={titleOf(row.kind)}
-              note={rowNote(who, row.note ?? "")}
-              timeLabel={dates.dateTime(row.created_at)}
-              amount={row.amount}
-            />
+      <SegmentPills
+        items={FILTERS.map((f) => f.label)}
+        activeIndex={filterIndex}
+        onChange={setFilterIndex}
+      />
+
+      {months.length === 0 ? (
+        <GlassCard radius={20}>
+          <EmptyState
+            title="Оплат в этой категории нет"
+            text="За июнь и июль 2026 по выбранной категории платежей не было. Выберите «Все», чтобы увидеть всю историю."
+          />
+        </GlassCard>
+      ) : null}
+
+      {months.map((month) => (
+        <div key={month.id} className="flex flex-col" style={{ gap: 11 }}>
+          <SectionCap label={month.label} />
+          {month.rows.map((row) => (
+            <HistoryCard key={row.id} row={row} who={who} />
           ))}
         </div>
       ))}
 
-      {/* Итоги — по тем же строкам, что выше: складывать нечего, кроме них. */}
-      <GlassCard variant="glass2" radius={18} style={{ padding: 14 }}>
-        <div className="flex items-center justify-between" style={{ gap: 12 }}>
-          <div className="flex flex-col" style={{ gap: 2 }}>
-            <span style={{ fontSize: 9.5, fontWeight: 800, color: ink2 }}>{p2.historyTotal}</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: ink1 }}>
-              {formatMoney(toppedUp, { withCurrency: true })}
-            </span>
-          </div>
-          <div className="flex flex-col items-end" style={{ gap: 2 }}>
-            <span style={{ fontSize: 9.5, fontWeight: 800, color: ink2 }}>{p2.historyNet}</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: ink1 }}>
-              {formatMoney(spent, { withCurrency: true })}
-            </span>
-          </div>
+      {/* Сводка за весь период — не зависит от фильтра (как в мобилке). */}
+      <div
+        className="relative overflow-hidden"
+        style={{
+          borderRadius: 20,
+          background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
+          boxShadow: "0 16px 36px rgba(91,33,182,0.35)",
+        }}
+      >
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0"
+          style={{ height: 1.5, background: "rgba(255,255,255,0.35)" }}
+        />
+        <div className="flex items-stretch" style={{ gap: 8, padding: 14 }}>
+          <TotalsColumn label="Всего оплат" value={formatMoney(totals.total)} />
+          <span aria-hidden style={{ width: 1, background: "rgba(255,255,255,0.2)" }} />
+          <TotalsColumn label="Списано" value={formatMoney(totals.net)} />
+          <span aria-hidden style={{ width: 1, background: "rgba(255,255,255,0.2)" }} />
+          <TotalsColumn label="Возвраты" value={formatMoney(totals.refunds)} />
         </div>
-      </GlassCard>
+      </div>
     </ScreenScroll>
   );
 }

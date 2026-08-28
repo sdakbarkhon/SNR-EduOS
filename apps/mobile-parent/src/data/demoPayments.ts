@@ -14,18 +14,14 @@
  *   PAYMENT_HISTORY               → таблица проведённых платежей (payments);
  *   RECEIPTS                      → фискальные документы провайдера, файлы
  *                                   чеков вместо кнопки «скачать»;
- *   MAIN_CARD / OTHER_METHODS     → токены карт у платёжного шлюза
- *                                   (Payme Merchant, Uzcard PSP). Реквизиты
+ *   MAIN_CARD / OTHER_CARDS /     → токены карт у платёжного шлюза
+ *   OTHER_METHODS                   (Payme Merchant, Uzcard PSP). Реквизиты
  *                                   карт в приложении не хранятся и не
  *                                   вводятся — их принимает страница шлюза;
  *   WALLET_BALANCE, WALLET_OPS    → таблица операций кошелька и терминал в
  *                                   столовой;
  *   TOPUP_PRESETS                 → останется настройкой интерфейса: это не
  *                                   данные, а быстрые кнопки сумм.
- *
- * 27.08.2026 сняты заготовки снесённых экранов «Перевод» и «Лимиты»
- * (WALLET_LIMITS, walletLimitsFor, TRANSFER_PRESETS) и список сохранённых карт
- * (SavedCard, OTHER_CARDS): экранов больше нет, карт проект не хранит.
  *
  * ДО ТЕХ ПОР НИ ОДНА КНОПКА ЭТИХ ЭКРАНОВ НИЧЕГО НЕ СОХРАНЯЕТ. Действие
  * показывает пояснение (`SoonNote`), а не делает вид, что сработало.
@@ -190,17 +186,31 @@ export const RECEIPTS: ReceiptRow[] = [
 
 /* ── Карты и способы оплаты ───────────────────────────────────────────────── */
 
+export interface SavedCard {
+  id: string;
+  brand: string;
+  gradient: Gradient;
+  /** Маскированный номер — единственное, что приложение видит о карте. */
+  masked: string;
+  /** «ММ/ГГ» строкой: это не дата события, а надпись на карте. */
+  validThru: string;
+}
+
 /**
  * Основная карта — та же, что названа картой автоплатежа в
- * истории операций кошелька: иначе у родителя было бы две разные «главные»
- * карты. (Строка автоплатежа, которая называла её же, снесена 27.08.2026
- * вместе с самим автоплатежом.)
+ * `PAYMENTS_OVERVIEW.autopay_note`: иначе у родителя было бы две разные
+ * «главные» карты.
  */
 export const MAIN_CARD = {
   brand: "UZCARD",
   masked: "···· ···· ···· 8341",
   validThru: "09/28",
 } as const;
+
+export const OTHER_CARDS: SavedCard[] = [
+  { id: "humo", brand: "HUMO", gradient: ["#22d3ee", "#0891b2"], masked: "···· 5519", validThru: "04/27" },
+  { id: "visa", brand: "VISA", gradient: ["#334155", "#0f172a"], masked: "···· 4242", validThru: "11/26" },
+];
 
 export interface PayMethodItem {
   id: string;
@@ -212,8 +222,8 @@ export interface PayMethodItem {
 }
 
 export const OTHER_METHODS: PayMethodItem[] = [
-  { id: "payme", tag: "PAYME", gradient: ["#2dd4bf", "#0d9488"], title: "Payme", linked: false },
-  { id: "click", tag: "CLICK", gradient: ["#38bdf8", "#0284c7"], title: "Click", linked: false },
+  { id: "payme", tag: "PAYME", gradient: ["#2dd4bf", "#0d9488"], title: "Payme", linked: true },
+  { id: "click", tag: "CLICK", gradient: ["#38bdf8", "#0284c7"], title: "Click", linked: true },
   { id: "uzum", tag: "UZUM", gradient: ["#a78bfa", "#7c3aed"], title: "Uzum Bank", linked: false },
 ];
 
@@ -301,6 +311,16 @@ export function walletTotals(days: WalletOpDay[] = WALLET_OPS): {
   }
   return { spent, topped, opsCount };
 }
+
+/* ── Лимиты и перевод: заготовок нет и не будет ───────────────────────────
+ *
+ * Витрину раздела оплат вернули 28.08.2026 целиком (см. раздел 0 в
+ * CLAUDE_CHAT_HANDOFF.md), но два экрана — «Перевод между кошельками» и
+ * «Лимиты расходов» — заказчик снял 27.08.2026 насовсем: денег между
+ * балансами детей в модели нет, а лимиты ей противоречат. Поэтому
+ * WALLET_LIMITS, TRANSFER_PRESETS и переходник walletLimitsFor сюда не
+ * вернулись. Если увидишь их в старом коммите — это не потеря, это решение.
+ */
 
 /* ── Быстрые суммы ────────────────────────────────────────────────────────── */
 
@@ -417,6 +437,7 @@ export function foodPurchases(locale: Locale): {
   }
   return trDeep(out, locale);
 }
+
 
 /** Дата+время документа — для мест, где нужна полная отметка. */
 export function stampFor(iso: string, localeTag: string): string {

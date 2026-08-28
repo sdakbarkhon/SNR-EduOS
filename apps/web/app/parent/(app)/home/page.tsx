@@ -7,7 +7,6 @@ import {
   childGradesSummary,
   childHomework,
   childNextLessonDate,
-  childPaymentsSummary,
   childScheduleDay,
   getSelectedChild,
   parentNowMs,
@@ -17,6 +16,7 @@ import {
 import { findNextLesson, tashkentHour, subjectDisplay } from "@snr/core";
 
 import { avatarGradient, givenNameLetter, initialsOf, tashkentDay } from "../_ui/format";
+import { getDueBills, getDueBillsCount, getDueTotal, getSelectedChildContext } from "../v2/data";
 import { billsCountLabel } from "../_demo/demo-data";
 import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
 
@@ -29,17 +29,13 @@ import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
  * и ВСЕГДА передают studentId в core (иначе родительский RLS вернул бы
  * объединение по всем детям и экран молча соврал бы на втором ребёнке).
  *
- * 27.08.2026, заход 4 по платежам — «К ОПЛАТЕ» СТАЛО НАСТОЯЩИМ. Раньше в этой
- * плитке лежало 4 950 000 из выдуманных счетов, и это первое, что видел
- * человек после входа. Теперь сумма считается по ОТКРЫТЫМ счетам ребёнка
- * (tuition_invoices, миграции 227/229) тем же аксессором, что и экран
+ * Что остаётся моком и почему: «Кошелёк», «К оплате», «Питание» — платёжного
+ * бэкенда и сервиса питания в проекте нет вовсе (ни таблиц, ни core-запросов),
+ * поэтому это единственные три числа на экране, которые не из БД. Питание
+ * помечено константой MOCK_* ниже, чтобы его было видно грепом, а «Кошелёк» и
+ * «К оплате» берутся аксессорами ../v2/data — теми же, что и на
  * /parent/payments: две плитки в одном тапе друг от друга обязаны показывать
- * под одним ярлыком одно число. Долгов нет — так и написано, а не «0 сум».
- *
- * Что остаётся моком: «Питание» — сервиса питания в проекте нет вовсе, ни
- * таблицей, ни core-запросом; помечено константой MOCK_* ниже, чтобы его было
- * видно грепом. Плитка «Кошелёк» с выдуманными 185 000 убрана 27.08.2026: это
- * первое, что видит человек после входа, и пометить её в строке метрик негде.
+ * под одним ярлыком одно число.
  *
  * Все производные строки (время, даты, инициалы) считаются ЗДЕСЬ, на сервере:
  * клиентский `new Date()` дал бы другой результат (часовой пояс браузера +
@@ -49,15 +45,35 @@ import { subjects, type StatusKey, type SubjectKey } from "../v2/tokens";
 /* ─── Мок-значения: бэкенда нет ───────────────────────────────────────────── */
 
 /**
- * «К оплате» — настоящий долг ребёнка: сумма его ОТКРЫТЫХ счетов.
+ * Баланс кошелька — из той же фикстуры, что и экраны /parent/payments и
+ * /parent/payments/top-up, а не своей константой.
  *
- * Срока оплаты у счёта в базе нет ни колонкой, ни правилом, поэтому строки
- * «до 5 августа» здесь больше нет: она была частью выдуманного счёта. Появится
- * срок в схеме — вернём и подпись.
+ * Раньше здесь лежало `185 000`, тогда как оба экрана оплат показывали баланс
+ * из `getSelectedChildContext().wallet_balance`. Это ровно тот же дефект, что
+ * был у «К оплате» ниже: два экрана в одном тапе друг от друга под одной
+ * подписью показывали разные числа. Платёжного бэкенда по-прежнему нет (см.
+ * заголовок файла) — но фикстура должна быть ОДНА.
  */
-async function dueTile(): Promise<{ amount: number; bills: number; failed: boolean }> {
-  const summary = await childPaymentsSummary();
-  return { amount: summary.dueTotal, bills: summary.dueCount, failed: summary.failed };
+function walletBalance(): number {
+  return getSelectedChildContext().wallet_balance;
+}
+/**
+ * «К оплате» — ЕДИНЫЙ источник с экраном /parent/payments: те же аксессоры
+ * над той же фикстурой счетов, а не своя константа.
+ *
+ * Раньше здесь лежало `{ amount: 1 250 000, bills: 2 }`. 1 250 000 — это
+ * «ОБЩИЙ БАЛАНС» экрана оплат, а не долг: плитка на главной и экран оплат,
+ * до которого один тап, показывали под одним ярлыком «К оплате» разные числа,
+ * и меньшее выглядело опечаткой. Настоящий долг — getDueTotal() (4 950 000).
+ */
+function dueTile(): { amount: number; bills: number; untilLabel: string } {
+  // «5 августа 2026» → «до 5 августа»: год в плитке не нужен.
+  const deadline = getDueBills()[0]?.due_date_label.replace(/\s*\d{4}$/, "") ?? "";
+  return {
+    amount: getDueTotal(),
+    bills: getDueBillsCount(),
+    untilLabel: deadline ? `до ${deadline}` : "",
+  };
 }
 /** «Питание»: статус абонемента. */
 const MOCK_MEALS = { statusLabel: "Активно", untilLabel: "до конца месяца" };
@@ -171,7 +187,6 @@ export default async function ParentHomePage() {
       bellCount,
       child: null,
       childLoadError,
-      dueState: "none" as const,
       greeting: {
         title: `${greetingPrefix(nowMs)}${parentFirstName ? `, ${parentFirstName}` : ""}!`,
         subtitle: childLoadError
@@ -179,7 +194,7 @@ export default async function ParentHomePage() {
           : "Профиль ученика ещё не привязан к вашему аккаунту",
       },
       statusChip: null,
-      metrics: { atSchoolSince: null, lessonsTotal: "0", attended: "0/0", homework: "0" },
+      metrics: { atSchoolSince: null, lessonsTotal: "0", attended: "0/0", homework: "0", walletLabel: "—" },
       nextLesson: null,
       due: { amountLabel: "—", subtitle: "" },
       meals: { statusLabel: "—", untilLabel: "" },
@@ -191,15 +206,12 @@ export default async function ParentHomePage() {
   }
 
   const today = await parentToday();
-  const [stats, dayStatus, homework, gradesSummary, bellCount, due] = await Promise.all([
+  const [stats, dayStatus, homework, gradesSummary, bellCount] = await Promise.all([
     childDailyStats(today),
     childDailyStatus(today),
     childHomework(),
     childGradesSummary(),
     bellCountPromise,
-    // Свою ошибку этот аксессор ловит сам (safeQuery) и отдаёт признак failed:
-    // упавший счёт не должен уронить весь экран вместе с расписанием.
-    dueTile(),
   ]);
 
   const childGiven = givenNameOf(child.full_name);
@@ -407,17 +419,16 @@ export default async function ParentHomePage() {
       lessonsTotal: String(dayStatus.totalLessons),
       attended: `${dayStatus.attendedCount}/${dayStatus.totalLessons}`,
       homework: String(pendingHomework.length),
+      walletLabel: `${formatMoney(walletBalance())} сум`,
     },
     nextLesson,
-    // Ноль здесь значит «ничего не должны», а не «данных нет»: фразу для
-    // такого случая подставляет HomeView — словарь живёт там, эта страница
-    // исторически пишет по-русски литералами и переводить её целиком не наша
-    // сегодняшняя задача.
-    dueState: due.failed ? ("failed" as const) : due.bills === 0 ? ("none" as const) : ("ok" as const),
-    due: {
-      amountLabel: `${formatMoney(due.amount)} сум`,
-      subtitle: billsCountLabel(due.bills),
-    },
+    due: (() => {
+      const d = dueTile();
+      return {
+        amountLabel: `${formatMoney(d.amount)} сум`,
+        subtitle: [billsCountLabel(d.bills), d.untilLabel].filter(Boolean).join(" · "),
+      };
+    })(),
     meals: { statusLabel: MOCK_MEALS.statusLabel, untilLabel: MOCK_MEALS.untilLabel },
     assistantText: assistantParts.join(" "),
     feed,

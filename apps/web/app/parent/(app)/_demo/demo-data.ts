@@ -59,17 +59,6 @@
  *     картой автоплатежа («1-го числа · Uzcard ····8341»), поэтому в «Способах
  *     оплаты» она же основная (в макете там стояла ···· 4242 — это дало бы
  *     родителю две разные «главные» карты).
- *
- * 27.08.2026: снесены заготовки экранов «Перевод» и «Лимиты» (WALLET_LIMITS,
- * TRANSFER_PRESETS) и сохранённых карт (SavedCard, MAIN_CARD, OTHER_CARDS) —
- * сами экраны удалены, карт в проекте не хранится, потребителей не осталось.
- *
- * 27.08.2026, после захода 4 по платежам: сняты заготовки СЧЕТОВ, ЧЕКОВ и
- * ИСТОРИИ ОПЛАТ (PAYMENT_HISTORY, CHECK_MONTHS, INVOICE_MONTHS, PAY_VISUAL,
- * historyTotals, unpaidGroupNote, BILL_NOTE_TAIL, SOON_FILE и их типы).
- * Экраны раздела читают настоящие tuition_invoices и balance_entries, и
- * звать эти заготовки стало некому. Кошелёк на питание и поддержка
- * остаются: под них в схеме нет ни одной таблицы.
  */
 
 /* ── Деньги ─────────────────────────────────────────────────────────────── */
@@ -145,6 +134,24 @@ export function rowNote(who: string, via: string): string {
   return [who, via].filter(Boolean).join(" · ");
 }
 
+/**
+ * «Хвост» подписи счетов карточки «К оплате сейчас» на /parent/payments.
+ *
+ * Сами счета приходят из фикстур ../v2/data (BILLS), а там поле `note` —
+ * целая строка мобильного макета вида «{чужой ребёнок} · {чужой класс} ·
+ * ежемесячный платёж». Фикстуру мы не правим (её делят другие экраны), но и
+ * показывать её `note` нельзя: в веб-демо семья одна. Поэтому от фикстуры
+ * берём только сумму/срок/иконку, а подпись собираем как
+ * rowNote(whoLabel(<настоящий ребёнок>), BILL_NOTE_TAIL[bill.id]).
+ * Ключи — id из BILLS.
+ */
+export const BILL_NOTE_TAIL: Record<string, string> = {
+  edu: "ежемесячный платёж",
+  food: "обеды в столовой",
+  form: "комплект на осень",
+  exc: "выезд класса",
+};
+
 /* ── Счётность ──────────────────────────────────────────────────────────── */
 
 /** «1 счёт» / «2 счёта» / «5 счетов» — русская тройная форма. */
@@ -157,38 +164,402 @@ export function billsCountLabel(n: number): string {
   return `${n} счетов`;
 }
 
+/* ── Визуал категорий (плитка-иконка строки) ────────────────────────────── */
+
+export type PayVisualKey = "edu" | "food" | "form" | "exc";
+
+/** Градиент + path'ы глифа. Значения — дословно из макета (BILLS.gradient/icon_paths). */
+export const PAY_VISUAL: Record<
+  PayVisualKey,
+  { gradient: readonly [string, string]; paths: readonly string[] }
+> = {
+  edu: {
+    gradient: ["#7c3aed", "#4f6df5"],
+    paths: ["M22 10 12 5 2 10l10 5 10-5Z", "M6 12.5V17c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5"],
+  },
+  food: {
+    gradient: ["#34d399", "#059669"],
+    paths: ["M4 2v7a3 3 0 0 0 6 0V2", "M7 12v10", "M20 2a4 4 0 0 0-4 4v7h4", "M20 13v9"],
+  },
+  form: {
+    gradient: ["#60a5fa", "#2563eb"],
+    paths: [
+      "M20.4 3.5 16 2a4 4 0 0 1-8 0L3.6 3.5a2 2 0 0 0-1.3 2.2l.6 3.5a1 1 0 0 0 1 .8H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.1a1 1 0 0 0 1-.8l.6-3.5a2 2 0 0 0-1.3-2.2Z",
+    ],
+  },
+  exc: {
+    gradient: ["#f472b6", "#db2777"],
+    paths: [
+      "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z",
+      "M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+    ],
+  },
+};
+
 /* ── Пополнение ─────────────────────────────────────────────────────────── */
 
 /** Быстрые суммы (topChips макета). Ввод вручную — до 9 цифр. */
 export const TOPUP_PRESETS: readonly number[] = [50000, 100000, 200000, 500000];
 
+/* ── История оплат ──────────────────────────────────────────────────────── */
+
+/** Категория чипа-фильтра: «Обучение» / «Питание» / «Другое». */
+export type HistoryCategory = "edu" | "food" | "other";
+
+export interface HistoryRow {
+  id: string;
+  category: HistoryCategory;
+  visual: PayVisualKey;
+  title: string;
+  /** Хвост подписи после «{Имя} · {класс}»: способ оплаты или пояснение. */
+  via: string;
+  dateLabel: string;
+  amount: number;
+  isRefund: boolean;
+}
+
+export interface HistoryMonth {
+  id: string;
+  label: string;
+  rows: HistoryRow[];
+}
+
+/** Уже проведённые оплаты. Свежие сверху — как в мобилке. */
+export const PAYMENT_HISTORY: HistoryMonth[] = [
+  {
+    id: "jul",
+    label: "Июль 2026",
+    rows: [
+      {
+        id: "jul-edu",
+        category: "edu",
+        visual: "edu",
+        title: "Обучение · июль",
+        via: "Payme",
+        dateLabel: "3 июля",
+        amount: 4500000,
+        isRefund: false,
+      },
+      {
+        id: "jul-food",
+        category: "food",
+        visual: "food",
+        title: "Питание · июль",
+        via: "Payme",
+        dateLabel: "3 июля",
+        amount: 450000,
+        isRefund: false,
+      },
+      {
+        id: "jul-refund",
+        category: "food",
+        visual: "food",
+        title: "Питание · перерасчёт",
+        via: "возврат за 3 дня отсутствия",
+        dateLabel: "18 июля",
+        amount: 60000,
+        isRefund: true,
+      },
+    ],
+  },
+  {
+    id: "jun",
+    label: "Июнь 2026",
+    rows: [
+      {
+        id: "jun-edu",
+        category: "edu",
+        visual: "edu",
+        title: "Обучение · июнь",
+        via: "Click",
+        dateLabel: "4 июня",
+        amount: 4500000,
+        isRefund: false,
+      },
+      {
+        id: "jun-food",
+        category: "food",
+        visual: "food",
+        title: "Питание · июнь",
+        via: "Payme",
+        dateLabel: "4 июня",
+        amount: 450000,
+        isRefund: false,
+      },
+      {
+        id: "jun-form",
+        category: "other",
+        visual: "form",
+        title: "Школьная форма",
+        via: "UZCARD ···· 8341",
+        dateLabel: "12 июня",
+        amount: 350000,
+        isRefund: false,
+      },
+    ],
+  },
+];
+
+/**
+ * Итоги для сводной карточки. НЕ хардкод: считаются из PAYMENT_HISTORY, иначе
+ * при правке одной строки цифры внизу экрана начали бы врать.
+ * `net` — сколько фактически ушло со счёта (оплаты минус возвраты).
+ */
+export function historyTotals(): { total: number; net: number; refunds: number } {
+  let total = 0;
+  let refunds = 0;
+  for (const month of PAYMENT_HISTORY) {
+    for (const row of month.rows) {
+      if (row.isRefund) refunds += row.amount;
+      else total += row.amount;
+    }
+  }
+  return { total, net: total - refunds, refunds };
+}
+
+/* ── Счета и чеки ───────────────────────────────────────────────────────── */
+
+export interface ReceiptRow {
+  id: string;
+  visual: PayVisualKey;
+  title: string;
+  /** «Чек № RCP-2026-07-018» / «Счёт № INV-2026-07-001». */
+  numberLabel: string;
+  dateLabel: string;
+  amount: number;
+  /** Только у счетов: «Оплачен 3 июля» / «К оплате до 5 августа». */
+  statusLabel?: string;
+  statusPaid?: boolean;
+}
+
+export interface ReceiptMonth {
+  id: string;
+  label: string;
+  rows: ReceiptRow[];
+}
+
+/** Фискальные чеки — строка в строку соответствуют PAYMENT_HISTORY. */
+export const CHECK_MONTHS: ReceiptMonth[] = [
+  {
+    id: "jul",
+    label: "Июль 2026",
+    rows: [
+      {
+        id: "rcp-07-018",
+        visual: "edu",
+        title: "Обучение · июль",
+        numberLabel: "Чек № RCP-2026-07-018",
+        dateLabel: "3 июля",
+        amount: 4500000,
+      },
+      {
+        id: "rcp-07-019",
+        visual: "food",
+        title: "Питание · июль",
+        numberLabel: "Чек № RCP-2026-07-019",
+        dateLabel: "3 июля",
+        amount: 450000,
+      },
+      {
+        id: "rcp-07-046",
+        visual: "food",
+        title: "Питание · перерасчёт",
+        numberLabel: "Чек № RCP-2026-07-046",
+        dateLabel: "18 июля",
+        amount: 60000,
+      },
+    ],
+  },
+  {
+    id: "jun",
+    label: "Июнь 2026",
+    rows: [
+      {
+        id: "rcp-06-011",
+        visual: "edu",
+        title: "Обучение · июнь",
+        numberLabel: "Чек № RCP-2026-06-011",
+        dateLabel: "4 июня",
+        amount: 4500000,
+      },
+      {
+        id: "rcp-06-012",
+        visual: "food",
+        title: "Питание · июнь",
+        numberLabel: "Чек № RCP-2026-06-012",
+        dateLabel: "4 июня",
+        amount: 450000,
+      },
+      {
+        id: "rcp-06-024",
+        visual: "form",
+        title: "Школьная форма",
+        numberLabel: "Чек № RCP-2026-06-024",
+        dateLabel: "12 июня",
+        amount: 350000,
+      },
+    ],
+  },
+];
+
+/**
+ * Счета — сгруппированы ПО СРОКУ ОПЛАТЫ, а не по месяцу выставления.
+ *
+ * Группа «К оплате сейчас» обязана строка в строку совпадать с одноимённой
+ * карточкой на /parent/payments: те же два счёта (обучение 4 500 000 +
+ * питание 450 000 = 4 950 000, срок 5 августа), что и BILLS.in_main_list в
+ * ../v2/data/fixtures/payments.ts. Экскурсия вне основного списка фикстуры и
+ * со сроком 15 августа — отдельная группа «Позже»; её 150 000 в «К оплате»
+ * не входят ни здесь, ни там.
+ */
+export const INVOICE_MONTHS: ReceiptMonth[] = [
+  {
+    id: "due-now",
+    label: "К оплате сейчас",
+    rows: [
+      {
+        id: "inv-07-001",
+        visual: "edu",
+        title: "Обучение · август",
+        numberLabel: "Счёт № INV-2026-07-001",
+        dateLabel: "20 июля",
+        amount: 4500000,
+        statusLabel: "К оплате до 5 августа",
+        statusPaid: false,
+      },
+      {
+        id: "inv-07-002",
+        visual: "food",
+        title: "Питание · август",
+        numberLabel: "Счёт № INV-2026-07-002",
+        dateLabel: "20 июля",
+        amount: 450000,
+        statusLabel: "К оплате до 5 августа",
+        statusPaid: false,
+      },
+    ],
+  },
+  {
+    id: "later",
+    label: "Позже",
+    rows: [
+      {
+        id: "inv-07-014",
+        visual: "exc",
+        title: "Экскурсия в музей",
+        numberLabel: "Счёт № INV-2026-07-014",
+        dateLabel: "24 июля",
+        amount: 150000,
+        statusLabel: "К оплате до 15 августа",
+        statusPaid: false,
+      },
+    ],
+  },
+  {
+    id: "paid",
+    label: "Оплаченные",
+    rows: [
+      {
+        id: "inv-06-021",
+        visual: "edu",
+        title: "Обучение · июль",
+        numberLabel: "Счёт № INV-2026-06-021",
+        dateLabel: "25 июня",
+        amount: 4500000,
+        statusLabel: "Оплачен 3 июля",
+        statusPaid: true,
+      },
+      {
+        id: "inv-06-022",
+        visual: "food",
+        title: "Питание · июль",
+        numberLabel: "Счёт № INV-2026-06-022",
+        dateLabel: "25 июня",
+        amount: 450000,
+        statusLabel: "Оплачен 3 июля",
+        statusPaid: true,
+      },
+    ],
+  },
+];
+
+/**
+ * Подпись группы счетов: «2 счёта · 4 950 000 сум» по НЕОПЛАЧЕННЫМ строкам.
+ * Считается из самих строк — иначе подпись и список снова разъехались бы.
+ * Для группы, где всё оплачено, возвращает null (там сумма к оплате не нужна).
+ *
+ * Условие именно `statusPaid === false`, а не `!statusPaid`: у чеков
+ * (CHECK_MONTHS) статуса нет вовсе, и «не оплачен» для них бессмысленно —
+ * иначе вкладка «Чеки» получила бы подпись «3 счёта · …» над фискальными
+ * документами, которые уже оплачены по определению.
+ */
+export function unpaidGroupNote(rows: readonly ReceiptRow[]): string | null {
+  const unpaid = rows.filter((r) => r.statusPaid === false);
+  if (unpaid.length === 0) return null;
+  const total = unpaid.reduce((s, r) => s + r.amount, 0);
+  return `${billsCountLabel(unpaid.length)} · ${formatMoney(total, { withCurrency: true })}`;
+}
+
 /* ── Способы оплаты ─────────────────────────────────────────────────────── */
 
-// 27.08.2026: MAIN_CARD и OTHER_CARDS снесены. Ни одной карты в проекте не
-// хранится, провайдера нет, а экран показывал «UZCARD •••• 8341, автоплатёж
-// 1-го числа» и два сохранённых пластика со сроками действия — то есть
-// выглядел подключённым. Заказчик показывает приложение клиентам, и всё, что
-// выглядит рабочим, он нажимает.
+export interface SavedCard {
+  id: string;
+  brand: string;
+  masked: string;
+  validThru: string;
+  gradient: readonly [string, string];
+}
+
+/** Основная карта — та же, что списывает автоплатёж на /parent/payments. */
+export const MAIN_CARD = {
+  brand: "UZCARD",
+  masked: "•••• 8341",
+  validThru: "06/27",
+  note: "Автоплатёж 1-го числа",
+} as const;
+
+export const OTHER_CARDS: SavedCard[] = [
+  { id: "humo", brand: "HUMO", masked: "•••• 8812", validThru: "09/26", gradient: ["#f59e0b", "#ef4444"] },
+  { id: "visa", brand: "VISA", masked: "•••• 1034", validThru: "03/28", gradient: ["#0ea5e9", "#1d4ed8"] },
+];
 
 export interface PayMethodItem {
   id: string;
   tag: string;
   title: string;
-  /** 27.08.2026: подписи в заготовке больше нет — её даёт словарь на языке
-   *  интерфейса. Раньше здесь лежало русское «Привязан аккаунт», которое
-   *  узбек и англичанин видели по-русски и вдобавок неправдой. */
+  subtitle: string;
   linked: boolean;
   gradient: readonly [string, string];
 }
 
-// 27.08.2026: три способа из утверждённой модели, все НЕ привязаны. Было:
-// Click и Payme значились «Привязан аккаунт» зелёным, хотя платить ими нечем;
-// Apple Pay в модели нет вовсе, зато не было Uzum. Поле linked оставлено —
-// оно ещё понадобится, когда провайдер подключится по-настоящему.
 export const OTHER_METHODS: PayMethodItem[] = [
-  { id: "payme", tag: "PAYME", title: "Payme", linked: false, gradient: ["#2dd4bf", "#0d9488"] },
-  { id: "click", tag: "CLICK", title: "Click", linked: false, gradient: ["#38bdf8", "#0284c7"] },
-  { id: "uzum",  tag: "UZUM",  title: "Uzum",  linked: false, gradient: ["#a78bfa", "#7c3aed"] },
+  {
+    id: "click",
+    tag: "CLICK",
+    title: "Click",
+    subtitle: "Привязан аккаунт",
+    linked: true,
+    gradient: ["#38bdf8", "#0284c7"],
+  },
+  {
+    id: "payme",
+    tag: "PAYME",
+    title: "Payme",
+    subtitle: "Привязан аккаунт",
+    linked: true,
+    gradient: ["#2dd4bf", "#0d9488"],
+  },
+  // Третьим стоял Apple Pay. Заказчик его не планирует (28.08.2026), а Uzum
+  // в планах есть и уже стоит третьим в мобильном приложении — два экрана
+  // обязаны показывать один и тот же список.
+  {
+    id: "uzum",
+    tag: "UZUM",
+    title: "Uzum Bank",
+    subtitle: "Не подключено",
+    linked: false,
+    gradient: ["#a78bfa", "#7c3aed"],
+  },
 ];
 
 /* ── Единый текст «пока не работает» ────────────────────────────────────── */
@@ -199,6 +570,9 @@ export const OTHER_METHODS: PayMethodItem[] = [
  */
 export const SOON_PAYMENTS =
   "Онлайн-оплата пока не подключена: школа принимает платежи напрямую. Раздел заработает сразу после подключения платёжного провайдера.";
+export const SOON_FILE =
+  "Скачивание документов появится вместе с онлайн-оплатой — файлы чеков и счетов формирует платёжный провайдер.";
+
 
 /* ══════════════════════════════════════════════════════════════════════════
  * КОШЕЛЁК РЕБЁНКА, ЛИМИТЫ, ПЕРЕВОД, ОПЕРАЦИИ  (12.08.2026)
@@ -291,6 +665,15 @@ export function walletTotals(): { spent: number; topped: number; opsCount: numbe
   }
   return { spent, topped, opsCount };
 }
+
+/* ── Лимиты и перевод: заготовок нет и не будет ───────────────────────────
+ *
+ * Витрину раздела оплат вернули 28.08.2026 целиком (см. раздел 0 в
+ * CLAUDE_CHAT_HANDOFF.md), но два экрана — «Перевод между кошельками» и
+ * «Лимиты расходов» — заказчик снял 27.08.2026 насовсем: денег между
+ * балансами детей в модели нет, а лимиты ей противоречат. Заготовки под них
+ * не вернулись. Увидишь их в старом коммите — это не потеря, это решение.
+ */
 
 /* ══════════════════════════════════════════════════════════════════════════
  * ПОДДЕРЖКА  (12.08.2026)

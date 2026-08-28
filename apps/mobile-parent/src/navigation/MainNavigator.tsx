@@ -67,6 +67,10 @@ import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
 import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
 import TopUpScreen from "../screens/payments/TopUpScreen";
 import WalletOpsScreen from "../screens/payments/WalletOpsScreen";
+// «Перевод между кошельками» и «Лимиты расходов» сняты заказчиком
+// 27.08.2026 и НЕ возвращаются: денег между балансами детей нет в модели,
+// а лимиты ей противоречат. Остальную витрину раздела оплат вернули
+// 28.08.2026 — см. раздел 0 в CLAUDE_CHAT_HANDOFF.md.
 import MealsScreen from "../screens/study/MealsScreen";
 import TransportScreen from "../screens/study/TransportScreen";
 import MedicalCardScreen from "../screens/study/MedicalCardScreen";
@@ -115,6 +119,7 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   d33: demoOr(PayMethodsScreen, "payMethods", "card", ["#a78bfa", "#7c3aed"]),
   dtop: demoOr(TopUpScreen, "topup", "plus", ["#34d399", "#059669"]),
   dwops: demoOr(WalletOpsScreen, "walletOps", "clock", ["#fbbf24", "#f97316"]),
+
 };
 
 /**

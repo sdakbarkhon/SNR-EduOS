@@ -33,7 +33,7 @@
  *       7c. row3 (1721): «Марка автобуса» / «Yutong ZK6115», hairline divider.
  *  8. SectionLabel «УВЕДОМЛЕНИЯ» (1723).
  *  9. NotificationsCard (1724–1726): glass r20 padding 5/14, 2×
- *     NotificationRow (паттерн взят с экрана «Лимиты», удалённого 27.08.2026):
+ *     NotificationRow (паттерн 1:1 из LimitsScreen.tsx):
  *       9a. «Уведомить за 10 минут до прибытия» (без divider) — arrival.
  *       9b. «Уведомить о посадке и высадке» (divider сверху) — delays.
  *     Локальный state инициализирован из getTransportRoute(locale).notify_defaults.
@@ -149,8 +149,7 @@ function InfoRow({
   );
 }
 
-/** Строка уведомления: подпись 11.5/800 flex + Toggle. Разметка взята с экрана
- *  «Лимиты» — сам экран удалён 27.08.2026, паттерн остался здесь. */
+/** Строка уведомления: подпись 11.5/800 flex + Toggle (1:1 из LimitsScreen.tsx). */
 function NotificationRow({
   label,
   value,

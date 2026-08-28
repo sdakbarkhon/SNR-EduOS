@@ -1,21 +1,20 @@
-import { childInvoices } from "@/lib/parent-queries";
 import { InnerHeader } from "../../_ui/screen-kit";
 import { InvoicesView } from "./InvoicesView";
 
 /**
- * «Счета» (d21).
+ * «Счета и чеки» (d21) — веб-порт
+ * apps/mobile-parent/src/screens/payments/ReceiptsScreen.tsx.
  *
- * 27.08.2026, заход 4 по платежам: счета настоящие, из `tuition_invoices`.
- * Заголовок раньше был «Счета и чеки» — чеков на экране больше нет, они
- * появятся вместе с онлайн-оплатой, и обещать их в названии нечестно.
+ * Данных с сервера экрану не нужно: чеков и счетов в БД нет вовсе, весь
+ * список — мок из _demo/demo-data.ts, согласованный по суммам и датам
+ * с /parent/payments и /parent/payments/history. Имя ребёнка в строках не
+ * фигурирует (в макете его там тоже нет — только предмет счёта и номер).
  */
-export default async function ParentInvoicesPage() {
-  const invoices = await childInvoices();
-
+export default function ParentInvoicesPage() {
   return (
     <div className="mx-auto w-full max-w-[430px]">
-      <InnerHeader title="Счета" backHref="/parent/payments" />
-      <InvoicesView invoices={invoices.items} failed={invoices.failed} />
+      <InnerHeader title="Счета и чеки" backHref="/parent/payments" />
+      <InvoicesView />
     </div>
   );
 }

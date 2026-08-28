@@ -99,6 +99,7 @@ export const STUBS: Record<string, StubInfo> = {
   aphoto: { t: "Отправка фото", n: "Действие", g: ["#60a5fa", "#2563eb"], i: "img" },
   afile: { t: "Отправка файла", n: "Действие", g: ["#fbbf24", "#f97316"], i: "doc" },
   help: { t: "Справка", n: "Действие", g: ["#60a5fa", "#2563eb"], i: "doc" },
+
   walletops: { t: "Операции кошелька", tKey: "scr.walletOps", n: "Раздел «Кошелёк»", g: ["#fbbf24", "#f97316"], i: "clock" },
   walletmenu: { t: "Действия с кошельком", n: "Действие", g: ["#94a3b8", "#64748b"], i: "grid" },
   carddet: { t: "Детали карты", n: "Раздел «Способы оплаты»", g: ["#7c3aed", "#4f6df5"], i: "card" },
@@ -183,6 +184,7 @@ export const SCREEN_INFO: Record<string, StubInfo> = {
   d33: STUBS.paymeth,
   dtop: STUBS.topup,
   dwops: STUBS.walletops,
+
   // Профиль
   d29: STUBS.child,
   d30: { t: "Данные родителя", tKey: "scr.parentData", n: "Экран #30", g: ["#8b5cf6", "#22d3ee"], i: "user" },
