@@ -1,0 +1,10 @@
+import { makeServiceRoleClient, SCHOOL_ID } from "./_backfill-shared.mjs";
+const db=makeServiceRoleClient(); const D=SCHOOL_ID;
+const { data: plans } = await db.from("curriculum_plans").select("*").eq("school_id",D);
+const good=plans.filter(p=>!p.source_file_url);
+const { data: t } = await db.from("curriculum_plan_topics").select("*").eq("plan_id",good[0].id).order("order_index");
+console.log("колонки тем:", Object.keys(t[0]).join(", "));
+console.log("темы целого плана «"+good[0].title+"»:");
+for(const x of t) console.log(`  ${x.order_index}: ${JSON.stringify({title:x.title,description:x.description,estimated_lessons:x.estimated_lessons})}`.slice(0,130));
+console.log("\nзаголовки всех 12 целых планов:");
+for(const p of good) console.log("  "+p.title);

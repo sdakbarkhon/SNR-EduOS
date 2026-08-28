@@ -146,6 +146,14 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (raw === "GROUP_NAME_TAKEN") {
     return t.groupNameTaken;
   }
+  // Окно ученика, миграция 232. Дата рождения и пол проверяются на сервере,
+  // а не только браузером: поле формы обходится запросом мимо неё.
+  if (raw === "BAD_BIRTH_DATE") return t.birthDateBad;
+  if (raw === "BIRTH_DATE_FUTURE") return t.birthDateInFuture;
+  if (raw === "BIRTH_DATE_TOO_OLD") return t.birthDateTooOld;
+  // Последний рубеж пола — проверка students_gender_known из 232: сюда
+  // отказ доходит, если значение пошло мимо разбора формы.
+  if (raw === "BAD_GENDER" || /students_gender_known/i.test(raw)) return t.genderBad;
   // Заход 2 по платежам. BAD_PRICE / PRICE_TOO_BIG бросает разбор формы
   // (lib/course-price.ts), а groups_course_price_not_negative — проверка из
   // миграции 227: последний рубеж, если запись пойдёт мимо разбора.

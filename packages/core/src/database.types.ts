@@ -3701,6 +3701,48 @@ export type Database = {
           },
         ]
       }
+      student_medical: {
+        Row: {
+          allergies: string | null
+          medical_notes: string | null
+          school_id: string
+          student_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allergies?: string | null
+          medical_notes?: string | null
+          school_id: string
+          student_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allergies?: string | null
+          medical_notes?: string | null
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_medical_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_medical_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           avatar_url: string | null
@@ -3708,7 +3750,9 @@ export type Database = {
           birth_date: string | null
           created_at: string
           curator_id: string | null
+          file_no: string | null
           full_name: string
+          gender: string | null
           google_email: string | null
           grade: string | null
           id: string
@@ -3724,7 +3768,9 @@ export type Database = {
           birth_date?: string | null
           created_at?: string
           curator_id?: string | null
+          file_no?: string | null
           full_name: string
+          gender?: string | null
           google_email?: string | null
           grade?: string | null
           id?: string
@@ -3740,7 +3786,9 @@ export type Database = {
           birth_date?: string | null
           created_at?: string
           curator_id?: string | null
+          file_no?: string | null
           full_name?: string
+          gender?: string | null
           google_email?: string | null
           grade?: string | null
           id?: string

@@ -25,7 +25,7 @@ import { revalidatePath } from "next/cache";
  *  Also resolves isSuperAdmin (existence in super_admins) — П.3 Заход 1:
  *  admin-api.ts's update/delete functions need this to allow the cross-school
  *  bypass for super admins, since they can't check auth.uid() themselves. */
-async function verifyAdmin(): Promise<{ schoolId: string; isSuperAdmin: boolean }> {
+async function verifyAdmin(): Promise<{ schoolId: string; isSuperAdmin: boolean; userId: string }> {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) throw new Error("Unauthorized");
@@ -36,21 +36,66 @@ async function verifyAdmin(): Promise<{ schoolId: string; isSuperAdmin: boolean 
     sbAny.from("super_admins").select("id").eq("user_id", user.id).maybeSingle(),
   ]);
   if (!admin) throw new Error("Not admin");
-  return { schoolId: admin.school_id as string, isSuperAdmin: !!superAdmin };
+  return { schoolId: admin.school_id as string, isSuperAdmin: !!superAdmin, userId: user.id };
+}
+
+/**
+ * Личные и медицинские сведения ученика из формы (миграция 232).
+ *
+ * ВСЁ НЕОБЯЗАТЕЛЬНОЕ. Обязательными остаются ФИО, логин, пароль и группа —
+ * иначе класс из тридцати человек не завести за один присест.
+ *
+ * Дата рождения проверяется здесь, а не только браузером: поле типа date
+ * можно обойти запросом мимо формы, а «родился в 1830-м» в базе потом
+ * ищется годами. Отказы уходят машинным кодом — фразу подставит
+ * humanizeAdminError на языке администратора.
+ */
+function readStudentExtras(formData: FormData): {
+  personal: { birth_date: string | null; gender: string | null; phone: string | null; file_no: string | null };
+  medical: { allergies: string | null; medical_notes: string | null };
+} {
+  const str = (k: string) => String(formData.get(k) ?? "").trim() || null;
+
+  const birth = str("birth_date");
+  if (birth !== null) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birth);
+    if (!m) throw new Error("BAD_BIRTH_DATE");
+    const d = new Date(birth + "T12:00:00Z");
+    if (Number.isNaN(d.getTime())) throw new Error("BAD_BIRTH_DATE");
+    const now = new Date();
+    if (d.getTime() > now.getTime()) throw new Error("BIRTH_DATE_FUTURE");
+    // Сто лет — не медицинская истина, а граница здравого смысла: школьник
+    // старше ста лет означает опечатку в годе, а не долгожителя.
+    if (now.getUTCFullYear() - Number(m[1]) > 100) throw new Error("BIRTH_DATE_TOO_OLD");
+  }
+
+  const gender = str("gender");
+  if (gender !== null && gender !== "male" && gender !== "female") {
+    throw new Error("BAD_GENDER");
+  }
+
+  return {
+    personal: { birth_date: birth, gender, phone: str("phone"), file_no: str("file_no") },
+    medical: { allergies: str("allergies"), medical_notes: str("medical_notes") },
+  };
 }
 
 // ── STUDENTS ─────────────────────────────────────────────────────────────────
 
 export async function actionCreateStudent(formData: FormData) {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    const { schoolId, userId } = await verifyAdmin();
     const full_name = String(formData.get("full_name") ?? "").trim();
     const username = String(formData.get("username") ?? "").trim();
     const password = String(formData.get("password") ?? "").trim();
     const group_id = String(formData.get("group_id") ?? "").trim();
     if (!full_name || !username || !password || !group_id) throw new Error("Missing fields");
     const google_email = String(formData.get("google_email") ?? "").trim() || null;
-    const result = await createStudent({ full_name, username, password, group_id, school_id: schoolId, google_email });
+    const { personal, medical } = readStudentExtras(formData);
+    const result = await createStudent({
+      full_name, username, password, group_id, school_id: schoolId, google_email,
+      personal, medical, actor_user_id: userId,
+    });
     revalidatePath("/admin/students");
     revalidatePath("/admin");
     return result;
@@ -59,7 +104,7 @@ export async function actionCreateStudent(formData: FormData) {
 
 export async function actionUpdateStudent(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin, userId } = await verifyAdmin();
     const student_id = String(formData.get("student_id") ?? "");
     const user_id = String(formData.get("user_id") ?? "");
     const full_name = String(formData.get("full_name") ?? "").trim();
@@ -70,7 +115,14 @@ export async function actionUpdateStudent(formData: FormData) {
     // Раньше здесь пустая строка превращалась в null и уезжала в базу поверх
     // заполненной почты при каждом сохранении.
     const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
-    await updateStudent(student_id, user_id, { full_name, username, group_id, old_group_id, ...changed }, schoolId, isSuperAdmin);
+    const { personal, medical } = readStudentExtras(formData);
+    await updateStudent(
+      student_id,
+      user_id,
+      { full_name, username, group_id, old_group_id, ...changed, personal, medical, actor_user_id: userId },
+      schoolId,
+      isSuperAdmin,
+    );
     revalidatePath("/admin/students");
   });
 }

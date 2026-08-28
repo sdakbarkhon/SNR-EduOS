@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { isDemoSchool as resolveIsDemoSchool } from "@/lib/admin-api";
 import { GroupsView } from "./GroupsView";
 
 export default async function AdminGroupsPage({
@@ -38,24 +37,22 @@ export default async function AdminGroupsPage({
   if (teachersError) console.error("[AdminGroupsPage] teachers query failed:", teachersError.message);
   if (catalogError) console.error("[AdminGroupsPage] catalog query failed:", catalogError.message);
 
-  // Z.2.6 — куратор группы есть только в демо-школе (решение заказчика 6.1).
-  // В реальных школах поля в форме нет; ПРАВА куратора при этом не меняются —
-  // их разделение отложено в Z.4, потому что is_curator_teacher() не знает
-  // про школу и входит в SELECT-политику уроков.
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: admin } = user
-    ? await sbAny.from("admins").select("school_id").eq("user_id", user.id).maybeSingle()
-    : { data: null };
-  // Признак демо-школы — из schools.is_demo (служебным клиентом внутри
-  // resolveIsDemoSchool), а не сравнением с вписанным идентификатором.
-  const isDemoSchool = admin?.school_id ? await resolveIsDemoSchool(admin.school_id) : false;
+  // 28.08.2026 — КУРАТОР ОТКРЫТ ОБЕИМ ШКОЛАМ.
+  //
+  // Здесь стояло сужение до демо-школы (Z.2.6, решение заказчика 6.1) с
+  // оговоркой: разделение ПРАВ куратора отложено, потому что
+  // is_curator_teacher() не знала про школу. Она узнала — миграция 187
+  // добавила в неё условие s.is_demo, и особые права куратора и без того не
+  // выходят за пределы демо-школы.
+  //
+  // Заказчик решил 28.08.2026: куратор задаётся у группы, один на класс, в
+  // обеих школах. Признак демо-школы этому экрану больше не нужен.
 
   return (
     <GroupsView
       groups={groups ?? []}
       teachers={teachers ?? []}
       catalog={catalog ?? []}
-      showCurator={isDemoSchool}
       defaultOpenAdd={action === "add"}
     />
   );

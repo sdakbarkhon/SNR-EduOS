@@ -127,6 +127,71 @@ async function createSchoolScopedUser(
 
 // ── STUDENTS ─────────────────────────────────────────────────────────────────
 
+/**
+ * Личные сведения ученика — колонки students, заведённые миграцией 232
+ * (плюс phone, который был всегда и до сих пор ни разу не заполнялся).
+ * Все необязательные: обязательными остаются ФИО, логин, пароль и группа.
+ */
+export type StudentPersonal = {
+  birth_date?: string | null;
+  gender?: string | null;
+  phone?: string | null;
+  file_no?: string | null;
+};
+
+/** Медицинские сведения — ОТДЕЛЬНАЯ таблица student_medical. Почему не
+ *  колонки в students: строку ученика обязан читать учитель, а это он
+ *  видеть не должен, и поколоночно в Supabase не спрятать (миграция 232). */
+export type StudentMedical = {
+  allergies?: string | null;
+  medical_notes?: string | null;
+};
+
+/** Пустая строка из формы — это «не заполнено», а не пустое значение. */
+function orNull(v: string | null | undefined): string | null {
+  const t = (v ?? "").trim();
+  return t.length > 0 ? t : null;
+}
+
+/**
+ * Записать медицинские сведения ученика.
+ *
+ * СТРОКА ЗАВОДИТСЯ ТОЛЬКО ЕСЛИ ЕСТЬ ЧТО ЗАПИСАТЬ. Пустая строка на каждого
+ * ученика — это тридцать одна запись «ничего не известно», которую потом
+ * никто не отличит от «не заполняли». Если оба поля очистили, а строка
+ * была — удаляем: отсутствие сведений и есть отсутствие строки.
+ */
+async function saveStudentMedical(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  studentId: string,
+  schoolId: string,
+  med: StudentMedical,
+  updatedBy: string | null,
+): Promise<void> {
+  const allergies = orNull(med.allergies);
+  const medical_notes = orNull(med.medical_notes);
+
+  if (allergies === null && medical_notes === null) {
+    const { error } = await sb.from("student_medical").delete().eq("student_id", studentId);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await sb.from("student_medical").upsert(
+    {
+      student_id: studentId,
+      school_id: schoolId,
+      allergies,
+      medical_notes,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy,
+    },
+    { onConflict: "student_id" },
+  );
+  if (error) throw error;
+}
+
 export async function createStudent(data: {
   full_name: string;
   username: string;
@@ -136,6 +201,13 @@ export async function createStudent(data: {
   /** Почта Google для входа. Необязательна: без неё вход только по логину и
    *  паролю, как раньше. Нормализуется той же функцией, что у родителей. */
   google_email?: string | null;
+  /** Личные сведения — все необязательные (миграция 232). */
+  personal?: StudentPersonal;
+  /** Медицинские сведения — уедут в student_medical, и только если
+   *  админ что-то ввёл. */
+  medical?: StudentMedical;
+  /** Кто вносит — для отметки в student_medical.updated_by. */
+  actor_user_id?: string | null;
 }): Promise<{ userId: string; studentId: string }> {
   const sb = getServiceClient();
   // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
@@ -145,7 +217,17 @@ export async function createStudent(data: {
   });
   const { data: student, error: stuErr } = await sb
     .from("students")
-    .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id, google_email: normalizeSocialEmail(data.google_email) })
+    .insert({
+      user_id: userId,
+      full_name: data.full_name,
+      username: data.username,
+      school_id: data.school_id,
+      google_email: normalizeSocialEmail(data.google_email),
+      birth_date: orNull(data.personal?.birth_date),
+      gender: orNull(data.personal?.gender),
+      phone: orNull(data.personal?.phone),
+      file_no: orNull(data.personal?.file_no),
+    })
     .select("id")
     .single();
   if (stuErr || !student) {
@@ -167,13 +249,39 @@ export async function createStudent(data: {
     throw sgErr;
   }
 
+  // Медицинские сведения — последним шагом и только если их ввели. Своего
+  // отката у него нет намеренно: ученик уже заведён и работает, а сбой
+  // записи медкарты не повод его сносить. Ошибка доедет до админа текстом.
+  if (data.medical) {
+    await saveStudentMedical(
+      sb,
+      (student as { id: string }).id,
+      data.school_id,
+      data.medical,
+      data.actor_user_id ?? null,
+    );
+  }
+
   return { userId, studentId: (student as { id: string }).id };
 }
 
 export async function updateStudent(
   studentId: string,
   userId: string,
-  data: { full_name: string; username: string; group_id?: string; old_group_id?: string; google_email?: string | null },
+  data: {
+    full_name: string;
+    username: string;
+    group_id?: string;
+    old_group_id?: string;
+    google_email?: string | null;
+    /** Личные сведения. В отличие от почты пишутся ВСЕГДА: форма рисует их
+     *  текущим значением, поэтому пустое поле — это «очистить», а не «не
+     *  трогали». Для почты приём другой (см. lib/form-patch.ts), потому что
+     *  там пустота однажды затирала настоящий адрес при каждом сохранении. */
+    personal?: StudentPersonal;
+    medical?: StudentMedical;
+    actor_user_id?: string | null;
+  },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
 ) {
@@ -188,6 +296,12 @@ export async function updateStudent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const patch: Record<string, any> = { full_name: data.full_name, username: data.username };
   if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+  if (data.personal) {
+    patch.birth_date = orNull(data.personal.birth_date);
+    patch.gender = orNull(data.personal.gender);
+    patch.phone = orNull(data.personal.phone);
+    patch.file_no = orNull(data.personal.file_no);
+  }
 
   const { error } = await sb
     .from("students")
@@ -244,6 +358,22 @@ export async function updateStudent(
         if (insErr) throw insErr;
       }
     }
+  }
+
+  // Медицинские сведения. Школа берётся у САМОГО ученика, а не у
+  // вызывающего: суперадмин правит чужую школу, и его собственной у него нет.
+  if (data.medical) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: owner, error: ownErr } = await (sb as any)
+      .from("students").select("school_id").eq("id", studentId).single();
+    if (ownErr) throw ownErr;
+    await saveStudentMedical(
+      sb,
+      studentId,
+      (owner as { school_id: string }).school_id,
+      data.medical,
+      data.actor_user_id ?? null,
+    );
   }
 
   // Update email if username changed

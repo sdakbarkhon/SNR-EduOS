@@ -50,8 +50,33 @@ type Student = {
    *  строка, а не число, иначе длинные суммы теряли бы точность. */
   balance: string | number;
   created_at: string;
+  /** Личные сведения, миграция 232. Все необязательные. */
+  birth_date: string | null;
+  gender: string | null;
+  phone: string | null;
+  file_no: string | null;
+  /**
+   * Медицинские сведения — из отдельной таблицы student_medical.
+   *
+   * Приходят вложением: PostgREST отдаёт связь один-к-одному объектом, но
+   * при отсутствии строки — null, а на некоторых версиях пустым массивом.
+   * Разбираем оба вида, иначе форма молча покажет пустые поля там, где
+   * сведения есть.
+   */
+  student_medical:
+    | { allergies: string | null; medical_notes: string | null }
+    | Array<{ allergies: string | null; medical_notes: string | null }>
+    | null;
   student_groups: Array<{ group_id: string; groups: { id: string; name: string; subject: string } | null }>;
 };
+
+/** Медкарта ученика в одном виде, каким бы её ни отдал PostgREST. */
+function medicalOf(student: Student): { allergies: string; medical_notes: string } {
+  const raw = Array.isArray(student.student_medical)
+    ? (student.student_medical[0] ?? null)
+    : student.student_medical;
+  return { allergies: raw?.allergies ?? "", medical_notes: raw?.medical_notes ?? "" };
+}
 
 type Modal =
   | { kind: "add" }
@@ -59,6 +84,82 @@ type Modal =
   | { kind: "reset"; student: Student }
   | { kind: "topup"; student: Student }
   | { kind: "delete"; student: Student };
+
+/**
+ * Раскрывающийся блок необязательных полей.
+ *
+ * Обычный <details>, а не своя раскладушка на состоянии: он открывается без
+ * JavaScript, доступен с клавиатуры и его находит поиск по странице. Закрыт
+ * по умолчанию — админ, заводящий класс из тридцати человек, не должен
+ * прокручивать мимо десяти полей, которые ему сейчас не нужны.
+ */
+function OptionalBlock({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="rounded-xl border border-gray-200 bg-gray-50/60">
+      <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-semibold text-gray-700">
+        {title}
+      </summary>
+      <div className="space-y-4 border-t border-gray-200 px-3 py-3">
+        {hint ? <p className="text-xs text-gray-400">{hint}</p> : null}
+        {children}
+      </div>
+    </details>
+  );
+}
+
+/** Личные сведения — общий кусок для обеих форм: создание и правка обязаны
+ *  уметь одно и то же, а две копии полей разъезжаются на третьей правке. */
+function StudentPersonalFields({ t, student }: { t: AdminDict; student?: Student }) {
+  return (
+    <>
+      <Field label={t.fieldBirthDate}>
+        {/* type="date" — календарь браузера на языке системы. Проверка «не в
+            будущем и не сто лет назад» стоит НА СЕРВЕРЕ (actions.ts): поле
+            формы обходится запросом мимо неё. */}
+        <Input type="date" name="birth_date" defaultValue={student?.birth_date ?? ""} />
+      </Field>
+      <Field label={t.fieldGender}>
+        {/* В базе коды male/female, на экране слова. Пусто — «не указан»: это
+            законное значение, а не пропуск. */}
+        <Select name="gender" defaultValue={student?.gender ?? ""}>
+          <option value="">{t.genderUnset}</option>
+          <option value="male">{t.genderMale}</option>
+          <option value="female">{t.genderFemale}</option>
+        </Select>
+      </Field>
+      <Field label={t.fieldStudentPhone}>
+        <Input name="phone" type="tel" defaultValue={student?.phone ?? ""} placeholder="+998 90 123-45-67" />
+      </Field>
+      <Field label={t.fieldFileNo}>
+        <Input name="file_no" defaultValue={student?.file_no ?? ""} placeholder="SNR-2026-00847" />
+      </Field>
+    </>
+  );
+}
+
+/** Медицинские сведения. Уезжают в отдельную таблицу student_medical, и
+ *  строка заводится только если админ что-то ввёл (см. admin-api.ts). */
+function StudentMedicalFields({ t, student }: { t: AdminDict; student?: Student }) {
+  const med = student ? medicalOf(student) : { allergies: "", medical_notes: "" };
+  return (
+    <>
+      <Field label={t.fieldAllergies}>
+        <Input name="allergies" defaultValue={med.allergies} />
+      </Field>
+      <Field label={t.fieldMedicalNotes}>
+        <Input name="medical_notes" defaultValue={med.medical_notes} />
+      </Field>
+    </>
+  );
+}
 
 function generatePassword(len = 8) {
   const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -532,6 +633,16 @@ function AddStudentModal({
             ))}
           </Select>
         </Field>
+
+        {/* Ниже — необязательное. Обязательными остаются четыре поля выше:
+            иначе класс из тридцати человек не завести за один присест. */}
+        <OptionalBlock title={t.sectionPersonalData} hint={t.optionalBlockHint}>
+          <StudentPersonalFields t={t} />
+        </OptionalBlock>
+        <OptionalBlock title={t.sectionMedical} hint={t.medicalWhoSees}>
+          <StudentMedicalFields t={t} />
+        </OptionalBlock>
+
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
             {t.cancelBtn}
@@ -598,6 +709,15 @@ function EditStudentModal({
             ))}
           </Select>
         </Field>
+
+        {/* Те же блоки, что и при создании: 31 существующий ученик стоит с
+            пустыми полями, админ дозаполняет их, когда понадобится. */}
+        <OptionalBlock title={t.sectionPersonalData} hint={t.optionalBlockHint}>
+          <StudentPersonalFields t={t} student={student} />
+        </OptionalBlock>
+        <OptionalBlock title={t.sectionMedical} hint={t.medicalWhoSees}>
+          <StudentMedicalFields t={t} student={student} />
+        </OptionalBlock>
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
             {t.cancelBtn}

@@ -1,3 +1,4 @@
+import type React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { StudentsView } from "./StudentsView";
 
@@ -21,7 +22,14 @@ export default async function AdminStudentsPage({
       .select(
         // balance — заход 3 по платежам: админ видит баланс ребёнка и
         // пополняет его рукой, пока платёжной системы нет.
-        "id, user_id, full_name, username, google_email, balance, created_at, student_groups(group_id, groups(id, name, subject))",
+        // Миграция 232: личные сведения — колонками students, медицинские —
+        // связанной таблицей student_medical. Правило доступа на неё пускает
+        // админа своей школы и родителя ребёнка; учитель эту страницу не
+        // открывает вовсе, а если бы открыл — вложение вернулось бы пустым.
+        "id, user_id, full_name, username, google_email, balance, created_at, " +
+          "birth_date, gender, phone, file_no, " +
+          "student_medical(allergies, medical_notes), " +
+          "student_groups(group_id, groups(id, name, subject))",
       )
       .order("full_name"),
     supabase.from("groups").select("id, name, subject").order("name"),
@@ -31,7 +39,11 @@ export default async function AdminStudentsPage({
 
   return (
     <StudentsView
-      students={students ?? []}
+      // Через unknown: сгенерированный тип не описывает вложение
+      // student_medical как связь один-к-одному, и supabase-js типизирует
+      // весь ответ как ошибку строкой. Тот же приём, что в
+      // packages/core/src/queries/parent.ts с алиасом куратора.
+      students={(students ?? []) as unknown as React.ComponentProps<typeof StudentsView>["students"]}
       groups={groups ?? []}
       defaultOpenAdd={action === "add"}
     />

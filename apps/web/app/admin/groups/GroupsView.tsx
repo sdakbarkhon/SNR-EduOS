@@ -122,7 +122,6 @@ function GroupForm({
   defaultValues,
   teachers,
   catalog,
-  showCurator,
   isPending,
   t,
   onClose,
@@ -133,7 +132,6 @@ function GroupForm({
   teachers: Teacher[];
   catalog: CatalogItem[];
   /** Z.2.6 — поле куратора показывается только демо-школе. */
-  showCurator: boolean;
   isPending: boolean;
   t: AdminDict;
   onClose: () => void;
@@ -196,19 +194,23 @@ function GroupForm({
           ))}
         </Select>
       </Field>
-      {/* Z.2.6 — куратор только в демо-школе. В реальных школах роли нет, и
-          поле не просто скрыто: его нет в FormData, поэтому server action
-          вообще не трогает groups.teacher_id. */}
-      {showCurator && (
-        <Field label={t.fieldTeacher}>
-          <Select name="teacher_id" defaultValue={defaultValues?.teacher_id ?? ""}>
-            <option value="">{t.noCuratorOption}</option>
-            {teachers.map((tc) => (
-              <option key={tc.id} value={tc.id}>{tc.full_name}</option>
-            ))}
-          </Select>
-        </Field>
-      )}
+      {/* КУРАТОР КЛАССА. До 28.08.2026 поле рисовалось только демо-школе, и
+          в боевой куратора задать было негде вовсе. Решение заказчика:
+          куратор один на класс, задаётся здесь, в обеих школах.
+
+          Что это включает, кроме подписи: teacher_id группы входит в
+          is_my_teacher_group(), значит куратор получает объявления своей
+          группы и личные чаты с её учениками и родителями — их заводит
+          триггер при назначении. Особые ПРАВА куратора на уроки сюда НЕ
+          входят: is_curator_teacher() ограничена демо-школой миграцией 187. */}
+      <Field label={t.fieldTeacher}>
+        <Select name="teacher_id" defaultValue={defaultValues?.teacher_id ?? ""}>
+          <option value="">{t.noCuratorOption}</option>
+          {teachers.map((tc) => (
+            <option key={tc.id} value={tc.id}>{tc.full_name}</option>
+          ))}
+        </Select>
+      </Field>
       {/* Заход 2 по платежам. Цену задаёт ТОЛЬКО админ школы: у учителя и
           куратора этой формы нет вовсе, а правило доступа на groups даёт
           запись одному fn_is_admin() своей школы. */}
@@ -230,14 +232,12 @@ export function GroupsView({
   groups,
   teachers,
   catalog,
-  showCurator,
   defaultOpenAdd,
 }: {
   groups: Group[];
   teachers: Teacher[];
   catalog: CatalogItem[];
   /** Z.2.6 — куратор есть только в демо-школе. */
-  showCurator: boolean;
   defaultOpenAdd?: boolean;
 }) {
   const { locale } = useLocale();
@@ -369,7 +369,6 @@ export function GroupsView({
             <GroupForm
               teachers={teachers}
               catalog={catalog}
-              showCurator={showCurator}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
@@ -395,7 +394,6 @@ export function GroupsView({
               defaultValues={modal.group}
               teachers={teachers}
               catalog={catalog}
-              showCurator={showCurator}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}

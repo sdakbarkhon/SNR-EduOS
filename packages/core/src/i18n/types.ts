@@ -596,6 +596,20 @@ export interface Dictionary {
     deleteBtn: string;
     addStudentTitle: string;
     editStudentTitle: string;
+    // Окно ученика: личные и медицинские сведения (миграция 232).
+    sectionPersonalData: string;
+    sectionMedical: string;
+    optionalBlockHint: string;
+    fieldBirthDate: string;
+    fieldGender: string;
+    genderUnset: string;
+    genderMale: string;
+    genderFemale: string;
+    fieldStudentPhone: string;
+    fieldFileNo: string;
+    fieldAllergies: string;
+    fieldMedicalNotes: string;
+    medicalWhoSees: string;
     fieldFullName: string;
     fieldUsername: string;
     fieldPassword: string;
@@ -1185,6 +1199,10 @@ export interface Dictionary {
     assignmentExists: string;
     phoneInvalid: string;
     groupNameTaken: string;
+    birthDateBad: string;
+    birthDateInFuture: string;
+    birthDateTooOld: string;
+    genderBad: string;
     coursePriceInvalid: string;
     coursePriceTooBig: string;
     superadminWriteBlocked: string;
