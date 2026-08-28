@@ -101,9 +101,14 @@ type RealHomeworkRow = {
  *  тексту (statusToFamily ниже сравнивает строки и остаётся верным ТОЛЬКО
  *  для демо-фикстуры, где статус-лейблы всегда фиксированный RU-литерал;
  *  для реальных данных лейбл теперь переведён и меняется с языком). */
-function realStatusFamily(kind: RealHomeworkStatusKind): StatusFamily {
+function realStatusFamily(kind: RealHomeworkStatusKind, overdue: boolean): StatusFamily {
   if (kind === "graded") return "green";
   if (kind === "pending_review") return "violet";
+  // 28.08.2026: просрочка не участвовала в цвете вовсе. Экран спорил сам с
+  // собой — в нижней сводке «Просрочено 3» красным, а сами три карточки
+  // серые «Не сдано». Признак берётся из СРОКА В БАЗЕ (homework.due_date
+  // против дня школы), а не из подписи статуса.
+  if (overdue) return "red";
   return "gray";
 }
 
@@ -192,7 +197,7 @@ function RealSubjectTile({ color, glyph }: { color: string; glyph: string }) {
  *  просто источник полей другой (RealHomeworkRow вместо HomeworkCardRow). */
 function RealHomeworkCard({ row, onPress }: { row: RealHomeworkRow; onPress: () => void }) {
   const { tokens, scheme } = useTheme();
-  const family = realStatusFamily(row.statusKind);
+  const family = realStatusFamily(row.statusKind, row.overdue);
   const st = tokens.status[family];
 
   const emphMeta = family === "orange" || family === "red";
@@ -684,6 +689,7 @@ function SummaryStatsBar({
   overdue: number;
 }) {
   const { tokens, scheme } = useTheme();
+  const { d } = useAppLocale();
   const dividerColor = scheme === "dark" ? "rgba(255,255,255,0.10)" : "rgba(23,18,67,0.08)";
 
   return (
@@ -709,19 +715,19 @@ function SummaryStatsBar({
         }}
       />
       <View style={styles.summaryContent}>
-        <SummaryCol value={String(total)} label="Всего" color={tokens.ink1} />
+        <SummaryCol value={String(total)} label={d.parentApp.hw.summaryTotal} color={tokens.ink1} />
         <View style={[styles.summaryDivider, { backgroundColor: dividerColor }]} />
-        <SummaryCol value={String(done)} label="Выполнено" color={tokens.status.green.text} />
+        <SummaryCol value={String(done)} label={d.parentApp.hw.filterDone} color={tokens.status.green.text} />
         <View style={[styles.summaryDivider, { backgroundColor: dividerColor }]} />
         <SummaryCol
           value={String(underReview)}
-          label="На проверке"
+          label={d.parentApp.status.underReview}
           color={tokens.status.violet.text}
         />
         <View style={[styles.summaryDivider, { backgroundColor: dividerColor }]} />
         <SummaryCol
           value={String(overdue)}
-          label="Просрочено"
+          label={d.parentApp.status.overdue}
           color={tokens.status.red.text}
         />
       </View>

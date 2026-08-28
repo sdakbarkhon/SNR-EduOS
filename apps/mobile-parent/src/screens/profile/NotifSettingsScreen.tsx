@@ -39,6 +39,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import { GlassCard, InnerHeader, Toggle } from "../../ui";
 import { SoonNote } from "../../ui/notices";
+import type { Dictionary } from "@snr/core";
 import { getNotificationCategories } from "../../data";
 import type { NotificationCategoryRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -47,16 +48,36 @@ import { useAppLocale } from "../../i18n";
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 /**
- * Пере­определения подписей категорий (Заход 7, правка заказчика).
- * Ключ = category.id, значение = новая подпись. Всё, чего нет в этой
- * мапе, отображается из фикстуры как есть.
+ * Текст девяти категорий — из общего словаря, по id из заготовки.
  *
- * `att` заменён по прямому требованию: подпись строки «Посещаемость»
- * должна нести смысл «приход/уход», без «пропуски» и без «опоздания».
+ * 28.08.2026: до этого названия и подписи брались прямо из заготовки
+ * (data/fixtures/notifications.ts) и были только по-русски — на узбекском
+ * и английском экран оставался русским целиком. Переводы всех девяти в
+ * словаре уже лежали и не звались ни разу.
+ *
+ * Требование заказчика про «Посещаемость» сохранено: подпись несёт смысл
+ * «приход/уход», без «пропусков» и «опозданий» — теперь она живёт в
+ * словаре (notif.attSub), а не переопределением в этом файле.
  */
-const SUBTITLE_OVERRIDES: Record<string, string> = {
-  att: "Отметки о приходе и уходе",
-};
+function categoryText(
+  id: string,
+  n: Dictionary["parentApp"]["notif"],
+): { title: string; sub: string } | null {
+  switch (id) {
+    case "grades": return { title: n.grades, sub: n.gradesSub };
+    case "hw": return { title: n.hw, sub: n.hwSub };
+    case "sched": return { title: n.sched, sub: n.schedSub };
+    case "att": return { title: n.att, sub: n.attSub };
+    case "ann": return { title: n.ann, sub: n.annSub };
+    case "events": return { title: n.events, sub: n.eventsSub };
+    case "pay": return { title: n.pay, sub: n.paySub };
+    case "msg": return { title: n.msg, sub: n.msgSub };
+    case "promo": return { title: n.promo, sub: n.promoSub };
+    // Заготовка добавила категорию, а перевода к ней нет: показываем то,
+    // что есть в заготовке, вместо пустой строки.
+    default: return null;
+  }
+}
 
 /** Круг 38×38 (мастер) или 36×36 (строка) с градиентом и белыми path'ами. */
 function CategoryIcon({
@@ -134,12 +155,14 @@ function SectionCap({ label }: { label: string }) {
 /** Одна строка категории (макет строка 1289): иконка + текст + Toggle. */
 function NotifSettingsRow({
   row,
+  text,
   value,
   onChange,
   disabled,
   divider,
 }: {
   row: NotificationCategoryRow;
+  text: { title: string; sub: string } | null;
   value: boolean;
   onChange: (next: boolean) => void;
   disabled: boolean;
@@ -147,7 +170,8 @@ function NotifSettingsRow({
 }) {
   const { tokens, scheme } = useTheme();
   const divColor = scheme === "dark" ? "rgba(255,255,255,0.10)" : "rgba(23,18,67,0.07)";
-  const sub = SUBTITLE_OVERRIDES[row.id] ?? row.subtitle;
+  const title = text?.title ?? row.name;
+  const sub = text?.sub ?? row.subtitle;
 
   return (
     <View
@@ -171,7 +195,7 @@ function NotifSettingsRow({
           numberOfLines={1}
           style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}
         >
-          {row.name}
+          {title}
         </Text>
         <Text
           style={{
@@ -272,7 +296,7 @@ export default function NotifSettingsScreen() {
               numberOfLines={1}
               style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}
             >
-              Разрешить уведомления
+              {d.parentApp.notif.allowTitle}
             </Text>
             <Text
               style={{
@@ -282,7 +306,7 @@ export default function NotifSettingsScreen() {
                 marginTop: 2,
               }}
             >
-              Главный переключатель всех уведомлений
+              {d.parentApp.notif.allowSub}
             </Text>
           </View>
           <Toggle value={master} onValueChange={setMasterExplained} />
@@ -292,7 +316,7 @@ export default function NotifSettingsScreen() {
         {notSaved ? <SoonNote text={d.parentApp.soon.notes.notifSave} /> : null}
 
         {/* 4. Секционный хедер. */}
-        <SectionCap label="УВЕДОМЛЕНИЯ" />
+        <SectionCap label={d.parentApp.notif.sectionCap} />
 
         {/* 5. Список категорий (9 строк) в одной GlassCard. */}
         <GlassCard
@@ -303,6 +327,7 @@ export default function NotifSettingsScreen() {
             <NotifSettingsRow
               key={row.id}
               row={row}
+              text={categoryText(row.id, d.parentApp.notif)}
               value={master ? values[row.id] : false}
               onChange={(next) => setOne(row.id, next)}
               disabled={!master}

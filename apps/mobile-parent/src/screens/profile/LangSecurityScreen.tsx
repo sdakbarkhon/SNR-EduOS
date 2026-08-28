@@ -284,17 +284,16 @@ export default function LangSecurityScreen() {
   // OS/expo-local-authentication и app-timeout появится на этапе данных).
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
+  // 28.08.2026: подпись автовыхода собирается из словаря, а не берётся
+  // готовой русской строкой из демо-заготовки — на узбекском и английском
+  // экран показывал «Через 15 минут». Заготовку не трогаем: из неё берём
+  // только код значения, а текст — из словаря на трёх языках.
   const autoExitFixture = getAutoExitFixture();
   const [aeLabel] = useState<string>(() => {
-    // DEFAULT_AUTO_EXIT_VALUE === "15" → «Через 15 минут» (options[1]).
-    const idx = autoExitFixture.default_value === "5"
-      ? 0
-      : autoExitFixture.default_value === "30"
-        ? 2
-        : autoExitFixture.default_value === "never"
-          ? 3
-          : 1;
-    return autoExitFixture.options[idx] ?? autoExitFixture.options[1];
+    const v = autoExitFixture.default_value;
+    if (v === "never") return d.parentApp.prof.autoExitNever;
+    const minutes = v === "5" ? "5" : v === "30" ? "30" : "15";
+    return d.parentApp.prof.autoExitIn.replace("{n}", minutes);
   });
 
   const [delAccOpen, setDelAccOpen] = useState(false);
@@ -575,8 +574,8 @@ export default function LangSecurityScreen() {
         iconBg={`rgba(${tokens.status.red.rgb},0.12)`}
         iconBorder={`rgba(${tokens.status.red.rgb},0.35)`}
         icon={<TrashIcon size={24} stroke={2} color={tokens.status.red.text} />}
-        title={delAccDialog?.title ?? "Удалить аккаунт?"}
-        text={delAccDialog?.body}
+        title={d.parentApp.prof.deleteAccTitle}
+        text={d.parentApp.prof.deleteAccBody}
       >
         {/* 15.08.2026 (заглушки). Красная кнопка «Удалить» тут просто закрывала
             модалку — самое опасное действие в приложении молча не делало

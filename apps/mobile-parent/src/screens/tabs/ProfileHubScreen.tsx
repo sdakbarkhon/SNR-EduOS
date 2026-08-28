@@ -243,7 +243,13 @@ export default function ProfileHubScreen() {
               gradient={k.avatar_gradient}
               ringColor={k.avatar_ring}
               status_chip={isRealFlow ? "" : k.status_chip}
-              tone={k.status_chip === "В школе" ? "green" : "gray"}
+              // Тон чипа — по признаку демо, а не по русской подписи: при
+              // переключении языка сравнение со строкой «В школе» перестало
+              // бы срабатывать. У настоящего ребёнка чипа нет вовсе.
+              // Литерал остаётся, но теперь он заведомо демо-только: список
+              // фикстурных детей не переводится (getChildren отдаёт CHILDREN как
+              // есть, без trDeep), поэтому подпись всегда русская.
+              tone={!isRealFlow && k.status_chip === "В школе" ? "green" : "gray"}
               divider={i > 0}
               onPress={() => {
                 // Заход 9: тап по ребёнку в «Мои дети» делает его активным
@@ -329,8 +335,8 @@ export default function ProfileHubScreen() {
             <Path d="M21 12H9" />
           </Svg>
         }
-        title={logoutDialog?.title ?? "Выйти?"}
-        text={logoutDialog?.body}
+        title={d.parentApp.prof.logoutTitle}
+        text={d.parentApp.prof.logoutBody}
       >
         <View style={{ flexDirection: "row", gap: 10, alignSelf: "stretch", marginTop: 6 }}>
           <Pressable

@@ -142,7 +142,10 @@ export default function TeacherProfileScreen() {
           byTeacher.set(s.teacherId, { id: s.teacherId, fullName: s.teacherName, subjectNames: [s.subjectName] });
         }
       }
-      return [...byTeacher.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "ru"));
+      // Порядок задаётся при отрисовке (см. teachers ниже), а не здесь:
+      // запрос не перезапускается при смене языка, и порядок застревал бы
+      // на том, что был при загрузке.
+      return [...byTeacher.values()];
     },
   );
 
@@ -160,7 +163,11 @@ export default function TeacherProfileScreen() {
   );
 
   const state = teacherId ? profileState : listState;
-  const teachers = teacherId ? [] : (listState.data ?? []);
+  // Сортировка по правилам ЯЗЫКА ИНТЕРФЕЙСА. Раньше стояло localeCompare(…,
+  // "ru") — на узбекском и английском список шёл чужим алфавитом.
+  const teachers = teacherId
+    ? []
+    : [...(listState.data ?? [])].sort((a, b) => a.fullName.localeCompare(b.fullName, localeTag));
   const profile = teacherId ? profileState.data?.profile ?? null : null;
   const reviews = teacherId ? profileState.data?.reviews ?? [] : [];
 

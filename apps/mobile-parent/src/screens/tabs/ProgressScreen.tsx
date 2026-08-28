@@ -571,7 +571,10 @@ export default function ProgressScreen() {
         statusTone: k.status_chip === "В школе" ? "green" : "gray",
       }));
 
-  const parentInitials = "ДК";
+  // Инициалы в аватаре шапки. Раньше здесь стояло «ДК» — инициалы
+  // выдуманного родителя из макета, и НАСТОЯЩИЙ человек видел в своём
+  // аватаре чужие буквы. Демо-гостю оставляем как было.
+  const parentInitials = isRealFlow ? initialsFromName(parentData!.parentName) : "ДК";
   const parentGradient: [string, string] = ["#8b5cf6", "#22d3ee"];
 
   return (
@@ -657,7 +660,7 @@ export default function ProgressScreen() {
 
           <View style={{ flexDirection: "row", gap: 10 }}>
             <AccentInset radius={14} style={{ flex: 1, padding: 12, gap: 6 }}>
-              <AccentCapsLabel>{`Прогресс за неделю`}</AccentCapsLabel>
+              <AccentCapsLabel>{d.parentApp.progressWeb.weekProgressLabel}</AccentCapsLabel>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: "#FFFFFF" }}>
                   {summary.week_progress_label}
@@ -697,7 +700,7 @@ export default function ProgressScreen() {
                 />
               </View>
               <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: "rgba(255,255,255,0.85)" }}>
-                присутствий {summary.attendance_ratio_label}
+                {format(d.parentApp.grades.attendanceRatio, { ratio: summary.attendance_ratio_label })}
               </Text>
             </AccentInset>
           </View>
@@ -929,7 +932,7 @@ export default function ProgressScreen() {
                   color: tokens.status.green.text,
                 }}
               >
-                Сильные стороны
+                {d.parentApp.grades.strengths}
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                 {summary.strengths.map((s) => (
@@ -946,7 +949,7 @@ export default function ProgressScreen() {
                   color: tokens.status.red.text,
                 }}
               >
-                Зоны роста
+                {d.parentApp.grades.growthAreas}
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                 {summary.growth_areas.map((s) => (

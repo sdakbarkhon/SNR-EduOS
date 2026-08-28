@@ -3511,6 +3511,9 @@ export interface Dictionary {
       gradeChipExcellent: string; // «Отлично!» — средний балл ≥4.5
       gradeChipGood: string;      // «Хорошо!» — средний балл ≥3.5
       gradeChipNeedsWork: string; // «Есть куда расти» — средний балл <3.5
+      strengths: string;
+      growthAreas: string;
+      attendanceRatio: string;     // «присутствий {ratio}»
     };
     /** Веб-родитель, экран «Успехи» — статичный мок-текст под карточкой
      *  «Средний балл» и вкладками «Навыки»/«Динамика» (те же вкладки в
@@ -3635,6 +3638,27 @@ export interface Dictionary {
       shareApp: string;
       myKids: string;
       switchChild: string;        // «Сменить ребёнка ›» (ChildSwitcherCard compact)
+      // Личные данные родителя (d30), табы профиля ребёнка (d29) и
+      // подтверждения выхода/удаления. Приехали из кода 28.08.2026.
+      sectionAdditional: string;
+      sectionContact: string;
+      fullNameRow: string;
+      gender: string;
+      maritalStatus: string;
+      city: string;
+      postalCode: string;
+      workplace: string;
+      jobTitle: string;
+      workPhone: string;
+      backupPhone: string;
+      tabData: string;
+      tabAchievements: string;
+      logoutTitle: string;
+      logoutBody: string;
+      deleteAccTitle: string;
+      deleteAccBody: string;
+      autoExitIn: string;          // «Через {n} минут»
+      autoExitNever: string;
       generalInfo: string;
       schoolContacts: string;
       additional: string;
@@ -3711,6 +3735,9 @@ export interface Dictionary {
       pay: string;         paySub: string;
       msg: string;         msgSub: string;
       promo: string;       promoSub: string;
+      allowTitle: string;
+      allowSub: string;
+      sectionCap: string;
     };
     wn: {
       thisVersion: string;
@@ -3728,6 +3755,9 @@ export interface Dictionary {
       study: string;
       finance: string;
       other: string;
+      promoTitle: string;
+      promoSub: string;
+      promoCta: string;
     };
     auth: {
       heroTitle: string;
@@ -4188,6 +4218,7 @@ export interface Dictionary {
       filterToday: string;       // «Сегодня»
       filterOverdue: string;     // «Просрочено»
       filterDone: string;        // «Выполнено»
+      summaryTotal: string;        // «Всего» в нижней строке-сводке
       sizeKb: string;            // «{n} КБ»
       sizeMb: string;            // «{n} МБ»
     };

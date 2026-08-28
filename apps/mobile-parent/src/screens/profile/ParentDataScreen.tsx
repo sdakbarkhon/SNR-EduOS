@@ -68,36 +68,34 @@ export default function ParentDataScreen() {
   // Kebab → универсальный profile-menu stub (согласовано с CardDetailsScreen).
   const goProfMenu = () => navigation.navigate("stub", { stubKey: "profmenu" });
 
-  // Литералы «Дополнительная информация» / «Связь» — в макете (строки 1233,
-  // 1239) захардкожены, в словаре core/src/i18n/ru.ts подходящих ключей нет.
-  // Экран уже читает d.parentApp.prof.* — эти два переведутся вместе с
-  // следующим i18n-проходом (Заход 8/10). SectionHeader сам применит
-  // textTransform:'uppercase' и letter-spacing .08em.
-  const SECTION_ADDITIONAL = "Дополнительная информация";
-  const SECTION_CONTACT = "Связь";
+  // 28.08.2026: все подписи этого экрана переехали в общий словарь. Раньше
+  // они были вписаны сюда по-русски и оставались русскими на узбекском и
+  // английском, хотя экран заявлен на трёх языках.
+  const p = d.parentApp.prof;
 
   const personalRows: KVRow[] = [
-    { key: "ФИО", value: realName ?? profile.full_name_official },
-    { key: "Дата рождения", value: profile.birth_date_label },
-    { key: "Пол", value: profile.gender_label },
-    { key: "Семейное положение", value: profile.marital_status_label },
+    { key: p.fullNameRow, value: realName ?? profile.full_name_official },
+    { key: p.birthDate, value: profile.birth_date_label },
+    { key: p.gender, value: profile.gender_label },
+    { key: p.maritalStatus, value: profile.marital_status_label },
   ];
 
   const addressRows: KVRow[] = [
-    { key: "Город", value: profile.city },
-    { key: "Адрес", value: profile.address },
-    { key: "Индекс", value: profile.postal_code },
+    { key: p.city, value: profile.city },
+    { key: p.address, value: profile.address },
+    { key: p.postalCode, value: profile.postal_code },
   ];
 
   const additionalRows: KVRow[] = [
-    { key: "Место работы", value: profile.workplace },
-    { key: "Должность", value: profile.job_title },
-    { key: "Рабочий телефон", value: profile.work_phone },
+    { key: p.workplace, value: profile.workplace },
+    { key: p.jobTitle, value: profile.job_title },
+    { key: p.workPhone, value: profile.work_phone },
   ];
 
   const contactRows: KVRow[] = [
+    // «Email» одинаков на всех трёх языках — переводить нечего.
     { key: "Email", value: parent.email },
-    { key: "Резервный телефон", value: profile.backup_phone },
+    { key: p.backupPhone, value: profile.backup_phone },
   ];
 
   return (
@@ -187,11 +185,11 @@ export default function ParentDataScreen() {
         <KVCard rows={addressRows} scheme={scheme} tokens={tokens} />
 
         {/* 8–9. Дополнительная информация (литерал → i18n позже). */}
-        <SectionHeader title={SECTION_ADDITIONAL} />
+        <SectionHeader title={p.sectionAdditional} />
         <KVCard rows={additionalRows} scheme={scheme} tokens={tokens} />
 
         {/* 10–11. Связь (литерал → i18n позже). */}
-        <SectionHeader title={SECTION_CONTACT} />
+        <SectionHeader title={p.sectionContact} />
         <KVCard rows={contactRows} scheme={scheme} tokens={tokens} />
       </ScrollView>
     </AppBackground>

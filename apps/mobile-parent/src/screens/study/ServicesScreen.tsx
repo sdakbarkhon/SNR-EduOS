@@ -720,7 +720,7 @@ export default function ServicesScreen() {
                     color: tokens.ink1,
                   }}
                 >
-                  Оцените новые возможности SNR EduOS
+                  {d.parentApp.svc.promoTitle}
                 </Text>
                 <Text
                   style={{
@@ -730,7 +730,7 @@ export default function ServicesScreen() {
                     color: tokens.ink2,
                   }}
                 >
-                  Мы постоянно улучшаем приложение для вас и ваших детей
+                  {d.parentApp.svc.promoSub}
                 </Text>
               </View>
               {/* Pill CTA «Что нового?» (макет строка 742). */}
@@ -758,7 +758,7 @@ export default function ServicesScreen() {
                       color: "#FFFFFF",
                     }}
                   >
-                    Что нового?
+                    {d.parentApp.svc.promoCta}
                   </Text>
                 </LinearGradient>
               </Pressable>

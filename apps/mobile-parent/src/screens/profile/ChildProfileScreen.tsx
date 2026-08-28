@@ -286,10 +286,10 @@ export default function ChildProfileScreen() {
 
   // Табы (макет 1181–1184). Клик по «data» — no-op (уже активный).
   const tabs: { key: ProfileTabKey; label: string; onPress: () => void }[] = [
-    { key: "data", label: "Данные", onPress: () => {} },
+    { key: "data", label: t.prof.tabData, onPress: () => {} },
     { key: "progress", label: t.nav.grades, onPress: goProgress },
     { key: "attend", label: t.scr.attendance, onPress: goAttend },
-    { key: "achieve", label: "Достижения", onPress: goAchieve },
+    { key: "achieve", label: t.prof.tabAchievements, onPress: goAchieve },
   ];
 
   return (
@@ -343,7 +343,7 @@ export default function ChildProfileScreen() {
           }}
           name={child.full_name}
           classLabel={`${child.class_name} ${t.grades.class}`}
-          switchLabel="Сменить ›"
+          switchLabel={`${t.prof.switchChild} ›`}
           onPress={() => setSheetOpen(true)}
         />
 

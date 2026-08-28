@@ -40,7 +40,11 @@ export const REAL_CHILD_PALETTE: [Gradient, string][] = [
  * «10-A class»), а там, где класс показывают без слова, остаётся «10-А».
  */
 function stripClassWord(name: string | null | undefined): string {
-  const clean = (name ?? "").replace(/s*(класс|sinf|class)s*$/i, "").trim();
+  // 28.08.2026: в шаблоне были потеряны слэши — вместо «пробелы» стояло
+  // «сколько-то букв s». Работало по совпадению: s* совпадает и с пустотой,
+  // поэтому «10-А класс» обрезалось верно. Чинится ради следующего читателя
+  // и ради имён, которые кончаются на s.
+  const clean = (name ?? "").replace(/\s*(класс|sinf|class)\s*$/i, "").trim();
   return clean || name || "—";
 }
 
