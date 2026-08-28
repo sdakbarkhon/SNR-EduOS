@@ -42,6 +42,16 @@ export type ParentContext = {
   parentName: string;
   parentPhone: string | null;
   /**
+   * Почта родителя или null.
+   *
+   * 28.08.2026: в public.parents НЕТ колонки email — есть google_email и
+   * apple_email, обе заводит администратор для входа вместо кода из SMS
+   * (миграция 201). Экран «Данные родителя» в мобильном показывал вместо
+   * них выдуманный адрес из заготовки. Берём ту, что заполнена: Google
+   * первой, потому что вход через Apple ещё не сделан.
+   */
+  parentEmail: string | null;
+  /**
    * Название школы родителя (schools.name) или null.
    *
    * 27.08.2026: профиль ребёнка в мобильном показывал строку «Школа» с
@@ -83,7 +93,7 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
 
   const { data: parent, error: parentErr } = await db
     .from("parents")
-    .select("id, full_name, phone, school_id")
+    .select("id, full_name, phone, school_id, google_email, apple_email")
     .eq("user_id", auth.user.id)
     .maybeSingle();
   if (parentErr) throw parentErr;
@@ -92,6 +102,8 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
   // Название школы. Ошибку НЕ бросаем: если правило доступа не пустит или
   // школа не проставлена, профиль ребёнка просто не покажет строку «Школа»
   // — это лучше, чем уронить весь экран из-за подписи.
+  const parentEmail = parent.google_email ?? parent.apple_email ?? null;
+
   let schoolName: string | null = null;
   let schoolIsDemo = false;
   if (parent.school_id) {
@@ -118,6 +130,7 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
       parentId: parent.id,
       parentName: parent.full_name,
       parentPhone: parent.phone,
+      parentEmail,
       schoolName,
       schoolIsDemo,
       children: [],
@@ -157,6 +170,7 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
     parentId: parent.id,
     parentName: parent.full_name,
     parentPhone: parent.phone,
+    parentEmail,
     schoolName,
     schoolIsDemo,
     children: studentIds.map((id) => byId.get(id)).filter((c): c is ParentChildSummary => Boolean(c)),

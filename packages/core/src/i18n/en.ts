@@ -3523,6 +3523,7 @@ export const en: Dictionary = {
       personalInfo: "Personal info",
       address: "Address",
       parentRole: "Parent",
+      parentDataOnlySchool: "The school does not store any other details yet: a parent record holds only the name, phone and email.",
       docsSub: "Certificates, records, ID",
       notifSetSub: "Grades, tasks, payments",
       payMethodsSub: "Cards and payment systems",

@@ -3524,6 +3524,7 @@ export const uz: Dictionary = {
       personalInfo: "Shaxsiy ma'lumotlar",
       address: "Manzil",
       parentRole: "Ota-ona",
+      parentDataOnlySchool: "Qolgan ma'lumotlarni maktab hozircha saqlamaydi: ota-ona kartasida faqat ism, telefon va pochta bor.",
       docsSub: "Guvohnomalar, ma'lumotnomalar, ID",
       notifSetSub: "Baholar, vazifalar, to'lovlar",
       payMethodsSub: "Kartalar va to'lov tizimlari",

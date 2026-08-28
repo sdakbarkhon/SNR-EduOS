@@ -35,6 +35,7 @@ import type {
   ApplicationRow,
   BillRow,
   ChildInfoRow,
+  ParentProfileRow,
   ChildRow,
   HomeworkCardRow,
   LegalDocRow,
@@ -250,8 +251,21 @@ export function getParent() {
   return PARENT;
 }
 
-export function getParentProfile() {
-  return PARENT_PROFILE;
+/**
+ * Выдуманный профиль родителя — дата рождения, пол, семейное положение,
+ * адрес, место работы. НИ ОДНОГО из этих полей в public.parents нет:
+ * таблица держит id, user_id, full_name, phone, school_id, created_at,
+ * created_by, google_email, apple_email — и всё (проверено живым запросом
+ * 28.08.2026).
+ *
+ * ПОЧЕМУ АРГУМЕНТ ОБЯЗАТЕЛЕН. До 28.08.2026 экран «Данные родителя» звал
+ * эту функцию безусловно и показывал настоящему человеку выдуманный адрес
+ * и место работы как его собственные. Теперь вызывающий обязан СКАЗАТЬ,
+ * что он в демо; при настоящем входе возвращается null, и подстановка
+ * становится невозможной по типам, а не запрещённой на словах.
+ */
+export function getParentProfile(demo: boolean): ParentProfileRow | null {
+  return demo ? PARENT_PROFILE : null;
 }
 
 export function getAuthFixtures() {

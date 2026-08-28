@@ -21,8 +21,33 @@
  *  10. SectionHeader «Связь» — литерал (макет 1239, отдельного ключа нет).
  *  11. GlassCard-rows: Email / Резервный телефон.
  *
- * Данные — только из фикстур: getParent() (identity-card), getParentProfile()
- * (все секции). Никаких input/edit-контролов, как в оригинале.
+ * 28.08.2026 — ЭКРАН ВРАЛ НАСТОЯЩЕМУ РОДИТЕЛЮ.
+ *
+ * Из четырнадцати значений настоящими были два — ФИО и телефон. Остальные
+ * двенадцать (инициалы аватара, роль «Мать», почта, дата рождения, пол,
+ * семейное положение, город, адрес, индекс, место работы, должность,
+ * рабочий и резервный телефоны) приходили из заготовки и были подписаны как
+ * данные самого человека. Экран не закрыт demoOr — это видел живой родитель.
+ *
+ * ЧТО ЕСТЬ В БАЗЕ. Таблица public.parents держит ровно девять колонок:
+ * id, user_id, full_name, phone, school_id, created_at, created_by,
+ * google_email, apple_email. Проверено живым запросом 28.08.2026, сходится
+ * с миграциями 74 / 180 / 201. Колонок под остальные поля нет ВООБЩЕ.
+ *
+ * СТАЛО. При настоящем входе экран показывает одну карточку: имя, роль,
+ * почту (если заведена) и телефон. Секции «Личные данные», «Адрес»,
+ * «Дополнительная информация» и «Связь» не рисуются вовсе — не прочерками,
+ * а отсутствием: всё настоящее и так стоит в карточке выше, а повторять её
+ * одной строкой под четырьмя заголовками бессмысленно. Под карточкой —
+ * строка о том, почему больше ничего нет, иначе пустой экран читается как
+ * поломка.
+ *
+ * РОЛЬ. В заготовке стояло «Мать». Пола родителя в базе нет, угадывать
+ * нельзя — берём нейтральное «Родитель» из словаря, то же самое, что уже
+ * показывает карточка на экране «Профиль».
+ *
+ * Демо-гость видит ровно то, что видел: getParentProfile(true) отдаёт ему
+ * всю заготовку, все четыре секции на месте.
  */
 import { Text, View, ScrollView, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Circle } from "react-native-svg";
@@ -39,9 +64,17 @@ import { AppBackground, fonts, useTheme } from "../../theme";
 import { useAppLocale } from "../../i18n";
 import { getParent, getParentProfile } from "../../data";
 import { useParentData } from "../../context/ParentDataContext";
+import { useAuthSession } from "../../context/AuthSessionContext";
 import type { MainStackParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
+
+/** ФИО → инициалы: первые буквы первых двух слов. Тот же приём, что на
+ *  экране «Профиль» (ProfileHubScreen.initialsFromFullName). */
+function initialsFromFullName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts.slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join("");
+}
 
 /** Пара ключ/значение внутри карточки-секции. */
 interface KVRow {
@@ -54,49 +87,76 @@ export default function ParentDataScreen() {
   const { d } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
+  // Подписи экрана — из общего словаря (28.08.2026): раньше были вписаны
+  // сюда по-русски и оставались русскими на узбекском и английском.
+  const p = d.parentApp.prof;
+
   const parent = getParent();
-  const profile = getParentProfile();
-  // Настоящие ФИО и телефон родителя — из parents (getParentContext).
-  // Остальные поля карточки (дата рождения, пол, семейное положение, адрес,
-  // место работы) в базе не хранятся вовсе — колонок под них нет, поэтому
-  // они остаются фикстурой; заводить таблицы ради них никто не просил.
+  const session = useAuthSession();
   const { data: parentData } = useParentData();
+  // Развилка — ПО ПРИЗНАКУ ДЕМО, а не по «данные родителя уже приехали».
+  // Второе ложно первые доли секунды после запуска, и настоящий человек
+  // успевал увидеть выдуманное имя и адрес. Признак демо известен сразу.
+  const isDemo = !!session.demoParentId;
+  // Выдуманный профиль. При настоящем входе его НЕТ — аксессор возвращает
+  // null, и подстановка чужих данных невозможна по типам (см. data/index.ts).
+  const profile = getParentProfile(isDemo);
+
+  // Всё, что база знает о родителе.
   const realName = parentData?.parentName ?? null;
   const realPhone = parentData?.parentPhone ?? null;
+  const realEmail = parentData?.parentEmail ?? null;
+
+  // Карточка сверху. У настоящего родителя инициалы считаются из его ФИО
+  // (в заготовке стояло «ДК» — буквы выдуманного человека), роль нейтральная
+  // («Мать» из заготовки — выдумка: пола родителя в базе нет), почта из
+  // parents.google_email/apple_email и только если заведена. Пока данные едут,
+  // поля пустые: пустое место честнее чужого имени.
+  const cardName = isDemo ? parent.full_name : (realName ?? "");
+  const cardInitials = isDemo ? parent.initials : (realName ? initialsFromFullName(realName) : "");
+  const cardRole = isDemo ? parent.role_label : p.parentRole;
+  const cardEmail = isDemo ? parent.email : realEmail;
+  const cardPhone = isDemo ? parent.phone : (realPhone ?? "");
 
   const goBack = () => navigation.goBack();
   // Kebab → универсальный profile-menu stub (согласовано с CardDetailsScreen).
   const goProfMenu = () => navigation.navigate("stub", { stubKey: "profmenu" });
 
-  // 28.08.2026: все подписи этого экрана переехали в общий словарь. Раньше
-  // они были вписаны сюда по-русски и оставались русскими на узбекском и
-  // английском, хотя экран заявлен на трёх языках.
-  const p = d.parentApp.prof;
 
-  const personalRows: KVRow[] = [
-    { key: p.fullNameRow, value: realName ?? profile.full_name_official },
-    { key: p.birthDate, value: profile.birth_date_label },
-    { key: p.gender, value: profile.gender_label },
-    { key: p.maritalStatus, value: profile.marital_status_label },
-  ];
+  // Четыре секции ниже — ТОЛЬКО ДЛЯ ДЕМО-ГОСТЯ. Ни одно их поле не имеет
+  // колонки в public.parents, а всё настоящее уже стоит в карточке выше.
+  const personalRows: KVRow[] = profile
+    ? [
+        { key: p.fullNameRow, value: profile.full_name_official },
+        { key: p.birthDate, value: profile.birth_date_label },
+        { key: p.gender, value: profile.gender_label },
+        { key: p.maritalStatus, value: profile.marital_status_label },
+      ]
+    : [];
 
-  const addressRows: KVRow[] = [
-    { key: p.city, value: profile.city },
-    { key: p.address, value: profile.address },
-    { key: p.postalCode, value: profile.postal_code },
-  ];
+  const addressRows: KVRow[] = profile
+    ? [
+        { key: p.city, value: profile.city },
+        { key: p.address, value: profile.address },
+        { key: p.postalCode, value: profile.postal_code },
+      ]
+    : [];
 
-  const additionalRows: KVRow[] = [
-    { key: p.workplace, value: profile.workplace },
-    { key: p.jobTitle, value: profile.job_title },
-    { key: p.workPhone, value: profile.work_phone },
-  ];
+  const additionalRows: KVRow[] = profile
+    ? [
+        { key: p.workplace, value: profile.workplace },
+        { key: p.jobTitle, value: profile.job_title },
+        { key: p.workPhone, value: profile.work_phone },
+      ]
+    : [];
 
-  const contactRows: KVRow[] = [
-    // «Email» одинаков на всех трёх языках — переводить нечего.
-    { key: "Email", value: parent.email },
-    { key: p.backupPhone, value: profile.backup_phone },
-  ];
+  const contactRows: KVRow[] = profile
+    ? [
+        // «Email» одинаков на всех трёх языках — переводить нечего.
+        { key: "Email", value: parent.email },
+        { key: p.backupPhone, value: profile.backup_phone },
+      ]
+    : [];
 
   return (
     <AppBackground>
@@ -143,7 +203,7 @@ export default function ParentDataScreen() {
             <View style={{ margin: 4.5 }}>
               <Avatar
                 size={54}
-                initials={parent.initials}
+                initials={cardInitials}
                 gradient={parent.avatar_gradient}
                 variant="ring"
                 ringColor="#8b5cf6"
@@ -152,7 +212,7 @@ export default function ParentDataScreen() {
             </View>
             <View style={{ flex: 1, gap: 1 }}>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 14.5, color: tokens.ink1 }}>
-                {realName ?? parent.full_name}
+                {cardName}
               </Text>
               <Text
                 style={{
@@ -161,36 +221,61 @@ export default function ParentDataScreen() {
                   color: tokens.status.violet.text,
                 }}
               >
-                {parent.role_label}
+                {cardRole}
               </Text>
-              <Text
-                style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink2 }}
-                numberOfLines={1}
-              >
-                {parent.email}
-              </Text>
+              {/* Почты может не быть вовсе: администратор заводит её только
+                  для входа вместо кода из SMS. Пустой строки не рисуем. */}
+              {cardEmail ? (
+                <Text
+                  style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink2 }}
+                  numberOfLines={1}
+                >
+                  {cardEmail}
+                </Text>
+              ) : null}
               <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink2 }}>
-                {realPhone ?? parent.phone}
+                {cardPhone}
               </Text>
             </View>
           </View>
         </GlassCard>
 
-        {/* 4–5. Личные данные. */}
-        <SectionHeader title={d.parentApp.prof.personalInfo} />
-        <KVCard rows={personalRows} scheme={scheme} tokens={tokens} />
+        {/* Блоки 4–11 — ТОЛЬКО ДЛЯ ДЕМО-ГОСТЯ: ни одного из их полей в
+            public.parents нет. Условие — profile: аксессор
+            отдаёт null ровно при настоящем входе. */}
+        {profile ? (
+          <>
+            {/* 4–5. Личные данные. */}
+            <SectionHeader title={d.parentApp.prof.personalInfo} />
+            <KVCard rows={personalRows} scheme={scheme} tokens={tokens} />
 
-        {/* 6–7. Адрес. */}
-        <SectionHeader title={d.parentApp.prof.address} />
-        <KVCard rows={addressRows} scheme={scheme} tokens={tokens} />
+            {/* 6–7. Адрес. */}
+            <SectionHeader title={d.parentApp.prof.address} />
+            <KVCard rows={addressRows} scheme={scheme} tokens={tokens} />
 
-        {/* 8–9. Дополнительная информация (литерал → i18n позже). */}
-        <SectionHeader title={p.sectionAdditional} />
-        <KVCard rows={additionalRows} scheme={scheme} tokens={tokens} />
+            {/* 8–9. Дополнительная информация. */}
+            <SectionHeader title={p.sectionAdditional} />
+            <KVCard rows={additionalRows} scheme={scheme} tokens={tokens} />
 
-        {/* 10–11. Связь (литерал → i18n позже). */}
-        <SectionHeader title={p.sectionContact} />
-        <KVCard rows={contactRows} scheme={scheme} tokens={tokens} />
+            {/* 10–11. Связь. */}
+            <SectionHeader title={p.sectionContact} />
+            <KVCard rows={contactRows} scheme={scheme} tokens={tokens} />
+          </>
+        ) : (
+          // Одна строка вместо четырёх пустых секций: без неё экран из одной
+          // карточки читается как недогрузившийся.
+          <Text
+            style={{
+              fontFamily: fonts.manrope600,
+              fontSize: 11,
+              lineHeight: 11 * 1.5,
+              color: tokens.ink2,
+              paddingHorizontal: 4,
+            }}
+          >
+            {p.parentDataOnlySchool}
+          </Text>
+        )}
       </ScrollView>
     </AppBackground>
   );

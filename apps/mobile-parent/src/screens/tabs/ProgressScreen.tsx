@@ -513,6 +513,26 @@ export default function ProgressScreen() {
           : "—"
     : summary.average_label;
   const averageMaxLabel = isRealFlow ? "5.0" : summary.average_max_label;
+
+  // ПОСЕЩАЕМОСТЬ НА КАРТОЧКЕ «СРЕДНИЙ БАЛЛ» — НАСТОЯЩАЯ (28.08.2026).
+  // Раньше и полоса, и подпись «присутствий 24/25» брались из заготовки, и
+  // настоящий родитель читал выдуманные 96 % как посещаемость своего ребёнка.
+  // Числа уже загружены этим же экраном: getChildSkills возвращает их в
+  // source вместе с навыками — второго запроса не нужно.
+  const attSource = skillsState.data?.source ?? null;
+  const realAttTotal = attSource?.attendanceTotal ?? 0;
+  const realAttPresent = attSource?.attendancePresent ?? 0;
+  const realAttPct = realAttTotal > 0 ? Math.round((realAttPresent / realAttTotal) * 100) : null;
+  // Отмеченных уроков нет — показывать нечего, вставка не рисуется вовсе.
+  const showAttendance = isRealFlow ? realAttPct !== null : true;
+  // «Прогресс за неделю» (стрелка, спарклайн, «отличный рост») источника в
+  // базе не имеет ни одного: ни колонки, ни расчёта. Настоящему родителю
+  // вставка не показывается.
+  const showWeekProgress = !isRealFlow;
+  const attPct = isRealFlow ? (realAttPct ?? 0) : summary.attendance_pct;
+  const attRatio = isRealFlow
+    ? `${realAttPresent}/${realAttTotal}`
+    : summary.attendance_ratio_label;
   const averageChipLabel = isRealFlow ? (realAvgLoading || realAvgError ? "" : realAverageChip) : summary.average_chip;
   const averageStars = isRealFlow ? (realAvgLoading || realAvgError ? 0 : realStarsFilled) : summary.stars_filled;
   // Подписи осей радара удалены вместе с самим радаром (14.08.2026):
@@ -658,7 +678,13 @@ export default function ProgressScreen() {
             ) : null}
           </View>
 
+          {/* Ряд из двух вставок. У настоящего родителя левой нет вовсе
+              (источника «прогресса за неделю» в базе не существует), а правая
+              рисуется только когда есть отмеченные уроки. Если не остаётся ни
+              одной — ряда нет: пустая полоса читается как поломка. */}
+          {showWeekProgress || showAttendance ? (
           <View style={{ flexDirection: "row", gap: 10 }}>
+            {showWeekProgress ? (
             <AccentInset radius={14} style={{ flex: 1, padding: 12, gap: 6 }}>
               <AccentCapsLabel>{d.parentApp.progressWeb.weekProgressLabel}</AccentCapsLabel>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -677,6 +703,8 @@ export default function ProgressScreen() {
                 {summary.week_progress_note}
               </Text>
             </AccentInset>
+            ) : null}
+            {showAttendance ? (
             <AccentInset
               radius={14}
               style={{ flex: 1, padding: 12, gap: 6 }}
@@ -687,23 +715,25 @@ export default function ProgressScreen() {
                 <ChevronRight />
               </View>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: "#FFFFFF" }}>
-                {summary.attendance_pct}%
+                {attPct}%
               </Text>
               <View style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.3)" }}>
                 <View
                   style={{
                     height: 4,
                     borderRadius: 2,
-                    width: `${summary.attendance_pct}%`,
+                    width: `${attPct}%`,
                     backgroundColor: "#FFFFFF",
                   }}
                 />
               </View>
               <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: "rgba(255,255,255,0.85)" }}>
-                {format(d.parentApp.grades.attendanceRatio, { ratio: summary.attendance_ratio_label })}
+                {format(d.parentApp.grades.attendanceRatio, { ratio: attRatio })}
               </Text>
             </AccentInset>
+            ) : null}
           </View>
+          ) : null}
         </AccentCard>
 
         {/* Две вкладки: «Оценки» и «Навыки» — обе на настоящих данных.
@@ -775,9 +805,14 @@ export default function ProgressScreen() {
                 </Popover>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
-                <Text style={{ fontFamily: fonts.manrope800, fontSize: 11, color: tokens.status.green.text }}>
-                  {summary.vs_prev_month_note} ↗
-                </Text>
+                {/* «Выше на 0.2, чем в июне ↗» — выдумка: сравнения среднего
+                    балла с прошлым месяцем никто не считает, ни в приложении,
+                    ни в базе. Настоящему родителю не показываем. */}
+                {isRealFlow ? null : (
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 11, color: tokens.status.green.text }}>
+                    {summary.vs_prev_month_note} ↗
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -919,9 +954,20 @@ export default function ProgressScreen() {
               </>
             )}
 
-            {/* «Сильные / зоны роста» (320–325) — остаётся фикстурой (см.
-                отчёт: не входит в явный список задачи, нет естественного
-                способа посчитать «зоны роста» без выдумывания метрики). */}
+            {/* «Сильные стороны / Зоны роста».
+
+                28.08.2026: чипы называют конкретные предметы — «Программирование,
+                Математика, Логика» против «Английский язык, Говорение,
+                Сочинения». Они из заготовки и одинаковы для любого ребёнка, а
+                читаются как разбор именно этого. Настоящему родителю блок не
+                показываем.
+
+                Посчитать их можно: средние по предметам уже есть на этом
+                экране, а правило («выше общего среднего — сильные, ниже —
+                зоны роста») уже написано в packages/core, getChildGradesSummary.
+                Не делаю здесь: средний балл — отдельная тема, её правила в этом
+                заходе не трогаем. */}
+            {isRealFlow ? null : (
             <GlassCard radius={22} contentStyle={{ padding: 14, gap: 10 }}>
               <Text
                 style={{
@@ -957,6 +1003,7 @@ export default function ProgressScreen() {
                 ))}
               </View>
             </GlassCard>
+            )}
 
             {/* Отзыв учителя (326–331). Заход 2, шаг 6: реальный последний
                 отзыв при isRealFlow — getChildTeacherReviews (lesson_grades.

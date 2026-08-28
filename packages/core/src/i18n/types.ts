@@ -3675,6 +3675,7 @@ export interface Dictionary {
       address: string;
       // Заход 4: экран «Профиль-хаб» — подписи меню и версии.
       parentRole: string;         // «Родитель»
+      parentDataOnlySchool: string;
       docsSub: string;            // «Свидетельства, справки, ID»
       notifSetSub: string;        // «Оценки, задания, оплаты»
       payMethodsSub: string;      // «Карты и платёжные системы»

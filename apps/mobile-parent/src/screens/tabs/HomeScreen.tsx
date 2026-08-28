@@ -96,6 +96,13 @@ type Nav = NativeStackNavigationProp<MainStackParamList & TabParamList>;
  * Данные приведены к «Имя Фамилия» (scripts/fix-demo-name-order.mjs), как у
  * остальных 31 карточки школы, и оба места читают ФИО одинаково.
  */
+/** ФИО → инициалы: первые буквы первых двух слов. Тот же приём, что на
+ *  экранах «Профиль» и «Данные родителя». */
+function givenInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts.slice(0, 2).map((x) => x.charAt(0).toUpperCase()).join("");
+}
+
 function givenName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
   return parts[0] || fullName;
@@ -530,7 +537,15 @@ export default function HomeScreen() {
         bellCount={bellCount}
         onBellPress={() => navigation.navigate("d8")}
         avatar={{
-          initials: parent.initials,
+          // Инициалы настоящего родителя считаются из его ФИО. В заготовке
+          // стоит «ДК» — буквы выдуманного человека, и до 28.08.2026 они
+          // висели в аватаре у всех. Градиент остаётся фикстурным: это
+          // оформление, а не данные.
+          // Признак ДЕМО, а не «данные приехали»: второе ложно первые доли
+          // секунды после запуска, и настоящий человек успевал увидеть «ДК».
+          initials: session.demoParentId
+            ? parent.initials
+            : (parentData?.parentName ? givenInitials(parentData.parentName) : ""),
           gradient: parent.avatar_gradient,
           variant: "ring",
         }}
