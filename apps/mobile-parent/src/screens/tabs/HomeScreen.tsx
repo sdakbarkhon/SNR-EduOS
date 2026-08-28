@@ -43,6 +43,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getStudentLessonsForWeek, getStudentAttendance, getHomeworkWithSubmissions, formatTime, format, LOCALE_TAG } from "@snr/core";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
+  EmptyBlock,
   AccentCard,
   AccentInset,
   BottomSheetFrame,
@@ -269,24 +270,36 @@ export default function HomeScreen() {
   // Демо (session.demoParentId != null) не тронут: childId остаётся
   // единственным источником и для идентичности, и для фикстурных
   // data-плиток, ровно как было.
-  const [childId, setChildId] = useState<string>(defaultChildId());
+  const [childId, setChildId] = useState<string | null>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const session = useAuthSession();
   const { data: parentData, selectedChildId, selectChild } = useParentData();
   const { isDemo } = useDemoSession();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  // Признак ПОКАЗА — из ключа аренды демо-места, как у demoOr.
+  // session.demoParentId для этого не годится: он всегда null.
+  const { isDemo: showcase } = useDemoSession();
   const realIndex = isRealFlow
-    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    // find, а не прижатый к нулю индекс: промах давал ПЕРВОГО ребёнка семьи
+    // вместо выбранного. Тот же класс, что и подстановка выдуманного ребёнка
+    // в resolveChild, только внутри одной семьи (28.08.2026).
+    ? parentData!.children.findIndex((c) => c.id === selectedChildId)
     : -1;
-  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+  // realIndex теперь может быть −1 (выбранного ребёнка нет в семье), а
+  // children[-1] это undefined — до конца проверять обязаны мы, тип массива
+  // об этом молчит.
+  const realChildRow =
+    isRealFlow && realIndex >= 0
+      ? toChildRow(parentData!.children[realIndex], realIndex)
+      : null;
 
   const parent = getParent();
   // getDashboard/getSelectedChildContext — фикстурные "данные-экраны"
   // (метрики, приветствие), НЕ идентичность; продолжают ходить по
   // session.currentChildId/childId как раньше, в этом шаге не меняются.
-  const dashboard = getDashboard(childId);
-  const ctx = getSelectedChildContext(childId);
+  const dashboard = getDashboard(childId ?? undefined);
+  const ctx = getSelectedChildContext(childId ?? undefined);
   const child = ctx.child;
   // Идентичность в ChildSwitcherCard (имя/класс/аватар/статус) — реальная
   // для phone-flow, фикстурная (как раньше) для демо.
@@ -307,7 +320,9 @@ export default function HomeScreen() {
   //     «Вот что происходит сегодня · Шерзод». Демо больше не берёт
   //     готовую родительную форму (first_name_gen), она удалена.
   const greetingParentName = isRealFlow ? givenName(parentData!.parentName) : parent.first_name;
-  const greetingChildName = isRealFlow ? givenName(identityChild.full_name) : child.first_name;
+  const greetingChildName = isRealFlow
+    ? (identityChild ? givenName(identityChild.full_name) : "")
+    : (child?.first_name ?? "");
   const greetingTitle = d.parentApp.home.greetingTitle.replace("{name}", greetingParentName);
   const greetingSub = d.parentApp.home.greetingSub.replace("{name}", greetingChildName);
 
@@ -528,6 +543,25 @@ export default function HomeScreen() {
     { label: d.parentApp.scr.schedule, gradient: ["#22d3ee", "#0891b2"], iconPaths: ICONS.cal, shadowRgb: "34,211,238", go: "d15" },
   ];
 
+  // РЕБЁНКА НЕТ. Школа завела родителя, но ученика к нему ещё не привязала —
+  // случай настоящий. До 28.08.2026 сюда молча подставлялся выдуманный
+  // ребёнок (resolveChild в data/index.ts), и человек читал чужое расписание
+  // и чужие оценки как данные своего. Теперь говорим словами.
+  //
+  // Демо-показа это не касается: там ребёнок есть всегда.
+  if (!child || !identityChild) {
+    return (
+      <AppBackground>
+        <View style={{ flex: 1, justifyContent: "center", padding: 18 }}>
+          <EmptyBlock
+            title={d.parentApp.common.noChildTitle}
+            text={d.parentApp.common.noChildText}
+          />
+        </View>
+      </AppBackground>
+    );
+  }
+
   return (
     <AppBackground>
       <RootHeader
@@ -541,9 +575,9 @@ export default function HomeScreen() {
           // стоит «ДК» — буквы выдуманного человека, и до 28.08.2026 они
           // висели в аватаре у всех. Градиент остаётся фикстурным: это
           // оформление, а не данные.
-          // Признак ДЕМО, а не «данные приехали»: второе ложно первые доли
+          // Признак ПОКАЗА, а не «данные приехали»: второе ложно первые доли
           // секунды после запуска, и настоящий человек успевал увидеть «ДК».
-          initials: session.demoParentId
+          initials: showcase
             ? parent.initials
             : (parentData?.parentName ? givenInitials(parentData.parentName) : ""),
           gradient: parent.avatar_gradient,
@@ -702,7 +736,7 @@ export default function HomeScreen() {
         <ChildPickerSheetContent
           title={d.parentApp.auth.chooseChild}
           items={pickerItems}
-          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : (childId ?? undefined)}
           onSelect={(id) => {
             if (isRealFlow) {
               selectChild(id);

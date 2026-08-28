@@ -74,6 +74,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
+  EmptyBlock,
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
@@ -184,7 +185,7 @@ export default function ChildProfileScreen() {
   const session = useAuthSession();
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(
+  const [childId, setChildId] = useState<string | null>(
     () => session.currentChildId ?? defaultChildId(),
   );
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -192,17 +193,26 @@ export default function ChildProfileScreen() {
   const { data: parentData, selectedChildId, selectChild } = useParentData();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
   const realIndex = isRealFlow
-    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    // find, а не прижатый к нулю индекс: промах давал ПЕРВОГО ребёнка семьи
+    // вместо выбранного. Тот же класс, что и подстановка выдуманного ребёнка
+    // в resolveChild, только внутри одной семьи (28.08.2026).
+    ? parentData!.children.findIndex((c) => c.id === selectedChildId)
     : -1;
-  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+  // realIndex теперь может быть −1 (выбранного ребёнка нет в семье), а
+  // children[-1] это undefined — до конца проверять обязаны мы, тип массива
+  // об этом молчит.
+  const realChildRow =
+    isRealFlow && realIndex >= 0
+      ? toChildRow(parentData!.children[realIndex], realIndex)
+      : null;
 
-  const ctx = getSelectedChildContext(childId);
+  const ctx = getSelectedChildContext(childId ?? undefined);
   const child = realChildRow ?? ctx.child;
   // Выдуманный профиль. У НАСТОЯЩЕГО ребёнка его нет и быть не может —
   // getChildInfo() отдаёт null, и это единственное условие, по которому
   // ниже прячутся выдуманные строки. Проверять isRealFlow для этого нельзя:
   // пока данные родителя грузятся, он ложен, а профиль уже фикстурный.
-  const info = getChildInfo(childId);
+  const info = getChildInfo(childId ?? undefined);
   const realSummary = isRealFlow ? parentData!.children[realIndex] : undefined;
 
   // Строки «Общей информации» собираются списком, а не вёрсткой: только так
@@ -213,7 +223,7 @@ export default function ChildProfileScreen() {
       { label: t.prof.birthDate, value: info.birth_date_label },
       { label: t.prof.age, value: info.age_label },
       { label: t.prof.school, value: "SNR International School" },
-      { label: t.prof.classRow, value: child.class_name },
+      { label: t.prof.classRow, value: child?.class_name ?? "" },
       { label: t.prof.curator, value: info.curator_name },
       { label: t.prof.fileNo, value: info.file_no },
     );
@@ -228,7 +238,7 @@ export default function ChildProfileScreen() {
     }
     const schoolName = parentData?.schoolName ?? null;
     if (schoolName) generalRows.push({ label: t.prof.school, value: schoolName });
-    generalRows.push({ label: t.prof.classRow, value: child.class_name });
+    generalRows.push({ label: t.prof.classRow, value: child?.class_name ?? "" });
     if (realSummary?.curatorName) {
       generalRows.push({ label: t.prof.curator, value: realSummary.curatorName });
     }
@@ -242,7 +252,10 @@ export default function ChildProfileScreen() {
   const sectionCapsColor = scheme === "light" ? "rgba(26,19,74,0.5)" : "rgba(255,255,255,0.55)";
   const inactiveTabTextColor = scheme === "light" ? "rgba(26,19,74,0.66)" : "rgba(255,255,255,0.7)";
 
-  const heroGradient = child.avatar_gradient;
+  // Значения ниже считаются до стража «ребёнка нет» (он обязан стоять после
+  // всех хуков), поэтому пишутся безопасно. На экран они попадают только
+  // после стража, то есть когда ребёнок точно есть.
+  const heroGradient = child?.avatar_gradient ?? (["#8b5cf6", "#6366f1"] as const);
   // Тень hero-карточки — в тоне второго стопа градиента (макет: box-shadow
   // 0 16 36 {g2}55 + inset 0 1.5 0 W35).
   const heroShadowColor = `${heroGradient[1]}55`;
@@ -291,6 +304,25 @@ export default function ChildProfileScreen() {
     { key: "attend", label: t.scr.attendance, onPress: goAttend },
     { key: "achieve", label: t.prof.tabAchievements, onPress: goAchieve },
   ];
+
+  // РЕБЁНКА НЕТ. Школа завела родителя, но ученика к нему ещё не привязала —
+  // случай настоящий. До 28.08.2026 сюда молча подставлялся выдуманный
+  // ребёнок (resolveChild в data/index.ts), и человек читал чужое расписание
+  // и чужие оценки как данные своего. Теперь говорим словами.
+  //
+  // Демо-показа это не касается: там ребёнок есть всегда.
+  if (!child) {
+    return (
+      <AppBackground>
+        <View style={{ flex: 1, justifyContent: "center", padding: 18 }}>
+          <EmptyBlock
+            title={t.common.noChildTitle}
+            text={t.common.noChildText}
+          />
+        </View>
+      </AppBackground>
+    );
+  }
 
   return (
     <AppBackground>
@@ -588,7 +620,7 @@ export default function ChildProfileScreen() {
         <ChildPickerSheetContent
           title={t.auth.chooseChild}
           items={pickerItems}
-          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : (childId ?? undefined)}
           onSelect={(id) => {
             if (isRealFlow) {
               selectChild(id);

@@ -157,7 +157,11 @@ export default function TopUpScreen() {
   const session = useAuthSession();
 
   const ctx = getSelectedChildContext(session.currentChildId ?? undefined);
-  const child = ctx.child;
+  // Экран закрыт demoOr — его видит ТОЛЬКО демо-гость, а у него ребёнок есть
+  // всегда: настоящий из демо-школы, а при пустом списке — фикстурный
+  // (см. DEMO_SHOWCASE в data/index.ts). Поэтому утверждение безопасно, и
+  // витрина остаётся ровно прежней.
+  const child = ctx.child!;
   const balance = ctx.wallet_balance;
 
   const presets = getTopupPresets();

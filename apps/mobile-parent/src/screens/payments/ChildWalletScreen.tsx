@@ -295,8 +295,14 @@ export default function ChildWalletScreen() {
 
   // Активный ребёнок → инициал / walletTitle / walletBalTxt (BLOCK-LIST 2).
   const children = getChildren();
-  const initialChildId = currentChildId ?? defaultChildId();
-  const { child, wallet_balance } = getSelectedChildContext(initialChildId);
+  const initialChildId = currentChildId ?? defaultChildId() ?? undefined;
+  const ctx = getSelectedChildContext(initialChildId);
+  // Экран закрыт demoOr — его видит ТОЛЬКО демо-гость, а у него ребёнок есть
+  // всегда: настоящий из демо-школы, а при пустом списке — фикстурный
+  // (см. DEMO_SHOWCASE в data/index.ts). Поэтому утверждение безопасно, и
+  // витрина остаётся ровно прежней.
+  const child = ctx.child!;
+  const wallet_balance = ctx.wallet_balance;
 
   const childInitial = child.first_name.slice(0, 1);
   // Заголовок кошелька — БЕЗ ПАДЕЖА: «Кошелёк · Шерзод». Было «Кошелёк

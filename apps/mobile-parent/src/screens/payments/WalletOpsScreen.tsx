@@ -241,14 +241,18 @@ export default function WalletOpsScreen() {
   const session = useAuthSession();
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(
-    () => session.currentChildId ?? defaultChildId(),
+  const [childId, setChildId] = useState<string | undefined>(
+    () => session.currentChildId ?? defaultChildId() ?? undefined,
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const ctx = getSelectedChildContext(childId);
-  const child = ctx.child;
+  // Экран закрыт demoOr — его видит ТОЛЬКО демо-гость, а у него ребёнок есть
+  // всегда: настоящий из демо-школы, а при пустом списке — фикстурный
+  // (см. DEMO_SHOWCASE в data/index.ts). Поэтому утверждение безопасно, и
+  // витрина остаётся ровно прежней.
+  const child = ctx.child!;
   const walletBalance = getWalletBalance(childId);
   const groups: WalletOpsDayGroup[] = getWalletOps(locale, childId);
 

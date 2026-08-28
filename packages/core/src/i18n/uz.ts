@@ -3222,6 +3222,8 @@ export const uz: Dictionary = {
     common: {
       back: "Orqaga",
       viewAll: "Barchasini ko'rish",
+      noChildTitle: "Farzand hali biriktirilmagan",
+      noChildText: "Maktab hisobingizga hali birorta o'quvchini biriktirmagan. Biriktirilgach, bu yerda dars jadvali, baholar va davomat paydo bo'ladi.",
       more: "Batafsil",
       done: "Tayyor",
       cancel: "Bekor qilish",

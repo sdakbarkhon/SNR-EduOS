@@ -3330,6 +3330,8 @@ export interface Dictionary {
     common: {
       back: string;
       viewAll: string;
+      noChildTitle: string;
+      noChildText: string;
       more: string;
       done: string;
       cancel: string;

@@ -62,12 +62,12 @@ import {
 } from "@snr/core";
 import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
+  EmptyBlock,
   AccentCard,
   AccentInset,
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
-  EmptyBlock,
   ErrorBlock,
   GlassCard,
   LoadingBlock,
@@ -101,6 +101,7 @@ import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 import { useAppLocale } from "../../i18n";
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
+import { useDemoSession } from "../../context/DemoSessionContext";
 import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
@@ -361,7 +362,7 @@ export default function ProgressScreen() {
   const navigation = useNavigation<Nav>();
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(defaultChildId());
+  const [childId, setChildId] = useState<string | null>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0 grades, 1 skills, 2 dyn
 
@@ -378,12 +379,25 @@ export default function ProgressScreen() {
   const session = useAuthSession();
   const { data: parentData, selectedChildId, selectChild } = useParentData();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
+  // Признак ПОКАЗА — ключ аренды демо-места, как у demoOr. Через
+  // session.demoParentId это не работает: поле всегда null, и 28.08.2026
+  // из-за него демо-гость потерял витрину этой вкладки.
+  const { isDemo: showcase } = useDemoSession();
   const realIndex = isRealFlow
-    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    // find, а не прижатый к нулю индекс: промах давал ПЕРВОГО ребёнка семьи
+    // вместо выбранного. Тот же класс, что и подстановка выдуманного ребёнка
+    // в resolveChild, только внутри одной семьи (28.08.2026).
+    ? parentData!.children.findIndex((c) => c.id === selectedChildId)
     : -1;
-  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+  // realIndex теперь может быть −1 (выбранного ребёнка нет в семье), а
+  // children[-1] это undefined — до конца проверять обязаны мы, тип массива
+  // об этом молчит.
+  const realChildRow =
+    isRealFlow && realIndex >= 0
+      ? toChildRow(parentData!.children[realIndex], realIndex)
+      : null;
 
-  const ctx = getSelectedChildContext(childId);
+  const ctx = getSelectedChildContext(childId ?? undefined);
   const child = realChildRow ?? ctx.child;
   const summary = getGradesSummary();
   const stats = getSubjectStats();
@@ -524,15 +538,15 @@ export default function ProgressScreen() {
   const realAttPresent = attSource?.attendancePresent ?? 0;
   const realAttPct = realAttTotal > 0 ? Math.round((realAttPresent / realAttTotal) * 100) : null;
   // Отмеченных уроков нет — показывать нечего, вставка не рисуется вовсе.
-  const showAttendance = isRealFlow ? realAttPct !== null : true;
+  const showAttendance = showcase ? true : realAttPct !== null;
   // «Прогресс за неделю» (стрелка, спарклайн, «отличный рост») источника в
   // базе не имеет ни одного: ни колонки, ни расчёта. Настоящему родителю
   // вставка не показывается.
-  const showWeekProgress = !isRealFlow;
-  const attPct = isRealFlow ? (realAttPct ?? 0) : summary.attendance_pct;
-  const attRatio = isRealFlow
-    ? `${realAttPresent}/${realAttTotal}`
-    : summary.attendance_ratio_label;
+  const showWeekProgress = showcase;
+  const attPct = showcase ? summary.attendance_pct : (realAttPct ?? 0);
+  const attRatio = showcase
+    ? summary.attendance_ratio_label
+    : `${realAttPresent}/${realAttTotal}`;
   const averageChipLabel = isRealFlow ? (realAvgLoading || realAvgError ? "" : realAverageChip) : summary.average_chip;
   const averageStars = isRealFlow ? (realAvgLoading || realAvgError ? 0 : realStarsFilled) : summary.stars_filled;
   // Подписи осей радара удалены вместе с самим радаром (14.08.2026):
@@ -596,6 +610,25 @@ export default function ProgressScreen() {
   // аватаре чужие буквы. Демо-гостю оставляем как было.
   const parentInitials = isRealFlow ? initialsFromName(parentData!.parentName) : "ДК";
   const parentGradient: [string, string] = ["#8b5cf6", "#22d3ee"];
+
+  // РЕБЁНКА НЕТ. Школа завела родителя, но ученика к нему ещё не привязала —
+  // случай настоящий. До 28.08.2026 сюда молча подставлялся выдуманный
+  // ребёнок (resolveChild в data/index.ts), и человек читал чужое расписание
+  // и чужие оценки как данные своего. Теперь говорим словами.
+  //
+  // Демо-показа это не касается: там ребёнок есть всегда.
+  if (!child) {
+    return (
+      <AppBackground>
+        <View style={{ flex: 1, justifyContent: "center", padding: 18 }}>
+          <EmptyBlock
+            title={d.parentApp.common.noChildTitle}
+            text={d.parentApp.common.noChildText}
+          />
+        </View>
+      </AppBackground>
+    );
+  }
 
   return (
     <AppBackground>
@@ -808,11 +841,11 @@ export default function ProgressScreen() {
                 {/* «Выше на 0.2, чем в июне ↗» — выдумка: сравнения среднего
                     балла с прошлым месяцем никто не считает, ни в приложении,
                     ни в базе. Настоящему родителю не показываем. */}
-                {isRealFlow ? null : (
+                {showcase ? (
                   <Text style={{ fontFamily: fonts.manrope800, fontSize: 11, color: tokens.status.green.text }}>
                     {summary.vs_prev_month_note} ↗
                   </Text>
-                )}
+                ) : null}
               </View>
             </View>
 
@@ -967,7 +1000,7 @@ export default function ProgressScreen() {
                 зоны роста») уже написано в packages/core, getChildGradesSummary.
                 Не делаю здесь: средний балл — отдельная тема, её правила в этом
                 заходе не трогаем. */}
-            {isRealFlow ? null : (
+            {showcase ? (
             <GlassCard radius={22} contentStyle={{ padding: 14, gap: 10 }}>
               <Text
                 style={{
@@ -1003,7 +1036,7 @@ export default function ProgressScreen() {
                 ))}
               </View>
             </GlassCard>
-            )}
+            ) : null}
 
             {/* Отзыв учителя (326–331). Заход 2, шаг 6: реальный последний
                 отзыв при isRealFlow — getChildTeacherReviews (lesson_grades.
@@ -1142,7 +1175,7 @@ export default function ProgressScreen() {
                     numberOfLines={3}
                     style={{ fontFamily: fonts.manrope600, fontSize: 11, lineHeight: 11 * 1.5, color: tokens.ink2 }}
                   >
-                    {getAssistantTexts(childId).review}
+                    {getAssistantTexts(childId ?? undefined).review}
                   </Text>
                 </View>
                 <View
@@ -1271,7 +1304,7 @@ export default function ProgressScreen() {
         <ChildPickerSheetContent
           title={d.parentApp.auth.chooseChild}
           items={pickerItems}
-          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : (childId ?? undefined)}
           onSelect={(id) => {
             if (isRealFlow) {
               selectChild(id);

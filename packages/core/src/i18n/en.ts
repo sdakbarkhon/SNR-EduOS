@@ -3221,6 +3221,8 @@ export const en: Dictionary = {
     common: {
       back: "Back",
       viewAll: "View all",
+      noChildTitle: "No child linked yet",
+      noChildText: "The school has not linked any student to your account yet. Once it does, the schedule, grades and attendance will appear here.",
       more: "Details",
       done: "Done",
       cancel: "Cancel",

@@ -35,8 +35,11 @@ export function useChildScope(): {
   const classWord = d.parentApp.grades.class;
 
   const children = data?.children ?? [];
-  const index = Math.max(0, children.findIndex((c) => c.id === selectedChildId));
-  const child = children.length > 0 ? toChildRow(children[index], index) : null;
+  // find, а не прижатый к нулю индекс: при промахе выдавался ПЕРВЫЙ ребёнок
+  // семьи вместо выбранного (28.08.2026). Не нашли — ребёнка нет, и вызывающий
+  // это уже умеет разбирать: child объявлен nullable с самого начала.
+  const index = children.findIndex((c) => c.id === selectedChildId);
+  const child = index >= 0 ? toChildRow(children[index], index) : null;
 
   const pickerItems = useMemo<ChildPickerItem[]>(
     () =>

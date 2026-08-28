@@ -157,8 +157,39 @@ export * from "./types";
  */
 let REAL_CHILDREN: ChildRow[] | null = null;
 
+/**
+ * ПУСТОЙ СПИСОК — ЭТО ОТВЕТ, А НЕ ОТСУТСТВИЕ ОТВЕТА.
+ *
+ * До 28.08.2026 пустой список схлопывался в null, а null означает «ещё не
+ * загружено» и включает фикстуры. Родитель, которому ребёнка ещё не
+ * привязали, из-за этого видел выдуманную семью Каримовых как свою.
+ * Теперь [] сохраняется как [], и getChildren() честно отдаёт пустоту.
+ */
 export function setRealChildren(rows: ChildRow[] | null): void {
-  REAL_CHILDREN = rows && rows.length > 0 ? rows : null;
+  REAL_CHILDREN = rows;
+}
+
+/**
+ * Идёт ли показ демонстрации.
+ *
+ * ЗАЧЕМ ОТДЕЛЬНЫЙ ФЛАГ. Слой данных не имеет доступа к контекстам, а
+ * решение «подставлять фикстуру или нет» принимать обязан: демо-гостю
+ * витрина нужна ровно такой, какой была, а настоящему родителю подставлять
+ * нельзя ничего. Значение кладёт ParentDataProvider из того же источника,
+ * которым пользуется demoOr — ключа аренды демо-места в защищённом
+ * хранилище (DemoSessionContext). Не путать с session.demoParentId: то поле
+ * НИКОГДА не выставляется (проверено 28.08.2026, присваивание одно — null в
+ * INITIAL_STATE), и все проверки через него всегда ложны.
+ */
+let DEMO_SHOWCASE = false;
+
+export function setDemoShowcase(on: boolean): void {
+  DEMO_SHOWCASE = on;
+}
+
+/** Показывать ли выдуманное вместо отсутствующего. Только для демо. */
+export function isDemoShowcase(): boolean {
+  return DEMO_SHOWCASE;
 }
 
 export function getChildren(): ChildRow[] {
@@ -182,23 +213,47 @@ export function getChildById(childId: string): ChildRow | undefined {
  * случалось; настоящие дети приехали заходом 2 — и индекс стал выходить за
  * границы у КАЖДОГО родителя с одним ребёнком.
  *
- * Здесь индекс прижимается к длине списка, а пустой список отдаёт первого
- * фикстурного — чтобы у вызывающего НИКОГДА не было undefined. Экраны зовут
- * только это; прямое индексирование по DEFAULT_CHILD_INDEX убрано отовсюду.
+ * Индекс прижимается к длине списка. А вот пустой список 28.08.2026
+ * перестал отдавать первого фикстурного: раньше родитель без привязанных
+ * детей молча получал выдуманную «Малику Каримову» и читал её расписание,
+ * оценки и профиль как данные своего ребёнка. Теперь возвращается null, и
+ * экран обязан сказать человеку, что ребёнка ещё не привязали.
+ *
+ * Демо-гостю витрина сохранена: при показе (см. setDemoShowcase) пустота
+ * по-прежнему отдаёт фикстурного ребёнка — там выдуманная семья и есть
+ * содержание показа.
  */
-export function getDefaultChild(): ChildRow {
+export function getDefaultChild(): ChildRow | null {
   const rows = getChildren();
-  if (rows.length === 0) return CHILDREN[0];
-  return rows[Math.min(Math.max(0, DEFAULT_CHILD_INDEX), rows.length - 1)];
+  if (rows.length === 0) return DEMO_SHOWCASE ? (CHILDREN[0] ?? null) : null;
+  return rows[Math.min(Math.max(0, DEFAULT_CHILD_INDEX), rows.length - 1)] ?? null;
 }
 
-/** id ребёнка по умолчанию. Никогда не бросает — см. getDefaultChild. */
-export function defaultChildId(): string {
-  return getDefaultChild().id;
+/** id ребёнка по умолчанию или null, если детей нет. */
+export function defaultChildId(): string | null {
+  return getDefaultChild()?.id ?? null;
 }
 
-function resolveChild(childId?: string): ChildRow {
-  return (childId ? getChildById(childId) : undefined) ?? CHILDREN[DEFAULT_CHILD_INDEX];
+/**
+ * КОРЕНЬ ТРЁХ ЗАХОДОВ ПОДРЯД.
+ *
+ * Здесь стояло `?? CHILDREN[DEFAULT_CHILD_INDEX]`: не нашли ребёнка —
+ * подставили выдуманную «Малику Каримову». Отсюда текло всё, что мы чинили
+ * у устья — профиль ребёнка, личные данные родителя, «Успехи»: каждый экран
+ * получал молча подставленного чужого ребёнка и честно его рисовал.
+ *
+ * Теперь подстановки нет: не нашли — null, и вызывающий обязан это разобрать.
+ * Для демо-показа подстановка сохранена: там выдуманная семья и есть
+ * содержание витрины.
+ */
+function resolveChild(childId?: string): ChildRow | null {
+  const found = childId ? getChildById(childId) : undefined;
+  if (found) return found;
+  if (!childId) {
+    // Без явного id — «тот, что открыт по умолчанию».
+    return getDefaultChild();
+  }
+  return DEMO_SHOWCASE ? (CHILDREN[DEFAULT_CHILD_INDEX] ?? null) : null;
 }
 
 /**
@@ -214,8 +269,13 @@ function resolveChild(childId?: string): ChildRow {
  */
 function childIndex(childId?: string): number | null {
   const child = resolveChild(childId);
-  const idx = CHILDREN.findIndex((c) => c.id === child.id);
-  return idx >= 0 ? idx : null;
+  const idx = child ? CHILDREN.findIndex((c) => c.id === child.id) : -1;
+  if (idx >= 0) return idx;
+  // Витрина: у демо-гостя ребёнок НАСТОЯЩИЙ (Шерзод из демо-школы), в
+  // фикстурном списке его нет, и до 28.08.2026 промах прижимался к нулю —
+  // показ шёл с профилем нулевого фикстурного ребёнка. Сохраняем ровно это:
+  // витрину заказчик показывает людям в таком виде.
+  return DEMO_SHOWCASE ? 0 : null;
 }
 
 /** Фикстурный профиль по месту в списке. null там, где места нет. */
@@ -230,15 +290,16 @@ function childInfoAt(idx: number | null): ChildInfoRow | null {
  * подставлять чужой нельзя. Вызывающий обязан это разобрать.
  */
 export function getSelectedChildContext(childId?: string): {
-  child: ChildRow;
+  /** null — ребёнка нет: не привязан, ещё не загрузился или id чужой. */
+  child: ChildRow | null;
   info: ChildInfoRow | null;
   wallet_balance: number;
 } {
-  const child = resolveChild(childId);
   return {
-    child,
+    child: resolveChild(childId),
     info: childInfoAt(childIndex(childId)),
-    wallet_balance: getWalletBalance(child.id),
+    // Баланс кошелька от ребёнка не зависит вовсе — одно число на семью.
+    wallet_balance: getWalletBalance(),
   };
 }
 
@@ -590,7 +651,10 @@ export function getAssistantTexts(childId?: string): {
   overview7: string;
   review: string;
 } {
+  // Ребёнка может не быть. Экран прогресса зовёт это только в демо-ветке,
+  // но пустые строки честнее склейки с чужим именем.
   const k = resolveChild(childId);
+  if (!k) return { dashboard: "", overview7: "", review: "" };
   return {
     dashboard: k.first_name + ASSISTANT_TEXT_TEMPLATES.dashboard,
     overview7: k.first_name + ASSISTANT_TEXT_TEMPLATES.overview7,
@@ -620,7 +684,7 @@ export function getDashboard(childId?: string) {
       until_label: DUE_CARD.until_label,
       gradient: DUE_CARD.gradient,
     },
-    wallet_balance: getWalletBalance(child.id),
+    wallet_balance: getWalletBalance(),
   };
 }
 

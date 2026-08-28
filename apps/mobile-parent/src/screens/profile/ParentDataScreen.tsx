@@ -64,7 +64,7 @@ import { AppBackground, fonts, useTheme } from "../../theme";
 import { useAppLocale } from "../../i18n";
 import { getParent, getParentProfile } from "../../data";
 import { useParentData } from "../../context/ParentDataContext";
-import { useAuthSession } from "../../context/AuthSessionContext";
+import { useDemoSession } from "../../context/DemoSessionContext";
 import type { MainStackParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -92,12 +92,15 @@ export default function ParentDataScreen() {
   const p = d.parentApp.prof;
 
   const parent = getParent();
-  const session = useAuthSession();
   const { data: parentData } = useParentData();
-  // Развилка — ПО ПРИЗНАКУ ДЕМО, а не по «данные родителя уже приехали».
-  // Второе ложно первые доли секунды после запуска, и настоящий человек
-  // успевал увидеть выдуманное имя и адрес. Признак демо известен сразу.
-  const isDemo = !!session.demoParentId;
+  // ПРИЗНАК ПОКАЗА — тот же, которым пользуется demoOr: ключ аренды
+  // демо-места в защищённом хранилище.
+  //
+  // 28.08.2026: здесь стояло `!!session.demoParentId`, а это поле НИКОГДА не
+  // выставляется — единственное присваивание null в INITIAL_STATE. Проверка
+  // была всегда ложной, и демо-гость терял витрину этого экрана. Найдено
+  // сквозной сверкой.
+  const { isDemo } = useDemoSession();
   // Выдуманный профиль. При настоящем входе его НЕТ — аксессор возвращает
   // null, и подстановка чужих данных невозможна по типам (см. data/index.ts).
   const profile = getParentProfile(isDemo);

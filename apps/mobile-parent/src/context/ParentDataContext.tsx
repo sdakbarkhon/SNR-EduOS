@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { fetchSchoolFrozenDate, getParentContext, type ParentContext as ParentContextData } from "@snr/core";
 import { getSupabase } from "../lib/supabase";
 import { useAsyncData } from "../hooks/useAsyncData";
-import { setRealChildren } from "../data";
+import { setDemoShowcase, setRealChildren } from "../data";
+import { useDemoSession } from "./DemoSessionContext";
 import { toChildRow } from "../lib/realChild";
 import { setSchoolFrozenDate } from "../lib/appTime";
 
@@ -41,6 +42,19 @@ export function ParentDataProvider({ children }: { children: ReactNode }) {
     return parent;
   }, []);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+
+  // ПРИЗНАК ПОКАЗА — в слой данных. Тот же источник, которым пользуется
+  // demoOr: ключ аренды демо-места в защищённом хранилище. Слой данных по
+  // нему решает, подставлять ли фикстуру вместо отсутствующего ребёнка:
+  // демо-гостю витрина нужна прежней, настоящему родителю — ничего.
+  //
+  // Через session.demoParentId это не сделать: поле НИКОГДА не выставляется
+  // (единственное присваивание — null в INITIAL_STATE), и все проверки по
+  // нему всегда ложны. Найдено сквозной сверкой 28.08.2026.
+  const { isDemo } = useDemoSession();
+  useEffect(() => {
+    setDemoShowcase(isDemo);
+  }, [isDemo]);
 
   // Настоящие дети — в слой данных, чтобы имена стали настоящими на всех
   // экранах сразу, включая оплаты (см. setRealChildren в data/index.ts).

@@ -46,6 +46,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getStudentLessonsForWeek, formatTime, LOCALE_TAG, type LessonWithSubject } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
+  EmptyBlock,
   BottomSheetFrame,
   ChildPickerSheetContent,
   ChildSwitcherCard,
@@ -353,12 +354,21 @@ export default function ScheduleScreen() {
   const { data: parentData, selectedChildId, selectChild } = useParentData();
   const isRealFlow = !session.demoParentId && !!parentData && parentData.children.length > 0;
   const realIndex = isRealFlow
-    ? Math.max(0, parentData!.children.findIndex((c) => c.id === selectedChildId))
+    // find, а не прижатый к нулю индекс: промах давал ПЕРВОГО ребёнка семьи
+    // вместо выбранного. Тот же класс, что и подстановка выдуманного ребёнка
+    // в resolveChild, только внутри одной семьи (28.08.2026).
+    ? parentData!.children.findIndex((c) => c.id === selectedChildId)
     : -1;
-  const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
+  // realIndex теперь может быть −1 (выбранного ребёнка нет в семье), а
+  // children[-1] это undefined — до конца проверять обязаны мы, тип массива
+  // об этом молчит.
+  const realChildRow =
+    isRealFlow && realIndex >= 0
+      ? toChildRow(parentData!.children[realIndex], realIndex)
+      : null;
 
   const children = getChildren();
-  const [childId, setChildId] = useState<string>(defaultChildId());
+  const [childId, setChildId] = useState<string | null>(defaultChildId());
   const [sheetOpen, setSheetOpen] = useState(false);
   // Долги, проход 3 — "сегодня" больше не застывает на дате монтирования
   // (useTashkentToday пересчитывает на возврат в foreground И на границе
@@ -372,11 +382,11 @@ export default function ScheduleScreen() {
     isRealFlow ? weekdayIndex(todayKey) : DEMO_TODAY.weekday_index,
   );
 
-  const ctx = getSelectedChildContext(childId);
+  const ctx = getSelectedChildContext(childId ?? undefined);
   const child = ctx.child;
   const identityChild = realChildRow ?? child;
   const week = getScheduleWeek();
-  const lessons = getDaySchedule(selectedDay, childId);
+  const lessons = getDaySchedule(selectedDay, childId ?? undefined);
 
   // ── Заход 2, шаг 4: реальная неделя (Пн-Вс, содержащая «сегодня» по
   // Ташкенту) — ОДИН запрос getStudentLessonsForWeek на всю неделю, дни
@@ -512,6 +522,25 @@ export default function ScheduleScreen() {
   }, [realDayLessons, locale]);
 
   const rows = isRealFlow ? realRows : fixtureRows;
+
+  // РЕБЁНКА НЕТ. Школа завела родителя, но ученика к нему ещё не привязала —
+  // случай настоящий. До 28.08.2026 сюда молча подставлялся выдуманный
+  // ребёнок (resolveChild в data/index.ts), и человек читал чужое расписание
+  // и чужие оценки как данные своего. Теперь говорим словами.
+  //
+  // Демо-показа это не касается: там ребёнок есть всегда.
+  if (!identityChild) {
+    return (
+      <AppBackground>
+        <View style={{ flex: 1, justifyContent: "center", padding: 18 }}>
+          <EmptyBlock
+            title={d.parentApp.common.noChildTitle}
+            text={d.parentApp.common.noChildText}
+          />
+        </View>
+      </AppBackground>
+    );
+  }
 
   return (
     <AppBackground>
@@ -733,7 +762,7 @@ export default function ScheduleScreen() {
         <ChildPickerSheetContent
           title={d.parentApp.auth.chooseChild}
           items={pickerItems}
-          selectedId={isRealFlow ? (selectedChildId ?? undefined) : childId}
+          selectedId={isRealFlow ? (selectedChildId ?? undefined) : (childId ?? undefined)}
           onSelect={(id) => {
             if (isRealFlow) {
               selectChild(id);

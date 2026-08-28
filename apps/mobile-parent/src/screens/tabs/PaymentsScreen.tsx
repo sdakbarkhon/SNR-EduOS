@@ -49,7 +49,7 @@ import {
   getDueBillsCount,
   getDueTotal,
   getPaymentsOverview,
-  getSelectedChildContext,
+  getWalletBalance,
 } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 import { ICONS } from "../../navigation/routes";
@@ -100,7 +100,10 @@ export default function PaymentsScreen() {
   // wallet_balance от ребёнка не зависит (одно число на семью) — берём его
   // отсюда, а ИМЯ только из настоящего ребёнка: пока данные едут, лучше
   // пустая подпись, чем мелькнувшее фикстурное «Малика».
-  const { wallet_balance } = getSelectedChildContext();
+  // Баланс кошелька от ребёнка не зависит — одно число на семью. Раньше он
+  // брался через getSelectedChildContext() БЕЗ аргумента, а тот подставлял
+  // выдуманного ребёнка просто чтобы вернуть число.
+  const wallet_balance = getWalletBalance();
   const localeTag = LOCALE_TAG[locale];
   // Префикс подписи счёта — как на экране счетов, из настоящего ребёнка.
   const who = scopedChild ? `${scopedChild.first_name} · ${scopedChild.class_name}` : "";
