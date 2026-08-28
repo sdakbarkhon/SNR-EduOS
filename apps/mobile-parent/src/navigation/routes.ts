@@ -110,7 +110,7 @@ export const STUBS: Record<string, StubInfo> = {
   adddoc: { t: "Добавление документа", n: "Действие", g: ["#7c3aed", "#4f6df5"], i: "plus" },
   chpass: { t: "Изменение пароля", n: "Раздел «Безопасность»", g: ["#a78bfa", "#7c3aed"], i: "grid" },
   sessions: { t: "Активные сессии", tKey: "scr.sessions", n: "Раздел «Безопасность»", g: ["#60a5fa", "#2563eb"], i: "clock" },
-  autoexit: { t: "Автоматический выход", tKey: "prof.autoExit", n: "Раздел «Конфиденциальность»", g: ["#fbbf24", "#f97316"], i: "clock" },
+
   terms: { t: "Условия использования", tKey: "prof.terms", n: "Документ", g: ["#94a3b8", "#64748b"], i: "doc" },
   privacy: { t: "Политика конфиденциальности", tKey: "prof.privacy", n: "Документ", g: ["#94a3b8", "#64748b"], i: "doc" },
   profmenu: { t: "Действия", n: "Действие", g: ["#94a3b8", "#64748b"], i: "grid" },

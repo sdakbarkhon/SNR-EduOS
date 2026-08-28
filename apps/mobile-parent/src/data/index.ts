@@ -123,9 +123,7 @@ import {
   VACCINATIONS,
 } from "./fixtures/services";
 import {
-  AUTO_EXIT_OPTIONS,
   CONFIRM_DIALOGS,
-  DEFAULT_AUTO_EXIT_VALUE,
   DOCUMENTS,
 } from "./fixtures/profile";
 import {
@@ -635,9 +633,11 @@ export function getConfirmDialog(id: string) {
   return CONFIRM_DIALOGS.find((c) => c.id === id);
 }
 
-export function getAutoExitFixture() {
-  return { options: AUTO_EXIT_OPTIONS, default_value: DEFAULT_AUTO_EXIT_VALUE };
-}
+// getAutoExitFixture убрана 28.08.2026 вместе со строкой «Автовыход» на
+// экране настроек: логики выхода по бездействию в приложении нет, и подпись
+// «Через 15 минут» была ложным утверждением о безопасности аккаунта. Сами
+// AUTO_EXIT_OPTIONS / DEFAULT_AUTO_EXIT_VALUE остались в заготовке нетронутыми
+// (её править нельзя) — просто больше никем не читаются.
 
 // ─── Поиск ───────────────────────────────────────────────────────────────────
 

@@ -18,7 +18,7 @@
  *     Никакой 2FA в макете нет — не рисуется.
  *  8. Секция «КОНФИДЕНЦИАЛЬНОСТЬ» (t.setPrivacySec).
  *  9. Privacy-карточка — 2 строки: «Автовыход» (nav + aeLabel из
- *     getAutoExitFixture, дефолт «Через 15 минут») и «Удалить аккаунт»
+ *     «Удалить аккаунт»
  *     (красный, иконка урны — ОСТАЁТСЯ по Apple-требованию; клик открывает
  *     CenterModalFrame по CONFIRM_DIALOGS.deleteAccount).
  * 10. Секция «О ПРИЛОЖЕНИИ» (t.scrAbout).
@@ -61,7 +61,7 @@ import {
 import { SoonNote } from "../../ui/notices";
 import { useAppLocale } from "../../i18n";
 import { legalUrl, type LegalKind } from "../../lib/legal";
-import { getAutoExitFixture, getConfirmDialog } from "../../data";
+import { getConfirmDialog } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -129,14 +129,6 @@ function FaceIcon({ size = 15, stroke = 1.8 }: GlyphProps) {
   );
 }
 
-function ClockIcon({ size = 15, stroke = 1.9 }: GlyphProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
-      <Circle cx={12} cy={12} r={9} />
-      <Path d="M12 7v5l3 2" />
-    </Svg>
-  );
-}
 
 function TrashIcon({ size = 15, stroke = 1.9, color = "#fff" }: GlyphProps & { color?: string }) {
   return (
@@ -284,17 +276,15 @@ export default function LangSecurityScreen() {
   // OS/expo-local-authentication и app-timeout появится на этапе данных).
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-  // 28.08.2026: подпись автовыхода собирается из словаря, а не берётся
-  // готовой русской строкой из демо-заготовки — на узбекском и английском
-  // экран показывал «Через 15 минут». Заготовку не трогаем: из неё берём
-  // только код значения, а текст — из словаря на трёх языках.
-  const autoExitFixture = getAutoExitFixture();
-  const [aeLabel] = useState<string>(() => {
-    const v = autoExitFixture.default_value;
-    if (v === "never") return d.parentApp.prof.autoExitNever;
-    const minutes = v === "5" ? "5" : v === "30" ? "30" : "15";
-    return d.parentApp.prof.autoExitIn.replace("{n}", minutes);
-  });
+  // СТРОКИ «АВТОВЫХОД» ЗДЕСЬ БОЛЬШЕ НЕТ (28.08.2026).
+  //
+  // Она печатала «Через 15 минут» ровно там, где системные настройки
+  // печатают текущее значение параметра, — то есть утверждала, что
+  // приложение выходит из аккаунта по бездействию. Такой логики в нём нет
+  // вовсе: ни таймера, ни слежения за уходом в фон, ни сохранения выбора.
+  // Значение и вовсе нельзя было изменить: сеттер состояния не заводился.
+  // Ложное утверждение о безопасности аккаунта — хуже, чем отсутствие
+  // строки, поэтому строка снята целиком вместе с заглушкой, куда она вела.
 
   const [delAccOpen, setDelAccOpen] = useState(false);
   const delAccDialog = getConfirmDialog("deleteAccount");
@@ -470,24 +460,12 @@ export default function LangSecurityScreen() {
         {/* 8. Section: Конфиденциальность */}
         <SectionHeader title={d.parentApp.set.privacySec} />
 
-        {/* 9. Privacy Card: Auto-exit + Delete account. */}
+        {/* 9. Privacy Card: Delete account. Строка автовыхода снята
+            28.08.2026 — см. комментарий выше. */}
         <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
-          {/* Автовыход. */}
-          <CardRow divider={false} onPress={() => navigation.navigate("stub", { stubKey: "autoexit" })}>
-            <IconTile gradient={["#fbbf24", "#f97316"]} shadowRgb="249,115,22">
-              <ClockIcon />
-            </IconTile>
-            <Text style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
-              {d.parentApp.set.autoExit}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink2, marginRight: 4 }}>
-              {aeLabel}
-            </Text>
-            <ChevronRight />
-          </CardRow>
-
-          {/* Удалить аккаунт — ОСТАЁТСЯ (Apple-требование). */}
-          <CardRow divider={true} onPress={() => setDelAccOpen(true)}>
+          {/* Удалить аккаунт — ОСТАЁТСЯ (Apple-требование). Разделитель
+              сверху убран: строка стала первой в карточке. */}
+          <CardRow divider={false} onPress={() => setDelAccOpen(true)}>
             <IconTile gradient={["#fb7185", "#e11d48"]} shadowRgb="225,29,72">
               <TrashIcon />
             </IconTile>

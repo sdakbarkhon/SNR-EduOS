@@ -3630,7 +3630,6 @@ export interface Dictionary {
       biometric: string;
       biometricSub: string;
       sessionsSub: string;
-      autoExit: string;
       deleteAcc: string;
       terms: string;
       privacy: string;
@@ -3659,8 +3658,6 @@ export interface Dictionary {
       logoutBody: string;
       deleteAccTitle: string;
       deleteAccBody: string;
-      autoExitIn: string;          // «Через {n} минут»
-      autoExitNever: string;
       generalInfo: string;
       schoolContacts: string;
       additional: string;
@@ -3722,7 +3719,6 @@ export interface Dictionary {
       langRu: string;     // «Русский» / «Rus tili» / «Russian»
       chPass: string;     // «Изменить пароль»
       sessions: string;   // «Активные сессии»
-      autoExit: string;   // «Автоматический выход» (в set-секции — дубль prof.autoExit)
     };
     /** Заход 7: #32 «Настройки уведомлений». Каждый пункт = переключатель
      *  с заголовком + подпись (subtitle). Опоздания в SNR EduOS НЕТ (см. attend.*),
