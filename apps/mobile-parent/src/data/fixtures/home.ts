@@ -9,13 +9,6 @@
  */
 import type { DashboardFeedItem, NextLessonCard } from "../types";
 
-/** Приветствие Dashboard: «Доброе утро, Дилноза!» + подпись с genitive-именем. */
-export const DASHBOARD_GREETING = {
-  title_prefix: "Доброе утро, ",
-  /** «Вот что происходит у {gen} сегодня» — gen подставляется из ребёнка. */
-  subtitle_template: "Вот что происходит у {gen} сегодня",
-} as const;
-
 /** Статус-строка карточки ребёнка: «В ШКОЛЕ С 08:12 · УРОКОВ 6 · ПОСЕЩЕНО 2/6 · ДЗ 2». */
 export const DASHBOARD_CHILD_STATUS = {
   at_school_since_label: "08:12",

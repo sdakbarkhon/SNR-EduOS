@@ -22,18 +22,57 @@ export type ParentChildSummary = {
   fullName: string;
   className: string | null;
   groupId: string | null;
+  /**
+   * Дата рождения, YYYY-MM-DD, или null.
+   *
+   * 27.08.2026: колонка students.birth_date в схеме ЕСТЬ и заполнена у части
+   * учеников — её просто никто не запрашивал. Мобильный профиль ребёнка из-за
+   * этого подставлял дату из фикстуры, и настоящий родитель видел чужой день
+   * рождения как день рождения своего ребёнка. Пусто — значит школа её не
+   * заполнила, и показывать строку на экране нечем.
+   */
+  birthDate: string | null;
+  /** Классный руководитель (students.curator_id → teachers.full_name) или
+   *  null, если куратор не назначен. Та же история, что с датой. */
+  curatorName: string | null;
 };
 
 export type ParentContext = {
   parentId: string;
   parentName: string;
   parentPhone: string | null;
+  /**
+   * Название школы родителя (schools.name) или null.
+   *
+   * 27.08.2026: профиль ребёнка в мобильном показывал строку «Школа» с
+   * зашитым в вёрстку «SNR International School» — названием из макета.
+   * Настоящая школа называется иначе, и родитель читал подпись как правду.
+   * Читается ОТДЕЛЬНЫМ запросом, а не вложением в students: вложение с
+   * неверно угаданным именем связи роняет весь контекст родителя разом,
+   * а отдельный запрос в худшем случае вернёт пусто, и строки просто не
+   * будет. Правило доступа своё: политика «authenticated reads own school»
+   * (миграция 190) пускает по current_school_id(), а туда родитель входит
+   * с миграции 82.
+   */
+  schoolName: string | null;
+  /**
+   * Школа помечена как демонстрационная (schools.is_demo).
+   *
+   * Нужен мобильному приложению, чтобы НЕ восстанавливать демо-вход при
+   * запуске. Демо-гость получает место в аренду на час; если после
+   * перезапуска молча вернуть его в приложение по сохранённой сессии,
+   * аренда уже может быть отдана другому, а человек будет считать, что он
+   * всё ещё в демо. Настоящий родитель восстанавливается всегда.
+   */
+  schoolIsDemo: boolean;
   children: ParentChildSummary[];
 };
 
 type StudentGroupsRow = {
   id: string;
   full_name: string;
+  birth_date: string | null;
+  curator: { full_name: string } | null;
   student_groups: { group_id: string; groups: { name: string } | null }[] | null;
 };
 
@@ -44,11 +83,27 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
 
   const { data: parent, error: parentErr } = await db
     .from("parents")
-    .select("id, full_name, phone")
+    .select("id, full_name, phone, school_id")
     .eq("user_id", auth.user.id)
     .maybeSingle();
   if (parentErr) throw parentErr;
   if (!parent) return null;
+
+  // Название школы. Ошибку НЕ бросаем: если правило доступа не пустит или
+  // школа не проставлена, профиль ребёнка просто не покажет строку «Школа»
+  // — это лучше, чем уронить весь экран из-за подписи.
+  let schoolName: string | null = null;
+  let schoolIsDemo = false;
+  if (parent.school_id) {
+    const { data: school } = await db
+      .from("schools")
+      .select("name, is_demo")
+      .eq("id", parent.school_id)
+      .maybeSingle();
+    const row = school as { name: string; is_demo: boolean | null } | null;
+    schoolName = row?.name ?? null;
+    schoolIsDemo = row?.is_demo === true;
+  }
 
   const { data: links, error: linksErr } = await db
     .from("parent_students")
@@ -59,20 +114,42 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
 
   const studentIds = ((links ?? []) as { student_id: string }[]).map((l) => l.student_id);
   if (studentIds.length === 0) {
-    return { parentId: parent.id, parentName: parent.full_name, parentPhone: parent.phone, children: [] };
+    return {
+      parentId: parent.id,
+      parentName: parent.full_name,
+      parentPhone: parent.phone,
+      schoolName,
+      schoolIsDemo,
+      children: [],
+    };
   }
 
   const { data: students, error: studentsErr } = await db
     .from("students")
-    .select("id, full_name, student_groups(group_id, groups(name))")
+    // curator: имя связи обязательно — между students и teachers путей
+    // несколько, и PostgREST отказывается угадывать (PGRST201).
+    .select(
+      "id, full_name, birth_date,"
+      + " curator:teachers!students_curator_id_fkey(full_name),"
+      + " student_groups(group_id, groups(name))",
+    )
     .in("id", studentIds);
   if (studentsErr) throw studentsErr;
 
   const byId = new Map<string, ParentChildSummary>(
-    ((students ?? []) as StudentGroupsRow[]).map((s) => {
+    // Через unknown: сгенерированный Database-тип не знает про алиас связи
+    // curator:teachers!..., и supabase-js типизирует ответ как ошибку строкой.
+    ((students ?? []) as unknown as StudentGroupsRow[]).map((s) => {
       const sg = (s.student_groups ?? [])[0] ?? null;
       const className = sg?.groups?.name ?? null;
-      return [s.id, { id: s.id, fullName: s.full_name, className, groupId: sg?.group_id ?? null }];
+      return [s.id, {
+        id: s.id,
+        fullName: s.full_name,
+        className,
+        groupId: sg?.group_id ?? null,
+        birthDate: s.birth_date ?? null,
+        curatorName: s.curator?.full_name ?? null,
+      }];
     }),
   );
 
@@ -80,6 +157,8 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
     parentId: parent.id,
     parentName: parent.full_name,
     parentPhone: parent.phone,
+    schoolName,
+    schoolIsDemo,
     children: studentIds.map((id) => byId.get(id)).filter((c): c is ParentChildSummary => Boolean(c)),
   };
 }

@@ -21,6 +21,7 @@
  * На phone-flow (isDemo=false) не показывается вообще.
  */
 import { useMemo } from "react";
+import { View } from "react-native";
 import { DefaultTheme, NavigationContainer, type Theme } from "@react-navigation/native";
 import MainNavigator from "./MainNavigator";
 import AuthNavigator from "./AuthNavigator";
@@ -31,7 +32,7 @@ import { useTheme } from "../theme";
 
 export default function RootNavigator() {
   const { tokens, scheme } = useTheme();
-  const { phase, isDemo, demoNoticeSeen, dismissDemoNotice } = useAuthSession();
+  const { phase, restoring, isDemo, demoNoticeSeen, dismissDemoNotice } = useAuthSession();
   const { d } = useAppLocale();
 
   // Фон контейнера ~ первый стоп bg-page, чтобы не было белой вспышки
@@ -54,6 +55,15 @@ export default function RootNavigator() {
   // One-shot центр-модалка «Демо-режим» — только когда мы уже в MainNavigator,
   // сессия помечена как isDemo и модалка ещё не была закрыта.
   const showDemoNotice = authenticated && isDemo && !demoNoticeSeen;
+
+  // Пока приложение спрашивает, жива ли сохранённая сессия, не показываем
+  // ничего, кроме фона. Иначе онбординг успевает мигнуть у родителя, который
+  // на самом деле уже вошёл — и выглядит это как «меня опять выкинуло».
+  // Ожидание ограничено по времени (см. AuthSessionContext), так что
+  // навсегда этот экран не остаётся.
+  if (restoring) {
+    return <View style={{ flex: 1, backgroundColor: tokens.bgPage.colors[0] }} />;
+  }
 
   return (
     <NavigationContainer theme={navTheme}>

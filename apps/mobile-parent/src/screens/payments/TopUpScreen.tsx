@@ -165,7 +165,11 @@ export default function TopUpScreen() {
   // Локальное состояние: строка цифр, до 9 знаков (макет 3973).
   const [topVal, setTopVal] = useState<string>("");
 
-  const walletTitle = t.pay.walletTitle.replace("{gen}", child.first_name_gen);
+  // Тот же заголовок, что на экране кошелька, и так же без падежа —
+  // см. ChildWalletScreen.
+  const walletTitle = child.first_name
+    ? t.pay.walletTitle.replace("{name}", child.first_name)
+    : t.pay.walletTitleGeneric;
   const walletBalTxt = `${formatMoney(balance)} ${t.pay.sum}`;
   const childInitial = child.first_name.slice(0, 1);
 

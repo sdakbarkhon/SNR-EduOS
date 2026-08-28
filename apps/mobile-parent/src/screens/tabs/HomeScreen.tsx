@@ -286,17 +286,23 @@ export default function HomeScreen() {
   const identityChild = realChildRow ?? child;
   const bellCount = useUnreadNotifications();
 
-  // Приветствие: «Доброе утро, {родитель}!» + «Вот что происходит у {ребёнок}
-  // сегодня». Заход 2, шаг 2: для real-flow — реальные ФИО (родитель из
-  // parentData.parentName, ребёнок из identityChild.full_name), демо — как
-  // раньше genitive-фикстура (child.first_name_gen). Реальные ФИО в базе —
-  // "Фамилия Имя" (см. testAccounts.ts), для обращения берём последнее слово
-  // (даёт "Бахтиёр"/"Шерзод", не "Исмаилов"); шаблон (dashboard.greeting,
-  // локализован ru/uz/en) не меняется, меняется только подставляемое имя.
+  // Приветствие: «Доброе утро, {родитель}!» + подпись с именем ребёнка.
+  // Реальные ФИО в базе — «Фамилия Имя» (см. testAccounts.ts), для
+  // обращения берём последнее слово (даёт "Бахтиёр"/"Шерзод", не "Исмаилов").
+  //
+  // 28.08.2026 — ДВЕ ПРАВКИ РАЗОМ.
+  //  1. Фраза бралась из ФИКСТУРЫ (DASHBOARD_GREETING), а она только
+  //     по-русски: узбекский и английский интерфейс всё равно читали
+  //     «Вот что происходит...». Теперь — из словаря, на трёх языках.
+  //  2. В шаблоне был РОДИТЕЛЬНЫЙ падеж («у {gen} сегодня»), а для
+  //     настоящего ребёнка подставлялось имя как есть: «у Шерзод сегодня».
+  //     Склонять на лету нельзя, поэтому падеж убран из самой фразы —
+  //     «Вот что происходит сегодня · Шерзод». Демо больше не берёт
+  //     готовую родительную форму (first_name_gen), она удалена.
   const greetingParentName = isRealFlow ? givenName(parentData!.parentName) : parent.first_name;
-  const greetingChildName = isRealFlow ? givenName(identityChild.full_name) : child.first_name_gen;
-  const greetingTitle = `${dashboard.greeting.title_prefix}${greetingParentName}!`;
-  const greetingSub = dashboard.greeting.subtitle_template.replace("{gen}", greetingChildName);
+  const greetingChildName = isRealFlow ? givenName(identityChild.full_name) : child.first_name;
+  const greetingTitle = d.parentApp.home.greetingTitle.replace("{name}", greetingParentName);
+  const greetingSub = d.parentApp.home.greetingSub.replace("{name}", greetingChildName);
 
   // ── Заход 2, шаг 4: реальные «В школе с» / «Уроков» / «Посещено X/Y» +
   // карточка «Следующий урок» — из недели уроков группы (getStudentLessonsForWeek,

@@ -28,3 +28,22 @@ export function pluralizeStudents(n: number, locale: PluralLocale | string = "ru
       return `${n} ${ruForm(n, "ученик", "ученика", "учеников")}`;
   }
 }
+
+/**
+ * Возраст словами: «7 лет» / «21 год» / «22 года».
+ *
+ * Нужен профилю ребёнка в родительском приложении: возраст там не колонка,
+ * а арифметика от students.birth_date, и без склонения он читался бы как
+ * «7 год». uz: «7 yosh» (узбекский не склоняет по числу). en: year/years.
+ */
+export function pluralizeYears(n: number, locale: PluralLocale | string = "ru"): string {
+  switch (locale) {
+    case "en":
+      return `${n} ${n === 1 ? "year" : "years"}`;
+    case "uz":
+      return `${n} yosh`;
+    case "ru":
+    default:
+      return `${n} ${ruForm(n, "год", "года", "лет")}`;
+  }
+}

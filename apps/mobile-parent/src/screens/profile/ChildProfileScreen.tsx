@@ -35,15 +35,35 @@
  * Правило заказчика: экран информационный, кружков/чатов/2FA/языков нет. Спец-
  * правила чата/объявлений/настроек к d29 не применяются.
  *
- * Заход 2, шаг 1: для реального (не демо) входа ChildSwitcherCard + HeroCard +
- * GeneralInfoCard-строка «Класс» — РЕАЛЬНЫЙ активный ребёнок (ParentDataContext),
- * не фикстура. Остальные поля GeneralInfoCard/MedicalCard (дата рождения,
- * классный руководитель, № личного дела, аллергия, мед.особенности) — таких
- * колонок в Supabase нет (подтверждено разведкой) — остаются на getChildInfo(),
- * заморожены на фикстурном ребёнке, выбранном при входе (session.currentChildId),
- * и НЕ меняются при переключении реального активного ребёнка в шторке — это
- * осознанный компромисс этого шага, не баг: сами данные подключим в
- * следующих заходах. Демо-флоу не тронут ни строкой.
+ * 28.08.2026 — ЭКРАН ВРАЛ НАСТОЯЩЕМУ РОДИТЕЛЮ.
+ *
+ * Здесь стояло, что колонок под дату рождения и классного руководителя в
+ * Supabase нет. Это НЕВЕРНО: students.birth_date и students.curator_id в
+ * схеме есть, их просто никто не запрашивал. А getChildInfo() при промахе
+ * отдавал ПЕРВЫЙ ФИКСТУРНЫЙ профиль (см. data/index.ts, childIndex), и
+ * родитель читал дату рождения и куратора чужого выдуманного ребёнка как
+ * данные своего. Экран не закрыт demoOr — это видел настоящий человек.
+ *
+ * СТАЛО. При настоящем входе строка показывается ТОЛЬКО если у неё есть
+ * источник в базе:
+ *   дата рождения         students.birth_date       пусто — строки нет
+ *   возраст               арифметика от даты        нет даты — строки нет
+ *   школа                 schools.name              пусто — строки нет
+ *   класс                 groups.name               есть всегда
+ *   классный руководитель students.curator_id       пусто — строки нет
+ *   № личного дела        колонки НЕТ               строки нет никогда
+ *   контакты школы        колонки есть, все пустые  блока нет целиком
+ *   аллергия, мед.        колонок НЕТ               блока нет целиком
+ * Прочерк вместо значения не ставим: пустая графа «Дата рождения» родителю
+ * не нужна, а выдуманная — вредна.
+ *
+ * Демо-гость видит ровно то, что видел: у него getChildInfo() находит свой
+ * фикстурный профиль, и все шесть строк, контакты и медкарта на месте.
+ *
+ * ЧЕГО ЭТОТ ЗАХОД НЕ ЧИНИТ. Пока ParentDataContext ещё грузится, isRealFlow
+ * ложен, и экран рисует фикстурного ребёнка целиком — как и все остальные
+ * экраны настоящего входа. Это общий для приложения порядок загрузки, он
+ * решается не здесь.
  */
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -70,6 +90,8 @@ import {
 import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { toChildRow } from "../../lib/realChild";
+import { ageYears, birthDayLabel } from "../../lib/dateLabels";
+import { LOCALE_TAG, pluralizeYears } from "@snr/core";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
@@ -155,7 +177,7 @@ type ProfileTabKey = "data" | "progress" | "attend" | "achieve";
 
 export default function ChildProfileScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
@@ -175,12 +197,42 @@ export default function ChildProfileScreen() {
   const realChildRow = isRealFlow ? toChildRow(parentData!.children[realIndex], realIndex) : null;
 
   const ctx = getSelectedChildContext(childId);
-  // Идентичность (ФИО/класс/аватар) — реальная для phone-flow, иначе как
-  // раньше. info (дата рождения, куратор, № личного дела, аллергия,
-  // мед.особенности) — колонок в Supabase нет, ВСЕГДА фикстура, заморожена
-  // на childId (login-time), не следует за переключением реального ребёнка.
   const child = realChildRow ?? ctx.child;
+  // Выдуманный профиль. У НАСТОЯЩЕГО ребёнка его нет и быть не может —
+  // getChildInfo() отдаёт null, и это единственное условие, по которому
+  // ниже прячутся выдуманные строки. Проверять isRealFlow для этого нельзя:
+  // пока данные родителя грузятся, он ложен, а профиль уже фикстурный.
   const info = getChildInfo(childId);
+  const realSummary = isRealFlow ? parentData!.children[realIndex] : undefined;
+
+  // Строки «Общей информации» собираются списком, а не вёрсткой: только так
+  // строка без источника не рисуется ВОВСЕ, а не показывает прочерк.
+  const generalRows: { label: string; value: string }[] = [];
+  if (info) {
+    generalRows.push(
+      { label: t.prof.birthDate, value: info.birth_date_label },
+      { label: t.prof.age, value: info.age_label },
+      { label: t.prof.school, value: "SNR International School" },
+      { label: t.prof.classRow, value: child.class_name },
+      { label: t.prof.curator, value: info.curator_name },
+      { label: t.prof.fileNo, value: info.file_no },
+    );
+  } else {
+    const born = realSummary?.birthDate ?? null;
+    if (born) {
+      generalRows.push({ label: t.prof.birthDate, value: birthDayLabel(born, LOCALE_TAG[locale]) });
+      const years = ageYears(born);
+      if (years !== null) {
+        generalRows.push({ label: t.prof.age, value: pluralizeYears(years, locale) });
+      }
+    }
+    const schoolName = parentData?.schoolName ?? null;
+    if (schoolName) generalRows.push({ label: t.prof.school, value: schoolName });
+    generalRows.push({ label: t.prof.classRow, value: child.class_name });
+    if (realSummary?.curatorName) {
+      generalRows.push({ label: t.prof.curator, value: realSummary.curatorName });
+    }
+  }
 
   // Активный таб — по макету (строка 1181) всегда «data» на входе; остальные
   // три — навигационные ссылки на другие экраны/табы.
@@ -387,12 +439,15 @@ export default function ChildProfileScreen() {
                 </View>
               ) : null}
             </View>
-            <Text
-              numberOfLines={1}
-              style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: "rgba(255,255,255,0.75)" }}
-            >
-              {`ID ученика · ${info.student_code}`}
-            </Text>
+            {/* Номер личного дела — выдуманный: колонки под него нет. */}
+            {info ? (
+              <Text
+                numberOfLines={1}
+                style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: "rgba(255,255,255,0.75)" }}
+              >
+                {`${t.prof.studentId} · ${info.student_code}`}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -459,58 +514,70 @@ export default function ChildProfileScreen() {
           {t.prof.generalInfo}
         </Text>
 
-        {/* Блок 6: GeneralInfoCard (6 строк). */}
+        {/* Блок 6: GeneralInfoCard. Демо — шесть строк макета; настоящий вход
+            — только те, у которых есть источник (см. generalRows выше). */}
         <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
-          <InfoRow label="Дата рождения" value={info.birth_date_label} divider={false} />
-          <InfoRow label="Возраст" value={info.age_label} divider />
-          <InfoRow label="Школа" value="SNR International School" divider />
-          <InfoRow label="Класс" value={child.class_name} divider />
-          <InfoRow label="Классный руководитель" value={info.curator_name} divider />
-          <InfoRow label="Номер личного дела" value={info.file_no} divider />
+          {generalRows.map((row, i) => (
+            <InfoRow key={row.label} label={row.label} value={row.value} divider={i > 0} />
+          ))}
         </GlassCard>
 
-        {/* Блок 7: SectionLabel «Контакты школы». */}
-        <Text
-          style={{
-            fontFamily: fonts.manrope800,
-            fontSize: 10.5,
-            letterSpacing: 10.5 * 0.08,
-            textTransform: "uppercase",
-            color: sectionCapsColor,
-          }}
-        >
-          {t.prof.schoolContacts}
-        </Text>
+        {/* Блоки 7–10 — ТОЛЬКО ДЛЯ ДЕМО-ГОСТЯ.
 
-        {/* Блок 8: SchoolContactsCard (3 строки, значения захардкожены в макете). */}
-        <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
-          <InfoRow label="Телефон" value="+998 71 200-40-40" divider={false} />
-          <InfoRow label="Email" value="info@snr-school.uz" divider />
-          <InfoRow label="Адрес" value="г. Ташкент, ул. Мустакиллик, 45" divider valueAlignRight />
-        </GlassCard>
+            Контакты школы захардкожены в макете (телефон, почта, адрес), а
+            колонки schools.phone/email/address у обеих школ пустые — показать
+            нечего. Аллергия и медицинские особенности — колонок под них нет
+            вовсе. Настоящему родителю оба раздела не рисуются: пустая графа
+            бесполезна, а заполненная выдумкой — опасна, речь о медицине.
 
-        {/* Блок 9: SectionLabel «Дополнительно». */}
-        <Text
-          style={{
-            fontFamily: fonts.manrope800,
-            fontSize: 10.5,
-            letterSpacing: 10.5 * 0.08,
-            textTransform: "uppercase",
-            color: sectionCapsColor,
-          }}
-        >
-          {t.prof.additional}
-        </Text>
+            Условие — info, а не isRealFlow: info равен null ровно тогда, когда
+            ребёнок настоящий (см. data/index.ts, childIndex). */}
+        {info ? (
+          <>
+          {/* Блок 7: SectionLabel «Контакты школы». */}
+          <Text
+            style={{
+              fontFamily: fonts.manrope800,
+              fontSize: 10.5,
+              letterSpacing: 10.5 * 0.08,
+              textTransform: "uppercase",
+              color: sectionCapsColor,
+            }}
+          >
+            {t.prof.schoolContacts}
+          </Text>
 
-        {/* Блок 10: MedicalCard (2 строки, вся карточка кликабельна → dmed). */}
-        <GlassCard
-          radius={20}
-          onPress={goMed}
-          contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}
-        >
-          <InfoRow label="Аллергия" value={info.allergies_label} divider={false} />
-          <InfoRow label="Медицинские особенности" value={info.med_note_label} divider />
-        </GlassCard>
+          {/* Блок 8: SchoolContactsCard (3 строки, значения захардкожены в макете). */}
+          <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+            <InfoRow label="Телефон" value="+998 71 200-40-40" divider={false} />
+            <InfoRow label="Email" value="info@snr-school.uz" divider />
+            <InfoRow label="Адрес" value="г. Ташкент, ул. Мустакиллик, 45" divider valueAlignRight />
+          </GlassCard>
+
+          {/* Блок 9: SectionLabel «Дополнительно». */}
+          <Text
+            style={{
+              fontFamily: fonts.manrope800,
+              fontSize: 10.5,
+              letterSpacing: 10.5 * 0.08,
+              textTransform: "uppercase",
+              color: sectionCapsColor,
+            }}
+          >
+            {t.prof.additional}
+          </Text>
+
+          {/* Блок 10: MedicalCard (2 строки, вся карточка кликабельна → dmed). */}
+          <GlassCard
+            radius={20}
+            onPress={goMed}
+            contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}
+          >
+            <InfoRow label="Аллергия" value={info.allergies_label} divider={false} />
+            <InfoRow label="Медицинские особенности" value={info.med_note_label} divider />
+          </GlassCard>
+          </>
+        ) : null}
       </ScrollView>
 
       {/* Шторка выбора ребёнка. Реальный phone-flow — переключаем реального

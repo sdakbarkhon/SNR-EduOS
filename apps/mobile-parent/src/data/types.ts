@@ -32,8 +32,9 @@ export interface ChildRow {
   id: string;
   full_name: string;          // KIDS.full
   first_name: string;         // KIDS.n
-  /** Родительный падеж имени («Малики») — для строк «Сегодня у {gen}». */
-  first_name_gen: string;     // KIDS.gen
+  // first_name_gen (родительный падеж имени) удалён 28.08.2026: у
+  // настоящего ребёнка склонять имя нечем, и поле хранило именительный
+  // под именем родительного. Фразы переписаны так, что падеж не нужен.
   is_female: boolean;         // KIDS.f
   class_name: string;         // KIDS.cl — groups.name
   group_id: string;

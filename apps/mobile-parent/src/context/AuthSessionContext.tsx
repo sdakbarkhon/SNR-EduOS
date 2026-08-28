@@ -23,6 +23,22 @@
  *
  * Дети берутся из настоящей привязки родителя (getParentContext через
  * ParentDataContext), а не из фикстурного набора, подобранного по количеству.
+ *
+ * ВОССТАНОВЛЕНИЕ ВХОДА ПРИ ЗАПУСКЕ (28.08.2026). Сессия Supabase лежит в
+ * защищённом хранилище телефона и переживает закрытие приложения, но её
+ * никто не спрашивал: приложение всегда стартовало с онбординга, и родитель
+ * КАЖДЫЙ раз заказывал новый код по SMS. Это прямые деньги по договору с
+ * Eskiz и лишний повод не открывать приложение. Теперь при запуске сессия
+ * запрашивается, и если она жива — сразу фаза app (или выбор ребёнка, если
+ * детей несколько).
+ *
+ * ДЕМО НЕ ВОССТАНАВЛИВАЕТСЯ. Ключ аренды демо-места лежит в том же
+ * хранилище и тоже переживает перезапуск, а сама аренда — нет: сервер
+ * отдаёт место на час и может передать его другому. Поэтому решение
+ * принимается не по ключу, а по школе: getParentContext отдаёт
+ * schoolIsDemo, и родителя ДЕМО-школы мы в приложение молча не пускаем —
+ * он проходит демо-вход заново и получает свежую аренду. Настоящий
+ * родитель восстанавливается всегда.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
@@ -44,6 +60,10 @@ const DEFAULT_SEL_BY_KIDS: Record<number, number> = { 1: 0, 2: 0, 3: 1 };
 
 export interface AuthSessionState {
   phase: AuthPhase;
+  /** Идёт попытка восстановить сохранённый вход. Пока true, корневой
+   *  навигатор не показывает НИЧЕГО: иначе онбординг успевал мигнуть перед
+   *  тем, как приложение само откроет главную. */
+  restoring: boolean;
   /** 9 цифр без кода страны. */
   phone: string;
   /** "+998" | "+7" | "+996". */
@@ -122,10 +142,17 @@ export interface AuthSessionCtx extends AuthSessionState {
 /** Сколько держим «Код принят» перед переходом. */
 const SUCCESS_HOLD_MS = 450;
 
+/** Сколько ждём ответ сервера при восстановлении входа, прежде чем показать
+ *  экран входа. Пустой экран навсегда хуже лишнего входа. */
+const RESTORE_TIMEOUT_MS = 8000;
+
 const AuthSessionContext = createContext<AuthSessionCtx | null>(null);
 
 const INITIAL_STATE: AuthSessionState = {
   phase: "onboarding",
+  // false: это состояние — ещё и «сброс после выхода», а там восстанавливать
+  // нечего. Первичное значение true ставится один раз при создании состояния.
+  restoring: false,
   phone: "",
   country: "+998",
   smsCode: "",
@@ -148,7 +175,7 @@ const INITIAL_STATE: AuthSessionState = {
 };
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthSessionState>(INITIAL_STATE);
+  const [state, setState] = useState<AuthSessionState>({ ...INITIAL_STATE, restoring: true });
   // Заход 1: verifyCode() — async, но должен читать САМЫЙ СВЕЖИЙ state
   // (smsCode/pendingCode) синхронно в момент вызова, а не то, что было
   // захвачено замыканием при последнем создании useCallback. Ref
@@ -186,6 +213,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   // возвращали «слишком часто» и затирали успех первого. Ref читается и
   // пишется синхронно: второй вызов в том же тике уже видит true.
   const requestBusyRef = useRef(false);
+  const clearDemoSessionRef = useRef(clearDemoSession);
+  clearDemoSessionRef.current = clearDemoSession;
 
   // Сессия могла кончиться не по нашей воле: её закрыли с другого устройства
   // на экране «Активные сессии» (миграция 199 удаляет строку auth.sessions
@@ -209,9 +238,74 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       // нужен: на фазе onboarding делать нечего.
       setState((prev) => (prev.phase === "onboarding" ? prev : INITIAL_STATE));
       selectParentChild(null);
+      // 28.08.2026. Кнопка «Выйти» признак демо гасила, а ЭТА ветка — нет,
+      // хотя приводит ровно туда же: сессии больше нет. Ключ аренды пережил
+      // бы обрыв, и следующий вход настоящего родителя показал бы ему
+      // выдуманные разделы как свои. Тот же вызов, что и в signOut.
+      void clearDemoSessionRef.current();
     });
     return () => data.subscription.unsubscribe();
   }, [selectParentChild]);
+
+  /**
+   * Один раз при запуске: жива ли сохранённая сессия.
+   *
+   * Порядок важен. getSession() читает хранилище локально и стоит дёшево —
+   * если сессии нет, ждать нечего и экран входа показывается сразу.
+   * Настоящая проверка — refreshParentData(): getParentContext сам
+   * спрашивает сервер, кто мы, и вернёт null на протухшем или отозванном
+   * токене. Отдельной проверки не заводим, чтобы не ходить на сервер дважды.
+   *
+   * Сеть может и не ответить. Тогда через RESTORE_TIMEOUT_MS перестаём ждать
+   * и показываем вход: пустой экран навсегда хуже лишнего входа.
+   */
+  const restoreStartedRef = useRef(false);
+  useEffect(() => {
+    if (restoreStartedRef.current) return;
+    restoreStartedRef.current = true;
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) setState((s) => (s.restoring ? { ...s, restoring: false } : s));
+    };
+    const timer = setTimeout(finish, RESTORE_TIMEOUT_MS);
+    (async () => {
+      try {
+        const { data } = await getSupabase().auth.getSession();
+        if (!data.session || cancelled) return;
+        await refreshParentData();
+        if (cancelled) return;
+        const ctx = parentDataRef.current;
+        // Родителя нет (сессия чужая или протухла) — на экран входа.
+        if (!ctx) return;
+        // Демо-школа: аренда места могла кончиться, пока приложение было
+        // закрыто. Пусть входит заново — см. заголовок файла.
+        if (ctx.schoolIsDemo) return;
+        const kids = ctx.children;
+        if (kids.length === 0) return;
+        setState((s) => {
+          // Человек успел начать вход руками, пока мы ходили на сервер —
+          // не мешаем ему.
+          if (s.phase !== "onboarding") return s;
+          return {
+            ...s,
+            kidsCount: kids.length,
+            authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? 0,
+            phase: kids.length <= 1 ? "app" : "childPicker",
+            currentChildId: kids.length <= 1 ? (kids[0]?.id ?? null) : null,
+          };
+        });
+      } catch (e) {
+        console.error("[AuthSessionContext] восстановление входа не удалось:", e);
+      } finally {
+        clearTimeout(timer);
+        finish();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [refreshParentData]);
 
   const setPhase = useCallback((next: AuthPhase) => {
     setState((s) => ({ ...s, phase: next }));

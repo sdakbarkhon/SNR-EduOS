@@ -3480,7 +3480,11 @@ export interface Dictionary {
       // (шаблон с {name}), мок-текст ассистента, мок-плейсхолдер значения
       // для карточек «К оплате»/«Питание» (данные пока не подключены).
       greetingTitle: string;  // «Доброе утро, {name}!»
-      greetingSub: string;    // «Вот что происходит у {name} сегодня»
+      // 28.08.2026 — БЕЗ ПАДЕЖА. Было «Вот что происходит у {name} сегодня»:
+      // имя настоящего ребёнка подставлялось именительным, и родитель читал
+      // «у Шерзод сегодня». Склонять на лету нельзя (имена бывают латиницей,
+      // узбекскими, несклоняемыми), поэтому падеж убран из самой фразы.
+      greetingSub: string;    // «Вот что происходит сегодня · {name}»
       assistantText: string;
       noDataYet: string;
     };
@@ -3553,7 +3557,10 @@ export interface Dictionary {
       billDueBy: string;          // «до {date}»
       payAllBtn: string;          // «Оплатить всё — {sum}»
       billsReceipts: string;      // «Счета и чеки»
-      walletTitle: string;        // «Кошелёк {gen}»
+      // Тоже без падежа, и по той же причине; плейсхолдер переименован из
+      // {gen} в {name}, чтобы имя подставляли именительным осознанно.
+      walletTitle: string;        // «Кошелёк · {name}»
+      walletTitleGeneric: string; // «Кошелёк ребёнка» — когда имени ещё нет
       walletSub: string;          // «На питание и покупки в школе»
       // Заход 6: доп. ключи для ветки «Оплаты» — экраны d17-limits,
       // d17-transfer, d17-addcard, d17-topup, paySheet-успехи, helpSheet.
@@ -3567,7 +3574,6 @@ export interface Dictionary {
      *  мобилки, first_name_gen). */
     paymentsWeb: {
       tuition: string;              // «Обучение» — заголовок 1-го счёта-заглушки
-      walletTitleGeneric: string;   // «Кошелёк ребёнка»
     };
     msg: {
       announcementsSub: string;  // подпись раздела на вкладке «Сообщения»
@@ -3614,6 +3620,15 @@ export interface Dictionary {
       generalInfo: string;
       schoolContacts: string;
       additional: string;
+      // Подписи строк профиля ребёнка (d29). До 28.08.2026 лежали в вёрстке
+      // экрана по-русски; переехали сюда вместе с починкой самого экрана.
+      birthDate: string;          // «Дата рождения»
+      age: string;                // «Возраст»
+      school: string;             // «Школа»
+      classRow: string;           // «Класс»
+      curator: string;            // «Классный руководитель»
+      fileNo: string;             // «Номер личного дела»
+      studentId: string;          // «ID ученика» — подпись под именем в hero
       personalInfo: string;
       address: string;
       // Заход 4: экран «Профиль-хаб» — подписи меню и версии.

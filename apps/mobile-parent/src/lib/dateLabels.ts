@@ -35,6 +35,46 @@ export function weekdayDayMonth(dateKey: string, localeTag: string): string {
   });
 }
 
+/**
+ * «14 марта 2017» — дата рождения ученика (students.birth_date).
+ *
+ * Отдельно от fullDate ниже: там на вход приходит МОМЕНТ в UTC, а тут —
+ * уже посчитанный день, и его нужно привязать к полудню Ташкента, иначе
+ * подпись съедет на соседний день. Год обязателен: без него дата рождения
+ * бессмысленна.
+ */
+export function birthDayLabel(dateKey: string, localeTag: string): string {
+  return noonOf(dateKey).toLocaleDateString(localeTag, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    ...TZ,
+  });
+}
+
+/**
+ * Полных лет на сегодня, или null, если дату не разобрать.
+ *
+ * Возраст в базе не хранится — это арифметика от даты рождения, и считать
+ * её надо по дню ШКОЛЫ (getAppNowMs), а не по часам устройства: у школы с
+ * замороженным временем «сегодня» своё.
+ */
+export function ageYears(dateKey: string): number | null {
+  // Без регулярных выражений: ключ дня всегда «YYYY-MM-DD», а сравнение
+  // «месяц+день» идёт строками — они одинаковой ширины и сравниваются верно.
+  const born = dateKey.split("-");
+  if (born.length !== 3) return null;
+  const today = new Date(getAppNowMs()).toLocaleDateString("en-CA", TZ).split("-");
+  if (today.length !== 3) return null;
+  const bornYear = Number(born[0]);
+  const nowYear = Number(today[0]);
+  if (!Number.isFinite(bornYear) || !Number.isFinite(nowYear)) return null;
+  let years = nowYear - bornYear;
+  // День рождения в этом году ещё не наступил — год не засчитан.
+  if (today[1]! + today[2]! < born[1]! + born[2]!) years -= 1;
+  return years >= 0 && years < 130 ? years : null;
+}
+
 /** «29 июля 2026» — для карточек объявлений и новостей. */
 export function fullDate(iso: string, localeTag: string): string {
   return new Date(iso).toLocaleDateString(localeTag, {

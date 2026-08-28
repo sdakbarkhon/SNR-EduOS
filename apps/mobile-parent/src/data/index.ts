@@ -130,7 +130,6 @@ import {
 import {
   ASSISTANT_TEXT_TEMPLATES,
   DASHBOARD_CHILD_STATUS,
-  DASHBOARD_GREETING,
   DUE_CARD,
   NEXT_LESSON_CARD,
   QUICK_ACTIONS,
@@ -201,24 +200,50 @@ function resolveChild(childId?: string): ChildRow {
   return (childId ? getChildById(childId) : undefined) ?? CHILDREN[DEFAULT_CHILD_INDEX];
 }
 
-function childIndex(childId?: string): number {
+/**
+ * Место ребёнка в фикстурном списке — или null, если такого там нет.
+ *
+ * ПОЧЕМУ null, А НЕ НОЛЬ. До 28.08.2026 здесь стояло
+ * Math.max(0, CHILDREN.findIndex(...)). У настоящего ребёнка findIndex
+ * возвращает −1, прижатие к нулю подставляло ПЕРВОГО ВЫДУМАННОГО, и
+ * родитель видел его дату рождения и его классного руководителя как правду
+ * о своём ребёнке. Теперь промах виден вызывающему, и экран сам решает, что
+ * делать: настоящие поля берутся из базы, а выдуманные строки не рисуются
+ * вовсе — пустая графа честнее подставного значения.
+ */
+function childIndex(childId?: string): number | null {
   const child = resolveChild(childId);
-  return Math.max(0, CHILDREN.findIndex((c) => c.id === child.id));
+  const idx = CHILDREN.findIndex((c) => c.id === child.id);
+  return idx >= 0 ? idx : null;
 }
 
-/** Контекст выбранного ребёнка: ребёнок + профиль + баланс кошелька. */
+/** Фикстурный профиль по месту в списке. null там, где места нет. */
+function childInfoAt(idx: number | null): ChildInfoRow | null {
+  return idx === null ? null : (CHILD_INFO[idx] ?? null);
+}
+
+/**
+ * Контекст выбранного ребёнка: ребёнок + профиль + баланс кошелька.
+ *
+ * info равен null у НАСТОЯЩЕГО ребёнка: выдуманного профиля для него нет и
+ * подставлять чужой нельзя. Вызывающий обязан это разобрать.
+ */
 export function getSelectedChildContext(childId?: string): {
   child: ChildRow;
-  info: ChildInfoRow;
+  info: ChildInfoRow | null;
   wallet_balance: number;
 } {
   const child = resolveChild(childId);
-  const idx = childIndex(childId);
-  return { child, info: CHILD_INFO[idx], wallet_balance: getWalletBalance(child.id) };
+  return {
+    child,
+    info: childInfoAt(childIndex(childId)),
+    wallet_balance: getWalletBalance(child.id),
+  };
 }
 
-export function getChildInfo(childId?: string): ChildInfoRow {
-  return CHILD_INFO[childIndex(childId)];
+/** Выдуманный профиль ребёнка. null у настоящего — см. childIndex. */
+export function getChildInfo(childId?: string): ChildInfoRow | null {
+  return childInfoAt(childIndex(childId));
 }
 
 export function getParent() {
@@ -271,7 +296,12 @@ export function getScheduleWeek(): ScheduleDayRow[] {
 export function getDaySchedule(dayIndex: number, childId?: string): ScheduleLessonRow[] {
   const day = SCHEDULE_DAYS[dayIndex];
   if (!day) return [];
-  const set = SETS_BY_CHILD[childIndex(childId)][day.set_id];
+  // Настоящего ребёнка в фикстурном списке нет (childIndex вернёт null).
+  // Берём нулевой набор ЗАВЕДОМО ВЫДУМАННЫХ уроков: экран расписания при
+  // настоящем входе рисует свои строки из базы, а этот ответ отбрасывает,
+  // и падать здесь незачем. Профиль ребёнка так делать НЕЛЬЗЯ — там
+  // подставленное значение уходит человеку на экран как правда.
+  const set = SETS_BY_CHILD[childIndex(childId) ?? 0][day.set_id];
   return set.map((subject_id, i) => {
     let status: ScheduleLessonRow["status"];
     if (dayIndex < DEMO_TODAY.weekday_index) status = "done";
@@ -509,8 +539,10 @@ export function getParentDocuments(locale: Locale) {
 
 
 
+/** Медкарта — целиком выдуманный экран, он закрыт demoOr и настоящему
+ *  родителю не показывается. Ноль здесь — заглушка от падения, не подстановка. */
 export function getMedicalCard(locale: Locale, childId?: string): MedicalCardRow {
-  return trDeep(MEDICAL_CARDS[childIndex(childId)], locale);
+  return trDeep(MEDICAL_CARDS[childIndex(childId) ?? 0], locale);
 }
 
 
@@ -560,7 +592,6 @@ export function getAssistantTexts(childId?: string): {
 export function getDashboard(childId?: string) {
   const child = resolveChild(childId);
   return {
-    greeting: DASHBOARD_GREETING,
     parent: PARENT,
     child,
     child_status: DASHBOARD_CHILD_STATUS,

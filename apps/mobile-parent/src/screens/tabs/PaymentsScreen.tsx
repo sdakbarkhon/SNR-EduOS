@@ -387,7 +387,11 @@ export default function PaymentsScreen() {
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: "#fff" }}>
-                {fillTemplate(d.parentApp.pay.walletTitle, { gen: scopedChild?.first_name_gen ?? "" })}
+                {/* Без падежа, и без висящего разделителя: пока имя не
+                    приехало, заголовок общий («Кошелёк ребёнка»). */}
+                {scopedChild?.first_name
+                  ? fillTemplate(d.parentApp.pay.walletTitle, { name: scopedChild.first_name })
+                  : d.parentApp.pay.walletTitleGeneric}
               </Text>
               <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: "rgba(255,255,255,0.8)" }}>
                 {d.parentApp.pay.walletSub}

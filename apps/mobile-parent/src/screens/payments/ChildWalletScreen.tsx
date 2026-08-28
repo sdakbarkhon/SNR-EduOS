@@ -299,11 +299,14 @@ export default function ChildWalletScreen() {
   const { child, wallet_balance } = getSelectedChildContext(initialChildId);
 
   const childInitial = child.first_name.slice(0, 1);
-  // walletTitle макета — «Кошелёк {gen}» (см. d.parentApp.pay.walletTitle).
-  const walletTitle = d.parentApp.pay.walletTitle.replace(
-    "{gen}",
-    child.first_name_gen,
-  );
+  // Заголовок кошелька — БЕЗ ПАДЕЖА: «Кошелёк · Шерзод». Было «Кошелёк
+  // {gen}» с готовой родительной формой из фикстуры, и у настоящего
+  // ребёнка туда попадало имя как есть — «Кошелёк Sherzod». Склонять на
+  // лету нельзя: имена бывают латиницей и несклоняемые, а «+ а» даёт
+  // гибрид «Sherzodа». Поэтому падеж убран из фразы, а не угадан.
+  const walletTitle = child.first_name
+    ? d.parentApp.pay.walletTitle.replace("{name}", child.first_name)
+    : d.parentApp.pay.walletTitleGeneric;
   const walletBalTxt = formatMoney(wallet_balance);
 
   // Первые четыре операции из общего списка. Подпись дня — «Сегодня» /
