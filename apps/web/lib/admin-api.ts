@@ -406,13 +406,77 @@ export async function deleteStudent(userId: string, callerSchoolId: string, call
 
 // ── TEACHERS ─────────────────────────────────────────────────────────────────
 
+/** Пара «предмет справочника × группа» — одна строка блока «Предметы». */
+export type TeacherAssignment = { catalog_id: string; group_id: string };
+
+/**
+ * Назначить учителю предметы ТОЙ ЖЕ функцией, что и экран «Назначения».
+ *
+ * Своей копии логики здесь нет намеренно: одно назначение трогает ТРИ
+ * поверхности — subjects.teacher_id (право вести), group_teachers (право
+ * видеть группу) и teachers.subject_slug (предметник или куратор). Вторая
+ * копия рано или поздно забудет одну из них, и учитель получит право вести
+ * уроки, не видя группы, — это уже было (Z.2.4).
+ *
+ * ПОЧЕМУ ОТКАЗ НЕ БРОСАЕТСЯ НАРУЖУ. Живая проверка показала беду: пара
+ * «предмет × группа» уникальна, и если у группы уже есть учитель по этому
+ * предмету, назначение падает. Учитель к этому моменту УЖЕ ЗАВЕДЁН — а
+ * админ видел только «Этот предмет уже назначен этой группе» и читал это
+ * как «ничего не создано». Повторная попытка упиралась в занятый логин.
+ * Поэтому причина возвращается значением рядом с числом удавшихся, и окно
+ * говорит обе правды сразу: человек заведён, предмет — нет, и почему.
+ */
+async function assignSubjectsToTeacher(
+  teacherId: string,
+  schoolId: string,
+  assignments: TeacherAssignment[],
+): Promise<{ assigned: number; failed: string[] }> {
+  let сделано = 0;
+  const отказы: string[] = [];
+  for (const a of assignments) {
+    if (!a.catalog_id || !a.group_id) continue;
+    try {
+      await createSubjectAssignment({
+        catalog_id: a.catalog_id,
+        group_id: a.group_id,
+        teacher_id: teacherId,
+        school_id: schoolId,
+      });
+      сделано += 1;
+    } catch (e) {
+      отказы.push(errorText(e));
+    }
+  }
+  return { assigned: сделано, failed: отказы };
+}
+
+/** Текст отказа из чего угодно. Ошибка Supabase — обычный объект, а не
+ *  Error, и String() дал бы «[object Object]»; имя нарушенного
+ *  ограничения лежит в details — по нему экран и узнаёт причину. */
+function errorText(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    const parts = [o.message, o.details, o.hint, o.code]
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (parts.length) return parts.join(" | ");
+  }
+  return String(e);
+}
+
 export async function createTeacher(data: {
   full_name: string;
   username: string;
   password: string;
   school_id: string;
   google_email?: string | null;
-}): Promise<{ userId: string; teacherId: string }> {
+  /** Телефон и описание — колонки были всегда, заполнить их было негде. */
+  phone?: string | null;
+  bio?: string | null;
+  /** Предметы прямо из окна создания: раньше это был отдельный экран, и
+   *  пропустить его было легко — учитель есть, уроков не видит. */
+  assignments?: TeacherAssignment[];
+}): Promise<{ userId: string; teacherId: string; assigned: number; failed: string[] }> {
   const sb = getServiceClient();
   // Z.2.10 — школьный адрес, если простой логин уже занят другой школой.
   const { userId } = await createSchoolScopedUser(sb, {
@@ -421,7 +485,15 @@ export async function createTeacher(data: {
   });
   const { data: teacher, error: tErr } = await sb
     .from("teachers")
-    .insert({ user_id: userId, full_name: data.full_name, username: data.username, school_id: data.school_id, google_email: normalizeSocialEmail(data.google_email) })
+    .insert({
+      user_id: userId,
+      full_name: data.full_name,
+      username: data.username,
+      school_id: data.school_id,
+      google_email: normalizeSocialEmail(data.google_email),
+      phone: orNull(data.phone),
+      bio: orNull(data.bio),
+    })
     .select("id")
     .single();
   if (tErr || !teacher) {
@@ -429,16 +501,40 @@ export async function createTeacher(data: {
     throw tErr ?? new Error("Teacher insert failed");
   }
 
-  return { userId, teacherId: (teacher as { id: string }).id };
+  // Назначения — последним шагом. Отката у них нет НАМЕРЕННО: учитель без
+  // предмета — законное состояние (куратор), и сносить заведённого человека
+  // из-за сбоя на предмете неправильно. Причина сбоя доедет до админа
+  // текстом, а предмет можно доназначить на экране «Назначения».
+  const итог = data.assignments?.length
+    ? await assignSubjectsToTeacher((teacher as { id: string }).id, data.school_id, data.assignments)
+    : { assigned: 0, failed: [] as string[] };
+
+  return {
+    userId,
+    teacherId: (teacher as { id: string }).id,
+    assigned: итог.assigned,
+    failed: итог.failed,
+  };
 }
 
 export async function updateTeacher(
   teacherId: string,
   userId: string,
-  data: { full_name: string; username: string; google_email?: string | null },
+  data: {
+    full_name: string;
+    username: string;
+    google_email?: string | null;
+    /** Пишутся всегда: форма рисует их текущим значением, значит пустое
+     *  поле — это «очистить». Для почты приём другой, см. updateStudent. */
+    phone?: string | null;
+    bio?: string | null;
+    /** ДОБАВЛЯЕМЫЕ назначения. Существующие снимаются списком под учителем
+     *  и правятся на экране «Назначения» — здесь только новые. */
+    assignments?: TeacherAssignment[];
+  },
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
-) {
+): Promise<{ assigned: number; failed: string[] }> {
   const sb = getServiceClient();
   await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
 
@@ -446,6 +542,8 @@ export async function updateTeacher(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const patch: Record<string, any> = { full_name: data.full_name, username: data.username };
   if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+  if ("phone" in data) patch.phone = orNull(data.phone);
+  if ("bio" in data) patch.bio = orNull(data.bio);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await sb.from("teachers").update(patch as any).eq("id", teacherId);
@@ -453,6 +551,22 @@ export async function updateTeacher(
   await sb.auth.admin.updateUserById(userId, {
     email: `${data.username.trim().toLowerCase()}@teachers.snr.local`,
   });
+
+  // Школа берётся у САМОГО учителя: суперадмин правит чужую, своей у него нет.
+  let итог = { assigned: 0, failed: [] as string[] };
+  if (data.assignments?.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: owner, error: ownErr } = await (sb as any)
+      .from("teachers").select("school_id").eq("id", teacherId).single();
+    if (ownErr) throw ownErr;
+    итог = await assignSubjectsToTeacher(
+      teacherId,
+      (owner as { school_id: string }).school_id,
+      data.assignments,
+    );
+  }
+
+  return итог;
 }
 
 export async function resetTeacherPassword(

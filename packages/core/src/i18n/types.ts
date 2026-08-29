@@ -744,6 +744,16 @@ export interface Dictionary {
     teacherUpdatedMsg: string;
     teacherDeletedMsg: string;
     teacherCreatedMsg: string;
+    // Окно учителя: телефон, описание и блок «Предметы».
+    fieldTeacherPhone: string;
+    fieldTeacherBio: string;
+    sectionSubjects: string;
+    subjectsHint: string;
+    addSubjectRow: string;
+    removeSubjectRow: string;
+    noSubjectWarning: string;
+    assignedCountMsg: string;
+    assignFailedMsg: string;
     studentUpdatedMsg: string;
     dashboardTitle: string;
     dashboardSubtitle: string;

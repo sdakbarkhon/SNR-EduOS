@@ -17,7 +17,7 @@ export default async function AdminTeachersPage({
   // базы, колонка в них есть.
   const { data: teachers, error: teachersError } = await supabase
     .from("teachers")
-    .select("id, user_id, full_name, username, google_email, created_at")
+    .select("id, user_id, full_name, username, google_email, created_at, phone, bio")
     .order("full_name");
   if (teachersError) console.error("[AdminTeachersPage] teachers query failed:", teachersError.message);
 
@@ -26,12 +26,17 @@ export default async function AdminTeachersPage({
   // назначений у каждого единицы.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
-  const [{ data: assignments }, { data: links }, { data: groups }, { data: lessons }] = await Promise.all([
-    sb.from("subjects").select("id, name, group_id, teacher_id").not("teacher_id", "is", null),
-    sb.from("group_teachers").select("group_id, teacher_id"),
-    sb.from("groups").select("id, name, teacher_id"),
-    sb.from("lessons").select("subject_id"),
-  ]);
+  // catalog — справочник предметов школы. Нужен блоку «Предметы» в окне
+  // учителя: назначение делается там же, где заводится человек, а не
+  // отдельным экраном, который легко пропустить.
+  const [{ data: assignments }, { data: links }, { data: groups }, { data: lessons }, { data: catalog }] =
+    await Promise.all([
+      sb.from("subjects").select("id, name, group_id, teacher_id").not("teacher_id", "is", null),
+      sb.from("group_teachers").select("group_id, teacher_id"),
+      sb.from("groups").select("id, name, teacher_id"),
+      sb.from("lessons").select("subject_id"),
+      sb.from("school_subjects").select("id, name, is_active").eq("is_active", true).order("name"),
+    ]);
 
   const groupById = new Map<string, { name: string; teacher_id: string | null }>(
     ((groups ?? []) as Array<{ id: string; name: string; teacher_id: string | null }>)
@@ -63,6 +68,12 @@ export default async function AdminTeachersPage({
   }
 
   return (
-    <TeachersView teachers={teachers ?? []} bindings={bindings} defaultOpenAdd={action === "add"} />
+    <TeachersView
+      teachers={teachers ?? []}
+      bindings={bindings}
+      catalog={(catalog ?? []) as Array<{ id: string; name: string }>}
+      groups={(groups ?? []) as Array<{ id: string; name: string }>}
+      defaultOpenAdd={action === "add"}
+    />
   );
 }

@@ -168,6 +168,30 @@ export async function actionDeleteStudent(userId: string) {
 
 // ── TEACHERS ─────────────────────────────────────────────────────────────────
 
+/**
+ * Строки блока «Предметы» из формы учителя.
+ *
+ * Поля называются одинаково у всех строк (assign_catalog / assign_group), и
+ * читаются getAll() парами по порядку — так браузер и шлёт повторяющиеся
+ * имена. Нумерованные assign_catalog_0/_1 потребовали бы знать заранее,
+ * сколько строк добавил админ.
+ *
+ * Неполные строки (выбран предмет, но не группа) молча пропускаются: это
+ * недозаполненная строка, а не ошибка, — админ мог нажать «добавить ещё» и
+ * передумать.
+ */
+function readTeacherAssignments(formData: FormData): Array<{ catalog_id: string; group_id: string }> {
+  const cats = formData.getAll("assign_catalog").map((v) => String(v).trim());
+  const grps = formData.getAll("assign_group").map((v) => String(v).trim());
+  const out: Array<{ catalog_id: string; group_id: string }> = [];
+  for (let i = 0; i < Math.max(cats.length, grps.length); i += 1) {
+    const catalog_id = cats[i] ?? "";
+    const group_id = grps[i] ?? "";
+    if (catalog_id && group_id) out.push({ catalog_id, group_id });
+  }
+  return out;
+}
+
 export async function actionCreateTeacher(formData: FormData) {
   return guard(async () => {
     const { schoolId } = await verifyAdmin();
@@ -176,9 +200,15 @@ export async function actionCreateTeacher(formData: FormData) {
     const password = String(formData.get("password") ?? "").trim();
     if (!full_name || !username || !password) throw new Error("Missing fields");
     const google_email = String(formData.get("google_email") ?? "").trim() || null;
-    const result = await createTeacher({ full_name, username, password, school_id: schoolId, google_email });
+    const phone = String(formData.get("phone") ?? "").trim() || null;
+    const bio = String(formData.get("bio") ?? "").trim() || null;
+    const result = await createTeacher({
+      full_name, username, password, school_id: schoolId, google_email,
+      phone, bio, assignments: readTeacherAssignments(formData),
+    });
     revalidatePath("/admin/teachers");
     revalidatePath("/admin");
+    revalidatePath("/admin/subject-assignments");
     return result;
   });
 }
@@ -192,8 +222,20 @@ export async function actionUpdateTeacher(formData: FormData) {
     const username = String(formData.get("username") ?? "").trim();
     // То же, что у ученика: пишем почту, только если её правда меняли.
     const changed = changedFields(formData, GOOGLE_EMAIL_FIELDS);
-    await updateTeacher(teacher_id, user_id, { full_name, username, ...changed }, schoolId, isSuperAdmin);
+    const phone = String(formData.get("phone") ?? "").trim() || null;
+    const bio = String(formData.get("bio") ?? "").trim() || null;
+    const result = await updateTeacher(
+      teacher_id,
+      user_id,
+      { full_name, username, ...changed, phone, bio, assignments: readTeacherAssignments(formData) },
+      schoolId,
+      isSuperAdmin,
+    );
     revalidatePath("/admin/teachers");
+    // Назначение трогает subjects и group_teachers — экран «Назначения»
+    // обязан увидеть новое сразу, иначе два экрана разъедутся на глазах.
+    revalidatePath("/admin/subject-assignments");
+    return result;
   });
 }
 

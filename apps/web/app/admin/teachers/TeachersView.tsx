@@ -107,6 +107,9 @@ type Teacher = {
    * Google. Компилятор молчит — тип рукописный, объект приходит переменной.
    */
   google_email?: string | null;
+  /** Телефон и описание: колонки были всегда, заполнить их было негде. */
+  phone: string | null;
+  bio: string | null;
   created_at: string;
 };
 
@@ -219,6 +222,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Тот же вид, что у Input — на экране учеников он объявлен так же. */
+function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className={
+        props.className ??
+        "w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+      }
+    />
+  );
+}
+
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
@@ -231,11 +247,16 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 export function TeachersView({
   teachers,
   bindings,
+  catalog,
+  groups,
   defaultOpenAdd,
 }: {
   teachers: Teacher[];
   /** Z.2.4 — что каждый ведёт, ключ = teacher.id. Считается на сервере. */
   bindings: Record<string, TeacherBindingRow[]>;
+  /** Справочник предметов школы и её группы — для блока «Предметы». */
+  catalog: Array<{ id: string; name: string }>;
+  groups: Array<{ id: string; name: string }>;
   defaultOpenAdd?: boolean;
 }) {
   const { locale } = useLocale();
@@ -357,17 +378,28 @@ export function TeachersView({
         <Backdrop onClose={() => setModal(null)}>
           <ModalCard title={t.addTeacherTitle} onClose={() => setModal(null)}>
             <AddTeacherForm
+              catalog={catalog}
+              groups={groups}
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
               onSubmit={(fd) => {
                 guard(() => startTransition(async () => {
                   try {
-                    await unwrap(actionCreateTeacher(fd));
+                    const res = await unwrap(actionCreateTeacher(fd));
+                    // Сообщение говорит «Учитель создан» — раньше здесь стояла
+                    // фраза про ученика, чинили это отдельным заходом. Плюс
+                    // число назначенных предметов: админ должен видеть, что
+                    // блок «Предметы» сработал, а не гадать.
+                    const назначено = res?.assigned ?? 0;
                     flash(
                       t.teacherCreatedMsg
                         .replace("{username}", String(fd.get("username")))
-                        .replace("{password}", String(fd.get("password"))),
+                        .replace("{password}", String(fd.get("password")))
+                      + (назначено > 0
+                        ? ". " + t.assignedCountMsg.replace("{n}", String(назначено))
+                        : "")
+                      + отказПредмета(res?.failed, t, locale as Locale),
                     );
                     setModal(null);
                   } catch (e) {
@@ -391,8 +423,15 @@ export function TeachersView({
                 fd.append("user_id", modal.teacher.user_id ?? "");
                 startTransition(async () => {
                   try {
-                    await unwrap(actionUpdateTeacher(fd));
-                    flash(t.teacherUpdatedMsg);
+                    const res = await unwrap(actionUpdateTeacher(fd));
+                    const назначено = res?.assigned ?? 0;
+                    flash(
+                      t.teacherUpdatedMsg
+                      + (назначено > 0
+                        ? ". " + t.assignedCountMsg.replace("{n}", String(назначено))
+                        : "")
+                      + отказПредмета(res?.failed, t, locale as Locale),
+                    );
                     setModal(null);
                   } catch (e) {
                     flash(humanizeAdminError(e, locale as Locale));
@@ -407,6 +446,21 @@ export function TeachersView({
                   «не трогал» от «стёр нарочно». Разбор — lib/form-patch.ts. */}
               <input type="hidden" name={origName("google_email")} defaultValue={modal.teacher.google_email ?? ""} />
               <GoogleEmailField defaultValue={modal.teacher.google_email} placeholder="anna@gmail.com" />
+              <Field label={t.fieldTeacherPhone}>
+                <Input name="phone" type="tel" defaultValue={modal.teacher.phone ?? ""} placeholder="+998 90 123-45-67" />
+              </Field>
+              <Field label={t.fieldTeacherBio}>
+                <Input name="bio" defaultValue={modal.teacher.bio ?? ""} />
+              </Field>
+              {/* Блок добавляет НОВЫЕ назначения. Уже существующие снимаются
+                  списком под учителем и правятся на экране «Назначения» —
+                  второй способ править одно и то же тут не заводим. */}
+              <SubjectAssignmentRows
+                t={t}
+                catalog={catalog}
+                groups={groups}
+                hasExisting={(bindings[modal.teacher.id]?.length ?? 0) > 0}
+              />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
                 <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60">
@@ -478,14 +532,126 @@ export function TeachersView({
 
 type AdminDict = ReturnType<typeof getDictionary>["admin"];
 
+/**
+ * Блок «Предметы» — назначения прямо в окне учителя.
+ *
+ * ЗАЧЕМ ОН ЗДЕСЬ. Раньше предмет назначался на отдельном экране, и
+ * пропустить этот шаг было легко: учитель заведён, а уроков не видит. Это
+ * было состоянием по умолчанию — так живёт один из десяти учителей в базе.
+ *
+ * ПОЧЕМУ НЕ ОБЯЗАТЕЛЬНЫЙ. Учителя заводят и без предмета — например,
+ * куратора класса. Но если ни одна строка не заполнена, окно говорит об
+ * этом прямо: молчание админ прочитал бы как «всё в порядке».
+ *
+ * Поля всех строк называются одинаково (assign_catalog / assign_group) —
+ * именно так браузер шлёт повторяющиеся имена, а сервер читает их парами
+ * (см. readTeacherAssignments в actions.ts).
+ */
+/**
+ * Хвост сообщения про НЕ назначенный предмет.
+ *
+ * Учитель к этому моменту уже заведён, и молчать о причине нельзя: без
+ * неё админ решит, что предмет назначился. Показываем причину первого
+ * отказа — они почти всегда одинаковы (пара «предмет × группа» занята).
+ */
+function отказПредмета(failed: string[] | undefined, t: AdminDict, locale: Locale): string {
+  if (!failed?.length) return "";
+  return ". " + t.assignFailedMsg.replace(
+    "{reason}",
+    humanizeAdminError(new Error(failed[0]), locale),
+  );
+}
+
+function SubjectAssignmentRows({
+  t,
+  catalog,
+  groups,
+  hasExisting,
+}: {
+  t: AdminDict;
+  catalog: Array<{ id: string; name: string }>;
+  groups: Array<{ id: string; name: string }>;
+  /** Ведёт ли учитель что-то УЖЕ. В окне правки предупреждение о пустом
+   *  предмете иначе врёт: у человека три предмета, а окно говорит, что
+   *  он не увидит уроков. Найдено живой проверкой на Elena Sokolova. */
+  hasExisting?: boolean;
+}) {
+  const [rows, setRows] = useState<Array<{ catalog: string; group: string }>>([{ catalog: "", group: "" }]);
+  const anyComplete = rows.some((r) => r.catalog && r.group);
+
+  const setRow = (i: number, patch: Partial<{ catalog: string; group: string }>) =>
+    setRows((prev) => prev.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+
+  return (
+    <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/60 p-3">
+      <div className="text-sm font-semibold text-gray-700">{t.sectionSubjects}</div>
+      <p className="text-xs text-gray-400">{t.subjectsHint}</p>
+      {rows.map((row, i) => (
+        <div key={i} className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[9rem] flex-1">
+            <Select
+              name="assign_catalog"
+              value={row.catalog}
+              onChange={(e) => setRow(i, { catalog: e.target.value })}
+            >
+              <option value="">{t.assignmentsPickSubject}</option>
+              {catalog.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-[9rem] flex-1">
+            <Select
+              name="assign_group"
+              value={row.group}
+              onChange={(e) => setRow(i, { group: e.target.value })}
+            >
+              <option value="">{t.assignmentsPickGroup}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </Select>
+          </div>
+          {rows.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => setRows((prev) => prev.filter((_, k) => k !== i))}
+              className="rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200"
+            >
+              {t.removeSubjectRow}
+            </button>
+          ) : null}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => setRows((prev) => [...prev, { catalog: "", group: "" }])}
+        className="rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200"
+      >
+        + {t.addSubjectRow}
+      </button>
+      {/* Предупреждение, а не запрет: учителя без предмета заводить можно.
+          Молчит, если предметы у него уже есть: тогда пустой блок означает
+          «ничего не добавляю», а не «останется без уроков». */}
+      {!anyComplete && !hasExisting ? (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">{t.noSubjectWarning}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function AddTeacherForm({
   isPending,
   t,
+  catalog,
+  groups,
   onClose,
   onSubmit,
 }: {
   isPending: boolean;
   t: AdminDict;
+  catalog: Array<{ id: string; name: string }>;
+  groups: Array<{ id: string; name: string }>;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
 }) {
@@ -517,6 +683,9 @@ function AddTeacherForm({
           </button>
         </div>
       </Field>
+      <Field label={t.fieldTeacherPhone}><Input name="phone" type="tel" placeholder="+998 90 123-45-67" /></Field>
+      <Field label={t.fieldTeacherBio}><Input name="bio" placeholder="" /></Field>
+      <SubjectAssignmentRows t={t} catalog={catalog} groups={groups} />
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">{t.cancelBtn}</button>
         <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
