@@ -12,10 +12,19 @@
  *
  * ДЕМО-ВХОД. 10.08.2026 прежний демо-вход был удалён как дырявый (три
  * зашитых номера, общий пароль открытым текстом, непроверяемый код).
- * 18.08.2026 он вернулся по-другому: сервер входит сам и отдаёт пару
- * токенов на час, привязанную к аренде места. С 23.08.2026 ключ этой
- * аренды сохраняется — он же признак «мы в демо», по которому разделы без
- * настоящих данных показывают выдуманные (см. demoOr).
+ * 18.08.2026 он вернулся по-другому: сервер входил сам и отдавал пару
+ * токенов на час, привязанную к аренде места.
+ *
+ * 29.08.2026 ОН ПЕРЕСТАЛ БЫТЬ ВХОДОМ ВОВСЕ. Кнопка «Демо» больше не берёт
+ * место в demo_leases, не зовёт claim_demo_slot и не заводит сессию
+ * Supabase — она включает локальный признак показа, и всё содержимое
+ * разделов даёт слой заготовок (см. DemoSessionContext). Показ не зависит
+ * ни от сети, ни от базы, ни от свободного места.
+ *
+ * Маршрут /api/demo/claim-parent, функция claim_demo_slot и таблица
+ * demo_leases остались в базе НЕТРОНУТЫМИ: на них держится демо-вход
+ * учеников и учителей в вебе. Отсюда их просто больше не зовут. Родитель
+ * Исмаилов и ученик Шерзод в базе тоже остались — они нужны демо-школе.
  *
  * Поле isDemo в ЭТОМ состоянии осталось константой false и признаком не
  * является — на него завязан только RootNavigator. Настоящий признак живёт
@@ -32,18 +41,17 @@
  * запрашивается, и если она жива — сразу фаза app (или выбор ребёнка, если
  * детей несколько).
  *
- * ДЕМО НЕ ВОССТАНАВЛИВАЕТСЯ. Ключ аренды демо-места лежит в том же
- * хранилище и тоже переживает перезапуск, а сама аренда — нет: сервер
- * отдаёт место на час и может передать его другому. Поэтому решение
- * принимается не по ключу, а по школе: getParentContext отдаёт
- * schoolIsDemo, и родителя ДЕМО-школы мы в приложение молча не пускаем —
- * он проходит демо-вход заново и получает свежую аренду. Настоящий
- * родитель восстанавливается всегда.
+ * ПОКАЗ ВОССТАНАВЛИВАЕТСЯ (29.08.2026). Раньше — нет, и по делу: ключ
+ * аренды перезапуск переживал, а сама аренда нет, поэтому родителя
+ * ДЕМО-школы в приложение молча не пускали. Проверка ctx.schoolIsDemo
+ * ниже осталась и продолжает беречь настоящий вход. Но аренды больше нет
+ * вовсе: признак локальный, и решение по нему принимается ДО и ВМЕСТО
+ * любого обращения к базе. Настоящий родитель восстанавливается как
+ * раньше, по живой сессии Supabase.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { getChildren, DEFAULT_CHILD_INDEX } from "../data";
+import { getChildren, defaultChildId, DEFAULT_CHILD_INDEX } from "../data";
 import { getSupabase } from "../lib/supabase";
-import { claimDemoParent } from "../lib/demoApi";
 import { NotParentError } from "../lib/auth";
 import { PhoneLoginFailure, requestPhoneCode, verifyPhoneCode, type PhoneLoginError } from "../lib/parentPhoneLogin";
 import { GoogleLoginFailure, loginParentWithGoogle, type GoogleLoginError } from "../lib/parentGoogleLogin";
@@ -184,12 +192,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const { data: parentData, refresh: refreshParentData, selectChild: selectParentChild } = useParentData();
-  // 23.08.2026. Ключ аренды демо-места приходил из claimDemoParent() и
-  // ВЫБРАСЫВАЛСЯ: продление не шло, и слот отваливался посреди показа. Теперь
-  // он сохраняется — это же и есть признак «вошли через кнопку Демо», по
-  // которому разделы без настоящих данных показывают выдуманные. Поведение
-  // самого входа не меняется: тот же слот, те же токены, те же экраны.
-  const { setDemoSession, clearDemoSession } = useDemoSession();
+  // Показ. enterDemo() пишет локальный ключ и ничего больше — ни сети, ни
+  // базы. demoActive и demoReady нужны восстановлению входа ниже: «идёт ли
+  // показ» и «прочитан ли уже ключ с диска».
+  const { enterDemo, clearDemoSession, isDemo: demoActive, demoReady } = useDemoSession();
   // Тот же приём, что и stateRef — verifyCode() читает это ПОСЛЕ await
   // refreshParentData(), поэтому нужен самый свежий parentData, а не тот,
   // что был захвачен замыканием при последнем создании useCallback.
@@ -215,6 +221,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const requestBusyRef = useRef(false);
   const clearDemoSessionRef = useRef(clearDemoSession);
   clearDemoSessionRef.current = clearDemoSession;
+  // Подписка на SIGNED_OUT создаётся один раз, и замыкание в ней навсегда
+  // запомнило бы demoActive первого рендера. Ref читается свежим.
+  const demoActiveRef = useRef(demoActive);
+  demoActiveRef.current = demoActive;
 
   // Сессия могла кончиться не по нашей воле: её закрыли с другого устройства
   // на экране «Активные сессии» (миграция 199 удаляет строку auth.sessions
@@ -228,6 +238,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data } = getSupabase().auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
+      // 29.08.2026. Показ больше не держится на сессии Supabase — войти в
+      // него можно вовсе без неё. Значит SIGNED_OUT никогда не про него, а
+      // погасить его мог бы: хвост signOut() настоящего родителя прилетает
+      // асинхронно и успел бы застать уже начатую демонстрацию.
+      if (demoActiveRef.current) return;
       // Вход через Google сам гасит промежуточную сессию Google посреди пути
       // (см. lib/parentGoogleLogin.ts, шаг 5). Это НЕ конец сессии родителя, и
       // сбрасывать состояние здесь нельзя — иначе человека выкинет на
@@ -261,8 +276,28 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
    */
   const restoreStartedRef = useRef(false);
   useEffect(() => {
+    // Пока локальный признак показа читается с диска, решать нечего: показ
+    // обязан перебивать восстановление настоящей сессии, а узнать о нём мы
+    // можем только после чтения. Флаг выставляется в любом случае, включая
+    // сбой хранилища, — вечного ожидания здесь нет.
+    if (!demoReady) return;
     if (restoreStartedRef.current) return;
     restoreStartedRef.current = true;
+    // ПОКАЗ ПЕРЕЖИЛ ПЕРЕЗАПУСК. В базу в этой ветке не идём вовсе — ни за
+    // сессией, ни за родителем. Дети берутся из заготовок: настоящих в слое
+    // данных нет, пока не было настоящего входа.
+    if (demoActive) {
+      const kids = getChildren();
+      setState((s) => ({
+        ...s,
+        restoring: false,
+        phase: "app",
+        kidsCount: kids.length,
+        authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? DEFAULT_CHILD_INDEX,
+        currentChildId: defaultChildId(),
+      }));
+      return;
+    }
     let cancelled = false;
     const finish = () => {
       if (!cancelled) setState((s) => (s.restoring ? { ...s, restoring: false } : s));
@@ -305,7 +340,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [refreshParentData]);
+  }, [refreshParentData, demoReady, demoActive]);
 
   const setPhase = useCallback((next: AuthPhase) => {
     setState((s) => ({ ...s, phase: next }));
@@ -503,62 +538,46 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   }, [refreshParentData, clearDemoSession]);
 
   /**
-   * Демо-вход родителем.
+   * Включение показа. С 29.08.2026 — БЕЗ БАЗЫ И БЕЗ СЕТИ.
    *
-   * Слот берёт та же серверная функция claim_demo_slot, что и кнопка «Демо» на
-   * вебе; отличие ровно одно — куда положить сессию. Сервер входит сам и
-   * отдаёт токены, приложение кладёт их через setSession.
+   * Было: claimDemoParent() брал место в demo_leases, сервер входил
+   * настоящим родителем демо-школы и отдавал пару токенов, приложение
+   * клало их через setSession, а ключ аренды становился признаком показа.
    *
-   * Хвост после успеха тот же, что у входа через Google и по коду: перечитать
-   * детей и выбрать фазу. Дублировать его нельзя, поэтому шаги те же самые.
+   * Стало: один локальный ключ. Содержимое разделов целиком из заготовок.
    *
-   * Защиту одной сессии не задевает: демо-вход не регистрируется в
-   * user_sessions — как и на вебе.
+   * ВЫБОРА РЕБЁНКА В ЭТОЙ ВЕТКЕ НЕТ, и это не потеря: «picker» она не
+   * возвращала и раньше — у демо-родителя в базе ребёнок один, и условие
+   * kids.length <= 1 всегда уводило сразу в приложение. Переключатель детей
+   * внутри приложения работает как работал, теперь на трёх выдуманных.
+   *
+   * Тип возврата сохранён намеренно: экран входа не тронут, он различает
+   * только «error» и всё остальное.
    */
   const signInAsDemo = useCallback(async (): Promise<"picker" | "app" | "error"> => {
     if (demoBusyRef.current) return "error";
     demoBusyRef.current = true;
     setState((s) => ({ ...s, demoBusy: true }));
     try {
-      const claimed = await claimDemoParent();
-      if (!claimed || "error" in claimed) {
-        console.error("[AuthSessionContext] демо-слот не выдан:", claimed && "error" in claimed ? claimed.error : "нет ответа");
-        setState((s) => ({ ...s, demoBusy: false }));
-        return "error";
-      }
-
-      const { error } = await getSupabase().auth.setSession({
-        access_token: claimed.access_token,
-        refresh_token: claimed.refresh_token,
-      });
-      if (error) {
-        console.error("[AuthSessionContext] setSession не принял токены демо:", error.message);
-        setState((s) => ({ ...s, demoBusy: false }));
-        return "error";
-      }
-
-      // Ключ аренды — до входа в приложение: разделы читают признак демо уже
-      // на первом кадре, и он должен быть выставлен раньше, чем phase="app".
-      await setDemoSession(claimed.session_token);
-
-      await refreshParentData();
-      const kids = parentDataRef.current?.children ?? [];
+      // Признак — до фазы app: разделы читают его уже на первом кадре, и
+      // выставлен он должен быть раньше, чем phase="app".
+      await enterDemo();
+      // Дети показа — из заготовок. REAL_CHILDREN пуст, пока настоящего
+      // входа не было, и getChildren() отдаёт выдуманную семью.
+      const kids = getChildren();
       setState((s) => ({
         ...s,
         demoBusy: false,
         kidsCount: kids.length,
-        authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? 0,
+        authSel: DEFAULT_SEL_BY_KIDS[kids.length] ?? DEFAULT_CHILD_INDEX,
+        phase: "app",
+        currentChildId: defaultChildId(),
       }));
-      if (kids.length <= 1) {
-        setState((s) => ({ ...s, phase: "app", currentChildId: kids[0]?.id ?? null }));
-        return "app";
-      }
-      setState((s) => ({ ...s, phase: "childPicker" }));
-      return "picker";
+      return "app";
     } finally {
       demoBusyRef.current = false;
     }
-  }, [refreshParentData, setDemoSession, clearDemoSession]);
+  }, [enterDemo]);
 
   const pickChildIndex = useCallback((i: number) => {
     setState((s) => ({ ...s, authSel: i }));
