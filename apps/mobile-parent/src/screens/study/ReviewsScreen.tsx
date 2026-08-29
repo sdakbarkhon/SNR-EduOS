@@ -29,7 +29,9 @@ import {
   InnerHeader,
   LoadingBlock,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getSubject, getTeacherReviews } from "../../data";
 import { useAppLocale } from "../../i18n";
 
 /** Цвет предмета из справочника; если его нет — нейтральный акцент. */
@@ -42,13 +44,26 @@ export function ReviewsScreen() {
   const { d, locale } = useAppLocale();
   const t = d.parentApp.reviewsScreen;
   const pa = d.parentApp;
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const sc = d.parentApp.showcase;
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const state = useChildQuery<ChildTeacherReview[]>(
-    childId,
+    realChildId,
     (db, id) => getChildTeacherReviews(db, id),
   );
+
+  // Витрина: три группы макета (сегодня / на этой неделе / ранее). Порядок
+  // и состав — из заготовки, она снята с REVS макета построчно.
+  const витрина = getTeacherReviews(locale);
+  const группы = [
+    { key: "t" as const, title: sc.groupToday },
+    { key: "w" as const, title: sc.groupThisWeek },
+    { key: "e" as const, title: sc.groupEarlier },
+  ]
+    .map((g) => ({ ...g, rows: витрина.filter((r) => r.group === g.key) }))
+    .filter((g) => g.rows.length > 0);
 
   const rows = state.data ?? [];
 
@@ -69,11 +84,81 @@ export function ReviewsScreen() {
           />
         ) : null}
 
-        <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, lineHeight: 16, color: tokens.ink3, paddingHorizontal: 2 }}>
-          {t.hint}
-        </Text>
+        {showcase ? null : (
+          <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, lineHeight: 16, color: tokens.ink3, paddingHorizontal: 2 }}>
+            {t.hint}
+          </Text>
+        )}
 
-        {childLoading || state.loading ? (
+        {showcase ? (
+          группы.map((g) => (
+            <View key={g.key} style={{ gap: 10 }}>
+              <Text
+                style={{
+                  fontFamily: fonts.manrope800,
+                  fontSize: 10.5,
+                  letterSpacing: 10.5 * 0.08,
+                  color: tokens.ink3,
+                  paddingHorizontal: 2,
+                }}
+              >
+                {g.title}
+              </Text>
+              {g.rows.map((r, i) => {
+                const sb = getSubject(r.subject_id);
+                const инициалы = r.teacher_name
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((w) => w.charAt(0).toUpperCase())
+                  .join("");
+                return (
+                  <GlassCard key={`${g.key}-${i}`} radius={18} contentStyle={{ padding: 14, gap: 9 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 17,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: sb.color,
+                        }}
+                      >
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: "#FFFFFF" }}>
+                          {инициалы}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                          {r.teacher_name}
+                        </Text>
+                        <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 10, color: sb.text_color }}>
+                          {sb.name}
+                        </Text>
+                      </View>
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                        {r.time_label}
+                      </Text>
+                    </View>
+
+                    <Text style={{ fontFamily: fonts.manrope600, fontSize: 12, lineHeight: 18, color: tokens.ink1 }}>
+                      {r.text}
+                    </Text>
+
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink3 }}>
+                        {`♥ ${r.likes}`}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.accent }}>
+                        {sc.reply}
+                      </Text>
+                    </View>
+                  </GlassCard>
+                );
+              })}
+            </View>
+          ))
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

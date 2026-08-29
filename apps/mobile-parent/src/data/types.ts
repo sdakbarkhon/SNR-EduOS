@@ -113,6 +113,21 @@ export interface SubjectRow {
   teacher_name: string;       // tch
 }
 
+/**
+ * Освоение темы (TOPICS макета, 3267–3273).
+ *
+ * Возвращён 29.08.2026 вместе с показом без базы. Удалён был 14.08, когда
+ * «Освоение тем» перешло на расчёт по журналу: два источника рядом были
+ * ни к чему. Теперь показу считать не из чего, и заготовка снова нужна —
+ * но только ему: настоящий родитель по-прежнему видит расчёт.
+ */
+export interface TopicMasteryRow {
+  subject_id: BaseSubjectKey;
+  title: string;
+  mastery_pct: number;
+  meta_label: string;         // «8 уроков · 6 заданий»
+}
+
 /** Учитель (teachers) — профиль dteach (TEACHERS.math). */
 export interface TeacherProfileRow {
   full_name: string;

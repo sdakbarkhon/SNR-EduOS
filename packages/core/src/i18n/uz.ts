@@ -3449,6 +3449,51 @@ export const uz: Dictionary = {
       axisIndependence: "Mustaq.",
       axisTeamwork: "Jamoa",
     },
+    /**
+     * ПОДПИСИ ВИТРИНЫ — шести экранов учёбы, собранных по макету.
+     *
+     * Отдельной секцией, потому что это подписи ровно тех блоков, которых у
+     * настоящего родителя нет: они появляются только в показе. Держать их
+     * вперемешку с подписями настоящих экранов значило бы каждый раз гадать,
+     * кому какая принадлежит.
+     *
+     * САМО СОДЕРЖИМОЕ (названия тем, тексты отзывов, реплики помощника) сюда
+     * НЕ попадает — оно живёт рядом с заготовками, в
+     * apps/mobile-parent/src/data/i18n.ts. Здесь только рамка.
+     */
+    showcase: {
+      atSchoolNow: "{name} maktabda",
+      // Род в узбекском не выражается — плейсхолдера {suf} здесь нет, и
+      // подстановка суффикса просто не находит, что заменить.
+      arrivedAt: "{time} da keldi · {entry}",
+      mainEntrance: "asosiy kirish",
+      lessonsOf: "{total} tadan {done} dars",
+      lessonRunning: "{n}-dars hozir ketmoqda, yana {ahead} ta oldinda",
+      nowRunning: "Hozir ketmoqda",
+      presentCap: "Qatnashgan",
+      excusedCap: "Uzrli sabab",
+      unexcusedCap: "Sababsiz",
+      mealsMenu: "Menyu: {menu}",
+      mealsBalance: "Ovqatlanish balansi: {sum}",
+      subjectsCount: "{n} ta fan",
+      avgGrade: "O'rtacha ball {avg}",
+      currentPerformanceCap: "JORIY O'ZLASHTIRISH",
+      teacherCap: "O'QITUVCHI",
+      lastWorkCap: "OXIRGI ISH",
+      upcomingTestCap: "YAQINLASHAYOTGAN TEST",
+      teacherCommentCap: "O'QITUVCHI IZOHI",
+      assistantRecommendations: "EduOS Assistant tavsiyalari",
+      groupToday: "BUGUN",
+      groupThisWeek: "SHU HAFTA",
+      groupEarlier: "OLDINROQ",
+      reply: "Javob berish",
+      overallIndexCap: "UMUMIY RIVOJLANISH INDEKSI",
+      topicsInPlan: "O'quv rejasida {n} ta mavzu",
+      topicsMastered: "{n} tasi 70% va undan yuqori",
+      topicsNeedAttention: "{n} ta mavzu e'tibor talab qiladi — ro'yxatda belgilangan",
+      needsAttention: "E'tibor talab qiladi",
+      allChip: "Barchasi",
+    },
     pay: {
       autopay: "Avtoto'lov",
       on: "Yoqilgan",

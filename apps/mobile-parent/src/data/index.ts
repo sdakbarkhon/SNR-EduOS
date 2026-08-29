@@ -35,6 +35,7 @@ import type {
   ApplicationRow,
   AttendanceDayRow,
   AttendanceStats,
+  BaseSubjectKey,
   BillRow,
   ChildInfoRow,
   ParentProfileRow,
@@ -68,12 +69,18 @@ import {
 } from "./fixtures/family";
 import {
   SUBJECTS,
+  SUBJECT_DETAIL_MATH,
   SUBJECT_STATS,
+  TEACHER_PROFILE,
   TEACHER_REVIEWS,
+  TOPICS,
+  TOPIC_MASTERED_AT,
+  TOPIC_SUBJECT_ORDER,
 } from "./fixtures/subjects";
 import {
   DATE_PICKER_MONTHS,
   DATE_PICKER_QUICK_CHIPS,
+  DAY_STATUS,
   DEMO_TODAY,
   SCHEDULE_DAYS,
   SCHEDULE_ROOM_LABEL,
@@ -94,6 +101,7 @@ import {
   GRADES_ASSISTANT_NOTES,
   GRADES_SUMMARY,
   GRADE_PERIODS,
+  SKILLS_SCREEN,
   SKILLS_TAB,
 } from "./fixtures/grades";
 import {
@@ -401,8 +409,10 @@ export function getAttendanceLastDays(childId: string | undefined, locale: Local
 
 // ─── Оценки и успехи ─────────────────────────────────────────────────────────
 
-export function getTeacherReviews(): TeacherReviewRow[] {
-  return TEACHER_REVIEWS;
+/** Отзывы учителей витрины. Тексты — содержимое, поэтому через словарь
+ *  заготовок: на узбекском и английском показ читается целиком. */
+export function getTeacherReviews(locale: Locale): TeacherReviewRow[] {
+  return trDeep(TEACHER_REVIEWS, locale);
 }
 
 /** Вкладка «Навыки» витрины: плитки, чипы и радар. У настоящего родителя
@@ -412,6 +422,139 @@ export function getSkillsTab(locale: Locale) {
     tiles: trDeep(SKILLS_TAB.tiles, locale),
     chips: trDeep(SKILLS_TAB.chips, locale),
     radar: SKILLS_TAB.radar,
+  };
+}
+
+/**
+ * Экран 16 «Навыки и развитие» — витрина.
+ *
+ * Индекс 4.6 и 92% отдаются как есть: в макете они согласованы между собой
+ * (4.6 / 5.0 = 92%), но НЕ равны среднему шести осей (оно 4.4). Считать
+ * индекс самим значило бы придумать формулу, которой макет не задавал.
+ */
+export function getSkillsScreen(locale: Locale) {
+  return {
+    overall_label: SKILLS_SCREEN.overall_label,
+    overall_max_label: SKILLS_SCREEN.overall_max_label,
+    overall_pct: SKILLS_SCREEN.overall_pct,
+    overall_note: tr(SKILLS_SCREEN.overall_note, locale),
+    axes: SKILLS_SCREEN.axes.map((a) => ({ ...a, name: tr(a.name, locale) })),
+    radar: SKILLS_SCREEN.radar,
+    assistant_note: tr(SKILLS_SCREEN.assistant_note, locale),
+    practice: SKILLS_SCREEN.practice.map((p) => ({
+      ...p,
+      title: tr(p.title, locale),
+      meta_label: tr(p.meta_label, locale),
+    })),
+  };
+}
+
+/**
+ * Экран «Все предметы» — витрина.
+ *
+ * Количество и средний балл СЧИТАЮТСЯ по строкам, а не берутся подписью из
+ * макета. Там они совпали (5 предметов, среднее ровно 4.60), но копия числа
+ * рядом с данными — это будущее расхождение: правка одной оценки увела бы
+ * подпись в сторону, и никто бы не заметил.
+ */
+export function getAllSubjects(locale: Locale) {
+  const rows = trDeep(SUBJECT_STATS, locale);
+  const сумма = SUBJECT_STATS.reduce((a, r) => a + Number(r.grade_label), 0);
+  const среднее = SUBJECT_STATS.length ? сумма / SUBJECT_STATS.length : 0;
+  return {
+    rows,
+    count: SUBJECT_STATS.length,
+    average_label: среднее.toFixed(1),
+  };
+}
+
+/** Карточка предмета d11 — витрина. В макете заполнена только математика
+ *  (у остальных предметов карточки нет вовсе), поэтому возвращается она
+ *  же независимо от того, какой предмет открыли. Так и в макете. */
+export function getSubjectDetail(locale: Locale) {
+  return trDeep(SUBJECT_DETAIL_MATH, locale);
+}
+
+/** Профиль учителя — в макете заполнен только для математики. */
+export function getTeacherProfile(locale: Locale) {
+  return trDeep(TEACHER_PROFILE, locale);
+}
+
+/**
+ * Экран «Освоение тем» — витрина.
+ *
+ * ЧИСЛА ШАПКИ СЧИТАЮТСЯ, А НЕ БЕРУТСЯ ИЗ МАКЕТА. В макете там стоял
+ * статический текст «20 тем в учебном плане · 14 освоено на 70% и выше ·
+ * 6 тем требуют внимания» и шкала на 70%. Пересчёт по самим темам даёт
+ * 20 / 15 / 5 и среднее 80% — то есть подпись расходилась со списком прямо
+ * под ней, и любой, кто пересчитал бы помеченные строки, получил бы пять,
+ * а не шесть. Считаем по данным: это единственный способ, при котором
+ * шапка и список не могут разойтись.
+ *
+ * Шкала — среднее по выбранному предмету (или по всем, если выбран «Все»).
+ * Отдельно любопытно, что 70% макета — это в точности среднее английского;
+ * похоже, шкалу срисовали при выбранном английском, а подписи — со всего
+ * плана.
+ */
+export function getTopicMastery(locale: Locale, subjectId?: BaseSubjectKey | null) {
+  const выбранные = subjectId ? TOPICS.filter((t) => t.subject_id === subjectId) : TOPICS;
+  const освоено = выбранные.filter((t) => t.mastery_pct >= TOPIC_MASTERED_AT).length;
+  const сумма = выбранные.reduce((a, t) => a + t.mastery_pct, 0);
+  const groups = TOPIC_SUBJECT_ORDER
+    .filter((s) => !subjectId || s === subjectId)
+    .map((s) => ({
+      subject_id: s,
+      rows: выбранные
+        .filter((t) => t.subject_id === s)
+        .map((t) => ({
+          ...t,
+          title: tr(t.title, locale),
+          meta_label: tr(t.meta_label, locale),
+        })),
+    }))
+    .filter((g) => g.rows.length > 0);
+  return {
+    groups,
+    total: выбранные.length,
+    mastered: освоено,
+    need_attention: выбранные.length - освоено,
+    overall_pct: выбранные.length ? Math.round(сумма / выбранные.length) : 0,
+    mastered_at: TOPIC_MASTERED_AT,
+    subject_order: TOPIC_SUBJECT_ORDER,
+  };
+}
+
+/**
+ * Экран 6 «Статус дня» — витрина.
+ *
+ * Своих чисел почти нет: уроки дня, сколько прошло и какой идёт берутся у
+ * расписания (getDaySchedule на тот же день), время прихода — с главной,
+ * баланс — из кошелька. Поэтому «2 из 6» и «3-й урок идёт сейчас, впереди
+ * ещё 3» не записаны нигде подписью, а выводятся из самого списка: у
+ * ребёнка с другим набором уроков они пересчитаются сами.
+ *
+ * Уважительных и неуважительных пропусков ноль не потому, что так в
+ * макете, а потому, что у строки расписания вообще нет статуса пропуска —
+ * только «прошёл», «идёт», «впереди». Взяться единице неоткуда.
+ */
+export function getDayStatus(childId: string | undefined, locale: Locale) {
+  const lessons = getDaySchedule(DEMO_TODAY.weekday_index, childId);
+  const done = lessons.filter((l) => l.status === "done").length;
+  const liveIndex = lessons.findIndex((l) => l.status === "live");
+  return {
+    lessons,
+    total: lessons.length,
+    done,
+    excused: 0,
+    unexcused: 0,
+    live_number: liveIndex >= 0 ? liveIndex + 1 : null,
+    ahead: liveIndex >= 0 ? lessons.length - liveIndex - 1 : 0,
+    arrived_label: DASHBOARD_CHILD_STATUS.at_school_since_label,
+    meals: {
+      menu_label: tr(DAY_STATUS.menu_label, locale),
+      lunch_label: tr(DAY_STATUS.lunch_label, locale),
+      balance: getWalletBalance(),
+    },
   };
 }
 

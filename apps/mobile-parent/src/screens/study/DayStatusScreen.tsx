@@ -20,7 +20,7 @@
  */
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { formatTime, getChildDailyStatus, type ChildDailyStatus } from "@snr/core";
+import { format, formatTime, getChildDailyStatus, type ChildDailyStatus } from "@snr/core";
 import { AppBackground, fonts, useTheme } from "../../theme";
 import {
   BottomSheetFrame,
@@ -31,8 +31,16 @@ import {
   GlassCard,
   InnerHeader,
   LoadingBlock,
+  SectionHeader,
+  StatusChip,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { getDayStatus, getSubject } from "../../data";
+import { formatMoney } from "../../lib/format";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { MainStackParamList } from "../../navigation/routes";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { useAppLocale } from "../../i18n";
 
@@ -41,15 +49,23 @@ export function DayStatusScreen() {
   const { d, locale } = useAppLocale();
   const t = d.parentApp.dayStatusScreen;
   const pa = d.parentApp;
+  const sc = d.parentApp.showcase;
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const todayKey = useTashkentToday();
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const state = useChildQuery<ChildDailyStatus>(
-    childId,
+    realChildId,
     (db, id) => getChildDailyStatus(db, id, todayKey),
     [todayKey],
   );
+
+  // Витрина. Числа не записаны подписью: уроки дня берутся у расписания, а
+  // «сколько прошло», «какой идёт» и «сколько впереди» выводятся из самого
+  // списка — см. getDayStatus.
+  const витрина = getDayStatus(childId ?? undefined, locale);
   const day = state.data;
 
   const attendanceLabel = (s: string | null): string => {
@@ -82,7 +98,106 @@ export function DayStatusScreen() {
           />
         ) : null}
 
-        {childLoading || state.loading ? (
+        {showcase ? (
+          <>
+            {/* Строка присутствия (разметка 424). */}
+            <GlassCard radius={18} contentStyle={{ padding: 14, gap: 4 }}>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.status.green.text }}>
+                {format(sc.atSchoolNow, { name: child?.first_name ?? "" })}
+              </Text>
+              <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, color: tokens.ink2 }}>
+                {format(sc.arrivedAt, {
+                  suf: child?.is_female ? "а" : "",
+                  time: витрина.arrived_label,
+                  entry: sc.mainEntrance,
+                })}
+              </Text>
+            </GlassCard>
+
+            {/* Посещаемость за день (427–434). Ссылка ведёт на свой экран. */}
+            <SectionHeader
+              title={d.parentApp.scr.attendance}
+              linkLabel={`${d.parentApp.common.viewAll} ›`}
+              onPress={() => navigation.navigate("d14")}
+            />
+            <GlassCard radius={18} contentStyle={{ padding: 14, gap: 10 }}>
+              <Text style={{ fontFamily: fonts.unbounded600, fontSize: 17, color: tokens.ink1 }}>
+                {format(sc.lessonsOf, { done: String(витрина.done), total: String(витрина.total) })}
+              </Text>
+              {[
+                { label: sc.presentCap, n: витрина.done, tone: tokens.status.green.text },
+                { label: sc.excusedCap, n: витрина.excused, tone: tokens.status.orange.text },
+                { label: sc.unexcusedCap, n: витрина.unexcused, tone: tokens.status.red.text },
+              ].map((r) => (
+                <View key={r.label} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ flex: 1, fontFamily: fonts.manrope600, fontSize: 11, color: tokens.ink2 }}>
+                    {r.label}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: r.tone }}>{r.n}</Text>
+                </View>
+              ))}
+              {витрина.live_number ? (
+                <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                  {format(sc.lessonRunning, {
+                    n: String(витрина.live_number),
+                    ahead: String(витрина.ahead),
+                  })}
+                </Text>
+              ) : null}
+            </GlassCard>
+
+            {/* Уроки дня (437–444) — те же строки, что в расписании. */}
+            <SectionHeader title={d.parentApp.sched.today} />
+            <GlassCard radius={18} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
+              {витрина.lessons.map((l, i) => {
+                const sb = getSubject(l.subject_id);
+                return (
+                  <View
+                    key={`${l.slot_index}-${l.subject_id}`}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      paddingVertical: 10,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: "rgba(23,18,67,0.07)",
+                    }}
+                  >
+                    <Text style={{ width: 42, fontFamily: fonts.manrope800, fontSize: 11, color: tokens.ink2 }}>
+                      {l.starts_at}
+                    </Text>
+                    <View style={{ width: 4, height: 22, borderRadius: 2, backgroundColor: sb.color }} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                        {sb.name}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                        {l.room_label}
+                      </Text>
+                    </View>
+                    {l.status === "live" ? <StatusChip label={sc.nowRunning} family="violet" /> : null}
+                  </View>
+                );
+              })}
+            </GlassCard>
+
+            {/* Питание (446–449). */}
+            <SectionHeader title={d.parentApp.svc.meals} />
+            <GlassCard radius={18} contentStyle={{ padding: 14, gap: 5 }}>
+              <Text style={{ fontFamily: fonts.manrope700, fontSize: 11.5, color: tokens.ink1 }}>
+                {format(sc.mealsMenu, { menu: витрина.meals.menu_label })}
+              </Text>
+              <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, color: tokens.ink2 }}>
+                {витрина.meals.lunch_label}
+              </Text>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.green.text }}>
+                {format(sc.mealsBalance, {
+                  sum: `${formatMoney(витрина.meals.balance)} ${d.parentApp.pay.sum}`,
+                })}
+              </Text>
+            </GlassCard>
+          </>
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

@@ -558,7 +558,7 @@ export default function ProgressScreen() {
   // навыков, посчитанных из данных, пять, а у радара шесть осей — шестую
   // («Творчество», «Команда») взять неоткуда.
   const notes = getGradesAssistantNotes();
-  const reviews = getTeacherReviews();
+  const reviews = getTeacherReviews(locale);
   const bellCount = useUnreadNotifications();
 
   // Sparkline данные для карточки «Средний балл» — точки макета строка 286

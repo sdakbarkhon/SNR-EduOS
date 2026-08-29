@@ -40,8 +40,12 @@ import {
   LoadingBlock,
   ProgressBar,
   Ring,
+  StatusChip,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getSubject, getTopicMastery } from "../../data";
+import type { BaseSubjectKey } from "../../data";
 import { hexToRgbCsv } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -65,19 +69,29 @@ function SortFilterIcon({ color }: { color: string }) {
 
 export default function TopicMasteryScreen() {
   const { tokens } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const m2 = t.more2;
   const m4 = t.more4;
   const navigation = useNavigation<Nav>();
 
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const sc = t.showcase;
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("pct_desc");
+  // Фильтр витрины отдельный: у настоящей ветки он по названию предмета, а
+  // здесь по ключу заготовки. Одно поле на оба смысла рано или поздно
+  // разъехалось бы.
+  const [showcaseFilter, setShowcaseFilter] = useState<BaseSubjectKey | null>(null);
 
-  const state = useChildQuery(childId, (db, id) => getChildTopicMastery(db, id));
+  const state = useChildQuery(realChildId, (db, id) => getChildTopicMastery(db, id));
+
+  // Витрина. Числа шапки считает аксессор по самим темам — в макете там
+  // стоял статический текст, и он расходился со списком (см. журнал).
+  const витрина = getTopicMastery(locale, showcaseFilter);
   const topics = useMemo(() => state.data ?? [], [state.data]);
 
   const subjects = useMemo(
@@ -152,7 +166,120 @@ export default function TopicMasteryScreen() {
           />
         ) : null}
 
-        {childLoading || state.loading ? (
+        {showcase ? (
+          <>
+            {/* Чипы предметов: «Все» + пять предметов, порядок как в макете. */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+              <TopChip label={sc.allChip} active={showcaseFilter === null} onPress={() => setShowcaseFilter(null)} />
+              {витрина.subject_order.map((key) => (
+                <TopChip
+                  key={key}
+                  label={getSubject(key).name}
+                  active={showcaseFilter === key}
+                  color={getSubject(key).color}
+                  onPress={() => setShowcaseFilter(key)}
+                />
+              ))}
+            </ScrollView>
+
+            {/* Кольцо и три числа — всё посчитано по темам ниже. */}
+            <GlassCard radius={22} contentStyle={{ padding: 16, flexDirection: "row", alignItems: "center", gap: 16 }}>
+              <Ring
+                size={76}
+                viewBoxSize={88}
+                r={32}
+                thickness={9}
+                value={витрина.overall_pct}
+                color={tokens.accent}
+                trackColor="rgba(124,58,237,0.16)"
+                centerContent={
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 17, color: tokens.ink1 }}>
+                    {`${витрина.overall_pct}%`}
+                  </Text>
+                }
+              />
+              <View style={{ flex: 1, minWidth: 0, gap: 7 }}>
+                {[
+                  format(sc.topicsInPlan, { n: String(витрина.total) }),
+                  format(sc.topicsMastered, { n: String(витрина.mastered) }),
+                  format(sc.topicsNeedAttention, { n: String(витрина.need_attention) }),
+                ].map((line) => (
+                  <Text key={line} style={{ fontFamily: fonts.manrope600, fontSize: 10.5, lineHeight: 15, color: tokens.ink2 }}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            </GlassCard>
+
+            {/* Список: заголовок предмета, под ним его темы. */}
+            {витрина.groups.map((g) => {
+              const sb = getSubject(g.subject_id);
+              return (
+                <View key={g.subject_id} style={{ gap: 8 }}>
+                  <Text
+                    style={{
+                      fontFamily: fonts.manrope800,
+                      fontSize: 10.5,
+                      letterSpacing: 10.5 * 0.08,
+                      color: tokens.ink3,
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    {sb.name.toUpperCase()}
+                  </Text>
+                  {g.rows.map((row) => {
+                    const мало = row.mastery_pct < витрина.mastered_at;
+                    return (
+                      <GlassCard
+                        key={row.title}
+                        radius={18}
+                        contentStyle={{ padding: 13, flexDirection: "row", alignItems: "center", gap: 10 }}
+                      >
+                        <View
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 11,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: sb.color,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
+                            {sb.name.trim().charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                            <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                              {row.title}
+                            </Text>
+                            {мало ? <StatusChip label={sc.needsAttention} family="orange" /> : null}
+                          </View>
+                          <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                            {row.meta_label}
+                          </Text>
+                          <ProgressBar pct={row.mastery_pct / 100} height={5} fillGradient={sb.gradient} />
+                        </View>
+                        <Text
+                          style={{
+                            fontFamily: fonts.manrope800,
+                            fontSize: 12,
+                            minWidth: 36,
+                            textAlign: "right",
+                            color: мало ? tokens.status.orange.text : tokens.ink1,
+                          }}
+                        >
+                          {`${row.mastery_pct}%`}
+                        </Text>
+                      </GlassCard>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </>
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

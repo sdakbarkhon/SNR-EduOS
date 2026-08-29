@@ -3448,6 +3448,50 @@ export const en: Dictionary = {
       axisIndependence: "Indep.",
       axisTeamwork: "Team",
     },
+    /**
+     * ПОДПИСИ ВИТРИНЫ — шести экранов учёбы, собранных по макету.
+     *
+     * Отдельной секцией, потому что это подписи ровно тех блоков, которых у
+     * настоящего родителя нет: они появляются только в показе. Держать их
+     * вперемешку с подписями настоящих экранов значило бы каждый раз гадать,
+     * кому какая принадлежит.
+     *
+     * САМО СОДЕРЖИМОЕ (названия тем, тексты отзывов, реплики помощника) сюда
+     * НЕ попадает — оно живёт рядом с заготовками, в
+     * apps/mobile-parent/src/data/i18n.ts. Здесь только рамка.
+     */
+    showcase: {
+      atSchoolNow: "{name} is at school",
+      // Английский рода не различает — {suf} здесь нет, как и в узбекском.
+      arrivedAt: "Arrived at {time} · {entry}",
+      mainEntrance: "main entrance",
+      lessonsOf: "{done}/{total} lessons",
+      lessonRunning: "Lesson {n} is running, {ahead} more ahead",
+      nowRunning: "In progress",
+      presentCap: "Present",
+      excusedCap: "Excused",
+      unexcusedCap: "Unexcused",
+      mealsMenu: "Menu: {menu}",
+      mealsBalance: "Meal balance: {sum}",
+      subjectsCount: "{n} subjects",
+      avgGrade: "Average {avg}",
+      currentPerformanceCap: "CURRENT PERFORMANCE",
+      teacherCap: "TEACHER",
+      lastWorkCap: "LAST WORK",
+      upcomingTestCap: "UPCOMING TEST",
+      teacherCommentCap: "TEACHER'S COMMENT",
+      assistantRecommendations: "EduOS Assistant recommendations",
+      groupToday: "TODAY",
+      groupThisWeek: "THIS WEEK",
+      groupEarlier: "EARLIER",
+      reply: "Reply",
+      overallIndexCap: "OVERALL DEVELOPMENT INDEX",
+      topicsInPlan: "{n} topics in the plan",
+      topicsMastered: "{n} mastered at 70% or above",
+      topicsNeedAttention: "{n} topics need attention — flagged in the list",
+      needsAttention: "Needs attention",
+      allChip: "All",
+    },
     pay: {
       autopay: "Auto-pay",
       on: "On",

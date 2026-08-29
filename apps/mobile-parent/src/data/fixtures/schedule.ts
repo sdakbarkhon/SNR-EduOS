@@ -65,6 +65,27 @@ export const SCHEDULE_DAYS: ScheduleDayRow[] = [
 export const TODAY_DONE_LESSONS = 2;
 export const TODAY_LIVE_LESSON_INDEX = 2;
 
+/**
+ * Экран 6 «Статус дня» — то немногое, чего нет в других заготовках.
+ * Разметка 424 и 446–449 макета.
+ *
+ * Остальное на этом экране НЕ дублируется, а берётся у соседей, и это
+ * важнее самой заготовки:
+ *  · список уроков дня — getDaySchedule(DEMO_TODAY.weekday_index);
+ *  · сколько прошло и какой идёт — TODAY_DONE_LESSONS и
+ *    TODAY_LIVE_LESSON_INDEX выше, то есть те же, что у расписания;
+ *  · время прихода — DASHBOARD_CHILD_STATUS.at_school_since_label,
+ *    тот же «08:12», что на главной;
+ *  · баланс питания — WALLET_BALANCE, тот же, что в кошельке.
+ *
+ * Скопируй мы эти числа сюда — они разошлись бы при первой же правке
+ * соседнего экрана.
+ */
+export const DAY_STATUS = {
+  menu_label: "стандартное",
+  lunch_label: "Обед в 12:40 · столовая",
+} as const;
+
 /** Месяцы дейтпикера (DS_MONTHS). */
 export const DATE_PICKER_MONTHS: DatePickerMonth[] = [
   { name: "Июнь 2026", days: 30, offset: 0, gen_label: "июня" },

@@ -3586,6 +3586,55 @@ export interface Dictionary {
       axisIndependence: string;  // «Самост.»
       axisTeamwork: string;      // «Команда»
     };
+    /**
+     * ПОДПИСИ ВИТРИНЫ — шести экранов учёбы, собранных по макету.
+     *
+     * Отдельной секцией, потому что это подписи ровно тех блоков, которых у
+     * настоящего родителя нет: они появляются только в показе. Держать их
+     * вперемешку с подписями настоящих экранов значило бы каждый раз гадать,
+     * кому какая принадлежит.
+     *
+     * САМО СОДЕРЖИМОЕ (названия тем, тексты отзывов, реплики помощника) сюда
+     * НЕ попадает — оно живёт рядом с заготовками, в
+     * apps/mobile-parent/src/data/i18n.ts. Здесь только рамка.
+     */
+    showcase: {
+      // Экран 6 «Статус дня»
+      atSchoolNow: string;      // «{name} в школе»
+      arrivedAt: string;        // «Пришл{suf} в {time} · {entry}»
+      mainEntrance: string;
+      lessonsOf: string;        // «{done}/{total} уроков»
+      lessonRunning: string;    // «{n}-й урок идёт сейчас, впереди ещё {ahead}»
+      nowRunning: string;
+      presentCap: string;
+      excusedCap: string;
+      unexcusedCap: string;
+      mealsMenu: string;        // «Меню: {menu}»
+      mealsBalance: string;     // «Баланс питания: {sum}»
+      // Экран «Все предметы»
+      subjectsCount: string;    // «{n} предметов»
+      avgGrade: string;         // «Средний балл {avg}»
+      // Экран 11 «Детали предмета»
+      currentPerformanceCap: string;
+      teacherCap: string;
+      lastWorkCap: string;
+      upcomingTestCap: string;
+      teacherCommentCap: string;
+      assistantRecommendations: string;
+      // Экран «Отзывы учителей»
+      groupToday: string;
+      groupThisWeek: string;
+      groupEarlier: string;
+      reply: string;
+      // Экран 16 «Навыки»
+      overallIndexCap: string;
+      // Экран «Освоение тем»
+      topicsInPlan: string;         // «{n} тем в учебном плане»
+      topicsMastered: string;       // «{n} освоено на 70% и выше»
+      topicsNeedAttention: string;  // «{n} тем требуют внимания — они помечены в списке»
+      needsAttention: string;
+      allChip: string;
+    };
     pay: {
       autopay: string;
       on: string;

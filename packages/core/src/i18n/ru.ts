@@ -3470,6 +3470,49 @@ export const ru: Dictionary = {
       axisIndependence: "Самост.",
       axisTeamwork: "Команда",
     },
+    /**
+     * ПОДПИСИ ВИТРИНЫ — шести экранов учёбы, собранных по макету.
+     *
+     * Отдельной секцией, потому что это подписи ровно тех блоков, которых у
+     * настоящего родителя нет: они появляются только в показе. Держать их
+     * вперемешку с подписями настоящих экранов значило бы каждый раз гадать,
+     * кому какая принадлежит.
+     *
+     * САМО СОДЕРЖИМОЕ (названия тем, тексты отзывов, реплики помощника) сюда
+     * НЕ попадает — оно живёт рядом с заготовками, в
+     * apps/mobile-parent/src/data/i18n.ts. Здесь только рамка.
+     */
+    showcase: {
+      atSchoolNow: "{name} в школе",
+      arrivedAt: "Пришл{suf} в {time} · {entry}",
+      mainEntrance: "главный вход",
+      lessonsOf: "{done}/{total} уроков",
+      lessonRunning: "{n}-й урок идёт сейчас, впереди ещё {ahead}",
+      nowRunning: "Идёт сейчас",
+      presentCap: "Присутствовал",
+      excusedCap: "Уважительная причина",
+      unexcusedCap: "Без уважительной",
+      mealsMenu: "Меню: {menu}",
+      mealsBalance: "Баланс питания: {sum}",
+      subjectsCount: "{n} предметов",
+      avgGrade: "Средний балл {avg}",
+      currentPerformanceCap: "ТЕКУЩАЯ УСПЕВАЕМОСТЬ",
+      teacherCap: "УЧИТЕЛЬ",
+      lastWorkCap: "ПОСЛЕДНЯЯ РАБОТА",
+      upcomingTestCap: "ПРЕДСТОЯЩИЙ ТЕСТ",
+      teacherCommentCap: "КОММЕНТАРИЙ УЧИТЕЛЯ",
+      assistantRecommendations: "Рекомендации EduOS Assistant",
+      groupToday: "СЕГОДНЯ",
+      groupThisWeek: "НА ЭТОЙ НЕДЕЛЕ",
+      groupEarlier: "РАНЕЕ",
+      reply: "Ответить",
+      overallIndexCap: "ОБЩИЙ ИНДЕКС РАЗВИТИЯ",
+      topicsInPlan: "{n} тем в учебном плане",
+      topicsMastered: "{n} освоено на 70% и выше",
+      topicsNeedAttention: "{n} тем требуют внимания — они помечены в списке",
+      needsAttention: "Требует внимания",
+      allChip: "Все",
+    },
     pay: {
       autopay: "Автоплатёж",
       on: "Включен",
