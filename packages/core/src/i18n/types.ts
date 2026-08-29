@@ -3797,6 +3797,11 @@ export interface Dictionary {
       allowTitle: string;
       allowSub: string;
       sectionCap: string;
+      // Настоящее хранилище настроек (миграция 236).
+      saveFailed: string;
+      saveFailedSub: string;
+      loadFailed: string;
+      onlyFourNote: string;
     };
     wn: {
       thisVersion: string;

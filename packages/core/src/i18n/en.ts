@@ -3645,6 +3645,10 @@ export const en: Dictionary = {
       allowTitle: "Allow notifications",
       allowSub: "Master switch for all notifications",
       sectionCap: "NOTIFICATIONS",
+      saveFailed: "Could not save",
+      saveFailedSub: "The switch went back to its previous value. Check your connection and try again.",
+      loadFailed: "Could not load settings",
+      onlyFourNote: "Four kinds of notification work for now — the rest will appear once the school starts sending them.",
     },
     wn: {
       thisVersion: "In this version",

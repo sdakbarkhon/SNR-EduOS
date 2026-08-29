@@ -3646,6 +3646,10 @@ export const uz: Dictionary = {
       allowTitle: "Bildirishnomalarga ruxsat berish",
       allowSub: "Barcha bildirishnomalarning asosiy kaliti",
       sectionCap: "BILDIRISHNOMALAR",
+      saveFailed: "Saqlab bo'lmadi",
+      saveFailedSub: "O'zgartirgich avvalgi holatiga qaytdi. Aloqani tekshirib, qaytadan urinib ko'ring.",
+      loadFailed: "Sozlamalarni yuklab bo'lmadi",
+      onlyFourNote: "Hozircha to'rt turdagi bildirishnoma ishlaydi — qolganlari maktab ularni yubora boshlaganda paydo bo'ladi.",
     },
     wn: {
       thisVersion: "Ushbu versiyada",

@@ -37,9 +37,17 @@ import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
-import { GlassCard, InnerHeader, Toggle } from "../../ui";
-import { SoonNote } from "../../ui/notices";
-import type { Dictionary } from "@snr/core";
+import { ErrorBlock, GlassCard, InnerHeader, LoadingBlock, Toggle } from "../../ui";
+import {
+  getNotificationPrefs,
+  setNotificationPref,
+  NOTIFICATION_CATEGORIES,
+  type Dictionary,
+  type NotificationCategory,
+  type NotificationPrefs,
+} from "@snr/core";
+import { useAsyncData } from "../../hooks/useAsyncData";
+import { getSupabase } from "../../lib/supabase";
 import { getNotificationCategories } from "../../data";
 import type { NotificationCategoryRow } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -59,6 +67,28 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
  * «приход/уход», без «пропусков» и «опозданий» — теперь она живёт в
  * словаре (notif.attSub), а не переопределением в этом файле.
  */
+/**
+ * ЧТО ОСТАЛОСЬ НА ЭКРАНЕ И ПОЧЕМУ ИМЕННО ЭТО.
+ *
+ * Из девяти категорий заготовки остаются четыре — ровно те, у которых есть
+ * источник в базе и тумблер в notification_prefs (миграция 236). Убраны:
+ * рекламные рассылки (источника нет вовсе, чистая витрина), расписание
+ * (триггер убрала миграция 224), посещаемость, мероприятия и оплаты (ни
+ * одного уведомления эти подсистемы не пишут). Тумблер, который ничего не
+ * выключает, — украшение, а украшение здесь врёт.
+ *
+ * ЗАГОТОВКА НЕ ТРОНУТА. Из неё по-прежнему берутся значки, градиенты и
+ * порядок: убираем категории с ЭКРАНА, а не из заготовки. Соответствие
+ * «идентификатор заготовки → категория базы» живёт здесь, потому что это
+ * единственное место, где встречаются оба списка.
+ */
+const CATEGORY_BY_ROW_ID: Readonly<Record<string, NotificationCategory>> = {
+  grades: "grades",
+  hw: "homework",
+  ann: "announcements",
+  msg: "messages",
+};
+
 function categoryText(
   id: string,
   n: Dictionary["parentApp"]["notif"],
@@ -218,33 +248,63 @@ export default function NotifSettingsScreen() {
   const { d } = useAppLocale();
   const navigation = useNavigation<Nav>();
 
-  const { categories, master_default } = useMemo(() => getNotificationCategories(), []);
+  // Только те строки заготовки, у которых есть категория в базе. Заготовка
+  // при этом не меняется: берём из неё значок, градиент и порядок.
+  const categories = useMemo(
+    () => getNotificationCategories().categories.filter((c) => CATEGORY_BY_ROW_ID[c.id]),
+    [],
+  );
 
-  // Мастер-тумблер (строка 1284). При OFF — все 9 строк disabled+false в UI.
-  const [master, setMaster] = useState<boolean>(master_default);
+  // 29.08.2026 — НАСТОЯЩЕЕ ХРАНИЛИЩЕ. До этого дня тумблеры жили в useState:
+  // родитель выключал, выходил, возвращался — включено обратно. Экран не
+  // закрыт demoOr, то есть это видел настоящий человек, и это был
+  // единственный пункт профиля, который ему врал.
+  const state = useAsyncData<NotificationPrefs>(() => getNotificationPrefs(getSupabase()), []);
 
-  // Session-state значений по категориям. Persist-в-backend — этап данных
-  // (Supabase таблица notification_prefs), сигнатура читалки сохранится.
-  const [values, setValues] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    for (const c of categories) init[c.id] = c.enabled_by_default;
-    return init;
-  });
+  // Показанное значение = загруженное + ещё не доехавшая правка. Отдельного
+  // «состояния экрана» нет намеренно: два хранилища одного и того же
+  // однажды разойдутся, и человек увидит не то, что в базе.
+  const [правка, setПравка] = useState<Partial<Record<NotificationCategory, boolean>>>({});
+  const [занято, setЗанято] = useState(false);
+  const [сбой, setСбой] = useState(false);
 
-  // 15.08.2026 (заглушки). Тумблеры переключаются, но сохранять их некуда:
-  // push-уведомления к приложению не подключены, таблицы настроек в базе нет.
-  // Молча «запоминать» настройку до первой перезагрузки — обман; при первой
-  // же правке экран говорит, что значение не сохранится.
-  const [notSaved, setNotSaved] = useState(false);
+  const значение = (c: NotificationCategory): boolean =>
+    правка[c] ?? state.data?.[c] ?? true;
 
-  const setOne = (id: string, next: boolean) => {
-    setNotSaved(true);
-    setValues((prev) => ({ ...prev, [id]: next }));
+  /** Главный переключатель ВЫЧИСЛЯЕТСЯ, а не хранится: он включён, пока
+   *  включена хоть одна категория. Отдельное поле под него завело бы второе
+   *  состояние, которое рано или поздно разойдётся с четырьмя строками. */
+  const master = NOTIFICATION_CATEGORIES.some((c) => значение(c));
+
+  /** Сохранение с откатом. Не прошло — тумблер возвращается на место, и
+   *  экран говорит об этом. Делать вид, что переключилось, нельзя: человек
+   *  ушёл бы уверенным, что уведомления выключены. */
+  const сохранить = async (пары: Array<[NotificationCategory, boolean]>) => {
+    if (занято) return;
+    setЗанято(true);
+    setСбой(false);
+    setПравка((prev) => ({ ...prev, ...Object.fromEntries(пары) }));
+    try {
+      const db = getSupabase();
+      for (const [c, v] of пары) await setNotificationPref(db, c, v);
+      await state.refresh();
+      setПравка({});
+    } catch {
+      setПравка({});
+      setСбой(true);
+    } finally {
+      setЗанято(false);
+    }
   };
 
+  const setOne = (id: string, next: boolean) => {
+    const c = CATEGORY_BY_ROW_ID[id];
+    if (c) void сохранить([[c, next]]);
+  };
+
+  // Главный переключатель трогает все четыре разом.
   const setMasterExplained = (next: boolean) => {
-    setNotSaved(true);
-    setMaster(next);
+    void сохранить(NOTIFICATION_CATEGORIES.map((c) => [c, next] as [NotificationCategory, boolean]));
   };
 
   // Иконка-колокольчик мастер-карточки (макет строка 1282).
@@ -309,32 +369,67 @@ export default function NotifSettingsScreen() {
               {d.parentApp.notif.allowSub}
             </Text>
           </View>
-          <Toggle value={master} onValueChange={setMasterExplained} />
+          <Toggle value={master} onValueChange={setMasterExplained} disabled={занято} />
         </GlassCard>
 
-        {/* Объяснение появляется после первой правки — не пугаем заранее. */}
-        {notSaved ? <SoonNote text={d.parentApp.soon.notes.notifSave} /> : null}
+        {/* Сбой сохранения. Появляется только если запись не прошла —
+            заранее никого не пугаем. */}
+        {сбой ? (
+          <GlassCard radius={16} contentStyle={{ padding: 12 }}>
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.status.red.text }}>
+              {d.parentApp.notif.saveFailed}
+            </Text>
+            <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink2, marginTop: 2 }}>
+              {d.parentApp.notif.saveFailedSub}
+            </Text>
+          </GlassCard>
+        ) : null}
 
         {/* 4. Секционный хедер. */}
         <SectionCap label={d.parentApp.notif.sectionCap} />
 
-        {/* 5. Список категорий (9 строк) в одной GlassCard. */}
-        <GlassCard
-          radius={20}
-          contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}
+        {/* 5. Список категорий — ЧЕТЫРЕ строки в одной GlassCard. */}
+        {state.loading ? (
+          <LoadingBlock />
+        ) : state.error ? (
+          <ErrorBlock
+            title={d.parentApp.notif.loadFailed}
+            message={state.error.message}
+            retryLabel={d.common.retry}
+            onRetry={() => state.refresh()}
+          />
+        ) : (
+          <GlassCard
+            radius={20}
+            contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}
+          >
+            {categories.map((row, i) => (
+              <NotifSettingsRow
+                key={row.id}
+                row={row}
+                text={categoryText(row.id, d.parentApp.notif)}
+                value={значение(CATEGORY_BY_ROW_ID[row.id] as NotificationCategory)}
+                onChange={(next) => setOne(row.id, next)}
+                disabled={занято}
+                divider={i > 0}
+              />
+            ))}
+          </GlassCard>
+        )}
+
+        {/* Почему категорий четыре, а не девять. Без этой строки убранные
+            разделы выглядели бы пропажей. */}
+        <Text
+          style={{
+            fontFamily: fonts.manrope600,
+            fontSize: 9.5,
+            lineHeight: 14,
+            color: tokens.ink3,
+            paddingHorizontal: 4,
+          }}
         >
-          {categories.map((row, i) => (
-            <NotifSettingsRow
-              key={row.id}
-              row={row}
-              text={categoryText(row.id, d.parentApp.notif)}
-              value={master ? values[row.id] : false}
-              onChange={(next) => setOne(row.id, next)}
-              disabled={!master}
-              divider={i > 0}
-            />
-          ))}
-        </GlassCard>
+          {d.parentApp.notif.onlyFourNote}
+        </Text>
       </ScrollView>
     </AppBackground>
   );
