@@ -3703,6 +3703,14 @@ export interface Dictionary {
       // Заход 4: экран «Профиль-хаб» — подписи меню и версии.
       parentRole: string;         // «Родитель»
       parentDataOnlySchool: string;
+      // Профиль ребёнка на настоящих полях (миграция 232).
+      genderMale: string;
+      genderFemale: string;
+      studentPhone: string;
+      allergies: string;
+      medicalNotes: string;
+      phoneRow: string;
+      emailRow: string;
       docsSub: string;            // «Свидетельства, справки, ID»
       notifSetSub: string;        // «Оценки, задания, оплаты»
       payMethodsSub: string;      // «Карты и платёжные системы»

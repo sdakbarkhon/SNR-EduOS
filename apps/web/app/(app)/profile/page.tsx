@@ -22,12 +22,22 @@ export default async function ProfilePage() {
     // оставляем null — ProfileView создаст запись при первом сохранении
   }
 
-  // Куратор (по curator_id ученика)
+  // КЛАССНЫЙ РУКОВОДИТЕЛЬ — У ГРУППЫ, А НЕ У УЧЕНИКА (29.08.2026).
+  //
+  // Здесь стояло students.curator_id — колонка, которую не заполняет ни один
+  // экран админки: поля под неё нет ни в окне ученика, ни где-либо ещё.
+  // Значит строка «Классный руководитель» показывала прочерк ВСЕГДА, у всех
+  // учеников обеих школ. Решение заказчика: куратор один на класс и задаётся
+  // в форме группы — это groups.teacher_id.
+  //
+  // Второго запроса не понадобилось: getMyGroups уже вернул строки групп
+  // целиком (select *), teacher_id в них есть.
   let curatorName = "";
-  if (student.curator_id) {
+  const curatorId = groups.find((g) => g.teacher_id)?.teacher_id ?? null;
+  if (curatorId) {
     try {
       const teachers = await getTeachers(db);
-      const c = teachers.find((t) => t.id === student.curator_id);
+      const c = teachers.find((t) => t.id === curatorId);
       curatorName = c?.full_name ?? "";
     } catch {
       // ignore

@@ -933,25 +933,44 @@ export const getCharges = (db: Db, studentId?: string) => {
   return query.then(unwrap);
 };
 
-/** Профиль одного ребёнка для parent-контекста: ФИО, ДР, куратор, группы+учителя. */
+/**
+ * Профиль одного ребёнка для parent-контекста: ФИО, ДР, куратор, группы+учителя.
+ *
+ * 29.08.2026 — КУРАТОР ПЕРЕЕХАЛ НА ГРУППУ. Здесь стояло вложение
+ * `curator:teachers!curator_id(...)` — по колонке students.curator_id,
+ * которую НЕ ЗАПОЛНЯЕТ НИ ОДИН экран админки. Поле приходило null всегда,
+ * у всех, в обеих школах. Решение заказчика: куратор один на класс и
+ * задаётся в форме группы, то есть это groups.teacher_id.
+ *
+ * Второго запроса не понадобилось: учитель группы и так приезжал этим же
+ * select — им пользуется экран «Предметы и учителя». Куратор теперь просто
+ * читается оттуда, а мёртвое вложение убрано.
+ *
+ * Форма ответа не менялась: `curator` на месте, читателям переучиваться не
+ * нужно. Колонку students.curator_id не трогаем — её ещё читает
+ * замороженное ученическое приложение напрямую из строки students.
+ */
 export const getStudentById = async (db: Db, studentId: string) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (db as any)
     .from("students")
     .select(
       "id, full_name, birth_date, avatar_url, balance, status, created_at, " +
-      "curator:teachers!curator_id(id, full_name, phone), " +
       "student_groups(groups(id, name, subject, teacher:teachers!groups_teacher_id_fkey(id, full_name, phone)))",
     )
     .eq("id", studentId)
     .single();
   if (error) throw error;
-  return data as {
+  const row = data as {
     id: string; full_name: string; birth_date: string | null; avatar_url: string | null;
     balance: number; status: StudentStatus; created_at: string;
-    curator: { id: string; full_name: string; phone: string | null } | null;
     student_groups: Array<{ groups: { id: string; name: string; subject: string; teacher: { id: string; full_name: string; phone: string | null } | null } | null }>;
   };
+  // Куратор — учитель ПЕРВОЙ группы ученика. Групп у ученика в этой
+  // модели одна; find, а не [0], потому что элемент с groups: null в
+  // выборке встречается (см. вызовы в SubjectsScreen).
+  const curator = row.student_groups.find((sg) => sg.groups?.teacher)?.groups?.teacher ?? null;
+  return { ...row, curator };
 };
 
 // --- Объявления ---

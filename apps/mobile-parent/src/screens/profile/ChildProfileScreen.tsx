@@ -45,17 +45,35 @@
  * данные своего. Экран не закрыт demoOr — это видел настоящий человек.
  *
  * СТАЛО. При настоящем входе строка показывается ТОЛЬКО если у неё есть
- * источник в базе:
- *   дата рождения         students.birth_date       пусто — строки нет
- *   возраст               арифметика от даты        нет даты — строки нет
- *   школа                 schools.name              пусто — строки нет
- *   класс                 groups.name               есть всегда
- *   классный руководитель students.curator_id       пусто — строки нет
- *   № личного дела        колонки НЕТ               строки нет никогда
- *   контакты школы        колонки есть, все пустые  блока нет целиком
- *   аллергия, мед.        колонок НЕТ               блока нет целиком
+ * источник в базе. 29.08.2026 источников стало восемь вместо пяти —
+ * миграция 232 и окна админки закрыли то, чего в схеме не хватало:
+ *
+ *   дата рождения         students.birth_date            пусто — строки нет
+ *   возраст               арифметика от даты             нет даты — строки нет
+ *   пол                   students.gender          232   пусто — строки нет
+ *   телефон ученика       students.phone                 пусто — строки нет
+ *   школа                 schools.name                   пусто — строки нет
+ *   класс                 groups.name                    есть всегда
+ *   классный руководитель groups.teacher_id              пусто — строки нет
+ *   № личного дела        students.file_no         232   пусто — строки нет
+ *   контакты школы        schools.phone/email/address    пусто — блока нет
+ *   аллергия, мед.        student_medical          232   пусто — блока нет
+ *
+ * КУРАТОР ПЕРЕЕХАЛ. Читался из students.curator_id — колонки, которую не
+ * заполняет ни один экран админки, то есть строка не показывалась НИКОГДА.
+ * Решение заказчика: куратор один на класс, задаётся в форме группы
+ * (groups.teacher_id). Подмена сделана в общем слое, здесь читается то же
+ * поле summary.curatorName.
+ *
+ * МЕДИЦИНСКИЕ СВЕДЕНИЯ — из отдельной таблицы student_medical, и это не
+ * прихоть верстальщика: её видят только админ школы и родитель ребёнка.
+ * Запрос идёт под ключом родителя, служебного ключа в приложении нет вовсе
+ * — обойти правило доступа отсюда нечем. Учителю и самому ученику эта
+ * таблица вернёт ноль строк.
+ *
  * Прочерк вместо значения не ставим: пустая графа «Дата рождения» родителю
- * не нужна, а выдуманная — вредна.
+ * не нужна, а выдуманная — вредна. Пустой РАЗДЕЛ тоже не рисуем: заголовок
+ * «Контакты школы» над пустотой читается как поломка.
  *
  * Демо-гость видит ровно то, что видел: у него getChildInfo() находит свой
  * фикстурный профиль, и все шесть строк, контакты и медкарта на месте.
@@ -236,12 +254,44 @@ export default function ChildProfileScreen() {
         generalRows.push({ label: t.prof.age, value: pluralizeYears(years, locale) });
       }
     }
+    // Пол — подписью на языке интерфейса, а не «male». Значений в базе два,
+    // третьего быть не может: колонка под CHECK, а общий слой сузил тип.
+    if (realSummary?.gender) {
+      generalRows.push({
+        label: t.prof.gender,
+        value: realSummary.gender === "female" ? t.prof.genderFemale : t.prof.genderMale,
+      });
+    }
+    if (realSummary?.phone) {
+      generalRows.push({ label: t.prof.studentPhone, value: realSummary.phone });
+    }
     const schoolName = parentData?.schoolName ?? null;
     if (schoolName) generalRows.push({ label: t.prof.school, value: schoolName });
     generalRows.push({ label: t.prof.classRow, value: child?.class_name ?? "" });
     if (realSummary?.curatorName) {
       generalRows.push({ label: t.prof.curator, value: realSummary.curatorName });
     }
+    if (realSummary?.fileNo) {
+      generalRows.push({ label: t.prof.fileNo, value: realSummary.fileNo });
+    }
+  }
+
+  // Контакты школы настоящего родителя — из schools, а не из вёрстки.
+  // Пусто у всех трёх — раздела нет вовсе.
+  const contactRows: { label: string; value: string }[] = [];
+  if (!info) {
+    if (parentData?.schoolPhone) contactRows.push({ label: t.prof.phoneRow, value: parentData.schoolPhone });
+    if (parentData?.schoolEmail) contactRows.push({ label: t.prof.emailRow, value: parentData.schoolEmail });
+    if (parentData?.schoolAddress) contactRows.push({ label: t.prof.address, value: parentData.schoolAddress });
+  }
+
+  // Медицинские сведения. Карточка НЕ кликабельна, в отличие от демо: там
+  // клик ведёт на витрину медкарты (экран dmed под demoOr), а настоящему
+  // родителю показывать витрину вместо его данных нельзя.
+  const medicalRows: { label: string; value: string }[] = [];
+  if (!info) {
+    if (realSummary?.allergies) medicalRows.push({ label: t.prof.allergies, value: realSummary.allergies });
+    if (realSummary?.medicalNotes) medicalRows.push({ label: t.prof.medicalNotes, value: realSummary.medicalNotes });
   }
 
   // Активный таб — по макету (строка 1181) всегда «data» на входе; остальные
@@ -554,13 +604,13 @@ export default function ChildProfileScreen() {
           ))}
         </GlassCard>
 
-        {/* Блоки 7–10 — ТОЛЬКО ДЛЯ ДЕМО-ГОСТЯ.
+        {/* Блоки 7–10 — ТОЛЬКО ДЛЯ ДЕМО-ГОСТЯ, с зашитыми в вёрстку
+            значениями макета. Витрина; не трогаем ни строки.
 
-            Контакты школы захардкожены в макете (телефон, почта, адрес), а
-            колонки schools.phone/email/address у обеих школ пустые — показать
-            нечего. Аллергия и медицинские особенности — колонок под них нет
-            вовсе. Настоящему родителю оба раздела не рисуются: пустая графа
-            бесполезна, а заполненная выдумкой — опасна, речь о медицине.
+            29.08.2026: у настоящего родителя оба раздела теперь ТОЖЕ есть —
+            но собираются ниже и из базы (schools.phone/email/address и
+            student_medical, миграция 232). Раньше их не было потому, что
+            источников не существовало, а не потому, что родителю не надо.
 
             Условие — info, а не isRealFlow: info равен null ровно тогда, когда
             ребёнок настоящий (см. data/index.ts, childIndex). */}
@@ -608,6 +658,59 @@ export default function ChildProfileScreen() {
             <InfoRow label="Аллергия" value={info.allergies_label} divider={false} />
             <InfoRow label="Медицинские особенности" value={info.med_note_label} divider />
           </GlassCard>
+          </>
+        ) : null}
+
+        {/* Контакты школы НАСТОЯЩЕГО родителя. Раздел появляется целиком
+            только если школа заполнила хоть один контакт. */}
+        {contactRows.length > 0 ? (
+          <>
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 10.5,
+                letterSpacing: 10.5 * 0.08,
+                textTransform: "uppercase",
+                color: sectionCapsColor,
+              }}
+            >
+              {t.prof.schoolContacts}
+            </Text>
+            <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+              {contactRows.map((row, i) => (
+                <InfoRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  divider={i > 0}
+                  valueAlignRight={row.label === t.prof.address}
+                />
+              ))}
+            </GlassCard>
+          </>
+        ) : null}
+
+        {/* Медицинские сведения НАСТОЯЩЕГО ребёнка — student_medical.
+            Ничего не заполнено — раздела нет: пустая графа «Аллергия» хуже
+            отсутствующей, речь о медицине. */}
+        {medicalRows.length > 0 ? (
+          <>
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 10.5,
+                letterSpacing: 10.5 * 0.08,
+                textTransform: "uppercase",
+                color: sectionCapsColor,
+              }}
+            >
+              {t.prof.additional}
+            </Text>
+            <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+              {medicalRows.map((row, i) => (
+                <InfoRow key={row.label} label={row.label} value={row.value} divider={i > 0} valueAlignRight />
+              ))}
+            </GlassCard>
           </>
         ) : null}
       </ScrollView>

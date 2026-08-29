@@ -32,9 +32,49 @@ export type ParentChildSummary = {
    * заполнила, и показывать строку на экране нечем.
    */
   birthDate: string | null;
-  /** Классный руководитель (students.curator_id → teachers.full_name) или
-   *  null, если куратор не назначен. Та же история, что с датой. */
+  /**
+   * Классный руководитель или null.
+   *
+   * 29.08.2026 ПЕРЕЕЗД. Читалось из students.curator_id — колонки, которую
+   * НЕ ЗАПОЛНЯЕТ НИКТО: в админке поля под неё нет ни на одном экране.
+   * Строка «Классный руководитель» из-за этого не показывалась никогда, в
+   * какую бы школу ни зашёл родитель. Решение заказчика: куратор один на
+   * класс и задаётся в форме группы — это groups.teacher_id, и его админ
+   * действительно заполняет.
+   *
+   * Колонку students.curator_id не трогаем: её ещё читает замороженное
+   * ученическое приложение (apps/mobile), а ронять его правкой общего слоя
+   * нельзя.
+   */
   curatorName: string | null;
+  /**
+   * Пол ученика: students.gender, миграция 232. Значения «male»/«female»
+   * или null, если школа не заполнила.
+   *
+   * Сужается здесь, а не у читателя: в базе это text с CHECK, и типы
+   * знают о нём только как о строке. Всё, что не «male»/«female», —
+   * null: показывать «пол: xyz» хуже, чем не показывать строку вовсе.
+   */
+  gender: "male" | "female" | null;
+  /** Номер личного дела: students.file_no, миграция 232. */
+  fileNo: string | null;
+  /** Телефон самого ученика: students.phone. Колонка была всегда. */
+  phone: string | null;
+  /**
+   * Аллергия и медицинские особенности — public.student_medical,
+   * миграция 232, ОТДЕЛЬНАЯ таблица.
+   *
+   * Почему не колонки в students: их видят только админ школы и родитель
+   * этого ребёнка. Учитель читает students целиком, а построчные правила
+   * Postgres пускают строку со ВСЕМИ колонками — спрятать две из них от
+   * одной роли в Supabase нечем (все вошедшие делят роль authenticated).
+   * Поэтому отдельная таблица со своим правилом чтения.
+   *
+   * Запрос ниже ходит под ключом родителя, не служебным, — правило
+   * доступа обойти он не может: чужому ребёнку вернётся ноль строк.
+   */
+  allergies: string | null;
+  medicalNotes: string | null;
 };
 
 export type ParentContext = {
@@ -66,6 +106,20 @@ export type ParentContext = {
    */
   schoolName: string | null;
   /**
+   * Контакты школы — schools.phone / email / address.
+   *
+   * 29.08.2026: в профиле ребёнка эти три строки были вписаны в вёрстку
+   * («+998 71 200-40-40», «info@snr-school.uz», «г. Ташкент, ул.
+   * Мустакиллик, 45») — значения из макета, а не из базы. Колонки есть
+   * давно; заполняет их суперадмин в карточке школы. Пусто — строки нет.
+   *
+   * Едут тем же запросом, что название и признак демо: лишнего похода
+   * в базу за тремя подписями не заводим.
+   */
+  schoolPhone: string | null;
+  schoolEmail: string | null;
+  schoolAddress: string | null;
+  /**
    * Школа помечена как демонстрационная (schools.is_demo).
    *
    * Нужен мобильному приложению, чтобы НЕ восстанавливать демо-вход при
@@ -82,9 +136,26 @@ type StudentGroupsRow = {
   id: string;
   full_name: string;
   birth_date: string | null;
-  curator: { full_name: string } | null;
-  student_groups: { group_id: string; groups: { name: string } | null }[] | null;
+  gender: string | null;
+  file_no: string | null;
+  phone: string | null;
+  student_groups: {
+    group_id: string;
+    groups: { name: string; teacher: { full_name: string } | null } | null;
+  }[] | null;
 };
+
+/** Пол из базы — только два принимаемых значения, всё прочее null. */
+function readGender(raw: string | null | undefined): "male" | "female" | null {
+  return raw === "male" || raw === "female" ? raw : null;
+}
+
+/** Пустая строка — это отсутствие значения, а не значение. Иначе на
+ *  экране появляется графа с пустотой, а её быть не должно. */
+function textOrNull(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  return v.length > 0 ? v : null;
+}
 
 /** Родитель (текущая сессия) + его дети, в порядке привязки (parent_students.created_at ASC). */
 export async function getParentContext(db: Db): Promise<ParentContext | null> {
@@ -106,15 +177,24 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
 
   let schoolName: string | null = null;
   let schoolIsDemo = false;
+  let schoolPhone: string | null = null;
+  let schoolEmail: string | null = null;
+  let schoolAddress: string | null = null;
   if (parent.school_id) {
     const { data: school } = await db
       .from("schools")
-      .select("name, is_demo")
+      .select("name, is_demo, phone, email, address")
       .eq("id", parent.school_id)
       .maybeSingle();
-    const row = school as { name: string; is_demo: boolean | null } | null;
+    const row = school as {
+      name: string; is_demo: boolean | null;
+      phone: string | null; email: string | null; address: string | null;
+    } | null;
     schoolName = row?.name ?? null;
     schoolIsDemo = row?.is_demo === true;
+    schoolPhone = textOrNull(row?.phone);
+    schoolEmail = textOrNull(row?.email);
+    schoolAddress = textOrNull(row?.address);
   }
 
   const { data: links, error: linksErr } = await db
@@ -132,6 +212,9 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
       parentPhone: parent.phone,
       parentEmail,
       schoolName,
+      schoolPhone,
+      schoolEmail,
+      schoolAddress,
       schoolIsDemo,
       children: [],
     };
@@ -139,29 +222,53 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
 
   const { data: students, error: studentsErr } = await db
     .from("students")
-    // curator: имя связи обязательно — между students и teachers путей
-    // несколько, и PostgREST отказывается угадывать (PGRST201).
+    // Куратор берётся у ГРУППЫ (groups.teacher_id), а не у ученика:
+    // students.curator_id не заполняет ни один экран админки. Имя связи
+    // обязательно — между groups и teachers путей несколько, и PostgREST
+    // отказывается угадывать (PGRST201). Та же связь уже используется в
+    // DAILY_LESSON_SELECT выше, то есть проверена живьём.
     .select(
-      "id, full_name, birth_date,"
-      + " curator:teachers!students_curator_id_fkey(full_name),"
-      + " student_groups(group_id, groups(name))",
+      "id, full_name, birth_date, gender, file_no, phone,"
+      + " student_groups(group_id, groups(name,"
+      + " teacher:teachers!groups_teacher_id_fkey(full_name)))",
     )
     .in("id", studentIds);
   if (studentsErr) throw studentsErr;
 
+  // Медкарта — отдельным запросом к отдельной таблице (см. пояснение у
+  // полей allergies/medicalNotes). Ошибку НЕ бросаем: если правило
+  // доступа не пустит, профиль просто не покажет две строки, а весь
+  // контекст родителя из-за них падать не должен.
+  const { data: medical } = await db
+    .from("student_medical")
+    .select("student_id, allergies, medical_notes")
+    .in("student_id", studentIds);
+  const medById = new Map<string, { allergies: string | null; medical_notes: string | null }>(
+    ((medical ?? []) as unknown as Array<{
+      student_id: string; allergies: string | null; medical_notes: string | null;
+    }>).map((m) => [m.student_id, m]),
+  );
+
   const byId = new Map<string, ParentChildSummary>(
     // Через unknown: сгенерированный Database-тип не знает про алиас связи
-    // curator:teachers!..., и supabase-js типизирует ответ как ошибку строкой.
+    // teacher:teachers!groups_teacher_id_fkey, и supabase-js типизирует ответ
+    // как ошибку строкой.
     ((students ?? []) as unknown as StudentGroupsRow[]).map((s) => {
       const sg = (s.student_groups ?? [])[0] ?? null;
       const className = sg?.groups?.name ?? null;
+      const med = medById.get(s.id);
       return [s.id, {
         id: s.id,
         fullName: s.full_name,
         className,
         groupId: sg?.group_id ?? null,
         birthDate: s.birth_date ?? null,
-        curatorName: s.curator?.full_name ?? null,
+        curatorName: textOrNull(sg?.groups?.teacher?.full_name),
+        gender: readGender(s.gender),
+        fileNo: textOrNull(s.file_no),
+        phone: textOrNull(s.phone),
+        allergies: textOrNull(med?.allergies),
+        medicalNotes: textOrNull(med?.medical_notes),
       }];
     }),
   );
@@ -172,6 +279,9 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
     parentPhone: parent.phone,
     parentEmail,
     schoolName,
+    schoolPhone,
+    schoolEmail,
+    schoolAddress,
     schoolIsDemo,
     children: studentIds.map((id) => byId.get(id)).filter((c): c is ParentChildSummary => Boolean(c)),
   };
