@@ -448,6 +448,7 @@ export interface Dictionary {
       marks: string;
       profile: string;
       chats: string;
+      support: string;
     };
     title: string;
     navDashboard: string;
@@ -461,6 +462,19 @@ export interface Dictionary {
     navProfile: string;
     navChats: string;
     navRag: string;
+    navSupport: string;
+    // Раздел «Поддержка» — рабочий ящик админа, обращения родителей.
+    supportTitle: string;
+    supportSubtitle: string;
+    supportEmptyTitle: string;
+    supportEmptyText: string;
+    supportNoMessages: string;
+    supportPickThread: string;
+    supportReplyPlaceholder: string;
+    supportSendBtn: string;
+    supportSending: string;
+    supportRoleAdmin: string;
+    supportRoleParent: string;
     ragTitle: string;
     ragSubtitle: string;
     ragQueued: string;

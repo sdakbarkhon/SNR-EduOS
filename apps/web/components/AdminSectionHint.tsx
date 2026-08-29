@@ -36,6 +36,7 @@ const SECTIONS: ReadonlyArray<readonly [prefix: string, key: string]> = [
   ["/admin/marks", "marks"],
   ["/admin/profile", "profile"],
   ["/admin/chats", "chats"],
+  ["/admin/support", "support"],
 ];
 
 function sectionKeyFor(pathname: string): string | null {

@@ -376,3 +376,107 @@ export async function getSupportThread(db: Db): Promise<SupportThread | null> {
     })),
   };
 }
+
+/** Одно обращение в списке админского раздела «Поддержка». */
+export type SupportThreadSummary = {
+  id: string;
+  parentId: string | null;
+  /** Кто написал. Заголовок комнаты в базе — имя родителя, но берём его у
+   *  участника с ролью parent: заголовок проставляется один раз и после
+   *  переименования устареет. */
+  parentName: string;
+  updatedAt: string;
+  lastMessage: { body: string; created_at: string; senderId: string | null; senderName: string } | null;
+  unreadCount: number;
+  /** Все участники комнаты, включая других админов, — чтобы было видно, кто
+   *  ещё отвечает. Ответственного за обращение не заводим: решение заказчика. */
+  participants: ChatParticipantInfo[];
+};
+
+/**
+ * Обращения в поддержку для админского раздела.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНЫЙ ЗАПРОС, А НЕ ФИЛЬТР ПО getMyThreadSummaries. Тот читает
+ * ВСЕ треды, которые видит вошедший, и ВСЕ их сообщения разом. Админ школы
+ * видит все чаты школы (миграция 142) — в демо-школе это 195 комнат и 555
+ * сообщений, и раздел поддержки тянул бы их целиком ради двух строк.
+ * Здесь берутся только комнаты вида support и только их сообщения.
+ *
+ * Школу не проверяем руками: правило доступа уже сужает до своей
+ * (school_id = current_school_id() AND fn_is_admin()). Родителю этот запрос
+ * тоже отдаст ровно его собственную комнату — но у родителя свой путь,
+ * getSupportThread, и он честнее по имени.
+ */
+export async function getSupportThreadsForAdmin(db: Db): Promise<SupportThreadSummary[]> {
+  const sb = db as any;
+  const { data: { user } } = await db.auth.getUser();
+  const myId: string | null = user?.id ?? null;
+
+  const { data: threads, error: threadsErr } = await sb
+    .from("chat_threads")
+    .select("id, title, parent_id, updated_at")
+    .eq("kind", "support")
+    .order("updated_at", { ascending: false });
+  if (threadsErr) throw threadsErr;
+
+  const rows = (threads ?? []) as Array<{ id: string; title: string | null; parent_id: string | null; updated_at: string }>;
+  if (rows.length === 0) return [];
+  const ids = rows.map((t) => t.id);
+
+  const [{ data: participants, error: pErr }, { data: messages, error: mErr }, { data: readStates, error: rErr }] =
+    await Promise.all([
+      sb.from("chat_participants").select("thread_id, user_id, role_in_thread").in("thread_id", ids),
+      sb.from("chat_messages").select("id, thread_id, sender_id, body, created_at").in("thread_id", ids).order("created_at", { ascending: true }),
+      myId
+        ? sb.from("chat_read_state").select("thread_id, last_read_message_id").eq("user_id", myId).in("thread_id", ids)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+  if (pErr) throw pErr;
+  if (mErr) throw mErr;
+  if (rErr) throw rErr;
+
+  const partRows = (participants ?? []) as Array<{ thread_id: string; user_id: string; role_in_thread: ChatParticipantRole }>;
+  const nameByUserId = await resolveParticipantNames(sb, Array.from(new Set(partRows.map((p) => p.user_id))));
+
+  const byThread = new Map<string, ChatParticipantInfo[]>();
+  for (const p of partRows) {
+    const arr = byThread.get(p.thread_id) ?? [];
+    arr.push({ user_id: p.user_id, role_in_thread: p.role_in_thread, full_name: nameByUserId.get(p.user_id) ?? "" });
+    byThread.set(p.thread_id, arr);
+  }
+
+  const msgsByThread = new Map<string, Array<{ id: string; sender_id: string | null; body: string; created_at: string }>>();
+  for (const m of (messages ?? []) as any[]) {
+    const arr = msgsByThread.get(m.thread_id) ?? [];
+    arr.push(m);
+    msgsByThread.set(m.thread_id, arr);
+  }
+  const readByThread = new Map<string, string | null>();
+  for (const r of (readStates ?? []) as any[]) readByThread.set(r.thread_id, r.last_read_message_id);
+
+  return rows.map((t) => {
+    const msgs = msgsByThread.get(t.id) ?? [];
+    const last = msgs.length ? msgs[msgs.length - 1] : null;
+    const lastReadId = readByThread.get(t.id) ?? null;
+    const idx = lastReadId ? msgs.findIndex((m) => m.id === lastReadId) : -1;
+    const хвост = lastReadId && idx >= 0 ? msgs.slice(idx + 1) : msgs;
+    const parts = byThread.get(t.id) ?? [];
+    const parentPart = parts.find((p) => p.role_in_thread === "parent");
+    return {
+      id: t.id,
+      parentId: t.parent_id ?? null,
+      parentName: parentPart?.full_name || t.title || "",
+      updatedAt: t.updated_at,
+      lastMessage: last
+        ? {
+            body: last.body,
+            created_at: last.created_at,
+            senderId: last.sender_id,
+            senderName: last.sender_id ? nameByUserId.get(last.sender_id) ?? "" : "",
+          }
+        : null,
+      unreadCount: хвост.filter((m) => m.sender_id !== myId).length,
+      participants: parts,
+    };
+  });
+}
