@@ -197,6 +197,17 @@ export interface DatePickerMonth {
  */
 export type AttendanceCellCode = "e" | "p" | "u" | "n" | "w" | "f" | "t";
 
+/** Месяц календаря посещаемости в витрине (attCells макета, 3807–3828).
+ *  Возвращён 29.08.2026 вместе с заготовкой: показ снова без базы, и
+ *  фиксированный двухмесячный набор макета снова достижим. Настоящий
+ *  календарь по-прежнему строится на лету по видимому месяцу и этого типа
+ *  не касается. */
+export interface AttendanceMonthRow {
+  month_index: number;         // 1 = «Июль 2026», 0 = «Июнь 2026»
+  label: string;
+  cells: AttendanceCellCode[]; // 35 ячеек, Пн–Вс
+}
+
 /** Статистика экрана «Посещаемость» (разметка 593–595). */
 export interface AttendanceStats {
   attendance_pct: number;     // 96
@@ -581,12 +592,21 @@ export interface SearchResultRow {
 
 // ─── home / dashboard ────────────────────────────────────────────────────────
 
-/** Элемент ленты «Сегодня» Dashboard (C1). */
+/** Элемент ленты «Сегодня» Dashboard (C1), разметка 266–268 макета. */
 export interface DashboardFeedItem {
   title: string;
   subtitle: string;
   /** Плашка-оценка (5) или чип-текст («Срок завтра» / «Успешно»). */
-  badge: { kind: "grade"; value: number } | { kind: "chip"; label: string };
+  /** Тон чипа снят с макета: 249,115,22 — оранжевый, 16,185,129 — зелёный.
+   *  Имена совпадают с ключами tokens.status, экран ничего не выводит сам. */
+  badge:
+    | { kind: "grade"; value: number }
+    | { kind: "chip"; label: string; tone: "green" | "orange" };
+  /** Плитка слева: текстовый глиф («√x», «Aa») или ключ ICONS («food»).
+   *  В макете первые две строки — текст, третья — иконка питания. */
+  tile: { kind: "text"; label: string } | { kind: "icon"; icon: string };
+  gradient: Gradient;
+  /** Маршрут перехода — тот же, что в макете (goSubj / goHw / goMeals). */
   go: string;
 }
 

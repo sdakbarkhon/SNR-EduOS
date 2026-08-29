@@ -288,6 +288,45 @@ export const DEMO_TR: Record<string, Pair> = {
   "Чт": ["Pa", "Thu"],
   "Пт": ["Ju", "Fri"],
   "Сб": ["Sh", "Sat"],
+
+  // ── Посещаемость: месяцы календаря ───────────────────────────────────────
+  "Июнь 2026": ["2026-yil iyun", "June 2026"],
+  "Июль 2026": ["2026-yil iyul", "July 2026"],
+
+  // ── Посещаемость: последние дни ──────────────────────────────────────────
+  "Сегодня, 23 июля": ["Bugun, 23-iyul", "Today, 23 July"],
+  "Вчера, 22 июля": ["Kecha, 22-iyul", "Yesterday, 22 July"],
+  "Вторник, 21 июля": ["Seshanba, 21-iyul", "Tuesday, 21 July"],
+  "Вторник, 14 июля": ["Seshanba, 14-iyul", "Tuesday, 14 July"],
+  // Плейсхолдера {suf} в переводах нет намеренно: род в узбекском и
+  // английском не выражается, и подстановка суффикса просто не находит
+  // ничего. Порядок «сначала перевод, потом подстановка» — в аксессоре.
+  "Присутствует": ["Maktabda", "At school"],
+  "Присутствовал{suf}": ["Maktabda bo'lgan", "Was at school"],
+  "Отсутствовал{suf} без уважительной причины": ["Sababsiz kelmagan", "Absent without a valid reason"],
+  "Уважительная причина · справка врача": ["Uzrli sabab · shifokor ma'lumotnomasi", "Excused · doctor's note"],
+
+  // ── Успехи: вкладка «Навыки» ─────────────────────────────────────────────
+  "Знания": ["Bilim", "Knowledge"],
+  "Мышление": ["Tafakkur", "Thinking"],
+  "Творчество": ["Ijodkorlik", "Creativity"],
+  "Коммуникация": ["Muloqot", "Communication"],
+  "Логика": ["Mantiq", "Logic"],
+  "Дисциплина": ["Intizom", "Discipline"],
+  // Не «Creativity» второй раз: «Творчество» выше уже занято, а это другая
+  // ось профиля — про способ думать, а не про занятие.
+  "Креативность": ["Ijodiy fikrlash", "Creative thinking"],
+
+  // ── Главная: лента «Сегодня» и плитка питания ────────────────────────────
+  "Математика — оценка за контрольную": ["Matematika — nazorat ishi bahosi", "Maths — test grade"],
+  "Дроби и проценты · 10:42": ["Kasrlar va foizlar · 10:42", "Fractions and percentages · 10:42"],
+  "Английский язык — эссе «My Summer»": ["Ingliz tili — «My Summer» inshosi", "English — «My Summer» essay"],
+  "Домашнее задание": ["Uyga vazifa", "Homework"],
+  "Срок завтра": ["Muddati ertaga", "Due tomorrow"],
+  "Питание оплачено": ["Ovqatlanish to'langan", "Meals paid"],
+  "Обед получен в 12:40": ["Tushlik 12:40 da olindi", "Lunch collected at 12:40"],
+  "Успешно": ["Muvaffaqiyatli", "Done"],
+  "Оплачено до 31 июля": ["31-iyulgacha to'langan", "Paid through 31 July"],
 };
 
 /** Перевести одну строку. Нет перевода — остаётся русская. */

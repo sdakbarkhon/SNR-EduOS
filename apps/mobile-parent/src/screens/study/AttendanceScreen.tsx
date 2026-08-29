@@ -26,7 +26,11 @@
  * без month-фильтра — марки уже отсортированы marked_at desc), а не из
  * data/fixtures/attendance.ts. Идентичность (ChildSwitcherCard) и переклю-
  * чатель — тот же общий свитчер, что и в Шагах 1–2 (ParentDataContext).
- * Демо-флоу — вёрстка и фикстурные данные не тронуты ни строкой.
+ * Заход 2 витрины (29.08.2026): ветка заготовки ВЕРНУЛАСЬ. Она была
+ * удалена 14.08 вместе с демо-входом как недостижимая; показ снова идёт
+ * без базы — и снова нужен свой календарь. Настоящий поток не тронут:
+ * запрос, разбор записей и построение месяца на лету остались как были,
+ * ветка показа стоит рядом и включается только по признаку показа.
  * Календарь строится на лету по видимому {year,month} (не фиксированный
  * 2-месячный фикстурный массив) — см. buildRealMonthCells ниже; вперёд
  * дальше текущего (ташкентского) месяца не листаем.
@@ -63,8 +67,17 @@ import {
   GlassCard,
   InnerHeader,
   LoadingBlock,
+  type ChildPickerItem,
 } from "../../ui";
+import {
+  defaultChildId,
+  getAttendanceLastDays,
+  getAttendanceMonths,
+  getAttendanceStats,
+  getChildren,
+} from "../../data";
 import type { AttendanceCellCode, AttendanceDayRow, AttendanceStats } from "../../data";
+import { useDemoSession } from "../../context/DemoSessionContext";
 import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { addDays } from "../../lib/tashkent";
@@ -361,16 +374,46 @@ export default function AttendanceScreen() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // 14.08.2026: идентичность и переключатель — из общего useChildScope, того
-  // же, что у остальных экранов на настоящих данных. Прежняя ветка «нет
-  // родителя → фикстурный ребёнок» убрана: демо-вход удалён (см. шапку
-  // AuthSessionContext), и подставлять выдуманного ребёнка стало нечему.
-  const { childId: selectedChildId, child: identityChild, pickerItems, selectChild } = useChildScope();
+  // Признак показа — тот же, которым пользуется demoOr.
+  const { isDemo: showcase } = useDemoSession();
+
+  // Идентичность и переключатель — из общего useChildScope, того же, что у
+  // остальных экранов на настоящих данных. В показе родителя в слое данных
+  // нет вовсе (см. ParentDataContext), поэтому семья берётся из заготовок,
+  // а выбранный ребёнок живёт в локальном состоянии — ровно как на главной
+  // и в расписании.
+  const { childId: realChildId, child: realIdentityChild, pickerItems: realPickerItems, selectChild } = useChildScope();
+  const [fixtureChildId, setFixtureChildId] = useState<string | null>(defaultChildId());
+  const fixtureChildren = getChildren();
+  const selectedChildId = showcase ? fixtureChildId : realChildId;
+  const identityChild = showcase
+    ? (fixtureChildren.find((c) => c.id === fixtureChildId) ?? null)
+    : realIdentityChild;
+  const pickerItems: ChildPickerItem[] = showcase
+    ? fixtureChildren.map((k) => ({
+        id: k.id,
+        initials: k.first_name.slice(0, 1),
+        gradient: k.avatar_gradient,
+        ringColor: k.avatar_ring,
+        name: k.full_name,
+        classLabel: `${k.class_name} ${d.parentApp.grades.class}`,
+        // Чип статуса — с подписью, но без тона, как у настоящих детей в
+        // useChildScope. Выводить тон сравнением статуса с русской строкой
+        // («В школе» → зелёный, иначе серый) — тот же класс ошибки, что уже
+        // ловили на статусах уроков; заводить его заново в новом коде не
+        // станем. В макете на этом экране чипа у карточки нет вовсе.
+        statusLabel: k.status_chip,
+        statusTone: "gray" as const,
+      }))
+    : realPickerItems;
 
   // ── Посещаемость активного ребёнка: ОДИН запрос без month-фильтра
   // (throw-on-error getStudentAttendance, НЕ .catch(()=>[])).
   // Перезапрашивается при смене ребёнка. ──────────────────────────────────
-  const attendanceState = useChildQuery(selectedChildId, (db, id) =>
+  // В показе запрос не уходит вовсе: realChildId там null, и useChildQuery
+  // по null не стреляет. Передаём именно его, а не selectedChildId —
+  // иначе идентификатор выдуманного ребёнка ушёл бы в базу.
+  const attendanceState = useChildQuery(realChildId, (db, id) =>
     getStudentAttendance(db, undefined, id),
   );
 
@@ -439,13 +482,38 @@ export default function AttendanceScreen() {
       return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
     });
 
-  // Фикстурная ветка календаря (ATTENDANCE_MONTHS / ATTENDANCE_STATS /
-  // ATTENDANCE_LAST_DAYS) удалена 14.08.2026 вместе с демо-входом: она была
-  // недостижима, а держать рядом второй, выдуманный календарь незачем.
-  const monthLabel = realMonthLabel;
-  const calendarDaysFinal = realCells;
-  const goPrevMonth = goPrevMonthReal;
-  const goNextMonth = goNextMonthReal;
+  // ── Календарь показа: два готовых месяца макета, июль открыт первым.
+  // Листается между ними и не дальше — в макете месяцев ровно два, и
+  // придумывать третий было бы добавлением того, чего в макете нет.
+  // useMemo обязателен: аксессор пересобирает массив месяцев на каждый
+  // вызов, и без него новая ссылка приходила бы каждый кадр — а от неё
+  // зависят и fixtureCells, и calendarRows ниже. Пересчёт тридцати пяти
+  // ячеек на пустом месте.
+  const fixtureCalendar = useMemo(() => getAttendanceMonths(locale), [locale]);
+  const [fixtureMonth, setFixtureMonth] = useState(fixtureCalendar.default_month_index);
+  const fixtureMonthRow =
+    fixtureCalendar.months.find((m) => m.month_index === fixtureMonth) ?? fixtureCalendar.months[0];
+  // Формат ячейки — тот же, что у настоящего календаря: код + номер дня.
+  // Код 'e' — пустая клетка (отступ до 1-го числа и хвост месяца), номера
+  // у неё нет; остальные нумеруются подряд, как в attCells макета.
+  const fixtureCells = useMemo(() => {
+    let day = 0;
+    return fixtureMonthRow.cells.map((code) => {
+      if (code === "e") return { code, dayNumber: null };
+      day += 1;
+      return { code, dayNumber: day };
+    });
+  }, [fixtureMonthRow]);
+  const fixtureMonthIndexes = fixtureCalendar.months.map((m) => m.month_index);
+  const goPrevMonthFixture = () =>
+    setFixtureMonth((m) => (fixtureMonthIndexes.includes(m - 1) ? m - 1 : m));
+  const goNextMonthFixture = () =>
+    setFixtureMonth((m) => (fixtureMonthIndexes.includes(m + 1) ? m + 1 : m));
+
+  const monthLabel = showcase ? fixtureMonthRow.label : realMonthLabel;
+  const calendarDaysFinal = showcase ? fixtureCells : realCells;
+  const goPrevMonth = showcase ? goPrevMonthFixture : goPrevMonthReal;
+  const goNextMonth = showcase ? goNextMonthFixture : goNextMonthReal;
 
   // Долги, проход 2: число рядов — динамическое, не жёсткие 5. Демо-фикстура
   // (cells()) всегда даёт ровно 35 ячеек (5×7) — Math.ceil(35/7)=5, поведение
@@ -487,23 +555,54 @@ export default function AttendanceScreen() {
       };
     });
   }, [attendanceState.data, todayKey, yesterdayKey, locale, t.date.today, t.date.yesterday, STATUS_META]);
-  const lastDaysFinal = realLastDays;
+  // «Последние дни» показа — четыре записи макета, с подставленным
+  // гендерным суффиксом выбранного ребёнка.
+  const fixtureLastDays = useMemo(
+    () => getAttendanceLastDays(fixtureChildId ?? undefined, locale),
+    [fixtureChildId, locale],
+  );
+  const lastDaysFinal = showcase ? fixtureLastDays : realLastDays;
   // Тот же срез records, параллельно realLastDays — tone/badge по РЕАЛЬНОМУ
   // статусу записи, а не по её позиции в списке.
   const realLastDaysMeta = useMemo(
     () => attendanceState.data?.records.slice(0, 4).map((r) => STATUS_META[r.status]) ?? [],
     [attendanceState.data],
   );
+  // У витрины статуса-перечисления нет — есть готовая строка. Значок
+  // подбирается по порядку записей макета: присутствует, присутствовал,
+  // без уважительной, уважительная. Позиционно это верно ровно потому,
+  // что список фиксированный и лежит рядом; для настоящих данных так
+  // делать нельзя, и там значок берётся по статусу записи.
+  const fixtureLastDaysMeta = useMemo(
+    () => [
+      STATUS_META.present,
+      STATUS_META.present,
+      STATUS_META.absent_unexcused,
+      STATUS_META.absent_excused,
+    ],
+    [STATUS_META],
+  );
+  const lastDaysMetaFinal = showcase ? fixtureLastDaysMeta : realLastDaysMeta;
 
   // Реальная сводка — за ВСЮ историю (не только видимый месяц календаря),
-  // из того же ответа getStudentAttendance.stats.
-  const statsFinal: AttendanceStats | null = attendanceState.data
-    ? {
-        attendance_pct: attendanceState.data.stats.percentage,
-        excused_count: attendanceState.data.stats.excused,
-        unexcused_count: attendanceState.data.stats.unexcused,
-      }
-    : null;
+  // из того же ответа getStudentAttendance.stats. Сводка показа — три
+  // числа макета, пересчитывающие его же июльский календарь.
+  const statsFinal: AttendanceStats | null = showcase
+    ? getAttendanceStats()
+    : attendanceState.data
+      ? {
+          attendance_pct: attendanceState.data.stats.percentage,
+          excused_count: attendanceState.data.stats.excused,
+          unexcused_count: attendanceState.data.stats.unexcused,
+        }
+      : null;
+
+  // Гейты загрузки/ошибки/пустоты — только для настоящего входа. В показе
+  // запроса не было, и все три состояния к нему не относятся: без этого
+  // «нет записей» закрывало бы витрину целиком.
+  const gateLoading = !showcase && attendanceState.loading;
+  const gateError = showcase ? null : attendanceState.error;
+  const gateEmpty = !showcase && (attendanceState.data?.records.length ?? 0) === 0;
 
   return (
     <AppBackground>
@@ -545,16 +644,16 @@ export default function AttendanceScreen() {
             состояния, не заминаем сбой запроса пустым списком (история
             тихих RLS-пустот 75/76/77/82/126 — родитель получал 0 строк без
             ошибки). */}
-        {attendanceState.loading ? (
+        {gateLoading ? (
           <LoadingBlock />
-        ) : attendanceState.error ? (
+        ) : gateError ? (
           <ErrorBlock
             title={t.attend.loadError}
-            message={attendanceState.error.message}
+            message={gateError.message}
             retryLabel={d.common.retry}
             onRetry={() => attendanceState.refresh()}
           />
-        ) : (attendanceState.data?.records.length ?? 0) === 0 ? (
+        ) : gateEmpty ? (
           <EmptyBlock title={t.attend.empty} text={t.more4.attendanceNoRecords} />
         ) : (
           <>
@@ -647,7 +746,7 @@ export default function AttendanceScreen() {
             ) : (
               <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
                 {lastDaysFinal.map((row, i) => {
-                  const meta = realLastDaysMeta[i] ?? STATUS_META.absent_unexcused;
+                  const meta = lastDaysMetaFinal[i] ?? STATUS_META.absent_unexcused;
                   const st = tokens.status[meta.tone];
                   const bothNull = row.arrived_label === null && row.left_label === null;
 
@@ -708,7 +807,12 @@ export default function AttendanceScreen() {
 
             {/* Из чего сложились три плитки сверху — как на вебе: экран
                 показывает выведенные проценты, и родитель должен видеть, на
-                каких отметках они посчитаны. */}
+                каких отметках они посчитаны.
+
+                В показе подписи нет: считать не из чего, и она вывела бы
+                четыре нуля под живыми числами витрины. В макете её тоже
+                нет — она появилась вместе с настоящим расчётом. */}
+            {showcase ? null : (
             <Text
               style={{
                 fontFamily: fonts.manrope600,
@@ -726,6 +830,7 @@ export default function AttendanceScreen() {
                 unexcused: String(attendanceState.data?.stats.unexcused ?? 0),
               })}
             </Text>
+            )}
           </>
         )}
       </ScrollView>
@@ -737,7 +842,8 @@ export default function AttendanceScreen() {
           items={pickerItems}
           selectedId={selectedChildId ?? undefined}
           onSelect={(id) => {
-            selectChild(id);
+            if (showcase) setFixtureChildId(id);
+            else selectChild(id);
             setSheetOpen(false);
           }}
         />

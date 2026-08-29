@@ -29,10 +29,12 @@ import {
   walletOpsFor,
 } from "./demoPayments";
 import type { Locale } from "@snr/core";
-import { trDeep } from "./i18n";
+import { tr, trDeep } from "./i18n";
 import type {
   ApplicationDetailRow,
   ApplicationRow,
+  AttendanceDayRow,
+  AttendanceStats,
   BillRow,
   ChildInfoRow,
   ParentProfileRow,
@@ -82,10 +84,17 @@ import {
   TODAY_LIVE_LESSON_INDEX,
 } from "./fixtures/schedule";
 import {
+  ATTENDANCE_LAST_DAYS,
+  ATTENDANCE_MONTHS,
+  ATTENDANCE_STATS,
+  DEFAULT_ATTENDANCE_MONTH_INDEX,
+} from "./fixtures/attendance";
+import {
   DEFAULT_GRADE_PERIOD,
   GRADES_ASSISTANT_NOTES,
   GRADES_SUMMARY,
   GRADE_PERIODS,
+  SKILLS_TAB,
 } from "./fixtures/grades";
 import {
   HOMEWORK_DETAIL,
@@ -129,7 +138,9 @@ import {
 import {
   ASSISTANT_TEXT_TEMPLATES,
   DASHBOARD_CHILD_STATUS,
+  DASHBOARD_FEED,
   DUE_CARD,
+  MEALS_TILE,
   NEXT_LESSON_CARD,
   QUICK_ACTIONS,
 } from "./fixtures/home";
@@ -344,8 +355,64 @@ export function getSubject(key: SubjectKey): SubjectRow {
 }
 
 
+// ─── Посещаемость ────────────────────────────────────────────────────────────
+
+/**
+ * Два месяца календаря витрины и месяц, открытый по умолчанию.
+ *
+ * Переводится ТОЛЬКО подпись месяца. Через trDeep гонять весь месяц нельзя:
+ * он пошёл бы и по массиву кодов ячеек, а это односимвольные строки («p»,
+ * «e», «w»…). Сегодня в таблице переводов такого ключа нет, и разницы не
+ * видно, — но появись он завтра, календарь молча посыпался бы, и искать
+ * причину пришлось бы долго.
+ */
+export function getAttendanceMonths(locale: Locale) {
+  return {
+    months: ATTENDANCE_MONTHS.map((m) => ({ ...m, label: tr(m.label, locale) })),
+    default_month_index: DEFAULT_ATTENDANCE_MONTH_INDEX,
+  };
+}
+
+/** Три плитки. Числа пересчитывают июльский календарь выше: два дня `u`
+ *  (3-й и 14-й) и один `n` (21-й) — сходятся, потому что и то и другое
+ *  снято с одного макета. */
+export function getAttendanceStats(): AttendanceStats {
+  return ATTENDANCE_STATS;
+}
+
+/**
+ * «Последние дни». {suf} — гендерный суффикс ребёнка, как childSuf в
+ * макете (строка 3853).
+ *
+ * ПОРЯДОК ВАЖЕН: сначала перевод, потом подстановка суффикса. Наоборот
+ * ключ таблицы («Присутствовал{suf}») уже не совпал бы со строкой, и
+ * узбекский с английским молча остались бы русскими. В переводах
+ * плейсхолдера нет вовсе — там род не выражается, и replace ничего не
+ * находит.
+ */
+export function getAttendanceLastDays(childId: string | undefined, locale: Locale): AttendanceDayRow[] {
+  const suf = resolveChild(childId)?.is_female ? "а" : "";
+  return ATTENDANCE_LAST_DAYS.map((row) => ({
+    ...row,
+    date_label: tr(row.date_label, locale),
+    status_label: tr(row.status_label, locale).replace("{suf}", suf),
+  }));
+}
+
+// ─── Оценки и успехи ─────────────────────────────────────────────────────────
+
 export function getTeacherReviews(): TeacherReviewRow[] {
   return TEACHER_REVIEWS;
+}
+
+/** Вкладка «Навыки» витрины: плитки, чипы и радар. У настоящего родителя
+ *  вкладка считается из его данных и сюда не заходит. */
+export function getSkillsTab(locale: Locale) {
+  return {
+    tiles: trDeep(SKILLS_TAB.tiles, locale),
+    chips: trDeep(SKILLS_TAB.chips, locale),
+    radar: SKILLS_TAB.radar,
+  };
 }
 
 export function getSubjectStats() {
@@ -667,7 +734,7 @@ export function getAssistantTexts(childId?: string): {
 }
 
 /** Данные Dashboard П5: все связанные числа — из своих источников. */
-export function getDashboard(childId?: string) {
+export function getDashboard(childId: string | undefined, locale: Locale) {
   const child = resolveChild(childId);
   return {
     parent: PARENT,
@@ -685,6 +752,14 @@ export function getDashboard(childId?: string) {
       gradient: DUE_CARD.gradient,
     },
     wallet_balance: getWalletBalance(),
+    // Лента «Сегодня» и плитка «Питание» — как и «К оплате», ТОЛЬКО для
+    // показа: гейт стоит в HomeScreen. Настоящему родителю событий взять
+    // неоткуда — ленты в базе нет вовсе.
+    feed: trDeep(DASHBOARD_FEED, locale),
+    meals_tile: {
+      status_label: tr(MEALS_TILE.status_label, locale),
+      gradient: MEALS_TILE.gradient,
+    },
   };
 }
 

@@ -62,6 +62,7 @@ import {
   type MetricCell,
 } from "../../ui";
 import {
+  getAssistantTexts,
   getChildren,
   getDashboard,
   getParent,
@@ -160,6 +161,16 @@ function AccentGlyphTile({
     </View>
   );
 }
+
+/** Подпись-капслок на цветной плитке (макет 247–248): у «К оплате» и
+ *  «Питания» она одинаковая, поэтому объявлена один раз. */
+const TILE_CAPTION = {
+  fontFamily: fonts.manrope800,
+  fontSize: 9,
+  letterSpacing: 9 * 0.08,
+  textTransform: "uppercase" as const,
+  color: "rgba(255,255,255,0.85)",
+};
 
 /** Chip-«5» 30×30 rounded-10 зелёный — макет строка 267 (feed #1, оценка). */
 function GradeBadge({ value }: { value: number }) {
@@ -298,7 +309,10 @@ export default function HomeScreen() {
   // getDashboard/getSelectedChildContext — фикстурные "данные-экраны"
   // (метрики, приветствие), НЕ идентичность; продолжают ходить по
   // session.currentChildId/childId как раньше, в этом шаге не меняются.
-  const dashboard = getDashboard(childId ?? undefined);
+  const dashboard = getDashboard(childId ?? undefined, locale);
+  // Текст помощника собирается от имени выбранного ребёнка тем же
+  // шаблоном, что в макете. Читается только в ветке показа ниже.
+  const assistantText = getAssistantTexts(childId ?? undefined).dashboard;
   const ctx = getSelectedChildContext(childId ?? undefined);
   const child = ctx.child;
   // Идентичность в ChildSwitcherCard (имя/класс/аватар/статус) — реальная
@@ -678,39 +692,81 @@ export default function HomeScreen() {
             счетов приходят из getDueTotal()/getDueBillsCount() — тех же
             BILLS, что и экран оплат, поэтому разойтись им негде. Соседняя
             плитка «Питание» вернётся вместе со своим разделом. */}
+        {/* Ряд из двух плиток — «К оплате» и «Питание» (разметка 246–249).
+            «Питание» вернулась 29.08.2026 вместе со своим разделом, как и
+            обещал комментарий ниже. Обе — только для показа. */}
+        {isDemo ? (
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <AccentCard
+              gradient={[dashboard.due_card.gradient[0], dashboard.due_card.gradient[1]]}
+              shadowRgb="244,63,94"
+              radius={18}
+              style={{ flex: 1 }}
+              contentStyle={{ padding: 12, gap: 4 }}
+              onPress={() => navigation.navigate("p17")}
+            >
+              <Text style={TILE_CAPTION}>{d.parentApp.status.due}</Text>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
+                {`${formatMoney(dashboard.due_card.amount)} ${d.parentApp.pay.sum}`}
+              </Text>
+              <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: "rgba(255,255,255,0.9)" }}>
+                {`${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`}
+              </Text>
+            </AccentCard>
+            <AccentCard
+              gradient={[dashboard.meals_tile.gradient[0], dashboard.meals_tile.gradient[1]]}
+              shadowRgb="52,211,153"
+              radius={18}
+              style={{ flex: 1 }}
+              contentStyle={{ padding: 12, gap: 4 }}
+              onPress={() => navigation.navigate("dmeals")}
+            >
+              <Text style={TILE_CAPTION}>{d.parentApp.svc.meals}</Text>
+              <Text style={{ fontFamily: fonts.manrope700, fontSize: 11.5, color: "#FFFFFF" }}>
+                {dashboard.meals_tile.status_label}
+              </Text>
+            </AccentCard>
+          </View>
+        ) : null}
+
+        {/* Карточка EduOS Assistant (разметка 251–253). Текст собирается от
+            имени выбранного ребёнка — тем же шаблоном, что в макете
+            (assistantText = k.n + '…'). Только для показа: настоящему
+            родителю помощник ничего не считает, раздел d7 — «Скоро». */}
         {isDemo ? (
           <AccentCard
-            gradient={[dashboard.due_card.gradient[0], dashboard.due_card.gradient[1]]}
-            shadowRgb="244,63,94"
-            radius={18}
-            contentStyle={{ padding: 12, gap: 4 }}
-            onPress={() => navigation.navigate("p17")}
+            gradient={["#8b5cf6", "#6366f1"]}
+            shadowRgb="139,92,246"
+            radius={20}
+            contentStyle={{ padding: 14, gap: 9 }}
           >
-            <Text
-              style={{
-                fontFamily: fonts.manrope800,
-                fontSize: 9,
-                letterSpacing: 9 * 0.08,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.85)",
-              }}
-            >
-              {d.parentApp.status.due}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: "#FFFFFF" }}>
+                EduOS Assistant
+              </Text>
+              <StatusChip label="NEW" variant="new" />
+            </View>
+            <Text style={{ fontFamily: fonts.manrope600, fontSize: 11.5, lineHeight: 17, color: "rgba(255,255,255,0.92)" }}>
+              {assistantText}
             </Text>
-            <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
-              {`${formatMoney(dashboard.due_card.amount)} ${d.parentApp.pay.sum}`}
-            </Text>
-            <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, color: "rgba(255,255,255,0.9)" }}>
-              {`${dashboard.due_card.bills_count} счёта · ${dashboard.due_card.until_label}`}
-            </Text>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <AssistantCta
+                label={d.parentApp.home.viewProgress}
+                onPress={() => navigation.navigate("p10")}
+              />
+              <AssistantCta
+                label={d.parentApp.home.msgTeacher}
+                onPress={() => navigation.navigate("d24")}
+              />
+            </View>
           </AccentCard>
         ) : null}
-        {/* 16.08.2026. Отсюда убраны три выдуманных блока: «К оплате» и
-            «Питание» (суммы и счета, которых в базе нет), карточка помощника
-            (заготовленный текст) и лента «Сегодня» (выдуманные события).
-            Осталось то, что читает базу: приветствие с настоящими именами,
-            метрики ребёнка, следующий урок и быстрые действия — они ведут в
-            живые разделы. Выдуманных сумм на главной больше нет. */}
+        {/* 16.08.2026 отсюда убрали четыре выдуманных блока: «К оплате»,
+            «Питание», карточку помощника и ленту «Сегодня». 23.08 вернулась
+            первая, 29.08 — остальные три, и все четыре стоят под признаком
+            показа. У настоящего родителя главная осталась ровно такой же,
+            какой была: приветствие с его именами, метрики ребёнка,
+            следующий урок и быстрые действия — всё из базы. */}
         {/* Быстрые действия (255–263). */}
         <SectionHeader title={d.parentApp.home.quickActions} />
         <QuickActionsGrid columns={3}>
@@ -725,6 +781,55 @@ export default function HomeScreen() {
             />
           ))}
         </QuickActionsGrid>
+
+        {/* Лента «Сегодня» (разметка 264–268). Только для показа: событий
+            такого рода в базе нет вовсе, собирать их настоящему родителю
+            не из чего. Заголовок ведёт в уведомления, строки — туда же,
+            куда вели в макете. */}
+        {isDemo ? (
+          <>
+            <SectionHeader
+              title={d.parentApp.home.todaySection}
+              linkLabel={`${d.parentApp.common.viewAll} ›`}
+              onPress={() => navigation.navigate("d8")}
+            />
+            <GlassCard radius={20} contentStyle={{ paddingVertical: 5, paddingHorizontal: 14 }}>
+              {dashboard.feed.map((item, i) => (
+                <Pressable
+                  key={item.title}
+                  onPress={() => navigation.navigate(item.go as never)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 11,
+                    paddingVertical: 10,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: "rgba(23,18,67,0.07)",
+                  }}
+                >
+                  <FeedIconTile
+                    gradient={[item.gradient[0], item.gradient[1]]}
+                    glyph={item.tile.kind === "text" ? item.tile.label : undefined}
+                    svgPaths={item.tile.kind === "icon" ? ICONS[item.tile.icon] : undefined}
+                  />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                      {item.title}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink3 }}>
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                  {item.badge.kind === "grade" ? (
+                    <GradeBadge value={item.badge.value} />
+                  ) : (
+                    <StatusChip label={item.badge.label} family={item.badge.tone} />
+                  )}
+                </Pressable>
+              ))}
+            </GlassCard>
+          </>
+        ) : null}
 
       </TabScreenScroll>
 

@@ -41,7 +41,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, Polygon } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -92,6 +92,7 @@ import {
   getSelectedChildContext,
   getSubject,
   getSubjectStats,
+  getSkillsTab,
   getTeacherReviews,
   defaultChildId,
 } from "../../data";
@@ -401,6 +402,10 @@ export default function ProgressScreen() {
   const child = realChildRow ?? ctx.child;
   const summary = getGradesSummary();
   const stats = getSubjectStats();
+  // Вкладка «Навыки» витрины: плитки, радар и чипы макета. У настоящего
+  // родителя вкладка считается из его данных (skillsState ниже), и сюда
+  // не заходит.
+  const skillsFixture = getSkillsTab(locale);
 
   // Навыки на вкладке «Навыки» — настоящие, тот же расчёт, что на d16.
   const skillsState = useAsyncData(
@@ -1225,7 +1230,107 @@ export default function ProgressScreen() {
                 Радар «Профиль навыков» убран: у него шесть осей, а навыков,
                 посчитанных из данных, пять. Шестую («Творчество», «Команда»)
                 взять неоткуда — ни одна таблица о ней ничего не знает. */}
-            {skillsState.loading ? (
+            {showcase ? (
+              <>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {skillsFixture.tiles.map((s) => (
+                    <View
+                      key={s.name}
+                      style={{
+                        width: "47%",
+                        flexGrow: 1,
+                        minWidth: 0,
+                        padding: 10,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: tokens.glassBorder,
+                        backgroundColor: "rgba(255,255,255,0.4)",
+                        gap: 6,
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <LinearGradient
+                          colors={[s.gradient[0], s.gradient[1]]}
+                          {...gradPoints(135)}
+                          style={{ width: 24, height: 24, borderRadius: 8 }}
+                        />
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                          {`${s.pct}%`}
+                        </Text>
+                      </View>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope700, fontSize: 9.5, color: tokens.ink2 }}>
+                        {s.name}
+                      </Text>
+                      <ProgressBar pct={s.pct / 100} height={3.5} fillGradient={[s.gradient[0], s.gradient[1]]} />
+                    </View>
+                  ))}
+                </View>
+
+                {/* «Профиль навыков» — шестиугольник макета (строка 351).
+                    Три полигона: рамка, внутренняя сетка и сам профиль;
+                    подписей осей в макете нет, и мы их не досочиняем. */}
+                <SectionHeader title={d.parentApp.skills.profile} />
+                <GlassCard radius={22} contentStyle={{ padding: 14, gap: 12 }}>
+                  <View style={{ alignItems: "center" }}>
+                    <Svg width={150} height={135} viewBox="0 0 120 108">
+                      <Polygon
+                        points={skillsFixture.radar.frame}
+                        fill="none"
+                        stroke={tokens.glassBorder}
+                        strokeWidth={1.2}
+                      />
+                      <Polygon
+                        points={skillsFixture.radar.grid}
+                        fill="none"
+                        stroke={tokens.glassBorder}
+                        strokeWidth={1}
+                      />
+                      <Polygon
+                        points={skillsFixture.radar.values}
+                        fill="rgba(124,58,237,0.22)"
+                        stroke="#7c3aed"
+                        strokeWidth={1.6}
+                      />
+                    </Svg>
+                  </View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
+                    {skillsFixture.chips.map((c) => {
+                      const st = tokens.status[c.tone];
+                      return (
+                        <View
+                          key={c.name}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 5,
+                            paddingVertical: 5,
+                            paddingHorizontal: 9,
+                            borderRadius: 999,
+                            borderWidth: 1,
+                            borderColor: `rgba(${st.rgb},0.32)`,
+                            backgroundColor: `rgba(${st.rgb},0.13)`,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink2 }}>
+                            {c.name}
+                          </Text>
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, color: st.text }}>
+                            {c.value_label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </GlassCard>
+
+                {/* Заметка помощника по вкладке — из заготовки макета. */}
+                <GlassCard radius={20} contentStyle={{ padding: 13 }}>
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, lineHeight: 16, color: tokens.ink2 }}>
+                    {getGradesAssistantNotes().skills}
+                  </Text>
+                </GlassCard>
+              </>
+            ) : skillsState.loading ? (
               <LoadingBlock paddingVertical={28} />
             ) : skillsState.error ? (
               <ErrorBlock
@@ -1276,7 +1381,7 @@ export default function ProgressScreen() {
                 а не разбор чего-либо, и он расходился с настоящими числами
                 выше. Вместо неё — та же подпись, что на экране «Навыки»:
                 из чего посчитаны проценты. */}
-            {skillsState.data && skillsState.data.source.gradeCount > 0 ? (
+            {!showcase && skillsState.data && skillsState.data.source.gradeCount > 0 ? (
               <Text
                 style={{
                   fontFamily: fonts.manrope600,
