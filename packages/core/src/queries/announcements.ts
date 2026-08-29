@@ -294,17 +294,169 @@ export const getParentAnnouncementById = async (db: Db, id: string): Promise<Par
   return toParentAnnouncement(data);
 };
 
+// ── Настройки уведомлений (миграция 236) ────────────────────────────────
+
+/** Категории экрана настроек. Те же четыре, что в CHECK таблицы. */
+export const NOTIFICATION_CATEGORIES = ["grades", "homework", "announcements", "messages"] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+/** Категория включена, если её не выключили. Ключи — все четыре всегда. */
+export type NotificationPrefs = Record<NotificationCategory, boolean>;
+
+/**
+ * ВИД УВЕДОМЛЕНИЯ → КАТЕГОРИЯ ЭКРАНА.
+ *
+ * ПОЧЕМУ ЗДЕСЬ, А НЕ В БАЗЕ. Фильтр по решению заказчика стоит при ЧТЕНИИ,
+ * а чтение — это вот эти две функции на TypeScript. Таблица соответствия в
+ * базе стоила бы лишнего запроса (или соединения) на каждую загрузку ленты
+ * И на каждый опрос колокольчика, а выиграть было бы нечего: ни один
+ * триггер её не спросит — они пишут всё подряд, в том и смысл решения.
+ * Плюс подписи категорий уже живут в общем словаре, тоже на TypeScript:
+ * правило и подпись меняются одним выпуском, а не двумя.
+ *
+ * ЧЕГО ЗДЕСЬ НЕТ И ПОЧЕМУ. Виды, не попавшие ни в одну категорию
+ * (lesson_material, lesson_created, student_excused, leave_request,
+ * leave_decision, lesson_starting_soon), ПОКАЗЫВАЮТСЯ ВСЕГДА.
+ *
+ * Прятать их по умолчанию нельзя по двум причинам. Первая: у них нет
+ * тумблера, значит выключатель был бы без включателя — человек не смог бы
+ * вернуть скрытое. Вторая, тяжелее: вид, заведённый будущей миграцией и
+ * забытый в этой таблице, ИСЧЕЗ БЫ МОЛЧА. Лишняя строка в ленте — мелкая
+ * беда, пропавшее уведомление — крупная и незаметная.
+ *
+ * Мёртвый lesson_created (121 строка) тоже показывается — и правильно: он
+ * должен уйти удалением строк (блок в хвосте миграции 236), а не спрятаться
+ * за фильтром. Спрятать значило бы замести беду под ковёр.
+ */
+const CATEGORY_BY_KIND: Readonly<Record<string, NotificationCategory>> = {
+  // Оценки: всё, что несёт отметку.
+  grade_received: "grades",
+  new_grade: "grades",
+  homework_graded: "grades",
+  // Домашние задания: выдали и сдали.
+  new_homework: "homework",
+  student_submitted: "homework",
+  // Объявления школы: оба вида — ученикам и учителям.
+  announcement: "announcements",
+  announcement_new: "announcements",
+  // Сообщения: источник заведён миграцией 236.
+  chat_message: "messages",
+};
+
+/** Школа текущего человека. Нужна только на ЗАПИСЬ настройки: правило
+ *  доступа требует school_id = current_school_id(), а колонка умолчания не
+ *  имеет. Спрашиваем по очереди четыре таблицы — свою строку в своей видит
+ *  каждая роль. На чтении этот запрос не выполняется ни разу. */
+async function resolveMySchoolId(db: Db): Promise<string | null> {
+  const sb = db as any;
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return null;
+  const источники = ["students", "teachers", "parents", "admins"];
+  const ответы = await Promise.all(источники.map((t) =>
+    sb.from(t).select("school_id").eq("user_id", user.id).maybeSingle()));
+  for (const r of ответы) {
+    const id = (r?.data as { school_id?: string } | null)?.school_id;
+    if (id) return id;
+  }
+  return null;
+}
+
+/**
+ * Настройки текущего человека. Все четыре ключа всегда на месте: отсутствие
+ * строки в таблице означает «включено», и разворачивать это в объект должен
+ * один код, а не каждый экран по-своему.
+ */
+export const getNotificationPrefs = async (db: Db): Promise<NotificationPrefs> => {
+  const итог = Object.fromEntries(NOTIFICATION_CATEGORIES.map((c) => [c, true])) as NotificationPrefs;
+  const { data, error } = await (db as any).from("notification_prefs").select("category, enabled");
+  // Не роняем ленту из-за настроек: не прочитались — считаем всё включённым.
+  // Это безопасная сторона отказа: человек увидит лишнее, а не потеряет своё.
+  if (error) {
+    console.error("[getNotificationPrefs] чтение настроек не удалось:", error.message);
+    return итог;
+  }
+  for (const r of (data ?? []) as Array<{ category: string; enabled: boolean }>) {
+    if ((NOTIFICATION_CATEGORIES as readonly string[]).includes(r.category)) {
+      итог[r.category as NotificationCategory] = r.enabled;
+    }
+  }
+  return итог;
+};
+
+/**
+ * Включить или выключить категорию.
+ *
+ * ВКЛЮЧЕНИЕ УДАЛЯЕТ СТРОКУ, а не пишет enabled = true. Отсутствие строки и
+ * есть «включено» — держать оба представления одного состояния значит рано
+ * или поздно получить их расхождение.
+ */
+export const setNotificationPref = async (
+  db: Db,
+  category: NotificationCategory,
+  enabled: boolean,
+): Promise<void> => {
+  const sb = db as any;
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  if (enabled) {
+    const { error } = await sb.from("notification_prefs").delete()
+      .eq("user_id", user.id).eq("category", category);
+    if (error) throw error;
+    return;
+  }
+
+  const schoolId = await resolveMySchoolId(db);
+  if (!schoolId) throw new Error("NOTIF_PREF_NO_SCHOOL");
+  const { error } = await sb.from("notification_prefs").upsert(
+    { user_id: user.id, school_id: schoolId, category, enabled: false, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,category" },
+  );
+  if (error) throw error;
+};
+
+/**
+ * СПИСОК СКРЫТЫХ ВИДОВ — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ ЖИВЁТ ПРАВИЛО ПОКАЗА.
+ *
+ * Обе читающие функции ниже зовут ЕЁ, и ни одна не решает сама. Это не
+ * вкусовщина: счётчик колокольчика и лента расходились бы ровно так же, как
+ * семь раз расходились копии среднего балла. Одна копия — расходиться
+ * нечему.
+ */
+async function hiddenKinds(db: Db): Promise<string[]> {
+  const prefs = await getNotificationPrefs(db);
+  const выключены = new Set(NOTIFICATION_CATEGORIES.filter((c) => !prefs[c]));
+  if (выключены.size === 0) return [];
+  return Object.entries(CATEGORY_BY_KIND)
+    .filter(([, category]) => выключены.has(category))
+    .map(([kind]) => kind);
+}
+
 // ── Notifications (any role; RLS limits to own) ──
+
+/**
+ * Лента уведомлений. Скрытые категории отсекаются В ЗАПРОСЕ, а не после
+ * него: limit должен применяться к тому, что человек увидит. Отфильтруй мы
+ * после выборки — при выключенной категории страница возвращала бы меньше
+ * строк, чем просили, и «показать ещё» вело бы себя непредсказуемо.
+ */
 export const getMyNotifications = async (db: Db, limit = 50): Promise<AppNotification[]> => {
-  const { data, error } = await (db as any).from("notifications")
+  const скрытые = await hiddenKinds(db);
+  let q = (db as any).from("notifications")
     .select("*").order("created_at", { ascending: false }).limit(limit);
+  if (скрытые.length) q = q.not("kind", "in", `(${скрытые.join(",")})`);
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as AppNotification[];
 };
 
+/** Непрочитанные — тем же отбором, что и лента. Иначе колокольчик считал бы
+ *  скрытое: красный кружок, ведущий в никуда. */
 export const getUnreadCount = async (db: Db): Promise<number> => {
-  const { count, error } = await (db as any).from("notifications")
+  const скрытые = await hiddenKinds(db);
+  let q = (db as any).from("notifications")
     .select("id", { count: "exact", head: true }).eq("is_read", false);
+  if (скрытые.length) q = q.not("kind", "in", `(${скрытые.join(",")})`);
+  const { count, error } = await q;
   if (error) return 0;
   return count ?? 0;
 };
