@@ -1,5 +1,5 @@
 import { cache } from "react";
-import type { ChatThreadKind, ChatThreadSummary } from "@snr/core";
+import { getDictionary, type ChatThreadKind, type ChatThreadSummary } from "@snr/core";
 import { createClient } from "@/lib/supabase/server";
 import { parentThreads } from "@/lib/parent-queries";
 import { avatarGradient, initialsOf, previewOf } from "./format";
@@ -47,10 +47,39 @@ export const getAuthUserId = cache(async (): Promise<string | null> => {
   return user?.id ?? null;
 });
 
+/**
+ * Подпись комнаты поддержки — из общего словаря, тем же ключом, которым
+ * подписан экран поддержки в мобильном. Не литералом: два одинаковых
+ * литерала в разных приложениях однажды разойдутся.
+ *
+ * ЯЗЫК ЗДЕСЬ ПРИБИТ К "ru" ОСОЗНАННО. Выбранный язык лежит в localStorage
+ * (см. LocaleProvider), сервер его не видит вовсе, а этот модуль —
+ * серверный: он собирает подписи до отправки на клиент. Весь экран
+ * «Сообщения» сегодня русский — «Учитель», «Куратор», «Класс» рядом тоже
+ * литералы. Перевести его целиком — отдельная работа, и делать её наполовину
+ * (одну подпись из словаря, три соседние литералами) было бы хуже: разошлись
+ * бы способы, а не только тексты.
+ */
+const SUPPORT_TITLE = getDictionary("ru").parentApp.msg.supportRealTitle;
+
+/**
+ * Комната поддержки — ПО ВИДУ ЧАТА, а не по тексту заголовка.
+ *
+ * ЧТО БЫЛО СЛОМАНО. Здесь стояла проверка на слова «поддерж»/«администрац»
+ * в заголовке. У комнаты поддержки (миграция 234) заголовок — ИМЯ САМОГО
+ * РОДИТЕЛЯ: админу в его разделе нужно видеть, кто написал. Проверка его не
+ * узнавала, и в списке чатов родителя комната подписывалась его собственным
+ * именем — то есть читалась как переписка с самим собой.
+ *
+ * ПОЧЕМУ ТЕКСТОМ НЕЛЬЗЯ ВООБЩЕ. Приложение живёт на трёх языках. Разбор
+ * смысла по русскому слову ломается молча: узбекский заголовок просто не
+ * совпадёт, и ветка тихо не сработает. Тот же класс, что сравнение статусов
+ * домашних заданий по русской строке, которое чинили раньше.
+ *
+ * admin_ai оставлен: это объявленный вид чата, а не догадка по тексту.
+ */
 function isSupportThread(s: ChatThreadSummary): boolean {
-  if (s.kind === "admin_ai") return true;
-  const t = (s.title ?? "").toLowerCase();
-  return t.includes("поддерж") || t.includes("администрац");
+  return s.kind === "support" || s.kind === "admin_ai";
 }
 
 function counterpartName(s: ChatThreadSummary, myUserId: string | null): string | null {
@@ -69,10 +98,15 @@ function roleLabelOf(s: ChatThreadSummary): string | null {
 
 function toVM(s: ChatThreadSummary, myUserId: string | null): ParentThreadVM {
   const support = isSupportThread(s);
+  // У комнаты поддержки заголовок в базе — имя родителя, и брать его сюда
+  // нельзя ни первым, ни запасным вариантом: родитель увидел бы собственное
+  // имя как имя собеседника. Подпись у неё своя и всегда одна.
   const name =
     s.kind === "direct"
       ? counterpartName(s, myUserId) ?? s.title ?? "Чат"
-      : s.title ?? (support ? "Поддержка школы" : "Групповой чат");
+      : support
+        ? SUPPORT_TITLE
+        : s.title ?? "Групповой чат";
 
   const stampSource = s.lastMessage?.created_at ?? s.updated_at;
 
