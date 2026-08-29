@@ -79,6 +79,7 @@ import ApplicationsScreen from "../screens/study/ApplicationsScreen";
 import DocumentsScreen from "../screens/profile/DocumentsScreen";
 import ChatScreen from "../screens/messages/ChatScreen";
 import SupportScreen from "../screens/messages/SupportScreen";
+import { SupportChatScreen } from "../screens/messages/SupportChatScreen";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -130,7 +131,9 @@ const MESSAGE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   d25: demoOr(ChatScreen, "chat", "chat", ["#22d3ee", "#0891b2"]),
   d26: AnnouncementsScreen,
   d27: AdminNewsScreen,
-  d28: demoOr(SupportScreen, "support", "chat", ["#60a5fa", "#2563eb"]),
+  // Шестой аргумент — настоящий экран. Демо-гость по-прежнему получает
+  // витрину SupportScreen; настоящий родитель — свою переписку со школой.
+  d28: demoOr(SupportScreen, "support", "chat", ["#60a5fa", "#2563eb"], false, SupportChatScreen),
 };
 
 /**

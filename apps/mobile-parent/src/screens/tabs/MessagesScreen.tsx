@@ -151,6 +151,21 @@ export default function MessagesScreen() {
             onPress={() => navigation.navigate("d27")}
             divider
           />
+          {/* ПОДДЕРЖКА — ТОЛЬКО ВНЕ ДЕМО. Значок непрочитанного на этой
+              вкладке считает все переписки, включая комнату поддержки, а
+              попасть отсюда в неё было некуда: красный кружок вёл в никуда.
+              Демо-гостю строка не показывается — его карточка остаётся ровно
+              из двух строк, какой была. */}
+          {!isDemo ? (
+            <SectionRow
+              icon="chat"
+              gradient={["#60a5fa", "#2563eb"]}
+              title={t.msg.supportRealTitle}
+              subtitle={t.msg.supportRealSub}
+              onPress={() => navigation.navigate("d28")}
+              divider
+            />
+          ) : null}
         </GlassCard>
 
         {/* В демо — список личных переписок с настоящими учителями. Вне демо

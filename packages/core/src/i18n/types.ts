@@ -3650,6 +3650,15 @@ export interface Dictionary {
       announcements: string;
       avgReply: string;
       supportName: string;
+      // Настоящая переписка родителя со школой (миграция 234).
+      supportRealTitle: string;
+      supportRealSub: string;
+      supportStartTitle: string;
+      supportStartText: string;
+      supportNoAdminTitle: string;
+      supportNoAdminText: string;
+      supportSendFailed: string;
+      supportRoleAdmin: string;
       // Заход 4: экран d24 «Сообщения» — табы и подписи «сторис».
       tabAll: string;
       tabChats: string;

@@ -149,6 +149,13 @@ export function comingSoon(
  * выданного сервером кнопке «Демо». Не «школа заморожена» и не «номер
  * телефона такой-то»: заведут второго настоящего родителя в демо-школе — и
  * он увидел бы выдуманное как своё.
+ *
+ * ШЕСТОЙ АРГУМЕНТ — НАСТОЯЩИЙ ЭКРАН, если он уже есть (29.08.2026). Раздел
+ * перестаёт быть «Скоро» не разом для всех: у поддержки настоящий экран
+ * появился, у остальных четырнадцати — ещё нет. Аргумент необязательный,
+ * поэтому все прежние вызовы его не передают и ведут себя ровно как раньше:
+ * демо-гостю витрина, настоящему родителю «Скоро». Витрина не затрагивается
+ * ни в одном из трёх случаев — она всегда в первой ветке.
  */
 export function demoOr(
   demoScreen: ComponentType<Record<string, never>>,
@@ -156,11 +163,14 @@ export function demoOr(
   icon: string,
   gradient: [string, string],
   root = false,
+  realScreen?: ComponentType<Record<string, never>>,
 ) {
   const DemoScreen = demoScreen;
+  const RealScreen = realScreen;
   const Screen = () => {
     const { isDemo } = useDemoSession();
     if (isDemo) return <DemoScreen />;
+    if (RealScreen) return <RealScreen />;
     return <ComingSoonScreen sectionKey={sectionKey} icon={icon} gradient={gradient} root={root} />;
   };
   Screen.displayName = `DemoOr(${sectionKey})`;
