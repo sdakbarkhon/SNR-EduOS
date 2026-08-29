@@ -3658,6 +3658,7 @@ export interface Dictionary {
       supportNoAdminTitle: string;
       supportNoAdminText: string;
       supportSendFailed: string;
+      supportSendBtn: string;
       supportRoleAdmin: string;
       // Заход 4: экран d24 «Сообщения» — табы и подписи «сторис».
       tabAll: string;

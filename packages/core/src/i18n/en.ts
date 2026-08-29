@@ -3509,6 +3509,7 @@ export const en: Dictionary = {
       supportNoAdminTitle: "Nobody to answer yet",
       supportNoAdminText: "Your school has no administrator yet. As soon as one appears, they will see this conversation and reply.",
       supportSendFailed: "Message not sent",
+      supportSendBtn: "Send",
       supportRoleAdmin: "school administrator",
       tabAll: "All",
       tabChats: "Chats",

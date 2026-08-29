@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { GlassCard } from "../../v2/GlassCard";
-import { EmptyState, Glyph, GlassCircleButton, InnerHeader, ScreenScroll } from "../../_ui/screen-kit";
+import { Glyph, GlassCircleButton, InnerHeader, ScreenScroll } from "../../_ui/screen-kit";
 // Чистые значения — из screen-tokens, а НЕ из screen-kit: файл серверный,
 // а screen-kit помечен "use client" (см. шапку screen-tokens.ts).
 import { ICON } from "../../_ui/screen-tokens";
@@ -14,15 +14,21 @@ import {
   pickSupportThread,
 } from "../../_ui/threads";
 import { ChatView, type ChatBubbleItem } from "./ChatView";
+import { SupportStartForm } from "./SupportStartForm";
 
 /**
  * Переписка родителя. Один реальный тред `chat_threads` + его сообщения.
  *
- * Особый id `support` — точка входа пункта «Помощь и поддержка» из профиля:
- * конкретного id у поддержки нет, поэтому он резолвится в ближайший подходящий
- * тред (admin_ai → по названию → групповой) и страница делает redirect на
- * настоящий /parent/chat/<id>. Если поддержки в БД нет вовсе — показываем
- * честное пустое состояние, а не 404.
+ * Особый id `support` — точка входа пункта «Помощь и поддержка» из профиля.
+ * Если комната родителя есть, страница делает redirect на настоящий
+ * /parent/chat/<id>.
+ *
+ * ЕСЛИ КОМНАТЫ НЕТ — предлагаем её ЗАВЕСТИ, а не подсовываем чужую переписку.
+ * Раньше pickSupportThread откатывался на личный чат классного руководителя,
+ * и «Помощь и поддержка» открывала разговор с учителем под видом поддержки;
+ * откат убран 29.08.2026. Комната заводится первым сообщением — тот же
+ * порядок, что в мобильном: иначе у каждого заглянувшего появилась бы пустая
+ * комната, а список обращений у админа забился бы пустышками.
  */
 export default async function ParentChatPage({
   params,
@@ -51,11 +57,10 @@ export default async function ParentChatPage({
         />
         <ScreenScroll>
           <GlassCard>
-            <EmptyState
-              title="Чат поддержки ещё не открыт"
-              text="Администрация школы пока не создала чат поддержки для вашей семьи. Обратитесь к классному руководителю — его чат виден в разделе «Сообщения»."
-              paths={ICON.help}
-            />
+            {/* Заголовок, пояснение и форма — одним компонентом: иначе
+                пояснение печаталось дважды, из EmptyState и из формы. Заодно
+                подписи берутся из словаря на языке родителя, а не литералами. */}
+            <SupportStartForm />
           </GlassCard>
         </ScreenScroll>
       </div>

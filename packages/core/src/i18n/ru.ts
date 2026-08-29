@@ -3534,6 +3534,7 @@ export const ru: Dictionary = {
       supportNoAdminTitle: "Отвечать пока некому",
       supportNoAdminText: "В вашей школе не заведён ни один администратор. Как только он появится, он увидит эту переписку и ответит.",
       supportSendFailed: "Сообщение не отправлено",
+      supportSendBtn: "Отправить",
       supportRoleAdmin: "администратор школы",
       tabAll: "Все",
       tabChats: "Чаты",

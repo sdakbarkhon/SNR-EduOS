@@ -3510,6 +3510,7 @@ export const uz: Dictionary = {
       supportNoAdminTitle: "Hozircha javob beradigan yo'q",
       supportNoAdminText: "Maktabingizda hali administrator yo'q. U paydo bo'lishi bilan bu yozishmani ko'radi va javob beradi.",
       supportSendFailed: "Xabar yuborilmadi",
+      supportSendBtn: "Yuborish",
       supportRoleAdmin: "maktab administratori",
       tabAll: "Barchasi",
       tabChats: "Chatlar",
