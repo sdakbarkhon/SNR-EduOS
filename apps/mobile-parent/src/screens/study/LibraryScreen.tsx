@@ -35,12 +35,16 @@ import {
   ChildPickerSheetContent,
   ChildSwitcherCard,
   EmptyBlock,
+  GlassCard,
   ErrorBlock,
   GlassCircleButton,
   InnerHeader,
   LoadingBlock,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getLibrary, getSubject } from "../../data";
+import type { BaseSubjectKey } from "../../data";
 import { getSupabase } from "../../lib/supabase";
 import { hexToRgbCsv } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
@@ -297,21 +301,27 @@ function BookCard({
 
 export default function LibraryScreen() {
   const { tokens, scheme } = useTheme();
-  const { d } = useAppLocale();
+  const { d, locale } = useAppLocale();
   const t = d.parentApp;
   const m = t.more;
   const m2 = t.more2;
   const m4 = t.more4;
   const navigation = useNavigation<Nav>();
 
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const sc = t.showcase;
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filter, setFilter] = useState<string>("all");
+  // Фильтр витрины отдельный: у настоящей ветки он по названию предмета,
+  // здесь по ключу заготовки.
+  const [scFilter, setScFilter] = useState<BaseSubjectKey | null>(null);
+  const scLib = getLibrary(locale, scFilter);
   const [openingId, setOpeningId] = useState<string | null>(null);
 
   // Книги видны всей школе, но отметка «в избранном» — по ребёнку, поэтому
   // запрос всё равно привязан к выбранному ребёнку.
-  const state = useChildQuery(childId, (db, id) => getLibraryBooks(db, id));
+  const state = useChildQuery(realChildId, (db, id) => getLibraryBooks(db, id));
   const books = useMemo(() => state.data ?? [], [state.data]);
 
   const subjects = useMemo(() => [...new Set(books.map((b) => b.subject))].sort(), [books]);
@@ -370,7 +380,131 @@ export default function LibraryScreen() {
           />
         ) : null}
 
-        {childLoading || state.loading ? (
+        {showcase ? (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+              <FilterChip
+                label={sc.allChip}
+                active={scFilter === null}
+                activeColor={tokens.accent}
+                onPress={() => setScFilter(null)}
+              />
+              {scLib.subjects.map((key) => (
+                <FilterChip
+                  key={key}
+                  label={getSubject(key).name}
+                  active={scFilter === key}
+                  activeColor={getSubject(key).color}
+                  onPress={() => setScFilter(key)}
+                />
+              ))}
+            </ScrollView>
+
+            {scFilter === null && scLib.recent.length > 0 ? (
+              <>
+                <Text
+                  style={{
+                    fontFamily: fonts.manrope800,
+                    fontSize: 10.5,
+                    letterSpacing: 10.5 * 0.08,
+                    color: tokens.ink3,
+                    paddingHorizontal: 2,
+                  }}
+                >
+                  {sc.recentlyOpenedCap}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 9 }}>
+                  {scLib.recent.map((b) => {
+                    const sb = getSubject(b.subject_id);
+                    return (
+                      <View key={b.name} style={{ width: 104, gap: 6 }}>
+                        <View
+                          style={{
+                            height: 76,
+                            borderRadius: 14,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: sb.color,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.unbounded600, fontSize: 20, color: "#FFFFFF" }}>
+                            {sb.name.trim().charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 10.5, color: tokens.ink1 }}>
+                          {b.name}
+                        </Text>
+                        <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9, color: tokens.ink3 }}>
+                          {sb.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            ) : null}
+
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 10.5,
+                letterSpacing: 10.5 * 0.08,
+                color: tokens.ink3,
+                paddingHorizontal: 2,
+              }}
+            >
+              {sc.allMaterialsCap}
+            </Text>
+            {scLib.rows.map((b) => {
+              const sb = getSubject(b.subject_id);
+              return (
+                <GlassCard
+                  key={b.name}
+                  radius={18}
+                  contentStyle={{ padding: 13, flexDirection: "row", alignItems: "center", gap: 11 }}
+                >
+                  <View
+                    style={{
+                      width: 38,
+                      height: 46,
+                      borderRadius: 9,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: sb.color,
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: "#FFFFFF" }}>
+                      {sb.name.trim().charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                      {b.name}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink2 }}>
+                      {b.author}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9, color: tokens.ink3 }}>
+                      {`${b.meta_label} · ${sb.name}`}
+                    </Text>
+                  </View>
+                </GlassCard>
+              );
+            })}
+
+            <Text
+              style={{
+                fontFamily: fonts.manrope600,
+                fontSize: 9.5,
+                lineHeight: 14,
+                color: tokens.ink3,
+                paddingHorizontal: 2,
+              }}
+            >
+              {sc.libraryNote}
+            </Text>
+          </>
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

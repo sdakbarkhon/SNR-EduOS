@@ -20,7 +20,7 @@
  * Донат в шапке считает средний ПРОЦЕНТ по сданным работам (score/max_score),
  * а не выдуманный «pct» фикстуры; рядом — число работ и средний балл.
  */
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -42,7 +42,9 @@ import {
   SectionHeader,
   StatusChip,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getSubject, getTests } from "../../data";
 import { dayMonth } from "../../lib/dateLabels";
 import { tashkentDateKey } from "../../lib/tashkent";
 import { useAppLocale } from "../../i18n";
@@ -97,10 +99,22 @@ export default function TestsScreen() {
   const localeTag = LOCALE_TAG[locale];
   const navigation = useNavigation<Nav>();
 
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const sc = t.showcase;
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [scFilter, setScFilter] = useState<"done" | "upcoming" | null>(null);
 
-  const state = useChildQuery(childId, (db, id) => getChildTests(db, id));
+  // Витрина: шесть тестов макета. Все три числа шапки считаются — список
+  // полный, зритель может пересчитать каждое (см. getTests).
+  const scTests = getTests(locale, scFilter);
+  const SC_FILTERS: { key: "done" | "upcoming" | null; label: string }[] = [
+    { key: null, label: sc.allChip },
+    { key: "done", label: sc.filterPassed },
+    { key: "upcoming", label: sc.filterUpcoming },
+  ];
+
+  const state = useChildQuery(realChildId, (db, id) => getChildTests(db, id));
   const tests = state.data ?? [];
 
   // 25.08.2026, заход 2 — сдача без выставленной оценки больше не выпадает
@@ -162,34 +176,116 @@ export default function TestsScreen() {
             viewBoxSize={88}
             r={32}
             thickness={9}
-            value={donutPct}
+            value={showcase ? scTests.avg_pct : donutPct}
             color="#FFFFFF"
             trackColor="rgba(255,255,255,0.3)"
             centerContent={
-              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>{`${donutPct}%`}</Text>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
+                {`${showcase ? scTests.avg_pct : donutPct}%`}
+              </Text>
             }
           />
 
           <View style={{ flex: 1, flexDirection: "row", gap: 8 }}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 8, letterSpacing: 8 * 0.06, textTransform: "uppercase", color: "rgba(255,255,255,0.75)" }}>
-                {m4.testsPassed}
+                {showcase ? sc.testsPassedCap : m4.testsPassed}
               </Text>
-              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>{tests.length}</Text>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
+                {showcase ? scTests.passed : tests.length}
+              </Text>
             </View>
 
             <View style={{ width: 1, backgroundColor: "rgba(255,255,255,0.25)" }} />
 
             <View style={{ flex: 1, gap: 2 }}>
               <Text numberOfLines={2} style={{ fontFamily: fonts.manrope800, fontSize: 8, letterSpacing: 8 * 0.06, textTransform: "uppercase", color: "rgba(255,255,255,0.75)" }}>
-                {m4.testsAvgGrade}
+                {showcase ? sc.avgScoreCap : m4.testsAvgGrade}
               </Text>
-              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>{avgGrade}</Text>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: "#FFFFFF" }}>
+                {showcase ? scTests.avg_grade_label : avgGrade}
+              </Text>
             </View>
           </View>
         </View>
 
-        {childLoading || state.loading ? (
+        {showcase ? (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {SC_FILTERS.map((fl) => {
+                const on = scFilter === fl.key;
+                return (
+                  <Pressable
+                    key={fl.label}
+                    onPress={() => setScFilter(fl.key)}
+                    style={{
+                      paddingVertical: 7,
+                      paddingHorizontal: 13,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: on ? tokens.accent : tokens.glassBorder,
+                      backgroundColor: on ? tokens.accent : "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 11, color: on ? "#FFFFFF" : tokens.ink2 }}>
+                      {fl.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {scTests.rows.map((row) => {
+              const sb = getSubject(row.subject_id);
+              return (
+                <GlassCard
+                  key={row.name}
+                  radius={18}
+                  contentStyle={{ padding: 13, flexDirection: "row", alignItems: "center", gap: 11 }}
+                >
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 12,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: sb.color,
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
+                      {sb.name.trim().charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                      {row.name}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                      {row.topic}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                      {row.date_label}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 3 }}>
+                    {row.done ? (
+                      <>
+                        <Text style={{ fontFamily: fonts.unbounded600, fontSize: 15, color: tokens.status.green.text }}>
+                          {row.grade}
+                        </Text>
+                        <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                          {row.result_label}
+                        </Text>
+                      </>
+                    ) : (
+                      <StatusChip label={row.countdown_label ?? ""} family="orange" />
+                    )}
+                  </View>
+                </GlassCard>
+              );
+            })}
+          </>
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

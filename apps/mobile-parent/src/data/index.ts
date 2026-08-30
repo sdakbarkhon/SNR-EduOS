@@ -40,6 +40,9 @@ import type {
   AttendanceStats,
   BaseSubjectKey,
   BillRow,
+  DiaryWeekRow,
+  LibraryBookRow,
+  TestRow,
   ChildInfoRow,
   ParentProfileRow,
   ChildRow,
@@ -95,6 +98,7 @@ import {
   TODAY_LIVE_LESSON_INDEX,
 } from "./fixtures/schedule";
 import { ADMIN_MESSAGE, ANNOUNCEMENTS } from "./fixtures/announcements";
+import { DIARY_WEEKS, LIBRARY_BOOKS, TESTS } from "./fixtures/studyServices";
 import {
   ATTENDANCE_LAST_DAYS,
   ATTENDANCE_MONTHS,
@@ -414,6 +418,77 @@ export function getAttendanceLastDays(childId: string | undefined, locale: Local
 }
 
 // ─── Оценки и успехи ─────────────────────────────────────────────────────────
+
+// ─── Дневник, тесты, библиотека ──────────────────────────────────────────────
+
+/**
+ * Дневник витрины.
+ *
+ * СРЕДНИЙ БАЛЛ ДНЯ СЧИТАЕТСЯ, а не берётся подписью: в макете все восемь
+ * дневных подписей сходятся с оценками своего дня, и хранить их второй
+ * копией незачем.
+ *
+ * ТРИ ЧИСЛА ШАПКИ НЕДЕЛИ — наоборот, отдаются как есть. Список дней в
+ * макете неполный (четыре дня из семи), поэтому «оценок получено» и
+ * «заданий сдано» относятся ко всей неделе, а не к видимым карточкам:
+ * пересчёт по списку молча заменил бы одно другим. Что именно не сходится
+ * — в журнале захода 5.
+ */
+export function getDiaryWeeks(locale: Locale) {
+  return (trDeep(DIARY_WEEKS, locale) as DiaryWeekRow[]).map((w) => ({
+    ...w,
+    days: w.days.map((day) => {
+      const оценки = day.lessons.map((l) => l.grade).filter((g): g is number => g !== null);
+      const среднее = оценки.length ? оценки.reduce((a, b) => a + b, 0) / оценки.length : null;
+      return { ...day, avg_label: среднее === null ? null : среднее.toFixed(1) };
+    }),
+  }));
+}
+
+/**
+ * Тесты витрины.
+ *
+ * Все три числа шапки СЧИТАЮТСЯ: список тестов полный (шесть строк, все
+ * видны), и зритель может пересчитать каждое. Два из трёх совпали с
+ * макетом («пройдено 4», «средний балл 4.5»), третье — нет: в макете
+ * стояло 82%, а по результатам самих тестов выходит 85% (и как среднее
+ * процентов, и как 34 балла из 40). Показываем посчитанное.
+ */
+export function getTests(locale: Locale, only?: "done" | "upcoming" | null) {
+  const все = trDeep(TESTS, locale) as TestRow[];
+  const пройденные = все.filter((t) => t.done);
+  const баллы = пройденные.map((t) => t.grade ?? 0);
+  const проценты = пройденные.map((t) => t.pct ?? 0);
+  const rows = only === "done" ? пройденные : only === "upcoming" ? все.filter((t) => !t.done) : все;
+  return {
+    rows,
+    passed: пройденные.length,
+    avg_grade_label: пройденные.length
+      ? (баллы.reduce((a, b) => a + b, 0) / пройденные.length).toFixed(1)
+      : "—",
+    avg_pct: пройденные.length
+      ? Math.round(проценты.reduce((a, b) => a + b, 0) / пройденные.length)
+      : 0,
+  };
+}
+
+/**
+ * Библиотека витрины: недавно открытые и все материалы, с фильтром по
+ * предмету. Чипы предметов строятся по самим материалам — предмет без
+ * книг в списке чипов не появится.
+ */
+export function getLibrary(locale: Locale, subjectId?: BaseSubjectKey | null) {
+  const все = trDeep(LIBRARY_BOOKS, locale) as LibraryBookRow[];
+  const rows = subjectId ? все.filter((b) => b.subject_id === subjectId) : все;
+  const предметы: BaseSubjectKey[] = [];
+  for (const b of все) if (!предметы.includes(b.subject_id)) предметы.push(b.subject_id);
+  return {
+    rows,
+    recent: все.filter((b) => b.is_recent),
+    total: все.length,
+    subjects: предметы,
+  };
+}
 
 // ─── Объявления и сообщение от администрации ─────────────────────────────────
 

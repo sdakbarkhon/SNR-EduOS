@@ -48,7 +48,9 @@ import {
   LoadingBlock,
   StatusChip,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getDiaryWeeks, getSubject } from "../../data";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { addDays, mondayOfWeek } from "../../lib/tashkent";
 import { dayMonth, hexToRgbCsv, weekdayDayMonth } from "../../lib/dateLabels";
@@ -139,8 +141,18 @@ export default function DiaryScreen() {
   const localeTag = LOCALE_TAG[locale];
   const navigation = useNavigation<Nav>();
 
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const sc = t.showcase;
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Витрина: две недели макета. Средние баллы дней считаются по оценкам
+  // самих дней; три числа шапки недели отдаются подписями — список дней в
+  // макете неполный, см. getDiaryWeeks.
+  const scWeeks = getDiaryWeeks(locale);
+  const [scWeekIndex, setScWeekIndex] = useState(scWeeks[0]?.index ?? 1);
+  const scWeek = scWeeks.find((w) => w.index === scWeekIndex) ?? scWeeks[0];
+  const scIndexes = scWeeks.map((w) => w.index);
 
   // Неделя школьного «сегодня» — стартовая. Пересчитывается, когда дата школы
   // приезжает из базы (useTashkentToday подписан на неё), поэтому дневник не
@@ -151,7 +163,7 @@ export default function DiaryScreen() {
   const activeWeek = weekStart ?? currentMonday;
 
   const state = useChildQuery(
-    childId,
+    realChildId,
     async (db, id) => {
       const lessons = await getStudentLessonsForWeek(db, activeWeek, id);
       return getChildDiaryWeek(db, id, activeWeek, lessons);
@@ -203,13 +215,32 @@ export default function DiaryScreen() {
           />
         ) : null}
 
-        {/* Переключатель недели. */}
+        {/* Переключатель недели. В показе листаем между двумя неделями
+            макета и не дальше — третьей там нет. */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Pressable onPress={() => setWeekStart(addDays(activeWeek, -7))} hitSlop={6} style={navButtonStyle}>
+          <Pressable
+            onPress={() =>
+              showcase
+                ? setScWeekIndex((i) => (scIndexes.includes(i - 1) ? i - 1 : i))
+                : setWeekStart(addDays(activeWeek, -7))
+            }
+            hitSlop={6}
+            style={navButtonStyle}
+          >
             <ChevronIcon direction="left" color={tokens.ink1} />
           </Pressable>
-          <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>{weekLabel}</Text>
-          <Pressable onPress={() => setWeekStart(addDays(activeWeek, 7))} hitSlop={6} style={navButtonStyle}>
+          <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>
+            {showcase ? scWeek.label : weekLabel}
+          </Text>
+          <Pressable
+            onPress={() =>
+              showcase
+                ? setScWeekIndex((i) => (scIndexes.includes(i + 1) ? i + 1 : i))
+                : setWeekStart(addDays(activeWeek, 7))
+            }
+            hitSlop={6}
+            style={navButtonStyle}
+          >
             <ChevronIcon direction="right" color={tokens.ink1} />
           </Pressable>
         </View>
@@ -223,11 +254,18 @@ export default function DiaryScreen() {
         >
           <LinearGradient colors={["#7c3aed", "#4f6df5"]} {...gradPoints(135)} style={StyleSheet.absoluteFill} />
           <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1.5, backgroundColor: "rgba(255,255,255,0.35)" }} />
-          {[
-            { cap: m2.diaryWeekGrades, value: String(week?.gradeCount ?? 0) },
-            { cap: m2.diaryWeekAvg, value: week?.average != null ? week.average.toFixed(1) : m2.diaryNoGrade },
-            { cap: m2.diaryWeekHw, value: String(week?.homeworkSubmitted ?? 0) },
-          ].map((c, i) => (
+          {(showcase
+            ? [
+                { cap: sc.gradesReceivedCap, value: scWeek.grades_label },
+                { cap: sc.weekAvgCap, value: scWeek.avg_label },
+                { cap: sc.homeworkDoneCap, value: scWeek.homework_label },
+              ]
+            : [
+                { cap: m2.diaryWeekGrades, value: String(week?.gradeCount ?? 0) },
+                { cap: m2.diaryWeekAvg, value: week?.average != null ? week.average.toFixed(1) : m2.diaryNoGrade },
+                { cap: m2.diaryWeekHw, value: String(week?.homeworkSubmitted ?? 0) },
+              ]
+          ).map((c, i) => (
             <View key={c.cap} style={{ flex: 1, flexDirection: "row" }}>
               {i > 0 ? <View style={{ width: 1, marginRight: 8, backgroundColor: "rgba(255,255,255,0.2)" }} /> : null}
               <View style={{ flex: 1, gap: 2 }}>
@@ -241,7 +279,90 @@ export default function DiaryScreen() {
         </View>
 
         {/* Дни недели. */}
-        {childLoading || state.loading ? (
+        {showcase ? (
+          scWeek.days.map((day) => (
+            <View key={day.label} style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    flex: 1,
+                    fontFamily: fonts.manrope800,
+                    fontSize: 10,
+                    letterSpacing: 10 * 0.06,
+                    color: tokens.ink3,
+                  }}
+                >
+                  {day.label}
+                </Text>
+                {day.avg_label ? (
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 11, color: tokens.accent }}>
+                    {day.avg_label}
+                  </Text>
+                ) : null}
+              </View>
+              <GlassCard radius={18} contentStyle={{ paddingVertical: 4, paddingHorizontal: 13 }}>
+                {day.lessons.map((l, i) => {
+                  const sb = getSubject(l.subject_id);
+                  return (
+                    <View
+                      key={`${l.subject_id}-${l.theme}`}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                        paddingVertical: 10,
+                        borderTopWidth: i === 0 ? 0 : 1,
+                        borderTopColor: "rgba(23,18,67,0.07)",
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 11,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: sb.color,
+                        }}
+                      >
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
+                          {sb.name.trim().charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                          {l.theme}
+                        </Text>
+                        <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                          {l.homework}
+                        </Text>
+                      </View>
+                      {l.grade === null ? null : (
+                        <View
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 9,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: tokens.chip(tokens.status.green.rgb).bg,
+                            borderWidth: 1,
+                            borderColor: tokens.chip(tokens.status.green.rgb).border,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.status.green.text }}>
+                            {l.grade}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </GlassCard>
+            </View>
+          ))
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

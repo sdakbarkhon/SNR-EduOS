@@ -128,6 +128,64 @@ export interface TopicMasteryRow {
   meta_label: string;         // «8 уроков · 6 заданий»
 }
 
+// ─── Дневник, тесты, библиотека (сервис-разделы) ─────────────────────────────
+
+/** Урок в дневнике: предмет, тема, домашнее задание, оценка. */
+export interface DiaryLessonRow {
+  subject_id: BaseSubjectKey;
+  theme: string;
+  homework: string;           // «Д/З: № 140–148» или «Д/З: не задано»
+  grade: number | null;
+}
+
+/** День дневника. Средний балл дня НЕ хранится: он считается по оценкам
+ *  этого же дня — все четыре подписи макета так и сходятся. */
+export interface DiaryDayRow {
+  label: string;              // «ПОНЕДЕЛЬНИК · 21 июля»
+  lessons: DiaryLessonRow[];
+}
+
+/**
+ * Неделя дневника.
+ *
+ * Три числа шапки хранятся ПОДПИСЯМИ, а не считаются, и это осознанно:
+ * список дней в макете неполный (четыре дня из семи), поэтому счётчики
+ * относятся ко всей неделе, а не к видимым карточкам. Пересчитать их по
+ * списку значило бы молча заменить «за неделю» на «за показанные дни».
+ * Расхождения описаны в журнале захода 5.
+ */
+export interface DiaryWeekRow {
+  index: number;              // 1 — текущая неделя макета
+  label: string;              // «20 – 26 июля»
+  grades_label: string;       // «8»
+  avg_label: string;          // «4.6»
+  homework_label: string;     // «8 из 10»
+  days: DiaryDayRow[];
+}
+
+/** Тест: пройденный (с результатом) или предстоящий (с отсчётом). */
+export interface TestRow {
+  subject_id: BaseSubjectKey;
+  name: string;
+  topic: string;
+  date_label: string;
+  done: boolean;
+  result_label?: string;      // «9 из 10»
+  pct?: number;
+  grade?: number;
+  countdown_label?: string;   // «Через 3 дня»
+}
+
+/** Материал школьной библиотеки. */
+export interface LibraryBookRow {
+  subject_id: BaseSubjectKey;
+  name: string;
+  author: string;
+  meta_label: string;         // «PDF · 4.2 МБ»
+  /** Попадает в блок «Недавно открытые» (rec в макете). */
+  is_recent: boolean;
+}
+
 /** Категория объявления в макете: важное, мероприятие, информация. */
 export type AnnouncementCategory = "imp" | "event" | "info";
 

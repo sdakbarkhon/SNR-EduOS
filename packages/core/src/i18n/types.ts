@@ -3659,6 +3659,17 @@ export interface Dictionary {
       lastReviewsAbout: string;
       allReviews: string;
       reviewTitle: string;        // «Оценка работы · {name}»
+      // Дневник, тесты, библиотека
+      gradesReceivedCap: string;
+      weekAvgCap: string;
+      homeworkDoneCap: string;
+      testsPassedCap: string;
+      avgScoreCap: string;
+      filterPassed: string;
+      filterUpcoming: string;
+      recentlyOpenedCap: string;
+      allMaterialsCap: string;
+      libraryNote: string;
     };
     pay: {
       autopay: string;
