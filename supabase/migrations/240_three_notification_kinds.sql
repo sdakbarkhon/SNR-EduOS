@@ -65,10 +65,21 @@ DROP FUNCTION IF EXISTS public.fn_leave_decision_notify();
 DROP TRIGGER IF EXISTS trg_excuse_notify ON public.lesson_excuse_requests;
 DROP FUNCTION IF EXISTS public.fn_excuse_notify();
 
+-- ── 8. Оценка за классную работу ────────────────────────────────────────────
+-- Классная работа удалена из продукта 21.08.2026 — рассылка о ней осталась.
+DROP TRIGGER IF EXISTS trg_classwork_grade_notify ON public.classwork_submissions;
+DROP FUNCTION IF EXISTS public.fn_classwork_grade_notify();
+
+-- ── 9. Оценка за проект ─────────────────────────────────────────────────────
+-- Проект — не домашняя работа.
+DROP TRIGGER IF EXISTS trg_project_grade_notify ON public.project_submissions;
+DROP FUNCTION IF EXISTS public.fn_project_grade_notify();
+
 COMMIT;
 
--- ПРОВЕРКА ПОСЛЕ ПРИМЕНЕНИЯ. Должно остаться шесть триггеров, ведущих к
--- уведомлениям, и ни одного из снятых восьми:
+-- ПРОВЕРКА ПОСЛЕ ПРИМЕНЕНИЯ. Из четырнадцати триггеров должны остаться
+-- ЧЕТЫРЕ: объявление, новое задание, проверка ДЗ, проверка теста.
+-- Снятых десять — ни одного из них в выборке быть не должно:
 --
 --   SELECT cl.relname, t.tgname, p.proname
 --     FROM pg_trigger t
@@ -81,29 +92,66 @@ COMMIT;
 --    ORDER BY cl.relname;
 --
 --
--- ═══ ТРИ ИСТОЧНИКА, КОТОРЫХ НЕ БЫЛО В СПИСКЕ — ОСТАВЛЕНЫ, НУЖНО РЕШЕНИЕ ═══
+-- ═══ ОЦЕНКА ЗА ТЕСТ ОСТАЁТСЯ ═══
 --
--- Кроме проверки домашней работы, вид `new_grade` пишут ещё три триггера. В
--- списке на снятие их не было, и снимать их молча я не стал:
+-- Вид `new_grade` пишут теперь два триггера: проверка домашней работы
+-- (`trg_homework_grade_notify`) и проверка теста (`trg_test_grade_notify`).
 --
---   test_submissions.trg_test_grade_notify           — оценка за тест
---   classwork_submissions.trg_classwork_grade_notify — оценка за классную работу
---   project_submissions.trg_project_grade_notify     — оценка за проект
+-- Тест оставлен по решению заказчика: в этой системе он заводится ТОЙ ЖЕ
+-- формой, что и задание (`homework.content_type = 'test'`), и для родителя это
+-- то же самое — работу задали, работу проверили.
 --
--- Все три зовут ту же `fn_notify_student_grade` и пишут ТОТ ЖЕ вид `new_grade`,
--- что и проверка ДЗ. Поэтому «остаются три вида» соблюдается буквально: видов
--- после этой миграции ровно три. Но по смыслу это оценки НЕ за домашнюю
--- работу, а тест в этой системе заводится той же формой, что и задание
--- (`homework.content_type = 'test'`), — так что «оценка за тест» это, скорее
--- всего, как раз то, что заказчик и называет проверкой работы.
+-- Оценка за классную работу снята выше: сама классная работа удалена из
+-- продукта 21.08.2026, рассылка о ней пережила её на девять дней. Оценка за
+-- проект снята потому, что проект — не домашняя работа.
 --
--- Если решение — снять и их, добавляется шесть строк того же вида:
+-- `fn_notify_student_grade` остаётся: её зовут обе оставшиеся проверки.
+
+
+-- ═══ УБОРКА СТАРЫХ СТРОК — ВЫПОЛНЯЕТСЯ ОТДЕЛЬНО, ПОСЛЕ ПРИМЕНЕНИЯ ═══
 --
---   DROP TRIGGER IF EXISTS trg_test_grade_notify ON public.test_submissions;
---   DROP FUNCTION IF EXISTS public.fn_test_grade_notify();
---   DROP TRIGGER IF EXISTS trg_classwork_grade_notify ON public.classwork_submissions;
---   DROP FUNCTION IF EXISTS public.fn_classwork_grade_notify();
---   DROP TRIGGER IF EXISTS trg_project_grade_notify ON public.project_submissions;
---   DROP FUNCTION IF EXISTS public.fn_project_grade_notify();
+-- Блок закомментирован намеренно, как это делалось с 121 мёртвой строкой
+-- `lesson_created` в миграции 236: сначала смотрим на числа, потом выполняем.
 --
--- `fn_notify_student_grade` в любом случае остаётся: её зовёт проверка ДЗ.
+-- ЧТО В БАЗЕ НА 30.08.2026 (всего 446 строк):
+--
+--   SNR Demo School  lesson_material     126 строк, непрочитанных 126
+--   SNR Demo School  grade_received       93 строк, непрочитанных  62
+--   SNR Demo School  student_submitted    40 строк, непрочитанных   0
+--   SNR Demo School  student_excused       1 строк, непрочитанных   0
+--   SNR School       grade_received        1 строк, непрочитанных   1
+--   ──────────────────────────────────────────────────────────────────
+--   К УДАЛЕНИЮ                            261 строк, непрочитанных 189
+--
+-- ОСТАНЕТСЯ 185:
+--
+--   announcement       92 строк, непрочитанных  0
+--   new_homework       63 строк, непрочитанных  0
+--   announcement_new   30 строк, непрочитанных 24
+--
+-- Из 189 непрочитанных 126 — «Новый материал»: колокольчик показывает число,
+-- за которым стоит ровно то, что решено больше не показывать.
+--
+-- Видов в списке больше, чем строк: `chat_message`, `leave_request`,
+-- `leave_decision`, `lesson_starting_soon` в базе не встречаются ни разу, но
+-- источников у них теперь тоже нет — включены, чтобы не возвращаться.
+--
+--   DELETE FROM public.notifications
+--    WHERE kind IN ('lesson_material', 'grade_received', 'student_submitted',
+--                   'student_excused', 'chat_message', 'leave_request',
+--                   'leave_decision', 'lesson_created', 'lesson_starting_soon');
+--
+--   -- Настройки с исчезнувшей категорией «сообщения». На 30.08.2026 таблица
+--   -- ПУСТА (0 строк), то есть удалять нечего — команда оставлена на случай,
+--   -- если между сегодня и применением кто-то успеет выключить тумблер.
+--   DELETE FROM public.notification_prefs WHERE category = 'messages';
+--
+-- ПОСЛЕ УБОРКИ СПИСОК ВИДОВ МОЖНО СУЗИТЬ — но ОТДЕЛЬНЫМ ФАЙЛОМ и только
+-- после того, как строки удалены: сужение CHECK на живых данных откажет, это
+-- мы уже проходили. Живыми после уборки остаются ТРИ вида:
+--
+--     announcement, announcement_new, new_homework, new_grade
+--
+-- — четыре значения на три вида в понимании заказчика: `announcement_new` это
+-- то же объявление, только его копия куратору. То же касается
+-- `notification_prefs.category`: там останутся три из четырёх.

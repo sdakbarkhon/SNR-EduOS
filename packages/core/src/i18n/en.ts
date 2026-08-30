@@ -3784,8 +3784,8 @@ export const en: Dictionary = {
     notif: {
       master: "All notifications",
       masterSub: "Master switch for push notifications",
-      grades: "Grades",
-      gradesSub: "New grades and teacher comments",
+      grades: "Grades for work",
+      gradesSub: "Checked homework and tests",
       hw: "Homework",
       hwSub: "New assignments and deadline reminders",
       sched: "Schedule",
@@ -3808,7 +3808,7 @@ export const en: Dictionary = {
       saveFailed: "Could not save",
       saveFailedSub: "The switch went back to its previous value. Check your connection and try again.",
       loadFailed: "Could not load settings",
-      onlyFourNote: "Four kinds of notification work for now — the rest will appear once the school starts sending them.",
+      onlyFourNote: "Three kinds of notification work for now — the rest will appear once the school starts sending them.",
     },
     wn: {
       thisVersion: "In this version",

@@ -3786,8 +3786,8 @@ export const uz: Dictionary = {
     notif: {
       master: "Barcha bildirishnomalar",
       masterSub: "Push-bildirishnomalar uchun asosiy tugma",
-      grades: "Baholar",
-      gradesSub: "Yangi baholar va o'qituvchilar izohlari",
+      grades: "Ishlar uchun baholar",
+      gradesSub: "Tekshirilgan uy ishlari va testlar",
       hw: "Uy vazifalari",
       hwSub: "Yangi vazifalar va muddat eslatmalari",
       sched: "Dars jadvali",
@@ -3810,7 +3810,7 @@ export const uz: Dictionary = {
       saveFailed: "Saqlab bo'lmadi",
       saveFailedSub: "O'zgartirgich avvalgi holatiga qaytdi. Aloqani tekshirib, qaytadan urinib ko'ring.",
       loadFailed: "Sozlamalarni yuklab bo'lmadi",
-      onlyFourNote: "Hozircha to'rt turdagi bildirishnoma ishlaydi — qolganlari maktab ularni yubora boshlaganda paydo bo'ladi.",
+      onlyFourNote: "Hozircha uch turdagi bildirishnoma ishlaydi — qolganlari maktab ularni yubora boshlaganda paydo bo'ladi.",
     },
     wn: {
       thisVersion: "Ushbu versiyada",

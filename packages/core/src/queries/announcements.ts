@@ -296,8 +296,21 @@ export const getParentAnnouncementById = async (db: Db, id: string): Promise<Par
 
 // ── Настройки уведомлений (миграция 236) ────────────────────────────────
 
-/** Категории экрана настроек. Те же четыре, что в CHECK таблицы. */
-export const NOTIFICATION_CATEGORIES = ["grades", "homework", "announcements", "messages"] as const;
+/**
+ * Категории экрана настроек.
+ *
+ * 30.08.2026 — ИХ ТРИ, А НЕ ЧЕТЫРЕ. Миграция 240 сняла рассылку про
+ * сообщения в чате вместе с ещё девятью источниками, и категория
+ * «сообщения» осталась тумблером, которому нечего выключать. Тумблер,
+ * который ничего не делает, хуже отсутствующего: человек им пользуется и
+ * считает, что настроил.
+ *
+ * В CHECK таблицы значений по-прежнему четыре — сузить его можно только
+ * после уборки старых строк, отдельным файлом (см. хвост миграции 240).
+ * Лишнее значение в базе безвредно: сюда оно не попадёт, потому что
+ * getNotificationPrefs сверяется с этим списком.
+ */
+export const NOTIFICATION_CATEGORIES = ["grades", "homework", "announcements"] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 /** Категория включена, если её не выключили. Ключи — все четыре всегда. */
 export type NotificationPrefs = Record<NotificationCategory, boolean>;
@@ -338,8 +351,8 @@ const CATEGORY_BY_KIND: Readonly<Record<string, NotificationCategory>> = {
   // Объявления школы: оба вида — ученикам и учителям.
   announcement: "announcements",
   announcement_new: "announcements",
-  // Сообщения: источник заведён миграцией 236.
-  chat_message: "messages",
+  // chat_message здесь БЫЛ и убран 30.08.2026 вместе с категорией
+  // «сообщения»: миграция 240 сняла триггер, источника больше нет.
 };
 
 /** Школа текущего человека. Нужна только на ЗАПИСЬ настройки: правило

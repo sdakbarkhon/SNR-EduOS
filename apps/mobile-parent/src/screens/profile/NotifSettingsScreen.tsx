@@ -86,7 +86,10 @@ const CATEGORY_BY_ROW_ID: Readonly<Record<string, NotificationCategory>> = {
   grades: "grades",
   hw: "homework",
   ann: "announcements",
-  msg: "messages",
+  // 30.08.2026 — «Сообщения» убраны. Миграция 240 сняла рассылку про чат,
+  // и категории `messages` в NOTIFICATION_CATEGORIES больше нет: строка
+  // здесь перестала бы даже собираться. Сам чат не тронут — снято только
+  // уведомление о нём.
 };
 
 function categoryText(
