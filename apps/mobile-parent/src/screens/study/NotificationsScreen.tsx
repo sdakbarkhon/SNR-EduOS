@@ -24,8 +24,8 @@
  * которых у родителя подходящего экрана нет, остаются некликабельными: это
  * честнее, чем увести на чужой раздел.
  */
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -54,6 +54,10 @@ import { TAB_ROUTES } from "../../navigation/routes";
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 type Filter = "all" | "unread";
 type Bucket = "today" | "yesterday" | "earlier";
+
+/** Сколько уведомлений в странице. Столько же берёт веб у ученика и
+ *  учителя — держим одинаково, чтобы «ещё» везде добавляло поровну. */
+const СТРАНИЦА = 20;
 
 /** kind → градиент круглой иконки + глиф. Виды — реальные значения колонки
  *  `notifications.kind`; те же наборы путей, что на вебе. */
@@ -221,11 +225,66 @@ export default function NotificationsScreen() {
     { key: "imp" as const, label: sc.filterImportant },
   ];
 
+  // ── ПОДГРУЗКА (30.08.2026) ────────────────────────────────────────────────
+  //
+  // Было: одна выборка на 50 строк без страничности, а колокольчик считал
+  // ВСЕ непрочитанные. При тысяче строк человек видел число, за которым
+  // стояли недостижимые записи. Теперь лента берётся страницами, и до любой
+  // записи можно дойти — колокольчик перестал врать, считая при этом всё.
+  //
+  // Двадцать, а не пятьдесят: столько же берёт веб у ученика и учителя, и
+  // на телефоне это примерно два экрана прокрутки до кнопки. Пятьдесят
+  // строк — семь экранов, кнопку никто не найдёт.
   const state = useAsyncData(
-    () => (showcase ? Promise.resolve([]) : getMyNotifications(getSupabase(), 50)),
+    () => (showcase ? Promise.resolve([]) : getMyNotifications(getSupabase(), СТРАНИЦА)),
     [showcase],
   );
-  const rows = useMemo(() => state.data ?? [], [state.data]);
+  const [добор, setДобор] = useState<AppNotification[]>([]);
+  const [добираем, setДобираем] = useState(false);
+  const [сбойДобора, setСбойДобора] = useState<string | null>(null);
+  const [конецСписка, setКонецСписка] = useState(false);
+
+  // Склейка страниц с проверкой по id: пока человек читает, могло прийти
+  // новое уведомление — оно сдвигает окно, и одна запись пришла бы дважды.
+  const rows = useMemo(() => {
+    const виденные = new Set<string>();
+    const итог: AppNotification[] = [];
+    for (const n of [...(state.data ?? []), ...добор]) {
+      if (виденные.has(n.id)) continue;
+      виденные.add(n.id);
+      итог.push(n);
+    }
+    return итог;
+  }, [state.data, добор]);
+
+  // Конец списка виден по неполной странице: пришло меньше, чем просили —
+  // значит дальше ничего нет. Отдельный запрос «сколько всего» не нужен.
+  const всёПоказано =
+    конецСписка || (!state.loading && !state.error && (state.data?.length ?? 0) < СТРАНИЦА);
+
+  const подгрузить = useCallback(async () => {
+    if (добираем) return;
+    setДобираем(true);
+    setСбойДобора(null);
+    try {
+      const пачка = await getMyNotifications(getSupabase(), СТРАНИЦА, rows.length);
+      if (пачка.length < СТРАНИЦА) setКонецСписка(true);
+      if (пачка.length) setДобор((было) => [...было, ...пачка]);
+    } catch (e) {
+      setСбойДобора((e as Error)?.message ?? String(e));
+    } finally {
+      setДобираем(false);
+    }
+  }, [добираем, rows.length]);
+
+  // «Повторить» после ошибки начинает список заново — иначе смещение
+  // считалось бы от страниц, которых на экране уже нет.
+  const начатьЗаново = useCallback(() => {
+    setДобор([]);
+    setКонецСписка(false);
+    setСбойДобора(null);
+    void state.refresh();
+  }, [state]);
 
   // Открыл список — значит увидел. 18.08.2026: раньше приложение не помечало
   // прочитанным НИЧЕГО, функция markAllNotificationsRead существовала в ядре и
@@ -238,15 +297,23 @@ export default function NotificationsScreen() {
   // Список на экране НЕ перерисовываем — фильтр «непрочитанные» должен
   // остаться рабочим, пока человек стоит на экране. Число над вкладкой
   // обновится при возврате: бейдж перечитывается по фокусу.
+  //
+  // 30.08.2026 — ОТМЕТКА СТАВИТСЯ ОДИН РАЗ ЗА ПОСЕЩЕНИЕ. С подгрузкой `rows`
+  // меняется на каждой странице, и без предохранителя команда уходила бы в
+  // базу на каждое «Загрузить ещё» — притом что первая уже пометила
+  // прочитанным ВСЁ, а не только показанное.
+  const отмечали = useRef(false);
   useEffect(() => {
     // В показе отмечать нечего: списка в базе нет.
     if (showcase) return;
+    if (отмечали.current) return;
     if (state.loading || state.error) return;
     if (!rows.some((n) => !n.is_read)) return;
+    отмечали.current = true;
     markAllNotificationsRead(getSupabase()).catch((e) => {
       console.error("[NotificationsScreen] отметка о прочтении не записалась:", e?.message);
     });
-  }, [state.loading, state.error, rows]);
+  }, [showcase, state.loading, state.error, rows]);
 
   const todayKey = useTashkentToday();
   const yesterdayKey = useMemo(() => addDays(todayKey, -1), [todayKey]);
@@ -369,7 +436,7 @@ export default function NotificationsScreen() {
             title={m4.loadFailed}
             message={state.error.message}
             retryLabel={d.common.retry}
-            onRetry={() => state.refresh()}
+            onRetry={начатьЗаново}
           />
         ) : sections.length === 0 ? (
           <EmptyBlock
@@ -377,19 +444,83 @@ export default function NotificationsScreen() {
             text={filter === "unread" ? m4.notifUnreadEmptyText : m4.notifEmptyText}
           />
         ) : (
-          sections.map((section) => (
-            <View key={section.bucket} style={{ gap: 11 }}>
-              <SectionCap label={bucketLabel[section.bucket]} />
-              {section.rows.map((n) => (
-                <NotificationCard
-                  key={n.id}
-                  row={n}
-                  timeLabel={stamp(n.created_at, todayKey, yesterdayKey, localeTag, d.parentApp.date.yesterday)}
-                  onPress={TARGET_BY_KIND[n.kind] ? () => open(n.kind) : undefined}
-                />
-              ))}
-            </View>
-          ))
+          <>
+            {sections.map((section) => (
+              <View key={section.bucket} style={{ gap: 11 }}>
+                <SectionCap label={bucketLabel[section.bucket]} />
+                {section.rows.map((n) => (
+                  <NotificationCard
+                    key={n.id}
+                    row={n}
+                    timeLabel={stamp(n.created_at, todayKey, yesterdayKey, localeTag, d.parentApp.date.yesterday)}
+                    onPress={TARGET_BY_KIND[n.kind] ? () => open(n.kind) : undefined}
+                  />
+                ))}
+              </View>
+            ))}
+
+            {/*
+              Хвост списка. Кнопка живёт ТОЛЬКО в фильтре «Все» — и вот
+              почему. Открытие экрана помечает прочитанным всё, что было
+              непрочитанным в базе, поэтому следующая страница приходит уже
+              прочитанной и в фильтр «Непрочитанные» не попадает: человек
+              нажал бы кнопку и не увидел ни одной новой строки. Кнопка,
+              после которой ничего не происходит, хуже её отсутствия.
+            */}
+            {filter === "all" ? (
+              всёПоказано ? (
+                rows.length > СТРАНИЦА ? (
+                  <Text
+                    style={{
+                      fontFamily: fonts.manrope600,
+                      fontSize: 10.5,
+                      color: tokens.ink3,
+                      textAlign: "center",
+                      paddingVertical: 6,
+                    }}
+                  >
+                    {d.notifications.noMore}
+                  </Text>
+                ) : null
+              ) : (
+                <View style={{ gap: 8 }}>
+                  {сбойДобора ? (
+                    <Text
+                      style={{
+                        fontFamily: fonts.manrope600,
+                        fontSize: 10.5,
+                        color: tokens.status.red.text,
+                        textAlign: "center",
+                      }}
+                    >
+                      {сбойДобора}
+                    </Text>
+                  ) : null}
+                  <Pressable
+                    onPress={подгрузить}
+                    disabled={добираем}
+                    style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed || добираем ? 0.6 : 1 })}
+                  >
+                    <GlassCard
+                      radius={18}
+                      contentStyle={{
+                        paddingVertical: 13,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        gap: 8,
+                      }}
+                    >
+                      {добираем ? <ActivityIndicator size="small" color={tokens.accent} /> : null}
+                      <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.accent }}>
+                        {сбойДобора ? d.common.retry : d.notifications.loadMore}
+                      </Text>
+                    </GlassCard>
+                  </Pressable>
+                </View>
+              )
+            ) : null}
+          </>
         )}
       </ScrollView>
     </AppBackground>
