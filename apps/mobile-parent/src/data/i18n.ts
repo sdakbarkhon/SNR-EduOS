@@ -514,6 +514,37 @@ export const DEMO_TR: Record<string, Pair> = {
   "сегодня, 10:42": ["bugun, 10:42", "today, 10:42"],
   "26 июля, 10:00": ["26-iyul, 10:00", "26 July, 10:00"],
   "2 часа назад": ["2 soat oldin", "2 hours ago"],
+
+  // ── Лента уведомлений ────────────────────────────────────────────────────
+  // Плейсхолдеры {name}, {suf} и {sum} остаются в переводах там, где нужны;
+  // {suf} в узбекском и английском не ставим — рода там нет.
+  "Оценка 5 по математике": ["Matematikadan 5 baho", "Grade 5 in maths"],
+  "Контрольная «Дроби и проценты» — отличный результат": ["«Kasrlar va foizlar» nazorat ishi — a'lo natija", "«Fractions and percentages» test — an excellent result"],
+  "Новое домашнее задание": ["Yangi uyga vazifa", "New homework"],
+  "Английский язык: эссе «My Summer» — срок завтра, 18:00": ["Ingliz tili: «My Summer» inshosi — muddati ertaga, 18:00", "English: «My Summer» essay — due tomorrow, 18:00"],
+  "Выставлен счёт за август": ["Avgust uchun hisob chiqarildi", "August invoice issued"],
+  "Обучение · {name} — {sum} сум, оплатить до 5 августа": ["O'qish · {name} — {sum} so'm, 5-avgustgacha to'lang", "Tuition · {name} — {sum} UZS, due 5 August"],
+  "Объявление школы": ["Maktab e'loni", "School announcement"],
+  "Родительское собрание 30 июля в 18:00, актовый зал": ["30-iyul soat 18:00 da ota-onalar yig'ilishi, yig'ilishlar zali", "Parent meeting on 30 July at 18:00, assembly hall"],
+  "Обед 22 июля успешно оплачен · баланс 185 000 сум": ["22-iyuldagi tushlik to'landi · balans 185 000 so'm", "Lunch on 22 July paid · balance 185,000 UZS"],
+  "Отсутствие 21 июля": ["21-iyulda kelmagan", "Absence on 21 July"],
+  "{name} отсутствовал{suf} без уважительной причины": ["{name} sababsiz kelmadi", "{name} was absent without a valid reason"],
+
+  // ── Активные сессии ──────────────────────────────────────────────────────
+  "Ташкент · IP 84.54.72.11": ["Toshkent · IP 84.54.72.11", "Tashkent · IP 84.54.72.11"],
+  "Вход выполнен: 23 июля, 09:14": ["Kirish: 23-iyul, 09:14", "Signed in: 23 July, 09:14"],
+  "Планшет · Ташкент · вчера, 20:15": ["Planshet · Toshkent · kecha, 20:15", "Tablet · Tashkent · yesterday, 20:15"],
+  "Браузер · Ташкент · 21 июля, 14:02": ["Brauzer · Toshkent · 21-iyul, 14:02", "Browser · Tashkent · 21 July, 14:02"],
+  "Телефон · Ташкент · 18 июля, 08:44": ["Telefon · Toshkent · 18-iyul, 08:44", "Phone · Tashkent · 18 July, 08:44"],
+
+  // ── О приложении ─────────────────────────────────────────────────────────
+  "Версия 1.0.0": ["Versiya 1.0.0", "Version 1.0.0"],
+  "Версия 0.9.2": ["Versiya 0.9.2", "Version 0.9.2"],
+  "Версия 0.9.0": ["Versiya 0.9.0", "Version 0.9.0"],
+  "1.0.0 (сборка 214)": ["1.0.0 (build 214)", "1.0.0 (build 214)"],
+  "23 июля 2026": ["2026-yil 23-iyul", "23 July 2026"],
+  "г. Ташкент, ул. Мирзо-Улугбекская, 21": ["Toshkent sh., Mirzo Ulug'bek ko'chasi, 21", "Tashkent, Mirzo Ulugbek St. 21"],
+  "© 2026 SNR International School. Все права защищены.": ["© 2026 SNR International School. Barcha huquqlar himoyalangan.", "© 2026 SNR International School. All rights reserved."],
 };
 
 /** Перевести одну строку. Нет перевода — остаётся русская. */

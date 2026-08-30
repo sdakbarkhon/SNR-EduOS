@@ -25,7 +25,7 @@
  * честнее, чем увести на чужой раздел.
  */
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -41,6 +41,8 @@ import {
   SegmentPills,
 } from "../../ui";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getNotificationFeed } from "../../data";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
 import { addDays, tashkentDateKey } from "../../lib/tashkent";
@@ -190,13 +192,39 @@ function NotificationCard({
 }
 
 export default function NotificationsScreen() {
+  const { tokens } = useTheme();
   const { d, locale } = useAppLocale();
   const m4 = d.parentApp.more4;
   const localeTag = LOCALE_TAG[locale];
   const navigation = useNavigation<Nav>();
 
   const [filter, setFilter] = useState<Filter>("all");
-  const state = useAsyncData(() => getMyNotifications(getSupabase(), 50), []);
+
+  // Витрина: шесть уведомлений макета. Третий чип «Важные» есть только
+  // здесь — у настоящего экрана таких пометок в базе нет.
+  const { showcase, childId } = useShowcaseChild();
+  const sc = d.parentApp.showcase;
+  const [scFilter, setScFilter] = useState<"all" | "unread" | "imp">("all");
+  const scFeed = getNotificationFeed(childId ?? undefined, locale);
+  const scShown = scFeed.filter((n) =>
+    scFilter === "unread" ? n.is_unread : scFilter === "imp" ? n.is_important : true,
+  );
+  const SC_GROUPS = [
+    { key: "today" as const, label: d.parentApp.date.today.toUpperCase() },
+    { key: "yday" as const, label: d.parentApp.date.yesterday.toUpperCase() },
+  ]
+    .map((g) => ({ ...g, rows: scShown.filter((n) => n.group === g.key) }))
+    .filter((g) => g.rows.length > 0);
+  const SC_FILTERS = [
+    { key: "all" as const, label: m4.notifFilterAll },
+    { key: "unread" as const, label: m4.notifFilterUnread },
+    { key: "imp" as const, label: sc.filterImportant },
+  ];
+
+  const state = useAsyncData(
+    () => (showcase ? Promise.resolve([]) : getMyNotifications(getSupabase(), 50)),
+    [showcase],
+  );
   const rows = useMemo(() => state.data ?? [], [state.data]);
 
   // Открыл список — значит увидел. 18.08.2026: раньше приложение не помечало
@@ -211,6 +239,8 @@ export default function NotificationsScreen() {
   // остаться рабочим, пока человек стоит на экране. Число над вкладкой
   // обновится при возврате: бейдж перечитывается по фокусу.
   useEffect(() => {
+    // В показе отмечать нечего: списка в базе нет.
+    if (showcase) return;
     if (state.loading || state.error) return;
     if (!rows.some((n) => !n.is_read)) return;
     markAllNotificationsRead(getSupabase()).catch((e) => {
@@ -273,12 +303,66 @@ export default function NotificationsScreen() {
         contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 118, gap: 11 }}
       >
         <SegmentPills
-          items={FILTERS.map((f) => f.label)}
-          activeIndex={activeIndex}
-          onChange={(i) => setFilter(FILTERS[i].key)}
+          items={showcase ? SC_FILTERS.map((f) => f.label) : FILTERS.map((f) => f.label)}
+          activeIndex={
+            showcase
+              ? Math.max(0, SC_FILTERS.findIndex((f) => f.key === scFilter))
+              : activeIndex
+          }
+          onChange={(i) => (showcase ? setScFilter(SC_FILTERS[i].key) : setFilter(FILTERS[i].key))}
         />
 
-        {state.loading ? (
+        {showcase ? (
+          SC_GROUPS.length === 0 ? (
+            <EmptyBlock title={m4.notifUnreadEmptyTitle} text={m4.notifUnreadEmptyText} />
+          ) : (
+            SC_GROUPS.map((g) => (
+              <View key={g.key} style={{ gap: 11 }}>
+                <SectionCap label={g.label} />
+                {g.rows.map((n) => (
+                  <Pressable
+                    key={n.id}
+                    onPress={() => navigation.navigate(n.go as never)}
+                    style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed ? 0.75 : 1 })}
+                  >
+                    <GlassCard
+                      radius={18}
+                      contentStyle={{ padding: 12, flexDirection: "row", alignItems: "flex-start", gap: 10 }}
+                    >
+                      <LinearGradient
+                        colors={[n.gradient[0], n.gradient[1]]}
+                        {...gradPoints(135)}
+                        style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }}
+                      >
+                        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                          {n.icon_paths.map((p, i) => (
+                            <Path key={i} d={p} />
+                          ))}
+                        </Svg>
+                      </LinearGradient>
+                      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                            {n.title}
+                          </Text>
+                          <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                            {n.time_label}
+                          </Text>
+                        </View>
+                        <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, lineHeight: 16, color: tokens.ink2 }}>
+                          {n.text}
+                        </Text>
+                      </View>
+                      {n.is_unread ? (
+                        <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 4, backgroundColor: tokens.accent }} />
+                      ) : null}
+                    </GlassCard>
+                  </Pressable>
+                ))}
+              </View>
+            ))
+          )
+        ) : state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

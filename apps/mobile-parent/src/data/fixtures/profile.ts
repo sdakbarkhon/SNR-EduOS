@@ -4,7 +4,7 @@
  * (3426–3450), «Что нового» WN_D (3451–3454), конфирмы (B8), автовыход (B9).
  * Все значения — ДОСЛОВНО из макета.
  */
-import type { ConfirmDialogRow, DocumentRow, LegalDocRow, SessionRow, WhatsNewRow } from "../types";
+import type { AboutShowcase, ConfirmDialogRow, CurrentSessionRow, DocumentRow, LegalDocRow, SessionRow, WhatsNewRow } from "../types";
 
 export const SESSIONS: SessionRow[] = [
   {
@@ -194,3 +194,37 @@ export const DEFAULT_AUTO_EXIT_VALUE = "15";
  *  имеют, а тот файл ушёл целиком в data/demoPayments.ts. */
 export const PASSWORD_RULES = ["Минимум 8 символов", "Есть заглавная буква", "Есть цифра"] as const;
 export const PASSWORD_STRENGTH_LABELS = ["Слабый", "Средний", "Надёжный"] as const;
+
+/**
+ * Текущее устройство на экране «Активные сессии» (разметка 1940–1941 макета).
+ * В `SESSIONS` выше лежат ТОЛЬКО другие устройства — так же, как в макете:
+ * там это отдельный блок «ДРУГИЕ УСТРОЙСТВА».
+ */
+export const CURRENT_SESSION: CurrentSessionRow = {
+  name: "iPhone 15 Pro",
+  place_label: "Ташкент · IP 84.54.72.11",
+  entered_label: "Вход выполнен: 23 июля, 09:14",
+};
+
+/**
+ * Экран «О приложении» (разметка 2354–2394 макета).
+ *
+ * У настоящего родителя этот экран показывает НАСТОЯЩИЕ версию, канал
+ * обновлений и школу — их отдаёт expo-updates и база. Здесь то, что нарисовано
+ * в макете, и только для показа.
+ */
+export const ABOUT_SHOWCASE: AboutShowcase = {
+  app_name: "SNR EduOS",
+  tagline: "School OS of the Future",
+  version_label: "Версия 1.0.0",
+  facts: [
+    { label_key: "aboutVersion", value: "1.0.0 (сборка 214)" },
+    { label_key: "aboutBuildDate", value: "23 июля 2026" },
+    { label_key: "aboutDeveloper", value: "SNR International School" },
+    { label_key: "aboutPlatform", value: "iOS 17+ · Android 12+" },
+  ],
+  school_name: "SNR International School",
+  school_address: "г. Ташкент, ул. Мирзо-Улугбекская, 21",
+  school_contacts: "+998 71 200-45-67 · info@snr.school",
+  copyright: "© 2026 SNR International School. Все права защищены.",
+};

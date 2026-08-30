@@ -35,10 +35,12 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { deviceLabel, endSession, getMySessions, LOCALE_TAG, type OwnSession } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
-import { CenterModalFrame, ErrorBlock, GlassCard, InnerHeader, LoadingBlock } from "../../ui";
+import { CenterModalFrame, ErrorBlock, GlassCard, InnerHeader, LoadingBlock, StatusChip } from "../../ui";
 import { NoticeBanner, SoonNote } from "../../ui/notices";
 import { useAppLocale } from "../../i18n";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useDemoSession } from "../../context/DemoSessionContext";
+import { getSessions } from "../../data";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
 import { addDays } from "../../lib/tashkent";
@@ -105,7 +107,16 @@ export default function ActiveSessionsScreen() {
   const s = t.sess;
   const navigation = useNavigation<Nav>();
 
-  const state = useAsyncData<OwnSession[]>(() => getMySessions(getSupabase()), []);
+  // Витрина: одно текущее устройство и три чужих, как в макете
+  // (разметка 1940–1948). В базу в показе не ходим.
+  const { isDemo: showcase } = useDemoSession();
+  const sc = t.showcase;
+  const scSessions = getSessions(locale);
+
+  const state = useAsyncData<OwnSession[]>(
+    () => (showcase ? Promise.resolve([]) : getMySessions(getSupabase())),
+    [showcase],
+  );
   const sessions = state.data ?? [];
   const current = sessions.find((x) => x.isCurrent) ?? null;
   const others = sessions.filter((x) => !x.isCurrent);
@@ -184,7 +195,99 @@ export default function ActiveSessionsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 118, gap: 11 }}
       >
-        {state.loading ? (
+        {showcase ? (
+          <>
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 10.5,
+                letterSpacing: 10.5 * 0.08,
+                color: capsInk,
+              }}
+            >
+              {s.currentCap}
+            </Text>
+            <GlassCard radius={20} contentStyle={{ padding: 14, gap: 5 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>
+                  {scSessions.current.name}
+                </Text>
+                <StatusChip label={t.more.sessionsCurrent} family="green" />
+              </View>
+              <Text style={{ fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2 }}>
+                {scSessions.current.place_label}
+              </Text>
+              <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                {scSessions.current.entered_label}
+              </Text>
+            </GlassCard>
+
+            <Text
+              style={{
+                fontFamily: fonts.manrope800,
+                fontSize: 10.5,
+                letterSpacing: 10.5 * 0.08,
+                color: capsInk,
+              }}
+            >
+              {sc.otherDevicesCap}
+            </Text>
+            {scSessions.others.length === 0 ? (
+              <GlassCard radius={18} contentStyle={{ padding: 16, alignItems: "center" }}>
+                <Text style={{ fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink3, textAlign: "center" }}>
+                  {sc.noOtherSessions}
+                </Text>
+              </GlassCard>
+            ) : (
+              <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+                {scSessions.others.map((x, i) => (
+                  <View
+                    key={x.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 11,
+                      paddingVertical: 11,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: rowDivider,
+                    }}
+                  >
+                    <LinearGradient
+                      colors={[x.gradient[0], x.gradient[1]]}
+                      {...gradPoints(135)}
+                      style={{ width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" }}
+                    >
+                      <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                        {x.icon_paths.map((p, k) => (
+                          <Path key={k} d={p} />
+                        ))}
+                      </Svg>
+                    </LinearGradient>
+                    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.ink1 }}>
+                        {x.name}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                        {x.subtitle}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </GlassCard>
+            )}
+
+            {/* Кнопка и предупреждение из макета. Ничего не завершают:
+                сессий в показе нет, и делать вид, что сработало, нельзя. */}
+            <GlassCard radius={16} contentStyle={{ padding: 13, alignItems: "center" }}>
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.status.red.text }}>
+                {sc.endAllSessions}
+              </Text>
+            </GlassCard>
+            <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, lineHeight: 14, color: tokens.ink3, paddingHorizontal: 2 }}>
+              {sc.sessionsWarning}
+            </Text>
+          </>
+        ) : state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

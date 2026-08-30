@@ -3670,6 +3670,23 @@ export interface Dictionary {
       recentlyOpenedCap: string;
       allMaterialsCap: string;
       libraryNote: string;
+      // Активные сессии
+      otherDevicesCap: string;
+      noOtherSessions: string;
+      endAllSessions: string;
+      sessionsWarning: string;
+      // О приложении
+      aboutVersion: string;
+      aboutBuildDate: string;
+      aboutDeveloper: string;
+      aboutPlatform: string;
+      aboutSchoolCap: string;
+      termsLink: string;
+      privacyLink: string;
+      licensesLink: string;
+      writeSupportLink: string;
+      rateAppLink: string;
+      shareAppLink: string;
     };
     pay: {
       autopay: string;

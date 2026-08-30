@@ -652,6 +652,48 @@ export interface SessionRow {
   gradient: Gradient;
 }
 
+/**
+ * Уведомление в ленте (ntData макета, строки 3560–3573).
+ *
+ * Текст — ШАБЛОН: два уведомления в макете называют ребёнка по имени, а
+ * одно ещё и склеивает сумму счёта. Хранить их готовыми строками значило
+ * бы, что при переключении на другого ребёнка ему сообщат про Малику, а
+ * правка счёта разошлась бы с разделом оплат.
+ */
+export interface NotificationRow {
+  id: string;
+  group: "today" | "yday";
+  title: string;
+  /** Может содержать {name}, {suf} и {sum} — подставляет аксессор. */
+  text: string;
+  time_label: string;
+  is_unread: boolean;
+  is_important: boolean;
+  icon_paths: string[];
+  gradient: Gradient;
+  /** Маршрут перехода — как в макете. */
+  go: string;
+}
+
+/** Текущее устройство на экране «Активные сессии» (разметка 1940–1941). */
+export interface CurrentSessionRow {
+  name: string;
+  place_label: string;        // «Ташкент · IP 84.54.72.11»
+  entered_label: string;      // «Вход выполнен: 23 июля, 09:14»
+}
+
+/** Экран «О приложении» (разметка 2354–2394). */
+export interface AboutShowcase {
+  app_name: string;
+  tagline: string;
+  version_label: string;      // «Версия 1.0.0»
+  facts: { label_key: string; value: string }[];
+  school_name: string;
+  school_address: string;
+  school_contacts: string;
+  copyright: string;
+}
+
 /** Документ (DOCS_CHILD / DOCS_PARENT). */
 export interface DocumentRow {
   owner: "child" | "parent";

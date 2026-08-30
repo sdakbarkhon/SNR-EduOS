@@ -49,8 +49,11 @@ import type {
   HomeworkCardRow,
   LegalDocRow,
   MedicalCardRow,
+  AboutShowcase,
+  CurrentSessionRow,
   MessageThreadRow,
   MessagesStoryRow,
+  NotificationRow,
   PaymentHistoryRow,
   ReceiptRow,
   ScheduleDayRow,
@@ -99,6 +102,7 @@ import {
 } from "./fixtures/schedule";
 import { ADMIN_MESSAGE, ANNOUNCEMENTS } from "./fixtures/announcements";
 import { DIARY_WEEKS, LIBRARY_BOOKS, TESTS } from "./fixtures/studyServices";
+import { formatMoney } from "../lib/format";
 import {
   ATTENDANCE_LAST_DAYS,
   ATTENDANCE_MONTHS,
@@ -124,6 +128,7 @@ import {
 import {
   NOTIFICATIONS_MASTER_DEFAULT,
   NOTIFICATION_CATEGORIES,
+  NOTIFICATION_FEED,
 } from "./fixtures/notifications";
 import {
   CHAT_ATTACH_OPTIONS,
@@ -151,7 +156,10 @@ import {
 } from "./fixtures/services";
 import {
   CONFIRM_DIALOGS,
+  ABOUT_SHOWCASE,
+  CURRENT_SESSION,
   DOCUMENTS,
+  SESSIONS,
 } from "./fixtures/profile";
 import {
   ASSISTANT_TEXT_TEMPLATES,
@@ -418,6 +426,66 @@ export function getAttendanceLastDays(childId: string | undefined, locale: Local
 }
 
 // ─── Оценки и успехи ─────────────────────────────────────────────────────────
+
+// ─── Уведомления, сессии, «О приложении» ─────────────────────────────────────
+
+/**
+ * Лента уведомлений витрины.
+ *
+ * Тексты собираются, а не лежат готовыми: {name} и {suf} — от выбранного
+ * ребёнка, {sum} — из счёта «Обучение · август», того же, что в разделе
+ * оплат. Иначе показ рассказывал бы Азизу про Малику, а сумма счёта жила
+ * бы в двух местах.
+ *
+ * Порядок подстановки тот же, что у «Последних дней» посещаемости:
+ * сначала перевод, потом плейсхолдеры — иначе ключ таблицы не совпал бы
+ * со строкой.
+ */
+export function getNotificationFeed(childId: string | undefined, locale: Locale): NotificationRow[] {
+  const ребёнок = resolveChild(childId);
+  const счёт = BILLS.find((b) => b.id === "edu");
+  return NOTIFICATION_FEED.map((n) => ({
+    ...n,
+    title: tr(n.title, locale),
+    text: tr(n.text, locale)
+      .replace("{name}", ребёнок?.first_name ?? "")
+      .replace("{suf}", ребёнок?.is_female ? "а" : "")
+      .replace("{sum}", форматСуммы(счёт?.amount ?? 0)),
+  }));
+}
+
+/** Сумма для подстановки в текст уведомления — тем же форматтером, что
+ *  и на экранах оплат: разряды неразрывным пробелом. */
+function форматСуммы(v: number): string {
+  return formatMoney(v);
+}
+
+/**
+ * Непрочитанные в показе — для бэйджа колокольчика.
+ *
+ * СЧИТАЕТСЯ ПО ЛЕНТЕ, а не стоит константой. В макете на колокольчике
+ * нарисована тройка, и по этому же списку выходит ровно три — но связь
+ * должна быть расчётом, иначе правка ленты и число над ней разойдутся.
+ * Ровно поэтому бэйдж и был отложен в заходе 2: ленты тогда не было.
+ */
+export function getUnreadShowcaseCount(): number {
+  return NOTIFICATION_FEED.filter((n) => n.is_unread).length;
+}
+
+/** Активные сессии витрины: текущее устройство отдельно, остальные — списком
+ *  (в макете это два разных блока). */
+export function getSessions(locale: Locale) {
+  return {
+    current: trDeep(CURRENT_SESSION, locale) as CurrentSessionRow,
+    others: trDeep(SESSIONS, locale),
+  };
+}
+
+/** «О приложении» витрины. У настоящего родителя экран показывает свои
+ *  версию, канал обновлений и школу — сюда он не заходит. */
+export function getAboutShowcase(locale: Locale): AboutShowcase {
+  return trDeep(ABOUT_SHOWCASE, locale) as AboutShowcase;
+}
 
 // ─── Дневник, тесты, библиотека ──────────────────────────────────────────────
 
