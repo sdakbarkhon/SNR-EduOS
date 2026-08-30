@@ -172,6 +172,24 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
     return t.lastSchoolAdmin;
   }
 
+  // Миграция 237 — удалению учётной записи мешают ссылки на неё. Код с
+  // числами приходит из deleteSchoolAdmin: он спрашивает причину у базы
+  // ДО вызова Auth API, пока она ещё читается.
+  const userRefs = raw.match(/^BLOCKED_USER_REFS:(\d+):(.*)$/);
+  if (userRefs) {
+    return t.userHasRefs.replace("{count}", userRefs[1] ?? "0")
+      + (userRefs[2] ? ` (${userRefs[2]})` : "");
+  }
+
+  // ПОСЛЕДНИЙ РУБЕЖ ДЛЯ ТЕКСТА. Если ссылка всё-таки проскочила мимо
+  // проверки выше (её добавили новым триггером, а не внешним ключом), Auth
+  // API вернёт свою английскую заглушку. Ветка foreignKeyBlocked её не
+  // поймает: слов «violates foreign key constraint» в подменённом тексте
+  // уже нет. Пусть человек хотя бы понимает, что произошло и что делать.
+  if (/database error (deleting|creating|updating) user/i.test(raw)) {
+    return t.authUserOperationFailed;
+  }
+
   // Заход 3 по платежам — разбор суммы ручного пополнения баланса.
   if (raw === "BAD_TOPUP_AMOUNT" || raw === "BAD_PRICE_TOPUP") {
     return t.topUpAmountInvalid;

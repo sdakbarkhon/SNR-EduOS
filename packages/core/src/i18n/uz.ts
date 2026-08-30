@@ -1207,6 +1207,8 @@ export const uz: Dictionary = {
     superadminWriteBlocked: "Superadministrator maktab ma'lumotlarini o'zgartira olmaydi. Bu buyurtmachining 20.08.2026 dagi qarori: nazorat — ha, tahrir — yo'q. O'zgartirishlarni maktab administratori kiritadi.",
     rlsWriteBlocked: "Bu yozuv uchun huquq yetarli emas: baza kirish qoidalari uni o'tkazmadi.",
     lastSchoolAdmin: "Bu maktabning oxirgi administratori — uni o'chirib bo'lmaydi. Avval maktabga boshqa administrator tayinlang, keyin buni o'chiring.",
+    userHasRefs: "O'chirib bo'lmaydi: bu hisobga boshqa yozuvlar bog'langan — {count}. Avval ularni olib tashlang yoki ko'chiring.",
+    authUserOperationFailed: "Hisob bilan amalni bajarib bo'lmadi: ma'lumotlar bazasi rad etdi. Ehtimol, unga boshqa ma'lumotlar bog'langan. To'liq sabab server jurnalida.",
     topUpAmountInvalid: "To'ldirish summasi — noldan katta butun son (so'mda).",
     topUpReasonRequired: "To'ldirish sababini yozing: usiz bir oydan keyin pul qayerdan kelganini hech kim eslay olmaydi.",
     invoiceNotOpen: "Bu hisob allaqachon to'langan yoki bekor qilingan — uni o'zgartirib bo'lmaydi. To'langan hisob summasi bolaning balansidan yechilgan, harakatlar jurnalini esa tahrirlab bo'lmaydi. Pulni qaytarish kerak bo'lsa, buni «O'quvchilar» ekranida balans harakati bilan qiling.",

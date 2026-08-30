@@ -1534,11 +1534,54 @@ export async function topUpStudentBalance(data: {
   if (error) throw error;
 }
 
+/**
+ * ЧТО МЕШАЕТ УДАЛИТЬ УЧЁТНУЮ ЗАПИСЬ. Миграция 237.
+ *
+ * Спрашивает у базы, какие внешние ключи на `auth.users` не дадут удалить
+ * этого пользователя, и сколько строк за каждым. Список НЕ зашит в код
+ * намеренно: его забыли бы пополнить ровно в тот день, когда он
+ * понадобится, — а понадобится он при заведении новой таблицы со ссылкой
+ * `created_by` без действия при удалении.
+ *
+ * Сегодня список пуст: три такие ссылки сняты миграцией 237.
+ *
+ * Функции ещё может не быть (миграция не применена) — тогда возвращаем
+ * пустой список, и поведение ровно прежнее. Отсутствие подсказки не повод
+ * запретить удаление.
+ */
+export async function getUserDeletionBlockers(
+  userId: string,
+): Promise<{ table: string; column: string; rows: number }[]> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (sb as any).rpc("fn_user_delete_blockers", { p_user_id: userId });
+  if (error) {
+    console.warn("[getUserDeletionBlockers] подсказка недоступна:", error.message);
+    return [];
+  }
+  return ((data ?? []) as { table_name: string; column_name: string; row_count: number }[])
+    .map((r) => ({ table: r.table_name, column: r.column_name, rows: Number(r.row_count) }));
+}
+
 export async function deleteSchoolAdmin(userId: string) {
   const sb = getServiceClient();
   // Проверка стоит ЗДЕСЬ, а не в действии: так её получает любой вызывающий,
   // включая тот, которого ещё нет. Второй рубеж — триггер из миграции 228.
   await assertNotLastSchoolAdmin(userId);
+
+  // РАДИ ТЕКСТА, А НЕ РАДИ ЗАПРЕТА. Удаление идёт через Auth API, а он
+  // подменяет ошибку базы своим «Database error deleting user» — и человек
+  // видит английскую заглушку вместо причины. Спрашиваем причину заранее,
+  // пока она ещё читается, и отдаём машинным кодом с числами: фразу соберёт
+  // humanizeAdminError. Тот же приём, что у удаления учителя
+  // (BLOCKED_TEACHER_LESSONS).
+  const blockers = await getUserDeletionBlockers(userId);
+  if (blockers.length > 0) {
+    const total = blockers.reduce((sum, b) => sum + b.rows, 0);
+    const where = blockers.map((b) => `${b.table} (${b.rows})`).join("; ");
+    throw new Error(`BLOCKED_USER_REFS:${total}:${where}`);
+  }
+
   const { error } = await sb.auth.admin.deleteUser(userId);
   if (error) throw error;
 }

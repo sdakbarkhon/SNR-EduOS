@@ -1207,6 +1207,8 @@ export const en: Dictionary = {
     superadminWriteBlocked: "A super admin cannot change school data. This is the customer's decision of 20.08.2026: oversight yes, editing no. Changes are made by the school admin.",
     rlsWriteBlocked: "Not enough rights for this write: the database access rules rejected it.",
     lastSchoolAdmin: "This is the school's last administrator — it cannot be deleted. Assign another administrator to the school first, then delete this one.",
+    userHasRefs: "Cannot delete: other records reference this account — {count}. Remove or reassign them first.",
+    authUserOperationFailed: "The account operation failed: the database rejected it. Most likely other data references this record. The full reason is in the server logs.",
     topUpAmountInvalid: "The top-up amount must be a whole number of UZS greater than zero.",
     topUpReasonRequired: "Write down the reason for the top-up: without it, in a month nobody will remember where the money came from.",
     invoiceNotOpen: "This invoice is already paid or cancelled — it cannot be changed. The amount of a paid invoice has already been taken from the child's balance, and the movement journal cannot be edited. To return money, do it as a balance movement on the «Students» screen, where manual top-up lives.",

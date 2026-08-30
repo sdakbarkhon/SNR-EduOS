@@ -1232,6 +1232,10 @@ export interface Dictionary {
     superadminWriteBlocked: string;
     rlsWriteBlocked: string;
     lastSchoolAdmin: string;
+    /** Миграция 237 — удалению учётной записи мешают ссылки на неё. */
+    userHasRefs: string;
+    /** Auth API подменяет ошибку базы своим текстом; это его перевод. */
+    authUserOperationFailed: string;
     topUpAmountInvalid: string;
     topUpReasonRequired: string;
     invoiceNotOpen: string;
