@@ -18,10 +18,12 @@
  *  * карточки кошелька — таблицы школьного кошелька в схеме нет ни одной;
  *  * способов оплаты — привязок карт не существует до подключения кассы.
  *    Все три — решения заказчика, те же, что приняты в вебе.
- *  * сетки быстрых действий. У витрины она ведёт на dtop/d20/d21/d33, а у
- *    настоящего родителя все четыре пока отвечают «Скоро»: их настоящие
- *    версии — следующий заход. Четыре плитки, ведущие в «Скоро», хуже, чем
- *    их отсутствие; ссылки появятся вместе с экранами.
+ *  * ДВУХ ИЗ ЧЕТЫРЁХ быстрых действий витрины. Её сетка ведёт на
+ *    dtop/d20/d21/d33; в заходе 5 не было ни одной плитки — все четыре
+ *    цели отвечали «Скоро», а плитка, ведущая в «Скоро», хуже её
+ *    отсутствия. Заход 6 оживил историю (d20) и счета (d21) — вернулись
+ *    ровно они. «Пополнить» и «Способы оплаты» по-прежнему «Скоро» и
+ *    плиток не получили.
  *
  * СРОКА У СЧЁТА НЕТ. В `tuition_invoices` нет колонки с датой «до»: есть
  * месяц, сумма, статус и дата оплаты. Витринное «до 5 августа» — выдумка
@@ -44,7 +46,8 @@ import {
   type ChildInvoice,
   type ChildPaymentsSummary,
 } from "@snr/core";
-import { AppBackground, fonts, useTheme } from "../../theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import {
   AccentCard,
   AccentInset,
@@ -91,6 +94,37 @@ function Glyph({ paths, size = 20, color = "#fff", width = 1.9 }: {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round">
       {paths.map((p, i) => <Path key={i} d={p} />)}
     </Svg>
+  );
+}
+
+/** Плитка быстрого действия — половина ширины (плиток две, не четыре). */
+function QuickTile({
+  label,
+  paths,
+  gradient,
+  onPress,
+}: {
+  label: string;
+  paths: readonly string[];
+  gradient: [string, string];
+  onPress: () => void;
+}) {
+  const { tokens } = useTheme();
+  return (
+    <Pressable onPress={onPress} style={{ flex: 1 }}>
+      <GlassCard radius={16} contentStyle={{ alignItems: "center", gap: 5, paddingVertical: 12, paddingHorizontal: 6 }}>
+        <LinearGradient
+          colors={gradient}
+          {...gradPoints(135)}
+          style={{ width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" }}
+        >
+          <Glyph paths={paths} size={15} />
+        </LinearGradient>
+        <Text style={{ fontFamily: fonts.manrope700, fontSize: 9, color: tokens.ink1, textAlign: "center" }}>
+          {label}
+        </Text>
+      </GlassCard>
+    </Pressable>
   );
 }
 
@@ -309,6 +343,24 @@ export function RealPaymentsScreen() {
               // предлагать оплатить нечего.
               <EmptyBlock title={t.noInvoicesTitle} text={t.noInvoicesText} />
             )}
+
+            {/* Две плитки, а не четыре: «Пополнить» и «Способы оплаты» у
+                настоящего родителя пока отвечают «Скоро», и вести туда
+                нечестно. Появятся вместе со своими экранами. */}
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+              <QuickTile
+                label={d.parentApp.scr.payHistory}
+                paths={ICONS.clock}
+                gradient={["#60a5fa", "#2563eb"]}
+                onPress={() => navigation.navigate("d20")}
+              />
+              <QuickTile
+                label={t.invoicesTitle}
+                paths={ICONS.doc}
+                gradient={["#fbbf24", "#f97316"]}
+                onPress={() => navigation.navigate("d21")}
+              />
+            </View>
           </>
         ) : null}
       </TabScreenScroll>

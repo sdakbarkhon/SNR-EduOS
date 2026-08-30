@@ -63,6 +63,10 @@ import LangSecurityScreen from "../screens/profile/LangSecurityScreen";
 import BillsScreen from "../screens/payments/BillsScreen";
 import PaymentHistoryScreen from "../screens/payments/PaymentHistoryScreen";
 import ReceiptsScreen from "../screens/payments/ReceiptsScreen";
+// Заход 6 по оплатам: настоящие экраны счетов и истории (шестой аргумент
+// demoOr ниже). Витрина — ReceiptsScreen/PaymentHistoryScreen выше.
+import { RealInvoicesScreen } from "../screens/payments/RealInvoicesScreen";
+import { RealPaymentHistoryScreen } from "../screens/payments/RealPaymentHistoryScreen";
 import ChildWalletScreen from "../screens/payments/ChildWalletScreen";
 import PayMethodsScreen from "../screens/payments/PayMethodsScreen";
 import TopUpScreen from "../screens/payments/TopUpScreen";
@@ -130,8 +134,12 @@ const STUDY_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> =
  */
 const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>> = {
   d18: demoOr(BillsScreen, "bills", "doc", ["#fb923c", "#ef4444"]),
-  d20: demoOr(PaymentHistoryScreen, "payHistory", "clock", ["#60a5fa", "#2563eb"]),
-  d21: demoOr(ReceiptsScreen, "receipts", "doc", ["#fbbf24", "#f97316"]),
+  // Заход 6 по оплатам: у настоящего родителя эти два перестали быть
+  // «Скоро». Шестой аргумент — настоящий экран; витрина остаётся ПЕРВЫМ
+  // аргументом и не задета. d18 (BillsScreen) настоящей версии не получил:
+  // из настоящего потока на него ничего не ведёт.
+  d20: demoOr(PaymentHistoryScreen, "payHistory", "clock", ["#60a5fa", "#2563eb"], false, RealPaymentHistoryScreen),
+  d21: demoOr(ReceiptsScreen, "receipts", "doc", ["#fbbf24", "#f97316"], false, RealInvoicesScreen),
   d22: demoOr(ChildWalletScreen, "wallet", "wallet", ["#7c3aed", "#a855f7"]),
   d33: demoOr(PayMethodsScreen, "payMethods", "card", ["#a78bfa", "#7c3aed"]),
   dtop: demoOr(TopUpScreen, "topup", "plus", ["#34d399", "#059669"]),
