@@ -143,11 +143,19 @@ const SUPPORT_ITEMS: HubMenuItem[] = [
 ];
 
 export function ProfileView({
+  isDemo,
   parentName,
   parentInitials,
   parentGradient,
   child,
 }: {
+  /**
+   * Демо ли смотрящий. Заход 7 по оплатам: у настоящего родителя раздел
+   * «Способы оплаты» убран совсем (карт и привязок не существует до
+   * подключения кассы), и пункт меню, ведущий в убранное, — это ссылка в
+   * никуда. У витрины меню остаётся ровно таким, каким было.
+   */
+  isDemo: boolean;
   parentName: string;
   parentInitials: string;
   parentGradient: readonly [string, string];
@@ -161,6 +169,9 @@ export function ProfileView({
 }) {
   const { locale } = useLocale();
   const dict = getDictionary(locale as Locale).parentApp;
+  // Витрина видит список целиком; у настоящего родителя из него уходит
+  // «Способы оплаты» — см. проп isDemo.
+  const settingsItems = isDemo ? SETTINGS_ITEMS : SETTINGS_ITEMS.filter((it) => it.key !== "payMeth");
   const [logoutOpen, setLogoutOpen] = useState(false);
   // Анимация confirm-панели: translateY(115%) → 0, .32s (макет строка 4228);
   // оверлей — opacity .28s (строка 4027).
@@ -264,7 +275,7 @@ export function ProfileView({
           {/* 4. Настройки. */}
           <SectionCap label="Настройки" />
           <GlassCard className="px-[14px] py-1">
-            {SETTINGS_ITEMS.map((it, i) => (
+            {settingsItems.map((it, i) => (
               <CardRow key={it.key} href={it.href} divider={i > 0}>
                 <IconTile gradient={it.gradient} paths={it.paths} size={36} glyphSize={18} />
                 <RowText

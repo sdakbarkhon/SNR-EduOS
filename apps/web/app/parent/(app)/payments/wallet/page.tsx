@@ -1,4 +1,5 @@
 import { getSelectedChild, parentIsDemo, parentToday } from "@/lib/parent-queries";
+import { RealSectionSoon } from "../RealSectionSoon";
 import { WALLET_BALANCE, WALLET_OPS, walletTotals } from "../../_demo/demo-data";
 import { WalletView } from "./WalletView";
 
@@ -14,8 +15,16 @@ import { WalletView } from "./WalletView";
  * Баланс 185 000 сум — то же число, что главная показывает в плитке
  * «КОШЕЛЁК»: два экрана не должны спорить друг с другом.
  */
+/**
+ * ЗАХОД 7. У настоящего родителя раздела больше нет — решение заказчика.
+ * Таблицы школьного кошелька в схеме не существует ни одной, столовая не
+ * заведена: показывать нечего и неоткуда.
+ */
 export default async function ParentWalletPage() {
-  const [child, today, isDemo] = await Promise.all([getSelectedChild(), parentToday(), parentIsDemo()]);
+  const isDemo = await parentIsDemo();
+  if (!isDemo) return <RealSectionSoon sectionKey="wallet" />;
+
+  const [child, today] = await Promise.all([getSelectedChild(), parentToday()]);
   const totals = walletTotals();
 
   return (

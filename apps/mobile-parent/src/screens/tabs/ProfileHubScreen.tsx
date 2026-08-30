@@ -135,14 +135,21 @@ export default function ProfileHubScreen() {
       iconPaths: ["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"],
       route: "d32",
     },
-    {
-      key: "payMeth",
-      title: d.parentApp.scr.payMethods,
-      subtitle: d.parentApp.prof.payMethodsSub,
-      gradient: ["#a78bfa", "#7c3aed"],
-      iconPaths: ["M2 8a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z", "M2 10h20"],
-      route: "d33",
-    },
+    // Заход 7 по оплатам: «Способы оплаты» у НАСТОЯЩЕГО родителя убраны
+    // совсем — карт и привязок не существует до подключения кассы, и пункт
+    // меню вёл бы в «Скоро». У витрины пункт остаётся на месте.
+    ...(isRealFlow
+      ? []
+      : [
+          {
+            key: "payMeth",
+            title: d.parentApp.scr.payMethods,
+            subtitle: d.parentApp.prof.payMethodsSub,
+            gradient: ["#a78bfa", "#7c3aed"] as [string, string],
+            iconPaths: ["M2 8a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z", "M2 10h20"],
+            route: "d33" as const,
+          },
+        ]),
     {
       key: "langSec",
       title: d.parentApp.scr.langSec,

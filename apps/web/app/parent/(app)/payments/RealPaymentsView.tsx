@@ -348,15 +348,13 @@ export function RealPaymentsView({
               </GlassCard>
             )}
 
-            {/* Быстрые действия. Четыре раздела станут настоящими на заходах
-                3 и 7 — до тех пор ведут на прежние экраны. */}
-            <div className="grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 4 }}>
-              <QuickTile
-                label={d.pay.topupBtn}
-                href="/parent/payments/top-up"
-                paths={ICON.wallet}
-                gradient={["#34d399", "#059669"]}
-              />
+            {/* ДВЕ плитки, а не четыре (заход 7). «Пополнить» и «Способы
+                оплаты» у настоящего родителя убраны совсем: пополнить из
+                приложения нельзя, карт и привязок не существует до кассы.
+                Вести туда плиткой значило бы обещать действие, которого нет.
+                Подпись второй — «Счета», а не витринное «Счета и чеки»:
+                чеков на настоящем экране нет. */}
+            <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 4 }}>
               <QuickTile
                 label={d.scr.payHistory}
                 href="/parent/payments/history"
@@ -364,16 +362,10 @@ export function RealPaymentsView({
                 gradient={["#60a5fa", "#2563eb"]}
               />
               <QuickTile
-                label={d.pay.billsReceipts}
+                label={t.invoicesTitle}
                 href="/parent/payments/invoices"
                 paths={ICON.doc}
                 gradient={["#fbbf24", "#f97316"]}
-              />
-              <QuickTile
-                label={d.scr.payMethods}
-                href="/parent/payments/methods"
-                paths={ICON.card}
-                gradient={["#a78bfa", "#7c3aed"]}
               />
             </div>
           </>

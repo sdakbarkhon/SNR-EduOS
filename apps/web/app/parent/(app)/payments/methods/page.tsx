@@ -1,4 +1,5 @@
 import { parentIsDemo } from "@/lib/parent-queries";
+import { RealSectionSoon } from "../RealSectionSoon";
 import { InnerHeader } from "../../_ui/screen-kit";
 import { PayMethodsView } from "./PayMethodsView";
 
@@ -13,8 +14,15 @@ import { PayMethodsView } from "./PayMethodsView";
  */
 // Заход 1 по оплатам: экран стал async только ради признака демо. Сети это
 // не добавляет — getParentContext уже вызван layout-ом того же запроса.
+/**
+ * ЗАХОД 7. У настоящего родителя раздела больше нет — решение заказчика.
+ * Карт и привязок платёжных систем не существует до подключения кассы, а
+ * реквизиты будет принимать сама касса, а не приложение.
+ */
 export default async function ParentPayMethodsPage() {
   const isDemo = await parentIsDemo();
+  if (!isDemo) return <RealSectionSoon sectionKey="payMethods" />;
+
   return (
     <div className="mx-auto w-full max-w-[430px]">
       <InnerHeader title="Способы оплаты" backHref="/parent/payments" />

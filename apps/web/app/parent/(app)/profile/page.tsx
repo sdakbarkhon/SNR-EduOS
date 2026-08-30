@@ -1,5 +1,5 @@
 import { getParentContext } from "@/lib/parent-context";
-import { getSelectedChild } from "@/lib/parent-queries";
+import { getSelectedChild, parentIsDemo } from "@/lib/parent-queries";
 import { avatarGradient, avatarRing, givenNameLetter, initialsOf } from "../_ui/format";
 import { ProfileView } from "./ProfileView";
 
@@ -12,13 +12,18 @@ import { ProfileView } from "./ProfileView";
  * а не падаем.
  */
 export default async function ParentProfilePage() {
-  const [ctx, child] = await Promise.all([getParentContext(), getSelectedChild()]);
+  const [ctx, child, isDemo] = await Promise.all([
+    getParentContext(),
+    getSelectedChild(),
+    parentIsDemo(),
+  ]);
 
   const parentName = ctx?.parentName ?? "";
   const parentGradient = avatarGradient(ctx?.parentId ?? parentName);
 
   return (
     <ProfileView
+      isDemo={isDemo}
       parentName={parentName}
       parentInitials={initialsOf(parentName)}
       parentGradient={parentGradient}
