@@ -9,11 +9,23 @@
  * новости от администрации — оба экрана читают базу и работают. Их и
  * показываем, с непрочитанными из того же счётчика, что и колокольчик.
  *
- * ЧЕГО БОЛЬШЕ НЕТ. Личных переписок с учителями: чата у школы пока нет, и
- * выдуманные диалоги убраны совсем. Вместо них — честная строка о том, что
- * появится позже; сам экран переписки (d25) тоже стал «Скоро».
+ * ЧЕГО БОЛЬШЕ НЕТ У НАСТОЯЩЕГО РОДИТЕЛЯ. Личных переписок с учителями:
+ * чата у школы пока нет, и выдуманные диалоги убраны совсем. Вместо них —
+ * честная строка о том, что появится позже.
+ *
+ * ВИТРИНА (30.08.2026). В показе вкладка собрана по макету, разметка
+ * 747–767: лента «важных» кружками, четыре чипа фильтра и восемь строк
+ * переписок. Заготовки для всего этого лежали в messages.ts с самого
+ * начала — не хватало только ветки, которая их покажет.
+ *
+ * До этого захода показ ходил сюда в базу за настоящими учителями ребёнка
+ * (getGroupSubjectTeachers) и рисовал из них три строки. После захода 1
+ * родителя в показе нет вовсе, запрос возвращал пустоту, и вкладка
+ * показывала «Скоро». Запрос убран: показу он не нужен, а настоящему
+ * родителю не был нужен никогда — эти строки рисовались только в демо.
  */
-import { Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,10 +34,9 @@ import { AppBackground, fonts, gradPoints, useTheme } from "../../theme";
 import { GlassCard, RootHeader, TabScreenScroll } from "../../ui";
 import { useAppLocale } from "../../i18n";
 import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
 import { useDemoSession } from "../../context/DemoSessionContext";
-import { getGroupSubjectTeachers } from "@snr/core";
-import { getMessageThreads } from "../../data";
+import { getMessageStories, getMessageThreads } from "../../data";
+import type { MessageThreadRow } from "../../data";
 import { ICONS } from "../../navigation/routes";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
 
@@ -109,20 +120,20 @@ export default function MessagesScreen() {
 
   const soon = t.soon2.items.chatList ?? t.soon2.fallback;
 
-  // 23.08.2026. В демо вкладка не может быть полупустой: заказчик показывает,
-  // как приложение будет выглядеть. Поэтому под настоящими объявлениями и
-  // новостями появляется список личных переписок — но только в демо; у
-  // настоящего родителя ниже по-прежнему честная строка «Скоро».
-  // Собеседники — НАСТОЯЩИЕ учителя ребёнка, те же, что в «Предметах»:
-  // выдуманных имён в демо-переписке быть не должно.
   const { isDemo } = useDemoSession();
-  const { child, childId } = useChildScope();
-  const teachers = useChildQuery(childId, (db) =>
-    child?.group_id ? getGroupSubjectTeachers(db, child.group_id) : Promise.resolve([]),
-  );
-  const chatPeers = (teachers.data ?? []).filter((x) => x.teacherName).slice(0, 3);
-  // Превью — первая реплика той же переписки, которую открывает строка.
-  const chatPreview = getMessageThreads(locale).find((x) => x.category === "chats")?.preview ?? "";
+
+  // Витрина: ленты и переписки из заготовок. В базу отсюда не ходим вовсе —
+  // ни за учителями, ни за чем-либо ещё.
+  const [msgFilter, setMsgFilter] = useState<"all" | MessageThreadRow["category"]>("all");
+  const stories = getMessageStories();
+  const threads = getMessageThreads(locale);
+  const shownThreads = msgFilter === "all" ? threads : threads.filter((x) => x.category === msgFilter);
+  const MSG_FILTERS = [
+    { key: "all" as const, label: t.msg.tabAll },
+    { key: "chats" as const, label: t.msg.tabChats },
+    { key: "ann" as const, label: t.msg.tabAnn },
+    { key: "svc" as const, label: t.msg.tabSvc },
+  ];
 
   return (
     <AppBackground>
@@ -134,6 +145,58 @@ export default function MessagesScreen() {
       />
 
       <TabScreenScroll style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 12 }}>
+        {/* Лента «важных» кружками (разметка 755–759) — только показ. */}
+        {isDemo ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 2 }}>
+            {stories.map((s) => (
+              <Pressable
+                key={s.id}
+                onPress={() => navigation.navigate(s.go as never)}
+                style={{ alignItems: "center", gap: 5, width: 60 }}
+              >
+                <View style={{ position: "relative" }}>
+                  <LinearGradient
+                    colors={[s.gradient[0], s.gradient[1]]}
+                    {...gradPoints(135)}
+                    style={{ width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" }}
+                  >
+                    {s.kind === "chat" ? (
+                      <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: "#FFFFFF" }}>{s.initials}</Text>
+                    ) : (
+                      <Svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round">
+                        {(ICONS[s.icon_key ?? "mega"] ?? []).map((p, i) => (
+                          <Path key={i} d={p} />
+                        ))}
+                      </Svg>
+                    )}
+                  </LinearGradient>
+                  {s.is_online ? (
+                    <View
+                      style={{
+                        position: "absolute",
+                        right: 1,
+                        bottom: 1,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: "#22c55e",
+                        borderWidth: 2,
+                        borderColor: "#FFFFFF",
+                      }}
+                    />
+                  ) : null}
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontFamily: fonts.manrope700, fontSize: 9, color: tokens.ink2, textAlign: "center" }}
+                >
+                  {t.msg[s.label_key as keyof typeof t.msg] as string}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+
         <GlassCard radius={22} contentStyle={{ paddingHorizontal: 14, paddingVertical: 2 }}>
           <SectionRow
             icon="mega"
@@ -168,23 +231,140 @@ export default function MessagesScreen() {
           ) : null}
         </GlassCard>
 
-        {/* В демо — список личных переписок с настоящими учителями. Вне демо
+        {/* Показ — восемь переписок макета с чипами фильтра. Вне показа
             личных переписок в школе нет, и мы говорим это прямо, а не
             показываем выдуманные диалоги. */}
-        {isDemo && chatPeers.length > 0 ? (
-          <GlassCard radius={22} contentStyle={{ paddingHorizontal: 14, paddingVertical: 2 }}>
-            {chatPeers.map((peer, i) => (
-              <SectionRow
-                key={peer.subjectId}
-                icon="chat"
-                gradient={["#22d3ee", "#0891b2"]}
-                title={peer.teacherName ?? ""}
-                subtitle={`${peer.subjectName} · ${chatPreview}`}
-                onPress={() => navigation.navigate("d25")}
-                divider={i > 0}
-              />
-            ))}
-          </GlassCard>
+        {isDemo ? (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {MSG_FILTERS.map((fl) => {
+                const on = msgFilter === fl.key;
+                return (
+                  <Pressable
+                    key={fl.key}
+                    onPress={() => setMsgFilter(fl.key)}
+                    style={{
+                      paddingVertical: 7,
+                      paddingHorizontal: 13,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: on ? tokens.accent : tokens.glassBorder,
+                      backgroundColor: on ? tokens.accent : "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: fonts.manrope800,
+                        fontSize: 11,
+                        color: on ? "#FFFFFF" : tokens.ink2,
+                      }}
+                    >
+                      {fl.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <GlassCard radius={22} contentStyle={{ paddingHorizontal: 13, paddingVertical: 2 }}>
+              {shownThreads.map((th, i) => (
+                <Pressable
+                  key={th.name}
+                  onPress={() => navigation.navigate(th.go as never)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    paddingVertical: 11,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: "rgba(23,18,67,0.07)",
+                  }}
+                >
+                  <View style={{ position: "relative" }}>
+                    <LinearGradient
+                      colors={[th.avatar_gradient?.[0] ?? "#a78bfa", th.avatar_gradient?.[1] ?? "#7c3aed"]}
+                      {...gradPoints(135)}
+                      style={{ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" }}
+                    >
+                      {th.avatar_initials ? (
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: "#FFFFFF" }}>
+                          {th.avatar_initials}
+                        </Text>
+                      ) : (
+                        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round">
+                          {(ICONS[th.avatar_icon_key ?? "chat"] ?? []).map((p, k) => (
+                            <Path key={k} d={p} />
+                          ))}
+                        </Svg>
+                      )}
+                    </LinearGradient>
+                    {th.is_online ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          bottom: 0,
+                          width: 11,
+                          height: 11,
+                          borderRadius: 6,
+                          backgroundColor: "#22c55e",
+                          borderWidth: 2,
+                          borderColor: "#FFFFFF",
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text numberOfLines={1} style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }}>
+                        {th.name}
+                      </Text>
+                      {th.role_label ? (
+                        <View
+                          style={{
+                            paddingVertical: 2,
+                            paddingHorizontal: 7,
+                            borderRadius: 999,
+                            backgroundColor: tokens.chip(tokens.status.violet.rgb).bg,
+                            borderWidth: 1,
+                            borderColor: tokens.chip(tokens.status.violet.rgb).border,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 8, color: tokens.status.violet.text }}>
+                            {th.role_label}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <View style={{ flex: 1 }} />
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                        {th.time_label}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink2 }}>
+                        {th.preview}
+                      </Text>
+                      {th.badge ? (
+                        <View
+                          style={{
+                            minWidth: 18,
+                            height: 18,
+                            paddingHorizontal: 5,
+                            borderRadius: 9,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: tokens.accent,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.manrope800, fontSize: 9, color: "#FFFFFF" }}>{th.badge}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
+            </GlassCard>
+          </>
         ) : (
         <GlassCard radius={20} contentStyle={{ padding: 16, gap: 7, alignItems: "center" }}>
           <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1, textAlign: "center" }}>

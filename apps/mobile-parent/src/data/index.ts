@@ -33,6 +33,9 @@ import { tr, trDeep } from "./i18n";
 import type {
   ApplicationDetailRow,
   ApplicationRow,
+  AdminMessage,
+  AnnouncementCardRow,
+  AnnouncementCategory,
   AttendanceDayRow,
   AttendanceStats,
   BaseSubjectKey,
@@ -44,6 +47,7 @@ import type {
   LegalDocRow,
   MedicalCardRow,
   MessageThreadRow,
+  MessagesStoryRow,
   PaymentHistoryRow,
   ReceiptRow,
   ScheduleDayRow,
@@ -90,6 +94,7 @@ import {
   TODAY_DONE_LESSONS,
   TODAY_LIVE_LESSON_INDEX,
 } from "./fixtures/schedule";
+import { ADMIN_MESSAGE, ANNOUNCEMENTS } from "./fixtures/announcements";
 import {
   ATTENDANCE_LAST_DAYS,
   ATTENDANCE_MONTHS,
@@ -118,6 +123,7 @@ import {
 } from "./fixtures/notifications";
 import {
   CHAT_ATTACH_OPTIONS,
+  MESSAGES_STORIES,
   MESSAGE_THREADS,
   SUPPORT_CHAT,
   SUPPORT_CHAT_HEADER,
@@ -409,6 +415,34 @@ export function getAttendanceLastDays(childId: string | undefined, locale: Local
 
 // ─── Оценки и успехи ─────────────────────────────────────────────────────────
 
+// ─── Объявления и сообщение от администрации ─────────────────────────────────
+
+/**
+ * Объявления витрины. Счётчик по каждой категории считается по самим
+ * карточкам — в макете чипы фильтра числа не показывают, но раз уж мы их
+ * считаем для пустого состояния, пусть это будет один расчёт, а не два.
+ */
+export function getAnnouncements(locale: Locale, category?: AnnouncementCategory | null) {
+  const все = trDeep(ANNOUNCEMENTS, locale) as AnnouncementCardRow[];
+  const rows = category ? все.filter((a) => a.category === category) : все;
+  return { rows, total: все.length };
+}
+
+/**
+ * Разворот объявления (экран 27).
+ *
+ * Просмотры и комментарии берутся у своей карточки, а не лежат второй
+ * копией: в макете там те же 245 и 12, и разойтись им негде.
+ */
+export function getAdminMessage(locale: Locale) {
+  const карточка = ANNOUNCEMENTS.find((a) => a.id === ADMIN_MESSAGE.announcement_id) ?? null;
+  return {
+    ...(trDeep(ADMIN_MESSAGE, locale) as AdminMessage),
+    views: карточка?.views ?? 0,
+    comments: карточка?.comments ?? 0,
+  };
+}
+
 /** Отзывы учителей витрины. Тексты — содержимое, поэтому через словарь
  *  заготовок: на узбекском и английском показ читается целиком. */
 export function getTeacherReviews(locale: Locale): TeacherReviewRow[] {
@@ -475,9 +509,38 @@ export function getSubjectDetail(locale: Locale) {
   return trDeep(SUBJECT_DETAIL_MATH, locale);
 }
 
-/** Профиль учителя — в макете заполнен только для математики. */
-export function getTeacherProfile(locale: Locale) {
-  return trDeep(TEACHER_PROFILE, locale);
+/**
+ * Профиль учителя — в макете заполнен только для математики.
+ *
+ * Длительность урока СЧИТАЕТСЯ по строке расписания («10:20 – 11:05»), а
+ * не записана числом. В макете под каждой строкой стоит «45 минут»; все
+ * шесть слотов действительно по 45 — проверено. Но записать это числом
+ * значило бы завести подпись, которая переживёт правку времени урока.
+ *
+ * Отзывы — те же, что на экране «Отзывы учителей», отфильтрованные по
+ * имени учителя и обрезанные до двух, как в макете (строка 4343).
+ */
+export function getTeacherProfile(locale: Locale, childId?: string) {
+  const профиль = trDeep(TEACHER_PROFILE, locale);
+  const минуты = (диапазон: string): number | null => {
+    const m = диапазон.match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return (Number(m[3]) * 60 + Number(m[4])) - (Number(m[1]) * 60 + Number(m[2]));
+  };
+  const ребёнок = resolveChild(childId);
+  return {
+    ...профиль,
+    room_label: SCHEDULE_ROOM_LABEL,
+    schedule: профиль.schedule.map(([day, time]) => ({
+      day,
+      time,
+      minutes: минуты(time),
+    })),
+    reviews: trDeep(TEACHER_REVIEWS, locale)
+      .filter((r) => r.teacher_name === TEACHER_PROFILE.full_name)
+      .slice(0, 2),
+    child_name: ребёнок?.first_name ?? "",
+  };
 }
 
 /**
@@ -733,6 +796,12 @@ export function getNotificationCategories() {
 
 /** Список бесед вкладки «Сообщения». В демо строки собираются из настоящих
  *  учителей ребёнка, отсюда берётся только текст превью. */
+/** Лента «важных» на вкладке сообщений — пять кружков макета. Подписи
+ *  берёт экран из словаря по label_key, поэтому перевод здесь не нужен. */
+export function getMessageStories(): MessagesStoryRow[] {
+  return MESSAGES_STORIES;
+}
+
 export function getMessageThreads(locale: Locale): MessageThreadRow[] {
   return trDeep(MESSAGE_THREADS, locale);
 }

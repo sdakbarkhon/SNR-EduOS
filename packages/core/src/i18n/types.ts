@@ -3634,6 +3634,31 @@ export interface Dictionary {
       topicsNeedAttention: string;  // «{n} тем требуют внимания — они помечены в списке»
       needsAttention: string;
       allChip: string;
+      // Экран 26 «Объявления» — два чипа фильтра, которых нет у настоящего
+      // экрана (у того свой набор: срочные / события / учёба).
+      filterImportant: string;
+      filterInfo: string;
+      importantBadge: string;    // чип «Важно» на карточке
+      filesAttached: string;     // «{n} файлов прикреплено»
+      // Экран 27 «От администрации»
+      commentsCount: string;      // «{n} комментариев»
+      eventDate: string;
+      eventTime: string;
+      eventPlace: string;
+      backToMessages: string;
+      // Профиль учителя
+      writeMessage: string;
+      callSchool: string;
+      aboutInfo: string;
+      experience: string;
+      education: string;
+      onlineNow: string;
+      teacherRole: string;        // «Учитель · {subject}»
+      scheduleWithChild: string;
+      lessonMeta: string;         // «{room} · {minutes} минут»
+      lastReviewsAbout: string;
+      allReviews: string;
+      reviewTitle: string;        // «Оценка работы · {name}»
     };
     pay: {
       autopay: string;

@@ -47,7 +47,9 @@ import {
   LoadingBlock,
   SectionHeader,
 } from "../../ui";
-import { useChildQuery, useChildScope } from "../../hooks/useChildScope";
+import { useChildQuery } from "../../hooks/useChildScope";
+import { useShowcaseChild } from "../../hooks/useShowcaseChild";
+import { getSubject, getTeacherProfile } from "../../data";
 import { fullDate } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
 import type { MainStackParamList } from "../../navigation/routes";
@@ -120,13 +122,21 @@ export default function TeacherProfileScreen() {
   const route = useRoute<Route>();
   const teacherId = route.params?.teacherId ?? null;
 
-  const { childId, child, pickerItems, selectChild, loading: childLoading } = useChildScope();
+  const sc = t.showcase;
+  const { showcase, childId, realChildId, child, pickerItems, selectChild, loading: childLoading } =
+    useShowcaseChild();
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Витрина. В макете профиль заполнен ТОЛЬКО для математики — у остальных
+  // учителей карточки нет вовсе. Поэтому показ не смотрит на teacherId и
+  // рисует ту единственную карточку, что в макете есть.
+  const витрина = getTeacherProfile(locale, childId ?? undefined);
+  const витринаSubject = getSubject(витрина.subject_id);
 
   // Режим списка: предметы класса ребёнка со своими учителями, схлопнутые по
   // человеку (один учитель нередко ведёт у класса два предмета).
   const listState = useChildQuery(
-    teacherId ? null : childId,
+    teacherId ? null : realChildId,
     async (db, id) => {
       const profile = await getStudentById(db, id);
       const groupId = profile.student_groups.find((sg) => sg.groups)?.groups?.id ?? null;
@@ -151,7 +161,7 @@ export default function TeacherProfileScreen() {
 
   // Режим профиля: карточка учителя + его отзывы об этом ребёнке.
   const profileState = useChildQuery(
-    teacherId ? childId : null,
+    teacherId ? realChildId : null,
     async (db, id) => {
       const [profile, reviews] = await Promise.all([
         getChildTeacherProfile(db, id, teacherId as string),
@@ -203,7 +213,167 @@ export default function TeacherProfileScreen() {
           />
         ) : null}
 
-        {childLoading || state.loading ? (
+        {showcase ? (
+          <>
+            {/* Шапка профиля (1438–1443). */}
+            <GlassCard radius={22} contentStyle={{ padding: 16, gap: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View
+                  style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 27,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: витринаSubject.color,
+                  }}
+                >
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 16, color: "#FFFFFF" }}>
+                    {витрина.full_name
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((w) => w.charAt(0).toUpperCase())
+                      .join("")}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: tokens.ink1 }}>
+                    {витрина.full_name}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, color: tokens.ink2 }}>
+                    {format(sc.teacherRole, { subject: витрина.subject_name })}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#22c55e" }} />
+                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 10, color: tokens.status.green.text }}>
+                      {sc.onlineNow}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Pressable
+                  onPress={() => navigation.navigate("d25")}
+                  style={({ pressed }: { pressed: boolean }) => ({
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 13,
+                    alignItems: "center",
+                    backgroundColor: tokens.accent,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: "#FFFFFF" }}>
+                    {sc.writeMessage}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => navigation.navigate("stub", { stubKey: "call" })}
+                  style={({ pressed }: { pressed: boolean }) => ({
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 13,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: tokens.glassBorder,
+                    backgroundColor: "rgba(255,255,255,0.55)",
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                    {sc.callSchool}
+                  </Text>
+                </Pressable>
+              </View>
+            </GlassCard>
+
+            {/* Информация (1445–1450). */}
+            <SectionHeader title={sc.aboutInfo} />
+            <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+              {[
+                [t.more.teacherSubject, витрина.subject_name],
+                [sc.experience, витрина.experience_label],
+                [sc.education, витрина.education_label],
+                [t.more.teacherClasses, витрина.classes_label],
+              ].map(([label, value], i) => (
+                <View
+                  key={label}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    paddingVertical: 10,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: "rgba(23,18,67,0.07)",
+                  }}
+                >
+                  <Text style={{ width: 92, fontFamily: fonts.manrope600, fontSize: 10.5, color: tokens.ink3 }}>
+                    {label}
+                  </Text>
+                  <Text style={{ flex: 1, fontFamily: fonts.manrope700, fontSize: 11.5, color: tokens.ink1 }}>
+                    {value}
+                  </Text>
+                </View>
+              ))}
+            </GlassCard>
+
+            {/* Расписание с ребёнком (1452–1455). Длительность считается по
+                самой строке времени, а не записана числом. */}
+            <SectionHeader title={sc.scheduleWithChild} />
+            <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 14 }}>
+              {витрина.schedule.map((row, i) => (
+                <View
+                  key={`${row.day}-${row.time}`}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 11,
+                    paddingVertical: 10,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: "rgba(23,18,67,0.07)",
+                  }}
+                >
+                  <Text style={{ width: 30, fontFamily: fonts.manrope800, fontSize: 11, color: tokens.ink2 }}>
+                    {row.day}
+                  </Text>
+                  <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: витринаSubject.color }} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontFamily: fonts.manrope700, fontSize: 11.5, color: tokens.ink1 }}>
+                      {row.time}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                      {row.minutes === null
+                        ? витрина.room_label
+                        : format(sc.lessonMeta, { room: витрина.room_label, minutes: String(row.minutes) })}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </GlassCard>
+
+            {/* Отзывы (1458–1460). */}
+            <SectionHeader
+              title={sc.lastReviewsAbout}
+              linkLabel={`${sc.allReviews} ›`}
+              onPress={() => navigation.navigate("drev")}
+            />
+            {витрина.reviews.map((r, i) => (
+              <GlassCard key={`${r.time_label}-${i}`} radius={18} contentStyle={{ padding: 13, gap: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                    {format(sc.reviewTitle, { name: витрина.child_name })}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                    {r.time_label}
+                  </Text>
+                </View>
+                <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, lineHeight: 17, color: tokens.ink2 }}>
+                  {r.text}
+                </Text>
+              </GlassCard>
+            ))}
+          </>
+        ) : childLoading || state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

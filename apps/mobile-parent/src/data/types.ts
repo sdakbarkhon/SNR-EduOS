@@ -128,6 +128,36 @@ export interface TopicMasteryRow {
   meta_label: string;         // «8 уроков · 6 заданий»
 }
 
+/** Категория объявления в макете: важное, мероприятие, информация. */
+export type AnnouncementCategory = "imp" | "event" | "info";
+
+/** Карточка объявления (разметка 810–835 макета). */
+export interface AnnouncementCardRow {
+  id: string;
+  category: AnnouncementCategory;
+  date_label: string;         // «21 июля 2026»
+  title: string;
+  text: string;
+  author: string;
+  views: number;
+  comments: number;
+  /** Куда ведёт карточка. null — разворота у неё в макете нет. */
+  go: string | null;
+}
+
+/** Разворот объявления — экран 27 (разметка 840–872). Счётчики просмотров
+ *  и комментариев здесь НЕ хранятся: их отдаёт сама карточка. */
+export interface AdminMessage {
+  announcement_id: string;
+  author: string;
+  sent_label: string;         // «21 июля 2026, 10:30»
+  title: string;
+  paragraphs: string[];
+  facts: { label_key: "eventDate" | "eventTime" | "eventPlace"; value: string }[];
+  note: string;
+  files: { name: string; size_label: string; kind: "pdf" | "img" | "doc" }[];
+}
+
 /** Учитель (teachers) — профиль dteach (TEACHERS.math). */
 export interface TeacherProfileRow {
   full_name: string;

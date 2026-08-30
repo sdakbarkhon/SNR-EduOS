@@ -327,6 +327,53 @@ export const DEMO_TR: Record<string, Pair> = {
   "Обед получен в 12:40": ["Tushlik 12:40 da olindi", "Lunch collected at 12:40"],
   "Успешно": ["Muvaffaqiyatli", "Done"],
   "Оплачено до 31 июля": ["31-iyulgacha to'langan", "Paid through 31 July"],
+
+  // ── Предметы ─────────────────────────────────────────────────────────────
+  // Названия предметов встречаются на всех экранах учёбы и сообщений; до
+  // сих пор они оставались русскими и на узбекском, и на английском.
+  "Русский язык": ["Rus tili", "Russian"],
+  "Английский язык": ["Ingliz tili", "English"],
+  "Математика": ["Matematika", "Maths"],
+  "Программирование": ["Dasturlash", "Programming"],
+  "Робототехника": ["Robototexnika", "Robotics"],
+  "Русский язык · факультатив": ["Rus tili · fakultativ", "Russian · elective"],
+
+  // ── Профиль учителя ──────────────────────────────────────────────────────
+  // Классы («3-А, 5-Б, 7-А, 10-А») не переводятся намеренно: это
+  // обозначения, а не слова.
+  "12 лет": ["12 yil", "12 years"],
+  "ТГПУ им. Низами": ["Nizomiy nomidagi TDPU", "Nizami TSPU"],
+
+  // ── Объявления: даты и авторы ────────────────────────────────────────────
+  "21 июля 2026": ["2026-yil 21-iyul", "21 July 2026"],
+  "20 июля 2026": ["2026-yil 20-iyul", "20 July 2026"],
+  "19 июля 2026": ["2026-yil 19-iyul", "19 July 2026"],
+  "18 июля 2026": ["2026-yil 18-iyul", "18 July 2026"],
+  "21 июля 2026, 10:30": ["2026-yil 21-iyul, 10:30", "21 July 2026, 10:30"],
+  "Администрация школы": ["Maktab ma'muriyati", "School administration"],
+  "Транспортный отдел": ["Transport bo'limi", "Transport department"],
+  "Пресс-служба школы": ["Maktab matbuot xizmati", "School press office"],
+
+  // ── Объявления: заголовки и тексты ───────────────────────────────────────
+  "Школьная ярмарка": ["Maktab yarmarkasi", "School fair"],
+  "24 июля состоится ежегодная школьная ярмарка! Ждём вас и ваших детей — активности, выступления и угощения.": ["24-iyul kuni an'anaviy maktab yarmarkasi bo'lib o'tadi! Sizni va farzandlaringizni kutamiz — mashg'ulotlar, chiqishlar va shirinliklar.", "The annual school fair takes place on 24 July! We look forward to seeing you and your children — activities, performances and treats."],
+  "Родительское собрание": ["Ota-onalar yig'ilishi", "Parent meeting"],
+  "30 июля в 18:00 состоится родительское собрание для 1–11 классов в актовом зале школы.": ["30-iyul kuni soat 18:00 da maktab yig'ilishlar zalida 1–11-sinflar uchun ota-onalar yig'ilishi bo'lib o'tadi.", "On 30 July at 18:00 there will be a parent meeting for grades 1–11 in the school assembly hall."],
+  "Изменение маршрута транспорта": ["Transport marshruti o'zgardi", "Transport route change"],
+  "С 28 июля маршрут №3 будет отправляться на 10 минут позже. Проверьте новое расписание в разделе «Транспорт».": ["28-iyuldan boshlab 3-marshrut 10 daqiqa kechroq jo'naydi. Yangi jadvalni «Transport» bo'limida ko'ring.", "From 28 July route 3 departs 10 minutes later. Check the new timetable in the Transport section."],
+  "Обновление SNR EduOS": ["SNR EduOS yangilanishi", "SNR EduOS update"],
+  "В приложении появились раздел «Все сервисы», обновлённое расписание с темами уроков и уведомления.": ["Ilovada «Barcha xizmatlar» bo'limi, dars mavzulari bilan yangilangan jadval va bildirishnomalar paydo bo'ldi.", "The app now has an All services section, an updated timetable with lesson topics, and notifications."],
+
+  // ── Разворот объявления ──────────────────────────────────────────────────
+  "Школьная ярмарка — 24 июля": ["Maktab yarmarkasi — 24-iyul", "School fair — 24 July"],
+  "Уважаемые родители! 24 июля в нашей школе состоится ежегодная школьная ярмарка.": ["Hurmatli ota-onalar! 24-iyul kuni maktabimizda an'anaviy maktab yarmarkasi bo'lib o'tadi.", "Dear parents! On 24 July our school holds its annual fair."],
+  "Будем рады видеть вас и ваших детей на этом празднике. Вас ждут интересные активности, выступления учеников и вкусные угощения.": ["Sizni va farzandlaringizni ushbu bayramda ko'rishdan mamnun bo'lamiz. Sizni qiziqarli mashg'ulotlar, o'quvchilar chiqishi va mazali taomlar kutmoqda.", "We would be glad to see you and your children at the celebration. Expect activities, student performances and tasty treats."],
+  "24 июля (пятница)": ["24-iyul (juma)", "24 July (Friday)"],
+  "Школьный двор": ["Maktab hovlisi", "School yard"],
+  "Важно! Просим подтвердить участие вашего ребёнка до 23 июля в разделе «Мероприятия».": ["Muhim! Farzandingiz ishtirokini 23-iyulgacha «Tadbirlar» bo'limida tasdiqlashingizni so'raymiz.", "Important: please confirm your child's attendance by 23 July in the Events section."],
+  "Программа ярмарки.pdf": ["Yarmarka dasturi.pdf", "Fair programme.pdf"],
+  "Плакат ярмарки.png": ["Yarmarka plakati.png", "Fair poster.png"],
+  "Список участников.xlsx": ["Ishtirokchilar ro'yxati.xlsx", "Participant list.xlsx"],
 };
 
 /** Перевести одну строку. Нет перевода — остаётся русская. */

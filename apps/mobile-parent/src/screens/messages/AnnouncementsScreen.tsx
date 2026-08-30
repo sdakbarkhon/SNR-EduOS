@@ -22,7 +22,7 @@
  * `parentApp.ann`: одна и та же надпись не должна иметь двух переводов.
  */
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
@@ -39,6 +39,9 @@ import {
   SegmentPills,
 } from "../../ui";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useDemoSession } from "../../context/DemoSessionContext";
+import { getAnnouncements } from "../../data";
+import type { AnnouncementCategory } from "../../data";
 import { getSupabase } from "../../lib/supabase";
 import { fullDate } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
@@ -84,6 +87,31 @@ export default function AnnouncementsScreen() {
   const navigation = useNavigation<Nav>();
 
   const [filter, setFilter] = useState<Filter>("all");
+
+  // Витрина: четыре карточки макета и свой набор чипов. У настоящего
+  // экрана фильтры другие (срочные / события / учёба) — сводить их не
+  // стали: это разные наборы категорий, и оба из своего источника.
+  const { isDemo: showcase } = useDemoSession();
+  const sc = d.parentApp.showcase;
+  const [scFilter, setScFilter] = useState<AnnouncementCategory | null>(null);
+  const scData = getAnnouncements(locale, scFilter);
+  const SC_FILTERS: { key: AnnouncementCategory | null; label: string; tone: "red" | "green" | "blue" }[] = [
+    { key: null, label: sc.allChip, tone: "blue" },
+    { key: "imp", label: sc.filterImportant, tone: "red" },
+    { key: "event", label: d.parentApp.ann.catEvent, tone: "green" },
+    { key: "info", label: sc.filterInfo, tone: "blue" },
+  ];
+  const CHIP_TEXT: Record<AnnouncementCategory, string> = {
+    imp: sc.importantBadge,
+    event: d.parentApp.ann.catEvent,
+    info: d.parentApp.ann.catGeneral,
+  };
+  const CHIP_TONE: Record<AnnouncementCategory, "red" | "green" | "blue"> = {
+    imp: "red",
+    event: "green",
+    info: "blue",
+  };
+
   const state = useAsyncData(() => getParentAnnouncements(getSupabase(), 100), []);
   const items = useMemo(() => state.data ?? [], [state.data]);
 
@@ -114,13 +142,76 @@ export default function AnnouncementsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 118, gap: 11 }}
       >
-        <SegmentPills
-          items={FILTER_KEYS.map((f) => ann[f.label])}
-          activeIndex={activeIndex}
-          onChange={(i) => setFilter(FILTER_KEYS[i].key)}
-        />
+        {showcase ? (
+          <SegmentPills
+            items={SC_FILTERS.map((f) => f.label)}
+            activeIndex={Math.max(0, SC_FILTERS.findIndex((f) => f.key === scFilter))}
+            onChange={(i) => setScFilter(SC_FILTERS[i].key)}
+          />
+        ) : (
+          <SegmentPills
+            items={FILTER_KEYS.map((f) => ann[f.label])}
+            activeIndex={activeIndex}
+            onChange={(i) => setFilter(FILTER_KEYS[i].key)}
+          />
+        )}
 
-        {state.loading ? (
+        {showcase ? (
+          scData.rows.length === 0 ? (
+            <EmptyBlock title={ann.emptyFilterTitle} text={ann.emptyFilterText} />
+          ) : (
+            scData.rows.map((a) => {
+              const tone = tokens.status[CHIP_TONE[a.category]];
+              return (
+                <Pressable
+                  key={a.id}
+                  onPress={() => (a.go ? navigation.navigate(a.go as never) : undefined)}
+                  style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed && a.go ? 0.75 : 1 })}
+                >
+                  <GlassCard radius={20} contentStyle={{ padding: 13, gap: 8 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View
+                        style={{
+                          paddingVertical: 3,
+                          paddingHorizontal: 8,
+                          borderRadius: 999,
+                          backgroundColor: tokens.chip(tone.rgb).bg,
+                          borderWidth: 1,
+                          borderColor: tokens.chip(tone.rgb).border,
+                        }}
+                      >
+                        <Text style={{ fontFamily: fonts.manrope800, fontSize: 8.5, color: tone.text }}>
+                          {CHIP_TEXT[a.category]}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }} />
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                        {a.date_label}
+                      </Text>
+                    </View>
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>
+                      {a.title}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.manrope600, fontSize: 11, lineHeight: 17, color: tokens.ink2 }}>
+                      {a.text}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.manrope700, fontSize: 10, color: tokens.ink3 }}>
+                        {a.author}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                        {`👁 ${a.views}`}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                        {`💬 ${a.comments}`}
+                      </Text>
+                    </View>
+                  </GlassCard>
+                </Pressable>
+              );
+            })
+          )
+        ) : state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock

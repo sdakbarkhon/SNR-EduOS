@@ -19,7 +19,7 @@
  * два экрана вместо двух похожих.
  */
 import { useMemo } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -41,6 +41,8 @@ import {
   SectionHeader,
 } from "../../ui";
 import { useAsyncData } from "../../hooks/useAsyncData";
+import { useDemoSession } from "../../context/DemoSessionContext";
+import { getAdminMessage } from "../../data";
 import { getSupabase } from "../../lib/supabase";
 import { fullDate } from "../../lib/dateLabels";
 import { useAppLocale } from "../../i18n";
@@ -61,6 +63,17 @@ export default function AdminNewsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const announcementId = route.params?.announcementId ?? null;
+
+  // Витрина: разворот первой карточки объявлений. Просмотры и комментарии
+  // приходят от неё же — второй копии этих чисел нет.
+  const { isDemo: showcase } = useDemoSession();
+  const sc = t.showcase;
+  const scMsg = getAdminMessage(locale);
+  const FACT_LABEL: Record<string, string> = {
+    eventDate: sc.eventDate,
+    eventTime: sc.eventTime,
+    eventPlace: sc.eventPlace,
+  };
 
   const state = useAsyncData(
     async () => {
@@ -97,7 +110,127 @@ export default function AdminNewsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 118, gap: 12 }}
       >
-        {state.loading ? (
+        {showcase ? (
+          <>
+            <GlassCard radius={20} contentStyle={{ padding: 14, gap: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 11.5, color: tokens.ink1 }}>
+                    {scMsg.author}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                    {scMsg.sent_label}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    paddingVertical: 3,
+                    paddingHorizontal: 8,
+                    borderRadius: 999,
+                    backgroundColor: tokens.chip(tokens.status.red.rgb).bg,
+                    borderWidth: 1,
+                    borderColor: tokens.chip(tokens.status.red.rgb).border,
+                  }}
+                >
+                  <Text style={{ fontFamily: fonts.manrope800, fontSize: 8.5, color: tokens.status.red.text }}>
+                    {sc.importantBadge}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={{ fontFamily: fonts.manrope800, fontSize: 15, color: tokens.ink1 }}>
+                {scMsg.title}
+              </Text>
+              {scMsg.paragraphs.map((p) => (
+                <Text key={p} style={{ fontFamily: fonts.manrope600, fontSize: 11.5, lineHeight: 18, color: tokens.ink2 }}>
+                  {p}
+                </Text>
+              ))}
+
+              {scMsg.facts.map((fct) => (
+                <View key={fct.label_key} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Text style={{ width: 66, fontFamily: fonts.manrope700, fontSize: 10.5, color: tokens.ink3 }}>
+                    {FACT_LABEL[fct.label_key]}
+                  </Text>
+                  <Text style={{ flex: 1, fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink1 }}>
+                    {fct.value}
+                  </Text>
+                </View>
+              ))}
+
+              <View
+                style={{
+                  padding: 11,
+                  borderRadius: 14,
+                  backgroundColor: tokens.chip(tokens.status.orange.rgb).bg,
+                  borderWidth: 1,
+                  borderColor: tokens.chip(tokens.status.orange.rgb).border,
+                }}
+              >
+                <Text style={{ fontFamily: fonts.manrope700, fontSize: 10.5, lineHeight: 16, color: tokens.status.orange.text }}>
+                  {scMsg.note}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                  {`👁 ${scMsg.views}`}
+                </Text>
+                <Text style={{ fontFamily: fonts.manrope600, fontSize: 10, color: tokens.ink3 }}>
+                  {format(sc.commentsCount, { n: String(scMsg.comments) })}
+                </Text>
+              </View>
+            </GlassCard>
+
+            <Text style={{ fontFamily: fonts.manrope800, fontSize: 10.5, letterSpacing: 10.5 * 0.08, color: tokens.ink3, paddingHorizontal: 2 }}>
+              {format(sc.filesAttached, { n: String(scMsg.files.length) })}
+            </Text>
+            <GlassCard radius={20} contentStyle={{ paddingVertical: 4, paddingHorizontal: 13 }}>
+              {scMsg.files.map((fl, i) => (
+                <View
+                  key={fl.name}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    paddingVertical: 10,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: "rgba(23,18,67,0.07)",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: tokens.chip(tokens.status.violet.rgb).bg,
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 8, color: tokens.status.violet.text }}>
+                      {fl.kind.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.manrope700, fontSize: 11, color: tokens.ink1 }}>
+                    {fl.name}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.manrope600, fontSize: 9.5, color: tokens.ink3 }}>
+                    {fl.size_label}
+                  </Text>
+                </View>
+              ))}
+            </GlassCard>
+
+            <Pressable onPress={() => navigation.goBack()} style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <GlassCard radius={16} contentStyle={{ padding: 13, alignItems: "center" }}>
+                <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.accent }}>
+                  {sc.backToMessages}
+                </Text>
+              </GlassCard>
+            </Pressable>
+          </>
+        ) : state.loading ? (
           <LoadingBlock />
         ) : state.error ? (
           <ErrorBlock
