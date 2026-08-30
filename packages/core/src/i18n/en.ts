@@ -3402,6 +3402,8 @@ export const en: Dictionary = {
       roomLabel: "Room {room}",
       greetingTitle: "Good morning, {name}!",
       greetingSub: "Here's what's happening today · {name}",
+      greetingTitlePlain: "Good morning!",
+      greetingSubPlain: "Here is what is happening today",
       assistantText: "Steady attendance and on-time homework this week — good progress overall.",
       noDataYet: "No data yet",
     },

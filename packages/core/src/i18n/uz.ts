@@ -3403,6 +3403,8 @@ export const uz: Dictionary = {
       roomLabel: "Xona {room}",
       greetingTitle: "Xayrli tong, {name}!",
       greetingSub: "Bugun nima bo'layotgani · {name}",
+      greetingTitlePlain: "Xayrli tong!",
+      greetingSubPlain: "Bugun nima bo'layotgani",
       assistantText: "Bu hafta davomat barqaror va topshiriqlar o'z vaqtida topshirilmoqda — yaxshi dinamika.",
       noDataYet: "Hozircha ma'lumot yo'q",
     },

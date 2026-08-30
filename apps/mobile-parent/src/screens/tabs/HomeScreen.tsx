@@ -105,11 +105,6 @@ function givenInitials(fullName: string): string {
   return parts.slice(0, 2).map((x) => x.charAt(0).toUpperCase()).join("");
 }
 
-function givenName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  return parts[0] || fullName;
-}
-
 /** Иконка-глиф из inline SVG-paths, 17px белым — как quick-action и «Следующий урок». */
 function WhiteGlyph({ paths, size = 17 }: { paths: string[]; size?: number }) {
   return (
@@ -333,12 +328,22 @@ export default function HomeScreen() {
   //     Склонять на лету нельзя, поэтому падеж убран из самой фразы —
   //     «Вот что происходит сегодня · Шерзод». Демо больше не берёт
   //     готовую родительную форму (first_name_gen), она удалена.
-  const greetingParentName = isRealFlow ? givenName(parentData!.parentName) : parent.first_name;
-  const greetingChildName = isRealFlow
-    ? (identityChild ? givenName(identityChild.full_name) : "")
-    : (child?.first_name ?? "");
-  const greetingTitle = d.parentApp.home.greetingTitle.replace("{name}", greetingParentName);
-  const greetingSub = d.parentApp.home.greetingSub.replace("{name}", greetingChildName);
+  //  3. У НАСТОЯЩЕГО ВХОДА ИМЁН В ПРИВЕТСТВИИ БОЛЬШЕ НЕТ. ФИО в боевой
+  //     школе записано узбекским порядком заглавными — «BOQIJONOV SARDOR
+  //     AZAMAT O'G'LI», одной строкой в full_name. Первое слово там —
+  //     фамилия, и экран здоровался «Доброе утро, BOQIJONOV!». Вытащить
+  //     имя из такой строки нельзя: порядок слов не гарантирован ни
+  //     школой, ни базой, а угадывать имя человека — хуже, чем не
+  //     называть его вовсе. По решению заказчика имя убрано из обеих
+  //     строк приветствия до появления отдельных колонок ФИО.
+  //     Витрина здоровается по имени как здоровалась: там имя выдуманное
+  //     и лежит в отдельном поле first_name.
+  const greetingTitle = isRealFlow
+    ? d.parentApp.home.greetingTitlePlain
+    : d.parentApp.home.greetingTitle.replace("{name}", parent.first_name);
+  const greetingSub = isRealFlow
+    ? d.parentApp.home.greetingSubPlain
+    : d.parentApp.home.greetingSub.replace("{name}", child?.first_name ?? "");
 
   // ── Заход 2, шаг 4: реальные «В школе с» / «Уроков» / «Посещено X/Y» +
   // карточка «Следующий урок» — из недели уроков группы (getStudentLessonsForWeek,

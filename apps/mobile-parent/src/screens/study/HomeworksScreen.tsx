@@ -49,6 +49,7 @@ import { useParentData } from "../../context/ParentDataContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
+import { SubjectIcon } from "../../lib/subjectIcons";
 import { tashkentDateKey, addDays } from "../../lib/tashkent";
 import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, realGradeDisplay, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 
@@ -87,6 +88,8 @@ type RealHomeworkRow = {
   id: string;
   subjectName: string;
   subjectColor: string;
+  /** Имя значка lucide из subjects.icon; null — рисуем буквы. */
+  subjectIcon: string | null;
   statusLabel: string;
   statusKind: RealHomeworkStatusKind;
   title: string;
@@ -165,6 +168,7 @@ function toRealHomeworkRow(
     id: hw.id,
     subjectName: hw.subjectName ?? hw.group.subject ?? t.hw.subjectFallback,
     subjectColor: hw.subjectColor ?? "#6366f1",
+    subjectIcon: hw.subjectIcon ?? null,
     statusLabel,
     statusKind: kind,
     title: hw.title,
@@ -177,16 +181,23 @@ function toRealHomeworkRow(
 }
 
 /** Плитка предмета для реальных данных — то же место/тень/форма, что
- *  SubjectTile, но цвет и глиф (первые буквы названия) — из resolved
- *  subjectColor/subjectName, а не из фикстурного SUBJECTS-словаря. */
-function RealSubjectTile({ color, glyph }: { color: string; glyph: string }) {
+ *  SubjectTile, но цвет и значок — из resolved subjectColor/subjectIcon
+ *  (subjects.color и subjects.icon), а не из фикстурного SUBJECTS-словаря.
+ *  30.08.2026: раньше здесь рисовались две первые буквы названия
+ *  («Ма», «Ан») — значок в базе был, но до экрана не доезжал.
+ *  Значка нет — остаются буквы, как раньше. */
+function RealSubjectTile({ color, glyph, icon }: { color: string; glyph: string; icon: string | null }) {
   const shadow = shadowStyle({ x: 0, y: 6, blur: 14, color: `rgba(${hexToRgbCsv(color)},0.3)` });
   return (
     <View style={[styles.subjectTileWrap, shadow]}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: color }]} />
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <Text style={styles.tileGlyphText}>{glyph}</Text>
+          {icon ? (
+            <SubjectIcon name={icon} size={20} />
+          ) : (
+            <Text style={styles.tileGlyphText}>{glyph}</Text>
+          )}
         </View>
       </View>
     </View>
@@ -240,7 +251,11 @@ function RealHomeworkCard({ row, onPress }: { row: RealHomeworkRow; onPress: () 
         }}
       />
       <View style={styles.cardContent}>
-        <RealSubjectTile color={row.subjectColor} glyph={row.subjectName.slice(0, 2)} />
+        <RealSubjectTile
+          color={row.subjectColor}
+          glyph={row.subjectName.slice(0, 2)}
+          icon={row.subjectIcon}
+        />
         <View style={styles.cardCenter}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <Text style={{ fontFamily: fonts.manrope800, fontSize: 12.5, color: tokens.ink1 }} numberOfLines={1}>

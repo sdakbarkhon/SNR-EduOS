@@ -78,6 +78,7 @@ import { toChildRow } from "../../lib/realChild";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { useTashkentToday } from "../../hooks/useTashkentToday";
 import { getSupabase } from "../../lib/supabase";
+import { SubjectIcon } from "../../lib/subjectIcons";
 import { tashkentDateKey, addDays } from "../../lib/tashkent";
 import { realSubmissionStatusKind, realTestStatusKind, homeworkStatusLabel, realGradeDisplay, type RealHomeworkStatusKind } from "../../lib/homeworkStatus";
 import type { MainStackParamList, TabParamList } from "../../navigation/routes";
@@ -661,9 +662,15 @@ export default function HomeworkDetailScreen() {
                       shadowStyle({ x: 0, y: 6, blur: 14, color: `rgba(${hexToRgbCsv(realHw.subjectColor ?? "#6366f1")},0.30)` }),
                     ]}
                   >
-                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: "#FFFFFF" }}>
-                      {(realHw.subjectName ?? "—").slice(0, 2)}
-                    </Text>
+                    {/* 30.08.2026 — значок предмета из subjects.icon; его нет —
+                        остаются две первые буквы названия, как было. */}
+                    {realHw.subjectIcon ? (
+                      <SubjectIcon name={realHw.subjectIcon} size={21} />
+                    ) : (
+                      <Text style={{ fontFamily: fonts.manrope800, fontSize: 14, color: "#FFFFFF" }}>
+                        {(realHw.subjectName ?? "—").slice(0, 2)}
+                      </Text>
+                    )}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text

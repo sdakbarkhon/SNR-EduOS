@@ -3422,6 +3422,8 @@ export const ru: Dictionary = {
       roomLabel: "Каб. {room}",
       greetingTitle: "Доброе утро, {name}!",
       greetingSub: "Вот что происходит сегодня · {name}",
+      greetingTitlePlain: "Доброе утро!",
+      greetingSubPlain: "Вот что происходит сегодня",
       assistantText: "На этой неделе стабильная посещаемость и вовремя сданные задания — хорошая динамика.",
       noDataYet: "Пока нет данных",
     },

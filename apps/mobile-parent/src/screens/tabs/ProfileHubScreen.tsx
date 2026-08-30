@@ -48,10 +48,26 @@ import {
 } from "../../data";
 import type { MainStackParamList } from "../../navigation/routes";
 
-/** "+998 XX XXX XX XX" — тот же формат, что в AuthDemoPickerSheet/LoginPhoneScreen. */
-function formatPhoneDisplay(nationalDigits: string): string {
-  const m = nationalDigits.match(/^(\d{0,2})(\d{0,3})(\d{0,2})(\d{0,2})/);
-  if (!m) return `+998 ${nationalDigits}`;
+/**
+ * "+998 XX XXX XX XX" — тот же формат, что в AuthDemoPickerSheet/LoginPhoneScreen.
+ *
+ * Было: шаблон ждал ГОЛЫЕ ДЕВЯТЬ ЦИФР без кода страны, а из базы
+ * приходит E.164 с плюсом — "+998999999999". Регулярка прибита к началу
+ * строки и требует цифру, поэтому на плюсе все четыре группы совпадали
+ * пустыми, filter(Boolean) выбрасывал всё — и оставалось голое "+998".
+ *
+ * Стало: сначала оставляем одни цифры (плюс, пробелы, скобки, дефисы
+ * — всё убирается), потом срезаем код страны — но ТОЛЬКО если после
+ * него остаются ровно девять цифр. Номер, записанный без плюса и без
+ * кода ("998999999" — девять цифр, начинается на 998), так не потеряет
+ * три свои первые цифры.
+ */
+function formatPhoneDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  const national = digits.length === 12 && digits.startsWith("998") ? digits.slice(3) : digits;
+  if (!national) return "—";
+  const m = national.match(/^(\d{0,2})(\d{0,3})(\d{0,2})(\d{0,2})/);
+  if (!m) return `+998 ${national}`;
   return `+998 ${[m[1], m[2], m[3], m[4]].filter(Boolean).join(" ")}`;
 }
 

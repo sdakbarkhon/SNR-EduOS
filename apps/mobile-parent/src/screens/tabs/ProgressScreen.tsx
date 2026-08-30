@@ -52,6 +52,8 @@ import {
   getStudentGrades,
   getChildTeacherReviews,
   getSubjectConfig,
+  getGroupSubjectTeachers,
+  getStudentById,
   formatDate,
   LOCALE_TAG,
   type Dictionary,
@@ -104,6 +106,7 @@ import { useAuthSession } from "../../context/AuthSessionContext";
 import { useParentData } from "../../context/ParentDataContext";
 import { useDemoSession } from "../../context/DemoSessionContext";
 import { toChildRow } from "../../lib/realChild";
+import { SubjectIcon } from "../../lib/subjectIcons";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
 import { getSupabase } from "../../lib/supabase";
@@ -241,6 +244,9 @@ type RealSubjectAgg = {
   subject: string;
   label: string;
   color: string;
+  /** Имя значка lucide из subjects.icon; null — в базе пусто или
+   *  предмета нет в группе ребёнка. Тогда плитка рисует две буквы, как раньше. */
+  icon: string | null;
   avg: number;
   avgLabel: string;
   pct: number;
@@ -279,9 +285,13 @@ function RealSubjectGridTile({ stat }: { stat: RealSubjectAgg }) {
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
-          {stat.label.slice(0, 2)}
-        </Text>
+        {stat.icon ? (
+          <SubjectIcon name={stat.icon} size={18} />
+        ) : (
+          <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: "#FFFFFF" }}>
+            {stat.label.slice(0, 2)}
+          </Text>
+        )}
       </View>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
         <Text style={{ fontFamily: fonts.manrope800, fontSize: 13, color: tokens.ink1 }}>
@@ -316,9 +326,13 @@ function RealSubjectListRow({ stat }: { stat: RealSubjectAgg }) {
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: "#FFFFFF" }}>
-          {stat.label.slice(0, 2)}
-        </Text>
+        {stat.icon ? (
+          <SubjectIcon name={stat.icon} size={15} />
+        ) : (
+          <Text style={{ fontFamily: fonts.manrope800, fontSize: 10, color: "#FFFFFF" }}>
+            {stat.label.slice(0, 2)}
+          </Text>
+        )}
       </View>
       <Text
         numberOfLines={1}
@@ -421,6 +435,29 @@ export default function ProgressScreen() {
     [isRealFlow, selectedChildId],
   );
 
+  // ЗНАЧКИ ПРЕДМЕТОВ — ИЗ БАЗЫ, А НЕ ДВЕ ПЕРВЫЕ БУКВЫ НАЗВАНИЯ. 30.08.2026.
+  //
+  // Было: в квадратике плитки стояло label.slice(0, 2) — «Ма», «Ан», «Ин».
+  // Собственные значки у предметов есть всё это время: subjects.icon — имя
+  // значка lucide, которое админ выбирает на веб-экране «Предметы», рядом
+  // лежит subjects.color. Запрос тоже уже есть — getGroupSubjectTeachers, тот
+  // самый, что питает «Предметы и учителя» и список чатов; своего
+  // запроса не заводим.
+  //
+  // Второстепенный блок: падёт — плитки остаются с буквами, вкладка
+  // «Оценки» не блокируется (основной error-контракт — у gradesState).
+  const subjectMetaState = useAsyncData(
+    async () => {
+      if (!isRealFlow || !selectedChildId) return null;
+      const db = getSupabase();
+      const profile = await getStudentById(db, selectedChildId);
+      const groupId = profile.student_groups.find((sg) => sg.groups)?.groups?.id ?? null;
+      if (!groupId) return null;
+      return getGroupSubjectTeachers(db, groupId);
+    },
+    [isRealFlow, selectedChildId],
+  );
+
   // Реальные оценки активного ребёнка — throw-on-error (getStudentGrades,
   // Долги-фикс), useAsyncData отдаёт loading/error/data раздельно, ничего не
   // глотаем. Переключение ребёнка (selectedChildId в deps) перезапрашивает.
@@ -472,6 +509,18 @@ export default function ProgressScreen() {
     () => averageOf(realCountedItems.map((g) => g.grade5)),
     [realCountedItems],
   );
+  // Имя предмета → его значок и цвет из базы. Ключ — subjects.name: именно
+  // его возвращает и getStudentGrades в поле subject (резолв через
+  // subject_id → subjects.name), и getGroupSubjectTeachers в subjectName —
+  // одно и то же поле одной таблицы, не два похожих названия.
+  const subjectMetaByName = useMemo(() => {
+    const map = new Map<string, { icon: string | null; color: string | null }>();
+    for (const s of subjectMetaState.data ?? []) {
+      map.set(s.subjectName, { icon: s.icon, color: s.color });
+    }
+    return map;
+  }, [subjectMetaState.data]);
+
   const realSubjectStats = useMemo(() => {
     const map = new Map<string, { sum: number; count: number }>();
     for (const g of realGradedItems) {
@@ -484,11 +533,15 @@ export default function ProgressScreen() {
     return Array.from(map.entries())
       .map(([subject, { sum, count }]) => {
         const cfg = getSubjectConfig(subject);
+        const meta = subjectMetaByName.get(subject);
         const avg = sum / count;
         return {
           subject,
           label: cfg.label,
-          color: cfg.color,
+          // Цвет школы главнее палитры ядра: админ выбрал его руками
+          // рядом со значком, и на вебе предмет выглядит именно так.
+          color: meta?.color ?? cfg.color,
+          icon: meta?.icon ?? null,
           avg,
           avgLabel: avg.toFixed(1),
           pct: Math.round((avg / 5) * 100),
@@ -496,7 +549,7 @@ export default function ProgressScreen() {
         };
       })
       .sort((a, b) => b.avg - a.avg);
-  }, [realGradedItems]);
+  }, [realGradedItems, subjectMetaByName]);
   const realStarsFilled = realAverage != null ? Math.max(0, Math.min(5, Math.round(realAverage))) : 0;
   const realAverageChip =
     realAverage == null
