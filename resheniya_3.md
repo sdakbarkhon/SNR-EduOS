@@ -9682,3 +9682,132 @@ NO ACTION или RESTRICT, и считает строки за ними. Пра�
 ### Коммит
 
 — этот самый коммит. **OTA не публиковалась.**
+
+---
+
+## 30.08.2026 — Миграция 238: право на выполнение отзывается поимённо
+
+Хвост от 237. Проверка применённой миграции показала, что права на
+`fn_user_delete_blockers` шире задуманного.
+
+### Что отозвано и у кого
+
+```sql
+REVOKE EXECUTE ON FUNCTION public.fn_user_delete_blockers(uuid)
+  FROM anon, authenticated;
+```
+
+Одна строка. `service_role` право сохраняет — её зовёт серверный код перед
+удалением учётной записи.
+
+### Почему 237 не сработала
+
+В ней стояло `REVOKE ALL ... FROM PUBLIC`. Это снимает только **неявное**
+право, которое есть у всех по умолчанию. А на схему `public` в этом проекте
+висят два правила прав по умолчанию — от `postgres` и от `supabase_admin`, — и
+каждое выдаёт EXECUTE на КАЖДУЮ новую функцию ролям anon, authenticated и
+service_role. Это **явные** гранты, и `REVOKE FROM PUBLIC` их не касается.
+
+Видно по самому списку прав: записи `=X/postgres` (это и есть PUBLIC) там нет —
+значит отзыв отработал; остались ровно два гранта от правил по умолчанию.
+
+**Третий раз, когда это кусается** (знаем с 22.08.2026). Правило на будущее
+короткое: **новую функцию закрывать поимённо**, а не через PUBLIC —
+
+```sql
+REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION ... TO <кому правда нужно>;
+```
+
+Так сделано в 234 у `fn_ensure_support_thread` и в 235 у `chat_admin_names` —
+там права оказались верными с первого раза.
+
+### Чем это было опасно
+
+Сегодня — ничем. Функция перечисляет внешние ключи на `auth.users` без
+каскада, а после 237 их не осталось ни одного: она возвращает пусто кому
+угодно. Опасно стало бы ровно тогда, когда она понадобится: заведут таблицу со
+ссылкой без каскада — и анонимный вызывающий сможет считать, сколько строк
+ссылается на произвольный идентификатор пользователя, причём функция
+выполняется от владельца (SECURITY DEFINER).
+
+### Что проверено заодно — всё, что мы завели миграциями 234–237
+
+| Объект | anon | authenticated | Вывод |
+|---|---|---|---|
+| `fn_user_delete_blockers` (237) | **true** | **true** | шире задуманного → **в 238** |
+| `fn_ensure_support_thread` (234) | false | true | верно, и authenticated право НУЖНО |
+| `chat_admin_names` (235) | false | SELECT | верно |
+| `tg_admin_support_membership` (234) | true | true | шире номинально, использовать нельзя |
+| `fn_chat_message_notify` (236) | true | true | то же |
+| `notification_prefs` (236) | INSERT есть | INSERT есть | не наша особенность |
+
+**Про `fn_ensure_support_thread`**: право у authenticated не лишнее, а
+необходимое — экран поддержки зовёт функцию под сессией самого родителя, а не
+служебным ключом. Отзыв сломал бы переписку.
+
+**Про две триггерные функции**: обе возвращают `trigger`, а такую функцию
+Postgres не даёт позвать напрямую вообще никому. Проверено вызовом, а не
+рассуждением:
+
+```
+fn_chat_message_notify      → 0A000 «trigger functions can only be called as triggers»
+tg_admin_support_membership → 0A000 «trigger functions can only be called as triggers»
+```
+
+Права шире номинально, воспользоваться ими нельзя. Не трогаем: выгоды ноль, а
+движение вокруг триггеров чата — риск на пустом месте.
+
+**Про `notification_prefs`**: у anon на уровне таблицы есть
+INSERT/UPDATE/DELETE/TRUNCATE — но это не наша особенность, а состояние
+**74 таблиц из 84** в схеме: те же правила прав по умолчанию. Строки при этом
+закрыты правилами доступа: чтение, изменение и удаление по
+`user_id = auth.uid()`, вставка по
+`user_id = auth.uid() AND school_id = current_school_id()`. У anon `auth.uid()`
+пуст, и ни одно условие не выполняется. Сузить одну таблицу из семидесяти
+четырёх значило бы сделать её непохожей на соседей и начать общую уборку прав
+— отдельная задача, не эта. **В 238 не вошло, решение за заказчиком.**
+
+### Прогон в транзакции с откатом
+
+```
+── ДО МИГРАЦИИ 238 ──
+  fn_user_delete_blockers (237)                 anon=true   authed=true   service=true
+  fn_ensure_support_thread (234)                anon=false  authed=true   service=true
+  tg_admin_support_membership (234, триггерная) anon=true   authed=true   service=true
+  fn_chat_message_notify (236, триггерная)      anon=true   authed=true   service=true
+  chat_admin_names (235, чтение)                anon=false  authed=true   service=true
+  notification_prefs (236, вставка)             anon=true   authed=true   service=true
+
+── ПОСЛЕ МИГРАЦИИ 238 ──
+  fn_user_delete_blockers (237)                 anon=false  authed=false  service=true
+  ... остальные строки без изменений ...
+
+  служебная роль зовёт функцию: работает, строк 0
+  anon зовёт функцию: отказ 42501 «permission denied for function
+                      fn_user_delete_blockers» — как и надо
+
+── ПОСЛЕ ОТКАТА ──
+  fn_user_delete_blockers (237)                 anon=true   authed=true   service=true
+```
+
+Изменилась ровно одна строка. Остальные пять — те же до и после: миграция их
+не касается.
+
+### Проверка
+
+- `pnpm type-check` — 5 из 5, чисто.
+- `pnpm lint --filter=!mobile` — 5 из 5, чисто.
+- `pnpm lint:hooks` — чисто.
+- `pnpm build` — 2 из 2.
+- Прогон — в транзакции с откатом. В базе ничего не осталось.
+
+### Миграция ждёт применения
+
+`238_revoke_delete_blockers_execute.sql` — файлом, в базу не применялась.
+Замков не берёт: `REVOKE` на функцию блокирует только её саму и только на
+время выполнения оператора. Закрывать вкладки не нужно.
+
+### Коммит
+
+— этот самый коммит. **OTA не публиковалась.**

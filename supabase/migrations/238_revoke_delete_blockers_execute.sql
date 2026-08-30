@@ -1,0 +1,82 @@
+-- Миграция 238: право на выполнение fn_user_delete_blockers отзывается у anon
+-- и authenticated ПОИМЁННО.
+--
+-- ЧТО НЕ СРАБОТАЛО В 237. Там стояло:
+--
+--     REVOKE ALL ON FUNCTION public.fn_user_delete_blockers(uuid) FROM PUBLIC;
+--     GRANT EXECUTE ON FUNCTION public.fn_user_delete_blockers(uuid) TO service_role;
+--
+-- и этого оказалось мало. `REVOKE ... FROM PUBLIC` снимает только НЕЯВНОЕ
+-- право, которое есть у всех по умолчанию. А в этом проекте на схему `public`
+-- висят правила прав по умолчанию — два, от `postgres` и от `supabase_admin`, —
+-- и каждое выдаёт EXECUTE на КАЖДУЮ новую функцию ролям anon, authenticated и
+-- service_role. Это ЯВНЫЕ гранты, и REVOKE FROM PUBLIC их не трогает.
+--
+-- Проверка после применения 237 показала ровно это:
+--
+--     acl: postgres=X/postgres , anon=X/postgres , authenticated=X/postgres ,
+--          service_role=X/postgres
+--     has_function_privilege: anon=true, authenticated=true
+--
+-- Записи `=X/postgres` (это и есть PUBLIC) в списке нет — значит REVOKE FROM
+-- PUBLIC отработал. Остались именно те два гранта, что пришли от правил по
+-- умолчанию.
+--
+-- ЭТО ТРЕТИЙ РАЗ, КОГДА ОНО КУСАЕТСЯ (знаем с 22.08.2026). Вывод на будущее
+-- один и он короткий: **новую функцию закрывать поимённо**, а не через PUBLIC.
+--
+--     REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated;
+--     GRANT  EXECUTE ON FUNCTION ... TO <кому правда нужно>;
+--
+-- Так это и сделано в миграции 234 у fn_ensure_support_thread и в 235 у
+-- представления chat_admin_names — там права оказались верными с первого раза.
+--
+-- ЧЕМ ЭТО БЫЛО ОПАСНО. Сегодня — ничем: fn_user_delete_blockers перечисляет
+-- внешние ключи на `auth.users` без каскада, а после 237 их не осталось ни
+-- одного, и функция возвращает пусто кому угодно. Опасно бы стало ровно тогда,
+-- когда она понадобится: заведут таблицу со ссылкой без каскада — и анонимный
+-- вызывающий сможет считать, сколько строк ссылается на произвольный
+-- идентификатор пользователя, причём функция выполняется от владельца
+-- (SECURITY DEFINER).
+
+BEGIN;
+
+REVOKE EXECUTE ON FUNCTION public.fn_user_delete_blockers(uuid) FROM anon, authenticated;
+
+COMMIT;
+
+-- ПРОВЕРКА ПОСЛЕ ПРИМЕНЕНИЯ. Должно вернуть false, false, true:
+--
+--   SELECT has_function_privilege('anon',          'public.fn_user_delete_blockers(uuid)', 'EXECUTE') AS anon,
+--          has_function_privilege('authenticated', 'public.fn_user_delete_blockers(uuid)', 'EXECUTE') AS authenticated,
+--          has_function_privilege('service_role',  'public.fn_user_delete_blockers(uuid)', 'EXECUTE') AS service_role;
+--
+--
+-- ЧТО ПРОВЕРЕНО ЗАОДНО И ПОЧЕМУ СЮДА НЕ ВОШЛО.
+--
+-- Обошёл всё, что мы завели миграциями 234–237:
+--
+--   fn_ensure_support_thread (234)     anon=false, authenticated=true — ВЕРНО.
+--       authenticated право нужно: экран поддержки зовёт функцию под сессией
+--       самого родителя, а не служебным ключом. Отзыв сломал бы переписку.
+--
+--   chat_admin_names (235, представление)  anon=false, authenticated=SELECT —
+--       ВЕРНО, и ровно это и задумано.
+--
+--   tg_admin_support_membership (234), fn_chat_message_notify (236)
+--       У обеих EXECUTE есть у anon и authenticated — от тех же правил по
+--       умолчанию. НО обе возвращают `trigger`, а такую функцию Postgres не
+--       даёт позвать напрямую вообще никому. Проверено вызовом:
+--           0A000  trigger functions can only be called as triggers
+--       Права шире номинально, использовать их нельзя. Не трогаем: выгоды ноль,
+--       а любое движение вокруг триггеров чата — риск на пустом месте.
+--
+--   notification_prefs (236, таблица)
+--       У anon на уровне таблицы есть INSERT/UPDATE/DELETE/TRUNCATE. Но это НЕ
+--       наша особенность: так у 74 таблиц из 84 в схеме — те же правила прав
+--       по умолчанию. Строки при этом закрыты правилами доступа: чтение,
+--       изменение и удаление идут по `user_id = auth.uid()`, вставка — по
+--       `user_id = auth.uid() AND school_id = current_school_id()`, а у anon
+--       `auth.uid()` пуст, и ни одно условие не выполняется. Сузить одну
+--       таблицу из семидесяти четырёх значило бы сделать её непохожей на
+--       соседей и начать общую уборку прав — отдельная задача, не эта.
