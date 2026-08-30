@@ -51,7 +51,9 @@ function DeleteTeacherImpact({
   if (failed) return <p className="mb-4 text-xs text-gray-500">{t.deleteWarning}</p>;
   if (!impact) return <p className="mb-4 text-xs text-gray-500">{t.impactLoading}</p>;
 
-  const bindings = impact.assignments + impact.groupLinks + impact.curatorOf;
+  // 30.08.2026 — impact.curatorOf из суммы убран: кураторства больше нет,
+  // groups.teacher_id пуст у всех групп (миграция 242).
+  const bindings = impact.assignments + impact.groupLinks;
   const cascade = impact.curriculumPlans + impact.announcements;
 
   return (
@@ -75,8 +77,7 @@ function DeleteTeacherImpact({
         <p className="text-xs text-gray-600">
           {t.teacherDeleteBindings
             .replace("{assignments}", String(impact.assignments))
-            .replace("{groups}", String(impact.groupLinks))
-            .replace("{curator}", String(impact.curatorOf))}
+            .replace("{groups}", String(impact.groupLinks))}
         </p>
       )}
       {!impact.blocked && cascade > 0 && (
@@ -118,7 +119,8 @@ export type TeacherBindingRow = {
   assignmentId: string;
   subjectName: string;
   groupName: string;
-  isCurator: boolean;
+  // 30.08.2026 — поля isCurator здесь больше нет: роль убрана из продукта,
+  // значок «куратор» рядом с назначением показывать нечему.
   /** Есть ли строка в group_teachers. Пусто — учитель не видит группу, и это
    *  ровно тот рассинхрон, ради которого делался Z.2.4. */
   seesGroup: boolean;
@@ -155,9 +157,6 @@ function TeacherBindings({
       {rows.map((r) => (
         <li key={r.assignmentId} className="flex items-center gap-1.5 text-xs font-normal">
           <span className="text-gray-600">{r.groupName} · {r.subjectName}</span>
-          {r.isCurator && (
-            <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">{t.curatorBadge}</span>
-          )}
           {!r.seesGroup && (
             <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">{t.seesGroupNo}</span>
           )}

@@ -42,7 +42,10 @@ export type ChatThreadSummary = {
   directGroupId?: string | null;
   directGroupName?: string | null;
   directSubjectName?: string | null;
-  isCuratorThread?: boolean;
+  // 30.08.2026 — признака isCuratorThread здесь больше нет. Он отличал чат
+  // с куратором класса от чата с предметником: group.teacher_id ===
+  // thread.teacher_id. Роль убрана из продукта, groups.teacher_id пуст у
+  // всех групп — признак был бы вечно ложным.
   /**
    * Заполняются только для kind === "support" — той же формы, что direct*
    * выше.
@@ -203,7 +206,6 @@ export async function getMyThreadSummaries(db: Db): Promise<ChatThreadSummary[]>
       summary.directGroupId = groupId;
       summary.directGroupName = group?.name ?? null;
       summary.directSubjectName = groupId && t.teacher_id ? subjectNameByGroupTeacher.get(`${groupId}:${t.teacher_id}`) ?? null : null;
-      summary.isCuratorThread = !!(group && t.teacher_id && group.teacher_id === t.teacher_id);
     }
 
     if (t.kind === "support") {

@@ -91,7 +91,9 @@ function counterpartName(s: ChatThreadSummary, myUserId: string | null): string 
 
 function roleLabelOf(s: ChatThreadSummary): string | null {
   if (isSupportThread(s)) return "Поддержка";
-  if (s.kind === "direct") return s.isCuratorThread ? "Куратор" : "Учитель";
+  // 30.08.2026 — «Куратор» из подписей убран вместе с ролью: все личные
+  // ветки родителя ведут к учителю-предметнику.
+  if (s.kind === "direct") return "Учитель";
   if (s.kind === "group") return "Класс";
   return null;
 }

@@ -300,14 +300,13 @@ async function resolveGroupSubject(formData: FormData, schoolId: string): Promis
   return getSubjectKeyByLabel(row.name) ?? row.name;
 }
 
-/** Z.2.6 — куратора в форме реальных школ нет, поле просто не приходит.
- *  `null` означает «не прислали»: обновление такое поле не трогает, создание
- *  оставляет группу без куратора. Пустая строка от демо-формы — это
- *  осознанное «без куратора» и тоже даёт null. */
-function readCuratorId(formData: FormData): string | null | undefined {
-  if (!formData.has("teacher_id")) return undefined;
-  return String(formData.get("teacher_id") ?? "").trim() || null;
-}
+// 30.08.2026 — ФУНКЦИИ readCuratorId ЗДЕСЬ БОЛЬШЕ НЕТ.
+//
+// Она доставала куратора из формы группы. Роль убрана из продукта, поля в
+// форме не осталось, и читать нечего. Создание группы теперь всегда пишет
+// teacher_id: null, обновление колонку не трогает вовсе — так группа,
+// заведённая до снятия роли, не поменяется молча при первом же
+// редактировании названия.
 
 /**
  * Цена из формы — заход 2 по платежам.
@@ -315,7 +314,7 @@ function readCuratorId(formData: FormData): string | null | undefined {
  * Возвращает undefined, если поля в FormData НЕТ вовсе. Это не то же самое,
  * что пустое поле: пустое — осознанный ноль («цена не задана»), отсутствие —
  * форма, которая про цену не знает, и её молчание не должно обнулять уже
- * заданную цену. Тот же приём, что у куратора выше.
+ * заданную цену.
  */
 function readCoursePrice(formData: FormData): number | undefined {
   const raw = formData.get("course_price");
@@ -329,7 +328,7 @@ export async function actionCreateGroup(formData: FormData) {
     if (!name) throw new Error("Missing fields");
     const subject = await resolveGroupSubject(formData, schoolId);
     const id = await createGroup({
-      name, subject, teacher_id: readCuratorId(formData) ?? null, school_id: schoolId,
+      name, subject, teacher_id: null, school_id: schoolId,
       course_price: readCoursePrice(formData),
     });
     revalidatePath("/admin/groups");
@@ -346,7 +345,7 @@ export async function actionUpdateGroup(formData: FormData) {
     const subject = await resolveGroupSubject(formData, schoolId);
     await updateGroup(
       group_id,
-      { name, subject, teacher_id: readCuratorId(formData), course_price: readCoursePrice(formData) },
+      { name, subject, course_price: readCoursePrice(formData) },
       schoolId,
       isSuperAdmin,
     );

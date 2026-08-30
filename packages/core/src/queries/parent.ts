@@ -32,21 +32,15 @@ export type ParentChildSummary = {
    * заполнила, и показывать строку на экране нечем.
    */
   birthDate: string | null;
-  /**
-   * Классный руководитель или null.
-   *
-   * 29.08.2026 ПЕРЕЕЗД. Читалось из students.curator_id — колонки, которую
-   * НЕ ЗАПОЛНЯЕТ НИКТО: в админке поля под неё нет ни на одном экране.
-   * Строка «Классный руководитель» из-за этого не показывалась никогда, в
-   * какую бы школу ни зашёл родитель. Решение заказчика: куратор один на
-   * класс и задаётся в форме группы — это groups.teacher_id, и его админ
-   * действительно заполняет.
-   *
-   * Колонку students.curator_id не трогаем: её ещё читает замороженное
-   * ученическое приложение (apps/mobile), а ронять его правкой общего слоя
-   * нельзя.
-   */
-  curatorName: string | null;
+  // ПОЛЯ curatorName ЗДЕСЬ БОЛЬШЕ НЕТ (30.08.2026).
+  //
+  // Оно прожило один день: 29.08 переехало со students.curator_id на
+  // groups.teacher_id, 30.08 роль куратора убрана из продукта целиком.
+  // Миграция 242 обнулила обе колонки и удалила единственного куратора,
+  // 243 снимет правила доступа и триггеры.
+  //
+  // Колонку students.curator_id мы не удаляли: её читает замороженное
+  // ученическое приложение (apps/mobile). Оно покажет прочерк — ожидаемо.
   /**
    * Пол ученика: students.gender, миграция 232. Значения «male»/«female»
    * или null, если школа не заполнила.
@@ -141,7 +135,7 @@ type StudentGroupsRow = {
   phone: string | null;
   student_groups: {
     group_id: string;
-    groups: { name: string; teacher: { full_name: string } | null } | null;
+    groups: { name: string } | null;
   }[] | null;
 };
 
@@ -222,15 +216,12 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
 
   const { data: students, error: studentsErr } = await db
     .from("students")
-    // Куратор берётся у ГРУППЫ (groups.teacher_id), а не у ученика:
-    // students.curator_id не заполняет ни один экран админки. Имя связи
-    // обязательно — между groups и teachers путей несколько, и PostgREST
-    // отказывается угадывать (PGRST201). Та же связь уже используется в
-    // DAILY_LESSON_SELECT выше, то есть проверена живьём.
+    // 30.08.2026 — из выборки убрана связь
+    // teacher:teachers!groups_teacher_id_fkey: она тянулась ради строки
+    // «Классный руководитель», а роль куратора убрана из продукта.
     .select(
       "id, full_name, birth_date, gender, file_no, phone,"
-      + " student_groups(group_id, groups(name,"
-      + " teacher:teachers!groups_teacher_id_fkey(full_name)))",
+      + " student_groups(group_id, groups(name))",
     )
     .in("id", studentIds);
   if (studentsErr) throw studentsErr;
@@ -263,7 +254,6 @@ export async function getParentContext(db: Db): Promise<ParentContext | null> {
         className,
         groupId: sg?.group_id ?? null,
         birthDate: s.birth_date ?? null,
-        curatorName: textOrNull(sg?.groups?.teacher?.full_name),
         gender: readGender(s.gender),
         fileNo: textOrNull(s.file_no),
         phone: textOrNull(s.phone),

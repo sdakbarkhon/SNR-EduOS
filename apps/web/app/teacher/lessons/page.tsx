@@ -4,7 +4,6 @@ import { getMyTeacher } from "@/lib/cached-queries";
 import { safeQuery } from "@/lib/safe-query";
 import { ensureMorningCycleRan } from "@/lib/ensureMorningCycleRan";
 import { getMySchoolNow } from "@/lib/school-time-server";
-import { isCuratorTeacher } from "@/lib/curator";
 import { TeacherLessonsView } from "./TeacherLessonsView";
 import { redirect } from "next/navigation";
 
@@ -17,11 +16,8 @@ export default async function TeacherLessonsPage() {
   // См. apps/web/app/(app)/lessons/[id]/page.tsx.
   try { await ensureMorningCycleRan(); } catch { /* noop */ }
 
-  // Куратор — наблюдательная роль и только в демо-школе (lib/curator.ts,
-  // то же правило, что в RLS 131/187). getMyTeacher request-scoped (layout
-  // уже дёргал) — доп. запроса нет.
+  // getMyTeacher request-scoped (layout уже дёргал) — доп. запроса нет.
   const teacher = await getMyTeacher(db);
-  const isCurator = await isCuratorTeacher(db);
 
   // Промт "презентации/skeleton" — TeacherLessonsView only ever uses the
   // initial `lessons` prop to seed the CURRENT month's view (see its
@@ -51,11 +47,12 @@ export default async function TeacherLessonsPage() {
   // без стабов). Раньше грузились все предметы всех доступных групп
   // («co-teacher parity», Этап 4.7) — и предметник мог создать урок чужого
   // предмета; RLS 131 такой INSERT теперь всё равно отклонит, селектор
-  // просто перестаёт предлагать невозможное. Куратору список не нужен:
-  // создание уроков ему заблокировано (isCurator скрывает кнопку, RLS —
-  // INSERT), пустой массив дополнительно включает no-subjects заглушку модалки.
+  // просто перестаёт предлагать невозможное.
+  //
+  // 30.08.2026 — оговорки про куратора здесь больше нет: роль убрана из
+  // продукта, список теперь один для всех — свои предметы.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: teacherSubjects, error: subjectsErr } = groups.length > 0 && !isCurator
+  const { data: teacherSubjects, error: subjectsErr } = groups.length > 0
     ? await (db as any)
         .from("subjects")
         .select("*, group:groups(id, name), teacher:teachers(id, full_name)")
@@ -72,7 +69,6 @@ export default async function TeacherLessonsPage() {
       groups={groups}
       teacherSubjects={teacherSubjects ?? []}
       loadError={lessonsRes.failed}
-      isCurator={isCurator}
     />
   );
 }

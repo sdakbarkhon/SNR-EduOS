@@ -571,14 +571,13 @@ export function TeacherLessonsView({
   groups,
   teacherSubjects,
   loadError = false,
-  isCurator = false,
 }: {
   lessons: LessonItem[];
   groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
   loadError?: boolean;
-  /** Куратор (subject_slug=NULL) — только просмотр: без создания/меню карточек. */
-  isCurator?: boolean;
+  // 30.08.2026 — пропа isCurator здесь больше нет. Он прятал создание урока
+  // и меню карточек у наблюдателя; роль убрана из продукта, прятать не от кого.
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -869,7 +868,7 @@ export function TeacherLessonsView({
               <h3 className="text-sm font-bold capitalize text-[#1D1D1F]">
                 {fmtDayHeader(selectedDayKey)}
               </h3>
-              {!isCurator && (
+              {(
                 <div className="flex shrink-0 items-center gap-2">
                   {/* Уроки в школе повторяются неделя за неделей — правило на
                       период вместо сотни отдельных нажатий на четверть. */}
@@ -896,7 +895,7 @@ export function TeacherLessonsView({
                   <CalendarDays className="h-6 w-6 text-gray-300" />
                 </div>
                 <p className="text-sm font-medium text-gray-400">На этот день уроков нет</p>
-                {!isCurator && (
+                {(
                   <button
                     onClick={openCreate}
                     className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
@@ -908,7 +907,7 @@ export function TeacherLessonsView({
             ) : (
               <div className="space-y-2">
                 {dayLessons.map(l => (
-                  <LessonCard key={l.id} lesson={l} onEdit={openEdit} onDelete={openDelete} readOnly={isCurator} />
+                  <LessonCard key={l.id} lesson={l} onEdit={openEdit} onDelete={openDelete} readOnly={false} />
                 ))}
               </div>
             )}

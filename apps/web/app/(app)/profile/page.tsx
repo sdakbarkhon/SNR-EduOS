@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  getNotificationSettings,
-  getTeachers,
-} from "@snr/core";
+import { getNotificationSettings } from "@snr/core";
 import { getMyStudent, getMyGroups } from "@/lib/cached-queries";
 import { ProfileView } from "./ProfileView";
 
@@ -22,34 +19,19 @@ export default async function ProfilePage() {
     // оставляем null — ProfileView создаст запись при первом сохранении
   }
 
-  // КЛАССНЫЙ РУКОВОДИТЕЛЬ — У ГРУППЫ, А НЕ У УЧЕНИКА (29.08.2026).
+  // КЛАССНОГО РУКОВОДИТЕЛЯ ЗДЕСЬ БОЛЬШЕ НЕТ (30.08.2026).
   //
-  // Здесь стояло students.curator_id — колонка, которую не заполняет ни один
-  // экран админки: поля под неё нет ни в окне ученика, ни где-либо ещё.
-  // Значит строка «Классный руководитель» показывала прочерк ВСЕГДА, у всех
-  // учеников обеих школ. Решение заказчика: куратор один на класс и задаётся
-  // в форме группы — это groups.teacher_id.
-  //
-  // Второго запроса не понадобилось: getMyGroups уже вернул строки групп
-  // целиком (select *), teacher_id в них есть.
-  let curatorName = "";
-  const curatorId = groups.find((g) => g.teacher_id)?.teacher_id ?? null;
-  if (curatorId) {
-    try {
-      const teachers = await getTeachers(db);
-      const c = teachers.find((t) => t.id === curatorId);
-      curatorName = c?.full_name ?? "";
-    } catch {
-      // ignore
-    }
-  }
+  // Роль куратора убрана из продукта целиком. Миграция 242 удалила
+  // единственного куратора и обнулила groups.teacher_id со
+  // students.curator_id; 243 снимает правила доступа и триггеры. Читать
+  // было бы нечего, а прочерк в карточке — это вопрос «а кто мой
+  // классный?», на который у продукта больше нет ответа.
 
   return (
     <ProfileView
       student={student}
       groups={groups}
       notifSettings={notifSettings}
-      curatorName={curatorName}
     />
   );
 }

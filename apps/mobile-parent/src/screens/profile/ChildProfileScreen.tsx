@@ -268,9 +268,13 @@ export default function ChildProfileScreen() {
     const schoolName = parentData?.schoolName ?? null;
     if (schoolName) generalRows.push({ label: t.prof.school, value: schoolName });
     generalRows.push({ label: t.prof.classRow, value: child?.class_name ?? "" });
-    if (realSummary?.curatorName) {
-      generalRows.push({ label: t.prof.curator, value: realSummary.curatorName });
-    }
+    // 30.08.2026 — СТРОКИ «КЛАССНЫЙ РУКОВОДИТЕЛЬ» ЗДЕСЬ БОЛЬШЕ НЕТ.
+    // Роль куратора убрана из продукта целиком (миграция 242 сняла данные,
+    // 243 снимет правила и триггеры). Показывать строку нечем и незачем:
+    // groups.teacher_id пуст у всех групп.
+    //
+    // В ВИТРИНЕ ОНА ОСТАЁТСЯ — там свой выдуманный классный руководитель на
+    // заготовке, он к базе отношения не имеет (см. ветку showcase выше).
     if (realSummary?.fileNo) {
       generalRows.push({ label: t.prof.fileNo, value: realSummary.fileNo });
     }

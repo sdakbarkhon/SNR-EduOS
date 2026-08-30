@@ -767,14 +767,12 @@ function isQuizType(ct: string | null | undefined): boolean {
 export function TeacherLessonDetailView({
   lesson,
   teacher,
-  isCurator = false,
   autostartEnabled = false,
 }: {
   lesson: TeacherLessonView;
   teacher: Teacher;
-  /** Наблюдатель ли зритель. Считает СЕРВЕР одним помощником на весь
-   *  проект (lib/curator.ts) — здесь своей формулы больше нет. */
-  isCurator?: boolean;
+  // 30.08.2026 — пропа isCurator здесь больше нет: роль наблюдателя убрана
+  // из продукта. Управление уроком теперь закрыто только у завершённого.
   /** У школы включён автозапуск уроков (schools.autostart_enabled). Тогда урок
    *  открывается и закрывается сам по расписанию, и ручные кнопки «Начать» /
    *  «Закончить» учителю не нужны — они только сбивают с толку. В школе с
@@ -1229,7 +1227,7 @@ export function TeacherLessonDetailView({
   // ── Active stage control ────────────────────────────────────────────────────
 
   async function handleActivateStage(stageId: string) {
-    if (status !== "in_progress" || isCurator) return;
+    if (status !== "in_progress") return;
     setActivatingStageId(stageId);
     setStageActivationError(null);
     try {
@@ -1330,7 +1328,7 @@ export function TeacherLessonDetailView({
   // проект, см. lib/curator.ts и миграцию 187). UI скрывает мутирующие
   // контролы тем же способом, что для завершённого урока; настоящий
   // enforcement — subject-scope RLS (миграция 131).
-  const readOnly = isLessonCompleted || isCurator;
+  const readOnly = isLessonCompleted;
   // 26.08.2026: getSubjectStyle(lesson.group.subject) снят. Он существовал
   // ради одной подписи-запасного варианта, а отдавал «Программирование» на
   // любом уроке — настоящий предмет (lesson.subjectName/Icon/Color) лежал
@@ -1390,12 +1388,12 @@ export function TeacherLessonDetailView({
                 кнопки показываем причину, чтобы учитель не упирался в сырую
                 ошибку Postgres. Замороженный день и всё, что позже,
                 стартуются как раньше — правило 1/2/3+ не затронуто. */}
-            {!autostartEnabled && status === "scheduled" && !isCurator && isPastDay(lesson.starts_at) && (
+            {!autostartEnabled && status === "scheduled" && isPastDay(lesson.starts_at) && (
               <span className="rounded-[11px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
                 {dl.startBlockedPastDay}
               </span>
             )}
-            {!autostartEnabled && status === "scheduled" && !isCurator && !isPastDay(lesson.starts_at) && (
+            {!autostartEnabled && status === "scheduled" && !isPastDay(lesson.starts_at) && (
               <button
                 onClick={handleStartLesson}
                 disabled={startingLesson}
@@ -1404,7 +1402,7 @@ export function TeacherLessonDetailView({
                 {startingLesson ? "…" : dl.startLessonBtn}
               </button>
             )}
-            {!autostartEnabled && status === "in_progress" && !isCurator && (
+            {!autostartEnabled && status === "in_progress" && (
               <button
                 onClick={handleEndLesson}
                 disabled={endingLesson}
@@ -1459,14 +1457,6 @@ export function TeacherLessonDetailView({
           </>
         }
       />
-
-      {/* Куратор — только просмотр (жёстко по-русски, как "Куратор" в TeacherHeaderInfo) */}
-      {isCurator && (
-        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
-          <Lock className="h-4 w-4 shrink-0" />
-          Режим куратора — только просмотр. Изменять урок может учитель предмета.
-        </div>
-      )}
 
       {/* Inline attendance reminder (5–15 min before end) */}
       {status === "in_progress" && (
@@ -1560,7 +1550,7 @@ export function TeacherLessonDetailView({
                 </div>
 
                 {/* Show-to-class control (only while the lesson is live) */}
-                {status === "in_progress" && !isCurator && (
+                {status === "in_progress" && (
                   demoMaterialId === mat.id ? (
                     <div className="flex items-center gap-2">
                       <span className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
@@ -1618,7 +1608,7 @@ export function TeacherLessonDetailView({
           <p className="text-xs font-semibold text-red-500">{stageActivationError}</p>
         )}
 
-        {status === "scheduled" && !isCurator && middleStages.length > 0 && (
+        {status === "scheduled" && middleStages.length > 0 && (
           <p className="text-[11px] text-violet-400">{dl.activeStage.lessonNotStarted}</p>
         )}
 
@@ -1670,7 +1660,7 @@ export function TeacherLessonDetailView({
               const isExpanded = expandedStages.has(stage.id);
               // Управление активацией — только там, где оно и было: живой или
               // ещё не начатый урок, не куратор (для него это мутация).
-              const canActivate = (status === "in_progress" || status === "scheduled") && !isCurator;
+              const canActivate = (status === "in_progress" || status === "scheduled");
 
               return (
               <div key={stage.id} className="flex flex-col">
@@ -1822,7 +1812,7 @@ export function TeacherLessonDetailView({
                 )}
 
                 {/* Kahoot: launch live game (мутация — куратору скрыто) */}
-                {stage.content_type === "quiz_kahoot" && !isCurator && (
+                {stage.content_type === "quiz_kahoot" && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setKahootStage(stage); }}
                     className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"

@@ -655,7 +655,7 @@ export interface Dictionary {
     impactLoading: string;
     teacherHasLessonsShort: string;   // "{count}"
     teacherHasGradesShort: string;    // "{count}"
-    teacherDeleteBindings: string;    // "{assignments} {groups} {curator}"
+    teacherDeleteBindings: string;    // "{assignments} {groups}"
     teacherDeleteCascade: string;     // "{plans} {announcements}"
     teacherDeleteAccount: string;
     teacherDeleteClean: string;
@@ -663,12 +663,10 @@ export interface Dictionary {
     subjectsAndGroupsTitle: string;
     subjectsAndGroupsEmpty: string;
     subjectsAndGroupsHint: string;
-    curatorBadge: string;
     seesGroupNo: string;
     unassignBtn: string;
     lessonsCount: string;             // "{n}"
     /** Z.2.6 — куратор только в демо-школе, поле необязательное. */
-    noCuratorOption: string;
     /** Z.2.7 — класс ученика в списке, выводится из группы. */
     tableGrade: string;
     gradeFromGroupUnknown: string;
@@ -684,7 +682,6 @@ export interface Dictionary {
     deleteGroupConfirm: string;
     fieldGroupName: string;
     fieldSubject: string;
-    fieldTeacher: string;
     fieldCoursePrice: string;
     coursePriceHint: string;
     tableCoursePrice: string;
@@ -741,7 +738,6 @@ export interface Dictionary {
     sumUnit: string;
     fieldDescription: string;
     tableStudentCount: string;
-    tableTeacher: string;
     loading: string;
     // П.3 Заход 2 — добавлено при i18n-переводе students/teachers/groups/dashboard
     noResults: string;
@@ -1294,15 +1290,9 @@ export interface Dictionary {
 
     profileTitle: string;
     birthDateLabel: string;
-    curatorLabel: string;
-    curatorPhoneLabel: string;
-    contactCurator: string;
-    curatorComingSoon: string;
-    noCurator: string;
     classesLabel: string;
 
     messagesStubTitle: string;
-    messagesStubDescription: string;
 
     notFoundChildTitle: string;
     notFoundChildDescription: string;
@@ -1550,14 +1540,12 @@ export interface Dictionary {
     childProfGenderLabel: string;
     childProfGenderMale: string;
     childProfGenderFemale: string;
-    childProfWriteCuratorBtn: string;
     childProfSubjectsTitle: string;
     childProfSubjectsEmpty: string;
     childProfStatusTitle: string;
     childProfStatusActive: string;
     childProfStatusInactive: string;
     childProfEnrolledLabel: string;
-    childProfNoThreadNotice: string;
 
     parentProfEmailLabel: string;
     parentProfEditBtn: string;
@@ -3312,8 +3300,6 @@ export interface Dictionary {
     sendError: string;            // тост при ошибке отправки
     noMessagesInThread: string;   // "Нет сообщений" — открытый тред, 0 сообщений
     // Промт 7.2: секции личных чатов ученик↔учитель.
-    sectionCurator: string;       // "Куратор" — метка над строкой куратора (ученик)
-    curatorSubtitle: string;      // "Куратор вашего класса" — подпись под именем куратора
     sectionGroupChat: string;     // "Групповой чат" — секция у ученика
     sectionTeachers: string;      // "Учителя" — секция личных чатов у ученика
     sectionGroupChats: string;    // "Групповые чаты" — секция у учителя

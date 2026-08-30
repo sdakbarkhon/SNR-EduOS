@@ -591,11 +591,13 @@ export type TeacherDeletionImpact = {
   /** Оценки и решения, на которые он подписан. ON DELETE NO ACTION —
    *  удаление упало бы сырой ошибкой базы, поэтому блокируем осознанно. */
   gradedRecords: number;
-  /** Три поверхности привязки: назначения предметов, строки group_teachers,
-   *  кураторство над группами. Снимаются вместе с учителем. */
+  /** Две поверхности привязки: назначения предметов и строки
+   *  group_teachers. Снимаются вместе с учителем.
+   *
+   *  30.08.2026 — третьей, кураторства над группами, больше нет: роль
+   *  убрана из продукта, groups.teacher_id пуст у всех групп. */
   assignments: number;
   groupLinks: number;
-  curatorOf: number;
   /** Уходит каскадом вместе с учителем — об этом надо предупредить. */
   curriculumPlans: number;
   announcements: number;
@@ -632,12 +634,11 @@ export async function getTeacherDeletionImpact(
     return count ?? 0;
   };
 
-  const [lessons, plansBySubject, groupLinks, curatorOf, plansByTeacher, announcements,
+  const [lessons, plansBySubject, groupLinks, plansByTeacher, announcements,
     lessonGrades, hwApproved, leaveDecided, stageGraded] = await Promise.all([
     countOf("lessons", "subject_id", subjectIds),
     countOf("curriculum_plans", "subject_id", subjectIds),
     countOf("group_teachers", "teacher_id", teacherId),
-    countOf("groups", "teacher_id", teacherId),
     countOf("curriculum_plans", "teacher_id", teacherId),
     countOf("announcements", "created_by", teacherId),
     countOf("lesson_grades", "graded_by", teacherId),
@@ -655,7 +656,7 @@ export async function getTeacherDeletionImpact(
 
   return {
     lessons, gradedRecords,
-    assignments: subjects.length, groupLinks, curatorOf,
+    assignments: subjects.length, groupLinks,
     curriculumPlans: Math.max(plansByTeacher, plansBySubject),
     announcements, lessonGroups,
     blocked: lessons > 0 || gradedRecords > 0,
@@ -686,10 +687,14 @@ export async function getTeacherDeletionImpact(
  *     просто без учителя. Строку не удаляем: на `subjects.id` висят ДЗ
  *     (SET NULL) и учебные планы (CASCADE), а терять план из-за увольнения
  *     учителя никто не просил.
- *   - строки `group_teachers` — удаляются;
- *   - `groups.teacher_id → NULL` — кураторство снимается.
- * Формально первое и третье сделал бы сам FK (оба SET NULL), но явный шаг
- * оставляет след в логе и не зависит от того, что кто-то поменяет правило.
+ *   - строки `group_teachers` — удаляются.
+ * Формально первое сделал бы сам FK (SET NULL), но явный шаг оставляет след
+ * в логе и не зависит от того, что кто-то поменяет правило.
+ *
+ * 30.08.2026 — третьего шага, `groups.teacher_id → NULL`, здесь больше нет:
+ * роль куратора убрана из продукта, колонка пуста у всех групп и заполнить
+ * её неоткуда — поля в форме группы не осталось. Сам FK по-прежнему стоит
+ * на SET NULL, то есть страховка никуда не делась.
  */
 export async function deleteTeacher(
   teacherId: string,
@@ -716,10 +721,6 @@ export async function deleteTeacher(
 
   const { error: linkErr } = await anySb.from("group_teachers").delete().eq("teacher_id", teacherId);
   if (linkErr) throw linkErr;
-
-  const { error: curatorErr } = await anySb
-    .from("groups").update({ teacher_id: null }).eq("teacher_id", teacherId);
-  if (curatorErr) throw curatorErr;
 
   // Учётная запись — чтобы уволенный не продолжал входить. user_id может
   // быть пустым у заведённых до Z.1 строк, поэтому шаг необязательный.
@@ -1154,7 +1155,7 @@ export type TeacherBinding = {
   groupId: string;
   groupName: string;
   /** Куратор группы — отдельная роль, показывается рядом для полноты картины. */
-  isCurator: boolean;
+  // 30.08.2026 — поля isCurator больше нет: роль куратора убрана из продукта.
   /** Есть ли строка в group_teachers, то есть видит ли он группу. */
   seesGroup: boolean;
   lessons: number;
@@ -1200,7 +1201,6 @@ export async function getTeacherBindings(
     subjectName: a.name,
     groupId: a.group_id,
     groupName: a.group?.name ?? "—",
-    isCurator: a.group?.teacher_id === teacherId,
     seesGroup: seen.has(a.group_id),
     lessons: lessonsBy.get(a.id) ?? 0,
   }));

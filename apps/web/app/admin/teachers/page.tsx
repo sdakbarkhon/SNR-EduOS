@@ -58,7 +58,6 @@ export default async function AdminTeachersPage({
       assignmentId: a.id,
       subjectName: a.name,
       groupName: group?.name ?? "—",
-      isCurator: group?.teacher_id === a.teacher_id,
       seesGroup: seenGroups.has(`${a.teacher_id}|${a.group_id}`),
       lessons: lessonsBySubject.get(a.id) ?? 0,
     });

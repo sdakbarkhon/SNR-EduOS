@@ -269,13 +269,15 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
     });
   }
 
-  // Промт 7.2: студент видит куратора отдельной строкой сверху + групповой
-  // чат класса + личные чаты с предметными учителями. Учитель видит все
-  // групповые чаты своих классов + личные чаты, сгруппированные по классу.
-  // Родитель — прежнее плоское поведение (без секций, не в скоупе Промта 7.2).
-  const curatorThread = role === "student" ? threads.find((t) => t.kind === "direct" && t.isCuratorThread) ?? null : null;
+  // Промт 7.2: студент видит групповой чат класса + личные чаты с учителями.
+  // Учитель видит все групповые чаты своих классов + личные чаты,
+  // сгруппированные по классу. Родитель — прежнее плоское поведение (без
+  // секций, не в скоупе Промта 7.2).
+  //
+  // 30.08.2026 — отдельной строки куратора сверху больше нет: роль убрана
+  // из продукта. Все личные чаты ученика теперь в одном списке.
   const studentGroupChats = role === "student" ? threads.filter((t) => t.kind === "group") : [];
-  const studentTeacherChats = role === "student" ? threads.filter((t) => t.kind === "direct" && !t.isCuratorThread) : [];
+  const studentTeacherChats = role === "student" ? threads.filter((t) => t.kind === "direct") : [];
 
   const teacherGroupChats = role === "teacher" ? threads.filter((t) => t.kind === "group") : [];
   const teacherDirectByClass = useMemo(() => {
@@ -377,17 +379,6 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
 
           {role === "student" && (
             <>
-              {curatorThread && (
-                <div className="border-b border-gray-100">
-                  <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-amber-600">{d.chat.sectionCurator}</p>
-                  {renderThreadRow(curatorThread, {
-                    key: curatorThread.id,
-                    avatarSize: 44,
-                    subtitle: d.chat.curatorSubtitle,
-                    highlight: true,
-                  })}
-                </div>
-              )}
               {studentGroupChats.length > 0 && (
                 <div className="border-b border-gray-100">
                   <p className="px-4 pt-3 text-[11px] font-bold uppercase tracking-wide text-gray-400">{d.chat.sectionGroupChat}</p>
@@ -458,9 +449,7 @@ function MessagesBody({ role }: { role: "student" | "teacher" | "parent" }) {
                     : (activeThread.title ?? d.chat.title)}
                 </p>
                 {activeThread.kind === "direct" ? (
-                  activeThread.isCuratorThread ? (
-                    <p className="text-xs font-semibold text-amber-600">{d.chat.curatorSubtitle}</p>
-                  ) : activeThread.directSubjectName ? (
+                  activeThread.directSubjectName ? (
                     <p className="text-xs text-gray-400">{activeThread.directSubjectName}</p>
                   ) : null
                 ) : (

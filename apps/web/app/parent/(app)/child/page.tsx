@@ -67,14 +67,12 @@ const ACHIEVEMENTS_MOCK: readonly {
   },
 ];
 
-/* ── МОК: куратор. Взять его из БД дёшево и безопасно нельзя — единственный
-      путь идёт через бросающий getStudentById().
+/* ── МОКА КУРАТОРА ЗДЕСЬ БОЛЬШЕ НЕТ (30.08.2026).
 
-      ФИО дословно как в БД (migration 97_full_reset_new_accounts.sql:
-      teachers.full_name = 'Karim Alisher Botirov'). Раньше здесь стояло
-      усечённое «Karim Alisher», и один и тот же человек выглядел как два
-      разных: в чатах и объявлениях родитель видит полное имя. ────────────── */
-const CURATOR_NAME_MOCK = "Karim Alisher Botirov";
+      В карточке «Контакты» стояло зашитое имя — Karim Alisher Botirov,
+      дословно из migration 97. Роль куратора убрана из продукта, а сам
+      Карим удалён миграцией 242: строка показывала бы родителю человека,
+      которого в школе нет. Осталась строка родителя — она настоящая. */
 
 /* ── Фолбэки, если контекст не приехал. Порядок слов — как в БД
       («Фамилия Имя», см. initialsOf/givenNameLetter в _ui/format.ts). ────── */
@@ -222,28 +220,13 @@ export default async function ParentChildPage() {
           ))}
         </GlassCard>
 
-        {/* Куратор и родитель (мок). */}
+        {/* Контакты. Строка классного руководителя убрана 30.08.2026 вместе
+            с ролью куратора — осталась строка родителя, она настоящая
+            (имя приходит из parent-контекста). Разделителя сверху больше
+            нет: строка теперь первая в карточке. */}
         <SectionCap label="Контакты" />
         <GlassCard radius={20} className="px-[14px] py-1">
           <div className="flex items-center" style={{ gap: 11, paddingBlock: 10 }}>
-            <Avatar
-              size={34}
-              initials={initialsOf(CURATOR_NAME_MOCK)}
-              gradient={avatarGradient(CURATOR_NAME_MOCK)}
-              fontSize={12}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate" style={{ fontSize: 12, fontWeight: 800, color: ink1 }}>
-                {CURATOR_NAME_MOCK}
-              </span>
-              <span className="block" style={{ fontSize: 9.5, fontWeight: 600, color: ink2, marginTop: 2 }}>
-                Классный руководитель
-              </span>
-            </span>
-            <StatusChip label="Куратор" family="violet" fontSize={8.5} />
-          </div>
-
-          <div className="flex items-center" style={{ gap: 11, paddingBlock: 10, borderTop: `1px solid ${DIVIDER}` }}>
             <Avatar
               size={34}
               initials={initialsOf(parentName)}

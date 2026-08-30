@@ -17,7 +17,6 @@ import { useSubmitGuard } from "@/lib/use-submit-guard";
 import { formatCoursePrice, formatCoursePriceInput } from "@/lib/course-price";
 import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
 
-type Teacher = { id: string; full_name: string };
 export type CatalogItem = { id: string; name: string; is_active: boolean };
 type Group = {
   id: string;
@@ -27,7 +26,8 @@ type Group = {
   /** Цена обучения в месяц, сумы, целое. НОЛЬ ЗНАЧИТ «не задана», а не
    *  «бесплатно» — см. lib/course-price.ts. */
   course_price: number;
-  teachers: { id: string; full_name: string } | null;
+  // 30.08.2026 — связи teachers здесь больше нет: колонка «Куратор» ушла
+  // из таблицы вместе с ролью.
   student_groups: { student_id: string }[];
 };
 
@@ -120,7 +120,6 @@ type AdminDict = ReturnType<typeof getDictionary>["admin"];
 
 function GroupForm({
   defaultValues,
-  teachers,
   catalog,
   isPending,
   t,
@@ -129,9 +128,7 @@ function GroupForm({
   submitLabel,
 }: {
   defaultValues?: Partial<Group>;
-  teachers: Teacher[];
   catalog: CatalogItem[];
-  /** Z.2.6 — поле куратора показывается только демо-школе. */
   isPending: boolean;
   t: AdminDict;
   onClose: () => void;
@@ -194,26 +191,14 @@ function GroupForm({
           ))}
         </Select>
       </Field>
-      {/* КУРАТОР КЛАССА. До 28.08.2026 поле рисовалось только демо-школе, и
-          в боевой куратора задать было негде вовсе. Решение заказчика:
-          куратор один на класс, задаётся здесь, в обеих школах.
-
-          Что это включает, кроме подписи: teacher_id группы входит в
-          is_my_teacher_group(), значит куратор получает объявления своей
-          группы и личные чаты с её учениками и родителями — их заводит
-          триггер при назначении. Особые ПРАВА куратора на уроки сюда НЕ
-          входят: is_curator_teacher() ограничена демо-школой миграцией 187. */}
-      <Field label={t.fieldTeacher}>
-        <Select name="teacher_id" defaultValue={defaultValues?.teacher_id ?? ""}>
-          <option value="">{t.noCuratorOption}</option>
-          {teachers.map((tc) => (
-            <option key={tc.id} value={tc.id}>{tc.full_name}</option>
-          ))}
-        </Select>
-      </Field>
-      {/* Заход 2 по платежам. Цену задаёт ТОЛЬКО админ школы: у учителя и
-          куратора этой формы нет вовсе, а правило доступа на groups даёт
-          запись одному fn_is_admin() своей школы. */}
+      {/* ПОЛЯ КУРАТОРА ЗДЕСЬ БОЛЬШЕ НЕТ (30.08.2026). Роль убрана из
+          продукта: миграция 242 обнулила groups.teacher_id у всех групп и
+          удалила единственного куратора, 243 снимает правила и триггеры.
+          Форма перестаёт присылать teacher_id — server action уже умеет
+          обходиться без него и пишет null (см. admin/actions.ts). */}
+      {/* Заход 2 по платежам. Цену задаёт ТОЛЬКО админ школы: у учителя
+          этой формы нет вовсе, а правило доступа на groups даёт запись
+          одному fn_is_admin() своей школы. */}
       <Field label={t.fieldCoursePrice}>
         <CoursePriceInput defaultValue={defaultValues?.course_price ?? 0} />
         <p className="text-xs text-gray-400">{t.coursePriceHint}</p>
@@ -230,14 +215,11 @@ function GroupForm({
 
 export function GroupsView({
   groups,
-  teachers,
   catalog,
   defaultOpenAdd,
 }: {
   groups: Group[];
-  teachers: Teacher[];
   catalog: CatalogItem[];
-  /** Z.2.6 — куратор есть только в демо-школе. */
   defaultOpenAdd?: boolean;
 }) {
   const { locale } = useLocale();
@@ -276,8 +258,7 @@ export function GroupsView({
     const q = search.toLowerCase();
     return (
       g.name.toLowerCase().includes(q) ||
-      g.subject.toLowerCase().includes(q) ||
-      (g.teachers?.full_name ?? "").toLowerCase().includes(q)
+      g.subject.toLowerCase().includes(q)
     );
   });
 
@@ -317,7 +298,6 @@ export function GroupsView({
               <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                 <th className="px-4 py-3">{t.fieldGroupName}</th>
                 <th className="px-4 py-3">{t.fieldSubject}</th>
-                <th className="px-4 py-3">{t.tableTeacher}</th>
                 <th className="px-4 py-3">{t.tableStudentCount}</th>
                 <th className="px-4 py-3">{t.tableCoursePrice}</th>
                 <th className="px-4 py-3 text-right">{t.tableActions}</th>
@@ -326,7 +306,7 @@ export function GroupsView({
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">{emptyText}</td>
                 </tr>
               ) : (
                 filtered.map((g) => {
@@ -335,7 +315,6 @@ export function GroupsView({
                     <tr key={g.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-3 font-medium text-gray-800">{g.name}</td>
                       <td className="px-4 py-3 text-gray-500">{subjectLabel}</td>
-                      <td className="px-4 py-3 text-gray-500">{g.teachers?.full_name ?? "—"}</td>
                       <td className="px-4 py-3 text-gray-500">{g.student_groups.length}</td>
                       {/* «0 сум» здесь был бы неправдой: ноль означает, что
                           цену ещё не заполнили. Так и пишем. */}
@@ -367,7 +346,6 @@ export function GroupsView({
         <Backdrop onClose={() => setModal(null)}>
           <ModalCard title={t.addGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
-              teachers={teachers}
               catalog={catalog}
               isPending={isPending}
               t={t}
@@ -392,7 +370,6 @@ export function GroupsView({
           <ModalCard title={t.editGroupTitle} onClose={() => setModal(null)}>
             <GroupForm
               defaultValues={modal.group}
-              teachers={teachers}
               catalog={catalog}
               isPending={isPending}
               t={t}

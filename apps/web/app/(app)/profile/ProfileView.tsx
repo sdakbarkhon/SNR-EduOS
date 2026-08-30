@@ -55,12 +55,10 @@ export function ProfileView({
   student: initialStudent,
   groups,
   notifSettings: initialNotif,
-  curatorName,
 }: {
   student: Student;
   groups: GroupWithSubjects[];
   notifSettings: NotifSettings | null;
-  curatorName: string;
 }) {
   const sb = createClient();
   const { theme, setTheme } = useTheme();
@@ -215,15 +213,12 @@ export function ProfileView({
     <div className="space-y-8">
       <h3 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{d.profile.tabProfile === "Профиль" ? "Учебная информация" : "Academic info"}</h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="bg-white/40 dark:bg-slate-700/40 p-6 rounded-2xl border border-white/50 dark:border-slate-600/30 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">{d.profile.gradeLabel}</p>
-          <p className="text-slate-800 dark:text-slate-100 font-bold text-xl">{student.grade}</p>
-        </div>
-        <div className="bg-white/40 dark:bg-slate-700/40 p-6 rounded-2xl border border-white/50 dark:border-slate-600/30 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">{d.profile.curator}</p>
-          <p className="text-slate-800 dark:text-slate-100 font-bold text-xl">{curatorName || "—"}</p>
-        </div>
+      {/* 30.08.2026 — ячейка «Куратор» убрана вместе с ролью. Сетка была
+          на две колонки; с одной ячейкой она выглядела бы наполовину
+          пустой, поэтому «Класс» занимает всю ширину. */}
+      <div className="bg-white/40 dark:bg-slate-700/40 p-6 rounded-2xl border border-white/50 dark:border-slate-600/30 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">{d.profile.gradeLabel}</p>
+        <p className="text-slate-800 dark:text-slate-100 font-bold text-xl">{student.grade}</p>
       </div>
 
       <div className="bg-white/40 dark:bg-slate-700/40 p-6 rounded-2xl border border-white/50 dark:border-slate-600/30 shadow-sm">
