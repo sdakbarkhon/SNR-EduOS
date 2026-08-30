@@ -3787,8 +3787,38 @@ export interface Dictionary {
      *  общее название первого счёта-заглушки и generic-заголовок карточки
      *  кошелька (без склонения имени ребёнка — на вебе нет genitive-хелпера
      *  мобилки, first_name_gen). */
+    /**
+     * ВЕБ-РАЗДЕЛ ОПЛАТ У НАСТОЯЩЕГО РОДИТЕЛЯ. Заход 2 по оплатам, 30.08.2026.
+     *
+     * Отдельная секция, а не `pay`: там подписи ВИТРИНЫ, дословно снятые с
+     * макета, и трогать их нельзя — демо-гость видит их до пикселя. Здесь —
+     * подписи экрана, который витрины не показывает вовсе. Тот же приём, что
+     * у настоящей переписки со школой (msg.supportReal*).
+     */
     paymentsWeb: {
       tuition: string;              // «Обучение» — заголовок 1-го счёта-заглушки
+      /** Склонения «счёт»: в русском 1 счёт / 2 счёта / 5 счетов. У настоящего
+       *  родителя счёт РОВНО ОДИН, и «1 счёта» из витрины было бы ошибкой. */
+      dueOne: string;
+      dueFew: string;
+      dueMany: string;
+      payBtn: string;               // «Оплатить — {sum}»
+      invoiceUnpaid: string;        // чип статуса открытого счёта
+      noInvoicesTitle: string;
+      noInvoicesText: string;
+      loadFailedTitle: string;
+      loadFailedText: string;
+      /** Шторка «онлайн-оплата не подключена». Кассы нет, но раздел работает. */
+      sheetTitle: string;
+      sheetText: string;
+      sheetInvoiceCap: string;
+      sheetHowCap: string;
+      sheetPhone: string;
+      sheetAddress: string;
+      /** Запасной текст, если у школы не заполнены ни телефон, ни адрес. */
+      sheetNoContacts: string;
+      sheetOk: string;
+      sheetCall: string;
     };
     msg: {
       announcementsSub: string;  // подпись раздела на вкладке «Сообщения»

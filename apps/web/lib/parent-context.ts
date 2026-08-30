@@ -82,6 +82,17 @@ export const getParentContext = cache(async (): Promise<{
    * getSchoolFrozenDate с заморозкой.
    */
   isDemo: boolean;
+  /**
+   * Контакты школы для шторки «как оплатить» (заход 2 по оплатам).
+   *
+   * Едут тем же вложенным select-ом, что и `is_demo`, — ещё три колонки в
+   * уже существующем embed `schools(...)`, ни одного лишнего round-trip.
+   *
+   * `legal_details` (банковские реквизиты) СЮДА НЕ ВХОДИТ и намеренно пуст
+   * в базе: реквизиты придут от заказчика. Шторка обязана выглядеть
+   * законченно без них — телефоном и адресом, а не дырой на их месте.
+   */
+  school: { name: string; phone: string | null; address: string | null } | null;
   children: ParentChild[];
   /**
    * true, если запрос ниже РЕАЛЬНО упал (сеть/RLS/что угодно), а не просто
@@ -121,7 +132,7 @@ export const getParentContext = cache(async (): Promise<{
   const { data: parent, error: parentErr } = await sb
     .from("parents")
     .select(
-      "id, full_name, school_id, school:schools(is_demo), parent_students(student_id, created_at, students(id, full_name, student_groups(groups(name))))",
+      "id, full_name, school_id, school:schools(is_demo, name, phone, address), parent_students(student_id, created_at, students(id, full_name, student_groups(groups(name))))",
     )
     .eq("user_id", user.id)
     .single();
@@ -158,6 +169,12 @@ export const getParentContext = cache(async (): Promise<{
     parentName: parent.full_name,
     schoolId: (parent as { school_id?: string | null }).school_id ?? null,
     isDemo: Boolean((parent as { school?: { is_demo?: boolean | null } | null }).school?.is_demo),
+    school: (() => {
+      const s = (parent as {
+        school?: { name?: string | null; phone?: string | null; address?: string | null } | null;
+      }).school;
+      return s ? { name: s.name ?? "", phone: s.phone ?? null, address: s.address ?? null } : null;
+    })(),
     children,
     hadError,
   };

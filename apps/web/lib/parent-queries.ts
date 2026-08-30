@@ -193,6 +193,17 @@ export const parentIsDemo = cache(async (): Promise<boolean> => {
   return ctx?.isDemo ?? false;
 });
 
+/** Контакты школы для шторки «как оплатить» (заход 2). Из того же
+ *  контекста, что и признак демо, — сети не добавляет. */
+export const parentSchoolContacts = cache(async (): Promise<{
+  name: string;
+  phone: string | null;
+  address: string | null;
+} | null> => {
+  const ctx = await getParentContext();
+  return ctx?.school ?? null;
+});
+
 // ── Расписание / уроки ───────────────────────────────────────────────────────
 
 /**
