@@ -30,7 +30,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getMyNotifications, markAllNotificationsRead, LOCALE_TAG, type AppNotification } from "@snr/core";
+import { getMyNotifications, markNotificationsRead, LOCALE_TAG, type AppNotification } from "@snr/core";
 import { AppBackground, fonts, gradPoints, shadowStyle, useTheme } from "../../theme";
 import {
   EmptyBlock,
@@ -286,31 +286,53 @@ export default function NotificationsScreen() {
     void state.refresh();
   }, [state]);
 
+  // ── ОТМЕТКА О ПРОЧТЕНИИ ───────────────────────────────────────────────────
+  //
   // Открыл список — значит увидел. 18.08.2026: раньше приложение не помечало
-  // прочитанным НИЧЕГО, функция markAllNotificationsRead существовала в ядре и
-  // не вызывалась отсюда ни разу — поэтому счётчик над вкладкой не двигался
-  // никогда, сколько ни открывай.
+  // прочитанным НИЧЕГО, поэтому счётчик над вкладкой не двигался никогда,
+  // сколько ни открывай.
   //
-  // Помечаем ПОСЛЕ загрузки списка, а не при входе на экран: иначе при сбое
-  // запроса непрочитанные исчезли бы, так и не показавшись человеку.
+  // 30.08.2026 — ПОМЕЧАЕМ ТОЛЬКО ПОКАЗАННОЕ. Было `markAllNotificationsRead`
+  // — «всё непрочитанное», без разбора. Последствия человек видел так:
+  // открыл экран на секунду — колокольчик обнулился, хотя прочитано ничего
+  // не было; а фильтр «Непрочитанные» после первого же открытия становился
+  // навсегда пустым, то есть бесполезным.
   //
-  // Список на экране НЕ перерисовываем — фильтр «непрочитанные» должен
+  // ЧТО СЧИТАЕМ «УВИДЕЛ»: ЗАГРУЖЕННУЮ СТРАНИЦУ, а не пролистанное до конца.
+  // Человек открыл ленту — записи перед ним, экран показывает их сразу и
+  // целиком, прокрутка нужна только чтобы дойти до нижних. Отслеживать
+  // фактическую прокрутку значило бы мерить, докрутил ли он до карточки и
+  // на сколько пикселей, — мерка хрупкая (высота карточек разная, экраны
+  // разные), а ошибается она в худшую сторону: запись показана, но не
+  // засчитана, и колокольчик держит число, за которым уже ничего нет.
+  // Страница же — граница, которую человек проводит сам: он нажал
+  // «Загрузить ещё», значит попросил показать следующие двадцать.
+  //
+  // Помечаем ПОСЛЕ загрузки, а не при входе на экран: иначе при сбое запроса
+  // непрочитанные исчезли бы, так и не показавшись.
+  //
+  // Список на экране НЕ перерисовываем — фильтр «Непрочитанные» должен
   // остаться рабочим, пока человек стоит на экране. Число над вкладкой
   // обновится при возврате: бейдж перечитывается по фокусу.
   //
-  // 30.08.2026 — ОТМЕТКА СТАВИТСЯ ОДИН РАЗ ЗА ПОСЕЩЕНИЕ. С подгрузкой `rows`
-  // меняется на каждой странице, и без предохранителя команда уходила бы в
-  // базу на каждое «Загрузить ещё» — притом что первая уже пометила
-  // прочитанным ВСЁ, а не только показанное.
-  const отмечали = useRef(false);
+  // Множество уже отправленных id — чтобы повторное срабатывание эффекта не
+  // слало ту же строку дважды. `rows` меняется на каждой подгрузке, а в
+  // локальном состоянии строки остаются непрочитанными (см. абзац выше), так
+  // что без него вторая страница переотправляла бы и первую.
+  const отправленные = useRef<Set<string>>(new Set());
   useEffect(() => {
     // В показе отмечать нечего: списка в базе нет.
     if (showcase) return;
-    if (отмечали.current) return;
     if (state.loading || state.error) return;
-    if (!rows.some((n) => !n.is_read)) return;
-    отмечали.current = true;
-    markAllNotificationsRead(getSupabase()).catch((e) => {
+    const свежие = rows
+      .filter((n) => !n.is_read && !отправленные.current.has(n.id))
+      .map((n) => n.id);
+    if (!свежие.length) return;
+    for (const id of свежие) отправленные.current.add(id);
+    markNotificationsRead(getSupabase(), свежие).catch((e) => {
+      // Не сложилось — снимаем пометку об отправке, чтобы следующая попытка
+      // (подгрузка, возврат на экран) отправила эти строки заново.
+      for (const id of свежие) отправленные.current.delete(id);
       console.error("[NotificationsScreen] отметка о прочтении не записалась:", e?.message);
     });
   }, [showcase, state.loading, state.error, rows]);
@@ -438,13 +460,21 @@ export default function NotificationsScreen() {
             retryLabel={d.common.retry}
             onRetry={начатьЗаново}
           />
-        ) : sections.length === 0 ? (
-          <EmptyBlock
-            title={filter === "unread" ? m4.notifUnreadEmptyTitle : m4.notifEmptyTitle}
-            text={filter === "unread" ? m4.notifUnreadEmptyText : m4.notifEmptyText}
-          />
         ) : (
           <>
+            {/*
+              Пустой срез больше НЕ отменяет хвост списка. Раньше «Ничего нет»
+              и кнопка стояли в разных ветках, и в фильтре «Непрочитанные» с
+              пустым срезом кнопки не было вовсе — дойти до непрочитанных из
+              глубины было нечем. Теперь пустой блок и кнопка стоят рядом.
+            */}
+            {sections.length === 0 ? (
+              <EmptyBlock
+                title={filter === "unread" ? m4.notifUnreadEmptyTitle : m4.notifEmptyTitle}
+                text={filter === "unread" ? m4.notifUnreadEmptyText : m4.notifEmptyText}
+              />
+            ) : null}
+
             {sections.map((section) => (
               <View key={section.bucket} style={{ gap: 11 }}>
                 <SectionCap label={bucketLabel[section.bucket]} />
@@ -460,66 +490,73 @@ export default function NotificationsScreen() {
             ))}
 
             {/*
-              Хвост списка. Кнопка живёт ТОЛЬКО в фильтре «Все» — и вот
-              почему. Открытие экрана помечает прочитанным всё, что было
-              непрочитанным в базе, поэтому следующая страница приходит уже
-              прочитанной и в фильтр «Непрочитанные» не попадает: человек
-              нажал бы кнопку и не увидел ни одной новой строки. Кнопка,
-              после которой ничего не происходит, хуже её отсутствия.
+              Хвост списка. Кнопка работает в ОБОИХ фильтрах.
+
+              Сутки назад она стояла только в «Все», и на то была причина:
+              открытие экрана помечало прочитанным ВСЁ непрочитанное, так что
+              следующая страница приходила уже прочитанной и в фильтр
+              «Непрочитанные» попасть не могла — кнопка добавляла бы ноль
+              строк. Причина исчезла вместе с той отметкой: прочитанным теперь
+              становится только показанное, и записи глубже загруженного
+              остаются непрочитанными по-настоящему. Прятать от них кнопку
+              значило бы сделать их недостижимыми.
+
+              Одно нажатие — одна страница, в обоих фильтрах. В
+              «Непрочитанных» страница может прийти целиком прочитанной, и
+              тогда на экране не прибавится ничего — но это правда о данных
+              (те двадцать человек уже видел в прошлый заход), а не поломка.
             */}
-            {filter === "all" ? (
-              всёПоказано ? (
-                rows.length > СТРАНИЦА ? (
+            {всёПоказано ? (
+              rows.length > СТРАНИЦА ? (
+                <Text
+                  style={{
+                    fontFamily: fonts.manrope600,
+                    fontSize: 10.5,
+                    color: tokens.ink3,
+                    textAlign: "center",
+                    paddingVertical: 6,
+                  }}
+                >
+                  {d.notifications.noMore}
+                </Text>
+              ) : null
+            ) : (
+              <View style={{ gap: 8 }}>
+                {сбойДобора ? (
                   <Text
                     style={{
                       fontFamily: fonts.manrope600,
                       fontSize: 10.5,
-                      color: tokens.ink3,
+                      color: tokens.status.red.text,
                       textAlign: "center",
-                      paddingVertical: 6,
                     }}
                   >
-                    {d.notifications.noMore}
+                    {сбойДобора}
                   </Text>
-                ) : null
-              ) : (
-                <View style={{ gap: 8 }}>
-                  {сбойДобора ? (
-                    <Text
-                      style={{
-                        fontFamily: fonts.manrope600,
-                        fontSize: 10.5,
-                        color: tokens.status.red.text,
-                        textAlign: "center",
-                      }}
-                    >
-                      {сбойДобора}
-                    </Text>
-                  ) : null}
-                  <Pressable
-                    onPress={подгрузить}
-                    disabled={добираем}
-                    style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed || добираем ? 0.6 : 1 })}
+                ) : null}
+                <Pressable
+                  onPress={подгрузить}
+                  disabled={добираем}
+                  style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed || добираем ? 0.6 : 1 })}
+                >
+                  <GlassCard
+                    radius={18}
+                    contentStyle={{
+                      paddingVertical: 13,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexDirection: "row",
+                      gap: 8,
+                    }}
                   >
-                    <GlassCard
-                      radius={18}
-                      contentStyle={{
-                        paddingVertical: 13,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexDirection: "row",
-                        gap: 8,
-                      }}
-                    >
-                      {добираем ? <ActivityIndicator size="small" color={tokens.accent} /> : null}
-                      <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.accent }}>
-                        {сбойДобора ? d.common.retry : d.notifications.loadMore}
-                      </Text>
-                    </GlassCard>
-                  </Pressable>
-                </View>
-              )
-            ) : null}
+                    {добираем ? <ActivityIndicator size="small" color={tokens.accent} /> : null}
+                    <Text style={{ fontFamily: fonts.manrope800, fontSize: 12, color: tokens.accent }}>
+                      {сбойДобора ? d.common.retry : d.notifications.loadMore}
+                    </Text>
+                  </GlassCard>
+                </Pressable>
+              </View>
+            )}
           </>
         )}
       </ScrollView>

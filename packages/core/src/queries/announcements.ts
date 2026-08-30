@@ -503,9 +503,40 @@ export const markNotificationRead = async (db: Db, id: string): Promise<void> =>
   if (error) throw error;
 };
 
+/**
+ * Пометить прочитанным ВСЁ непрочитанное.
+ *
+ * Зовётся только с кнопки «Прочитать все» — веб ученика, веб учителя и
+ * колокольчик. Там человек нажал сам, и команда честна.
+ *
+ * 30.08.2026 — мобильное приложение родителя ЭТИМ БОЛЬШЕ НЕ ПОЛЬЗУЕТСЯ.
+ * Кнопки на том экране нет, команда уходила сама при загрузке списка и
+ * гасила всё непрочитанное — включая то, чего человек не видел. Открыл
+ * экран на секунду — колокольчик обнулился, а фильтр «Непрочитанные» стал
+ * навсегда пустым. Теперь там markNotificationsRead по списку показанных.
+ */
 export const markAllNotificationsRead = async (db: Db): Promise<void> => {
   const { error } = await (db as any).from("notifications")
     .update({ is_read: true, read_at: new Date().toISOString() }).eq("is_read", false);
+  if (error) throw error;
+};
+
+/**
+ * Пометить прочитанными ИМЕННО ЭТИ записи — те, что человек увидел.
+ *
+ * Пустой список не идёт в базу вовсе: `in()` без значений — это запрос
+ * впустую, а зовут эту функцию из эффекта, то есть часто.
+ *
+ * `eq("is_read", false)` оставляет `read_at` нетронутым у тех, кто уже
+ * прочитан: время первого прочтения не должно переписываться при каждом
+ * возврате на экран.
+ */
+export const markNotificationsRead = async (db: Db, ids: string[]): Promise<void> => {
+  if (!ids.length) return;
+  const { error } = await (db as any).from("notifications")
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .in("id", ids)
+    .eq("is_read", false);
   if (error) throw error;
 };
 
