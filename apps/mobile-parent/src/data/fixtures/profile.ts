@@ -228,3 +228,39 @@ export const ABOUT_SHOWCASE: AboutShowcase = {
   school_contacts: "+998 71 200-45-67 · info@snr.school",
   copyright: "© 2026 SNR International School. Все права защищены.",
 };
+
+/**
+ * «Что нового» — текущая версия (разметка 2403–2411 макета). Предыдущие
+ * версии лежат в WHATS_NEW выше; здесь только та, что выделена в шапке.
+ */
+export const WHATS_NEW_CURRENT = {
+  version_label: "Версия 1.0.0",
+  release_label: "Релиз 23 июля 2026 · первый публичный выпуск",
+  items: [
+    { title: "Успехи и EduOS Assistant", text: "Оценки, навыки и динамика по всем предметам — с еженедельной сводкой EduOS Assistant." },
+    { title: "Домашние задания со статусами", text: "Таймлайн от «Выдано» до «Проверено» и отправка обновлённой работы прямо из приложения." },
+    { title: "Живое расписание", text: "Лента дней с темами уроков, оценками за урок и отметкой «Идёт сейчас»." },
+    { title: "Оплаты в два тапа", text: "Все счета в одном месте, оплата через Payme, Click и Uzum, чеки и автоплатёж." },
+    { title: "Сообщения без личных номеров", text: "Чаты с учителями, объявления школы и приёмная — всё внутри приложения." },
+  ],
+} as const;
+
+/** Детали карты (разметка 1846–1866 макета). Номер — маскированный, как в
+ *  макете: настоящих карт в показе нет и быть не может. */
+export const CARD_DETAIL = {
+  brand: "UZCARD",
+  masked: "•••• •••• •••• 4242",
+  holder: "DILNOZA KARIMOVA",
+  valid_thru: "06/27",
+  facts: [
+    { label_key: "cardSystem", value: "Uzcard" },
+    { label_key: "cardType", value: "Дебетовая" },
+    { label_key: "cardBank", value: "Kapitalbank" },
+    { label_key: "cardStatus", value: "Активна" },
+  ],
+  last_payments: [
+    { name: "Обучение · июль", date_label: "3 июля", amount: 4500000 },
+    { name: "Питание · июль", date_label: "3 июля", amount: 450000 },
+    { name: "Пополнение кошелька", date_label: "21 июля", amount: 100000 },
+  ],
+} as const;

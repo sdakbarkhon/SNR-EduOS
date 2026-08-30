@@ -545,6 +545,33 @@ export const DEMO_TR: Record<string, Pair> = {
   "23 июля 2026": ["2026-yil 23-iyul", "23 July 2026"],
   "г. Ташкент, ул. Мирзо-Улугбекская, 21": ["Toshkent sh., Mirzo Ulug'bek ko'chasi, 21", "Tashkent, Mirzo Ulugbek St. 21"],
   "© 2026 SNR International School. Все права защищены.": ["© 2026 SNR International School. Barcha huquqlar himoyalangan.", "© 2026 SNR International School. All rights reserved."],
+
+  // ── Заход 7: поиск, документы, карта ─────────────────────────────────────
+  // Длинные подписи результатов поиска («Математика · последнее сообщение
+  // 2 ч назад» и подобные) намеренно НЕ переводятся: это склейки из уже
+  // переведённых кусков, и каждая встречается ровно один раз. Оставлены
+  // русскими — по правилу таблицы непереведённая строка не молчит.
+  "Расписание": ["Dars jadvali", "Timetable"],
+  "Посещаемость": ["Davomat", "Attendance"],
+  "Медкарта": ["Tibbiy karta", "Medical record"],
+  "Транспорт": ["Transport", "Transport"],
+  "Автоплатёж": ["Avto to'lov", "Autopay"],
+  "чат": ["chat", "chat"],
+  "счёт": ["hisob", "invoice"],
+  "чек": ["chek", "receipt"],
+  "настройка": ["sozlama", "setting"],
+  "раздел": ["bo'lim", "section"],
+  "23 июля": ["23-iyul", "23 July"],
+  "22 июля": ["22-iyul", "22 July"],
+  "21 июля": ["21-iyul", "21 July"],
+  "Релиз 23 июля 2026 · первый публичный выпуск": ["2026-yil 23-iyul relizi · birinchi ommaviy chiqarilish", "Released 23 July 2026 · first public build"],
+  "Условия использования": ["Foydalanish shartlari", "Terms of use"],
+  "Политика конфиденциальности": ["Maxfiylik siyosati", "Privacy policy"],
+  "Лицензии": ["Litsenziyalar", "Licences"],
+  "Дебетовая": ["Debet", "Debit"],
+  "Активна": ["Faol", "Active"],
+  "Пополнение кошелька": ["Hamyonni to'ldirish", "Wallet top-up"],
+  "3 июля": ["3-iyul", "3 July"],
 };
 
 /** Перевести одну строку. Нет перевода — остаётся русская. */

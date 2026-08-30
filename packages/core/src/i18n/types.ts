@@ -3687,6 +3687,39 @@ export interface Dictionary {
       writeSupportLink: string;
       rateAppLink: string;
       shareAppLink: string;
+      // Экраны действий
+      workDescCap: string;
+      gradeCap: string;
+      downloadWork: string;
+      appStatusCap: string;
+      appDataCap: string;
+      schoolCommentCap: string;
+      attachedDocsCap: string;
+      withdrawApp: string;
+      periodCap: string;
+      reasonCap: string;
+      commentCap: string;
+      searchRecentCap: string;
+      searchPopularCap: string;
+      thisVersionCap: string;
+      prevVersionsCap: string;
+      lastUpdatedLabel: string;
+      // Оплаты
+      cardSystem: string;
+      cardType: string;
+      cardBank: string;
+      cardStatus: string;
+      cardLastPaymentsCap: string;
+      deleteCard: string;
+      cardNumberCap: string;
+      cardExpiryCap: string;
+      cardCvvCap: string;
+      cardHolderCap: string;
+      makeMainCard: string;
+      addCard: string;
+      /** Замена «успокаивающей» подписи макета про передачу данных банку. */
+      cardPreviewNote: string;
+      formPreviewNote: string;
     };
     pay: {
       autopay: string;

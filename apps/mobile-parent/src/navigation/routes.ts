@@ -184,6 +184,12 @@ export const SCREEN_INFO: Record<string, StubInfo> = {
   d33: STUBS.paymeth,
   dtop: STUBS.topup,
   dwops: STUBS.walletops,
+  // Заход 7 витрины: три экрана оплат, удалённые 15.08.2026 как
+  // формы-обманки. Возвращены ТОЛЬКО для показа — маршруты закрыты demoOr,
+  // у настоящего родителя на них «Скоро».
+  d19: STUBS.checkout,
+  dcarddet: STUBS.carddet,
+  daddcard: STUBS.addcard,
 
   // Профиль
   d29: STUBS.child,
@@ -227,7 +233,7 @@ export const STACK_ROUTES = [
   "d6", "d11", "d12", "d13", "d14", "d15", "d16", "d7", "dallsubj", "drev", "dtopics",
   "d8", "d9",
   "d25", "d26", "d27", "d28", "dteach",
-  "d18", "d20", "d21", "d22", "d33", "dtop", "dwops",
+  "d18", "d19", "d20", "d21", "d22", "d33", "dtop", "dwops", "dcarddet", "daddcard",
   "d29", "d30", "d31", "d32", "d34", "dchpass", "dsessions",
   "dmeals", "ddiary", "dtests", "dlib", "dport", "dapps", "dmed", "dtrans",
   "a1", "a2", "a3", "a4",

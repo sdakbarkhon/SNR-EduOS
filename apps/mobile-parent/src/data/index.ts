@@ -141,7 +141,10 @@ import {
   TEACHER_CHAT_HEADER,
 } from "./fixtures/messages";
 import {
+  ABSENCE_REASONS,
   APPLICATIONS,
+  APPLICATION_DETAILS,
+  APPLICATION_TYPES,
   DEFAULT_MEAL_DAY_INDEX,
   MEALS_DAY_PILLS,
   MEALS_WEEK,
@@ -152,13 +155,26 @@ import {
   PORTFOLIO_WORKS,
   TRANSPORT_NOTIFY_DEFAULTS,
   TRANSPORT_STOPS,
+  NEW_APPLICATION_SUBMIT,
   VACCINATIONS,
+  WORK_DETAILS,
 } from "./fixtures/services";
+import {
+  SEARCH_FILTERS,
+  SEARCH_POPULAR,
+  SEARCH_RECENT,
+  SEARCH_RESULTS,
+  type SearchGroupKey,
+} from "./fixtures/search";
 import {
   CONFIRM_DIALOGS,
   ABOUT_SHOWCASE,
+  CARD_DETAIL,
   CURRENT_SESSION,
   DOCUMENTS,
+  LEGAL_DOCS,
+  WHATS_NEW,
+  WHATS_NEW_CURRENT,
   SESSIONS,
 } from "./fixtures/profile";
 import {
@@ -426,6 +442,73 @@ export function getAttendanceLastDays(childId: string | undefined, locale: Local
 }
 
 // ─── Оценки и успехи ─────────────────────────────────────────────────────────
+
+// ─── Экраны действий (заглушки макета) ───────────────────────────────────────
+
+/** Детали работы портфолио (da3). В макете разворот один — первый. */
+export function getWorkDetail(locale: Locale) {
+  return trDeep(WORK_DETAILS[0], locale);
+}
+
+/** Детали заявления (da4) — первое из списка, как в макете. */
+export function getApplicationDetail(locale: Locale) {
+  const заявления = trDeep(APPLICATIONS, locale);
+  const первое = заявления[0] ?? null;
+  const детали = первое ? APPLICATION_DETAILS[первое.number_label] : undefined;
+  return первое && детали ? { row: первое, detail: trDeep(детали, locale) } : null;
+}
+
+/** Новое заявление (da5): типы, причины и текст подтверждения. */
+export function getNewApplication(locale: Locale) {
+  return {
+    types: trDeep(APPLICATION_TYPES, locale),
+    reasons: trDeep(ABSENCE_REASONS, locale),
+    submit: trDeep(NEW_APPLICATION_SUBMIT, locale),
+  };
+}
+
+/**
+ * Поиск по сервисам (da6).
+ *
+ * Результаты сгруппированы по разделу, порядок групп — как в макете.
+ * Поле ввода в показе не набирается: витрина показывает, как выглядит
+ * найденное, а искать в заготовках нечего.
+ */
+export function getSearchShowcase(locale: Locale, group?: SearchGroupKey | null) {
+  const все = trDeep(SEARCH_RESULTS, locale);
+  const rows = group ? все.filter((r) => r.group === group) : все;
+  const порядок: SearchGroupKey[] = ["msgs", "mats", "hw", "pays", "svc"];
+  const groups = порядок
+    .map((g) => ({ key: g, rows: rows.filter((r) => r.group === g) }))
+    .filter((g) => g.rows.length > 0);
+  return {
+    groups,
+    total: все.length,
+    recent: trDeep(SEARCH_RECENT, locale),
+    popular: trDeep(SEARCH_POPULAR, locale),
+    filters: trDeep(SEARCH_FILTERS, locale),
+  };
+}
+
+/** «Что нового» (da8): текущая версия и предыдущие. */
+export function getWhatsNew(locale: Locale) {
+  return {
+    current: trDeep(WHATS_NEW_CURRENT, locale),
+    previous: trDeep(WHATS_NEW, locale),
+  };
+}
+
+/** Документ (ddoc): условия, политика или лицензии. */
+export function getLegalDoc(locale: Locale, id?: string) {
+  const док = LEGAL_DOCS.find((x) => x.id === id) ?? LEGAL_DOCS[0];
+  return док ? trDeep(док, locale) : null;
+}
+
+/** Детали карты (dcarddet). Номер маскированный — настоящих карт в показе
+ *  нет и быть не может. */
+export function getCardDetail(locale: Locale) {
+  return trDeep(CARD_DETAIL, locale);
+}
 
 // ─── Уведомления, сессии, «О приложении» ─────────────────────────────────────
 

@@ -81,6 +81,22 @@ import ChatScreen from "../screens/messages/ChatScreen";
 import SupportScreen from "../screens/messages/SupportScreen";
 import { SupportChatScreen } from "../screens/messages/SupportChatScreen";
 import { withScreenBoundary } from "../components/ScreenErrorBoundary";
+// Заход 7 витрины: экраны-действия и три экрана оплат. Все девять —
+// только показ, поэтому закрыты demoOr и у настоящего родителя дают
+// «Скоро», как и раньше.
+import {
+  ApplicationDetailScreen,
+  DocumentScreen,
+  NewApplicationScreen,
+  SearchScreen,
+  WhatsNewScreen,
+  WorkDetailScreen,
+} from "../screens/showcase/actions";
+import {
+  AddCardScreen,
+  CardDetailsScreen,
+  CheckoutScreen,
+} from "../screens/showcase/payments";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -120,6 +136,9 @@ const PAYMENT_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   d33: demoOr(PayMethodsScreen, "payMethods", "card", ["#a78bfa", "#7c3aed"]),
   dtop: demoOr(TopUpScreen, "topup", "plus", ["#34d399", "#059669"]),
   dwops: demoOr(WalletOpsScreen, "walletOps", "clock", ["#fbbf24", "#f97316"]),
+  d19: demoOr(CheckoutScreen, "checkout", "card", ["#7c3aed", "#4f6df5"]),
+  dcarddet: demoOr(CardDetailsScreen, "carddet", "card", ["#334155", "#0f172a"]),
+  daddcard: demoOr(AddCardScreen, "addcard", "plus", ["#a78bfa", "#7c3aed"]),
 
 };
 
@@ -166,6 +185,14 @@ const SERVICE_SCREENS: Partial<Record<StackRouteName, React.ComponentType<any>>>
   // Заход 5 (заглушки): «О приложении» — единственный маршрут-заглушка, под
   // которым нашлись настоящие данные (версия, канал, школа, родитель).
   da7: AboutScreen,
+  // Экраны-действия витрины (заход 7). До него все шесть падали в общую
+  // заглушку, а на пять из них уже вели живые кнопки собранных разделов.
+  da3: demoOr(WorkDetailScreen, "workdet", "star", ["#2dd4bf", "#0d9488"]),
+  da4: demoOr(ApplicationDetailScreen, "appdet", "doc", ["#34d399", "#059669"]),
+  da5: demoOr(NewApplicationScreen, "newapp", "plus", ["#34d399", "#059669"]),
+  da6: demoOr(SearchScreen, "search", "search", ["#8b5cf6", "#22d3ee"]),
+  da8: demoOr(WhatsNewScreen, "whatsnew", "spark", ["#8b5cf6", "#6366f1"]),
+  ddoc: demoOr(DocumentScreen, "docview", "doc", ["#94a3b8", "#64748b"]),
 };
 
 
