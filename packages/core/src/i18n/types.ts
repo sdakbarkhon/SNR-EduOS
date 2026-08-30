@@ -3819,6 +3819,32 @@ export interface Dictionary {
       sheetNoContacts: string;
       sheetOk: string;
       sheetCall: string;
+      // ── Заход 3: экраны «Счета» и «История оплат» ──
+      /** Заголовок экрана счетов у настоящего родителя. У витрины он
+       *  «Счета и чеки»: чеки выдаёт платёжная система, которой нет, и
+       *  вкладка с ними у настоящего убрана целиком — пустая обещала бы,
+       *  что там что-то появится. */
+      invoicesTitle: string;
+      invoicesOpenCap: string;
+      invoicesPaidCap: string;
+      invoicesCanceledCap: string;
+      invoicePaid: string;
+      invoiceCanceled: string;
+      invoicePaidOn: string;          // «Оплачен 5 сентября 2026»
+      /** Админ школы может изменить сумму счёта руками — тогда у счёта
+       *  amount_source = admin_adjusted и обычно есть причина. Родитель
+       *  обязан видеть, что сумма не та, которую посчитала система. */
+      invoiceAdjusted: string;
+      invoiceAdjustedNoReason: string;
+      historyTopup: string;
+      historyCharge: string;
+      historyAdjust: string;
+      historyRefund: string;
+      historyEmptyTitle: string;
+      historyEmptyText: string;
+      historyToppedCap: string;
+      historyChargedCap: string;
+      historyRefundsCap: string;
     };
     msg: {
       announcementsSub: string;  // подпись раздела на вкладке «Сообщения»

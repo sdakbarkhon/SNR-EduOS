@@ -1,24 +1,44 @@
-import { parentIsDemo } from "@/lib/parent-queries";
+import { childInvoices, parentIsDemo } from "@/lib/parent-queries";
 import { InnerHeader } from "../../_ui/screen-kit";
 import { InvoicesView } from "./InvoicesView";
+import { RealInvoicesView } from "./RealInvoicesView";
 
 /**
- * «Счета и чеки» (d21) — веб-порт
- * apps/mobile-parent/src/screens/payments/ReceiptsScreen.tsx.
+ * «Счета и чеки» (d21) — РАЗВИЛКА ДЕМО/НАСТОЯЩИЙ. Заход 3 по оплатам,
+ * 30.08.2026.
  *
- * Данных с сервера экрану не нужно: чеков и счетов в БД нет вовсе, весь
- * список — мок из _demo/demo-data.ts, согласованный по суммам и датам
- * с /parent/payments и /parent/payments/history. Имя ребёнка в строках не
- * фигурирует (в макете его там тоже нет — только предмет счёта и номер).
+ * Демо-гость получает витрину: два таба «Чеки»/«Счета», шесть выдуманных
+ * документов, кнопки скачивания. Настоящий родитель — свои счета из
+ * `tuition_invoices`.
+ *
+ * ЗАГОЛОВОК У НИХ РАЗНЫЙ, и поэтому шапку рисует не страница, а каждая ветка
+ * сама. У витрины «Счета и чеки» — как было. У настоящего просто «Счета»:
+ * чеков там нет, вкладка с ними убрана целиком (решение заказчика — чек
+ * выдаёт платёжная система, которой у школы нет), и заголовок «и чеки» над
+ * экраном без чеков обещал бы ровно то же, что и пустая вкладка. Настоящая
+ * шапка живёт внутри RealInvoicesView, где доступен словарь: остальные шапки
+ * раздела зашиты по-русски, а новую заводить такой же не хотелось.
+ *
+ * Развилка стоит здесь, а не внутри компонента, — чтобы файл витрины не
+ * пришлось трогать вовсе.
  */
-// Заход 1 по оплатам: экран стал async только ради признака демо. Сети это
-// не добавляет — getParentContext уже вызван layout-ом того же запроса.
 export default async function ParentInvoicesPage() {
   const isDemo = await parentIsDemo();
+
+  if (isDemo) {
+    return (
+      <div className="mx-auto w-full max-w-[430px]">
+        <InnerHeader title="Счета и чеки" backHref="/parent/payments" />
+        <InvoicesView isDemo={isDemo} />
+      </div>
+    );
+  }
+
+  const invoices = await childInvoices();
+
   return (
     <div className="mx-auto w-full max-w-[430px]">
-      <InnerHeader title="Счета и чеки" backHref="/parent/payments" />
-      <InvoicesView isDemo={isDemo} />
+      <RealInvoicesView invoices={invoices.items} failed={invoices.failed} />
     </div>
   );
 }
