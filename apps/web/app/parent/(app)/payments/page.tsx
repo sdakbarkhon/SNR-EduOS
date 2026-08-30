@@ -1,4 +1,4 @@
-import { getSelectedChild } from "@/lib/parent-queries";
+import { getSelectedChild, parentIsDemo } from "@/lib/parent-queries";
 import { PaymentsView } from "./PaymentsView";
 
 /**
@@ -15,6 +15,16 @@ import { PaymentsView } from "./PaymentsView";
  * Авторизация/редирект — на уровне layout.tsx этого сегмента.
  */
 export default async function ParentPaymentsPage() {
-  const child = await getSelectedChild();
-  return <PaymentsView childName={child?.full_name ?? null} childClassName={child?.className ?? null} />;
+  // Заход 1 по оплатам: признак демо доезжает до экрана, но ничем пока не
+  // управляет. Обе величины — попадания в кеш запроса (cache()), сети не
+  // добавляют; Promise.all вместо двух await, чтобы порядок не намекал на
+  // зависимость между ними.
+  const [child, isDemo] = await Promise.all([getSelectedChild(), parentIsDemo()]);
+  return (
+    <PaymentsView
+      isDemo={isDemo}
+      childName={child?.full_name ?? null}
+      childClassName={child?.className ?? null}
+    />
+  );
 }

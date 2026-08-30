@@ -1,3 +1,4 @@
+import { parentIsDemo } from "@/lib/parent-queries";
 import { InnerHeader } from "../../_ui/screen-kit";
 import { PayMethodsView } from "./PayMethodsView";
 
@@ -10,11 +11,14 @@ import { PayMethodsView } from "./PayMethodsView";
  * не подключил). Весь список — мок из _demo/demo-data.ts; основная карта
  * совпадает с той, что названа картой автоплатежа на /parent/payments.
  */
-export default function ParentPayMethodsPage() {
+// Заход 1 по оплатам: экран стал async только ради признака демо. Сети это
+// не добавляет — getParentContext уже вызван layout-ом того же запроса.
+export default async function ParentPayMethodsPage() {
+  const isDemo = await parentIsDemo();
   return (
     <div className="mx-auto w-full max-w-[430px]">
       <InnerHeader title="Способы оплаты" backHref="/parent/payments" />
-      <PayMethodsView />
+      <PayMethodsView isDemo={isDemo} />
     </div>
   );
 }

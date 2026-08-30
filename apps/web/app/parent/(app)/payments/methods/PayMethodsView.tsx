@@ -66,7 +66,15 @@ function MethodRow({
   );
 }
 
-export function PayMethodsView() {
+export function PayMethodsView({ isDemo: _isDemo }: {
+  /**
+   * Демо ли смотрящий (`schools.is_demo`, заход 1 по оплатам). ПОКА НЕ
+   * ИСПОЛЬЗУЕТСЯ И ЭТО НАМЕРЕННО: заход 1 только доводит признак до экрана,
+   * ветвиться будет заход 2, когда деньги переедут на настоящие счета. До
+   * тех пор заготовка видна обоим — и гостю, и настоящему родителю.
+   */
+  isDemo: boolean;
+}) {
   const [soon, setSoon] = useState(false);
 
   return (

@@ -1,4 +1,4 @@
-import { getSelectedChild, parentToday } from "@/lib/parent-queries";
+import { getSelectedChild, parentIsDemo, parentToday } from "@/lib/parent-queries";
 import { WALLET_BALANCE, WALLET_OPS, walletTotals } from "../../_demo/demo-data";
 import { WalletView } from "./WalletView";
 
@@ -15,11 +15,12 @@ import { WalletView } from "./WalletView";
  * «КОШЕЛЁК»: два экрана не должны спорить друг с другом.
  */
 export default async function ParentWalletPage() {
-  const [child, today] = await Promise.all([getSelectedChild(), parentToday()]);
+  const [child, today, isDemo] = await Promise.all([getSelectedChild(), parentToday(), parentIsDemo()]);
   const totals = walletTotals();
 
   return (
     <WalletView
+      isDemo={isDemo}
       balance={WALLET_BALANCE}
       days={WALLET_OPS.slice(0, 2)}
       totals={totals}

@@ -1,4 +1,4 @@
-import { getSelectedChild } from "@/lib/parent-queries";
+import { getSelectedChild, parentIsDemo } from "@/lib/parent-queries";
 import { InnerHeader } from "../../_ui/screen-kit";
 import { PaymentHistoryView } from "./PaymentHistoryView";
 import { whoLabel } from "../../_demo/demo-data";
@@ -11,12 +11,15 @@ import { whoLabel } from "../../_demo/demo-data";
  * сами платежи — мок: платёжного бэкенда нет (см. _demo/demo-data.ts).
  */
 export default async function ParentPaymentHistoryPage() {
-  const child = await getSelectedChild();
+  const [child, isDemo] = await Promise.all([getSelectedChild(), parentIsDemo()]);
 
   return (
     <div className="mx-auto w-full max-w-[430px]">
       <InnerHeader title="История оплат" backHref="/parent/payments" />
-      <PaymentHistoryView who={whoLabel(child?.full_name ?? null, child?.className ?? null)} />
+      <PaymentHistoryView
+        isDemo={isDemo}
+        who={whoLabel(child?.full_name ?? null, child?.className ?? null)}
+      />
     </div>
   );
 }

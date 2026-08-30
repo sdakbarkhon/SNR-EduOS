@@ -54,6 +54,34 @@ export const getParentContext = cache(async (): Promise<{
    * вложенном select.
    */
   schoolId: string | null;
+  /**
+   * ДЕМО ЛИ ЭТО. Заход 1 по оплатам, 30.08.2026.
+   *
+   * Веб-родитель до сих пор не отличал демо-гостя от настоящего родителя
+   * НИ В ОДНОМ месте — и следующим заходам, которые переводят оплаты на
+   * настоящие счета, ветвиться было не по чему.
+   *
+   * Признак берётся у ШКОЛЫ (`schools.is_demo`), а не у родителя: демо-школа
+   * одна и помечена в базе, а «демо-родитель» — это обычная строка `parents`
+   * внутри неё. Тот же приём уже применён в lib/parent-google.ts.
+   *
+   * ЛИШНЕГО ЗАПРОСА НЕТ. Это ещё одна колонка во вложенном select, который
+   * и так выполняется ниже одним round-trip: `parents → parent_students →
+   * students → student_groups → groups`, к нему добавлено `schools(is_demo)`
+   * по существующему FK `parents.school_id`. Ровно тем же способом сюда
+   * когда-то попал сам `school_id`.
+   *
+   * ДЕМО-ВХОД НА ВЕБЕ ИДЁТ МИМО ОБЩЕГО МЕХАНИЗМА — кнопка «Посмотреть демо»
+   * зовёт demoParentLogin() с зашитым номером +998912345678. Отдельной
+   * обработки это не требует: тот вход выдаёт сессию НАСТОЯЩЕЙ строки
+   * `parents` демо-школы, поэтому запрос ниже находит её так же, как любую
+   * другую, и `is_demo` приходит true сам собой.
+   *
+   * false при отсутствии школы или сбое запроса: «не знаем» безопаснее
+   * трактовать как «настоящий родитель» — тот же выбор умолчания, что у
+   * getSchoolFrozenDate с заморозкой.
+   */
+  isDemo: boolean;
   children: ParentChild[];
   /**
    * true, если запрос ниже РЕАЛЬНО упал (сеть/RLS/что угодно), а не просто
@@ -93,7 +121,7 @@ export const getParentContext = cache(async (): Promise<{
   const { data: parent, error: parentErr } = await sb
     .from("parents")
     .select(
-      "id, full_name, school_id, parent_students(student_id, created_at, students(id, full_name, student_groups(groups(name))))",
+      "id, full_name, school_id, school:schools(is_demo), parent_students(student_id, created_at, students(id, full_name, student_groups(groups(name))))",
     )
     .eq("user_id", user.id)
     .single();
@@ -129,6 +157,7 @@ export const getParentContext = cache(async (): Promise<{
     parentId: parent.id,
     parentName: parent.full_name,
     schoolId: (parent as { school_id?: string | null }).school_id ?? null,
+    isDemo: Boolean((parent as { school?: { is_demo?: boolean | null } | null }).school?.is_demo),
     children,
     hadError,
   };

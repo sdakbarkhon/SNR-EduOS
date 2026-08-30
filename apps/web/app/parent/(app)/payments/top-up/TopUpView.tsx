@@ -42,7 +42,16 @@ import { BrandChip, NoticeBanner, PAY_GLYPH, SoonNote } from "../parts";
 
 const MAX_DIGITS = 9;
 
-export function TopUpView({ childName }: { childName: string | null }) {
+export function TopUpView({ isDemo: _isDemo, childName }: {
+  /**
+   * Демо ли смотрящий (`schools.is_demo`, заход 1 по оплатам). ПОКА НЕ
+   * ИСПОЛЬЗУЕТСЯ И ЭТО НАМЕРЕННО: заход 1 только доводит признак до экрана,
+   * ветвиться будет заход 2, когда деньги переедут на настоящие счета. До
+   * тех пор заготовка видна обоим — и гостю, и настоящему родителю.
+   */
+  isDemo: boolean;
+  childName: string | null;
+}) {
   // Баланс — фикстура (кошелька в БД нет), но ЕДИНАЯ с карточкой на /parent/payments.
   const { wallet_balance: balance } = getSelectedChildContext();
 

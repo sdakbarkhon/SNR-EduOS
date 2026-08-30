@@ -1,4 +1,4 @@
-import { parentToday } from "@/lib/parent-queries";
+import { parentIsDemo, parentToday } from "@/lib/parent-queries";
 import { WALLET_OPS, walletTotals } from "../../../_demo/demo-data";
 import { WalletOpsView } from "./WalletOpsView";
 
@@ -11,6 +11,6 @@ import { WalletOpsView } from "./WalletOpsView";
  * итоги внизу кошелька и здесь всегда совпадают.
  */
 export default async function ParentWalletOpsPage() {
-  const today = await parentToday();
-  return <WalletOpsView days={WALLET_OPS} totals={walletTotals()} today={today} />;
+  const [today, isDemo] = await Promise.all([parentToday(), parentIsDemo()]);
+  return <WalletOpsView isDemo={isDemo} days={WALLET_OPS} totals={walletTotals()} today={today} />;
 }

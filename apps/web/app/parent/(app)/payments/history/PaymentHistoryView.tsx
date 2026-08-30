@@ -105,7 +105,16 @@ function TotalsColumn({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function PaymentHistoryView({ who }: { who: string }) {
+export function PaymentHistoryView({ isDemo: _isDemo, who }: {
+  /**
+   * Демо ли смотрящий (`schools.is_demo`, заход 1 по оплатам). ПОКА НЕ
+   * ИСПОЛЬЗУЕТСЯ И ЭТО НАМЕРЕННО: заход 1 только доводит признак до экрана,
+   * ветвиться будет заход 2, когда деньги переедут на настоящие счета. До
+   * тех пор заготовка видна обоим — и гостю, и настоящему родителю.
+   */
+  isDemo: boolean;
+  who: string;
+}) {
   const [filterIndex, setFilterIndex] = useState(0);
   const activeKey = FILTERS[filterIndex]?.key ?? "all";
 
