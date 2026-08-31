@@ -949,6 +949,8 @@ export interface Dictionary {
     svAnAttendance: string;
     svAnHomeworkGraded: string;
     svAnAvgHomework: string;
+    svAnBySource: string;
+    svAnBySourceNote: string;
     aiTitle: string;
     aiSubtitle: string;
     aiFreshNotice: string;

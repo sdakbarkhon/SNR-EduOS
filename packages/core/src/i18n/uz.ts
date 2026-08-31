@@ -931,6 +931,8 @@ export const uz: Dictionary = {
     svAnAttendance: "Davomat, %",
     svAnHomeworkGraded: "Baholangan ishlar",
     svAnAvgHomework: "Ishlar uchun o‘rtacha",
+    svAnBySource: "Nimadan tashkil topgan",
+    svAnBySourceNote: "Nom ostida — shu turdagi baholar soni. Dars bosqichlari uchun baholar o'rtacha ballga kirmaydi.",
     aiTitle: "SI xarajatlari",
     aiSubtitle: "Modelga nechta murojaat, nechta token va bu pulli tarifda qanchaga tushardi.",
     aiFreshNotice: "Hisob 2026-yil 18-avgustda yo‘lga qo‘yildi. Ilgari xarajatlar umuman yozilmagan — ular bo‘lmagani uchun emas, sanashning imkoni bo‘lmagani uchun. Bu yerda faqat o‘sha kundan boshlab to‘plangani ko‘rinadi.",

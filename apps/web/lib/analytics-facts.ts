@@ -12,9 +12,17 @@
 // динамика — живут в @snr/core (presenters/analytics.ts) и здесь не
 // повторяются ни одной строкой.
 //
-// ЧИТАЕТ ПОД СЕССИЕЙ ВЫЗЫВАЮЩЕГО. Ни одного обращения служебным ключом:
-// правила доступа сами отсекают чужую школу, и это единственная защита, на
+// ЧИТАЕТ ПОД СЕССИЕЙ ВЫЗЫВАЮЩЕГО — ЕСЛИ ШКОЛА НЕ ЗАДАНА ЯВНО. У админа
+// школы правила доступа сами отсекают чужое, и это единственная защита, на
 // которую тут можно полагаться.
+//
+// 30.08.2026 — ПОЯВИЛСЯ ПАРАМЕТР schoolId, И ОН ОБЯЗАТЕЛЕН ДЛЯ СУПЕРАДМИНА.
+// Суперадмин ходит служебным ключом, личности в базе у него нет, поэтому
+// current_school_id() для него пуст, а `OR is_super_admin()` в правилах ни к
+// какой школе не привязан. Любой запрос отсюда без явного фильтра посчитал
+// бы ОБЕ школы разом и показал бы смесь как данные одной. Когда schoolId
+// задан, КАЖДЫЙ запрос несёт .eq("school_id", …) — ровно как это делают все
+// десять экранов просмотра школы (см. lib/school-view.ts).
 
 import { getStudentGrades, getSubjectKeyByLabel } from "@snr/core";
 import type { AnalyticsInput } from "@snr/core";
@@ -36,15 +44,27 @@ export async function collectAnalyticsFacts(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   todayIso: string,
+  /** Школа, о которой считаем. Обязателен для служебного клиента: без него
+   *  запросы соберут обе школы разом. Админу школы не нужен — за него
+   *  сужают правила доступа. */
+  schoolId?: string,
 ): Promise<AnalyticsFactsBase> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const школа = <T>(q: T): T => (schoolId ? (q as any).eq("school_id", schoolId) : q);
+
   const [gradesRaw, studentsRes, attendanceRes, homeworkRes, submissionsRes] = await Promise.all([
     // Оценки — тем же сбором, что и экран оценок ученика: шесть источников,
     // одна нормировка к пятибалльной. Своего запроса аналитика не заводит.
-    getStudentGrades(db).catch(() => []),
-    db.from("students").select("id, full_name, student_groups(groups(id, name))"),
-    db.from("attendance").select("student_id, status, lesson:lessons!inner(starts_at, group:groups!inner(name), subject:subjects(name))"),
-    db.from("homework").select("id, due_date, group_id, group:groups!inner(name), subject:subjects(name)"),
-    db.from("homework_submissions").select("id, student_id, homework_id, submitted_at"),
+    //
+    // 30.08.2026 — .catch(() => []) СНЯТ. Он превращал сбой выборки в пустой
+    // список, а экран показывал нули как настоящие данные: «средний балл 0,
+    // оценок 0» неотличимо от школы, где оценок правда нет. Пусть падает —
+    // страница покажет ошибку, и это честнее молчаливого нуля.
+    getStudentGrades(db, undefined, schoolId ? { schoolId } : undefined),
+    школа(db.from("students").select("id, full_name, student_groups(groups(id, name))")),
+    школа(db.from("attendance").select("student_id, status, lesson:lessons!inner(starts_at, group:groups!inner(name), subject:subjects(name))")),
+    школа(db.from("homework").select("id, due_date, group_id, group:groups!inner(name), subject:subjects(name)")),
+    школа(db.from("homework_submissions").select("id, student_id, homework_id, submitted_at")),
   ]);
 
   type StudentRow = {
@@ -130,6 +150,10 @@ export async function collectAnalyticsFacts(
   }
 
   return {
+    // sourceTable ПЕРЕДАЁТСЯ ДАЛЬШЕ. 30.08.2026: здесь строка сворачивалась
+    // без него, и правило среднего балла нечем было применить — в среднее
+    // подмешивались оценки за этапы урока. У администратора выходило 4.37
+    // против 4.38 по общему правилу.
     grades: gradesRaw.map((g) => ({
       studentId: g.studentId,
       groupName: g.groupName,
@@ -137,6 +161,7 @@ export async function collectAnalyticsFacts(
       date: g.date,
       grade5: g.grade5,
       title: g.title,
+      sourceTable: g.sourceTable,
     })).filter((g) => g.date && g.studentId),
     attendance,
     submitted,

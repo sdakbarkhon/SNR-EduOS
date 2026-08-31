@@ -1187,8 +1187,21 @@ type HwJoin = { title: string; content_type: string; group: { name: string } | n
  *  ошибка любого из них бросается наружу, а не глотается в console.error
  *  с продолжением на data ?? [] (был тот же класс silent-fail, что уже
  *  чинили в getStudentAttendance/getHomeworkWithSubmissions — иначе сбой
- *  сети/RLS неотличим от «оценок правда нет»). */
-export const getStudentGrades = async (db: Db, studentId?: string): Promise<StudentGradeItem[]> => {
+ *  сети/RLS неотличим от «оценок правда нет»).
+ *
+ *  opts.schoolId — 30.08.2026, заход 3. Нужен ОДНОМУ читателю: суперадмину,
+ *  который смотрит школу служебным ключом. Личности в базе у него нет,
+ *  current_school_id() пуст, а `OR is_super_admin()` в правилах ни к какой
+ *  школе не привязан — без явного фильтра он собрал бы обе школы разом.
+ *  Всем остальным сужают правила доступа, и довод им не нужен. */
+export const getStudentGrades = async (
+  db: Db,
+  studentId?: string,
+  opts?: { schoolId?: string },
+): Promise<StudentGradeItem[]> => {
+  const schoolId = opts?.schoolId;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const вШколе = (q: any): any => (schoolId ? q.eq("school_id", schoolId) : q);
   // NB: не выбираем graded_at — экран ученика не должен зависеть от миграции 19
   // на hosted. Дата работы = submitted_at (для seed практически совпадает).
   const fileSel =
@@ -1203,6 +1216,8 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     fileQuery = fileQuery.eq("student_id", studentId);
     testQuery = testQuery.eq("student_id", studentId);
   }
+  fileQuery = вШколе(fileQuery);
+  testQuery = вШколе(testQuery);
   const [fileRes, testRes] = await Promise.all([fileQuery, testQuery]);
   const fileData = unwrap(fileRes);
   const testData = unwrap(testRes);
@@ -1272,6 +1287,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let projQuery: any = (db as any).from("project_submissions").select(projSel).not("grade", "is", null);
     if (studentId) projQuery = projQuery.eq("student_id", studentId);
+    projQuery = вШколе(projQuery);
     const projRes = await projQuery;
     const projData = unwrap(projRes);
     for (const r of projData as unknown as Array<{
@@ -1307,6 +1323,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let stageQuery: any = (db as any).from("lesson_stage_progress").select(stageSel).not("grade", "is", null);
     if (studentId) stageQuery = stageQuery.eq("student_id", studentId);
+    stageQuery = вШколе(stageQuery);
     const stageRes = await stageQuery;
     const stageData = unwrap(stageRes);
     for (const r of stageData as unknown as Array<{
@@ -1347,6 +1364,7 @@ export const getStudentGrades = async (db: Db, studentId?: string): Promise<Stud
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let lgQuery: any = (db as any).from("lesson_grades").select(lgSel);
     if (studentId) lgQuery = lgQuery.eq("student_id", studentId);
+    lgQuery = вШколе(lgQuery);
     const lgRes = await lgQuery;
     const lgData = unwrap(lgRes);
     for (const r of lgData as unknown as Array<{

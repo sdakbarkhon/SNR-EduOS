@@ -931,6 +931,8 @@ export const en: Dictionary = {
     svAnAttendance: "Attendance, %",
     svAnHomeworkGraded: "Graded works",
     svAnAvgHomework: "Average for works",
+    svAnBySource: "What it adds up from",
+    svAnBySourceNote: "Under each name — how many grades of that kind. Lesson-stage grades do not count toward the average.",
     aiTitle: "AI costs",
     aiSubtitle: "How many model calls, how many tokens, and what it would cost on the paid tier.",
     aiFreshNotice: "Accounting started on 18 August 2026. Before that, costs were not recorded at all — not because there were none, but because there was nothing to count them with. Only data collected from that day onward is shown here.",
