@@ -3131,6 +3131,7 @@ export const uz: Dictionary = {
     filterAll: "Barchasi",
     filterAssignment: "Topshiriqlar uchun",
     filterLesson: "Dars uchun",
+    filterStage: "Darsdagi ish",
     periodWeek: "Shu hafta",
     periodMonth: "Shu oy",
     periodSemester: "Shu semestr",

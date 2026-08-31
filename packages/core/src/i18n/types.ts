@@ -3237,6 +3237,7 @@ export interface Dictionary {
     filterAll: string;          // "Все"
     filterAssignment: string;   // "За задания"
     filterLesson: string;       // "За урок"
+    filterStage: string;        // "Работа на уроке" — оценки за этапы урока
     periodWeek: string;         // "Эта неделя"
     periodMonth: string;        // "Этот месяц"
     periodSemester: string;     // "Этот семестр"

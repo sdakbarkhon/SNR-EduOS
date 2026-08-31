@@ -22,7 +22,10 @@ interface Props {
 
 type TypeFilter = "all" | StudentGradeItem["kind"];
 type PeriodFilter = "all" | "week" | "month" | "semester";
-type CategoryFilter = "all" | "assignment" | "lesson";
+// 30.08.2026 — третья категория. «Работа на уроке» отделена от «За урок»:
+// оценка за квиз и оценка учителя за урок — разные вещи, первая в средний
+// балл не идёт, а в списке они стояли неразличимо.
+type CategoryFilter = "all" | "assignment" | "lesson" | "stage";
 type SortValue = "date_desc" | "date_asc" | "grade_desc" | "grade_asc" | "subject";
 type Tier = 5 | 4 | 3 | 2 | 1;
 
@@ -306,14 +309,20 @@ export function GradesView({ grades, error = false }: Props) {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Table card */}
         <div className="min-w-0 flex-1 rounded-[24px] border border-white bg-white/80 p-6 shadow-md backdrop-blur-xl">
-          {/* Все / За задания / За урок — сегментированный переключатель,
-              стиль как у "Сегодня/Неделя" в расписании (rounded-full
-              bg-white p-1 shadow-sm контейнер + пилюли внутри). */}
-          <div className="mb-4 flex w-fit rounded-full bg-white p-1 shadow-sm">
+          {/* Все / За задания / За урок / Работа на уроке — сегментированный
+              переключатель, стиль как у "Сегодня/Неделя" в расписании
+              (rounded-full bg-white p-1 shadow-sm контейнер + пилюли внутри).
+
+              Четвёртая пилюля добавлена 30.08.2026. До неё оценки за этапы
+              урока попадали в «За урок» вместе с оценками учителя за урок —
+              и человек не мог отличить машинный балл за квиз от настоящей
+              оценки. Теперь «За урок» показывает только lesson_grades. */}
+          <div className="mb-4 flex w-fit flex-wrap rounded-full bg-white p-1 shadow-sm">
             {([
               { value: "all", label: t.filterAll },
               { value: "assignment", label: t.filterAssignment },
               { value: "lesson", label: t.filterLesson },
+              { value: "stage", label: t.filterStage },
             ] as { value: CategoryFilter; label: string }[]).map((opt) => (
               <button
                 key={opt.value}
@@ -382,7 +391,21 @@ export function GradesView({ grades, error = false }: Props) {
                         <p className="truncate text-[14.5px] font-extrabold text-slate-900">
                           {g.kind === "lesson" ? `${d.lesson.kindLesson}: ${g.title}` : g.title}
                         </p>
-                        <p className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-400">{subjectLabelOf(g.subject)}</p>
+                        <p className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-400">
+                          {subjectLabelOf(g.subject)}
+                          {/* Результат отдельно от оценки. «2» за квиз — это
+                              два верных ответа из четырёх, а не двойка; без
+                              этого числа оценка выглядит хуже, чем есть.
+                              Показываем только там, где счёт правда есть. */}
+                          {g.detail ? (
+                            <span className="text-slate-500">
+                              {" · "}
+                              {d.lesson.quiz.ofTotal
+                                .replace("{correct}", String(g.detail.correct))
+                                .replace("{total}", String(g.detail.total))}
+                            </span>
+                          ) : null}
+                        </p>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3">
                         <span className={cn("inline-flex rounded-[9px] px-2.5 py-1 text-[11.5px] font-bold", KIND_BADGE[g.kind])}>{kindLabel(g.kind, d)}</span>

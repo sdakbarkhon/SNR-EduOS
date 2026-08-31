@@ -3143,6 +3143,7 @@ export const ru: Dictionary = {
     filterAll: "Все",
     filterAssignment: "За задания",
     filterLesson: "За урок",
+    filterStage: "Работа на уроке",
     periodWeek: "Эта неделя",
     periodMonth: "Этот месяц",
     periodSemester: "Этот семестр",

@@ -1160,13 +1160,41 @@ export type StudentGradeItem = {
   grade5: number | null; // нормировано к /5 для средних
   display: string; // "4/5" или "85/100"
   comment: string | null;
+  /**
+   * Результат работы, если он есть отдельно от оценки: сколько верно из
+   * скольких. 30.08.2026, заход 4 (часть про различимость).
+   *
+   * ЗАЧЕМ. Оценка за квиз «2» — это два правильных ответа из четырёх, а не
+   * двойка за четверть. В списке оценок она стояла голым числом рядом с
+   * настоящими оценками за урок и выглядела хуже, чем есть.
+   *
+   * ЧИСЛАМИ, А НЕ СТРОКОЙ: подпись собирает экран на своём языке
+   * (lesson.ofTotal). Ядро языка не знает и знать не должно.
+   *
+   * Заполняется только у этапов урока, где ответ содержит счёт: квиз,
+   * Kahoot, код с пропусками. У остальных null.
+   */
+  detail?: { correct: number; total: number } | null;
 };
 
-/** "За задания" / "За урок" для фильтра на экране оценок (ученик и учитель).
- *  Классификация ПО ИСТОЧНИКУ, не по kind — kind "programming" бывает и от
- *  homework (задание на дом), и от lesson_stage_progress (этап "код" прямо
- *  на уроке), так что сам по себе kind это различить не может. */
-export function gradeCategory(sourceTable: GradeSourceTable): "assignment" | "lesson" {
+/**
+ * Категория оценки для фильтра на экране оценок.
+ *
+ * Классификация ПО ИСТОЧНИКУ, не по kind — kind "programming" бывает и от
+ * homework (задание на дом), и от lesson_stage_progress (этап «код» прямо
+ * на уроке), так что сам по себе kind это различить не может.
+ *
+ * 30.08.2026 — КАТЕГОРИЙ СТАЛО ТРИ, А НЕ ДВЕ. «Работа на уроке» отделена
+ * от «За урок»: раньше оценка за квиз и оценка учителя за урок падали в
+ * одну кучу, хотя это разные вещи. Оценка за урок идёт в средний балл, за
+ * этап — нет (utils/gradeAverage), и человек, глядя на список, различить их
+ * не мог. Это и была та путаница, ради которой их вынесли из среднего.
+ *
+ * Зовёт эту функцию ОДИН экран — оценки ученика. У учителя своя матрица,
+ * она этапов не показывает вовсе.
+ */
+export function gradeCategory(sourceTable: GradeSourceTable): "assignment" | "lesson" | "stage" {
+  if (sourceTable === "lesson_stage_progress") return "stage";
   return sourceTable === "homework_submissions" || sourceTable === "test_submissions" || sourceTable === "project_submissions"
     ? "assignment"
     : "lesson";
@@ -1341,6 +1369,18 @@ export const getStudentGrades = async (
         ct === "code" ? "programming" :
         ct === "code_completion" ? "code_completion" :
         "external";
+      // Результат отдельно от оценки. Формы ответа три и все со счётом:
+      //   квиз    {kind:"quiz",   correct, total}
+      //   Kahoot  {kind:"kahoot", correct, total}
+      //   код с пропусками        {score, total, answers}
+      // Берём и correct, и score — иначе третья форма молча осталась бы без
+      // подписи. Чего нет или что не число — того не показываем вовсе.
+      const сд = (r.submission_data ?? null) as {
+        correct?: unknown; score?: unknown; total?: unknown;
+      } | null;
+      const верно = typeof сд?.correct === "number" ? сд.correct
+        : typeof сд?.score === "number" ? сд.score : null;
+      const всего = typeof сд?.total === "number" ? сд.total : null;
       items.push({
         id: r.id,
         studentId: r.student_id,
@@ -1353,6 +1393,7 @@ export const getStudentGrades = async (
         grade5: r.grade,
         display: `${r.grade}/5`,
         comment: r.teacher_comment,
+        detail: верно != null && всего != null && всего > 0 ? { correct: верно, total: всего } : null,
       });
     }
   }

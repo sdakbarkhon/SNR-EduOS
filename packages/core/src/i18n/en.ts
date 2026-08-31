@@ -3131,6 +3131,7 @@ export const en: Dictionary = {
     filterAll: "All",
     filterAssignment: "For assignments",
     filterLesson: "For lessons",
+    filterStage: "Classwork in lesson",
     periodWeek: "This week",
     periodMonth: "This month",
     periodSemester: "This semester",
