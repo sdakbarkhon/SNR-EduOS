@@ -19,9 +19,12 @@ export async function TeacherHeaderInfo() {
     const teacher = await getMyTeacher(supabase);
     teacherName = teacher.full_name ?? "";
     avatarUrl = teacher.avatar_url ?? null;
-    // subject_slug=NULL — куратор (teacher_karim), доступ ко всем предметам,
-    // а не "Программирование" из legacy groups.subject (одинаковое во всех группах).
-    teacherSubtitle = teacher.subject_slug ? getSubjectConfig(teacher.subject_slug).label : "Куратор";
+    // Подпись — предмет из карточки. Пусто, если предмет ещё не назначен:
+    // 30.08.2026 здесь стояло слово «Куратор», роль убрана из продукта, и
+    // называть так каждого учителя с незаполненной карточкой — неправда.
+    // Брать «Программирование» из legacy groups.subject тоже нельзя: оно
+    // одинаковое во всех группах.
+    teacherSubtitle = teacher.subject_slug ? getSubjectConfig(teacher.subject_slug).label : "";
   } catch (err) {
     console.error("[TeacherHeaderInfo] getMyTeacher failed:", err);
   }

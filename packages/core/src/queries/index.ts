@@ -1494,8 +1494,8 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
   // group_teachers с миграции 109 записаны ВСЕ предметники всех групп —
   // поэтому журнал робототехника показывал столбцами задания всех десяти
   // предметов класса, а подвал «Средняя по классу» усреднял их вместе со
-  // своими. Тот же фильтр, что и у расписания: свои предметы, куратор
-  // (subject_slug пуст) по-прежнему видит всё.
+  // своими. Тот же фильтр, что и у расписания: только свои предметы.
+  // Исключений ни для кого нет — см. getTeacherSubjectFilter.
   const subjectFilter = await getTeacherSubjectFilter(db);
   const homework = filterBySubject(
     (hwRes.data ?? []) as Array<GradeMatrixData["homework"][number] & { subject_id?: string | null }>,
@@ -1541,7 +1541,7 @@ export const getTeacherGradeMatrix = async (db: Db, groupId: string): Promise<Gr
  * предметов. Поэтому задания и тесты сужаются здесь тем же фильтром, что и
  * расписание (getTeacherSubjectFilter), — по своему предмету.
  *
- * Куратор (subject_slug пуст) фильтра не получает и видит всё: это его роль.
+ * Исключений нет ни для кого: фильтр сужает по subjects.teacher_id.
  *
  * ПОСТРАНИЧНО. Postgrest молча отдаёт первую 1000 строк — этой мели проект
  * уже касался 08.08 (авария с эталоном демо). Годовая школа переваливает за
@@ -1584,7 +1584,9 @@ export const getTeacherGradesFull = async (db: Db): Promise<TeacherGrade[]> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
   const filter = await getTeacherSubjectFilter(db);
-  const mySubjects = filter?.subjectIds ?? null; // null = куратор, без сужения
+  // null здесь означает только «карточки учителя нет» (filter === null):
+  // тогда сужать не по чему. У живого учителя это всегда список.
+  const mySubjects = filter?.subjectIds ?? null;
   const teacherId = filter?.teacherId ?? null;
 
   const out: TeacherGrade[] = [];
@@ -2027,19 +2029,38 @@ export const createTestQuestions = async (
   }
 };
 
-// PROMT 3 (rework) — с миграции 109 все 5 предметных учителей состоят в
-// group_teachers всех 3 групп (нужно для RLS-доступа к самим группам), но
-// каждый должен видеть в расписании ТОЛЬКО СВОЙ предмет — teacher_karim
-// (subject_slug=NULL, куратор) продолжает видеть всё. RLS остаётся
-// group-based (не меняем — иначе сломается доступ karim), фильтр по
-// предмету — здесь, в query-слое.
+// С миграции 109 предметники состоят в group_teachers всех своих групп —
+// это нужно для RLS-доступа к самим группам. Но в расписании и журнале
+// каждый должен видеть ТОЛЬКО СВОЙ предмет, поэтому сужение стоит здесь,
+// в query-слое: RLS на homework и grades остаётся group-based.
+//
+// 30.08.2026 — ИСКЛЮЧЕНИЯ ДЛЯ ПУСТОГО СЛАГА БОЛЬШЕ НЕТ (пункт 81).
+//
+// Здесь стояло: `subject_slug IS NULL` → сужение не применяется вовсе.
+// Писалось это под куратора демо-школы (teacher_karim), которому по роли
+// полагалось видеть всё. Роль убрана из продукта — миграции 242 и 243, —
+// а условие осталось и продолжало снимать сужение с КАЖДОГО учителя с
+// незаполненной карточкой: не только у куратора и не только в демо.
+//
+// В боевой школе такой учитель есть — Sardorbek Eshmurodov. Сегодня он
+// ничего лишнего не видит только потому, что школа пуста: заданий 0,
+// оценок 0. При наполнении увидел бы задания и оценки всех предметов
+// своих групп, а не своего одного.
+//
+// Случая, когда учитель без слага ДОЛЖЕН видеть всё, не осталось: слаг —
+// это подпись в карточке, а не роль. Кто ведёт предмет, записано в
+// subjects.teacher_id, и сужаем мы теперь строго по нему.
+//
+// НЕ ПУТАТЬ С БИБЛИОТЕКОЙ КАФЕДРЫ: там пустой слаг — законный признак
+// («кафедры нет»), и он остаётся, см. canUseDepartmentLibrary.
 type TeacherSubjectFilter = { teacherId: string; subjectIds: string[] | null };
 
-/** null subjectIds = куратор (subject_slug=NULL) — фильтр не нужен.
+/** Свои предметы учителя. subjectIds всегда список — пусть и пустой:
+ *  учитель без назначенных предметов не видит ничего, и это верно.
  *
- * Промт «скорость», Задача 3: раньше — 2 последовательных round trip'а
- * (teachers, затем subjects по teacher_id). subjects.teacher_id → teachers.id
- * — настоящий FK, поэтому embedded-select забирает оба одним запросом. */
+ *  Промт «скорость», Задача 3: раньше — 2 последовательных round trip'а
+ *  (teachers, затем subjects по teacher_id). subjects.teacher_id → teachers.id
+ *  — настоящий FK, поэтому embedded-select забирает оба одним запросом. */
 async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
@@ -2048,7 +2069,9 @@ async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | n
   if (!userId) return null;
   const { data: teacher, error: teacherErr } = await db2
     .from("teachers")
-    .select("id, subject_slug, my_subjects:subjects!teacher_id(id)")
+    // subject_slug из выборки убран 30.08.2026 вместе с исключением по нему:
+    // чтобы никто не решил, что слаг тут снова при чём.
+    .select("id, my_subjects:subjects!teacher_id(id)")
     .eq("user_id", userId)
     .maybeSingle();
   // Fail closed (5222b73): раньше сбой этого запроса молча возвращал null →
@@ -2056,7 +2079,6 @@ async function getTeacherSubjectFilter(db: Db): Promise<TeacherSubjectFilter | n
   // список с ошибкой в логах лучше тихой утечки чужого расписания.
   if (teacherErr) throw teacherErr;
   if (!teacher) return null;
-  if (!teacher.subject_slug) return { teacherId: teacher.id, subjectIds: null };
   return {
     teacherId: teacher.id,
     subjectIds: ((teacher.my_subjects ?? []) as Array<{ id: string }>).map((s) => s.id),
