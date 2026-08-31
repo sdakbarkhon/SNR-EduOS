@@ -2164,6 +2164,7 @@ export const uz: Dictionary = {
     markWindowLeft: "Yana {n} daqiqa tuzatish mumkin",
     markCommentAlways: "Izohni istalgan vaqtda tahrirlash mumkin.",
     createNoSubjects: "Tayinlangan fanlaringiz yo'q. Administratorga murojaat qiling.",
+    editSubjectHasGrades: "Bu dars uchun allaqachon {n} ta baho qo'yilgan. Fan almashtirilsa, ular dars bilan birga ko'chadi.",
     createSelectSubject: "Fan tanlang",
     back: "Jadvalga qaytish",
     progressTitle: "Dars jarayoni",

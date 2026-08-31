@@ -2171,6 +2171,7 @@ export const ru: Dictionary = {
     markWindowLeft: "Исправить можно ещё {n} мин",
     markCommentAlways: "Комментарий можно править всегда.",
     createNoSubjects: "У вас нет закреплённых предметов. Обратитесь к администратору.",
+    editSubjectHasGrades: "За этот урок уже стоит оценок: {n}. При смене предмета они перейдут вместе с уроком.",
     createSelectSubject: "Выберите предмет",
     back: "Назад к расписанию",
     progressTitle: "Прогресс урока",

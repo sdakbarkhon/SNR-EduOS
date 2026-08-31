@@ -9,7 +9,7 @@ import {
   MoreHorizontal, Pencil, Trash2, X, AlertTriangle, CalendarDays, CalendarRange,
 } from "lucide-react";
 import {
-  createLesson, updateLesson, deleteLesson,
+  createLesson, updateLesson, deleteLesson, getLessonGrades,
   getTeacherLessonsByMonth, getDictionary, defaultLocale,
   getCurriculumPlanForGroupSubject, getCurriculumTopicsWithUsage,
   tashkentDayKey, tashkentParts, tashkentMonthBoundsUtc,
@@ -37,6 +37,9 @@ type LessonItem = {
   // 26.08.2026: иконка на карточке — единственный признак предмета в этом
   // списке, и она бралась из заглушки group.subject.
   subject?: { name: string; icon: string | null; color: string | null } | null;
+  // 30.08.2026 (пункт 78): id предмета выборка отдавала и раньше, тип его
+  // не объявлял — и форма правки не могла подставить текущий предмет.
+  subject_id?: string | null;
 };
 type FormState = {
   groupId: string; subjectId: string; date: string; startTime: string;
@@ -155,7 +158,11 @@ function emptyForm(groupId = ""): FormState {
 }
 function lessonToForm(l: LessonItem): FormState {
   return {
-    groupId: l.group_id, subjectId: "",
+    // 30.08.2026 — БЫЛО subjectId: "". Селектор предмета в правке рисовался
+    // (он зависит только от группы), показывал «— выберите предмет —» и
+    // выглядел так, будто предмет у урока не задан. Теперь подставляем
+    // текущий: человек видит, что стоит, и меняет осознанно.
+    groupId: l.group_id, subjectId: l.subject_id ?? "",
     date: toLocalDateStr(l.starts_at),
     startTime: toLocalTimeStr(l.starts_at),
     durationMinutes: "45",
@@ -324,11 +331,14 @@ function DatePickerField({
 
 // ── LessonFormModal ───────────────────────────────────────────────────────────
 function LessonFormModal({
-  mode, groups, teacherSubjects, initial, onClose, onSave,
+  mode, groups, teacherSubjects, initial, editLessonId, onClose, onSave,
 }: {
   mode: "create" | "edit"; groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
   initial: FormState;
+  /** Правим существующий урок — его id. Нужен ровно для одного: узнать,
+   *  есть ли у урока оценки, и предупредить перед сменой предмета. */
+  editLessonId?: string;
   onClose: () => void; onSave: (f: FormState) => Promise<void>;
 }) {
   const { locale } = useLocale();
@@ -337,6 +347,29 @@ function LessonFormModal({
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // СКОЛЬКО ОЦЕНОК УЖЕ СТОИТ У ЭТОГО УРОКА. 30.08.2026, пункт 78.
+  //
+  // Оценки за урок висят на lesson_id, а не на предмете, и при смене
+  // предмета уезжают вместе с уроком — ни одна не теряется, но начинают
+  // числиться по другому предмету. Отличить «исправляю опечатку» от
+  // «переношу историю» может только человек, поэтому решение оставляем ему,
+  // а числом предупреждаем.
+  //
+  // Статус урока для этого не годится: в демо-школе 16 из 84 уроков со
+  // статусом scheduled уже несут по десять оценок. Спрашиваем сами оценки.
+  const [оценокУУрока, setОценокУУрока] = useState<number | null>(null);
+  useEffect(() => {
+    if (mode !== "edit" || !editLessonId) return;
+    let отменено = false;
+    getLessonGrades(createClient(), editLessonId)
+      .then((rows) => { if (!отменено) setОценокУУрока(rows.length); })
+      .catch(() => { if (!отменено) setОценокУУрока(null); });
+    return () => { отменено = true; };
+  }, [mode, editLessonId]);
+
+  const предметМеняют = mode === "edit" && !!form.subjectId && form.subjectId !== initial.subjectId;
+  const предупредить = предметМеняют && (оценокУУрока ?? 0) > 0;
 
   function set(key: keyof FormState, val: string) { setForm(p => ({ ...p, [key]: val })); }
 
@@ -381,11 +414,14 @@ function LessonFormModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.groupId)   { setError("Выберите группу"); return; }
-    // ЧАСТЬ В: предмет обязателен при создании — subject-scope RLS (131)
-    // отклоняет INSERT урока без предмета, а уроки с subject_id=NULL были бы
-    // невидимы предметникам (filterBySubject). В edit предмет не меняется
-    // (updateLesson не принимает subject_id) — там не требуем.
-    if (mode === "create" && !form.subjectId) { setError("Выберите предмет"); return; }
+    // Предмет обязателен ВЕЗДЕ, и при создании, и при правке. С миграции 226
+    // он not-null; уроки без предмета были бы невидимы предметникам
+    // (filterBySubject), а INSERT без него отклоняет правило доступа.
+    //
+    // 30.08.2026 — в правке требуем тоже. Раньше не требовали, потому что
+    // updateLesson предмет не принимал; теперь принимает, и пустое поле
+    // здесь означало бы «сбросить обязательное» — этого не бывает.
+    if (!form.subjectId) { setError("Выберите предмет"); return; }
     if (!form.date)      { setError("Укажите дату"); return; }
     if (!form.startTime) { setError("Укажите время начала"); return; }
     setSaving(true); setError("");
@@ -456,6 +492,15 @@ function LessonFormModal({
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
+              )}
+              {/* Смена предмета у урока, за который уже стоят оценки. Не
+                  запрещаем: отличить исправленную опечатку от переноса
+                  истории может только человек. Показываем, сколько оценок
+                  поедет, и оставляем решение ему. */}
+              {предупредить && (
+                <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  {d.editSubjectHasGrades.replace("{n}", String(оценокУУрока))}
+                </p>
               )}
             </div>
           )}
@@ -720,6 +765,13 @@ export function TeacherLessonsView({
       await updateLesson(db, editLesson.id, {
         group_id: form.groupId, starts_at: startsAt, duration_minutes: durationMinutes,
         room: form.room || null, title: form.title || null, description: form.desc || null,
+        // 30.08.2026 (пункт 78). Без этой строки перенос урока в другую
+        // группу оставлял предмет СТАРОЙ группы: урок в 7-А с английским
+        // из 10-А. База такое пропускает — ограничения «предмет принадлежит
+        // группе урока» в схеме нет. Список предметов в форме сужен по
+        // выбранной группе, поэтому через интерфейс рассогласовать больше
+        // нечем.
+        subject_id: form.subjectId,
       }, schoolNowMs());
       setFormModal(null);
       await loadMonth(viewYear, viewMonth);
@@ -937,6 +989,7 @@ export function TeacherLessonsView({
                 ? { ...emptyForm(presetGroupSubject.groupId), subjectId: presetGroupSubject.subjectId }
                 : emptyForm(groups[0]?.id ?? "")
           }
+          editLessonId={formModal === "edit" ? editLesson?.id : undefined}
           onClose={() => setFormModal(null)}
           onSave={handleSave}
         />

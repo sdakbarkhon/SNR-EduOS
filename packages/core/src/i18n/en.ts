@@ -2164,6 +2164,7 @@ export const en: Dictionary = {
     markWindowLeft: "{n} min left to correct",
     markCommentAlways: "The comment can be edited at any time.",
     createNoSubjects: "You have no assigned subjects. Please contact the administrator.",
+    editSubjectHasGrades: "This lesson already has {n} grades. Changing the subject moves them along with the lesson.",
     createSelectSubject: "Select subject",
     back: "Back to schedule",
     progressTitle: "Lesson progress",

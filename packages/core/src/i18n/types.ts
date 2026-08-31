@@ -2233,6 +2233,7 @@ export interface Dictionary {
     markWindowLeft: string;    // «Исправить можно ещё {n} мин»
     markCommentAlways: string;
     createNoSubjects: string;
+    editSubjectHasGrades: string;   // «уже стоит оценок: {n}» — предупреждение при смене предмета
     createSelectSubject: string;
     back: string;
     progressTitle: string;
