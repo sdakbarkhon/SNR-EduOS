@@ -41,9 +41,14 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   const [rows, setRows] = useState<AttendanceRollCallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savedId, setSavedId] = useState<string | null>(null);
-  // Замок миграции 203: отметку старше 15 минут меняет только администратор.
-  // Молча откатывать кнопку нельзя — учитель должен понять, почему не вышло.
-  const [lockNotice, setLockNotice] = useState(false);
+  // Почему кнопка не сработала. Молча откатывать нельзя — учитель должен
+  // понять, что произошло.
+  //   "locked" — замок миграций 203/245: база сказала mark_locked;
+  //   "failed" — любой другой отказ базы.
+  // 31.08.2026. Раньше вторая ветка уходила только в console.error, и экран
+  // не показывал ничего. Так восемь дней пряталась поломка миграции 225:
+  // база падала сырой ошибкой, а учитель видел просто «ничего не произошло».
+  const [notice, setNotice] = useState<null | "locked" | "failed">(null);
   // Grades map: studentId → LessonGrade
   const [gradesMap, setGradesMap] = useState<Record<string, LessonGrade>>({});
   // Grade modal state
@@ -63,6 +68,14 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   // Заперта СТРОКА, а не весь список: запирать нечего там, где отметку никто не
   // ставил. Иначе выходило так: учитель исправил машинный прогул, промахнулся
   // кнопкой — и снова заперт, потому что вся перекличка помечена финализованной.
+  //
+  // ЭТО НЕ ЗАМОК ПЯТНАДЦАТИ МИНУТ, А ЗЕРКАЛО ПРАВИЛА ДОСТУПА. Правило
+  // «teacher updates attendance» пускает учителя при is_finalized = false ЛИБО
+  // marked_by IS NULL. Миграция 245 его не трогала, поэтому и здесь ничего не
+  // меняется: отпустить кнопку на идущем уроке значило бы дать учителю нажать
+  // и молча ничего не получить — правило вернуло бы ноль строк без ошибки.
+  // Финализованную перекличку проставляет только автозавершение и только
+  // завершённому уроку, так что на идущем уроке эта ветка не срабатывает.
   const rowLocked = (r: AttendanceRollCallRow) => r.is_finalized && !isMachineMark(r);
   const hasFixableRows = readOnly && rows.some((r) => !rowLocked(r));
 
@@ -105,8 +118,15 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
     if (!current || rowLocked(current)) return;
     // Часы замка машинной отметки завела машина — считать по ним нельзя, иначе
     // прогул, поставленный час назад, оказывается запертым ещё до нажатия.
-    if (!isMachineMark(current) && markLockState(current.marked_at).locked) { setLockNotice(true); return; }
-    setLockNotice(false);
+    //
+    // 31.08.2026 (миграция 245). В markLockState уходит и статус урока: пока
+    // урок идёт, замка нет, и экран обязан это знать. Своего отсчёта здесь нет
+    // и не должно быть — правило записано один раз, в packages/core.
+    if (
+      !isMachineMark(current)
+      && markLockState({ stamp: current.marked_at, lesson: lessonStatus }).locked
+    ) { setNotice("locked"); return; }
+    setNotice(null);
     setRows((prev) =>
       prev.map((r) =>
         r.student_id === studentId
@@ -130,8 +150,8 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
       // Возвращаем строку целиком, а не одно поле: иначе откат затирал бы
       // marked_at и признак автора значениями, которых в базе не было.
       setRows((prev) => prev.map((r) => (r.student_id === studentId ? current : r)));
-      if (isMarkLockedError(err)) setLockNotice(true);
-      else console.error("[AttendanceRollCall] отметка не сохранилась:", err);
+      if (isMarkLockedError(err)) setNotice("locked");
+      else { setNotice("failed"); console.error("[AttendanceRollCall] отметка не сохранилась:", err); }
     }
   }
 
@@ -195,11 +215,18 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
         </div>
       )}
 
-      {/* Замок: прошло больше 15 минут — правит администратор школы. */}
-      {lockNotice && (
+      {/* Замок: прошло больше 15 минут, урок уже не идёт — правит администратор. */}
+      {notice === "locked" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
           <p className="text-xs font-bold text-amber-800">{d.lesson.markLockedTitle}</p>
           <p className="mt-0.5 text-[11px] leading-snug text-amber-700">{d.lesson.markLockedBody}</p>
+        </div>
+      )}
+      {/* Любой другой отказ базы: молчать нельзя, кнопка ведь откатилась. */}
+      {notice === "failed" && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
+          <p className="text-xs font-bold text-red-700">{d.common.error}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-red-600">{d.common.retry}</p>
         </div>
       )}
 
@@ -333,6 +360,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
           studentId={gradeTarget.id}
           studentName={gradeTarget.name}
           existing={gradesMap[gradeTarget.id] ?? null}
+          lessonStatus={lessonStatus}
           onClose={() => setGradeTarget(null)}
           onSaved={(saved) => {
             setGradesMap((prev) => ({ ...prev, [saved.student_id]: saved }));

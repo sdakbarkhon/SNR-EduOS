@@ -2163,6 +2163,7 @@ export const en: Dictionary = {
     markLockedBody: "More than 15 minutes have passed since this was set. A school administrator can correct it — please ask them.",
     markWindowLeft: "{n} min left to correct",
     markCommentAlways: "The comment can be edited at any time.",
+    markFreeWhileLesson: "The lesson is running — you can change this freely, no countdown.",
     createNoSubjects: "You have no assigned subjects. Please contact the administrator.",
     editSubjectHasGrades: "This lesson already has {n} grades. Changing the subject moves them along with the lesson.",
     createSelectSubject: "Select subject",

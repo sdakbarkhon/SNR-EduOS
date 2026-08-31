@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Star, Check, Loader2 } from "lucide-react";
 import { getDictionary, gradeStudentForLesson, isMarkLockedError, markLockState } from "@snr/core";
-import type { Locale, LessonGrade } from "@snr/core";
+import type { Locale, LessonGrade, LessonLockStatus } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -23,11 +23,13 @@ type Props = {
   studentId: string;
   studentName: string;
   existing: LessonGrade | null;
+  /** Статус урока: пока он идёт, замка нет (миграция 245). */
+  lessonStatus: LessonLockStatus;
   onClose: () => void;
   onSaved: (grade: LessonGrade) => void;
 };
 
-export function GradeModal({ lessonId, teacherId, studentId, studentName, existing, onClose, onSaved }: Props) {
+export function GradeModal({ lessonId, teacherId, studentId, studentName, existing, lessonStatus, onClose, onSaved }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
@@ -38,11 +40,18 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
   const [customText, setCustomText] = useState<string>(existing?.comment ?? "");
   const [isOther, setIsOther] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [lockError, setLockError] = useState(false);
+  // Почему «Сохранить» не сработало.
+  //   "locked" — база сказала mark_locked;
+  //   "failed" — любой другой её отказ.
+  // 31.08.2026. Раньше вторая ветка уходила только в console.error, окно
+  // оставалось открытым и молчало. Так восемь дней пряталась поломка
+  // миграции 225: база падала сырой ошибкой, а учитель видел пустоту.
+  const [saveError, setSaveError] = useState<null | "locked" | "failed">(null);
 
-  // Замок миграции 203: через 15 минут после выставления оценку меняет только
-  // администратор школы. Комментарий не запирается — его правят всегда.
-  const lock = markLockState(existing?.graded_at ?? null);
+  // Замок миграций 203 и 245. Правило целиком живёт в markLockState — здесь
+  // только вопрос и ответ, своей копии отсчёта у экрана нет. Комментарий не
+  // запирается никогда: его правят и после того, как оценка заперлась.
+  const lock = markLockState({ stamp: existing?.graded_at ?? null, lesson: lessonStatus });
 
   // preset comments keyed by grade (1-5)
   const presets = grade ? (dl.gradeComments as Record<string, string[]>)[String(grade)] ?? [] : [];
@@ -65,8 +74,8 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
     } catch (err) {
       // Молчать здесь нельзя: запертую запись сервер отклоняет, и учитель
       // должен понять, почему кнопка «не сработала».
-      if (isMarkLockedError(err)) setLockError(true);
-      else console.error("[GradeModal] сохранить не удалось:", err);
+      if (isMarkLockedError(err)) setSaveError("locked");
+      else { setSaveError("failed"); console.error("[GradeModal] сохранить не удалось:", err); }
     } finally {
       setSaving(false);
     }
@@ -98,19 +107,33 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Состояние замка. Заперто — говорим, к кому идти; идёт окно —
-              показываем, сколько времени ещё есть. Молчаливого отказа нет. */}
-          {(lock.locked || lockError) ? (
+          {/* Состояние замка. Заперто — говорим, к кому идти; урок идёт —
+              говорим, что отсчёта нет; иначе показываем, сколько времени ещё
+              есть. Молчаливого отказа нет ни в одной ветке.
+
+              saveError === "locked" идёт первым вместе с lock.locked: если база
+              всё-таки отказала, её слово главнее нашего счёта — экран не спорит. */}
+          {(lock.locked || saveError === "locked") ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
               <p className="text-xs font-bold text-amber-800">{dl.markLockedTitle}</p>
               <p className="mt-0.5 text-[11px] leading-snug text-amber-700">{dl.markLockedBody}</p>
               <p className="mt-1 text-[11px] text-amber-600">{dl.markCommentAlways}</p>
             </div>
+          ) : lock.freeWhileLesson ? (
+            <p className="text-[11px] font-medium text-emerald-600">{dl.markFreeWhileLesson}</p>
           ) : !lock.notSetYet ? (
             <p className="text-[11px] font-medium text-slate-500">
               {dl.markWindowLeft.replace("{n}", String(lock.minutesLeft))}
             </p>
           ) : null}
+
+          {/* Любой другой отказ базы: окно не закрылось — надо сказать почему. */}
+          {saveError === "failed" && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
+              <p className="text-xs font-bold text-red-700">{d.common.error}</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-red-600">{d.common.retry}</p>
+            </div>
+          )}
 
           {/* Grade picker */}
           <div>

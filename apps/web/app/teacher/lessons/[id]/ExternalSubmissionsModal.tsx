@@ -137,12 +137,16 @@ function ExternalRow({
 }) {
   const { locale } = useLocale();
   const dl = getDictionary(locale as Locale).lesson;
+  const dc = getDictionary(locale as Locale).common;
   const dx = dl.external;
   const db = createClient();
 
   const sub = (row.submission_data ?? {}) as ExternalServiceSubmission;
   const [grade, setGrade] = useState<number | null>(row.grade);
-  const [lockError, setLockError] = useState(false);
+  // Почему сохранение не прошло. "locked" — база сказала mark_locked,
+  // "failed" — любой другой отказ. 31.08.2026: вторая ветка раньше уходила
+  // только в console.error, и учитель видел, что «ничего не произошло».
+  const [saveError, setSaveError] = useState<null | "locked" | "failed">(null);
   const [comment, setComment] = useState(row.teacher_comment ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -164,9 +168,11 @@ function ExternalRow({
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
-      // Замок 203: запертую отметку молча «не сохранять» нельзя — говорим, к кому идти.
-      if (isMarkLockedError(err)) setLockError(true);
-      else console.error("[ExternalSubmissions] оценка не сохранилась:", err);
+      // Замок 203/245: запертую отметку молча «не сохранять» нельзя — говорим,
+      // к кому идти. Своего отсчёта у этого экрана нет и не нужно: пока урок
+      // идёт, база пускает сама, и отказ приходит только по делу.
+      if (isMarkLockedError(err)) setSaveError("locked");
+      else { setSaveError("failed"); console.error("[ExternalSubmissions] оценка не сохранилась:", err); }
     } finally {
       setSaving(false);
     }
@@ -272,10 +278,16 @@ function ExternalRow({
               rows={2}
               className="mb-3 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
             />
-            {lockError && (
+            {saveError === "locked" && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                 <p className="text-[11px] font-bold text-amber-800">{dl.markLockedTitle}</p>
                 <p className="mt-0.5 text-[11px] leading-snug text-amber-700">{dl.markLockedBody}</p>
+              </div>
+            )}
+            {saveError === "failed" && (
+              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-[11px] font-bold text-red-700">{dc.error}</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-red-600">{dc.retry}</p>
               </div>
             )}
             <button

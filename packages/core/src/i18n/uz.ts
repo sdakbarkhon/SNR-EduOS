@@ -2163,6 +2163,7 @@ export const uz: Dictionary = {
     markLockedBody: "Qo‘yilganiga 15 daqiqadan ko‘p vaqt o‘tdi. Uni maktab ma’muriyati tuzatishi mumkin — ularga murojaat qiling.",
     markWindowLeft: "Yana {n} daqiqa tuzatish mumkin",
     markCommentAlways: "Izohni istalgan vaqtda tahrirlash mumkin.",
+    markFreeWhileLesson: "Dars davom etmoqda — hisoblashsiz, bemalol tuzatish mumkin.",
     createNoSubjects: "Tayinlangan fanlaringiz yo'q. Administratorga murojaat qiling.",
     editSubjectHasGrades: "Bu dars uchun allaqachon {n} ta baho qo'yilgan. Fan almashtirilsa, ular dars bilan birga ko'chadi.",
     createSelectSubject: "Fan tanlang",
