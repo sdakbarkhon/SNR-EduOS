@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSubjectKeyByLabel, groupNameKey, GROUP_BULK_MAX, normalizeUzPhone, parentAuthEmail } from "@snr/core";
+import {
+  getSubjectKeyByLabel, groupNameKey, GROUP_BULK_MAX, normalizeUzPhone, parentAuthEmail,
+  usernameToEmail, MANAGER_EMAIL_DOMAIN,
+} from "@snr/core";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -2235,7 +2238,10 @@ export async function createManager(data: {
 }): Promise<{ userId: string; managerId: string }> {
   const sb = getServiceClient();
   const login = data.username.trim().toLowerCase();
-  const email = `${login}@managers.snr.local`;
+  // Домен берётся из ядра, а не пишется строкой: этот же домен перебирает
+  // вход (signInWithUsername). Две копии разошлись бы, и менеджер завёлся
+  // бы под адресом, по которому его потом не находят.
+  const email = usernameToEmail(login, MANAGER_EMAIL_DOMAIN);
 
   const created = await sb.auth.admin.createUser({
     email, password: data.password, email_confirm: true,

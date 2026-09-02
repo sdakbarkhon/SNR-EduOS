@@ -5,6 +5,10 @@ export const TEACHER_EMAIL_DOMAIN = "teachers.snr.local";
 export const ADMIN_EMAIL_DOMAIN = "admins.snr.local";
 export const DEMO_EMAIL_DOMAIN = "demo.snr.local";
 export const PARENT_EMAIL_DOMAIN = "parents.snr.local";
+/** Менеджер — роль из миграции 250. Домен свой: менеджеров будет много, и
+ *  класть их в admins.snr.local значит однажды столкнуться логинами со
+ *  школьным администратором. */
+export const MANAGER_EMAIL_DOMAIN = "managers.snr.local";
 
 export function usernameToEmail(
   username: string,
@@ -25,7 +29,11 @@ export function isParentEmail(email: string | null | undefined): boolean {
   return !!email?.endsWith(`@${PARENT_EMAIL_DOMAIN}`);
 }
 
-/** Tries student → teacher → admin → parent domain. Returns role alongside auth result.
+export function isManagerEmail(email: string | null | undefined): boolean {
+  return !!email?.endsWith(`@${MANAGER_EMAIL_DOMAIN}`);
+}
+
+/** Tries student → teacher → admin → parent → manager domain. Returns role alongside auth result.
  *  If username already contains "@" it is treated as a full email and tried directly first. */
 export async function signInWithUsername(
   db: Db,
@@ -41,7 +49,8 @@ export async function signInWithUsername(
       password,
     });
     if (!direct.error) {
-      const role = isAdminEmail(input) ? "admin" as const
+      const role = isManagerEmail(input) ? "manager" as const
+        : isAdminEmail(input) ? "admin" as const
         : isTeacherEmail(input) ? "teacher" as const
         : isParentEmail(input) ? "parent" as const
         : "student" as const;
@@ -90,6 +99,22 @@ export async function signInWithUsername(
       return { ...demoResult, role: lower.startsWith("demo_teacher") ? "teacher" as const : "student" as const };
     }
   }
+
+  // МЕНЕДЖЕР ПРОБУЕТСЯ ПОСЛЕДНИМ, И ЭТО НЕ НЕБРЕЖНОСТЬ, А АРИФМЕТИКА.
+  //
+  // Каждая неудачная попытка — полный круг до Supabase Auth во Франкфурте.
+  // Поставь менеджера выше — и лишний круг заплатят все, кто ниже: у демо-
+  // входа он появился бы на ровном месте, а демо-вход это витрина.
+  //
+  // Демо-блок выше своих кругов не стоит вовсе: он под проверкой префикса
+  // `demo_`, и для обычного логина не выполняется. Значит эта попытка —
+  // единственное, что добавилось, и платит за неё только менеджер.
+  // Менеджеров в системе единицы, и входят они не каждую минуту.
+  const managerResult = await db.auth.signInWithPassword({
+    email: usernameToEmail(input, MANAGER_EMAIL_DOMAIN),
+    password,
+  });
+  if (!managerResult.error) return { ...managerResult, role: "manager" as const };
 
   return { ...studentResult, role: null };
 }
