@@ -1017,6 +1017,7 @@ export interface Dictionary {
     mgrCardSave: string;
     mgrCardSaved: string;
     mgrCardTab: string;
+    mgrMoneyTab: string;
     jActionManagerCreate: string;
     jActionManagerUpdate: string;
     jActionManagerDelete: string;

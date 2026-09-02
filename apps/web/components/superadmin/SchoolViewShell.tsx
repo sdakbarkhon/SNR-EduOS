@@ -51,6 +51,10 @@ const ВКЛАДКИ = [
  *  карточка правится своим окном, вместе с именем, кодом и автостартом. */
 const ВКЛАДКА_КАРТОЧКИ = { seg: "card", key: "mgrCardTab" } as const;
 
+/** Вкладка оплат. Показывается ТОЛЬКО менеджеру: суперадмину деньги закрыты
+ *  миграцией 222, и заводить ему дорогу к ним этот заход не собирается. */
+const ВКЛАДКА_ОПЛАТ = { seg: "payments", key: "mgrMoneyTab" } as const;
+
 export function SchoolViewShell({
   schoolId,
   schoolName,
@@ -62,7 +66,7 @@ export function SchoolViewShell({
   exitHref = "/superadmin/schools",
   /** Подписанная ссылка на логотип. Нет — знак нарисует буквы названия. */
   logoUrl,
-  /** Показывать ли вкладку правки карточки. Только у менеджера. */
+  /** Показывать ли вкладки правки карточки и оплат. Только у менеджера. */
   cardTab = false,
   /**
    * Кнопка рядом с выходом. Срез 3c: у менеджера нет дашборда админа, где
@@ -119,7 +123,7 @@ export function SchoolViewShell({
       </div>
 
       <nav className="mt-4 flex flex-wrap gap-1.5">
-        {[...ВКЛАДКИ, ...(cardTab ? [ВКЛАДКА_КАРТОЧКИ] : [])].map((v) => {
+        {[...ВКЛАДКИ, ...(cardTab ? [ВКЛАДКА_ОПЛАТ, ВКЛАДКА_КАРТОЧКИ] : [])].map((v) => {
           const href = v.seg ? `${база}/${v.seg}` : база;
           const active = хвост === v.seg;
           return (

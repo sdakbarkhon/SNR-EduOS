@@ -1003,6 +1003,7 @@ export const uz: Dictionary = {
     mgrCardSave: "Saqlash",
     mgrCardSaved: "Karta saqlandi",
     mgrCardTab: "Karta",
+    mgrMoneyTab: "To'lovlar",
     jActionManagerCreate: "Menejer yaratildi",
     jActionManagerUpdate: "Menejer tahrirlandi",
     jActionManagerDelete: "Menejer oʻchirildi",

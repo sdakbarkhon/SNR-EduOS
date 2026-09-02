@@ -50,9 +50,18 @@ export type StaffContext = {
   schoolId: string;
   /** Кем он действует. Нужно журналу и запретам. */
   role: StaffRole;
+  /**
+   * Учётная запись. Есть у ЛЮБОЙ роли — и в этом весь смысл.
+   *
+   * Здесь же лежала `adminId` — строка из `admins`, которой у менеджера нет
+   * и быть не может. Её держали ради денег: `tuition_invoices.adjusted_by`
+   * ссылался на `admins`. Миграция 251 перевела ссылку на `auth.users`, и
+   * последний потребитель `adminId` исчез — вместе с самим полем.
+   *
+   * Убрано намеренно, а не за ненадобностью: пока оно тут лежит, следующий
+   * денежный код потянется к нему и снова упрётся в ту же стену.
+   */
   userId: string;
-  /** Строка admins — есть только у админа школы. Нужна деньгам. */
-  adminId: string | null;
   /** Он же суперадмин? Досталось от прежних копий, сужает проверки школы. */
   isSuperAdmin: boolean;
 };
@@ -71,7 +80,7 @@ export async function verifyStaff(requestedSchoolId?: string | null): Promise<St
   const sbAny = sb as any;
 
   const [admin, superAdmin, manager] = await Promise.all([
-    sbAny.from("admins").select("id, school_id").eq("user_id", user.id).maybeSingle(),
+    sbAny.from("admins").select("school_id").eq("user_id", user.id).maybeSingle(),
     sbAny.from("super_admins").select("id").eq("user_id", user.id).maybeSingle(),
     sbAny.from("managers").select("id").eq("user_id", user.id).maybeSingle(),
   ]);
@@ -86,7 +95,6 @@ export async function verifyStaff(requestedSchoolId?: string | null): Promise<St
       schoolId: своя,
       role: "admin",
       userId: user.id,
-      adminId: admin.data.id as string,
       isSuperAdmin: !!superAdmin.data,
     };
   }
@@ -105,9 +113,6 @@ export async function verifyStaff(requestedSchoolId?: string | null): Promise<St
       schoolId: school.id as string,
       role: "manager",
       userId: user.id,
-      // Своей строки в admins у менеджера нет и быть не может. Кому это
-      // важно — деньгам, — тот обязан обойтись без неё; см. переезд денег.
-      adminId: null,
       isSuperAdmin: !!superAdmin.data,
     };
   }

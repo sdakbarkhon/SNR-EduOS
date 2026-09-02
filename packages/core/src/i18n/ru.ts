@@ -1006,6 +1006,7 @@ export const ru: Dictionary = {
     mgrCardSave: "Сохранить",
     mgrCardSaved: "Карточка сохранена",
     mgrCardTab: "Карточка",
+    mgrMoneyTab: "Оплаты",
     jActionManagerCreate: "Заведён менеджер",
     jActionManagerUpdate: "Правка менеджера",
     jActionManagerDelete: "Удалён менеджер",

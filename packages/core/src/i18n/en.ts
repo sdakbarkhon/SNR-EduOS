@@ -1003,6 +1003,7 @@ export const en: Dictionary = {
     mgrCardSave: "Save",
     mgrCardSaved: "Card saved",
     mgrCardTab: "Card",
+    mgrMoneyTab: "Payments",
     jActionManagerCreate: "Manager created",
     jActionManagerUpdate: "Manager edited",
     jActionManagerDelete: "Manager deleted",

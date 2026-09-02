@@ -443,7 +443,7 @@ export function StudentsView({
               onClose={() => setModal(null)}
               onSubmit={(fd) => startTransition(async () => {
                 try {
-                  await unwrap(actionTopUpStudentBalance(fd));
+                  await unwrap(actionTopUpStudentBalance(сШколой(fd)));
                   flash(
                     t.balanceToppedUpMsg
                       .replace("{name}", modal.student.full_name)

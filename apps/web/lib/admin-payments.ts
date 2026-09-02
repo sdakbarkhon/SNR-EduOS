@@ -172,7 +172,11 @@ export async function adjustInvoiceAmount(data: {
   invoiceId: string;
   amount: number;
   reason: string;
-  adminId: string;
+  /** Учётная запись правящего. Миграция 251: adjusted_by смотрит на
+   *  auth.users, а не на admins — править может и менеджер. */
+  actorUserId: string;
+  /** В каком качестве правит: admin или manager. Отдельный факт. */
+  actorRole: "admin" | "manager";
   callerSchoolId: string;
   callerIsSuperAdmin: boolean;
 }): Promise<void> {
@@ -187,7 +191,8 @@ export async function adjustInvoiceAmount(data: {
   const { error } = await (sb as any).from("tuition_invoices").update({
     amount: data.amount,
     amount_source: "admin_adjusted",
-    adjusted_by: data.adminId,
+    adjusted_by: data.actorUserId,
+    adjusted_by_role: data.actorRole,
     adjusted_at: new Date().toISOString(),
     adjust_reason: data.reason.trim(),
   }).eq("id", data.invoiceId).eq("status", "open");
@@ -205,7 +210,8 @@ export async function adjustInvoiceAmount(data: {
 export async function cancelInvoice(data: {
   invoiceId: string;
   reason: string;
-  adminId: string;
+  actorUserId: string;
+  actorRole: "admin" | "manager";
   callerSchoolId: string;
   callerIsSuperAdmin: boolean;
 }): Promise<void> {
@@ -217,7 +223,8 @@ export async function cancelInvoice(data: {
   const { error } = await (sb as any).from("tuition_invoices").update({
     status: "canceled",
     amount_source: "admin_adjusted",
-    adjusted_by: data.adminId,
+    adjusted_by: data.actorUserId,
+    adjusted_by_role: data.actorRole,
     adjusted_at: new Date().toISOString(),
     adjust_reason: data.reason.trim(),
   }).eq("id", data.invoiceId).eq("status", "open");

@@ -163,7 +163,11 @@ export async function actionResetStudentPassword(userId: string, requestedSchool
  */
 export async function actionTopUpStudentBalance(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    // Срез 3d: пополнение баланса переехало к менеджеру вместе с остальными
+    // деньгами, хотя лежит не в разделе оплат, а среди действий с учениками.
+    // Школа приходит формой — как у шести соседних действий.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
     const studentId = String(formData.get("student_id") ?? "");
     const amount = parseCoursePrice(String(formData.get("amount") ?? ""));
     const note = String(formData.get("note") ?? "");

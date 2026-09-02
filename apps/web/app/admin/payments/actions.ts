@@ -15,11 +15,6 @@ import { revalidatePath } from "next/cache";
 import { verifyStaff, type StaffRole } from "@/lib/verify-staff";
 
 /**
- * Кто перед нами. Своя копия — как в `admin/parents/actions.ts`: этому разделу
- * нужен ещё и `admins.id`, он идёт в `adjusted_by` у поправленного счёта, а
- * общая версия возвращает только школу.
- */
-/**
  * Кто действует и в какой школе.
  *
  * 03.09.2026, заход 3 по роли менеджера — ТЕЛО ПЕРЕЕХАЛО В lib/verify-staff.ts.
@@ -33,33 +28,36 @@ import { verifyStaff, type StaffRole } from "@/lib/verify-staff";
  */
 async function verifyAdmin(
   requestedSchoolId?: string | null,
-): Promise<{ schoolId: string; adminId: string | null; isSuperAdmin: boolean; role: StaffRole }> {
+): Promise<{ schoolId: string; userId: string; isSuperAdmin: boolean; role: StaffRole }> {
   const s = await verifyStaff(requestedSchoolId);
-  // adminId у менеджера null: своей строки в admins у него нет и быть не
-  // может. Деньги на него сегодня не смотрят, а если посмотрят — отказ
-  // должен быть громким, а не тихой подстановкой чужого идентификатора.
-  return { schoolId: s.schoolId, adminId: s.adminId, isSuperAdmin: s.isSuperAdmin, role: s.role };
+  // УЧЁТНАЯ ЗАПИСЬ, А НЕ СТРОКА АДМИНА. До миграции 251 отсюда отдавался
+  // `adminId`, потому что автор правки ссылался на `admins`. Теперь он
+  // ссылается на `auth.users`, и `userId` есть у любой роли — включая
+  // менеджера, у которого строки в admins нет и быть не может.
+  return { schoolId: s.schoolId, userId: s.userId, isSuperAdmin: s.isSuperAdmin, role: s.role };
 }
 
 /**
- * ДЕНЬГИ МЕНЕДЖЕРУ ПОКА ЗАКРЫТЫ, И ЭТО УПОР В СХЕМУ, А НЕ РЕШЕНИЕ.
+ * ═══ ДЕНЬГИ ОТКРЫТЫ МЕНЕДЖЕРУ. Срез 3d, 03.09.2026 ════════════════════════
  *
- * `tuition_invoices.adjusted_by` объявлен как
- * `REFERENCES admins(id) ON DELETE SET NULL` — то есть автором правки счёта
- * может быть только строка из `admins`. У менеджера её нет и быть не может:
- * он не привязан ни к какой школе, в этом вся роль.
+ * Здесь стоял `assertMoneyAllowed`, отбивавший менеджера от всех пяти
+ * действий. Он был не решением, а честным отказом на месте упора в схему:
+ * `tuition_invoices.adjusted_by` ссылался на `admins`, строки в которых у
+ * менеджера нет и быть не может.
  *
- * Пропустить его с `adjusted_by = null` можно было бы одной строкой, но тогда
- * правка суммы счёта потеряла бы автора молча. Деньги — последнее место, где
- * такое допустимо.
+ * Пропустить его пустотой было нельзя даже при желании: проверка
+ * `tuition_invoices_adjusted_has_author` требует автора и время всегда, когда
+ * сумма помечена правленой. База отбила бы такую запись сама.
  *
- * Значит переезд денег требует миграции: либо `adjusted_by` перестаёт
- * указывать на `admins`, либо рядом появляется колонка роли. Миграций в этом
- * заходе нет по условию, поэтому здесь честный отказ, а не тихая потеря.
+ * Миграция 251 перевела `adjusted_by` на `auth.users` и завела рядом
+ * `adjusted_by_role`. Автор теперь записывается у любой роли, и в истории
+ * видно не только КТО, но и В КАКОМ КАЧЕСТВЕ.
+ *
+ * ШКОЛА. Админу она не нужна — она в его строке; менеджеру обязательна —
+ * своей у него нет. Формы несут её полем `school_id`, действия без формы —
+ * необязательным доводом. Подделать нечего: менеджеру и так разрешены все
+ * школы, а у админа чужая школа отвергается, а не подставляется молча.
  */
-function assertMoneyAllowed(role: StaffRole): void {
-  if (role === "manager") throw new Error("MANAGER_MONEY_NOT_READY");
-}
 
 /**
  * Что случится, если нажать «Выставить счета».
@@ -68,19 +66,19 @@ function assertMoneyAllowed(role: StaffRole): void {
  * показывать числа НА МОМЕНТ НАЖАТИЯ. Между открытием экрана и нажатием админ
  * мог вписать цену классу — и счётов стало бы больше, чем обещала страница.
  */
-export async function actionIssuePreview(): Promise<ActionResult<IssuePreview>> {
+export async function actionIssuePreview(
+  requestedSchoolId?: string | null,
+): Promise<ActionResult<IssuePreview>> {
   return guard(async () => {
-    const { schoolId, role } = await verifyAdmin();
-    assertMoneyAllowed(role);
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
     return issueInvoicesPreview(schoolId);
   });
 }
 
 /** Выставить счета своей школе. Граница школы — в функции базы (миграция 230). */
-export async function actionIssueInvoicesNow() {
+export async function actionIssueInvoicesNow(requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, role } = await verifyAdmin();
-    assertMoneyAllowed(role);
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
     const result = await issueInvoicesNow(schoolId);
     revalidatePath("/admin/payments");
     return result;
@@ -90,16 +88,17 @@ export async function actionIssueInvoicesNow() {
 /** Правка суммы открытого счёта. Сумма читается тем же кодом, что цена группы
  *  и пополнение баланса: правило чтения денег в проекте одно. */
 export async function actionAdjustInvoice(formData: FormData) {
+  const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
   return guard(async () => {
-    const { schoolId, adminId, isSuperAdmin, role } = await verifyAdmin();
-    assertMoneyAllowed(role);
+    const { schoolId, userId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
     await adjustInvoiceAmount({
       invoiceId: String(formData.get("invoice_id") ?? ""),
       amount: parseCoursePrice(String(formData.get("amount") ?? "")),
       reason: String(formData.get("reason") ?? ""),
-      // Заслон assertMoneyAllowed выше пропускает сюда только админа школы,
-      // а у него строка в admins есть всегда.
-      adminId: adminId as string,
+      // Учётная запись, а не строка админа: миграция 251. У менеджера строки
+      // в admins нет, а учётная запись есть у любого вошедшего.
+      actorUserId: userId,
+      actorRole: role,
       callerSchoolId: schoolId,
       callerIsSuperAdmin: isSuperAdmin,
     });
@@ -109,15 +108,14 @@ export async function actionAdjustInvoice(formData: FormData) {
 
 /** Отмена открытого счёта. */
 export async function actionCancelInvoice(formData: FormData) {
+  const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
   return guard(async () => {
-    const { schoolId, adminId, isSuperAdmin, role } = await verifyAdmin();
-    assertMoneyAllowed(role);
+    const { schoolId, userId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
     await cancelInvoice({
       invoiceId: String(formData.get("invoice_id") ?? ""),
       reason: String(formData.get("reason") ?? ""),
-      // Заслон assertMoneyAllowed выше пропускает сюда только админа школы,
-      // а у него строка в admins есть всегда.
-      adminId: adminId as string,
+      actorUserId: userId,
+      actorRole: role,
       callerSchoolId: schoolId,
       callerIsSuperAdmin: isSuperAdmin,
     });
@@ -126,10 +124,9 @@ export async function actionCancelInvoice(formData: FormData) {
 }
 
 /** Вернуть отменённый счёт в работу. */
-export async function actionRestoreInvoice(invoiceId: string) {
+export async function actionRestoreInvoice(invoiceId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin, role } = await verifyAdmin();
-    assertMoneyAllowed(role);
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await restoreInvoice({ invoiceId, callerSchoolId: schoolId, callerIsSuperAdmin: isSuperAdmin });
     revalidatePath("/admin/payments");
   });

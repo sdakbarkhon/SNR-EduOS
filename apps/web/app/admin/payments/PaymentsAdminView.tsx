@@ -111,10 +111,28 @@ type Modal =
 export function PaymentsAdminView({
   invoices,
   blockers,
+  /**
+   * Школа, в которой идёт работа. Срез 3d, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНА — ничего не меняется: формы уходят байт в байт прежними,
+   * доводы прежние, школу берут из строки вошедшего админа. Так работает
+   * админ школы, и его экран не тронут.
+   *
+   * ПЕРЕДАНА — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
 }: {
   invoices: SchoolInvoiceRow[];
   blockers: InvoiceBlockerRow[];
+  schoolId?: string;
 }) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.admin;
@@ -140,7 +158,7 @@ export function PaymentsAdminView({
   function openIssue() {
     startTransition(async () => {
       try {
-        const p = await unwrap(actionIssuePreview());
+        const p = await unwrap(actionIssuePreview(schoolId));
         if (p.will_issue === 0) {
           flash(t.paymentsIssueNothing.replace("{month}", monthLabel(p.invoice_month)));
           return;
@@ -245,7 +263,7 @@ export function PaymentsAdminView({
                           <button
                             onClick={() => startTransition(async () => {
                               try {
-                                await unwrap(actionRestoreInvoice(row.id));
+                                await unwrap(actionRestoreInvoice(row.id, schoolId));
                                 flash(t.invoiceRestoredMsg);
                               } catch (e) { fail(e); }
                             })}
@@ -325,7 +343,7 @@ export function PaymentsAdminView({
                 disabled={isPending}
                 onClick={() => startTransition(async () => {
                   try {
-                    const r = await unwrap(actionIssueInvoicesNow());
+                    const r = await unwrap(actionIssueInvoicesNow(schoolId));
                     flash(t.paymentsIssuedMsg
                       .replace("{issued}", String(r.issued))
                       .replace("{skipped}", String(r.skipped)));
@@ -358,7 +376,7 @@ export function PaymentsAdminView({
                 fd.set("invoice_id", modal.row.id);
                 startTransition(async () => {
                   try {
-                    await unwrap(actionAdjustInvoice(fd));
+                    await unwrap(actionAdjustInvoice(сШколой(fd)));
                     flash(t.invoiceAdjustedMsg);
                     setModal({ kind: "none" });
                   } catch (err) { fail(err); }
@@ -417,7 +435,7 @@ export function PaymentsAdminView({
                 fd.set("invoice_id", modal.row.id);
                 startTransition(async () => {
                   try {
-                    await unwrap(actionCancelInvoice(fd));
+                    await unwrap(actionCancelInvoice(сШколой(fd)));
                     flash(t.invoiceCanceledMsg);
                     setModal({ kind: "none" });
                   } catch (err) { fail(err); }
