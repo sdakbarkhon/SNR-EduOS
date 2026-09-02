@@ -1004,9 +1004,13 @@ export interface Dictionary {
     mgrResetDone: string;
     mgrResetOnce: string;
     mgrLoginTaken: string;
-    mgrHomeTitle: string;
-    mgrHomeSoon: string;
     mgrHomeLogout: string;
+    // Заход 2: менеджер ходит в любую школу.
+    mgrSchoolsTitle: string;
+    mgrSchoolsSearch: string;
+    mgrSchoolsEmpty: string;
+    mgrSchoolsNoResults: string;
+    mgrSchoolsReadOnly: string;
     jActionManagerCreate: string;
     jActionManagerUpdate: string;
     jActionManagerDelete: string;

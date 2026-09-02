@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Eye, LogOut } from "lucide-react";
+import { SchoolMark } from "@/components/SchoolMark";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 
@@ -20,6 +21,17 @@ import { useLocale } from "@/components/LocaleProvider";
  * сервере: «где я сейчас» написано в самом адресе. Отсюда два следствия,
  * которые нам нужны: закрытая вкладка не оставляет ничего, а две вкладки с
  * разными школами не путаются между собой.
+ *
+ * ═══ 03.09.2026 — ТА ЖЕ ОБОЛОЧКА СЛУЖИТ МЕНЕДЖЕРУ ══════════════════════
+ *
+ * Появились три необязательных свойства: корень вкладок, адрес выхода и
+ * логотип школы. У всех трёх умолчания — прежние суперадминские, поэтому
+ * его макет не тронут ВООБЩЕ: он их не передаёт, и всё работает как вчера.
+ *
+ * Логотип просил заказчик отдельно: «чтобы всё фильтровалось и чётко было
+ * различно, чтобы не путать с другими школами». Менеджер ходит по чужим
+ * школам подряд, и название словами он читает, а знак школы узнаёт боковым
+ * зрением — как в шапке админки, откуда знак и взят.
  */
 
 const ВКЛАДКИ = [
@@ -40,17 +52,26 @@ export function SchoolViewShell({
   schoolName,
   isDemo,
   children,
+  /** Корень вкладок. Умолчание — прежний суперадминский. */
+  basePath,
+  /** Куда уводит «Выйти». Умолчание — прежний список школ суперадмина. */
+  exitHref = "/superadmin/schools",
+  /** Подписанная ссылка на логотип. Нет — знак нарисует буквы названия. */
+  logoUrl,
 }: {
   schoolId: string;
   schoolName: string;
   isDemo: boolean;
   children: ReactNode;
+  basePath?: string;
+  exitHref?: string;
+  logoUrl?: string | null;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).superadmin;
   const pathname = usePathname();
 
-  const база = `/superadmin/schools/${schoolId}/view`;
+  const база = basePath ?? `/superadmin/schools/${schoolId}/view`;
   const хвост = pathname.startsWith(база) ? pathname.slice(база.length).replace(/^\//, "") : "";
 
   return (
@@ -58,6 +79,11 @@ export function SchoolViewShell({
       {/* Полоса гостя. Стоит выше всего и не уезжает при прокрутке содержимого. */}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
         <Eye className="h-5 w-5 shrink-0 text-amber-700" />
+        {/* Знак школы. Показывается, только если ссылка передана: у
+            суперадминского макета её нет, и его полоса выглядит как вчера. */}
+        {logoUrl !== undefined && (
+          <SchoolMark name={schoolName} logoUrl={logoUrl} size="sm" />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-bold text-amber-900">
             {schoolName}
@@ -66,7 +92,7 @@ export function SchoolViewShell({
           <p className="text-[12px] text-amber-800">{t.svReadOnly}</p>
         </div>
         <Link
-          href="/superadmin/schools"
+          href={exitHref}
           className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-[13px] font-medium text-amber-900 hover:bg-amber-100"
         >
           <LogOut className="h-4 w-4" />
