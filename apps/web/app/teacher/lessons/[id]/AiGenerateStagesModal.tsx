@@ -8,28 +8,14 @@ import {
   Paperclip, Search, Copy, ExternalLink,
   Ruler, FlaskConical, LineChart, Shuffle, Palette, PenTool, Brain, Database,
 } from "lucide-react";
-import { addLessonStage, replaceQuizQuestions, getDictionary, linkLessonMaterialFromKnowledgeBase, getSubjectKeyByLabel } from "@snr/core";
-import type { Locale, StageDifficulty, LessonContentType, LessonStageType, LessonSlide, QuizQuestionInput } from "@snr/core";
+import { applyGeneratedStages, getDictionary } from "@snr/core";
+import type { Locale, StageDifficulty, LessonSlide, GeneratedStage } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { AiWorkProgress, useTypicalDuration, type WorkStep } from "@/components/AiWorkProgress";
 import { AI_TASKS } from "@/lib/ai/usage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface GeneratedStage {
-  stage_type: "theory" | "task";
-  content_type: string;
-  title: string;
-  description?: string;
-  teacher_notes?: string;
-  starter_code?: string;
-  programming_language?: string;
-  slides?: LessonSlide[];
-  quiz?: { questions: Array<{ text: string; options: string[]; correct_index: number }> };
-  difficulty: StageDifficulty;
-  duration_min: number;
-}
 
 interface GenerateResult {
   stages: GeneratedStage[];
@@ -38,11 +24,6 @@ interface GenerateResult {
   notes: string;
   external: string[];
 }
-
-const EXTERNAL = [
-  "wokwi", "codesandbox",
-  "geogebra", "phet", "desmos", "blockly_games", "visualgo", "p5js", "excalidraw", "learningapps", "sqlonline",
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -183,103 +164,40 @@ export function AiGenerateStagesModal({
     return () => { cancelled = true; };
   }, [lessonId]);
 
-  // Пачка «240 пустых уроков», ЧАСТЬ 3 — до 3 книг БЗ того же предмета,
-  // без дублирования файла (copy-by-reference, та же схема, что модалка
-  // "Прикрепить материал"). Идемпотентно: если у урока уже есть материал
-  // из БЗ (kb_bucket='books') — не трогает.
-  async function attachBooksFromKnowledgeBase() {
-    const slug = getSubjectKeyByLabel(subjectName);
-    if (!slug) return;
-
-    const { data: existing } = await db
-      .from("lesson_materials")
-      .select("id")
-      .eq("lesson_id", lessonId)
-      .eq("kb_bucket", "books")
-      .limit(1);
-    if (existing?.length) return;
-
-    const { data: books } = await db
-      .from("books")
-      .select("id, title, file_storage_path, file_size_bytes")
-      .eq("subject", slug)
-      // Миграция 175 — в «Библиотеке» появились книги-видеоссылки без файла.
-      // Сюда идёт storagePath, поэтому берём только книги-файлы: иначе к уроку
-      // молча прикрепился бы материал с пустым путём.
-      .not("file_storage_path", "is", null)
-      .order("created_at", { ascending: true })
-      .limit(3);
-    if (!books?.length) return;
-
-    for (const b of books) {
-      await linkLessonMaterialFromKnowledgeBase(db, {
-        lessonId, teacherId, title: b.title, storagePath: b.file_storage_path,
-        kbBucket: "books", fileSizeBytes: b.file_size_bytes,
-      });
-    }
-  }
-
+  /**
+   * Положить сгенерированные этапы в урок.
+   *
+   * 03.09.2026, заход Q2. ЗДЕСЬ БЫЛА САМА РАБОТА — шестьдесят строк: пересчёт
+   * длительностей, вставка по одному, вопросы квиза, книги библиотеки. Теперь
+   * она в ядре (applyGeneratedStages), потому что ровно то же самое делает
+   * разборщик очереди. Две копии разошлись бы через месяц: одна кладёт вопросы
+   * квиза, другая забыла.
+   *
+   * Окно оставило себе ровно то, чего у разборщика нет и быть не может, —
+   * счётчик «3 из 7» на экране.
+   */
   const addToLesson = useCallback(async (stages: GeneratedStage[]) => {
-    const toAdd = stages.map((s) => ({ ...s }));
-    // Rescale durations to fit lesson duration
-    const total = toAdd.reduce((s, x) => s + x.duration_min, 0);
-    if (total > 0 && total !== duration) {
-      for (const s of toAdd) {
-        s.duration_min = Math.max(1, Math.round((s.duration_min * duration) / total));
-      }
-      const newTotal = toAdd.reduce((s, x) => s + x.duration_min, 0);
-      const last = toAdd[toAdd.length - 1];
-      if (last && newTotal !== duration) {
-        last.duration_min = Math.max(1, last.duration_min + (duration - newTotal));
-      }
-    }
     setAdding(true);
     setGenError("");
-    setTotalToSave(toAdd.length);
+    setTotalToSave(stages.length);
     setSavedCount(0);
     try {
-      for (const s of toAdd) {
-        const config: Record<string, unknown> = {};
-        if (s.content_type === "quiz_qia" || s.content_type === "quiz_kahoot") {
-          config.time_limit_minutes = null;
-          config.points_per_question = 1;
-        } else if (EXTERNAL.includes(s.content_type)) {
-          config.url = "";
-          config.requires_link = true;
-          config.requires_screenshot = false;
-        }
-        const newStage = await addLessonStage(db, lessonId, {
-          stageType: s.stage_type as LessonStageType,
-          contentType: s.content_type as LessonContentType,
-          title: s.title,
-          description: s.description ?? null,
-          teacherNotes: s.teacher_notes ?? null,
-          slides: s.slides && s.slides.length > 0 ? s.slides : null,
-          ...(s.content_type === "code" ? {
-            starterCode: s.starter_code ?? "",
-            programmingLanguage: s.programming_language ?? "python",
-          } : {}),
-          config,
-          difficulty: s.difficulty,
-          durationMin: s.duration_min,
-        });
-        if (s.content_type === "quiz_qia" && s.quiz?.questions.length) {
-          const questions: QuizQuestionInput[] = s.quiz.questions.map((q) => ({
-            question_text: q.text,
-            options: q.options,
-            correct_option_index: q.correct_index,
-          }));
-          await replaceQuizQuestions(db, newStage.id, questions).catch(() => null);
-        }
-        setSavedCount((n) => n + 1);
-      }
+      await applyGeneratedStages(db, {
+        lessonId,
+        teacherId,
+        lessonMinutes: duration,
+        subjectName: subjectName ?? "",
+        stages,
+        // Одиночное наполнение НИЧЕГО НЕ СТИРАЕТ — как и раньше. Стирание
+        // середины бывает только при перезаполнении из очереди, и там об этом
+        // спрашивают числом.
+        replaceExisting: false,
+        onProgress: (saved, total) => {
+          setSavedCount(saved);
+          setTotalToSave(total);
+        },
+      });
       setWorkStep(2);
-      // Пачка «240 пустых уроков», ЧАСТЬ 3 — финальный шаг: прицепить до 3
-      // книг БЗ того же предмета (БЕЗ вызова Gemini, чистое сопоставление
-      // subjectName -> canonical slug -> books.subject). Best-effort — этапы
-      // уже успешно добавлены к этому моменту, сбой здесь НЕ должен
-      // показывать ошибку пользователю.
-      await attachBooksFromKnowledgeBase().catch(() => null);
       setPhase("added");
       setTimeout(() => { onAdded(); onClose(); }, 1200);
     } catch (err) {

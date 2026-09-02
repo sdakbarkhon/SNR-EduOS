@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini-client";
 import { AI_TASKS } from "@/lib/ai/usage";
 import { getGroupPerformance, groupPerformancePromptSection } from "@/lib/ai/group-performance";
@@ -234,17 +235,37 @@ function normalizeStage(s: GenStage, overallDifficulty: string): GenStage | null
   return { ...s, title: s.title.trim(), content_type: ct, stage_type, difficulty, duration_min, teacher_notes, starter_code, programming_language, slides, quiz };
 }
 
+/**
+ * Ведёт ли этот учитель группу этого урока. Только для СЛУЖЕБНОГО входа.
+ *
+ * У пользовательского входа доказательство другое и лучше: правила доступа
+ * сами не отдадут чужой урок (см. комментарий у выборки урока ниже). Служебному
+ * ключу правила не писаны, поэтому связь спрашивается прямо — тремя способами,
+ * теми же, что у is_my_teacher_group: классный, предметник, соучитель.
+ *
+ * Отдельной функции в схеме для этого не заводим: миграций в этом заходе нет,
+ * а три обычных запроса стоят столько же.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function teacherOwnsLesson(db: any, teacherId: string, lessonId: string): Promise<boolean> {
+  const { data: lesson } = await db
+    .from("lessons").select("group_id").eq("id", lessonId).maybeSingle();
+  const groupId = (lesson as { group_id?: string } | null)?.group_id;
+  if (!groupId) return false;
+
+  const [{ data: group }, { data: co }, { data: subj }] = await Promise.all([
+    db.from("groups").select("teacher_id").eq("id", groupId).maybeSingle(),
+    db.from("group_teachers").select("teacher_id")
+      .eq("group_id", groupId).eq("teacher_id", teacherId).limit(1),
+    db.from("subjects").select("id")
+      .eq("group_id", groupId).eq("teacher_id", teacherId).limit(1),
+  ]);
+  return (group as { teacher_id?: string } | null)?.teacher_id === teacherId
+    || ((co ?? []) as unknown[]).length > 0
+    || ((subj ?? []) as unknown[]).length > 0;
+}
+
 export async function POST(req: NextRequest) {
-  const db = await createClient();
-
-  const { data: { user } } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: teacher } = await (db as any)
-    .from("teachers").select("id").eq("user_id", user.id).single();
-  if (!teacher) return NextResponse.json({ error: "Not a teacher" }, { status: 403 });
-
   const body = (await req.json()) as {
     lesson_id: string;
     topic: string;
@@ -253,7 +274,45 @@ export async function POST(req: NextRequest) {
     use_web_search?: boolean;
     overall_difficulty?: string;
     attached_materials?: AttachedMaterial[];
+    /** Только для служебного входа: за какого учителя работаем. */
+    teacher_id?: string;
   };
+
+  // ── ДВА ВХОДА, ОДНА ГЕНЕРАЦИЯ (03.09.2026, заход Q2) ─────────────────────
+  //
+  // Первый вход прежний: вошедший учитель, его сессия, его правила доступа.
+  // Второй — служебный: разборщик очереди наполнения. Сессии у него нет и быть
+  // не может (он работает по расписанию), поэтому он предъявляет CRON_SECRET и
+  // называет учителя, за которого работает.
+  //
+  // ПРОМТ, МОДЕЛЬ И САМА ГЕНЕРАЦИЯ НИЖЕ НЕ ТРОНУТЫ. Меняется ровно предисловие:
+  // откуда берутся `db` и `teacher`.
+  const secret = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
+    ?? req.headers.get("x-cron-secret");
+  const служебный = Boolean(process.env.CRON_SECRET) && secret === process.env.CRON_SECRET;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let db: any;
+  let teacher: { id: string } | null = null;
+
+  if (служебный) {
+    if (!body.teacher_id) {
+      return NextResponse.json({ error: "teacher_id required for service call" }, { status: 400 });
+    }
+    db = createAdminClient();
+    if (!(await teacherOwnsLesson(db, body.teacher_id, body.lesson_id))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    teacher = { id: body.teacher_id };
+  } else {
+    db = await createClient();
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: row } = await db
+      .from("teachers").select("id").eq("user_id", user.id).single();
+    if (!row) return NextResponse.json({ error: "Not a teacher" }, { status: 403 });
+    teacher = row as { id: string };
+  }
 
   if (!body.topic?.trim()) {
     return NextResponse.json({ error: "Missing topic" }, { status: 400 });

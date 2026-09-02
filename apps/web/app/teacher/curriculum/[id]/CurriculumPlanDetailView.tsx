@@ -328,6 +328,46 @@ export function CurriculumPlanDetailView({
   };
 
   const [pickedLessons, setPickedLessons] = useState<Set<string>>(new Set());
+  // ═══ РАЗБОР ОЧЕРЕДИ (заход Q2) ═══════════════════════════════════════════
+  //
+  // ОДНО НАЖАТИЕ — ОДИН УРОК. Генерация идёт до пяти минут при потолке функции
+  // в 300 секунд; два урока в один заход не влезают, а обрыв посреди вставки
+  // оставил бы урок с половиной этапов. Пачку набирает человек повторными
+  // нажатиями — либо дожидается расписания (заход Q3).
+  //
+  // Крутить цикл за него мы НЕ будем: каждый круг стоит денег, и решать,
+  // сколько их потратить, должен человек, а не наш `for`.
+  const [drainBusy, setDrainBusy] = useState(false);
+  const [drainMsg, setDrainMsg] = useState<string | null>(null);
+  const [drainError, setDrainError] = useState<string | null>(null);
+
+  async function handleDrain() {
+    setDrainBusy(true);
+    setDrainMsg(null);
+    setDrainError(null);
+    try {
+      const res = await fetch(`/api/curriculum-plans/${plan.id}/process-stage-queue`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) { setDrainError(json.error || tc.networkError); return; }
+      if (json.kind === "empty") setDrainMsg(tc.step2DrainEmpty);
+      else if (json.kind === "done") {
+        setDrainMsg(format(tc.step2DrainDone, {
+          inserted: json.inserted, removed: json.removed, remaining: json.remaining,
+        }));
+      } else {
+        // Отказ доезжает до человека своим текстом, а не молчанием.
+        setDrainError(format(tc.step2DrainFailed, { reason: String(json.reason ?? "") }));
+      }
+      // Перечитываем темы: у урока изменились этапы и состояние в очереди.
+      const fresh = await getCurriculumTopicsWithUsage(db, plan.id).catch(() => null);
+      if (fresh) setTopics(fresh);
+    } catch {
+      setDrainError(tc.networkError);
+    } finally {
+      setDrainBusy(false);
+    }
+  }
+
   const [enqueueBusy, setEnqueueBusy] = useState(false);
   const [enqueueError, setEnqueueError] = useState<string | null>(null);
   const [enqueueDone, setEnqueueDone] = useState<{ queued: number; skipped: number } | null>(null);
@@ -841,11 +881,36 @@ export function CurriculumPlanDetailView({
                   </p>
                 )}
 
-                {/* Разбирать пока некому — говорим это прямо, а не оставляем
-                    человека гадать, почему «в очереди» не меняется. */}
-                <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-800">
-                  {tc.step2NoDrainer}
-                </p>
+                {/* Разбор очереди. Кнопка появляется, только когда есть что
+                    разбирать: предлагать нажать «наполнить» при пустой очереди
+                    значит предлагать потратить деньги впустую. */}
+                {пачкаСводка.queued > пачкаСводка.done + пачкаСводка.failed && (
+                  <div className="mt-2 rounded-xl border border-violet-100 bg-violet-50/50 p-3">
+                    <button
+                      onClick={handleDrain}
+                      disabled={drainBusy}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                    >
+                      {drainBusy
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Sparkles className="h-4 w-4" />}
+                      {drainBusy ? tc.step2Draining : tc.step2Drain}
+                    </button>
+                    <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{tc.step2DrainHint}</p>
+                  </div>
+                )}
+
+                {drainMsg && (
+                  <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] leading-snug text-emerald-800">
+                    {drainMsg}
+                  </p>
+                )}
+                {drainError && (
+                  <p className="mt-2 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-[11px] leading-snug text-red-700">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {drainError}
+                  </p>
+                )}
 
                 {enqueueError && (
                   <p className="mt-2 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-700">
@@ -1172,7 +1237,7 @@ export function CurriculumPlanDetailView({
                 ? format(tc.step2RefillBody, { n: выбранныеНаполненные })
                 : tc.step2RefillNone}
             </p>
-            <p className="mt-2 text-[11px] leading-snug text-amber-700">{tc.step2NoDrainer}</p>
+            <p className="mt-2 text-[11px] leading-snug text-slate-500">{tc.step2DrainHint}</p>
             {enqueueError && <p className="mt-3 text-xs text-red-600">{enqueueError}</p>}
             <div className="mt-4 flex gap-3">
               <button onClick={() => setConfirmRefill(false)} disabled={enqueueBusy} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">{tc.cancel}</button>

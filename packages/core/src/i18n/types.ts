@@ -127,7 +127,12 @@ export interface Dictionary {
     step2Enqueue: string;
     step2PickFirst: string;
     step2BatchLine: string;
-    step2NoDrainer: string;
+    step2Drain: string;              // «Разобрать очередь» (заход Q2)
+    step2Draining: string;
+    step2DrainHint: string;
+    step2DrainDone: string;          // «Наполнен урок: … (осталось N)»
+    step2DrainEmpty: string;
+    step2DrainFailed: string;
     step2Enqueued: string;
     step2Skipped: string;
     step2RefillTitle: string;

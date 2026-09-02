@@ -18,6 +18,7 @@ export * from "./utils/plural";
 export * from "./utils/markLock";
 export * from "./utils/lessonTiming";
 export * from "./utils/lessonDuration";
+export * from "./utils/generatedStages";
 export * from "./utils/gradeAverage";
 export * from "./utils/room";
 export * from "./utils/groupName";
