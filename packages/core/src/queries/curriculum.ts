@@ -3,7 +3,7 @@
 // СОЗДАНИИ нового урока (см. createLesson в index.ts), не при редактировании.
 
 import type { Db } from "../supabase/factory";
-import type { CurriculumPlan, CurriculumPlanTopic, CurriculumPlanWithTopics, CurriculumTopicLesson, CurriculumTopicWithUsage } from "../types";
+import type { CurriculumPlan, CurriculumPlanTopic, CurriculumPlanWithTopics, CurriculumTopicLesson, CurriculumTopicWithUsage, StageGenQueueRow } from "../types";
 import { unwrap } from "./helpers";
 import { mySchoolStoragePath } from "../storage/path";
 
@@ -112,7 +112,11 @@ export async function deleteCurriculumPlanTopic(db: Db, topicId: string): Promis
  *  Сортировка по starts_at, а не по created_at: «первый урок по теме» для
  *  человека — тот, что раньше в расписании. */
 export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Promise<CurriculumTopicWithUsage[]> {
-  const [{ data: topics, error: topicsErr }, { data: lessons, error: lessonsErr }] = await Promise.all([
+  const [
+    { data: topics, error: topicsErr },
+    { data: lessons, error: lessonsErr },
+    { data: queueRows },
+  ] = await Promise.all([
     (db as AnyDb).from("curriculum_plan_topics").select("*").eq("plan_id", planId).order("order_index"),
     (db as AnyDb)
       .from("lessons")
@@ -134,6 +138,22 @@ export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Prom
       )
       .eq("curriculum_plan_topics.plan_id", planId)
       .order("starts_at"),
+    // 03.09.2026, заход Q1 — ОЧЕРЕДЬ НА НАПОЛНЕНИЕ (миграция 247).
+    //
+    // Едет в ТОМ ЖЕ Promise.all, поэтому лишнего круга по сети нет. Но
+    // отдельным запросом, а не встроенным в предыдущий, и это важно: код
+    // уезжает в прод раньше, чем заказчик применит миграцию. Встроенная
+    // связка с несуществующей таблицей уронила бы ВЕСЬ запрос, и страница
+    // плана перестала бы открываться. Отдельный запрос падает сам по себе, а
+    // его отказ мы проглатываем ниже — до применения миграции страница
+    // работает ровно как сегодня.
+    (db as AnyDb)
+      .from("lesson_stage_gen_queue")
+      .select("lesson_id, batch_id, status, attempts, last_error, enqueued_at")
+      .then(
+        (r: { data: unknown; error: unknown }) => r,
+        () => ({ data: null, error: null }),
+      ),
   ]);
   if (topicsErr) throw topicsErr;
   if (lessonsErr) throw lessonsErr;
@@ -145,13 +165,23 @@ export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Prom
     lesson_stages?: Array<{ stage_role: string }> | null;
   };
 
+  // Заказы по урокам. Правило доступа отдаёт учителю только его собственные,
+  // поэтому чужие сюда не попадают вовсе — фильтровать не нужно.
+  const очередь = new Map<string, StageGenQueueRow>();
+  for (const q of (queueRows ?? []) as StageGenQueueRow[]) очередь.set(q.lesson_id, q);
+
   const byTopic = new Map<string, CurriculumTopicLesson[]>();
   for (const l of (lessons ?? []) as Строка[]) {
     // «Пусто» — это отсутствие middle-этапов, а не отсутствие этапов вовсе:
     // «Старт» и «Итог» кладёт триггер каждому уроку без исключения.
     const has_content = (l.lesson_stages ?? []).some((s) => s.stage_role === "middle");
     const список = byTopic.get(l.curriculum_topic_id) ?? [];
-    список.push({ id: l.id, starts_at: l.starts_at, has_content });
+    список.push({
+      id: l.id,
+      starts_at: l.starts_at,
+      has_content,
+      queue: очередь.get(l.id) ?? null,
+    });
     byTopic.set(l.curriculum_topic_id, список);
   }
 
@@ -166,6 +196,34 @@ export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Prom
       lessons: свои,
     };
   });
+}
+
+
+/**
+ * Поставить уроки в очередь на наполнение этапами. Миграция 247, заход Q1.
+ *
+ * ЗОВЁТ ФУНКЦИЮ БАЗЫ, А НЕ ПИШЕТ В ТАБЛИЦУ. Права на запись у вошедшего нет
+ * вовсе — и это не строгость ради строгости: учителя и уроки функция берёт
+ * сама (current_teacher_id, is_my_teacher_group), поэтому подделать «от чьего
+ * имени» и «какой урок» неоткуда.
+ *
+ * Возвращает, сколько поставлено и сколько пропущено. Пропущенные — это уроки
+ * не своей группы и те, что уже в работе. Молчать о них нельзя: человек
+ * выбрал десять, а поставилось восемь.
+ */
+export async function enqueueStageGeneration(
+  db: Db,
+  lessonIds: string[],
+): Promise<{ batchId: string; queued: number; skipped: number }> {
+  const { data, error } = await (db as AnyDb)
+    .rpc("fn_enqueue_stage_generation", { p_lesson_ids: lessonIds });
+  if (error) throw error;
+  const r = (data ?? {}) as { batch_id?: string; queued?: number; skipped?: number };
+  return {
+    batchId: r.batch_id ?? "",
+    queued: r.queued ?? 0,
+    skipped: r.skipped ?? 0,
+  };
 }
 
 /** Добавить свою тему в план — рядом с теми, что пришли из разбора файла.

@@ -11,7 +11,8 @@ import {
 import {
   getCurriculumTopicsWithUsage, updateCurriculumPlanTopic,
   reorderCurriculumPlanTopics, deleteCurriculumPlanTopic,
-  createCurriculumPlanTopic, getDictionary, format, tashkentDayKey,
+  createCurriculumPlanTopic, enqueueStageGeneration,
+  getDictionary, format, tashkentDayKey,
 } from "@snr/core";
 import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage, Dictionary, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
@@ -309,6 +310,70 @@ export function CurriculumPlanDetailView({
     t.lessons.map((l) => ({ ...l, topicTitle: t.title })),
   ).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const emptyLessons = planLessons.filter((l) => !l.has_content).length;
+
+  // Сводка по последней пачке. Считается по batch_id самого свежего заказа:
+  // «заказано 20, сделано 0» — ровно то, что человек хочет увидеть,
+  // вернувшись.
+  const свежийЗаказ = planLessons
+    .map((l) => l.queue)
+    .filter((q): q is NonNullable<typeof q> => q !== null)
+    .sort((a, b) => b.enqueued_at.localeCompare(a.enqueued_at))[0] ?? null;
+  const пачка = свежийЗаказ
+    ? planLessons.filter((l) => l.queue?.batch_id === свежийЗаказ.batch_id)
+    : [];
+  const пачкаСводка = {
+    queued: пачка.length,
+    done: пачка.filter((l) => l.queue?.status === "done").length,
+    failed: пачка.filter((l) => l.queue?.status === "failed").length,
+  };
+
+  const [pickedLessons, setPickedLessons] = useState<Set<string>>(new Set());
+  const [enqueueBusy, setEnqueueBusy] = useState(false);
+  const [enqueueError, setEnqueueError] = useState<string | null>(null);
+  const [enqueueDone, setEnqueueDone] = useState<{ queued: number; skipped: number } | null>(null);
+  const [confirmRefill, setConfirmRefill] = useState(false);
+
+  function toggleLesson(id: string) {
+    setEnqueueError(null);
+    setEnqueueDone(null);
+    setPickedLessons((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const выбранные = planLessons.filter((l) => pickedLessons.has(l.id));
+  const выбранныеНаполненные = выбранные.filter((l) => l.has_content).length;
+
+  /** Спрашиваем ПЕРЕД заказом, если среди выбранных есть уже наполненные:
+   *  решение заказчика — не пропускать молча и не перетирать молча. Само
+   *  стирание этапов делает разборщик (заход Q2), здесь только вопрос. */
+  function askEnqueue() {
+    if (pickedLessons.size === 0) { setEnqueueError(tc.step2PickFirst); return; }
+    setEnqueueError(null);
+    setConfirmRefill(true);
+  }
+
+  async function handleEnqueue() {
+    setEnqueueBusy(true);
+    setEnqueueError(null);
+    try {
+      const res = await enqueueStageGeneration(db, [...pickedLessons]);
+      setEnqueueDone({ queued: res.queued, skipped: res.skipped });
+      setPickedLessons(new Set());
+      setConfirmRefill(false);
+      // Перечитываем: состояние очереди приезжает вместе с темами, и после
+      // заказа строки должны появиться на экране сразу.
+      const fresh = await getCurriculumTopicsWithUsage(db, plan.id).catch(() => null);
+      if (fresh) setTopics(fresh);
+    } catch (e) {
+      // Молчать нельзя: заказ либо прошёл, либо нет, и человек должен знать.
+      setEnqueueError(e instanceof Error ? e.message : tc.networkError);
+    } finally {
+      setEnqueueBusy(false);
+    }
+  }
 
   // ═══ ШАГ 3. УДАЛИТЬ ТЕМЫ ═════════════════════════════════════════════════
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -767,28 +832,108 @@ export function CurriculumPlanDetailView({
                 <p className="mt-2 text-xs font-bold text-violet-700">
                   {format(tc.step2Counts, { empty: emptyLessons, all: planLessons.length })}
                 </p>
+
+                {/* Сводка по последнему заказу. Появляется, только если заказ
+                    был: пустая строка «заказано 0» ничего не объясняет. */}
+                {свежийЗаказ && (
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {format(tc.step2BatchLine, пачкаСводка)}
+                  </p>
+                )}
+
+                {/* Разбирать пока некому — говорим это прямо, а не оставляем
+                    человека гадать, почему «в очереди» не меняется. */}
+                <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-800">
+                  {tc.step2NoDrainer}
+                </p>
+
+                {enqueueError && (
+                  <p className="mt-2 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-700">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    {enqueueError}
+                  </p>
+                )}
+                {enqueueDone && (
+                  <div className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700">
+                    {format(tc.step2Enqueued, { n: enqueueDone.queued })}
+                    {enqueueDone.skipped > 0 && (
+                      <span className="mt-0.5 block font-normal text-amber-700">
+                        {format(tc.step2Skipped, { n: enqueueDone.skipped })}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-2.5 max-h-64 divide-y divide-slate-50 overflow-y-auto rounded-xl border border-slate-100">
-                  {planLessons.map((l) => (
-                    <div key={l.id} className="flex items-center gap-2.5 px-3 py-2">
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          l.has_content ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                        }`}
+                  {planLessons.map((l) => {
+                    // Третье состояние рядом с «пусто / наполнен»: заказ важнее
+                    // наполненности, потому что рассказывает, что происходит
+                    // прямо сейчас.
+                    const q = l.queue;
+                    const метка = q && q.status === "queued" ? { text: tc.step2Queued, cls: "bg-sky-100 text-sky-700" }
+                      : q && q.status === "running" ? { text: tc.step2Running, cls: "bg-violet-100 text-violet-700" }
+                      : q && q.status === "failed" ? { text: tc.step2Failed, cls: "bg-red-100 text-red-700" }
+                      : l.has_content ? { text: tc.step2Filled, cls: "bg-emerald-100 text-emerald-700" }
+                      : { text: tc.step2Empty, cls: "bg-amber-100 text-amber-700" };
+                    return (
+                      <div
+                        key={l.id}
+                        className={`flex items-center gap-2.5 px-3 py-2 ${pickedLessons.has(l.id) ? "bg-violet-50/50" : ""}`}
                       >
-                        {l.has_content ? tc.step2Filled : tc.step2Empty}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{l.topicTitle}</span>
-                      <span className="shrink-0 text-[10px] text-slate-400">
-                        {lessonWhen(l.starts_at).date}, {lessonWhen(l.starts_at).time}
-                      </span>
-                      <Link
-                        href={`/teacher/lessons/${l.id}`}
-                        className="flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-100"
-                      >
-                        <Sparkles className="h-3 w-3" /> {tc.step2Open}
-                      </Link>
-                    </div>
-                  ))}
+                        {/* Галочка есть и у наполненного: заказчик решил
+                            спрашивать про перезаполнение, а не запрещать его. */}
+                        <input
+                          type="checkbox"
+                          checked={pickedLessons.has(l.id)}
+                          onChange={() => toggleLesson(l.id)}
+                          disabled={q?.status === "running"}
+                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-400 disabled:opacity-40"
+                        />
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${метка.cls}`}>
+                          {метка.text}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{l.topicTitle}</span>
+                        {q?.status === "failed" && q.last_error && (
+                          <span className="shrink-0 truncate text-[10px] text-red-500" title={q.last_error}>
+                            {q.last_error.slice(0, 40)}
+                          </span>
+                        )}
+                        <span className="shrink-0 text-[10px] text-slate-400">
+                          {lessonWhen(l.starts_at).date}, {lessonWhen(l.starts_at).time}
+                        </span>
+                        <Link
+                          href={`/teacher/lessons/${l.id}`}
+                          className="flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-100"
+                        >
+                          <Sparkles className="h-3 w-3" /> {tc.step2Open}
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setPickedLessons(new Set(planLessons.filter((l) => l.queue?.status !== "running").map((l) => l.id)))}
+                    className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    {tc.step3SelectAll}
+                  </button>
+                  <button
+                    onClick={() => { setPickedLessons(new Set()); setEnqueueError(null); }}
+                    disabled={pickedLessons.size === 0}
+                    className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    {tc.step3ClearAll}
+                  </button>
+                  <button
+                    onClick={askEnqueue}
+                    disabled={enqueueBusy}
+                    className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {enqueueBusy ? tc.step2Enqueuing : format(tc.step2Enqueue, { n: pickedLessons.size })}
+                  </button>
                 </div>
               </>
             )}
@@ -1009,6 +1154,34 @@ export function CurriculumPlanDetailView({
       </div>
 
       </>
+      )}
+
+      {/* Заказ на наполнение. Спрашиваем ВСЕГДА, а не только при
+          перезаполнении: заказ тратит деньги, и нажатие должно быть
+          осознанным. Если среди выбранных есть наполненные — говорим числом,
+          сколько этапов будет стёрто (стирает разборщик, заход Q2). */}
+      {confirmRefill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !enqueueBusy && setConfirmRefill(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-3 flex items-center gap-2 text-violet-600">
+              <Sparkles className="h-5 w-5" />
+              <h3 className="text-base font-bold">{format(tc.step2RefillTitle, { n: pickedLessons.size })}</h3>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-600">
+              {выбранныеНаполненные > 0
+                ? format(tc.step2RefillBody, { n: выбранныеНаполненные })
+                : tc.step2RefillNone}
+            </p>
+            <p className="mt-2 text-[11px] leading-snug text-amber-700">{tc.step2NoDrainer}</p>
+            {enqueueError && <p className="mt-3 text-xs text-red-600">{enqueueError}</p>}
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setConfirmRefill(false)} disabled={enqueueBusy} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">{tc.cancel}</button>
+              <button onClick={handleEnqueue} disabled={enqueueBusy} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50">
+                {enqueueBusy ? tc.step2Enqueuing : format(tc.step2Enqueue, { n: pickedLessons.size })}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Подтверждение массового удаления. Решение заказчика 02.09.2026:

@@ -534,6 +534,26 @@ export type CurriculumPlanWithTopics = CurriculumPlan & {
 
 /** Тема плана + сколько существующих (будущих) уроков уже используют её —
  *  для селектора темы в форме создания урока ("использована в N уроках"). */
+/**
+ * Состояние заказа на наполнение урока этапами. Миграция 247.
+ *
+ * `queued`   — стоит в очереди, разбора ещё не было;
+ * `running`  — разборщик взял в работу (заход Q2);
+ * `done`     — наполнен;
+ * `failed`   — попытки кончились, причина в last_error;
+ * `canceled` — человек передумал. Строка остаётся намеренно: след заказа.
+ */
+export type StageGenStatus = "queued" | "running" | "done" | "failed" | "canceled";
+
+export type StageGenQueueRow = {
+  lesson_id: string;
+  batch_id: string;
+  status: StageGenStatus;
+  attempts: number;
+  last_error: string | null;
+  enqueued_at: string;
+};
+
 /** Урок, созданный по теме плана, — с ответом на вопрос «наполнен ли он». */
 export type CurriculumTopicLesson = {
   id: string;
@@ -546,6 +566,9 @@ export type CurriculumTopicLesson = {
    * урока — это middle-этапы, поэтому пустым считается урок без них.
    */
   has_content: boolean;
+  /** Заказ на наполнение, если он есть. null — урок в очередь не ставили.
+   *  Приезжает вместе с темами, отдельного похода за ним нет. */
+  queue: StageGenQueueRow | null;
 };
 
 export type CurriculumTopicWithUsage = CurriculumPlanTopic & {

@@ -120,6 +120,20 @@ export interface Dictionary {
     step2Filled: string;
     step2Counts: string;
     step2Open: string;
+    // Очередь наполнения (миграция 247, заход Q1).
+    step2Queued: string;
+    step2Running: string;
+    step2Failed: string;
+    step2Enqueue: string;
+    step2PickFirst: string;
+    step2BatchLine: string;
+    step2NoDrainer: string;
+    step2Enqueued: string;
+    step2Skipped: string;
+    step2RefillTitle: string;
+    step2RefillBody: string;
+    step2RefillNone: string;
+    step2Enqueuing: string;
     step3Title: string;
     step3Hint: string;
     step3PickFirst: string;
