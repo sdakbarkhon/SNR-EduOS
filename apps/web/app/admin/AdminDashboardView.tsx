@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { QuickStartButton } from "./QuickStartModal";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 
@@ -133,6 +134,14 @@ export function AdminDashboardView({
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
         <h2 className="mb-4 text-base font-semibold text-gray-700">{t.quickActions}</h2>
         <div className="flex flex-wrap gap-3">
+          {/* Пункт 228 — единое окно. Стоит ПЕРВЫМ и отличается по виду от
+              трёх ссылок рядом: те уводят на экран, а это открывается прямо
+              здесь и делает всю связку целиком.
+
+              Почему тут, а не на /admin/groups: там уже две кнопки создания,
+              и третья рядом стала бы загадкой. А «Быстрые действия» — готовая
+              точка входа, которая до сих пор пустовала. */}
+          <QuickStartButton />
           <Link
             href="/admin/students?action=add"
             className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700"

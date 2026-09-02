@@ -4,6 +4,7 @@ import {
   createStudent, updateStudent, resetStudentPassword, deleteStudent,
   createTeacher, updateTeacher, resetTeacherPassword, deleteTeacher,
   createGroup, updateGroup, deleteGroup, createGroupsBulk,
+  quickStartGroup, getQuickStartData,
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
   createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
   deleteSchoolSubject, getSchoolSubjectImpact, getSubjectAssignmentImpact,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/admin-api";
 import type {
   SchoolSubjectDeletionImpact, SubjectDeletionImpact, TeacherDeletionImpact,
-  BulkAssignPlan, BulkAssignResult, BulkGroupsResult,
+  BulkAssignPlan, BulkAssignResult, BulkGroupsResult, QuickStartResult,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
 import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
@@ -375,6 +376,81 @@ export async function actionCreateGroupsBulk(
     });
 
     revalidatePath("/admin/groups");
+    revalidatePath("/admin");
+    return итог;
+  });
+}
+
+/**
+ * ЕДИНОЕ ОКНО, ШАГ 0 — СПИСКИ. Пункт 228.
+ *
+ * Справочник, группы и учителя одним походом, ПО ОТКРЫТИЮ ОКНА. Вешать их на
+ * дашборд не стали: он и без того делает одиннадцать счётных запросов, а окно
+ * открывают раз в жизни школы.
+ *
+ * Списки нужны окну, чтобы показать занятое ДО записи: имя группы против
+ * существующих, предмет против справочника.
+ */
+export async function actionQuickStartData(): Promise<ActionResult<{
+  catalog: Array<{ id: string; name: string; is_active: boolean }>;
+  groups: Array<{ id: string; name: string }>;
+  teachers: Array<{ id: string; full_name: string }>;
+}>> {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    return getQuickStartData(schoolId);
+  });
+}
+
+/**
+ * ЕДИНОЕ ОКНО — ЗАПИСЬ. Пункт 228.
+ *
+ * СБРАСЫВАЕТ ПЯТЬ ПУТЕЙ, а не два. Одно действие трогает четыре таблицы —
+ * school_subjects, groups, subjects, group_teachers, — и их читают все пять
+ * экранов.
+ *
+ * Проявиться несогласованность в списках сброса сегодня не может: admin/layout
+ * зовёт createClient, тот зовёт cookies(), и все маршруты /admin/* поэтому
+ * динамические — полного кэша маршрута для них не создаётся вовсе, и
+ * revalidatePath там нечего инвалидировать. Но несогласованность в коде
+ * остаётся несогласованностью: настройки кэширования меняются, а списки
+ * переписывать потом будет некому.
+ */
+export async function actionQuickStart(
+  formData: FormData,
+): Promise<ActionResult<QuickStartResult>> {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+
+    const groupName = String(formData.get("group_name") ?? "").trim();
+    if (!groupName) throw new Error("Missing fields");
+
+    const список = (имя: string): string[] => {
+      let разобрано: unknown;
+      try {
+        разобрано = JSON.parse(String(formData.get(имя) ?? "[]"));
+      } catch {
+        throw new Error("Missing fields");
+      }
+      if (!Array.isArray(разобрано)) throw new Error("Missing fields");
+      return [...new Set(разобрано.map((v) => String(v).trim()).filter(Boolean))];
+    };
+
+    const teacher = String(formData.get("teacher_id") ?? "").trim();
+    const итог = await quickStartGroup({
+      groupName,
+      // Пустое поле цены = 0, тем же разбором, что у обеих форм группы.
+      coursePrice: readCoursePrice(formData) ?? 0,
+      catalogIds: список("catalog_ids"),
+      newSubjectNames: список("new_subject_names"),
+      teacherId: teacher || null,
+      schoolId,
+    });
+
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin/subjects");
+    revalidatePath("/admin/subject-assignments");
+    revalidatePath("/admin/teachers");
     revalidatePath("/admin");
     return итог;
   });

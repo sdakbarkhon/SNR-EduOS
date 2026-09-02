@@ -925,6 +925,209 @@ export async function createGroupsBulk(input: {
   return итог;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ЕДИНОЕ ОКНО СОЗДАНИЯ. Пункт 228, 03.09.2026.
+//
+// ЗАЧЕМ. «Создать группу, завести предметы и назначить учителя — в одном
+// месте, а не ходить по трём экранам». Экранов на деле ЧЕТЫРЕ: учителя
+// заводятся только на /admin/teachers, и без него связка неполная.
+//
+// Счёт для сценария «новая школа, один класс, три предмета, один учитель»:
+//
+//   учитель уже есть   27 нажатий + 2 перехода = 29 действий
+//   учителя нет        31 нажатие  + 3 перехода = 34 действия
+//
+// ═══ ПОРЯДОК НА ЭКРАНЕ И ПОРЯДОК ВНУТРИ — РАЗНЫЕ ══════════════════════════
+//
+// Человек видит: группа → предметы → учитель, как и просил заказчик.
+//
+// Записывается наоборот: СПРАВОЧНИК → ГРУППА → НАЗНАЧЕНИЯ. Иначе нельзя:
+// groups.subject объявлен NOT NULL и заполняется записью справочника, а
+// назначение требует готовую группу. Окно прячет этот порядок, а не спорит
+// с ним.
+//
+// ═══ groups.subject НЕ СПРАШИВАЕТСЯ ═══════════════════════════════════════
+//
+// Колонка досталась от модели «группа = один курс» и сегодня декоративна:
+// она держит слаг ради цвета и значка, а настоящая связка живёт в subjects.
+// Спрашивать у человека «какой предмет у класса», когда предметов у класса
+// будет три, — значит задавать вопрос, ответ на который ни на что не влияет.
+// Подставляем первый выбранный.
+//
+// ═══ ЧТО ПЕРЕИСПОЛЬЗУЕТСЯ, А ЧТО НЕТ ══════════════════════════════════════
+//
+//   createSchoolSubject   — один круг, отдаёт id;
+//   createGroup           — отдаёт id (он нам нужен для назначений) и сам
+//                           зовёт assertGroupNameFree;
+//   applyBulkAssignment   — вчерашняя, с одним разбором пар на план и запись.
+//
+// createGroupsBulk НЕ подходит: она не возвращает идентификаторов созданных
+// групп (тип BulkGroupsResult — только числа), а нам нужен id, чтобы завести
+// назначения. Плюс предмет у неё один на всю пачку.
+
+/** Что просит единое окно. */
+export type QuickStartInput = {
+  groupName: string;
+  coursePrice: number;
+  /** Записи справочника, выбранные галочками. */
+  catalogIds: string[];
+  /** Имена предметов, которых в справочнике ещё нет — заведём по дороге. */
+  newSubjectNames: string[];
+  teacherId: string | null;
+  schoolId: string;
+};
+
+export type QuickStartResult = {
+  groupId: string;
+  groupName: string;
+  /** Сколько записей справочника завели по дороге. */
+  subjectsCreated: number;
+  /** Имена, которые завести не вышло, с причиной. Частичный отказ не теряет
+   *  прошедшего: группа создаётся даже если один предмет не завёлся. */
+  subjectsFailed: Array<{ name: string; reason: string }>;
+  /** Итог назначений — тот же тип, что у массового назначения. */
+  assignments: BulkAssignResult;
+};
+
+/** Списки для единого окна: справочник, группы и учителя одним походом.
+ *
+ *  ГРУЗИТСЯ ПО ОТКРЫТИЮ ОКНА, А НЕ НА КАЖДЫЙ ЗАХОД НА ДАШБОРД. Дашборд и без
+ *  того делает одиннадцать счётных запросов; вешать на него три списка ради
+ *  окна, которое открывают раз в жизни школы, было бы платой ни за что. */
+export async function getQuickStartData(schoolId: string): Promise<{
+  catalog: Array<{ id: string; name: string; is_active: boolean }>;
+  groups: Array<{ id: string; name: string }>;
+  teachers: Array<{ id: string; full_name: string }>;
+}> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const [cat, grp, tch] = await Promise.all([
+    anySb.from("school_subjects").select("id, name, is_active").eq("school_id", schoolId).order("name"),
+    anySb.from("groups").select("id, name").eq("school_id", schoolId).order("name"),
+    anySb.from("teachers").select("id, full_name").eq("school_id", schoolId).order("full_name"),
+  ]);
+  if (cat.error) throw cat.error;
+  if (grp.error) throw grp.error;
+  if (tch.error) throw tch.error;
+  return { catalog: cat.data ?? [], groups: grp.data ?? [], teachers: tch.data ?? [] };
+}
+
+/**
+ * Завести группу, предметы и назначения одним действием.
+ *
+ * ЧАСТИЧНЫЙ ОТКАЗ НЕ ТЕРЯЕТ ПРОШЕДШЕГО. Предмет, который не завёлся, уезжает
+ * в subjectsFailed, а группа всё равно создаётся: терять её из-за одного
+ * названия было бы хуже, чем сказать правду про оба.
+ *
+ * ОТКАЗ ГРУППЫ — ДРУГОЕ ДЕЛО. Без неё назначать нечего, поэтому он бросается
+ * наружу и доезжает до человека фразой (GROUP_NAME_TAKEN или
+ * groups_school_name_unique_idx — humanizeAdminError знает оба).
+ */
+export async function quickStartGroup(input: QuickStartInput): Promise<QuickStartResult> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  // ── 1. СПРАВОЧНИК ─────────────────────────────────────────────────────
+  //
+  // Одно чтение на всю пачку, а не по чтению на имя. Заодно оно и даёт
+  // сравнение без регистра: в базе на school_subjects стоит UNIQUE
+  // (school_id, name) — С УЧЁТОМ регистра, и «робототехника» спокойно
+  // ложится рядом с «Робототехника» (проверено прогоном с откатом
+  // 03.09.2026). Два почти одинаковых предмета в списке — это загадка для
+  // следующего человека, поэтому регистр отбиваем ЗДЕСЬ. Уникальность в
+  // базе не трогаем: это отдельная миграция, заказчик записал.
+  const { data: existingCat, error: catErr } = await anySb
+    .from("school_subjects").select("id, name").eq("school_id", input.schoolId);
+  if (catErr) throw catErr;
+
+  // Две карты сразу: по ключу без регистра — чтобы отбить двойника, и по
+  // идентификатору — чтобы потом подставить имя в groups.subject, не ходя за
+  // ним второй раз.
+  const поКлючу = new Map<string, string>();
+  const имяПоId = new Map<string, string>();
+  for (const r of ((existingCat ?? []) as Array<{ id: string; name: string }>)) {
+    поКлючу.set(r.name.trim().toLowerCase(), r.id);
+    имяПоId.set(r.id, r.name);
+  }
+
+  const catalogIds = [...input.catalogIds];
+  const subjectsFailed: QuickStartResult["subjectsFailed"] = [];
+  let subjectsCreated = 0;
+
+  for (const сырое of input.newSubjectNames) {
+    const name = сырое.trim();
+    if (!name) continue;
+    const ключ = name.toLowerCase();
+
+    // Уже есть под другим регистром — берём существующую запись, а не
+    // заводим двойника. Молча: человек хотел этот предмет, он его и получит.
+    const было = поКлючу.get(ключ);
+    if (было) {
+      if (!catalogIds.includes(было)) catalogIds.push(было);
+      continue;
+    }
+
+    try {
+      const id = await createSchoolSubject({
+        name,
+        // Значок и цвет — те же умолчания, что у формы справочника при
+        // неизвестном названии. Известные названия получат своё оформление
+        // на экране справочника при первой правке.
+        icon: "BookOpen",
+        color: "#64748B",
+        school_id: input.schoolId,
+      });
+      поКлючу.set(ключ, id);
+      имяПоId.set(id, name);
+      catalogIds.push(id);
+      subjectsCreated += 1;
+    } catch (e) {
+      subjectsFailed.push({ name, reason: errorText(e) });
+    }
+  }
+
+  // ── 2. ГРУППА ─────────────────────────────────────────────────────────
+  //
+  // groups.subject подставляется первым выбранным предметом, а не
+  // спрашивается. Если предметов не выбрано вовсе — пустая строка: колонка
+  // NOT NULL, но пустоту она допускает (у всех десяти живых групп там слаг,
+  // но ограничения на непустоту нет).
+  const первый = catalogIds[0] ? (имяПоId.get(catalogIds[0]) ?? "") : "";
+  const groupId = await createGroup({
+    name: input.groupName.trim(),
+    subject: первый ? (getSubjectKeyByLabel(первый) ?? первый) : "",
+    teacher_id: null,
+    school_id: input.schoolId,
+    course_price: input.coursePrice,
+  });
+
+  // ── 3. НАЗНАЧЕНИЯ ─────────────────────────────────────────────────────
+  //
+  // Вчерашняя функция целиком: она сама разложит пары, сама поставит
+  // group_teachers один раз на группу и сама вернёт частичный отказ по
+  // каждой паре. Группа только что создана, значит занятых пар в ней быть
+  // не может — но проверку она всё равно сделает, и это правильно: между
+  // созданием и назначением кто-то мог успеть.
+  const assignments = catalogIds.length
+    ? await applyBulkAssignment({
+        catalogIds,
+        groupIds: [groupId],
+        teacherId: input.teacherId,
+        schoolId: input.schoolId,
+      })
+    : { created: 0, assigned: 0, failed: [] };
+
+  return {
+    groupId,
+    groupName: input.groupName.trim(),
+    subjectsCreated,
+    subjectsFailed,
+    assignments,
+  };
+}
+
 export async function updateGroup(
   groupId: string,
   data: { name: string; subject: string; teacher_id?: string | null; course_price?: number },

@@ -9,6 +9,7 @@ import { useLocale } from "@/components/LocaleProvider";
 import { LUCIDE_ICONS } from "@/lib/subject-icons";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
+import { ВыборГалочками } from "@/components/CheckboxPicker";
 import {
   actionCreateSubjectAssignment,
   actionUpdateSubjectAssignment,
@@ -55,68 +56,6 @@ type ModalState =
 
 const NEW_SUBJECT = "__new__";
 
-/**
- * Набор галочек с «выбрать все» и «снять выбор».
- *
- * Своего компонента множественного выбора в проекте не было — был устойчивый
- * образец (Set в состоянии, две кнопки, число в заголовке) прямо в разметке
- * учебного плана. Здесь он нужен ДВАЖДЫ в одном окне, и вторая копия рядом с
- * первой была бы уже перебором.
- *
- * Учебный план намеренно не трогаем: он не в этом заходе, а переезд рабочего
- * экрана на новый компонент — отдельная работа со своей проверкой.
- */
-function ВыборГалочками({
-  title, items, picked, onToggle, onAll, onNone, allLabel, noneLabel,
-}: {
-  title: string;
-  items: Array<{ id: string; label: string }>;
-  picked: Set<string>;
-  onToggle: (id: string) => void;
-  onAll: () => void;
-  onNone: () => void;
-  allLabel: string;
-  noneLabel: string;
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-medium text-zinc-700">{title}</span>
-        <div className="flex gap-1.5">
-          <button
-            type="button" onClick={onAll}
-            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50"
-          >
-            {allLabel}
-          </button>
-          <button
-            type="button" onClick={onNone} disabled={picked.size === 0}
-            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
-          >
-            {noneLabel}
-          </button>
-        </div>
-      </div>
-      <div className="grid max-h-40 gap-1 overflow-y-auto sm:grid-cols-2">
-        {items.map((it) => (
-          <label
-            key={it.id}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${picked.has(it.id) ? "bg-violet-100 text-violet-900" : "text-zinc-700 hover:bg-white"}`}
-          >
-            <input
-              type="checkbox"
-              checked={picked.has(it.id)}
-              onChange={() => onToggle(it.id)}
-              className="h-4 w-4 shrink-0 rounded border-zinc-300 text-violet-600 focus:ring-violet-400"
-            />
-            <span className="min-w-0 truncate">{it.label}</span>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function SubjectGlyph({ name, size = 18, className }: { name: string; size?: number; className?: string }) {
   const Icon = LUCIDE_ICONS[name] ?? LUCIDE_ICONS.BookOpen!;
   return <Icon size={size} className={className} />;
@@ -134,7 +73,23 @@ export function AssignmentsView({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
 
-  const [modal, setModal] = useState<ModalState>(defaultOpenAdd ? { mode: "add" } : { mode: "none" });
+  // Форма назначения требует готовую группу и учителя: без них её списки
+  // пусты, а поля обязательны.
+  //
+  // 03.09.2026 — ТА ЖЕ ДЫРА, ЧТО ЧИНИЛАСЬ НА /admin/groups. Кнопки гаснут по
+  // missingBasics, а окно, открытое сразу по адресу с ?action=add, про запрет
+  // не знало вовсе и открывалось в тупик. Поэтому запор считается ВЫШЕ
+  // состояния и входит в его начальное значение.
+  //
+  // Справочник в запор НЕ добавлен намеренно: при пустом справочнике форма
+  // работает через «+ Создать предмет», и запрещать этот путь было бы хуже,
+  // чем оставить как есть. Врала подпись, а не проверка, — её и поправили
+  // («Нужны группы и учителя»).
+  const missingBasics = groups.length === 0 || teachers.length === 0;
+
+  const [modal, setModal] = useState<ModalState>(
+    defaultOpenAdd && !missingBasics ? { mode: "add" } : { mode: "none" },
+  );
   const [isPending, startTransition] = useTransition();
 
   // Filters
@@ -316,7 +271,6 @@ export function AssignmentsView({
     });
   }
 
-  const missingBasics = groups.length === 0 || teachers.length === 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
