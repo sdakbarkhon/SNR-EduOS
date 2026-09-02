@@ -6,15 +6,16 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ChevronUp, ChevronDown, Pencil, Trash2, Check,
   Sparkles, AlertTriangle, CalendarPlus, Loader2,
-  Plus, ArrowRight, CalendarRange, Lock,
+  Plus, ArrowRight, CalendarRange, Lock, XCircle, RotateCcw,
 } from "lucide-react";
 import {
   getCurriculumTopicsWithUsage, updateCurriculumPlanTopic,
   reorderCurriculumPlanTopics, deleteCurriculumPlanTopic,
   createCurriculumPlanTopic, enqueueStageGeneration,
+  cancelStageGenBatch, retryStageGenLesson, describeError,
   getDictionary, format, tashkentDayKey,
 } from "@snr/core";
-import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage, Dictionary, Locale } from "@snr/core";
+import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWithUsage, Dictionary, Locale, StageGenStatus } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
@@ -321,11 +322,24 @@ export function CurriculumPlanDetailView({
   const пачка = свежийЗаказ
     ? planLessons.filter((l) => l.queue?.batch_id === свежийЗаказ.batch_id)
     : [];
+  // ПРОГРЕСС ПАЧКИ (заход Q4). Считается по тем же данным, что уже лежат на
+  // странице: состояние очереди приезжает вместе с темами, второго запроса за
+  // ним нет и заводить его незачем.
+  //
+  // «Ждут» — это queued и running вместе. Для человека, глядящего на сводку,
+  // и то и другое значит «ещё не готово»; разделять их здесь — лишний шум. А
+  // вот в метке у самой строки они разные, и там разделены.
+  const счёт = (st: StageGenStatus) => пачка.filter((l) => l.queue?.status === st).length;
   const пачкаСводка = {
-    queued: пачка.length,
-    done: пачка.filter((l) => l.queue?.status === "done").length,
-    failed: пачка.filter((l) => l.queue?.status === "failed").length,
+    ordered: пачка.length,
+    done: счёт("done"),
+    failed: счёт("failed"),
+    canceled: счёт("canceled"),
+    waiting: счёт("queued") + счёт("running"),
   };
+  // Отменять можно только незапущенное. Если ждущих нет — кнопки не будет
+  // вовсе: предлагать отмену там, где отменять нечего, значит врать.
+  const можноОтменить = счёт("queued");
 
   const [pickedLessons, setPickedLessons] = useState<Set<string>>(new Set());
   // ═══ РАЗБОР ОЧЕРЕДИ (заход Q2) ═══════════════════════════════════════════
@@ -365,6 +379,64 @@ export function CurriculumPlanDetailView({
       setDrainError(tc.networkError);
     } finally {
       setDrainBusy(false);
+    }
+  }
+
+  // ═══ ОТМЕНА И ПОВТОР (заход Q4, миграция 248) ════════════════════════════
+  //
+  // Обе пишут не сами, а через функции базы: прав на запись в очередь у
+  // вошедшего нет вовсе (миграция 247), и это не строгость ради строгости —
+  // учителя и урок функции берут из сессии, подделать неоткуда.
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [retryBusy, setRetryBusy] = useState<string | null>(null);
+  const [queueMsg, setQueueMsg] = useState<string | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
+
+  /** Перечитать темы: состояние очереди приезжает вместе с ними. */
+  async function перечитатьТемы() {
+    const fresh = await getCurriculumTopicsWithUsage(db, plan.id).catch(() => null);
+    if (fresh) setTopics(fresh);
+  }
+
+  async function handleCancelBatch() {
+    if (!свежийЗаказ) return;
+    setCancelBusy(true);
+    setQueueMsg(null);
+    setQueueError(null);
+    try {
+      const res = await cancelStageGenBatch(db, свежийЗаказ.batch_id);
+      if (res.canceled === 0 && res.running === 0) setQueueMsg(tc.step2CancelNone);
+      else {
+        // Про начатое говорим ОТДЕЛЬНОЙ строкой, а не молчим. Сказать
+        // «отменено», когда один урок всё равно наполнится, — это соврать
+        // человеку про потраченные деньги.
+        setQueueMsg(
+          format(tc.step2CancelDone, { canceled: res.canceled })
+          + (res.running > 0 ? " " + tc.step2CancelRunning : ""),
+        );
+      }
+      await перечитатьТемы();
+    } catch (e) {
+      setQueueError(describeError(e));
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
+  // Имя длиннее, чем хотелось бы, но handleRetry в этом файле уже занят:
+  // им повторяют РАЗБОР ФАЙЛА плана. Наш повтор — про одну строку очереди.
+  async function handleRetryLesson(lessonId: string) {
+    setRetryBusy(lessonId);
+    setQueueMsg(null);
+    setQueueError(null);
+    try {
+      const res = await retryStageGenLesson(db, lessonId);
+      setQueueMsg(res.queued > 0 ? tc.step2RetryDone : tc.step2RetryNone);
+      await перечитатьТемы();
+    } catch (e) {
+      setQueueError(describeError(e));
+    } finally {
+      setRetryBusy(null);
     }
   }
 
@@ -876,15 +948,45 @@ export function CurriculumPlanDetailView({
                 {/* Сводка по последнему заказу. Появляется, только если заказ
                     был: пустая строка «заказано 0» ничего не объясняет. */}
                 {свежийЗаказ && (
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {format(tc.step2BatchLine, пачкаСводка)}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <p className="text-xs font-semibold text-slate-500">
+                      {format(tc.step2BatchLine, пачкаСводка)}
+                      {/* Снятые показываем, только если они есть: строка
+                          «снято 0» в обычном случае — лишний шум. */}
+                      {пачкаСводка.canceled > 0
+                        && format(tc.step2BatchCanceled, { canceled: пачкаСводка.canceled })}
+                    </p>
+                    {можноОтменить > 0 && (
+                      <button
+                        onClick={handleCancelBatch}
+                        disabled={cancelBusy}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        {cancelBusy
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <XCircle className="h-3 w-3" />}
+                        {cancelBusy ? tc.step2Canceling : tc.step2Cancel}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {queueMsg && (
+                  <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-snug text-slate-700">
+                    {queueMsg}
+                  </p>
+                )}
+                {queueError && (
+                  <p className="mt-2 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-[11px] leading-snug text-red-700">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {queueError}
                   </p>
                 )}
 
                 {/* Разбор очереди. Кнопка появляется, только когда есть что
                     разбирать: предлагать нажать «наполнить» при пустой очереди
                     значит предлагать потратить деньги впустую. */}
-                {пачкаСводка.queued > пачкаСводка.done + пачкаСводка.failed && (
+                {пачкаСводка.waiting > 0 && (
                   <div className="mt-2 rounded-xl border border-violet-100 bg-violet-50/50 p-3">
                     <button
                       onClick={handleDrain}
@@ -935,43 +1037,76 @@ export function CurriculumPlanDetailView({
                     // наполненности, потому что рассказывает, что происходит
                     // прямо сейчас.
                     const q = l.queue;
+                    // Третье состояние рядом с «пусто / наполнен»: заказ важнее
+                    // наполненности, потому что рассказывает, что происходит
+                    // прямо сейчас.
                     const метка = q && q.status === "queued" ? { text: tc.step2Queued, cls: "bg-sky-100 text-sky-700" }
                       : q && q.status === "running" ? { text: tc.step2Running, cls: "bg-violet-100 text-violet-700" }
                       : q && q.status === "failed" ? { text: tc.step2Failed, cls: "bg-red-100 text-red-700" }
+                      : q && q.status === "canceled" ? { text: tc.step2Canceled, cls: "bg-slate-200 text-slate-600" }
                       : l.has_content ? { text: tc.step2Filled, cls: "bg-emerald-100 text-emerald-700" }
                       : { text: tc.step2Empty, cls: "bg-amber-100 text-amber-700" };
+                    // Повторять можно сдавшееся и снятое. Бегущее ещё считается,
+                    // наполненное уже стоило денег — для него «повторить»
+                    // означало бы заплатить второй раз молча.
+                    const можноПовторить = q?.status === "failed" || q?.status === "canceled";
                     return (
                       <div
                         key={l.id}
-                        className={`flex items-center gap-2.5 px-3 py-2 ${pickedLessons.has(l.id) ? "bg-violet-50/50" : ""}`}
+                        className={pickedLessons.has(l.id) ? "bg-violet-50/50" : ""}
                       >
-                        {/* Галочка есть и у наполненного: заказчик решил
-                            спрашивать про перезаполнение, а не запрещать его. */}
-                        <input
-                          type="checkbox"
-                          checked={pickedLessons.has(l.id)}
-                          onChange={() => toggleLesson(l.id)}
-                          disabled={q?.status === "running"}
-                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-400 disabled:opacity-40"
-                        />
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${метка.cls}`}>
-                          {метка.text}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{l.topicTitle}</span>
-                        {q?.status === "failed" && q.last_error && (
-                          <span className="shrink-0 truncate text-[10px] text-red-500" title={q.last_error}>
-                            {q.last_error.slice(0, 40)}
+                        <div className="flex items-center gap-2.5 px-3 py-2">
+                          {/* Галочка есть и у наполненного: заказчик решил
+                              спрашивать про перезаполнение, а не запрещать его. */}
+                          <input
+                            type="checkbox"
+                            checked={pickedLessons.has(l.id)}
+                            onChange={() => toggleLesson(l.id)}
+                            disabled={q?.status === "running"}
+                            className="h-4 w-4 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-400 disabled:opacity-40"
+                          />
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${метка.cls}`}>
+                            {метка.text}
                           </span>
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{l.topicTitle}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">
+                            {lessonWhen(l.starts_at).date}, {lessonWhen(l.starts_at).time}
+                          </span>
+                          {можноПовторить && (
+                            <button
+                              onClick={() => handleRetryLesson(l.id)}
+                              disabled={retryBusy !== null}
+                              className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              {retryBusy === l.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <RotateCcw className="h-3 w-3" />}
+                              {retryBusy === l.id ? tc.step2Retrying : tc.step2Retry}
+                            </button>
+                          )}
+                          <Link
+                            href={`/teacher/lessons/${l.id}`}
+                            className="flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-100"
+                          >
+                            <Sparkles className="h-3 w-3" /> {tc.step2Open}
+                          </Link>
+                        </div>
+                        {/* ПРИЧИНА ОТКАЗА — ЦЕЛИКОМ И ОТДЕЛЬНОЙ СТРОКОЙ.
+                            Раньше она жила обрезком в сорок знаков внутри
+                            всплывающей подсказки: «Ошибка вставки этапов [235»
+                            — и человеку это не говорило ничего. Теперь текст
+                            переносится и виден весь.
+
+                            Показываем и у ждущих: отказ по квоте попытку не
+                            тратит и оставляет строку в 'queued' с записанной
+                            причиной, и молчать о ней нельзя — иначе урок
+                            выглядит просто «в очереди», а он там застрял. */}
+                        {q?.last_error && q.status !== "done" && (
+                          <p className="px-3 pb-2 text-[10px] leading-snug text-red-600">
+                            <span className="font-bold">{tc.step2ErrorLabel} </span>
+                            {q.last_error}
+                          </p>
                         )}
-                        <span className="shrink-0 text-[10px] text-slate-400">
-                          {lessonWhen(l.starts_at).date}, {lessonWhen(l.starts_at).time}
-                        </span>
-                        <Link
-                          href={`/teacher/lessons/${l.id}`}
-                          className="flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-100"
-                        >
-                          <Sparkles className="h-3 w-3" /> {tc.step2Open}
-                        </Link>
                       </div>
                     );
                   })}

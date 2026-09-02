@@ -23,4 +23,5 @@ export * from "./utils/gradeAverage";
 export * from "./utils/room";
 export * from "./utils/groupName";
 export * from "./utils/reviewQueue";
+export * from "./utils/errorText";
 export * from "./mocks/payments";

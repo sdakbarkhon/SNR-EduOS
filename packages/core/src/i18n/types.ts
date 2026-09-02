@@ -133,6 +133,19 @@ export interface Dictionary {
     step2DrainDone: string;          // «Наполнен урок: … (осталось N)»
     step2DrainEmpty: string;
     step2DrainFailed: string;
+    // Отмена, повтор и причина отказа (миграция 248, заход Q4).
+    step2BatchCanceled: string;
+    step2Canceled: string;
+    step2Cancel: string;
+    step2Canceling: string;
+    step2CancelDone: string;
+    step2CancelRunning: string;
+    step2CancelNone: string;
+    step2Retry: string;
+    step2Retrying: string;
+    step2RetryDone: string;
+    step2RetryNone: string;
+    step2ErrorLabel: string;
     step2Enqueued: string;
     step2Skipped: string;
     step2RefillTitle: string;

@@ -19,7 +19,7 @@
 // расписание (заход Q3).
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { applyGeneratedStages, getSchoolLessonDuration, type GeneratedStage } from "@snr/core";
+import { applyGeneratedStages, describeError, getSchoolLessonDuration, type GeneratedStage } from "@snr/core";
 
 /** Две попытки — решение заказчика. Внутри маршрута уже до трёх обращений к
  *  модели, три попытки очереди сверху дали бы девять на урок. */
@@ -144,7 +144,7 @@ export async function drainOneStageGenJob(baseUrl: string): Promise<DrainOutcome
 
     const data = JSON.parse(текст) as { stages?: GeneratedStage[]; error?: unknown };
     if (data.error) {
-      const причина = описатьОшибку(data.error);
+      const причина = describeError(data.error);
       return провал(причина, !isQuotaError(причина));
     }
     if (!data.stages?.length) return провал("Модель вернула пустой список этапов", true);
@@ -180,24 +180,14 @@ export async function drainOneStageGenJob(baseUrl: string): Promise<DrainOutcome
     // supabase-js бросает не Error, а обычный объект с полями message,
     // code, details. Разбор занял отдельную пробу, которой не понадобилось
     // бы, скажи запись правду сразу.
-    const текст = описатьОшибку(e);
+    // Правило разбора уехало в ядро (describeError): экран очереди из захода
+    // Q4 ловит ТОТ ЖЕ вид ошибки, и второй копии здесь быть не должно.
+    const текст = describeError(e);
     // Сеть и таймаут попытку тратят — решение заказчика.
     return провал(текст, !isQuotaError(текст));
   }
 }
 
-/** Человеческий текст из чего угодно, что может прилететь в catch. */
-function описатьОшибку(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (e && typeof e === "object") {
-    const o = e as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
-    const куски = [o.message, o.details, o.hint].filter((x) => typeof x === "string" && x);
-    const код = typeof o.code === "string" && o.code ? ` [${o.code}]` : "";
-    if (куски.length) return куски.join(" — ") + код;
-    try { return JSON.stringify(e).slice(0, 300); } catch { /* не сериализуется */ }
-  }
-  return String(e);
-}
 
 /** Сколько строк ещё ждёт разбора. */
 export async function countQueuedStageGenJobs(): Promise<number> {

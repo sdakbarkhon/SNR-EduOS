@@ -226,6 +226,46 @@ export async function enqueueStageGeneration(
   };
 }
 
+/**
+ * Снять с очереди незапущенное из пачки. Миграция 248, заход Q4.
+ *
+ * НАЧАТОЕ НЕ СНИМАЕТСЯ, И ЭТО НЕ УПРОЩЕНИЕ. Строка в состоянии `running` уже
+ * стоит денег: разборщик её взял, модель считает, прервать вызов нельзя.
+ * Такая добежит до `done` или `failed` — функция базы возвращает, сколько их
+ * было, чтобы человеку можно было сказать правду, а не «отменено», когда
+ * один урок всё-таки наполнится.
+ *
+ * Пишет функция базы, а не мы: права на запись в очередь у вошедшего нет
+ * вовсе (миграция 247), и учителя функция берёт из сессии.
+ */
+export async function cancelStageGenBatch(
+  db: Db,
+  batchId: string,
+): Promise<{ canceled: number; running: number }> {
+  const { data, error } = await (db as AnyDb)
+    .rpc("fn_cancel_stage_gen_batch", { p_batch_id: batchId });
+  if (error) throw error;
+  const r = (data ?? {}) as { canceled?: number; running?: number };
+  return { canceled: r.canceled ?? 0, running: r.running ?? 0 };
+}
+
+/**
+ * Вернуть в очередь одну сдавшуюся строку. Миграция 248, заход Q4.
+ *
+ * Сбрасывает счётчик попыток и стирает прошлую ошибку. Берёт только `failed`
+ * и `canceled`: `running` ещё считается, а `done` уже стоила денег, и
+ * «повторить» для неё означало бы заплатить второй раз молча.
+ */
+export async function retryStageGenLesson(
+  db: Db,
+  lessonId: string,
+): Promise<{ queued: number }> {
+  const { data, error } = await (db as AnyDb)
+    .rpc("fn_retry_stage_gen_lesson", { p_lesson_id: lessonId });
+  if (error) throw error;
+  return { queued: ((data ?? {}) as { queued?: number }).queued ?? 0 };
+}
+
 /** Добавить свою тему в план — рядом с теми, что пришли из разбора файла.
  *
  *  ВСТАЁТ В КОНЕЦ. order_index = максимальный + 1. Так предсказуемее всего:
