@@ -63,7 +63,28 @@ const COLOR_OPTIONS = [
   "#2D5BFF", "#EC4899", "#8B5CF6", "#71717A", "#16A34A", "#64748B",
 ];
 
-export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
+export function AdminSubjectsView({
+  subjects,
+  /**
+   * Школа, в которой идёт работа. Срез 3c, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
+}: {
+  subjects: CatalogRow[];
+  schoolId?: string;
+}) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
 
@@ -105,8 +126,8 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
 
     startTransition(async () => {
       try {
-        if (modal.mode === "add") await unwrap(actionCreateSchoolSubject(fd));
-        else if (modal.mode === "edit") await unwrap(actionUpdateSchoolSubject(fd));
+        if (modal.mode === "add") await unwrap(actionCreateSchoolSubject(сШколой(fd)));
+        else if (modal.mode === "edit") await unwrap(actionUpdateSchoolSubject(сШколой(fd)));
         setModal({ mode: "none" });
       } catch (e) {
         setFormError(humanizeAdminError(e, locale as Locale));
@@ -117,7 +138,7 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
   function toggleActive(row: CatalogRow) {
     startTransition(async () => {
       try {
-        await unwrap(actionSetSchoolSubjectActive(row.id, !row.is_active));
+        await unwrap(actionSetSchoolSubjectActive(row.id, !row.is_active, schoolId));
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));
       }
@@ -131,7 +152,7 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
   function removeSubject(row: CatalogRow) {
     startTransition(async () => {
       try {
-        const impact = await unwrap(actionSchoolSubjectImpact(row.id));
+        const impact = await unwrap(actionSchoolSubjectImpact(row.id, schoolId));
         if (impact.blocked) {
           alert(d.catalogSubjectInUseHint
             .replace("{assignments}", String(impact.assignments))
@@ -141,7 +162,7 @@ export function AdminSubjectsView({ subjects }: { subjects: CatalogRow[] }) {
           return;
         }
         if (!confirm(`${d.catalogSubjectDeleteTitle}: «${row.name}». ${d.catalogSubjectDeleteClean}`)) return;
-        await unwrap(actionDeleteSchoolSubject(row.id));
+        await unwrap(actionDeleteSchoolSubject(row.id, schoolId));
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));
       }

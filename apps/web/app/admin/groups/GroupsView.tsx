@@ -222,11 +222,28 @@ export function GroupsView({
   groups,
   catalog,
   defaultOpenAdd,
+  /**
+   * Школа, в которой идёт работа. Срез 3c, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
 }: {
   groups: Group[];
   catalog: CatalogItem[];
   defaultOpenAdd?: boolean;
+  schoolId?: string;
 }) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.admin;
@@ -319,7 +336,7 @@ export function GroupsView({
     fd.set("course_price", bulkPrice);
     startTransition(async () => {
       try {
-        const итог = await unwrap(actionCreateGroupsBulk(fd));
+        const итог = await unwrap(actionCreateGroupsBulk(сШколой(fd)));
         setBulkResult(итог);
         // Созданные имена уходят из списка: повторное нажатие не должно
         // пытаться завести их снова.
@@ -665,7 +682,7 @@ export function GroupsView({
               onClose={() => setModal(null)}
               onSubmit={(fd) => guard(startTransition, async () => {
                 try {
-                  await unwrap(actionCreateGroup(fd));
+                  await unwrap(actionCreateGroup(сШколой(fd)));
                   flash(t.groupCreatedMsg.replace("{name}", String(fd.get("name"))));
                   setModal(null);
                 } catch (e) {
@@ -691,7 +708,7 @@ export function GroupsView({
                 fd.append("group_id", modal.group.id);
                 startTransition(async () => {
                   try {
-                    await unwrap(actionUpdateGroup(fd));
+                    await unwrap(actionUpdateGroup(сШколой(fd)));
                     flash(t.groupUpdatedMsg);
                     setModal(null);
                   } catch (e) {
@@ -717,7 +734,7 @@ export function GroupsView({
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    await unwrap(actionDeleteGroup(modal.group.id));
+                    await unwrap(actionDeleteGroup(modal.group.id, schoolId));
                     flash(t.groupDeletedMsg);
                     setModal(null);
                   } catch (e) {

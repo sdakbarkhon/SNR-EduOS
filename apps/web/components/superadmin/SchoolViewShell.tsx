@@ -64,6 +64,15 @@ export function SchoolViewShell({
   logoUrl,
   /** Показывать ли вкладку правки карточки. Только у менеджера. */
   cardTab = false,
+  /**
+   * Кнопка рядом с выходом. Срез 3c: у менеджера нет дашборда админа, где
+   * живёт «Создать всё сразу», — а школа у него выбирается адресом. Поэтому
+   * окно переехало в шапку школы: оно доступно с любой её вкладки и всегда
+   * знает, о какой школе речь.
+   *
+   * Суперадмин ничего не передаёт, и его полоса выглядит как вчера.
+   */
+  extra,
 }: {
   schoolId: string;
   schoolName: string;
@@ -73,6 +82,7 @@ export function SchoolViewShell({
   exitHref?: string;
   logoUrl?: string | null;
   cardTab?: boolean;
+  extra?: ReactNode;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).superadmin;
@@ -98,6 +108,7 @@ export function SchoolViewShell({
           </p>
           <p className="text-[12px] text-amber-800">{t.svReadOnly}</p>
         </div>
+        {extra}
         <Link
           href={exitHref}
           className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-[13px] font-medium text-amber-900 hover:bg-amber-100"

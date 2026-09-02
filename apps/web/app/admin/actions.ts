@@ -294,9 +294,9 @@ export async function actionDeleteTeacher(teacherId: string, userId: string, req
 
 /** Z.2.4 — назначить или снять учителя одним действием: subjects.teacher_id,
  *  group_teachers и (в реальных школах) subject_slug. */
-export async function actionSetAssignmentTeacher(assignmentId: string, teacherId: string | null) {
+export async function actionSetAssignmentTeacher(assignmentId: string, teacherId: string | null, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     const result = await setAssignmentTeacher(assignmentId, teacherId, schoolId, isSuperAdmin);
     revalidatePath("/admin/teachers");
     revalidatePath("/admin/subject-assignments");
@@ -348,7 +348,11 @@ function readCoursePrice(formData: FormData): number | undefined {
 
 export async function actionCreateGroup(formData: FormData) {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
     const name = String(formData.get("name") ?? "").trim();
     if (!name) throw new Error("Missing fields");
     const subject = await resolveGroupSubject(formData, schoolId);
@@ -376,7 +380,11 @@ export async function actionCreateGroupsBulk(
   formData: FormData,
 ): Promise<ActionResult<BulkGroupsResult>> {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
 
     let разобрано: unknown;
     try {
@@ -413,13 +421,15 @@ export async function actionCreateGroupsBulk(
  * Списки нужны окну, чтобы показать занятое ДО записи: имя группы против
  * существующих, предмет против справочника.
  */
-export async function actionQuickStartData(): Promise<ActionResult<{
+export async function actionQuickStartData(
+  requestedSchoolId?: string | null,
+): Promise<ActionResult<{
   catalog: Array<{ id: string; name: string; is_active: boolean }>;
   groups: Array<{ id: string; name: string }>;
   teachers: Array<{ id: string; full_name: string }>;
 }>> {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    const { schoolId } = await verifyAdmin(requestedSchoolId);
     return getQuickStartData(schoolId);
   });
 }
@@ -442,7 +452,11 @@ export async function actionQuickStart(
   formData: FormData,
 ): Promise<ActionResult<QuickStartResult>> {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
 
     const groupName = String(formData.get("group_name") ?? "").trim();
     if (!groupName) throw new Error("Missing fields");
@@ -480,7 +494,11 @@ export async function actionQuickStart(
 
 export async function actionUpdateGroup(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
     const group_id = String(formData.get("group_id") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const subject = await resolveGroupSubject(formData, schoolId);
@@ -494,9 +512,9 @@ export async function actionUpdateGroup(formData: FormData) {
   });
 }
 
-export async function actionDeleteGroup(groupId: string) {
+export async function actionDeleteGroup(groupId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteGroup(groupId, schoolId, isSuperAdmin);
     revalidatePath("/admin/groups");
     revalidatePath("/admin");
@@ -516,7 +534,11 @@ function revalidateSubjects() {
 
 export async function actionCreateSchoolSubject(formData: FormData) {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
     const name = String(formData.get("name") ?? "").trim();
     const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
     const color = String(formData.get("color") ?? "").trim() || "#64748B";
@@ -529,7 +551,11 @@ export async function actionCreateSchoolSubject(formData: FormData) {
 
 export async function actionUpdateSchoolSubject(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
     const id = String(formData.get("id") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const icon = String(formData.get("icon") ?? "").trim() || "BookOpen";
@@ -540,9 +566,9 @@ export async function actionUpdateSchoolSubject(formData: FormData) {
   });
 }
 
-export async function actionSetSchoolSubjectActive(id: string, isActive: boolean) {
+export async function actionSetSchoolSubjectActive(id: string, isActive: boolean, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await setSchoolSubjectActive(id, isActive, schoolId, isSuperAdmin);
     revalidateSubjects();
   });
@@ -550,16 +576,16 @@ export async function actionSetSchoolSubjectActive(id: string, isActive: boolean
 
 /** Z.2.3 — что мешает удалить предмет справочника. Питает диалог, который
  *  вместо «вы уверены» показывает числа и предлагает скрыть. */
-export async function actionSchoolSubjectImpact(id: string): Promise<ActionResult<SchoolSubjectDeletionImpact>> {
+export async function actionSchoolSubjectImpact(id: string, requestedSchoolId?: string | null): Promise<ActionResult<SchoolSubjectDeletionImpact>> {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     return getSchoolSubjectImpact(id, schoolId, isSuperAdmin);
   });
 }
 
-export async function actionDeleteSchoolSubject(id: string) {
+export async function actionDeleteSchoolSubject(id: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteSchoolSubject(id, schoolId, isSuperAdmin);
     revalidateSubjects();
   });
@@ -572,7 +598,11 @@ export async function actionDeleteSchoolSubject(id: string) {
 
 export async function actionCreateSubjectAssignment(formData: FormData) {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
     const catalog_id = String(formData.get("catalog_id") ?? "").trim();
     const group_id = String(formData.get("group_id") ?? "").trim();
     const teacher_id = String(formData.get("teacher_id") ?? "").trim();
@@ -599,7 +629,11 @@ export async function actionPlanBulkAssignment(
   formData: FormData,
 ): Promise<ActionResult<BulkAssignPlan>> {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
     const { catalogIds, groupIds, teacherId } = readBulkInput(formData);
     return planBulkAssignment({ catalogIds, groupIds, teacherId, schoolId });
   });
@@ -611,7 +645,11 @@ export async function actionApplyBulkAssignment(
   formData: FormData,
 ): Promise<ActionResult<BulkAssignResult>> {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
     const { catalogIds, groupIds, teacherId } = readBulkInput(formData);
     const итог = await applyBulkAssignment({ catalogIds, groupIds, teacherId, schoolId });
     revalidateSubjects();
@@ -647,7 +685,11 @@ function readBulkInput(formData: FormData): {
 
 export async function actionUpdateSubjectAssignment(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет. Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
     const id = String(formData.get("id") ?? "");
     const catalog_id = String(formData.get("catalog_id") ?? "").trim();
     const group_id = String(formData.get("group_id") ?? "").trim();
@@ -660,16 +702,16 @@ export async function actionUpdateSubjectAssignment(formData: FormData) {
   });
 }
 
-export async function actionSubjectAssignmentImpact(id: string): Promise<ActionResult<SubjectDeletionImpact>> {
+export async function actionSubjectAssignmentImpact(id: string, requestedSchoolId?: string | null): Promise<ActionResult<SubjectDeletionImpact>> {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     return getSubjectAssignmentImpact(id, schoolId, isSuperAdmin);
   });
 }
 
-export async function actionDeleteSubjectAssignment(id: string) {
+export async function actionDeleteSubjectAssignment(id: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteSubjectAssignment(id, schoolId, isSuperAdmin);
     revalidateSubjects();
   });

@@ -63,13 +63,30 @@ function SubjectGlyph({ name, size = 18, className }: { name: string; size?: num
 
 export function AssignmentsView({
   assignments, catalog, groups, teachers, defaultOpenAdd,
+  /**
+   * Школа, в которой идёт работа. Срез 3c, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
 }: {
   assignments: Assignment[];
   catalog: CatalogItem[];
   groups: Group[];
   teachers: Teacher[];
   defaultOpenAdd?: boolean;
+  schoolId?: string;
 }) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
 
@@ -146,7 +163,7 @@ export function AssignmentsView({
         if (creatingNew) {
           const nf = new FormData();
           nf.set("name", formNewName.trim());
-          catalogId = await unwrap(actionCreateSchoolSubject(nf));
+          catalogId = await unwrap(actionCreateSchoolSubject(сШколой(nf)));
         }
 
         const fd = new FormData();
@@ -155,9 +172,9 @@ export function AssignmentsView({
         fd.set("teacher_id", formTeacherId);
         if (modal.mode === "edit") {
           fd.set("id", modal.row.id);
-          await unwrap(actionUpdateSubjectAssignment(fd));
+          await unwrap(actionUpdateSubjectAssignment(сШколой(fd)));
         } else {
-          await unwrap(actionCreateSubjectAssignment(fd));
+          await unwrap(actionCreateSubjectAssignment(сШколой(fd)));
         }
         setModal({ mode: "none" });
       } catch (e) {
@@ -171,7 +188,7 @@ export function AssignmentsView({
     const id = modal.row.id;
     startTransition(async () => {
       try {
-        await unwrap(actionDeleteSubjectAssignment(id));
+        await unwrap(actionDeleteSubjectAssignment(id, schoolId));
         setModal({ mode: "none" });
       } catch (e) {
         alert(humanizeAdminError(e, locale as Locale));
@@ -243,7 +260,7 @@ export function AssignmentsView({
     setBulkResult(null);
     startTransition(async () => {
       try {
-        setBulkPlan(await unwrap(actionPlanBulkAssignment(bulkFormData())));
+        setBulkPlan(await unwrap(actionPlanBulkAssignment(сШколой(bulkFormData()))));
       } catch (e) {
         setBulkError(humanizeAdminError(e, locale as Locale));
       } finally {
@@ -260,7 +277,7 @@ export function AssignmentsView({
     setBulkError("");
     startTransition(async () => {
       try {
-        const итог = await unwrap(actionApplyBulkAssignment(bulkFormData()));
+        const итог = await unwrap(actionApplyBulkAssignment(сШколой(bulkFormData())));
         setBulkResult(итог);
         setBulkPlan(null);
       } catch (e) {

@@ -3,6 +3,7 @@ import { schoolViewContext } from "@/lib/school-view";
 import { signLogoUrl } from "@/lib/school-card";
 import { SchoolViewShell } from "@/components/superadmin/SchoolViewShell";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { QuickStartButton } from "@/app/admin/QuickStartModal";
 
 /**
  * Каркас «менеджер смотрит школу». Та же оболочка, что у суперадмина, — она
@@ -47,6 +48,7 @@ export default async function ManagerSchoolViewLayout({
       exitHref="/manager/schools"
       logoUrl={await signLogoUrl((data as { logo_path?: string | null } | null)?.logo_path)}
       cardTab
+      extra={<QuickStartButton schoolId={school.id} />}
     >
       {children}
     </SchoolViewShell>

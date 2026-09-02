@@ -24,10 +24,21 @@ export function MarksView({
   rows,
   groups,
   subjects,
+  /**
+   * Школа, в которой идёт работа. Срез 3c, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
 }: {
   rows: MarkRow[];
   groups: { id: string; name: string }[];
   subjects: string[];
+  schoolId?: string;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -146,6 +157,7 @@ export function MarksView({
 
       {editing && (
         <EditDialog
+          schoolId={schoolId}
           row={editing}
           labels={{ ...t, kind: kindLabel[editing.kind], att: attLabel }}
           onClose={() => setEditing(null)}
@@ -176,12 +188,14 @@ function Select({
 }
 
 function EditDialog({
-  row, labels, onClose,
+  row, labels, onClose, schoolId,
 }: {
   row: MarkRow;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   labels: any;
   onClose: () => void;
+  /** Школа менеджера. Не передана — школу даёт строка админа. */
+  schoolId?: string;
 }) {
   const [next, setNext] = useState<string>(row.kind === "attendance" ? row.value : String(row.numeric ?? ""));
   const [error, setError] = useState(false);
@@ -193,7 +207,7 @@ function EditDialog({
       ? next
       : next.trim() === "" ? null : Number(next);
     start(async () => {
-      const res = await updateMark(row.kind, row.id, value);
+      const res = await updateMark(row.kind, row.id, value, schoolId);
       if (res.ok) onClose();
       else setError(true);
     });

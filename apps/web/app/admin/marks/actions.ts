@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyStaff } from "@/lib/verify-staff";
 
 export type MarkKind = "lesson_grade" | "attendance" | "homework" | "test";
 
@@ -13,27 +14,54 @@ const TABLE: Record<MarkKind, string> = {
 };
 
 /**
- * Правка одной записи администратором.
+ * Правка одной записи админом школы или менеджером.
  *
- * Здесь НЕТ проверки «а моя ли это школа» — и это осознанно. Пишем обычным
- * пользовательским клиентом, а не сервисным ключом, поэтому запрос проходит
- * через правила базы: политики «admin updates …» из миграции 203 разрешают
- * запись только при is_school_admin_of(school_id). Чужая школа просто не
- * найдётся, и вернётся notFound. Одно правило в одном месте надёжнее двух.
+ * ═══ 03.09.2026, СРЕЗ 3c — ПЕРЕВЕДЕНО НА СЛУЖЕБНЫЙ КЛЮЧ ══════════════════
  *
- * Автор записи (graded_by / marked_by) НЕ меняется: правка администратором не
- * переписывает историю — оценку по-прежнему поставил тот учитель.
- * Отметку времени (graded_at / marked_at) тоже не трогаем: она нужна замку как
- * точка отсчёта, и обновить её значило бы открыть учителю новые 15 минут.
+ * Это было ПОСЛЕДНЕЕ из сорока одного действия админки, писавшее под токеном
+ * человека. Все сорок остальных ходят служебным ключом, и держать одно
+ * исключение ради одного экрана дороже, чем привести его к общему виду.
+ * Плюс менеджеру иначе не дать: правил доступа у него нет ни одного, а
+ * заводить их запрещено.
+ *
+ * ЧТО ИМЕННО ПРОВЕРЯЛО ПРАВИЛО, И ЧЕМ ОНО ЗАМЕНЕНО. Политики «admin updates
+ * …» из миграции 203 проверяли РОВНО ОДНО:
+ *
+ *     is_school_admin_of(school_id)
+ *       = EXISTS(admins where user_id = auth.uid() and school_id = строка.school_id)
+ *         OR is_super_admin()
+ *
+ * То есть «строка принадлежит моей школе». Больше ничего: ни диапазонов
+ * значений, ни авторства, ни замка — всё это и раньше жило в коде.
+ *
+ * Заменено УСЛОВИЕМ В САМОМ ЗАПРОСЕ: .eq("school_id", staff.schoolId). Это
+ * не «проверка рядом», а тот же самый предикат на том же самом месте — чужая
+ * школа по-прежнему не находится, и наверх уходит тот же not_found. Лишнего
+ * круга до базы не добавилось.
+ *
+ * Суперадмин при этом ничего не теряет: ветка is_super_admin() в правиле у
+ * него и так перекрыта сужающим сторожем из миграции 222 (белый список пуст),
+ * то есть писать сюда он не мог и вчера.
+ *
+ * ЗАМОК ОЦЕНОК НЕ ТРОНУТ. Автор записи (graded_by / marked_by) не меняется:
+ * правка не переписывает историю. Отметка времени (graded_at / marked_at)
+ * тоже — она нужна замку как точка отсчёта, и обновить её значило бы открыть
+ * учителю новые пятнадцать минут.
  */
 export async function updateMark(
   kind: MarkKind,
   id: string,
   value: number | string | null,
+  /** Школа менеджера. Админ её не шлёт — его школа берётся из его строки. */
+  requestedSchoolId?: string | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return { ok: false, error: "unauthorized" };
+  let staff;
+  try {
+    staff = await verifyStaff(requestedSchoolId);
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message ?? "unauthorized" };
+  }
+  const sb = createAdminClient();
 
   let patch: Record<string, unknown>;
   if (kind === "attendance") {
@@ -60,6 +88,10 @@ export async function updateMark(
     .from(TABLE[kind])
     .update(patch)
     .eq("id", id)
+    // ВОТ ЧЕМ ЗАМЕНЕНО ПРАВИЛО ДОСТУПА. Ровно тот же предикат, что стоял в
+    // is_school_admin_of: строка обязана принадлежать школе действующего.
+    // Чужая не найдётся, и ниже вернётся not_found — как и раньше.
+    .eq("school_id", staff.schoolId)
     .select("id");
 
   if (error) {

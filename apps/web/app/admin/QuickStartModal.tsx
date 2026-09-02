@@ -52,7 +52,20 @@ type Данные = {
   teachers: Array<{ id: string; full_name: string }>;
 };
 
-export function QuickStartModal({ onClose }: { onClose: () => void }) {
+export function QuickStartModal({
+  onClose,
+  /**
+   * Школа. Срез 3c: у менеджера дашборда админа нет, и окно живёт на
+   * ОБЗОРНОЙ вкладке школы — она и есть его дашборд для этой школы. Оттуда
+   * школа и приходит.
+   *
+   * Не передана — работает как раньше, у админа его собственная школа.
+   */
+  schoolId,
+}: {
+  onClose: () => void;
+  schoolId?: string;
+}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
 
@@ -73,7 +86,7 @@ export function QuickStartModal({ onClose }: { onClose: () => void }) {
     let жив = true;
     startTransition(async () => {
       try {
-        const r = await unwrap(actionQuickStartData());
+        const r = await unwrap(actionQuickStartData(schoolId));
         if (жив) setДанные(r);
       } catch (e) {
         if (жив) setError(humanizeAdminError(e, locale as Locale));
@@ -120,6 +133,7 @@ export function QuickStartModal({ onClose }: { onClose: () => void }) {
     fd.set("catalog_ids", JSON.stringify([...picked]));
     fd.set("new_subject_names", JSON.stringify(новые));
     fd.set("teacher_id", teacherId);
+    if (schoolId) fd.set("school_id", schoolId);
     startTransition(async () => {
       try {
         setResult(await unwrap(actionQuickStart(fd)));
@@ -351,7 +365,7 @@ export function QuickStartModal({ onClose }: { onClose: () => void }) {
 
 /** Кнопка входа. Живёт в «Быстрых действиях» дашборда — точке входа, которая
  *  до сих пор пустовала. */
-export function QuickStartButton() {
+export function QuickStartButton({ schoolId }: { schoolId?: string } = {}) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).admin;
   const [open, setOpen] = useState(false);
@@ -363,7 +377,7 @@ export function QuickStartButton() {
       >
         <Sparkles className="h-4 w-4" /> {d.quickStart}
       </button>
-      {open && <QuickStartModal onClose={() => setOpen(false)} />}
+      {open && <QuickStartModal onClose={() => setOpen(false)} schoolId={schoolId} />}
     </>
   );
 }
