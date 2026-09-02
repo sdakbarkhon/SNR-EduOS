@@ -997,6 +997,12 @@ export const en: Dictionary = {
     mgrSchoolsEmpty: "No schools yet",
     mgrSchoolsNoResults: "Nothing found",
     mgrSchoolsReadOnly: "Viewing only for now: inside a school you can look but not change. Working with the data arrives in the next round.",
+    // Round 3: the manager edits the school card.
+    mgrCardTitle: "School card",
+    mgrCardHint: "Only these six fields are editable. The school name, code, lesson autostart and lesson length are set by the super admin.",
+    mgrCardSave: "Save",
+    mgrCardSaved: "Card saved",
+    mgrCardTab: "Card",
     jActionManagerCreate: "Manager created",
     jActionManagerUpdate: "Manager edited",
     jActionManagerDelete: "Manager deleted",

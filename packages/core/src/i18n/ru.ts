@@ -1000,6 +1000,12 @@ export const ru: Dictionary = {
     mgrSchoolsEmpty: "Школ пока нет",
     mgrSchoolsNoResults: "Ничего не нашлось",
     mgrSchoolsReadOnly: "Пока только просмотр: внутри школы можно смотреть, но не менять. Работа с данными появится следующим заходом.",
+    // Заход 3: менеджер правит карточку школы.
+    mgrCardTitle: "Карточка школы",
+    mgrCardHint: "Правятся только эти шесть полей. Название школы, код, автостарт уроков и длительность урока задаёт суперадминистратор.",
+    mgrCardSave: "Сохранить",
+    mgrCardSaved: "Карточка сохранена",
+    mgrCardTab: "Карточка",
     jActionManagerCreate: "Заведён менеджер",
     jActionManagerUpdate: "Правка менеджера",
     jActionManagerDelete: "Удалён менеджер",

@@ -55,7 +55,17 @@ export type JournalAction =
 
 export type JournalOutcome = "started" | "done" | "failed" | "denied";
 
+/**
+ * Кто действовал. Заход 3 по роли менеджера, 03.09.2026.
+ *
+ * Умолчание — суперадмин: на 250-й миграции колонка actor_role заведена
+ * именно с ним, и все записи до сегодня оставил он.
+ */
+export type JournalActorRole = "super_admin" | "manager";
+
 export type JournalEntry = {
+  /** Кем совершено. Не указано — суперадмин, как было всегда. */
+  actorRole?: JournalActorRole;
   action: JournalAction;
   actorUserId?: string | null;
   actorName?: string | null;
@@ -139,7 +149,32 @@ export async function journalWrite(
     console.error("[journal] запись не легла, действие отменяется:", error.message ?? error);
     throw new Error("journal_write_failed");
   }
-  return typeof data === "number" ? data : null;
+  const id = typeof data === "number" ? data : null;
+
+  // РОЛЬ ДОПИСЫВАЕТСЯ ВТОРЫМ ЗАПРОСОМ, И ЭТО ОСОЗНАННО.
+  //
+  // Колонку actor_role завела миграция 250, но функция базы
+  // superadmin_journal_write её не принимает: у неё девять доводов и роли
+  // среди них нет. Расширить подпись — это миграция, а миграций в этом
+  // заходе нет по условию.
+  //
+  // Поэтому строка пишется как раньше, а роль дописывается следом — ТОЛЬКО
+  // менеджеру: у суперадмина она и так стоит умолчанием, и лишнего круга он
+  // не платит. Пишем служебным ключом, он правила обходит.
+  //
+  // Отказ здесь НЕ роняет действие: главную гарантию даёт строка «начато»,
+  // она уже легла. Потерять роль хуже, чем потерять запись, но ронять из-за
+  // неё уже совершённое действие — ещё хуже.
+  //
+  // Расширить функцию базы одной миграцией было бы чище, и это стоит сделать
+  // вместе с переездом денег, где миграция всё равно понадобится.
+  if (id !== null && entry.actorRole === "manager") {
+    const { error: roleErr } = await db
+      .from("superadmin_journal").update({ actor_role: "manager" }).eq("id", id);
+    if (roleErr) console.error("[journal] роль не дописалась:", roleErr.message ?? roleErr);
+  }
+
+  return id;
 }
 
 /**

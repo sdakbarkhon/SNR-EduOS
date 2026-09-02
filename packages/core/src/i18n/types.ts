@@ -1011,6 +1011,12 @@ export interface Dictionary {
     mgrSchoolsEmpty: string;
     mgrSchoolsNoResults: string;
     mgrSchoolsReadOnly: string;
+    // Заход 3: менеджер правит карточку школы.
+    mgrCardTitle: string;
+    mgrCardHint: string;
+    mgrCardSave: string;
+    mgrCardSaved: string;
+    mgrCardTab: string;
     jActionManagerCreate: string;
     jActionManagerUpdate: string;
     jActionManagerDelete: string;

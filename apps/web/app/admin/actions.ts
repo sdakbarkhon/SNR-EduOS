@@ -21,6 +21,7 @@ import { parseCoursePrice } from "@/lib/course-price";
 import { guard, type ActionResult } from "@/lib/action-result";
 import { getSubjectKeyByLabel } from "@snr/core";
 import { revalidatePath } from "next/cache";
+import { verifyStaff, type StaffRole } from "@/lib/verify-staff";
 
 /** Returns the calling admin's school_id — the service-role client used by
  *  admin-api.ts has no auth.uid(), so current_school_id() resolves to NULL
@@ -28,18 +29,23 @@ import { revalidatePath } from "next/cache";
  *  Also resolves isSuperAdmin (existence in super_admins) — П.3 Заход 1:
  *  admin-api.ts's update/delete functions need this to allow the cross-school
  *  bypass for super admins, since they can't check auth.uid() themselves. */
-async function verifyAdmin(): Promise<{ schoolId: string; isSuperAdmin: boolean; userId: string }> {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sbAny = sb as any;
-  const [{ data: admin }, { data: superAdmin }] = await Promise.all([
-    sbAny.from("admins").select("id, school_id").eq("user_id", user.id).single(),
-    sbAny.from("super_admins").select("id").eq("user_id", user.id).maybeSingle(),
-  ]);
-  if (!admin) throw new Error("Not admin");
-  return { schoolId: admin.school_id as string, isSuperAdmin: !!superAdmin, userId: user.id };
+/**
+ * Кто действует и в какой школе.
+ *
+ * 03.09.2026, заход 3 по роли менеджера — ТЕЛО ПЕРЕЕХАЛО В lib/verify-staff.ts.
+ * Раньше эта функция жила ТРЕМЯ ОДИНАКОВЫМИ КОПИЯМИ в трёх файлах действий, и
+ * учить пускать менеджера пришлось бы все три. Здесь осталась только оболочка,
+ * сохраняющая прежнюю подпись, — поэтому ни один из вызывающих не тронут.
+ *
+ * Довод `requestedSchoolId` — школа, названная снаружи. Админу она не нужна
+ * (его школа в его строке) и при несовпадении отвергается; менеджеру она
+ * обязательна, потому что своей школы у него нет.
+ */
+async function verifyAdmin(
+  requestedSchoolId?: string | null,
+): Promise<{ schoolId: string; isSuperAdmin: boolean; userId: string; role: StaffRole }> {
+  const s = await verifyStaff(requestedSchoolId);
+  return { schoolId: s.schoolId, isSuperAdmin: s.isSuperAdmin, userId: s.userId, role: s.role };
 }
 
 /**

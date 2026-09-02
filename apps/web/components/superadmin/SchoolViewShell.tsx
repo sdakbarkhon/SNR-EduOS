@@ -47,6 +47,10 @@ const ВКЛАДКИ = [
   { seg: "analytics", key: "svTabAnalytics" },
 ] as const;
 
+/** Вкладка правки карточки. Показывается ТОЛЬКО менеджеру: у суперадмина
+ *  карточка правится своим окном, вместе с именем, кодом и автостартом. */
+const ВКЛАДКА_КАРТОЧКИ = { seg: "card", key: "mgrCardTab" } as const;
+
 export function SchoolViewShell({
   schoolId,
   schoolName,
@@ -58,6 +62,8 @@ export function SchoolViewShell({
   exitHref = "/superadmin/schools",
   /** Подписанная ссылка на логотип. Нет — знак нарисует буквы названия. */
   logoUrl,
+  /** Показывать ли вкладку правки карточки. Только у менеджера. */
+  cardTab = false,
 }: {
   schoolId: string;
   schoolName: string;
@@ -66,6 +72,7 @@ export function SchoolViewShell({
   basePath?: string;
   exitHref?: string;
   logoUrl?: string | null;
+  cardTab?: boolean;
 }) {
   const { locale } = useLocale();
   const t = getDictionary(locale as Locale).superadmin;
@@ -101,7 +108,7 @@ export function SchoolViewShell({
       </div>
 
       <nav className="mt-4 flex flex-wrap gap-1.5">
-        {ВКЛАДКИ.map((v) => {
+        {[...ВКЛАДКИ, ...(cardTab ? [ВКЛАДКА_КАРТОЧКИ] : [])].map((v) => {
           const href = v.seg ? `${база}/${v.seg}` : база;
           const active = хвост === v.seg;
           return (

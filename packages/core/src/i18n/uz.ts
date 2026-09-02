@@ -997,6 +997,12 @@ export const uz: Dictionary = {
     mgrSchoolsEmpty: "Hozircha maktablar yoʻq",
     mgrSchoolsNoResults: "Hech narsa topilmadi",
     mgrSchoolsReadOnly: "Hozircha faqat koʻrish: maktab ichida koʻrish mumkin, lekin oʻzgartirib boʻlmaydi. Maʼlumotlar bilan ishlash keyingi bosqichda paydo boʻladi.",
+    // 3-bosqich: menejer maktab kartasini tahrirlaydi.
+    mgrCardTitle: "Maktab kartasi",
+    mgrCardHint: "Faqat shu olti maydon tahrirlanadi. Maktab nomi, kodi, darslarning avtomatik boshlanishi va dars davomiyligini superadmin belgilaydi.",
+    mgrCardSave: "Saqlash",
+    mgrCardSaved: "Karta saqlandi",
+    mgrCardTab: "Karta",
     jActionManagerCreate: "Menejer yaratildi",
     jActionManagerUpdate: "Menejer tahrirlandi",
     jActionManagerDelete: "Menejer oʻchirildi",

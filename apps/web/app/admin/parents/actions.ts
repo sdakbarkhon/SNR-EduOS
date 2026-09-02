@@ -6,22 +6,28 @@ import { pendingCodeFor } from "@/lib/parent-sms";
 import { guard } from "@/lib/action-result";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { verifyStaff, type StaffRole } from "@/lib/verify-staff";
 
 /** П.3 Заход 1: also resolves isSuperAdmin — see app/admin/actions.ts's
  *  verifyAdmin() for the full rationale (same pattern, duplicated here since
  *  this file already had its own copy). */
-async function verifyAdmin(): Promise<{ schoolId: string; userId: string; isSuperAdmin: boolean }> {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sbAny = sb as any;
-  const [{ data: admin }, { data: superAdmin }] = await Promise.all([
-    sbAny.from("admins").select("id, school_id").eq("user_id", user.id).single(),
-    sbAny.from("super_admins").select("id").eq("user_id", user.id).maybeSingle(),
-  ]);
-  if (!admin) throw new Error("Not admin");
-  return { schoolId: admin.school_id as string, userId: user.id, isSuperAdmin: !!superAdmin };
+/**
+ * Кто действует и в какой школе.
+ *
+ * 03.09.2026, заход 3 по роли менеджера — ТЕЛО ПЕРЕЕХАЛО В lib/verify-staff.ts.
+ * Раньше эта функция жила ТРЕМЯ ОДИНАКОВЫМИ КОПИЯМИ в трёх файлах действий, и
+ * учить пускать менеджера пришлось бы все три. Здесь осталась только оболочка,
+ * сохраняющая прежнюю подпись, — поэтому ни один из вызывающих не тронут.
+ *
+ * Довод `requestedSchoolId` — школа, названная снаружи. Админу она не нужна
+ * (его школа в его строке) и при несовпадении отвергается; менеджеру она
+ * обязательна, потому что своей школы у него нет.
+ */
+async function verifyAdmin(
+  requestedSchoolId?: string | null,
+): Promise<{ schoolId: string; userId: string; isSuperAdmin: boolean; role: StaffRole }> {
+  const s = await verifyStaff(requestedSchoolId);
+  return { schoolId: s.schoolId, userId: s.userId, isSuperAdmin: s.isSuperAdmin, role: s.role };
 }
 
 export async function actionCreateParent(formData: FormData) {

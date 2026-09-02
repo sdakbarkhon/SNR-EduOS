@@ -46,6 +46,7 @@ export default async function ManagerSchoolViewLayout({
       basePath={`/manager/schools/${school.id}/view`}
       exitHref="/manager/schools"
       logoUrl={await signLogoUrl((data as { logo_path?: string | null } | null)?.logo_path)}
+      cardTab
     >
       {children}
     </SchoolViewShell>
