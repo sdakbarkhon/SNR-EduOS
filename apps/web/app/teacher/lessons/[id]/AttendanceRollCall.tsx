@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { useLocale } from "@/components/LocaleProvider";
 import { cn } from "@/lib/cn";
-import { GradeModal } from "./GradeModal";
+import { GradeModal, type GradeTarget } from "./GradeModal";
 
 type Props = {
   lessonId: string;
@@ -52,7 +52,11 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   // Grades map: studentId → LessonGrade
   const [gradesMap, setGradesMap] = useState<Record<string, LessonGrade>>({});
   // Grade modal state
-  const [gradeTarget, setGradeTarget] = useState<{ id: string; name: string } | null>(null);
+  const [gradeTarget, setGradeTarget] = useState<GradeTarget | null>(null);
+  // Массовое действие: идёт ли и чем кончилось (пункт 15).
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkPartial, setBulkPartial] = useState<{ ok: number; all: number } | null>(null);
+  const [bulkDone, setBulkDone] = useState<number | null>(null);
 
   const isFinalized = lessonStatus === "completed" || rows.some((r) => r.is_finalized);
   const readOnly = isFinalized;
@@ -78,6 +82,39 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
   // завершённому уроку, так что на идущем уроке эта ветка не срабатывает.
   const rowLocked = (r: AttendanceRollCallRow) => r.is_finalized && !isMachineMark(r);
   const hasFixableRows = readOnly && rows.some((r) => !rowLocked(r));
+
+  /**
+   * МОЖНО ЛИ МЕНЯТЬ ЭТУ СТРОКУ — ОДИН ОТВЕТ НА ВЕСЬ ЭКРАН.
+   *
+   * 02.09.2026, пункт 15. Массовая отметка обязана слушаться того же правила,
+   * что и одиночная, и брать его ОТСЮДА, а не заводить свою копию: и правило
+   * доступа (rowLocked), и замок пятнадцати минут (markLockState из
+   * packages/core) спрашиваются в одном месте, обоими путями.
+   */
+  const canChange = (r: AttendanceRollCallRow) => {
+    if (rowLocked(r)) return false;
+    // Часы машинной отметки завела машина — считать по ним нельзя (миграция 225).
+    if (isMachineMark(r)) return true;
+    return !markLockState({ stamp: r.marked_at, lesson: lessonStatus }).locked;
+  };
+
+  /**
+   * ЧЬЕГО РЕШЕНИЯ ЕЩЁ НЕТ. Массовая отметка трогает только этих.
+   *
+   * Два случая, и оба означают «учитель сюда ещё не решал»:
+   *   • отметки нет вовсе (status === null);
+   *   • отметку раздало автозавершение (машинный прогул, marked_by пуст) —
+   *     миграция 225 прямо называет её правку ПЕРВЫМ выставлением человеком.
+   *
+   * Уже отмеченных массовое действие НЕ переписывает. Это решение, а не
+   * упрощение: учитель отметил двоих отсутствующими, потом нажал «отметить
+   * остальных» — и если бы кнопка перебила его работу, восстанавливать её
+   * было бы нечем. Заодно кнопка никогда не упирается в замок: у строки без
+   * отметки нет и отметки времени, а машинная отметка из-под замка выведена
+   * миграцией 225. Менять уже отмеченного — по одному, как и раньше.
+   */
+  const pending = (r: AttendanceRollCallRow) => (r.status === null || isMachineMark(r)) && canChange(r);
+  const pendingRows = rows.filter(pending);
 
   // Notify parent whenever rows change. The callback is kept in a ref and is NOT
   // an effect dependency: callers often pass an inline arrow (new reference every
@@ -122,10 +159,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
     // 31.08.2026 (миграция 245). В markLockState уходит и статус урока: пока
     // урок идёт, замка нет, и экран обязан это знать. Своего отсчёта здесь нет
     // и не должно быть — правило записано один раз, в packages/core.
-    if (
-      !isMachineMark(current)
-      && markLockState({ stamp: current.marked_at, lesson: lessonStatus }).locked
-    ) { setNotice("locked"); return; }
+    if (!canChange(current)) { setNotice("locked"); return; }
     setNotice(null);
     setRows((prev) =>
       prev.map((r) =>
@@ -153,6 +187,67 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
       if (isMarkLockedError(err)) setNotice("locked");
       else { setNotice("failed"); console.error("[AttendanceRollCall] отметка не сохранилась:", err); }
     }
+  }
+
+  /**
+   * ОТМЕТИТЬ ОСТАЛЬНЫХ (02.09.2026, пункт 15).
+   *
+   * ЧАСТИЧНЫЙ ОТКАЗ НЕ РОНЯЕТ ВСЁ. allSettled, а не all: у отметок нет ни
+   * транзакции, ни порядка, и терять девять сохранённых из-за одного отказа
+   * было бы хуже всего. Прошедшие остаются на экране, у непрошедших строка
+   * возвращается к прежнему виду, и человеку говорят числом, сколько прошло.
+   *
+   * МАШИННЫЙ ПРИЗНАК СНИМАЕТСЯ ПРАВИЛЬНО. markStudentAttendance пишет
+   * marked_by = teacherId и is_finalized = false — та же функция, что и у
+   * одиночной кнопки. Значит, исправленный машинный прогул становится
+   * учительской отметкой, и дальше на неё действует обычное правило
+   * пятнадцати минут, как обещала миграция 225.
+   */
+  async function markAll(next: AttendanceStatus) {
+    const цели = rows.filter(pending);
+    if (цели.length === 0) return;
+    setNotice(null);
+    setBulkPartial(null);
+    setBulkDone(null);
+    setBulkBusy(true);
+
+    const было = new Map(цели.map((r) => [r.student_id, r]));
+    setRows((prev) =>
+      prev.map((r) => (было.has(r.student_id)
+        ? {
+            ...r,
+            status: next,
+            marked_at: new Date(schoolNowMs()).toISOString(),
+            // Отметка перестаёт быть машинной: у неё появляется автор.
+            marked_by: teacherId,
+            is_finalized: false,
+          }
+        : r)),
+    );
+
+    const итоги = await Promise.allSettled(
+      цели.map((r) => markStudentAttendance(db, lessonId, r.student_id, next, teacherId)),
+    );
+    setBulkBusy(false);
+
+    const упавшие = цели.filter((_, i) => итоги[i]!.status === "rejected");
+    if (упавшие.length === 0) {
+      // Молчаливого успеха быть не должно: строки, конечно, перекрасились, но
+      // сказать «сохранено, столько-то» дешевле, чем заставлять пересчитывать
+      // глазами. Одиночная кнопка так и делает — «Сохранено» у строки.
+      setBulkDone(цели.length);
+      setTimeout(() => setBulkDone(null), 2500);
+      return;
+    }
+    // Возвращаем ТОЛЬКО непрошедшие строки целиком — прошедшие остаются
+    // такими, какими их приняла база.
+    const вернуть = new Map(упавшие.map((r) => [r.student_id, r]));
+    setRows((prev) => prev.map((r) => вернуть.get(r.student_id) ?? r));
+
+    const причины = итоги.flatMap((r) => (r.status === "rejected" ? [r.reason] : []));
+    if (причины.some((e) => isMarkLockedError(e))) setNotice("locked");
+    else { setNotice("failed"); console.error("[AttendanceRollCall] часть отметок не сохранилась:", причины[0]); }
+    setBulkPartial({ ok: цели.length - упавшие.length, all: цели.length });
   }
 
   const [gradeSavedToast, setGradeSavedToast] = useState(false);
@@ -212,6 +307,78 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
               </span>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Массовые действия (02.09.2026, пункт 15) ─────────────────────────
+          Трогают ТОЛЬКО тех, чьего решения ещё нет: неотмеченных и машинные
+          прогулы. Уже отмеченных не переписывают — их меняют по одному, как и
+          раньше. Поэтому кнопки исчезают, когда трогать некого. */}
+      {rows.length > 0 && (
+        <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              {dt.rollCallMarkAll}
+            </span>
+            {pendingRows.length === 0 ? (
+              <span className="text-[12px] font-medium text-gray-400">{dt.rollCallMarkAllNone}</span>
+            ) : (
+              <>
+                {([
+                  ["present", dt.rollCallPresent, Check, "hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200"],
+                  ["absent_excused", dt.rollCallExcused, BookMarked, "hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-200"],
+                  ["absent_unexcused", dt.rollCallUnexcused, UserX, "hover:bg-red-50 hover:text-red-500 hover:border-red-200"],
+                ] as Array<[AttendanceStatus, string, typeof Check, string]>).map(([st, label, Icon, hover]) => (
+                  <button
+                    key={st}
+                    onClick={() => markAll(st)}
+                    disabled={bulkBusy}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors disabled:opacity-50",
+                      hover,
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" /> {label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setGradeTarget({
+                    kind: "all",
+                    students: rows
+                      .filter((r) => !gradesMap[r.student_id])
+                      .map((r) => ({ id: r.student_id, name: r.full_name })),
+                  })}
+                  disabled={bulkBusy || rows.every((r) => gradesMap[r.student_id])}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-50"
+                >
+                  <Star className="h-3.5 w-3.5" /> {dt.rollCallGradeAll}
+                </button>
+              </>
+            )}
+          </div>
+          {pendingRows.length > 0 && (
+            <p className="mt-1.5 text-[11px] leading-snug text-gray-400">
+              {dt.rollCallMarkAllHint.replace("{n}", String(pendingRows.length))}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Массовое действие прошло целиком. */}
+      {bulkDone !== null && (
+        <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+          <Check className="h-4 w-4" /> {dt.rollCallSaved}: {bulkDone}
+        </div>
+      )}
+
+      {/* Частичный отказ массового действия: часть прошла, часть нет. */}
+      {bulkPartial && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+          <p className="text-[11px] leading-snug text-amber-800">
+            {dt.bulkPartialSaved
+              .replace("{ok}", String(bulkPartial.ok))
+              .replace("{all}", String(bulkPartial.all))}
+          </p>
         </div>
       )}
 
@@ -284,7 +451,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                   if (!lg) {
                     return (
                       <button
-                        onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
+                        onClick={() => setGradeTarget({ kind: "one", studentId: row.student_id, studentName: row.full_name, existing: null })}
                         className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition-colors"
                       >
                         <Star className="h-3 w-3" />
@@ -294,7 +461,7 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
                   }
                   return (
                     <button
-                      onClick={() => setGradeTarget({ id: row.student_id, name: row.full_name })}
+                      onClick={() => setGradeTarget({ kind: "one", studentId: row.student_id, studentName: row.full_name, existing: lg })}
                       className="flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700 transition-colors hover:bg-amber-200"
                     >
                       <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
@@ -357,14 +524,18 @@ export function AttendanceRollCall({ lessonId, teacherId, lessonStatus, excused,
         <GradeModal
           lessonId={lessonId}
           teacherId={teacherId}
-          studentId={gradeTarget.id}
-          studentName={gradeTarget.name}
-          existing={gradesMap[gradeTarget.id] ?? null}
+          target={gradeTarget}
           lessonStatus={lessonStatus}
           onClose={() => setGradeTarget(null)}
           onSaved={(saved) => {
-            setGradesMap((prev) => ({ ...prev, [saved.student_id]: saved }));
-            setGradeTarget(null);
+            // Массив: при «оценить остальных» приходят все прошедшие разом, а
+            // при частичном отказе — только они. Окно в этом случае остаётся
+            // открытым и само скажет, сколько не прошло.
+            setGradesMap((prev) => {
+              const next = { ...prev };
+              for (const g of saved) next[g.student_id] = g;
+              return next;
+            });
             setGradeSavedToast(true);
             setTimeout(() => setGradeSavedToast(false), 2500);
           }}

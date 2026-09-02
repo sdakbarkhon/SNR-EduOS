@@ -91,6 +91,22 @@ export function BulkLessonsModal({
 
   const [weekdays, setWeekdays] = useState<number[]>([1, 3, 5]);
   const [time, setTime] = useState("09:00");
+  /**
+   * ВРЕМЯ ПО КАЖДОМУ ДНЮ ОТДЕЛЬНО (02.09.2026, пункт 11).
+   *
+   * Выключено по умолчанию, и это главное: не тронул — все выбранные дни идут
+   * в одно время, ровно как было. Семь полей ради одного урока никто
+   * заполнять не должен.
+   *
+   * Включил — под днями появляется по строке на КАЖДЫЙ ВЫБРАННЫЙ день, каждая
+   * заполнена общим временем. Меняет он только те, которым нужно своё.
+   */
+  const [perDay, setPerDay] = useState(false);
+  const [timeByWeekday, setTimeByWeekday] = useState<Record<number, string>>({});
+
+  /** Время дня недели: своё, если задано, иначе общее. Одно правило на показ и
+   *  на отправку — второй копии счёта здесь нет. */
+  const timeOf = (n: number) => timeByWeekday[n] ?? time;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [room, setRoom] = useState("");
@@ -104,11 +120,30 @@ export function BulkLessonsModal({
   function toggleWeekday(n: number) {
     setPreview(null);
     setWeekdays((cur) => (cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n].sort()));
+    // Сняли день — забываем его время. Иначе снятый день тихо хранил бы своё
+    // значение и «оживал» при повторном включении не тем временем, которое
+    // человек видит сейчас.
+    setTimeByWeekday((cur) => {
+      if (!(n in cur)) return cur;
+      const копия = { ...cur };
+      delete копия[n];
+      return копия;
+    });
+  }
+
+  function setDayTime(n: number, value: string) {
+    setPreview(null);
+    setTimeByWeekday((cur) => ({ ...cur, [n]: value }));
   }
 
   function payload(isPreview: boolean) {
     return {
       groupId, subjectId, weekdays, time, from, to,
+      // Своё время по дням шлём только когда режим включён. Выключен — поля
+      // нет в запросе вовсе, и сервер работает как до пункта 11.
+      timeByWeekday: perDay
+        ? Object.fromEntries(weekdays.map((n) => [String(n), timeOf(n)]))
+        : undefined,
       useTopics,
       // Длительность не шлём: с 01.09.2026 (миграция 246) её задаёт школа
       // одним числом, роут читает его сам. Здесь было поле — третий источник.
@@ -217,6 +252,7 @@ export function BulkLessonsModal({
 
               {/* Поля длительности здесь больше нет (01.09.2026, миграция 246):
                   одно число на школу задаёт суперадмин в её карточке. */}
+              {/* Общее время — оно же умолчание для режима «по дням». */}
               <div className="grid grid-cols-3 gap-4">
                 <Field label={t.bulkTime}>
                   <input type="time" value={time} onChange={(e) => { setTime(e.target.value); setPreview(null); }} className={inputCls} />
@@ -227,6 +263,49 @@ export function BulkLessonsModal({
                 <Field label={t.bulkTo}>
                   <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreview(null); }} className={inputCls} />
                 </Field>
+              </div>
+
+              {/* ── Своё время по дням (пункт 11) ──────────────────────── */}
+              <div className="rounded-xl bg-gray-50 p-3">
+                <label className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={perDay}
+                    onChange={(e) => {
+                      setPerDay(e.target.checked);
+                      setPreview(null);
+                      // Включили — заполняем каждый выбранный день общим
+                      // временем: человек видит, от чего отталкивается, и
+                      // правит только нужные строки.
+                      if (e.target.checked) {
+                        setTimeByWeekday(Object.fromEntries(weekdays.map((n) => [n, timeOf(n)])));
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {t.bulkPerDayTime}
+                    <span className="mt-0.5 block text-[11px] text-gray-400">
+                      {perDay ? t.bulkPerDayTimeHint : t.bulkTimeSame}
+                    </span>
+                  </span>
+                </label>
+
+                {perDay && weekdays.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {[...weekdays].sort((a, b) => a - b).map((n) => (
+                      <label key={n} className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5">
+                        <span className="w-8 shrink-0 text-[11px] font-bold uppercase text-gray-400">{wdLabel[n]}</span>
+                        <input
+                          type="time"
+                          value={timeOf(n)}
+                          onChange={(e) => setDayTime(n, e.target.value)}
+                          className="w-full rounded-md border border-gray-200 px-2 py-1 text-sm outline-none focus:border-blue-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Field label={t.bulkRoom}>

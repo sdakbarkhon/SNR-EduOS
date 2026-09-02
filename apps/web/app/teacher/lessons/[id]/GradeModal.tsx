@@ -17,23 +17,36 @@ const GRADE_COLORS: Record<number, { bg: string; text: string; ring: string }> =
   5: { bg: "bg-emerald-500",text: "text-white", ring: "ring-emerald-400" },
 };
 
+/**
+ * Кого оцениваем. Разделено типом, а не флагом, чтобы «одного» и «всех» нельзя
+ * было перепутать местами: у одного есть прежняя оценка и замок, у всех —
+ * список тех, кого ещё не оценивали, и замка на них по определению нет.
+ */
+export type GradeTarget =
+  | { kind: "one"; studentId: string; studentName: string; existing: LessonGrade | null }
+  | { kind: "all"; students: Array<{ id: string; name: string }> };
+
 type Props = {
   lessonId: string;
   teacherId: string;
-  studentId: string;
-  studentName: string;
-  existing: LessonGrade | null;
+  target: GradeTarget;
   /** Статус урока: пока он идёт, замка нет (миграция 245). */
   lessonStatus: LessonLockStatus;
   onClose: () => void;
-  onSaved: (grade: LessonGrade) => void;
+  /** Массив, а не одна оценка: при «оценить остальных» их несколько, и экран
+   *  должен показать даже те, что прошли при частичном отказе. */
+  onSaved: (grades: LessonGrade[]) => void;
 };
 
-export function GradeModal({ lessonId, teacherId, studentId, studentName, existing, lessonStatus, onClose, onSaved }: Props) {
+export function GradeModal({ lessonId, teacherId, target, lessonStatus, onClose, onSaved }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const dl = d.lesson;
   const db = createClient();
+
+  const один = target.kind === "one" ? target : null;
+  const всех = target.kind === "all" ? target.students : null;
+  const existing = один?.existing ?? null;
 
   const [grade, setGrade] = useState<number | null>(existing?.grade ?? null);
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
@@ -47,10 +60,15 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
   // оставалось открытым и молчало. Так восемь дней пряталась поломка
   // миграции 225: база падала сырой ошибкой, а учитель видел пустоту.
   const [saveError, setSaveError] = useState<null | "locked" | "failed">(null);
+  /** Частичный отказ при «оценить остальных»: сколько прошло из скольких. */
+  const [partial, setPartial] = useState<{ ok: number; all: number } | null>(null);
 
   // Замок миграций 203 и 245. Правило целиком живёт в markLockState — здесь
   // только вопрос и ответ, своей копии отсчёта у экрана нет. Комментарий не
   // запирается никогда: его правят и после того, как оценка заперлась.
+  // При «оценить остальных» список составлен из тех, у кого оценки НЕТ, —
+  // значит отметки времени нет тоже, и замку не за что цепляться. Правило
+  // одно и то же, зовём его одинаково, а не заводим второй ответ.
   const lock = markLockState({ stamp: existing?.graded_at ?? null, lesson: lessonStatus });
 
   // preset comments keyed by grade (1-5)
@@ -67,10 +85,34 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
   async function handleSave() {
     if (!canSave || !grade) return;
     setSaving(true);
+    setSaveError(null);
+    setPartial(null);
     try {
-      const saved = await gradeStudentForLesson(db, lessonId, teacherId, studentId, grade, comment);
-      onSaved(saved);
-      onClose();
+      if (один) {
+        const saved = await gradeStudentForLesson(db, lessonId, teacherId, один.studentId, grade, comment);
+        onSaved([saved]);
+        onClose();
+        return;
+      }
+
+      // ── «Оценить остальных» ──────────────────────────────────────────────
+      // КАЖДЫЙ УЧЕНИК ОТДЕЛЬНО, И ПАДЕНИЕ ОДНОГО НЕ РОНЯЕТ ОСТАЛЬНЫХ.
+      // allSettled, а не all: у оценок нет ни транзакции, ни порядка, и терять
+      // девять сохранённых из-за одного отказа было бы хуже всего. Прошедшие
+      // уходят на экран сразу, непрошедшие остаются в списке — их видно и
+      // можно поставить по одному.
+      const итоги = await Promise.allSettled(
+        (всех ?? []).map((st) => gradeStudentForLesson(db, lessonId, teacherId, st.id, grade, comment)),
+      );
+      const прошли = итоги.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+      const отказы = итоги.flatMap((r) => (r.status === "rejected" ? [r.reason] : []));
+      if (прошли.length) onSaved(прошли);
+
+      if (отказы.length === 0) { onClose(); return; }
+      // Отказ базы обязан доехать до человека — и назваться своим именем.
+      if (отказы.some((e) => isMarkLockedError(e))) setSaveError("locked");
+      else { setSaveError("failed"); console.error("[GradeModal] часть оценок не сохранилась:", отказы[0]); }
+      setPartial({ ok: прошли.length, all: итоги.length });
     } catch (err) {
       // Молчать здесь нельзя: запертую запись сервер отклоняет, и учитель
       // должен понять, почему кнопка «не сработала».
@@ -99,7 +141,9 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
           <p className="truncate text-sm font-bold text-slate-700">
-            {dl.gradeStudent} <span className="text-brand-blue">{studentName}</span>
+            {один
+              ? <>{dl.gradeStudent} <span className="text-brand-blue">{один.studentName}</span></>
+              : <>{d.teacher.rollCallGradeAll} <span className="text-brand-blue">({всех?.length ?? 0})</span></>}
           </p>
           <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <X className="h-4 w-4" />
@@ -126,6 +170,18 @@ export function GradeModal({ lessonId, teacherId, studentId, studentName, existi
               {dl.markWindowLeft.replace("{n}", String(lock.minutesLeft))}
             </p>
           ) : null}
+
+          {/* Частичный отказ при «оценить остальных»: часть прошла, часть нет.
+              Молчать нельзя — иначе человек решит, что оценены все. */}
+          {partial && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="text-[11px] leading-snug text-amber-800">
+                {d.teacher.bulkPartialSaved
+                  .replace("{ok}", String(partial.ok))
+                  .replace("{all}", String(partial.all))}
+              </p>
+            </div>
+          )}
 
           {/* Любой другой отказ базы: окно не закрылось — надо сказать почему. */}
           {saveError === "failed" && (

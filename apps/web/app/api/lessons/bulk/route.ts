@@ -27,6 +27,9 @@ type Body = {
   subjectId?: string;
   weekdays?: number[];
   time?: string;
+  /** Своё время по дням недели (пункт 11). Ключ — ISO-день, «1».. «7».
+   *  Не пришло — все дни идут по `time`, как было до 02.09.2026. */
+  timeByWeekday?: Record<string, string>;
   from?: string;
   to?: string;
   useTopics?: boolean;
@@ -60,6 +63,19 @@ export async function POST(req: NextRequest) {
   if (!groupId || !subjectId) return NextResponse.json({ error: "Не выбрана группа или предмет" }, { status: 400 });
   if (weekdays.length === 0) return NextResponse.json({ error: "Не выбран ни один день недели" }, { status: 400 });
   if (!time || !TIME_RE.test(time)) return NextResponse.json({ error: "Неверное время" }, { status: 400 });
+
+  // Своё время по дням недели. Берём ТОЛЬКО выбранные дни и только годные
+  // значения: мусор из тела запроса не должен доехать до раскладки, а лишний
+  // день (учитель задал время, потом снял галку) — просто не нужен.
+  const timeByWeekday: Partial<Record<Weekday, string>> = {};
+  for (const [ключ, значение] of Object.entries(body.timeByWeekday ?? {})) {
+    const день = Number(ключ) as Weekday;
+    if (!weekdays.includes(день)) continue;
+    if (typeof значение !== "string" || !TIME_RE.test(значение)) {
+      return NextResponse.json({ error: "Неверное время у одного из дней недели" }, { status: 400 });
+    }
+    timeByWeekday[день] = значение;
+  }
   if (!from || !to || !DATE_RE.test(from) || !DATE_RE.test(to)) {
     return NextResponse.json({ error: "Неверный период" }, { status: 400 });
   }
@@ -103,7 +119,7 @@ export async function POST(req: NextRequest) {
   let planned: PlannedLesson[];
   try {
     planned = await planWeeklySchedule(db, groupId, {
-      weekdays, time, from, to, durationMinutes: duration,
+      weekdays, time, timeByWeekday, from, to, durationMinutes: duration,
     }, nowMs);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка раскладки" }, { status: 500 });

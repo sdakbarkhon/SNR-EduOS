@@ -200,7 +200,7 @@ export async function planLessonSlots(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // МАССОВОЕ СОЗДАНИЕ: правило «эти дни недели, это время, с такого числа по
-// такое».
+// такое». С 02.09.2026 время можно задать каждому дню своё (пункт 11).
 //
 // ПОЧЕМУ ЗДЕСЬ, А НЕ В НОВОМ ФАЙЛЕ. Раскладка одна, поводов для неё два:
 // «разложи темы плана сам» (planLessonSlots выше) и «разложи по моему
@@ -237,8 +237,17 @@ export type PlannedLesson = {
 
 export type WeeklyPlanInput = {
   weekdays: Weekday[];
-  /** «HH:MM» по Ташкенту. */
+  /** «HH:MM» по Ташкенту — время ПО УМОЛЧАНИЮ для всех выбранных дней. */
   time: string;
+  /**
+   * Своё время для отдельных дней недели: «в понедельник первым уроком, в
+   * среду третьим». День, которого здесь нет, идёт по `time`.
+   *
+   * 02.09.2026, пункт 11. Поле необязательное намеренно: не передали — работает
+   * ровно как раньше, одно время на все дни. Заставлять заполнять семь полей
+   * ради одного урока было бы хуже прежнего.
+   */
+  timeByWeekday?: Partial<Record<Weekday, string>>;
   /** Обе границы включительно, «YYYY-MM-DD». */
   from: string;
   to: string;
@@ -290,8 +299,11 @@ export async function planWeeklySchedule(
 
   let cursor = input.from;
   for (let guard = 0; guard < MAX_PERIOD_DAYS && cursor <= input.to; guard++) {
-    if (wanted.has(weekdayOf(cursor))) {
-      const startMs = new Date(`${cursor}T${input.time}:00+05:00`).getTime();
+    const wd = weekdayOf(cursor);
+    if (wanted.has(wd)) {
+      // Время этого дня недели, если оно задано отдельно; иначе общее.
+      const time = input.timeByWeekday?.[wd] ?? input.time;
+      const startMs = new Date(`${cursor}T${time}:00+05:00`).getTime();
       const endMs = startMs + dur * 60 * 1000;
 
       // Прошедшее время: createLesson такой урок отвергает, а триггер на
@@ -304,7 +316,7 @@ export async function planWeeklySchedule(
           return startMs < le && endMs > ls;
         });
         out.push({
-          date: cursor, time: input.time, occupied,
+          date: cursor, time, occupied,
           topicId: null, topicTitle: null, topicDescription: null,
         });
       }

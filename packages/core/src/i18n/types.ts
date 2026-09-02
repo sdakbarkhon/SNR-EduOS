@@ -2745,6 +2745,9 @@ export interface Dictionary {
     bulkSubject: string;
     bulkWeekdays: string;
     bulkTime: string;
+    bulkPerDayTime: string;        // «Своё время по дням» (пункт 11)
+    bulkPerDayTimeHint: string;
+    bulkTimeSame: string;          // подпись общего времени, когда режим выключен
     bulkFrom: string;
     bulkTo: string;
     bulkRoom: string;
@@ -3023,6 +3026,12 @@ export interface Dictionary {
     rollCallExcused: string;
     rollCallUnexcused: string;
     rollCallSaved: string;
+    rollCallMarkAll: string;        // «Отметить остальных» (пункт 15)
+    rollCallMarkAllHint: string;
+    rollCallMarkAllNone: string;
+    rollCallGradeAll: string;       // «Оценить остальных»
+    rollCallGradeAllNone: string;
+    bulkPartialSaved: string;       // «Сохранено {ok} из {all}»
     rollCallStats: string;
     endLessonConfirmTitle: string;
     endLessonConfirmMsg: string;
