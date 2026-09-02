@@ -1,7 +1,8 @@
 "use server";
 
 import {
-  createSchoolAdmin, changeOwnPassword, createSchool, updateSchoolCard,
+  createSchoolAdmin,
+  createManager, updateManager, deleteManager, resetManagerPassword, changeOwnPassword, createSchool, updateSchoolCard,
   updateSchoolAdmin, deleteSchoolAdmin, resetSchoolAdminPassword,
   assertSchoolIsManageable, assertAdminIsManageable,
 } from "@/lib/admin-api";
@@ -323,6 +324,125 @@ export async function actionEnterSchool(schoolId: string) {
 }
 
 // ── SCHOOL ADMINS ────────────────────────────────────────────────────────────
+
+// ── МЕНЕДЖЕРЫ ────────────────────────────────────────────────────────────────
+//
+// Роль менеджера, заход 1 (миграция 250). Четыре действия — слепок с
+// администраторов школ, минус всё, что связано со школой: у менеджера её нет.
+//
+// ЖУРНАЛ ПИШЕТСЯ ТАК ЖЕ, КАК У АДМИНИСТРАТОРОВ. Названия действий свои —
+// manager.create, manager.update, manager.delete, manager.password.reset, —
+// потому что название отвечает на вопрос «что сделано», и заводить менеджера
+// это не то же самое, что заводить админа школы.
+//
+// А вот КТО действовал, названием не кодируется: для этого миграция 250
+// завела колонку actor_role со значением по умолчанию 'super_admin'. Здесь
+// действует суперадмин, поэтому умолчание и подходит; когда в заходе 3 писать
+// в журнал начнёт сам менеджер, роль придётся передавать явно.
+
+export async function actionCreateManager(formData: FormData) {
+  return guard(async () => {
+    const actor = await verifySuperAdmin();
+    const full_name = String(formData.get("full_name") ?? "").trim();
+    const username = String(formData.get("username") ?? "").trim();
+    const password = String(formData.get("password") ?? "").trim();
+    if (!full_name || !username || !password) throw new Error("Missing fields");
+    const google_email = String(formData.get("google_email") ?? "").trim() || null;
+
+    // ПАРОЛЬ В ЖУРНАЛ НЕ ПОПАДАЕТ: поля перечислены поимённо, и его среди них
+    // нет. Второй рубеж — проверка в самой базе (journal_assert_no_secrets,
+    // миграция 220), она отвергла бы запись с таким ключом.
+    const result = await withJournal(
+      {
+        action: "manager.create", actorUserId: actor.id, actorName: actor.name,
+        targetType: "manager", targetName: full_name,
+        details: { full_name, username, google_email },
+      },
+      () => createManager({ full_name, username, password, google_email }),
+      (r) => ({ targetId: r.managerId }),
+    );
+    revalidatePath("/superadmin/managers");
+    revalidatePath("/superadmin/dashboard");
+    return result;
+  });
+}
+
+export async function actionUpdateManager(formData: FormData) {
+  return guard(async () => {
+    const actor = await verifySuperAdmin();
+    const manager_id = String(formData.get("manager_id") ?? "").trim();
+    const full_name = String(formData.get("full_name") ?? "").trim();
+    if (!manager_id || !full_name) throw new Error("Missing fields");
+
+    // Почта пишется, только если её правда правили: тот же приём с скрытым
+    // полем «было», что у администратора школы (lib/form-patch.ts). Иначе
+    // отсутствие поля затирало бы почту при каждом сохранении.
+    const changed = changedFields(formData, ADMIN_GUARDED_FIELDS);
+
+    await withJournal(
+      {
+        action: "manager.update", actorUserId: actor.id, actorName: actor.name,
+        targetType: "manager", targetId: manager_id, targetName: full_name,
+        details: { full_name, ...("google_email" in changed ? { google_email: changed.google_email } : {}) },
+      },
+      () => updateManager(manager_id, { full_name, ...changed }),
+    );
+    revalidatePath("/superadmin/managers");
+  });
+}
+
+export async function actionDeleteManager(userId: string) {
+  return guard(async () => {
+    const actor = await verifySuperAdmin();
+    if (!userId) throw new Error("Missing fields");
+    const имя = await managerNameFor(userId);
+
+    await withJournal(
+      {
+        action: "manager.delete", actorUserId: actor.id, actorName: actor.name,
+        targetType: "manager", targetId: userId, targetName: имя,
+        details: {},
+      },
+      () => deleteManager(userId),
+    );
+    revalidatePath("/superadmin/managers");
+    revalidatePath("/superadmin/dashboard");
+  });
+}
+
+export async function actionResetManagerPassword(userId: string) {
+  return guard(async () => {
+    const actor = await verifySuperAdmin();
+    if (!userId) throw new Error("Missing fields");
+    const имя = await managerNameFor(userId);
+
+    // НОВЫЙ ПАРОЛЬ ВОЗВРАЩАЕТСЯ НАРУЖУ, НО В ЖУРНАЛ НЕ ПИШЕТСЯ. Он нужен
+    // человеку ровно один раз — показать и передать; в журнале ему делать
+    // нечего, и база бы его не приняла.
+    return withJournal(
+      {
+        action: "manager.password.reset", actorUserId: actor.id, actorName: actor.name,
+        targetType: "manager", targetId: userId, targetName: имя,
+        details: {},
+      },
+      () => resetManagerPassword(userId),
+    );
+  });
+}
+
+/** Имя менеджера для журнала: после удаления взять его будет негде. Молчит
+ *  при любой беде — журнал не должен ронять действие из-за подписи. */
+async function managerNameFor(userId: string): Promise<string | null> {
+  try {
+    const sb = createAdminClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (sb as any)
+      .from("managers").select("full_name").eq("user_id", userId).maybeSingle();
+    return (data as { full_name?: string } | null)?.full_name ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function actionCreateSchoolAdmin(formData: FormData) {
   return guard(async () => {

@@ -38,7 +38,20 @@ export type JournalAction =
   | "self.password"
   | "access.denied"
   /** Вход в школу на просмотр (миграция 221). */
-  | "school.visit";
+  | "school.visit"
+  /**
+   * Менеджеры (миграция 250). Названия свои, потому что название отвечает на
+   * вопрос «ЧТО сделано», а завести менеджера — не то же самое, что завести
+   * администратора школы.
+   *
+   * Кто именно действовал, названием НЕ кодируется: для этого 250 завела
+   * колонку actor_role. Иначе фильтр по действию пришлось бы выбирать дважды,
+   * а число названий удвоилось бы на ровном месте.
+   */
+  | "manager.create"
+  | "manager.update"
+  | "manager.delete"
+  | "manager.password.reset";
 
 export type JournalOutcome = "started" | "done" | "failed" | "denied";
 
@@ -46,7 +59,7 @@ export type JournalEntry = {
   action: JournalAction;
   actorUserId?: string | null;
   actorName?: string | null;
-  targetType?: "school" | "admin" | "self" | null;
+  targetType?: "school" | "admin" | "manager" | "self" | null;
   targetId?: string | null;
   targetName?: string | null;
   /** ТОЛЬКО перечисленные поля. Форму целиком сюда не передавать никогда. */

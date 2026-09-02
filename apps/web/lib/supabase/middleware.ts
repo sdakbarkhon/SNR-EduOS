@@ -52,6 +52,9 @@ export async function updateSession(request: NextRequest) {
   const isTeacherRoute = pathname.startsWith("/teacher");
   const isAdminRoute = pathname.startsWith("/admin");
   const isSuperadminRoute = pathname.startsWith("/superadmin");
+  // Раздел менеджера. Проверять пересечение с /admin не нужно: строки
+  // начинаются по-разному, и «/manager» под startsWith("/admin") не попадёт.
+  const isManagerRoute = pathname.startsWith("/manager");
   const isParentRoute = pathname.startsWith("/parent") && !isParentLoginRoute;
 
   // Публичный экран телефон-входа и возврат от провайдера — без гейта.
@@ -124,6 +127,7 @@ export async function updateSession(request: NextRequest) {
     }
 
     const isSuperAdmin = role === "super_admin";
+    const isManager = role === "manager";
     const isAdmin = role === "admin";
     const isParent = role === "parent";
     const isTeacher = role === "teacher";
@@ -139,6 +143,22 @@ export async function updateSession(request: NextRequest) {
     if (isSuperAdmin && !isSuperadminRoute && !isAuthPage) {
       const target = request.nextUrl.clone();
       target.pathname = "/superadmin/dashboard";
+      return NextResponse.redirect(target);
+    }
+
+    // Чужой на разделе менеджера → на вход. Пара к следующему правилу:
+    // ровно так же устроены суперадмин, родитель и админ выше и ниже.
+    if (isManagerRoute && !isManager) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/login";
+      return NextResponse.redirect(target);
+    }
+
+    // Менеджер на любом чужом разделе → к себе. Заходы 2 и 3 добавят ему
+    // право работать внутри школ; пока у него один свой адрес.
+    if (isManager && !isManagerRoute && !isAuthPage) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/manager";
       return NextResponse.redirect(target);
     }
 

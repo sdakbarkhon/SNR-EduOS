@@ -74,6 +74,11 @@ async function resolveLoginCandidates(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyAdmin = admin as any;
 
+  // Менеджера здесь НЕТ намеренно. Резолвер нужен только тогда, когда один
+  // и тот же логин занят в РАЗНЫХ школах и человеку надо выбрать свою;
+  // у менеджера школы нет, а его логин уникален на всю базу (индекс
+  // managers_username_uniq, миграция 250). Он входит первым же шагом, по
+  // простому адресу, и до резолвера дело не доходит.
   const [students, teachers, admins] = await Promise.all([
     anyAdmin.from("students").select("user_id, school_id").ilike("username", login),
     anyAdmin.from("teachers").select("user_id, school_id").ilike("username", login),
@@ -133,15 +138,19 @@ async function schoolOfUser(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyAdmin = admin as any;
 
-  const [sup, st, te, ad, pa] = await Promise.all([
+  const [sup, mg, st, te, ad, pa] = await Promise.all([
     anyAdmin.from("super_admins").select("id").eq("user_id", userId).maybeSingle(),
+    // Менеджер, как и суперадмин, ни к какой школе не привязан — в этом
+    // вся роль. Значит и школы у него нет, и экран выбора школы при входе
+    // ему показывать нечего (миграция 250).
+    anyAdmin.from("managers").select("id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("students").select("school_id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("teachers").select("school_id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("admins").select("school_id").eq("user_id", userId).maybeSingle(),
     anyAdmin.from("parents").select("school_id").eq("user_id", userId).maybeSingle(),
   ]);
 
-  if (sup.data) return { schoolId: null, schoolName: null, isDemo: false };
+  if (sup.data || mg.data) return { schoolId: null, schoolName: null, isDemo: false };
 
   const schoolId = (st.data?.school_id ?? te.data?.school_id ?? ad.data?.school_id ?? pa.data?.school_id ?? null) as string | null;
   if (!schoolId) return { schoolId: null, schoolName: null, isDemo: false };
@@ -205,18 +214,22 @@ interface ClaimSlotRow {
   user_id: string;
 }
 
-/** Приоритет как в middleware: super_admin > admin > parent > teacher > student. */
+/** Приоритет как в middleware: super_admin > manager > admin > parent >
+ *  teacher > student. Менеджер добавлен вторым (миграция 250). */
 async function resolveDest(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string> {
-  const [superAdminRes, adminRes, parentRes, teacherRes] = await Promise.all([
+  const [superAdminRes, managerRes, adminRes, parentRes, teacherRes] = await Promise.all([
     supabase.from("super_admins").select("id").eq("user_id", userId).maybeSingle(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from("managers").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("admins").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("parents").select("id").eq("user_id", userId).maybeSingle(),
     supabase.from("teachers").select("id").eq("user_id", userId).maybeSingle(),
   ]);
   if (superAdminRes.data) return "/superadmin/dashboard";
+  if (managerRes.data) return "/manager";
   if (adminRes.data) return "/admin";
   if (parentRes.data) return "/parent/home";
   if (teacherRes.data) return "/teacher/dashboard";

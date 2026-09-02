@@ -1,8 +1,23 @@
-/** DB-based role resolution. Super_admin wins over admin wins over parent
- *  wins over teacher wins over student. Works with both server and browser
- *  Supabase clients. */
+/** DB-based role resolution. Super_admin wins over manager wins over admin
+ *  wins over parent wins over teacher wins over student. Works with both
+ *  server and browser Supabase clients. */
 
-export type UserRole = "super_admin" | "admin" | "parent" | "teacher" | "student" | null;
+/**
+ * Роли системы. Порядок в объединении — порядок старшинства, и он тот же,
+ * что в get_current_user_role() (миграция 250).
+ *
+ * МЕНЕДЖЕР ВСТАЛ ВТОРЫМ. Он «админ школы во всех школах сразу»: сильнее
+ * школьного админа, потому что не привязан ни к одной школе, и слабее
+ * суперадмина, потому что школ не заводит.
+ */
+export type UserRole =
+  | "super_admin"
+  | "manager"
+  | "admin"
+  | "parent"
+  | "teacher"
+  | "student"
+  | null;
 
 /** Resolves the caller's own role (super_admin → admin → parent → teacher →
  *  student priority) in a single round trip via get_current_user_role()
@@ -22,6 +37,7 @@ export async function getCurrentUserRole(
 
 export function roleToHome(role: UserRole): string {
   if (role === "super_admin") return "/superadmin/dashboard";
+  if (role === "manager") return "/manager";
   if (role === "admin") return "/admin";
   if (role === "parent") return "/parent/home";
   if (role === "teacher") return "/teacher/dashboard";

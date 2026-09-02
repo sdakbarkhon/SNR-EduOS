@@ -2164,6 +2164,171 @@ export async function updateSchoolCard(
   if (error) throw error;
 }
 
+// ── СУПЕРАДМИН: МЕНЕДЖЕРЫ ────────────────────────────────────────────────────
+//
+// Роль менеджера — заход 1, миграция 250. «Админ школы, но во всех школах
+// сразу»: следит за учителями и за деньгами, школ и администраторов не
+// заводит.
+//
+// ═══ ЧЕМ ОТЛИЧАЕТСЯ ОТ АДМИНИСТРАТОРА ШКОЛЫ ══════════════════════════════
+//
+// Одним, и это главное: у менеджера НЕТ ШКОЛЫ. Отсюда всё остальное —
+//
+//   * адрес учётной записи собирается напрямую, без createSchoolScopedUser:
+//     та функция при столкновении логинов дописывает КОД ШКОЛЫ, а брать его
+//     неоткуда. Столкновений и не будет: логин менеджера уникален на всю базу
+//     (индекс managers_username_uniq), а домен у роли свой;
+//   * в форме нет поля школы и нет перевода в другую школу;
+//   * нет заслона «последнего не удалять»: он про то, чтобы школа не осталась
+//     без управления, а менеджер ничьей школой не управляет.
+//
+// ═══ ДОМЕН АДРЕСА: managers.snr.local ════════════════════════════════════
+//
+// У каждой роли свой: students.snr.local, teachers.snr.local,
+// admins.snr.local, parents.snr.local. Суперадмин сидит на admins.snr.local
+// под именем superadmin@ — это наследство миграции 71, и повторять его не
+// надо: менеджеров будет много, и класть их в чужой домен значит однажды
+// столкнуться логинами со школьным админом.
+
+export type ManagerRow = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  username: string | null;
+  google_email: string | null;
+  created_at: string;
+  /** Адрес учётной записи. Берётся из Auth, в таблице его нет. */
+  email: string | null;
+};
+
+/** Список менеджеров для экрана суперадмина. Адреса подтягиваются одним
+ *  походом в Auth — тем же getUserEmails, что и у администраторов школ. */
+export async function listManagers(): Promise<ManagerRow[]> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (sb as any)
+    .from("managers")
+    .select("id, user_id, full_name, username, google_email, created_at")
+    .order("full_name");
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<Omit<ManagerRow, "email">>;
+  if (rows.length === 0) return [];
+  // getUserEmails отдаёт обычный объект, а не Map — как у экрана
+  // администраторов школ.
+  const emails = await getUserEmails(rows.map((r) => r.user_id));
+  return rows.map((r) => ({ ...r, email: emails[r.user_id] ?? null }));
+}
+
+/**
+ * Завести менеджера.
+ *
+ * ПОРЯДОК ТОТ ЖЕ, ЧТО У АДМИНИСТРАТОРА ШКОЛЫ: сперва учётная запись, потом
+ * строка роли, и если вторая половина не удалась — учётная запись сносится.
+ * Иначе в Auth оседали бы висячие пользователи, которых никто не видит.
+ */
+export async function createManager(data: {
+  full_name: string;
+  username: string;
+  password: string;
+  google_email?: string | null;
+}): Promise<{ userId: string; managerId: string }> {
+  const sb = getServiceClient();
+  const login = data.username.trim().toLowerCase();
+  const email = `${login}@managers.snr.local`;
+
+  const created = await sb.auth.admin.createUser({
+    email, password: data.password, email_confirm: true,
+  });
+  if (!created.data?.user) {
+    // Занятый адрес — самая частая беда, и она должна доехать фразой, а не
+    // английской заглушкой Auth.
+    if (/already.*(registered|exists)|email_exists|duplicate/i.test(created.error?.message ?? "")) {
+      throw new Error("MANAGER_LOGIN_TAKEN");
+    }
+    throw created.error ?? new Error("Auth user creation failed");
+  }
+  const userId = created.data.user.id;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: row, error } = await (sb as any)
+    .from("managers")
+    .insert({
+      user_id: userId,
+      full_name: data.full_name.trim(),
+      username: login,
+      google_email: normalizeSocialEmail(data.google_email),
+    })
+    .select("id")
+    .single();
+  if (error || !row) {
+    await sb.auth.admin.deleteUser(userId);
+    // Уникальность логина держит ещё и индекс в базе: два человека могли
+    // нажать «Создать» одновременно, и Auth пропустил бы обоих по разным
+    // адресам, а индекс — нет.
+    if (/managers_username_uniq/i.test(String((error as { message?: string } | null)?.message ?? ""))) {
+      throw new Error("MANAGER_LOGIN_TAKEN");
+    }
+    throw error ?? new Error("Manager insert failed");
+  }
+  return { userId, managerId: (row as { id: string }).id };
+}
+
+/** Переименовать менеджера и поправить ему почту Google.
+ *
+ *  Почта пишется, ТОЛЬКО если ключ присутствует — то же правило, что у
+ *  администратора школы: без него отсутствие поля означало бы undefined и
+ *  затирало бы почту при каждом сохранении. */
+export async function updateManager(
+  managerId: string,
+  data: { full_name: string; google_email?: string | null },
+) {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: Record<string, any> = { full_name: data.full_name.trim() };
+  if ("google_email" in data) patch.google_email = normalizeSocialEmail(data.google_email);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (sb as any).from("managers").update(patch).eq("id", managerId);
+  if (error) throw error;
+}
+
+/**
+ * Удалить менеджера вместе с учётной записью.
+ *
+ * Строка managers уходит каскадом от auth.users (ON DELETE CASCADE в миграции
+ * 250) — как у администратора школы.
+ *
+ * ЗАСЛОНА «ПОСЛЕДНЕГО НЕ УДАЛЯТЬ» ЗДЕСЬ НЕТ, и это не забывчивость. У
+ * администраторов он стоит потому, что без последнего админа школа остаётся
+ * без управления. Менеджер ничьей школой не управляет: удали всех — и просто
+ * не станет менеджеров.
+ *
+ * Причину отказа спрашиваем ЗАРАНЕЕ, тем же приёмом, что у администратора:
+ * Auth подменяет ошибку базы своим «Database error deleting user», и человек
+ * увидел бы английскую заглушку вместо ссылок на живые записи.
+ */
+export async function deleteManager(userId: string) {
+  const sb = getServiceClient();
+  const blockers = await getUserDeletionBlockers(userId);
+  if (blockers.length > 0) {
+    const total = blockers.reduce((sum, b) => sum + b.rows, 0);
+    const where = blockers.map((b) => `${b.table} (${b.rows})`).join("; ");
+    throw new Error(`BLOCKED_USER_REFS:${total}:${where}`);
+  }
+  const { error } = await sb.auth.admin.deleteUser(userId);
+  if (error) throw error;
+}
+
+/** Новый пароль менеджеру. Возвращается один раз — показать и забыть. */
+export async function resetManagerPassword(userId: string): Promise<string> {
+  const sb = getServiceClient();
+  const newPassword = generatePassword();
+  const { error } = await sb.auth.admin.updateUserById(userId, { password: newPassword });
+  if (error) throw error;
+  return newPassword;
+}
+
 // ── SUPER ADMIN: SCHOOL ADMINS ───────────────────────────────────────────────
 
 export async function createSchoolAdmin(data: {

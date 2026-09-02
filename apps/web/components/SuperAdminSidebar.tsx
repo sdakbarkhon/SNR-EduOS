@@ -3,10 +3,7 @@
 import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard, School, UserCog, Settings, Coins, ScrollText,
-  LogOut, PanelLeftClose, PanelLeftOpen,
-} from "lucide-react";
+import { Coins, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, School, ScrollText, Settings, UserCog, Users } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -54,6 +51,9 @@ export function SuperAdminSidebar() {
     { key: "dashboard", href: "/superadmin/dashboard", icon: LayoutDashboard, label: dsa.navDashboard },
     { key: "schools",   href: "/superadmin/schools",   icon: School,         label: dsa.navSchools },
     { key: "admins",    href: "/superadmin/admins",    icon: UserCog,        label: dsa.navAdmins },
+    // Менеджеры — заход 1 (миграция 250). Рядом с администраторами: и то и
+    // другое про людей, которых заводит суперадмин.
+    { key: "managers",  href: "/superadmin/managers",  icon: Users,          label: dsa.navManagers },
     { key: "ai-costs",  href: "/superadmin/ai-costs",  icon: Coins,          label: dsa.navAiCosts },
     { key: "journal",   href: "/superadmin/journal",   icon: ScrollText,     label: dsa.navJournal },
     { key: "settings",  href: "/superadmin/settings",  icon: Settings,       label: dsa.navSettings },
