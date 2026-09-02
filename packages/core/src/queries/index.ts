@@ -3490,6 +3490,11 @@ export const linkLessonMaterialFromKnowledgeBase = async (
     kbBucket: "materials" | "books";
     fileSizeBytes: number | null;
     visibility?: "all" | "teacher_only";
+    /** Школа урока — та же ловушка, что у addLessonStage (03.09.2026):
+     *  под служебным ключом умолчание current_school_id() пусто. Вызывающие
+     *  оборачивают эту функцию в .catch(), поэтому падение было бы молчаливым:
+     *  книги библиотеки просто не прицепились бы. */
+    schoolId?: string;
   },
 ): Promise<LessonMaterial> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3501,6 +3506,7 @@ export const linkLessonMaterialFromKnowledgeBase = async (
       file_storage_path: input.storagePath,
       file_size_bytes: input.fileSizeBytes,
       file_original_name: input.title,
+      ...(input.schoolId ? { school_id: input.schoolId } : {}),
       uploaded_by: input.teacherId,
       visibility: input.visibility ?? "all",
       from_knowledge_base: true,
@@ -3675,6 +3681,18 @@ export const addLessonStage = async (
     config?: Record<string, unknown>;
     difficulty?: StageDifficulty;
     durationMin?: number | null;
+    /**
+     * Школа урока. 03.09.2026 — понадобилось разборщику очереди.
+     *
+     * У lesson_stages.school_id стоит NOT NULL с умолчанием
+     * current_school_id(). Под клиентом учителя оно работает; под СЛУЖЕБНЫМ
+     * ключом auth.uid() пуст, значит и current_school_id() пуст, и вставка
+     * падает с «null value in column school_id». Проверено пробой с откатом:
+     * код 23502.
+     *
+     * Не передан — ведёт себя ровно как раньше, умолчание колонки в силе.
+     */
+    schoolId?: string;
   },
 ): Promise<LessonStage> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3732,6 +3750,7 @@ export const addLessonStage = async (
       config: input.config ?? {},
       ...(input.difficulty ? { difficulty: input.difficulty } : {}),
       ...(input.durationMin !== undefined ? { duration_min: input.durationMin } : {}),
+      ...(input.schoolId ? { school_id: input.schoolId } : {}),
     })
     .select("*")
     .single();
@@ -4133,6 +4152,11 @@ export const deleteQuizQuestion = async (db: Db, questionId: string): Promise<vo
 /** Полностью заменяет вопросы этапа (delete-all + insert) — для сохранения из StageModal. */
 export const replaceQuizQuestions = async (
   db: Db, stageId: string, questions: QuizQuestionInput[],
+  /** Школа этапа — та же ловушка, что у addLessonStage: под служебным ключом
+   *  умолчание current_school_id() пусто. Здесь она была ОПАСНЕЕ, потому что
+   *  вызывающие оборачивают эту функцию в .catch() — вопросы квиза пропали бы
+   *  молча, и урок вышел бы с пустым тестом. 03.09.2026. */
+  schoolId?: string,
 ): Promise<void> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
@@ -4149,6 +4173,7 @@ export const replaceQuizQuestions = async (
     correct_option_index: q.correct_option_index,
     points: q.points ?? 1,
     time_per_question_seconds: q.time_per_question_seconds ?? 20,
+    ...(schoolId ? { school_id: schoolId } : {}),
   }));
   const { error } = await db2.from("quiz_questions").insert(rows);
   if (error) throw error;

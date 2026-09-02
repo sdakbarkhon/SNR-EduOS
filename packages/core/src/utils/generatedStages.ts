@@ -110,6 +110,7 @@ async function attachBooksFromKnowledgeBase(
   lessonId: string,
   teacherId: string,
   subjectName: string,
+  schoolId?: string,
 ): Promise<number> {
   const slug = getSubjectKeyByLabel(subjectName);
   if (!slug) return 0;
@@ -137,7 +138,7 @@ async function attachBooksFromKnowledgeBase(
   for (const b of books as Array<{ title: string; file_storage_path: string; file_size_bytes: number }>) {
     await linkLessonMaterialFromKnowledgeBase(db, {
       lessonId, teacherId, title: b.title, storagePath: b.file_storage_path,
-      kbBucket: "books", fileSizeBytes: b.file_size_bytes,
+      kbBucket: "books", fileSizeBytes: b.file_size_bytes, schoolId,
     });
     прицеплено += 1;
   }
@@ -174,6 +175,22 @@ export async function applyGeneratedStages(
     lessonMinutes: number;
     /** Название предмета: по нему подбираются книги библиотеки. */
     subjectName: string;
+    /**
+     * Школа урока. ОБЯЗАТЕЛЬНА ДЛЯ СЛУЖЕБНОГО КЛЮЧА, и вот почему.
+     *
+     * У четырёх таблиц на этом пути — lesson_stages, quiz_questions,
+     * lesson_materials, course_materials — колонка school_id объявлена
+     * NOT NULL с умолчанием current_school_id(). Под клиентом учителя оно
+     * работает. Под служебным ключом auth.uid() пуст, значит пусто и
+     * умолчание, и вставка падает с кодом 23502.
+     *
+     * Три из четырёх вызовов обёрнуты в .catch(), поэтому падали бы МОЛЧА:
+     * урок вышел бы без вопросов квиза и без книг, и никто бы не узнал.
+     * Найдено замером 03.09.2026, доказано пробой с откатом.
+     *
+     * Окно учителя может не передавать: у него сессия есть, умолчание в силе.
+     */
+    schoolId?: string;
     stages: GeneratedStage[];
     /** Стереть этапы середины перед вставкой. Перезаполнение (решение
      *  заказчика 02.09.2026): «старт» и «итог» не трогаются. */
@@ -215,6 +232,7 @@ export async function applyGeneratedStages(
       config,
       difficulty: s.difficulty,
       durationMin: s.duration_min,
+      schoolId: input.schoolId,
     });
 
     if (s.content_type === "quiz_qia" && s.quiz?.questions.length) {
@@ -225,7 +243,7 @@ export async function applyGeneratedStages(
       }));
       // Вопросы — «как получится»: этап уже стоит, и падение на вопросах не
       // должно отменять его. Так было и в окне.
-      await replaceQuizQuestions(db, newStage.id, questions).catch(() => null);
+      await replaceQuizQuestions(db, newStage.id, questions, input.schoolId).catch(() => null);
     }
 
     inserted += 1;
@@ -233,7 +251,7 @@ export async function applyGeneratedStages(
   }
 
   const booksAttached = await attachBooksFromKnowledgeBase(
-    db, input.lessonId, input.teacherId, input.subjectName,
+    db, input.lessonId, input.teacherId, input.subjectName, input.schoolId,
   ).catch(() => 0);
 
   return { inserted, removed, booksAttached };

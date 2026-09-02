@@ -142,8 +142,11 @@ export async function drainOneStageGenJob(baseUrl: string): Promise<DrainOutcome
       return провал(текст.slice(0, 300) || `HTTP ${res.status}`, !isQuotaError(текст) && res.status !== 429);
     }
 
-    const data = JSON.parse(текст) as { stages?: GeneratedStage[]; error?: string };
-    if (data.error) return провал(data.error, !isQuotaError(data.error));
+    const data = JSON.parse(текст) as { stages?: GeneratedStage[]; error?: unknown };
+    if (data.error) {
+      const причина = описатьОшибку(data.error);
+      return провал(причина, !isQuotaError(причина));
+    }
     if (!data.stages?.length) return провал("Модель вернула пустой список этапов", true);
 
     // ПЕРЕЗАПОЛНЕНИЕ. Урок мог быть уже наполнен — стираем середину и кладём
@@ -156,6 +159,10 @@ export async function drainOneStageGenJob(baseUrl: string): Promise<DrainOutcome
       subjectName,
       stages: data.stages,
       replaceExisting: true,
+      // Школа — обязательна: разборщик ходит служебным ключом, а у четырёх
+      // таблиц на этом пути school_id NOT NULL с умолчанием
+      // current_school_id(), которое под служебным ключом пусто.
+      schoolId: job.school_id,
     });
 
     await anyDb.from("lesson_stage_gen_queue").update({
@@ -168,10 +175,28 @@ export async function drainOneStageGenJob(baseUrl: string): Promise<DrainOutcome
       inserted: итог.inserted, removed: итог.removed, ms: Date.now() - startedMs,
     };
   } catch (e) {
-    const текст = e instanceof Error ? e.message : String(e);
+    // ПРИЧИНУ НЕ ГЛОТАТЬ. 03.09.2026: здесь стояло String(e), и первый же
+    // настоящий прогон записал в очередь «[object Object]» — потому что
+    // supabase-js бросает не Error, а обычный объект с полями message,
+    // code, details. Разбор занял отдельную пробу, которой не понадобилось
+    // бы, скажи запись правду сразу.
+    const текст = описатьОшибку(e);
     // Сеть и таймаут попытку тратят — решение заказчика.
     return провал(текст, !isQuotaError(текст));
   }
+}
+
+/** Человеческий текст из чего угодно, что может прилететь в catch. */
+function описатьОшибку(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+    const куски = [o.message, o.details, o.hint].filter((x) => typeof x === "string" && x);
+    const код = typeof o.code === "string" && o.code ? ` [${o.code}]` : "";
+    if (куски.length) return куски.join(" — ") + код;
+    try { return JSON.stringify(e).slice(0, 300); } catch { /* не сериализуется */ }
+  }
+  return String(e);
 }
 
 /** Сколько строк ещё ждёт разбора. */
