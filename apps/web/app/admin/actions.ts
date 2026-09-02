@@ -93,7 +93,11 @@ function readStudentExtras(formData: FormData): {
 
 export async function actionCreateStudent(formData: FormData) {
   return guard(async () => {
-    const { schoolId, userId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет (WRONG_SCHOOL). Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, userId } = await verifyAdmin(школаИзФормы);
     const full_name = String(formData.get("full_name") ?? "").trim();
     const username = String(formData.get("username") ?? "").trim();
     const password = String(formData.get("password") ?? "").trim();
@@ -113,7 +117,11 @@ export async function actionCreateStudent(formData: FormData) {
 
 export async function actionUpdateStudent(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin, userId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет (WRONG_SCHOOL). Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin, userId } = await verifyAdmin(школаИзФормы);
     const student_id = String(formData.get("student_id") ?? "");
     const user_id = String(formData.get("user_id") ?? "");
     const full_name = String(formData.get("full_name") ?? "").trim();
@@ -136,9 +144,9 @@ export async function actionUpdateStudent(formData: FormData) {
   });
 }
 
-export async function actionResetStudentPassword(userId: string) {
+export async function actionResetStudentPassword(userId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     const newPassword = await resetStudentPassword(userId, schoolId, isSuperAdmin);
     revalidatePath("/admin/students");
     return newPassword;
@@ -166,9 +174,9 @@ export async function actionTopUpStudentBalance(formData: FormData) {
   });
 }
 
-export async function actionDeleteStudent(userId: string) {
+export async function actionDeleteStudent(userId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteStudent(userId, schoolId, isSuperAdmin);
     revalidatePath("/admin/students");
     revalidatePath("/admin");
@@ -203,7 +211,11 @@ function readTeacherAssignments(formData: FormData): Array<{ catalog_id: string;
 
 export async function actionCreateTeacher(formData: FormData) {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет (WRONG_SCHOOL). Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId } = await verifyAdmin(школаИзФормы);
     const full_name = String(formData.get("full_name") ?? "").trim();
     const username = String(formData.get("username") ?? "").trim();
     const password = String(formData.get("password") ?? "").trim();
@@ -224,7 +236,11 @@ export async function actionCreateTeacher(formData: FormData) {
 
 export async function actionUpdateTeacher(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет (WRONG_SCHOOL). Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
     const teacher_id = String(formData.get("teacher_id") ?? "");
     const user_id = String(formData.get("user_id") ?? "");
     const full_name = String(formData.get("full_name") ?? "").trim();
@@ -248,9 +264,9 @@ export async function actionUpdateTeacher(formData: FormData) {
   });
 }
 
-export async function actionResetTeacherPassword(userId: string) {
+export async function actionResetTeacherPassword(userId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     const newPassword = await resetTeacherPassword(userId, schoolId, isSuperAdmin);
     revalidatePath("/admin/teachers");
     return newPassword;
@@ -258,16 +274,16 @@ export async function actionResetTeacherPassword(userId: string) {
 }
 
 /** Что удаление затронет — для честного текста в подтверждении. Z.2.3. */
-export async function actionTeacherDeletionImpact(teacherId: string): Promise<ActionResult<TeacherDeletionImpact>> {
+export async function actionTeacherDeletionImpact(teacherId: string, requestedSchoolId?: string | null): Promise<ActionResult<TeacherDeletionImpact>> {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     return getTeacherDeletionImpact(teacherId, schoolId, isSuperAdmin);
   });
 }
 
-export async function actionDeleteTeacher(teacherId: string, userId: string) {
+export async function actionDeleteTeacher(teacherId: string, userId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteTeacher(teacherId, userId, schoolId, isSuperAdmin);
     revalidatePath("/admin/teachers");
     revalidatePath("/admin/subject-assignments");

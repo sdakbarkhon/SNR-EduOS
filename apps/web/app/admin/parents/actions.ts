@@ -32,7 +32,11 @@ async function verifyAdmin(
 
 export async function actionCreateParent(formData: FormData) {
   return guard(async () => {
-    const { schoolId, userId } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет (WRONG_SCHOOL). Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, userId } = await verifyAdmin(школаИзФормы);
     const full_name = String(formData.get("full_name") ?? "").trim();
     const phone = String(formData.get("phone") ?? "").trim();
     const student_ids = formData.getAll("student_ids").map((v) => String(v));
@@ -57,9 +61,9 @@ export async function actionCreateParent(formData: FormData) {
  *  Временно, пока нет SMS-провайдера; снимается вместе с заглушкой доставки.
  *  Школа проверяется здесь: таблица кодов закрыта от браузера (RLS без
  *  политик), и без этой проверки админ одной школы увидел бы код чужой. */
-export async function actionParentPendingCode(parentId: string) {
+export async function actionParentPendingCode(parentId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     const sb = await createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: parent } = await (sb as any)
@@ -70,9 +74,9 @@ export async function actionParentPendingCode(parentId: string) {
   });
 }
 
-export async function actionDeleteParent(parentId: string) {
+export async function actionDeleteParent(parentId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     await deleteParent(parentId, schoolId, isSuperAdmin);
     revalidatePath("/admin/parents");
   });
@@ -80,7 +84,11 @@ export async function actionDeleteParent(parentId: string) {
 
 export async function actionUpdateParent(formData: FormData) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    // Школа приходит снаружи ТОЛЬКО у менеджера: своей у него нет.
+    // Админ её не шлёт, а пришлёт свою — verifyStaff примет, чужую
+    // отвергнет (WRONG_SCHOOL). Подделать нечего.
+    const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
+    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
     const parent_id = String(formData.get("parent_id") ?? "");
     const full_name = String(formData.get("full_name") ?? "").trim();
     const phone = String(formData.get("phone") ?? "").trim();
@@ -105,9 +113,9 @@ export async function actionUpdateParent(formData: FormData) {
   });
 }
 
-export async function actionResetParentPassword(userId: string) {
+export async function actionResetParentPassword(userId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin();
+    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
     const newPassword = await resetParentPassword(userId, schoolId, isSuperAdmin);
     revalidatePath("/admin/parents");
     return newPassword;

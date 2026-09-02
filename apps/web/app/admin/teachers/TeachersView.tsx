@@ -251,6 +251,16 @@ export function TeachersView({
   catalog,
   groups,
   defaultOpenAdd,
+  /**
+   * Школа, в которой идёт работа. Срез 3b, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
 }: {
   teachers: Teacher[];
   /** Z.2.4 — что каждый ведёт, ключ = teacher.id. Считается на сервере. */
@@ -259,7 +269,14 @@ export function TeachersView({
   catalog: Array<{ id: string; name: string }>;
   groups: Array<{ id: string; name: string }>;
   defaultOpenAdd?: boolean;
+  schoolId?: string;
 }) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.admin;
@@ -406,7 +423,7 @@ export function TeachersView({
               onSubmit={(fd) => {
                 guard(startTransition, async () => {
                   try {
-                    const res = await unwrap(actionCreateTeacher(fd));
+                    const res = await unwrap(actionCreateTeacher(сШколой(fd)));
                     // Сообщение говорит «Учитель создан» — раньше здесь стояла
                     // фраза про ученика, чинили это отдельным заходом. Плюс
                     // число назначенных предметов: админ должен видеть, что
@@ -443,7 +460,7 @@ export function TeachersView({
                 fd.append("user_id", modal.teacher.user_id ?? "");
                 startTransition(async () => {
                   try {
-                    const res = await unwrap(actionUpdateTeacher(fd));
+                    const res = await unwrap(actionUpdateTeacher(сШколой(fd)));
                     const назначено = res?.assigned ?? 0;
                     flash(
                       t.teacherUpdatedMsg
@@ -502,7 +519,7 @@ export function TeachersView({
                 onClick={() => startTransition(async () => {
                   try {
                     if (!modal.teacher.user_id) throw new Error("No user_id");
-                    const pwd = await unwrap(actionResetTeacherPassword(modal.teacher.user_id));
+                    const pwd = await unwrap(actionResetTeacherPassword(modal.teacher.user_id, schoolId));
                     flash(t.passwordResetMsg.replace("{name}", modal.teacher.full_name).replace("{password}", pwd));
                     setModal(null);
                   } catch (e) {
@@ -530,7 +547,7 @@ export function TeachersView({
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    await unwrap(actionDeleteTeacher(modal.teacher.id, modal.teacher.user_id ?? ""));
+                    await unwrap(actionDeleteTeacher(modal.teacher.id, modal.teacher.user_id ?? "", schoolId));
                     flash(t.teacherDeletedMsg);
                     setModal(null);
                   } catch (e) {

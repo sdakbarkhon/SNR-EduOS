@@ -58,15 +58,24 @@ function EditParentModal({
   onError,
   t,
   locale,
+  /** Школа менеджера. Не передана — форма прежняя, школу дают правила. */
+  schoolId,
 }: {
   parent: ParentRow;
   allStudents: Student[];
+  schoolId?: string;
   onClose: () => void;
   onSaved: () => void;
   onError: (msg: string) => void;
   t: ReturnType<typeof getDictionary>["adminParents"];
   locale: Locale;
 }) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const [fullName, setFullName] = useState(parent.full_name);
   // Из базы приходит «+998912345678» — вытаскиваем девять цифр, чтобы
   // карточка уже заведённого родителя открывалась с заполненным полем.
@@ -116,7 +125,7 @@ function EditParentModal({
         // приёма и его причина: lib/form-patch.ts.
         fd.set(origName("google_email"), parent.googleEmail ?? "");
         selectedIds.forEach((id) => fd.append("student_ids", id));
-        await unwrap(actionUpdateParent(fd));
+        await unwrap(actionUpdateParent(сШколой(fd)));
         onSaved();
       } catch (err) {
         onError(humanizeAdminError(err, locale));
@@ -204,7 +213,30 @@ function EditParentModal({
   );
 }
 
-export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; allStudents: Student[] }) {
+export function ParentsView({
+  parents,
+  allStudents,
+  /**
+   * Школа, в которой идёт работа. Срез 3b, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
+}: {
+  parents: ParentRow[];
+  allStudents: Student[];
+  schoolId?: string;
+}) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.adminParents;
@@ -310,7 +342,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                           <button
                             onClick={() => startTransition(async () => {
                               try {
-                                const code = await unwrap(actionParentPendingCode(p.id));
+                                const code = await unwrap(actionParentPendingCode(p.id, schoolId));
                                 flash(code ? `${t.codeLabel}: ${code.code}` : t.codeNone);
                               } catch (err) {
                                 flash(humanizeAdminError(err, locale as Locale));
@@ -369,6 +401,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
 
       {modal.kind === "edit" && (
         <EditParentModal
+          schoolId={schoolId}
           parent={modal.parent}
           allStudents={allStudents}
           onClose={() => setModal({ kind: "none" })}
@@ -396,7 +429,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
                   if (!userId) { flash(t.resetPasswordNotRegistered); setModal({ kind: "none" }); return; }
                   startTransition(async () => {
                     try {
-                      const newPassword = await unwrap(actionResetParentPassword(userId));
+                      const newPassword = await unwrap(actionResetParentPassword(userId, schoolId));
                       flash(t.newPasswordFlash.replace("{name}", modal.parent.full_name).replace("{password}", newPassword));
                       setModal({ kind: "none" });
                     } catch (err) {
@@ -428,7 +461,7 @@ export function ParentsView({ parents, allStudents }: { parents: ParentRow[]; al
               <button
                 onClick={() => startTransition(async () => {
                   try {
-                    await unwrap(actionDeleteParent(modal.parent.id));
+                    await unwrap(actionDeleteParent(modal.parent.id, schoolId));
                     flash(t.parentDeletedMsg);
                     setModal({ kind: "none" });
                   } catch (err) {

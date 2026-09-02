@@ -183,11 +183,28 @@ export function StudentsView({
   students,
   groups,
   defaultOpenAdd,
+  /**
+   * Школа, в которой идёт работа. Срез 3b, роль менеджера.
+   *
+   * НЕ ПЕРЕДАНО — ничего не меняется: форма уходит байт в байт прежней,
+   * доводы прежние, школу подставляют правила доступа. Так работает админ.
+   *
+   * ПЕРЕДАНО — школа кладётся в каждую форму и в каждый довод. Так работает
+   * менеджер: своей школы у него нет, и подставить её некому.
+   */
+  schoolId,
 }: {
   students: Student[];
   groups: Group[];
   defaultOpenAdd?: boolean;
+  schoolId?: string;
 }) {
+  /** Дописать школу в форму. Без неё форма остаётся прежней. */
+  const сШколой = (fd: FormData) => {
+    if (schoolId) fd.set("school_id", schoolId);
+    return fd;
+  };
+
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
   const t = d.admin;
@@ -349,7 +366,7 @@ export function StudentsView({
             onSubmit={async (fd) => {
               guard(startTransition, async () => {
                 try {
-                  await unwrap(actionCreateStudent(fd));
+                  await unwrap(actionCreateStudent(сШколой(fd)));
                   flash(
                     t.createdMsg
                       .replace("{username}", String(fd.get("username")))
@@ -377,7 +394,7 @@ export function StudentsView({
             onSubmit={async (fd) => {
               startTransition(async () => {
                 try {
-                  await unwrap(actionUpdateStudent(fd));
+                  await unwrap(actionUpdateStudent(сШколой(fd)));
                   flash(t.studentUpdatedMsg);
                   setModal(null);
                 } catch (e) {
@@ -400,7 +417,7 @@ export function StudentsView({
             onConfirm={() => {
               startTransition(async () => {
                 try {
-                  const newPwd = await unwrap(actionResetStudentPassword(modal.student.user_id));
+                  const newPwd = await unwrap(actionResetStudentPassword(modal.student.user_id, schoolId));
                   flash(t.passwordResetMsg.replace("{name}", modal.student.full_name).replace("{password}", newPwd));
                   setModal(null);
                 } catch (e) {
@@ -453,7 +470,7 @@ export function StudentsView({
             onConfirm={() => {
               startTransition(async () => {
                 try {
-                  await unwrap(actionDeleteStudent(modal.student.user_id));
+                  await unwrap(actionDeleteStudent(modal.student.user_id, schoolId));
                   flash(t.deletedMsg);
                   setModal(null);
                 } catch (e) {
