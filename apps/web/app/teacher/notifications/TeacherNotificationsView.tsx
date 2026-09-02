@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import {
   Bell, Megaphone, FileText, Award, CheckCircle, CalendarX, Clock,
@@ -82,7 +83,22 @@ export function TeacherNotificationsView({
   const [hasMore, setHasMore] = useState(initialNotifications.length >= PAGE_SIZE);
   // Z.3, заход 3 — «сейчас» из школы; у замороженной таймер не заводится.
   const nowMs = useSchoolNowMs(30_000);
-  const [activeTab, setActiveTab] = useState<"notifications" | "announcements">("notifications");
+  /**
+   * Вкладка — из адреса, если он её называет.
+   *
+   * 03.09.2026. Понадобилось дашборду: у него в блоке объявлений появилась
+   * ссылка «Все объявления», а отдельного экрана объявлений у учителя нет —
+   * маршрут /teacher/announcements упразднён, объявления живут вкладкой здесь.
+   * Без разбора адреса ссылка открывала бы вкладку уведомлений, то есть вела
+   * бы не туда, куда обещает.
+   *
+   * Читается ОДИН раз, при первом показе: дальше вкладку переключает человек,
+   * и перечитывать адрес значило бы отменять его выбор.
+   */
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<"notifications" | "announcements">(
+    searchParams.get("tab") === "announcements" ? "announcements" : "notifications",
+  );
   const reloadRef = useRef<() => void>(() => {});
 
   async function reload() {

@@ -299,6 +299,13 @@ function HeroBlock({ lessons, now }: { lessons: TodayLesson[]; now: Date | null 
   );
 }
 
+/**
+ * Сколько строк показывать в правых списках дашборда. Четвёртой строкой идёт
+ * ссылка на полный список — но только если за ней правда что-то есть: при
+ * трёх и меньше ссылка повела бы в список, где ровно то же самое.
+ */
+const DASH_LIST_LIMIT = 3;
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TeacherDashboardView({
@@ -347,7 +354,17 @@ export function TeacherDashboardView({
   // Right column data
   // Список под плиткой — по тому же признаку, что и её число: иначе «0 на
   // проверке» соседствовало бы с непустым списком работ на проверку.
-  const pendingReview = recentSubmissions.filter(isFileSubmissionPending).slice(0, 5);
+  //
+  // 03.09.2026. ТРИ СТРОКИ, ЧЕТВЁРТОЙ — ССЫЛКА. Было пять у работ и «сколько
+  // есть» у объявлений: восемь объявлений вытягивали правый столбец вдвое
+  // длиннее расписания, и под расписанием оставалось полэкрана белого поля
+  // (разбор — у сетки ниже). Три — столько, сколько человек читает взглядом,
+  // не прокручивая; за остальным есть полный список.
+  //
+  // Число одно на оба списка намеренно: два разных предела в соседних
+  // карточках выглядели бы случайностью.
+  const pendingReview = recentSubmissions.filter(isFileSubmissionPending).slice(0, DASH_LIST_LIMIT);
+  const shownAnnouncements = announcements.slice(0, DASH_LIST_LIMIT);
   const allActivity = recentSubmissions.slice(0, 5);
 
   return (
@@ -378,8 +395,15 @@ export function TeacherDashboardView({
       {/* Hero: current / next lesson */}
       <HeroBlock lessons={todayLessons} now={now} />
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-12 gap-6">
+      {/* Two-column layout.
+          items-start — 03.09.2026, и это вторая половина той же беды. У сетки
+          по умолчанию align-items: stretch, поэтому обе колонки вытягивались до
+          высоты более длинной. Правая (три карточки, восемь объявлений) была
+          выше — и левая карточка расписания, у которой белый фон, растягивалась
+          вместе с ней. Отсюда и бралось «полэкрана белого поля» под четырьмя
+          уроками: пустота была ВНУТРИ карточки расписания, а не под ней.
+          Со start каждая колонка кончается там, где кончается её содержимое. */}
+      <div className="grid grid-cols-12 items-start gap-6">
 
         {/* СЛЕВА: расписание дня списком (8 из 12 колонок) */}
         <section className="col-span-8 rounded-[24px] border border-white bg-white/70 p-6 shadow-sm backdrop-blur-xl">
@@ -515,7 +539,10 @@ export function TeacherDashboardView({
                     </Link>
                   ))}
                 </div>
-                {pendingCount > 5 && (
+                {/* Ссылка — только если за ней правда есть что смотреть.
+                    Сравниваем с тем, СКОЛЬКО ПОКАЗАНО, а не с пятёркой: работ
+                    на проверке может быть 120, а в свежих сдачах их две. */}
+                {pendingCount > pendingReview.length && (
                   <Link
                     href="/teacher/homework"
                     className="mt-3 block text-center text-[12px] font-semibold text-blue-600 hover:underline"
@@ -541,7 +568,7 @@ export function TeacherDashboardView({
               </div>
             ) : (
               <div className="space-y-2">
-                {announcements.map((a) => (
+                {shownAnnouncements.map((a) => (
                   <div key={a.id} className="rounded-xl p-2.5 transition-colors hover:bg-slate-50">
                     <div className="flex items-start gap-2">
                       <Megaphone className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", a.is_pinned ? "text-amber-500" : "text-slate-300")} />
@@ -557,6 +584,21 @@ export function TeacherDashboardView({
                     </div>
                   </div>
                 ))}
+                {/* Четвёртой строкой — полный список. Ведёт на
+                    /teacher/notifications: отдельного экрана объявлений у
+                    учителя НЕТ, маршрут /teacher/announcements упразднён, и
+                    объявления живут вкладкой внутри уведомлений. Адрес несёт
+                    ?tab=announcements, иначе ссылка «Все объявления» открывала
+                    бы вкладку уведомлений — то есть вела бы не туда, куда
+                    обещает. */}
+                {announcements.length > shownAnnouncements.length && (
+                  <Link
+                    href="/teacher/notifications?tab=announcements"
+                    className="mt-1 block text-center text-[12px] font-semibold text-blue-600 hover:underline"
+                  >
+                    Все объявления →
+                  </Link>
+                )}
               </div>
             )}
           </section>
