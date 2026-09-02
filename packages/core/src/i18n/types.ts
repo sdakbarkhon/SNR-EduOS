@@ -2835,6 +2835,7 @@ export interface Dictionary {
     kpiPending: string;
     kpiStudents: string;
     kpiLessonsDone: string;      // "{done} из {total}" — плитка «Уроков сегодня»
+    kpiPendingReview: string;    // плитка «Непроверенные работы» (03.09.2026)
     // 24.08.2026 — расписание на дашборде учителя.
     scheduleTitle: string;       // "Расписание сегодня"
     scheduleFreeDay: string;     // "Свободный день"
@@ -2844,7 +2845,6 @@ export interface Dictionary {
     lessonRoom: string;          // "Кабинет"
     todayLessons: string;
     noLessons: string;
-    recentActivity: string;
     noActivity: string;
     homeworkTitle: string;
     createBtn: string;

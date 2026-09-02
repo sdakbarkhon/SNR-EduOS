@@ -2745,7 +2745,7 @@ export const ru: Dictionary = {
     lessonRoom: "Кабинет",
     // 24.08.2026 — плитка «Уроков сегодня» на дашборде учителя.
     kpiLessonsDone: "{done} из {total}",
-    recentActivity: "Последние действия",
+    kpiPendingReview: "Непроверенные работы",
     noActivity: "Нет активности",
     homeworkTitle: "Задания",
     createBtn: "+ Создать задание",

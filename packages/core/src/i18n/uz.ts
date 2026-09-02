@@ -2735,7 +2735,7 @@ export const uz: Dictionary = {
     lessonDone: "Tugadi",
     lessonRoom: "Xona",
     kpiLessonsDone: "{total} tadan {done}",
-    recentActivity: "So'nggi faollik",
+    kpiPendingReview: "Tekshirilmagan ishlar",
     noActivity: "Faollik yo'q",
     homeworkTitle: "Topshiriqlar",
     createBtn: "+ Topshiriq yaratish",

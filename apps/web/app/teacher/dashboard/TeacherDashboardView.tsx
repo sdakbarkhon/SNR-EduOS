@@ -365,7 +365,6 @@ export function TeacherDashboardView({
   // карточках выглядели бы случайностью.
   const pendingReview = recentSubmissions.filter(isFileSubmissionPending).slice(0, DASH_LIST_LIMIT);
   const shownAnnouncements = announcements.slice(0, DASH_LIST_LIMIT);
-  const allActivity = recentSubmissions.slice(0, 5);
 
   return (
     <PageContainer className="space-y-6 pb-6">
@@ -378,7 +377,12 @@ export function TeacherDashboardView({
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiCard title="Всего учеников" value={totalStudents} icon={Users} />
-        <KpiCard title="На проверке"    value={pendingCount}   icon={FileText}     highlight />
+        {/* 03.09.2026. Было «На проверке» — не читалось: на проверке у кого,
+            чего и кем. Теперь плитка называет то, что считает, и берёт
+            подпись из словаря, а не из строки в коде. Слово «учеников»
+            намеренно опущено: на дашборде учителя других работ не бывает,
+            а плиток в ряду четыре и место в них не бесконечное. */}
+        <KpiCard title={d.teacher.kpiPendingReview} value={pendingCount} icon={FileText} highlight />
         <KpiCard title="Проверено"      value={checkedCount}   icon={CheckCircle2} />
         <KpiCard
           title={d.teacher.todayLessons}
@@ -603,37 +607,13 @@ export function TeacherDashboardView({
             )}
           </section>
 
-          {/* Block 3 — Activity feed */}
-          <section className="rounded-[24px] border border-white bg-white/70 p-5 shadow-sm backdrop-blur-xl">
-            <h2 className="mb-4 text-[15px] font-bold text-slate-800">{d.teacher.recentActivity}</h2>
-            {allActivity.length === 0 ? (
-              <p className="text-[12px] text-slate-400">{d.teacher.noActivity}</p>
-            ) : (
-              <div className="space-y-3">
-                {allActivity.map((sub) => (
-                  <Link
-                    key={sub.id}
-                    href={`/teacher/homework/${sub.homework_id}`}
-                    className="flex items-start gap-2"
-                  >
-                    <Avatar name={sub.student?.full_name ?? "?"} size={28} />
-                    <div className="min-w-0 text-[12px] leading-snug">
-                      <span className="font-semibold text-slate-800">{sub.student?.full_name}</span>{" "}
-                      <span className="text-slate-500">
-                        {sub.status === "graded" ? "получил(а) оценку за" : "сдал(а)"}
-                      </span>{" "}
-                      <span className="font-medium italic text-blue-600">
-                        «{sub.homework?.title}»
-                      </span>
-                      <div className="mt-0.5 text-[10px] text-slate-400">
-                        {timeAgo(sub.submitted_at, now?.getTime() ?? null)}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* Блок «Последние действия» убран 03.09.2026 по решению
+              заказчика: на дашборде ему места нет.
+
+              ЗАПРОС ПРИ ЭТОМ ОСТАЁТСЯ НУЖЕН и не осиротел:
+              getTeacherRecentSubmissions кормит ещё и блок «Работы на
+              проверку» выше (pendingReview) — он из тех же свежих сдач
+              отбирает непроверенные. Убрать поход в базу было бы нельзя. */}
 
         </div>
       </div>

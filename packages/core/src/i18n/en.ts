@@ -2735,7 +2735,7 @@ export const en: Dictionary = {
     lessonDone: "Finished",
     lessonRoom: "Room",
     kpiLessonsDone: "{done} of {total}",
-    recentActivity: "Recent activity",
+    kpiPendingReview: "Ungraded work",
     noActivity: "No activity yet",
     homeworkTitle: "Assignments",
     createBtn: "+ Create assignment",
