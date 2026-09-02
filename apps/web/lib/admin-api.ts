@@ -1230,18 +1230,25 @@ async function unlinkTeacherFromGroupIfUnused(
   sb: any,
   groupId: string,
   teacherId: string,
-) {
+): Promise<boolean> {
   const { count: others } = await sb
     .from("subjects").select("id", { count: "exact", head: true })
     .eq("group_id", groupId).eq("teacher_id", teacherId);
-  if ((others ?? 0) > 0) return;
+  if ((others ?? 0) > 0) return false;
 
   const { data: group } = await sb.from("groups").select("teacher_id").eq("id", groupId).maybeSingle();
-  if (group?.teacher_id === teacherId) return;
+  if (group?.teacher_id === teacherId) return false;
 
-  const { error } = await sb
-    .from("group_teachers").delete().eq("group_id", groupId).eq("teacher_id", teacherId);
+  // 03.09.2026, пункт 103. Возвращаем ФАКТ, а не намерение: строки в
+  // group_teachers могло и не быть вовсе, и тогда доступ никто не терял.
+  // Считается это бесплатно — удаление и так выполняется, просто раньше его
+  // результат выбрасывался.
+  const { data: удалено, error } = await sb
+    .from("group_teachers").delete()
+    .eq("group_id", groupId).eq("teacher_id", teacherId)
+    .select("teacher_id");
   if (error) throw error;
+  return ((удалено ?? []) as unknown[]).length > 0;
 }
 
 /** Проставляет subject_slug при первом назначении — только в реальных школах
@@ -1276,7 +1283,7 @@ export async function setAssignmentTeacher(
   teacherId: string | null,
   callerSchoolId: string,
   callerIsSuperAdmin: boolean,
-): Promise<{ changed: boolean; groupId: string }> {
+): Promise<{ changed: boolean; groupId: string; lostGroupAccess: boolean }> {
   const sb = getServiceClient();
   await assertSameSchool(sb, "subjects", assignmentId, callerSchoolId, callerIsSuperAdmin);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1289,7 +1296,9 @@ export async function setAssignmentTeacher(
 
   const schoolId = (row.school_id as string) ?? callerSchoolId;
   const previous = (row.teacher_id as string | null) ?? null;
-  if (previous === teacherId) return { changed: false, groupId: row.group_id as string };
+  if (previous === teacherId) {
+    return { changed: false, groupId: row.group_id as string, lostGroupAccess: false };
+  }
 
   if (teacherId) {
     await assertSameSchool(sb, "teachers", teacherId, callerSchoolId, callerIsSuperAdmin);
@@ -1303,11 +1312,15 @@ export async function setAssignmentTeacher(
     await linkTeacherToGroup(anySb, row.group_id as string, teacherId, schoolId);
     await ensureSubjectSlug(anySb, teacherId, row.name as string, schoolId);
   }
+  // 03.09.2026, пункт 103. Потерял ли прежний учитель доступ к группе —
+  // теперь это ЗНАЮТ, а не догадываются: unlinkTeacherFromGroupIfUnused
+  // выполняет удаление и отдаёт его результат. Ни одного лишнего запроса.
+  let lostGroupAccess = false;
   if (previous) {
-    await unlinkTeacherFromGroupIfUnused(anySb, row.group_id as string, previous);
+    lostGroupAccess = await unlinkTeacherFromGroupIfUnused(anySb, row.group_id as string, previous);
   }
 
-  return { changed: true, groupId: row.group_id as string };
+  return { changed: true, groupId: row.group_id as string, lostGroupAccess };
 }
 // Z.1, 06.08.2026. Суперадмин управляет только НЕ-демо школами. Фильтра в UI
 // для этого мало: все четыре write-действия ниже принимают school_id/userId

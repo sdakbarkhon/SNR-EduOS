@@ -669,6 +669,8 @@ export const ru: Dictionary = {
     subjectsAndGroupsHint: "Одно действие ставит и право вести предмет, и доступ к группе.",
     seesGroupNo: "не видит группу",
     unassignBtn: "Снять",
+    unassignedMsg: "Снято: {subject} — {group}",
+    unassignedLostGroupMsg: "Снято: {subject} — {group}. Учитель больше ничего не ведёт в этой группе и больше её не видит.",
     lessonsCount: "уроков: {n}",
     tableGrade: "Класс",
     gradeFromGroupUnknown: "—",

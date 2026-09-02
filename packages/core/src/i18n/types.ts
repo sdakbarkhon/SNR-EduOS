@@ -675,6 +675,8 @@ export interface Dictionary {
     subjectsAndGroupsHint: string;
     seesGroupNo: string;
     unassignBtn: string;
+    unassignedMsg: string;           // «Снято: предмет — группа» (пункт 103)
+    unassignedLostGroupMsg: string;  // то же + учитель потерял доступ к группе
     lessonsCount: string;             // "{n}"
     /** Z.2.6 — куратор только в демо-школе, поле необязательное. */
     /** Z.2.7 — класс ученика в списке, выводится из группы. */

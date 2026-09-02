@@ -667,6 +667,8 @@ export const uz: Dictionary = {
     subjectsAndGroupsHint: "Bitta amal ham fan o'qitish huquqini, ham guruhga kirishni beradi.",
     seesGroupNo: "guruhni ko'rmaydi",
     unassignBtn: "Olib tashlash",
+    unassignedMsg: "Olib tashlandi: {subject} — {group}",
+    unassignedLostGroupMsg: "Olib tashlandi: {subject} — {group}. O‘qituvchi bu guruhda boshqa hech narsa o‘qitmaydi va uni endi ko‘rmaydi.",
     lessonsCount: "darslar: {n}",
     tableGrade: "Sinf",
     gradeFromGroupUnknown: "—",

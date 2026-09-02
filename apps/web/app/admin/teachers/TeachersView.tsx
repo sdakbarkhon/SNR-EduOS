@@ -137,7 +137,9 @@ function TeacherBindings({
   rows: TeacherBindingRow[];
   t: AdminDict;
   disabled: boolean;
-  onUnassign: (assignmentId: string) => void;
+  /** Строка целиком, а не один идентификатор: сообщение должно назвать
+   *  предмет и группу, а они здесь уже есть — доставать нечего. */
+  onUnassign: (row: TeacherBindingRow) => void;
 }) {
   if (rows.length === 0) {
     // Раньше здесь была только констатация «Пока ничего не ведёт». Она не
@@ -164,7 +166,7 @@ function TeacherBindings({
             <span className="text-[10px] text-gray-400">{t.lessonsCount.replace("{n}", String(r.lessons))}</span>
           )}
           <button
-            onClick={() => onUnassign(r.assignmentId)}
+            onClick={() => onUnassign(r)}
             disabled={disabled}
             className="rounded px-1 text-[10px] text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
           >
@@ -338,10 +340,29 @@ export function TeachersView({
                         rows={bindings[tc.id] ?? []}
                         t={t}
                         disabled={isPending}
-                        onUnassign={(assignmentId) => startTransition(async () => {
+                        onUnassign={(row) => startTransition(async () => {
                           try {
-                            await unwrap(actionSetAssignmentTeacher(assignmentId, null));
-                            flash(t.teacherUpdatedMsg);
+                            // 03.09.2026, пункт 103. Здесь стояло
+                            // «Данные учителя обновлены» — та же строка, что
+                            // после правки карточки учителя. Одно сообщение на
+                            // два разных события: человек не мог отличить
+                            // «переименовал учителя» от «снял с него предмет».
+                            //
+                            // Теперь сообщение называет, ЧТО снято, и —
+                            // отдельной фразой — потерял ли учитель доступ к
+                            // группе. Второе не считается лишним запросом:
+                            // setAssignmentTeacher и так выполняет удаление из
+                            // group_teachers, просто раньше его результат
+                            // выбрасывался, а теперь возвращается.
+                            const res = await unwrap(actionSetAssignmentTeacher(row.assignmentId, null));
+                            const шаблон = res?.lostGroupAccess
+                              ? t.unassignedLostGroupMsg
+                              : t.unassignedMsg;
+                            flash(
+                              шаблон
+                                .replace("{subject}", row.subjectName)
+                                .replace("{group}", row.groupName),
+                            );
                           } catch (e) {
                             flash(humanizeAdminError(e, locale as Locale));
                           }

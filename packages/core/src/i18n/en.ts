@@ -667,6 +667,8 @@ export const en: Dictionary = {
     subjectsAndGroupsHint: "One action grants both the right to teach and access to the group.",
     seesGroupNo: "cannot see the group",
     unassignBtn: "Unassign",
+    unassignedMsg: "Unassigned: {subject} — {group}",
+    unassignedLostGroupMsg: "Unassigned: {subject} — {group}. The teacher no longer teaches anything in this group and can no longer see it.",
     lessonsCount: "lessons: {n}",
     tableGrade: "Grade",
     gradeFromGroupUnknown: "—",
