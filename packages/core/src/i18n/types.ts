@@ -626,6 +626,34 @@ export interface Dictionary {
     assignmentsDeleteTitle: string;
     assignmentsDeleteConfirm: string;
     assignmentsDeleteWarning: string;
+    // Массовое назначение: предмет(ы) × группы × один учитель. 03.09.2026.
+    assignmentsBulk: string;
+    assignmentsBulkTitle: string;
+    assignmentsBulkHint: string;
+    assignmentsBulkTeacher: string;
+    assignmentsBulkSubjects: string;
+    assignmentsBulkGroups: string;
+    assignmentsBulkSelectAll: string;
+    assignmentsBulkClear: string;
+    assignmentsBulkNeedPick: string;
+    assignmentsBulkCounting: string;
+    assignmentsBulkRecount: string;
+    assignmentsBulkPlanTitle: string;
+    assignmentsBulkPlanCreate: string;
+    assignmentsBulkPlanAssign: string;
+    assignmentsBulkPlanNothing: string;
+    assignmentsBulkPlanChats: string;
+    assignmentsBulkPlanNoChats: string;
+    assignmentsBulkPlanSilent: string;
+    assignmentsBulkPlanNoAccount: string;
+    assignmentsBulkOccupied: string;
+    assignmentsBulkOccupiedBy: string;
+    assignmentsBulkAlready: string;
+    assignmentsBulkApply: string;
+    assignmentsBulkApplying: string;
+    assignmentsBulkDone: string;
+    assignmentsBulkFailedTitle: string;
+    assignmentsBulkFailedRow: string;
     role: string;
     profileSchool: string;
     // dashboard

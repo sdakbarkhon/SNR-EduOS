@@ -8,9 +8,11 @@ import {
   createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
   deleteSchoolSubject, getSchoolSubjectImpact, getSubjectAssignmentImpact,
   getTeacherDeletionImpact, setAssignmentTeacher, topUpStudentBalance,
+  planBulkAssignment, applyBulkAssignment,
 } from "@/lib/admin-api";
 import type {
   SchoolSubjectDeletionImpact, SubjectDeletionImpact, TeacherDeletionImpact,
+  BulkAssignPlan, BulkAssignResult,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
 import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
@@ -442,6 +444,66 @@ export async function actionCreateSubjectAssignment(formData: FormData) {
     revalidateSubjects();
     return id;
   });
+}
+
+/**
+ * МАССОВОЕ НАЗНАЧЕНИЕ, ШАГ 1 — ПОСЧИТАТЬ И НИЧЕГО НЕ ЗАПИСАТЬ.
+ *
+ * Тот же приём, что у массового создания уроков: предпросмотр считает тем
+ * же кодом, которым потом пишет, поэтому показанное число и сделанное не
+ * могут разойтись.
+ *
+ * Списки приходят JSON-строками, а не getAll(): здесь не форма браузера, а
+ * прямой вызов из клиента — и порядок пар нам не нужен, нужны два множества.
+ */
+export async function actionPlanBulkAssignment(
+  formData: FormData,
+): Promise<ActionResult<BulkAssignPlan>> {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const { catalogIds, groupIds, teacherId } = readBulkInput(formData);
+    return planBulkAssignment({ catalogIds, groupIds, teacherId, schoolId });
+  });
+}
+
+/** МАССОВОЕ НАЗНАЧЕНИЕ, ШАГ 2 — записать. Частичный отказ не теряет
+ *  прошедшего: результат несёт числа и причину по каждой непрошедшей паре. */
+export async function actionApplyBulkAssignment(
+  formData: FormData,
+): Promise<ActionResult<BulkAssignResult>> {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+    const { catalogIds, groupIds, teacherId } = readBulkInput(formData);
+    const итог = await applyBulkAssignment({ catalogIds, groupIds, teacherId, schoolId });
+    revalidateSubjects();
+    revalidatePath("/admin/teachers");
+    return итог;
+  });
+}
+
+/** Разбор входа обоих массовых действий. Один на два, чтобы шаг «посчитать»
+ *  и шаг «записать» не могли понять запрос по-разному. */
+function readBulkInput(formData: FormData): {
+  catalogIds: string[]; groupIds: string[]; teacherId: string | null;
+} {
+  const список = (имя: string): string[] => {
+    const raw = String(formData.get(имя) ?? "[]");
+    let разобрано: unknown;
+    try {
+      разобрано = JSON.parse(raw);
+    } catch {
+      throw new Error("Missing fields");
+    }
+    if (!Array.isArray(разобрано)) throw new Error("Missing fields");
+    // Пустые и повторы отсеиваем здесь: дальше они дали бы лишние круги до
+    // базы и задвоенные строки в отчёте.
+    return [...new Set(разобрано.map((v) => String(v).trim()).filter(Boolean))];
+  };
+  const catalogIds = список("catalog_ids");
+  const groupIds = список("group_ids");
+  if (catalogIds.length === 0 || groupIds.length === 0) throw new Error("Missing fields");
+  const teacher = String(formData.get("teacher_id") ?? "").trim();
+  return { catalogIds, groupIds, teacherId: teacher || null };
 }
 
 export async function actionUpdateSubjectAssignment(formData: FormData) {

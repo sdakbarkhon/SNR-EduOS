@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
-import { Layers, Plus, Pencil, Trash2, X, Check, Loader2, Info } from "lucide-react";
-import { getDictionary } from "@snr/core";
+import { Layers, Plus, Pencil, Trash2, X, Check, Loader2, Info, ListChecks, AlertTriangle } from "lucide-react";
+import { getDictionary, format } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
 import { useLocale } from "@/components/LocaleProvider";
@@ -14,7 +14,10 @@ import {
   actionUpdateSubjectAssignment,
   actionDeleteSubjectAssignment,
   actionCreateSchoolSubject,
+  actionPlanBulkAssignment,
+  actionApplyBulkAssignment,
 } from "../actions";
+import type { BulkAssignPlan, BulkAssignResult } from "@/lib/admin-api";
 
 // Z.2.2 — «кто что где ведёт». Одна строка = один предмет в одной группе с
 // одним учителем.
@@ -51,6 +54,68 @@ type ModalState =
   | { mode: "delete"; row: Assignment };
 
 const NEW_SUBJECT = "__new__";
+
+/**
+ * Набор галочек с «выбрать все» и «снять выбор».
+ *
+ * Своего компонента множественного выбора в проекте не было — был устойчивый
+ * образец (Set в состоянии, две кнопки, число в заголовке) прямо в разметке
+ * учебного плана. Здесь он нужен ДВАЖДЫ в одном окне, и вторая копия рядом с
+ * первой была бы уже перебором.
+ *
+ * Учебный план намеренно не трогаем: он не в этом заходе, а переезд рабочего
+ * экрана на новый компонент — отдельная работа со своей проверкой.
+ */
+function ВыборГалочками({
+  title, items, picked, onToggle, onAll, onNone, allLabel, noneLabel,
+}: {
+  title: string;
+  items: Array<{ id: string; label: string }>;
+  picked: Set<string>;
+  onToggle: (id: string) => void;
+  onAll: () => void;
+  onNone: () => void;
+  allLabel: string;
+  noneLabel: string;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-medium text-zinc-700">{title}</span>
+        <div className="flex gap-1.5">
+          <button
+            type="button" onClick={onAll}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            {allLabel}
+          </button>
+          <button
+            type="button" onClick={onNone} disabled={picked.size === 0}
+            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
+          >
+            {noneLabel}
+          </button>
+        </div>
+      </div>
+      <div className="grid max-h-40 gap-1 overflow-y-auto sm:grid-cols-2">
+        {items.map((it) => (
+          <label
+            key={it.id}
+            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${picked.has(it.id) ? "bg-violet-100 text-violet-900" : "text-zinc-700 hover:bg-white"}`}
+          >
+            <input
+              type="checkbox"
+              checked={picked.has(it.id)}
+              onChange={() => onToggle(it.id)}
+              className="h-4 w-4 shrink-0 rounded border-zinc-300 text-violet-600 focus:ring-violet-400"
+            />
+            <span className="min-w-0 truncate">{it.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function SubjectGlyph({ name, size = 18, className }: { name: string; size?: number; className?: string }) {
   const Icon = LUCIDE_ICONS[name] ?? LUCIDE_ICONS.BookOpen!;
@@ -159,6 +224,98 @@ export function AssignmentsView({
     });
   }
 
+  // ═══ МАССОВОЕ НАЗНАЧЕНИЕ ═══════════════════════════════════════════════
+  //
+  // ДВА НАБОРА ГАЛОЧЕК, ОДНА ФОРМА. Предметы и группы отмечаются независимо,
+  // и берётся их произведение: один предмет в шесть групп и шесть предметов в
+  // одну группу — это один и тот же механизм, разводить его на две формы
+  // незачем.
+  //
+  // Учитель один на всю пачку. Двух учителей сразу здесь быть не может: пара
+  // «предмет + группа» держит ровно одного, и выбор второго означал бы
+  // перебивку — а её заказчик запретил.
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTeacher, setBulkTeacher] = useState("");
+  const [bulkSubjects, setBulkSubjects] = useState<Set<string>>(new Set());
+  const [bulkGroups, setBulkGroups] = useState<Set<string>>(new Set());
+  const [bulkPlan, setBulkPlan] = useState<BulkAssignPlan | null>(null);
+  const [bulkResult, setBulkResult] = useState<BulkAssignResult | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+
+  /** Любая правка выбора обесценивает расчёт. Показывать вчерашнее число над
+   *  сегодняшним выбором нельзя: человек согласится не на то, что увидит. */
+  function сбросРасчёт() {
+    setBulkPlan(null);
+    setBulkResult(null);
+    setBulkError("");
+  }
+
+  const переключить = (набор: Set<string>, поставить: (s: Set<string>) => void) => (id: string) => {
+    const копия = new Set(набор);
+    if (копия.has(id)) копия.delete(id); else копия.add(id);
+    поставить(копия);
+    сбросРасчёт();
+  };
+
+  function openBulk() {
+    setBulkTeacher("");
+    setBulkSubjects(new Set());
+    setBulkGroups(new Set());
+    сбросРасчёт();
+    setBulkOpen(true);
+  }
+
+  function bulkFormData(): FormData {
+    const fd = new FormData();
+    fd.set("catalog_ids", JSON.stringify([...bulkSubjects]));
+    fd.set("group_ids", JSON.stringify([...bulkGroups]));
+    fd.set("teacher_id", bulkTeacher);
+    return fd;
+  }
+
+  /** ШАГ 1 — ПОСЧИТАТЬ, НИЧЕГО НЕ ЗАПИСЫВАЯ. Считает сервер тем же кодом,
+   *  которым потом пишет: иначе показанное и сделанное разойдутся. Точное
+   *  число чатов на клиенте не собрать — нужны размеры групп, уже
+   *  существующие ветки и наличие учётных записей. */
+  function handleBulkPlan() {
+    if (bulkSubjects.size === 0 || bulkGroups.size === 0) {
+      setBulkError(d.assignmentsBulkNeedPick);
+      return;
+    }
+    setBulkBusy(true);
+    setBulkError("");
+    setBulkResult(null);
+    startTransition(async () => {
+      try {
+        setBulkPlan(await unwrap(actionPlanBulkAssignment(bulkFormData())));
+      } catch (e) {
+        setBulkError(humanizeAdminError(e, locale as Locale));
+      } finally {
+        setBulkBusy(false);
+      }
+    });
+  }
+
+  /** ШАГ 2 — записать. Частичный отказ не теряет прошедшего: сервер отдаёт
+   *  числа и причину по каждой непрошедшей паре, и мы показываем обе правды
+   *  сразу — сколько прошло и что именно не прошло. */
+  function handleBulkApply() {
+    setBulkBusy(true);
+    setBulkError("");
+    startTransition(async () => {
+      try {
+        const итог = await unwrap(actionApplyBulkAssignment(bulkFormData()));
+        setBulkResult(итог);
+        setBulkPlan(null);
+      } catch (e) {
+        setBulkError(humanizeAdminError(e, locale as Locale));
+      } finally {
+        setBulkBusy(false);
+      }
+    });
+  }
+
   const missingBasics = groups.length === 0 || teachers.length === 0;
 
   return (
@@ -177,14 +334,26 @@ export function AssignmentsView({
         {/* Назначение связывает предмет, группу и учителя. Предмет можно
             завести прямо в форме, а группу и учителя — нет: без них форма
             открывается с пустыми списками. */}
-        <button
-          onClick={openAdd}
-          disabled={missingBasics}
-          title={missingBasics ? d.needBasicsFirst : undefined}
-          className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-violet-600"
-        >
-          <Plus className="h-4 w-4" /> {d.assignmentsAdd}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Массовое рядом с одиночным, а не вместо него: одно назначение
+              всё ещё делается быстрее в маленькой форме. */}
+          <button
+            onClick={openBulk}
+            disabled={missingBasics}
+            title={missingBasics ? d.needBasicsFirst : undefined}
+            className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ListChecks className="h-4 w-4" /> {d.assignmentsBulk}
+          </button>
+          <button
+            onClick={openAdd}
+            disabled={missingBasics}
+            title={missingBasics ? d.needBasicsFirst : undefined}
+            className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-violet-600"
+          >
+            <Plus className="h-4 w-4" /> {d.assignmentsAdd}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -348,6 +517,187 @@ export function AssignmentsView({
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {d.saveBtn}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── МАССОВОЕ НАЗНАЧЕНИЕ ─────────────────────────────────────── */}
+      {bulkOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-100 p-5">
+              <h2 className="text-lg font-semibold text-zinc-900">{d.assignmentsBulkTitle}</h2>
+              <button
+                onClick={() => setBulkOpen(false)}
+                disabled={bulkBusy}
+                className="rounded-lg p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+              <p className="text-xs leading-relaxed text-zinc-500">{d.assignmentsBulkHint}</p>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">{d.assignmentsBulkTeacher}</label>
+                <select
+                  value={bulkTeacher}
+                  onChange={(e) => { setBulkTeacher(e.target.value); сбросРасчёт(); }}
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  {/* «Не назначен» оставлен намеренно: так одной пачкой можно
+                      завести предмет во все группы и раздать учителей потом.
+                      Чатов при этом не будет ни одного — оба триггера выходят
+                      первой строкой при пустом учителе. */}
+                  <option value="">{d.subjectsNotAssigned}</option>
+                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                </select>
+              </div>
+
+              <ВыборГалочками
+                title={format(d.assignmentsBulkSubjects, { n: bulkSubjects.size })}
+                items={activeCatalog.map((c) => ({ id: c.id, label: c.name }))}
+                picked={bulkSubjects}
+                onToggle={переключить(bulkSubjects, setBulkSubjects)}
+                onAll={() => { setBulkSubjects(new Set(activeCatalog.map((c) => c.id))); сбросРасчёт(); }}
+                onNone={() => { setBulkSubjects(new Set()); сбросРасчёт(); }}
+                allLabel={d.assignmentsBulkSelectAll}
+                noneLabel={d.assignmentsBulkClear}
+              />
+
+              <ВыборГалочками
+                title={format(d.assignmentsBulkGroups, { n: bulkGroups.size })}
+                items={groups.map((g) => ({ id: g.id, label: g.name }))}
+                picked={bulkGroups}
+                onToggle={переключить(bulkGroups, setBulkGroups)}
+                onAll={() => { setBulkGroups(new Set(groups.map((g) => g.id))); сбросРасчёт(); }}
+                onNone={() => { setBulkGroups(new Set()); сбросРасчёт(); }}
+                allLabel={d.assignmentsBulkSelectAll}
+                noneLabel={d.assignmentsBulkClear}
+              />
+
+              {/* ── ЧТО ПРОИЗОЙДЁТ. Показывается ДО согласия ───────────── */}
+              {bulkPlan && (
+                <div className="space-y-1.5 rounded-xl border border-violet-100 bg-violet-50/50 p-3 text-xs">
+                  <div className="font-semibold text-violet-900">{d.assignmentsBulkPlanTitle}</div>
+                  {bulkPlan.willCreate === 0 && bulkPlan.willAssign === 0 ? (
+                    <p className="text-amber-700">{d.assignmentsBulkPlanNothing}</p>
+                  ) : (
+                    <>
+                      {bulkPlan.willCreate > 0 && (
+                        <p className="text-zinc-700">{format(d.assignmentsBulkPlanCreate, { n: bulkPlan.willCreate })}</p>
+                      )}
+                      {bulkPlan.willAssign > 0 && (
+                        <p className="text-zinc-700">{format(d.assignmentsBulkPlanAssign, { n: bulkPlan.willAssign })}</p>
+                      )}
+                      {bulkPlan.chats.teacherHasNoAccount ? (
+                        <p className="text-amber-700">{d.assignmentsBulkPlanNoAccount}</p>
+                      ) : bulkPlan.chats.newThreads > 0 ? (
+                        <p className="text-zinc-700">
+                          {format(d.assignmentsBulkPlanChats, {
+                            threads: bulkPlan.chats.newThreads,
+                            participants: bulkPlan.chats.newParticipants,
+                          })}
+                        </p>
+                      ) : (
+                        <p className="text-zinc-500">{d.assignmentsBulkPlanNoChats}</p>
+                      )}
+                      {/* Тихий ноль называется вслух: эти чаты не заведутся, и
+                          без этой строки никто бы не узнал. */}
+                      {bulkPlan.chats.silentStudents > 0 && (
+                        <p className="text-amber-700">
+                          {format(d.assignmentsBulkPlanSilent, { n: bulkPlan.chats.silentStudents })}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {bulkPlan.blocked.length > 0 && (
+                    <div className="mt-2 border-t border-violet-100 pt-2">
+                      <div className="font-semibold text-zinc-600">
+                        {format(d.assignmentsBulkOccupied, { n: bulkPlan.blocked.length })}
+                      </div>
+                      <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
+                        {bulkPlan.blocked.map((b) => (
+                          <li key={`${b.catalogId}-${b.groupId}`} className="text-zinc-500">
+                            {b.reason === "already_this_teacher"
+                              ? format(d.assignmentsBulkAlready, { subject: b.subjectName, group: b.groupName })
+                              : format(d.assignmentsBulkOccupiedBy, {
+                                  subject: b.subjectName, group: b.groupName, teacher: b.teacherName ?? "—",
+                                })}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── ЧТО ПОЛУЧИЛОСЬ. Обе правды сразу ──────────────────── */}
+              {bulkResult && (
+                <div className="space-y-1.5 rounded-xl bg-emerald-50 p-3 text-xs">
+                  <p className="font-semibold text-emerald-800">
+                    {format(d.assignmentsBulkDone, { created: bulkResult.created, assigned: bulkResult.assigned })}
+                  </p>
+                  {bulkResult.failed.length > 0 && (
+                    <div className="border-t border-emerald-100 pt-1.5">
+                      <div className="font-semibold text-red-700">
+                        {format(d.assignmentsBulkFailedTitle, { n: bulkResult.failed.length })}
+                      </div>
+                      <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
+                        {bulkResult.failed.map((f, i) => (
+                          <li key={i} className="text-red-600">
+                            {format(d.assignmentsBulkFailedRow, {
+                              subject: f.subjectName, group: f.groupName, reason: f.reason,
+                            })}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {bulkError && (
+                <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {bulkError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 p-5">
+              <button
+                onClick={() => setBulkOpen(false)}
+                disabled={bulkBusy}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50"
+              >
+                {d.cancelBtn}
+              </button>
+              {/* Кнопка «Назначить» появляется ТОЛЬКО после расчёта и только
+                  если делать есть что. Так человек не может согласиться на
+                  то, чего не видел, — тот же порядок, что у массового
+                  создания уроков. */}
+              {bulkPlan && (bulkPlan.willCreate > 0 || bulkPlan.willAssign > 0) ? (
+                <button
+                  onClick={handleBulkApply}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {bulkBusy ? d.assignmentsBulkApplying : d.assignmentsBulkApply}
+                </button>
+              ) : (
+                <button
+                  onClick={handleBulkPlan}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
+                  {bulkBusy ? d.assignmentsBulkCounting : bulkPlan ? d.assignmentsBulkRecount : d.assignmentsBulkPlanTitle}
+                </button>
+              )}
             </div>
           </div>
         </div>

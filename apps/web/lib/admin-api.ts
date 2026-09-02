@@ -1206,6 +1206,379 @@ export async function getTeacherBindings(
   }));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// МАССОВОЕ НАЗНАЧЕНИЕ: предмет(ы) × группы × один учитель. 03.09.2026.
+//
+// ЗАЧЕМ. Учитель ведёт математику с первого по шестой класс. Сегодня его
+// привязывают к каждой группе отдельно: восемь нажатий на одно назначение,
+// сорок восемь на шесть групп, причём предмет и учитель выбираются заново
+// каждый раз.
+//
+// ═══ ДВЕ ОПЕРАЦИИ, А НЕ ОДНА ══════════════════════════════════════════════
+//
+// В просьбе «назначить на несколько групп» спрятаны две разные вещи, и живые
+// числа 03.09.2026 показали, что нужны обе:
+//
+//   A. проставить учителя там, где предмет в группе УЖЕ заведён без него;
+//   B. завести предмет в группе, где его ещё нет, сразу с учителем.
+//
+// Свободных назначений (случай A) на всю базу было 14, и ВСЕ в демо-школе.
+// В боевых школах — ноль: там любое новое назначение это создание строки.
+// Форма только для A досталась бы витрине и никому больше.
+//
+// ═══ ЗАНЯТЫЕ ЧУЖИМ УЧИТЕЛЕМ НЕ ПЕРЕБИВАЮТСЯ ═══════════════════════════════
+//
+// Решение заказчика. Перебивка одним махом — это тихая потеря доступа у
+// прежнего учителя: setAssignmentTeacher на такое умеет отвечать («предмет
+// снят, доступ к группе потерян»), а пачка на тридцать строк не сумеет
+// рассказать это про каждую. Занятые показываются занятыми, с именем.
+//
+// ═══ ПОЧЕМУ ЭТО НЕ ОДИН UPDATE ════════════════════════════════════════════
+//
+// На subjects.teacher_id висят два чат-триггера. Замер 03.09.2026 на живой
+// базе, всё в транзакциях с откатом:
+//
+//   одно назначение, группа из 10 учеников → +10 веток, +21 участник
+//   ВТОРОЙ предмет тому же учителю в той же группе → +0, +0
+//   три группы по 10 одному учителю → +30 веток, +63 участника
+//
+// Ветка заводится на пару «ученик + учитель», а не на назначение, и всё
+// идемпотентно. Сами триггеры дёшевы: по часам базы 2,5 мс при нуле учеников
+// и 4,8 мс при десяти.
+//
+// ═══ ЧТО ЗДЕСЬ ВЫНЕСЕНО ИЗ ЦИКЛА ══════════════════════════════════════════
+//
+// Настоящая опасность не в чатах, а в кругах до базы. createSubjectAssignment
+// делает на КАЖДОЕ назначение 4 обращения в демо-школе и до 6 в боевой:
+// чтение справочника, вставка, group_teachers, isDemoSchool, чтение и запись
+// subject_slug. Тридцать назначений — 120–180 последовательных кругов, и
+// упрётся в потолок функции именно это.
+//
+// Здесь постоянная часть прочитана ОДИН раз на всю пачку, а group_teachers
+// пишется один раз на группу, а не на пару:
+//
+//   было:  30 пар × 4 (демо) или × 5..6 (боевая)   = 120..180 кругов
+//   стало: 3 постоянных + 30 пар + 6 групп + до 2   = 41 круг
+//
+// Счёт «стало» проверен по коду: три чтения в разложитьПары, по одной записи
+// на пару, по одной на задетую группу и до двух на subject_slug — он у
+// учителя один, поэтому пишется однажды на всю пачку, а не на каждый предмет.
+//
+// Второй копии логики это не заводит: пары раскладывает один разбор
+// (разложитьПары), и план, и запись зовут его же.
+
+export type BulkAssignPair = { catalogId: string; groupId: string };
+
+/** Пара, которую делать не будем, и почему. Имя занявшего нужно человеку:
+ *  «занято» без имени не говорит, к кому идти. */
+export type BulkAssignBlocked = {
+  catalogId: string;
+  groupId: string;
+  subjectName: string;
+  groupName: string;
+  /** Кто уже ведёт. null — строка есть, но учителя у неё нет (такого сюда не
+   *  попадает) либо имя не прочиталось. */
+  teacherName: string | null;
+  reason: "occupied" | "already_this_teacher";
+};
+
+export type BulkAssignPlan = {
+  /** Новых строк subjects (случай B). */
+  willCreate: number;
+  /** Существующих строк без учителя, которым он проставится (случай A). */
+  willAssign: number;
+  blocked: BulkAssignBlocked[];
+  chats: {
+    /** Новых личных веток: ученики выбранных групп, у кого ветки с этим
+     *  учителем ещё нет. */
+    newThreads: number;
+    /** Две строки на ветку плюс до одной в классной ветке каждой задетой
+     *  группы. */
+    newParticipants: number;
+    /**
+     * ТИХИЙ НОЛЬ. fn_ensure_direct_chat молча выходит, если у ученика или у
+     * учителя нет user_id, — ни ошибки, ни следа. Значит показать «заведётся
+     * 300 чатов» и завести ноль можно совершенно незаметно.
+     *
+     * Такие ученики посчитаны отдельно и из newThreads ИСКЛЮЧЕНЫ: заказчик
+     * просил, чтобы число было честным.
+     */
+    silentStudents: number;
+    /** У учителя нет учётной записи — не заведётся НИ ОДНОГО чата. */
+    teacherHasNoAccount: boolean;
+  };
+};
+
+export type BulkAssignResult = {
+  created: number;
+  assigned: number;
+  /** Пары, которые не прошли, с причиной у каждой. Частичный отказ не теряет
+   *  прошедшего — то же правило, что у assignSubjectsToTeacher. */
+  failed: Array<{ subjectName: string; groupName: string; reason: string }>;
+};
+
+type РазборПар = {
+  создать: Array<{ catalogId: string; groupId: string; name: string; icon: string; color: string }>;
+  проставить: Array<{ subjectId: string; catalogId: string; groupId: string; name: string }>;
+  blocked: BulkAssignBlocked[];
+  /** Группы, которых коснёмся: по одной строке group_teachers на каждую. */
+  группы: string[];
+  имена: { предметы: Map<string, string>; группы: Map<string, string> };
+};
+
+/**
+ * Разложить выбранное на «создать», «проставить» и «занято».
+ *
+ * ОДИН разбор на план и на запись. Если бы их было два, показанное число и
+ * сделанное разошлись бы — ровно та беда, из-за которой массовое создание
+ * уроков считает предпросмотр тем же кодом, которым потом создаёт.
+ */
+async function разложитьПары(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  catalogIds: string[],
+  groupIds: string[],
+  teacherId: string | null,
+  schoolId: string,
+): Promise<РазборПар> {
+  // ── постоянная часть: читается один раз на всю пачку, а не на каждую пару ──
+  const { data: catRows, error: catErr } = await sb
+    .from("school_subjects")
+    .select("id, name, icon, color, school_id")
+    .in("id", catalogIds);
+  if (catErr) throw catErr;
+  const справочник = new Map<string, { id: string; name: string; icon: string; color: string }>();
+  for (const c of (catRows ?? []) as Array<{ id: string; name: string; icon: string; color: string; school_id: string }>) {
+    // Чужая школа отсеивается здесь, а не проверкой на каждую пару.
+    if (c.school_id !== schoolId) continue;
+    справочник.set(c.id, { id: c.id, name: c.name, icon: c.icon, color: c.color });
+  }
+
+  const { data: grpRows, error: grpErr } = await sb
+    .from("groups").select("id, name, school_id").in("id", groupIds);
+  if (grpErr) throw grpErr;
+  const группыИмена = new Map<string, string>();
+  for (const g of (grpRows ?? []) as Array<{ id: string; name: string; school_id: string }>) {
+    if (g.school_id === schoolId) группыИмена.set(g.id, g.name);
+  }
+
+  // Что уже стоит в этих группах. Одно чтение на всю пачку.
+  const { data: сущ, error: сущErr } = await sb
+    .from("subjects")
+    .select("id, name, catalog_id, group_id, teacher_id, teacher:teachers(full_name)")
+    .in("group_id", [...группыИмена.keys()]);
+  if (сущErr) throw сущErr;
+
+  type Строка = {
+    id: string; name: string; catalog_id: string | null; group_id: string;
+    teacher_id: string | null; teacher: { full_name: string } | null;
+  };
+  // ЗАНЯТОСТЬ ИЩЕТСЯ ПО ИМЕНИ, А НЕ ПО catalog_id. Уникальность в базе —
+  // UNIQUE (name, group_id), проверено на живой схеме 03.09.2026. Строка,
+  // заведённая до появления справочника, имеет catalog_id = null, но имя
+  // занимает, и вставка на неё упадёт. Ключ по catalog_id такую пару
+  // проглядел бы, и «создастся 6» превратилось бы в «создалось 4».
+  const поИмени = new Map<string, Строка>();
+  for (const r of (сущ ?? []) as Строка[]) поИмени.set(`${r.group_id}::${r.name}`, r);
+
+  const разбор: РазборПар = {
+    создать: [], проставить: [], blocked: [], группы: [],
+    имена: { предметы: new Map(), группы: группыИмена },
+  };
+  const задетые = new Set<string>();
+
+  for (const catalogId of catalogIds) {
+    const cat = справочник.get(catalogId);
+    if (!cat) continue;
+    разбор.имена.предметы.set(catalogId, cat.name);
+    for (const groupId of группыИмена.keys()) {
+      const было = поИмени.get(`${groupId}::${cat.name}`);
+      if (!было) {
+        разбор.создать.push({ catalogId, groupId, name: cat.name, icon: cat.icon, color: cat.color });
+        задетые.add(groupId);
+        continue;
+      }
+      if (было.teacher_id === null) {
+        разбор.проставить.push({ subjectId: было.id, catalogId, groupId, name: cat.name });
+        задетые.add(groupId);
+        continue;
+      }
+      // Занято. Своим же учителем — это «уже сделано», а не отказ; чужим —
+      // показываем имя и не трогаем.
+      разбор.blocked.push({
+        catalogId,
+        groupId,
+        subjectName: cat.name,
+        groupName: группыИмена.get(groupId) ?? "—",
+        teacherName: было.teacher?.full_name ?? null,
+        reason: было.teacher_id === teacherId ? "already_this_teacher" : "occupied",
+      });
+    }
+  }
+  разбор.группы = [...задетые];
+  return разбор;
+}
+
+/**
+ * Посчитать, что произойдёт, НИЧЕГО НЕ ЗАПИСЫВАЯ.
+ *
+ * Тот же приём, что у массового создания уроков: предпросмотр считает тем же
+ * кодом, которым потом пишет.
+ *
+ * ПОЧЕМУ СЧЁТ ЧАТОВ НЕ НА КЛИЕНТЕ, хотя собирались именно так. Точное число
+ * требует трёх вещей, которых на странице нет и быть не должно: сколько
+ * учеников в каждой группе, с кем из них у этого учителя ветка уже есть, и
+ * есть ли у всех учётные записи. Первое можно было бы дотащить; второе — это
+ * «ученики × учителя» строк, в боевой школе тысячи; третье клиенту не видно
+ * вовсе. Заказчик просил, чтобы число было честным, — а честным на клиенте
+ * оно быть не может.
+ */
+export async function planBulkAssignment(input: {
+  catalogIds: string[];
+  groupIds: string[];
+  teacherId: string | null;
+  schoolId: string;
+}): Promise<BulkAssignPlan> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const разбор = await разложитьПары(anySb, input.catalogIds, input.groupIds, input.teacherId, input.schoolId);
+
+  const план: BulkAssignPlan = {
+    willCreate: разбор.создать.length,
+    willAssign: разбор.проставить.length,
+    blocked: разбор.blocked,
+    chats: { newThreads: 0, newParticipants: 0, silentStudents: 0, teacherHasNoAccount: false },
+  };
+  // Без учителя чатов не бывает вовсе: оба триггера выходят первой строкой
+  // при teacher_id IS NULL. Это же делает массовое СНЯТИЕ бесплатным.
+  if (!input.teacherId || разбор.группы.length === 0) return план;
+
+  const { data: teacher } = await anySb
+    .from("teachers").select("user_id").eq("id", input.teacherId).maybeSingle();
+  const учительБезАккаунта = !(teacher as { user_id: string | null } | null)?.user_id;
+  план.chats.teacherHasNoAccount = учительБезАккаунта;
+
+  const { data: зачисления } = await anySb
+    .from("student_groups").select("student_id, group_id").in("group_id", разбор.группы);
+  const ученики = [...new Set(((зачисления ?? []) as Array<{ student_id: string }>).map((r) => r.student_id))];
+  if (ученики.length === 0) return план;
+
+  const { data: рядыУчеников } = await anySb
+    .from("students").select("id, user_id").in("id", ученики);
+  const безАккаунта = new Set(
+    ((рядыУчеников ?? []) as Array<{ id: string; user_id: string | null }>)
+      .filter((r) => !r.user_id).map((r) => r.id),
+  );
+
+  // С кем ветка уже есть — ровно те, за кого платить не придётся. Это и есть
+  // причина, по которой второй предмет тому же учителю в той же группе стоит
+  // ноль: все ветки уже стоят.
+  const { data: ветки } = await anySb
+    .from("chat_threads").select("student_id")
+    .eq("kind", "direct").eq("teacher_id", input.teacherId).in("student_id", ученики);
+  const ужеЕсть = new Set(((ветки ?? []) as Array<{ student_id: string | null }>).map((r) => r.student_id));
+
+  const новые = ученики.filter((id) => !ужеЕсть.has(id) && !безАккаунта.has(id));
+  план.chats.silentStudents = ученики.filter((id) => безАккаунта.has(id)).length;
+  план.chats.newThreads = учительБезАккаунта ? 0 : новые.length;
+  // Две строки участников на ветку плюс до одной на классную ветку каждой
+  // задетой группы: там ON CONFLICT DO NOTHING, поэтому «до».
+  план.chats.newParticipants = учительБезАккаунта ? 0 : новые.length * 2 + разбор.группы.length;
+  return план;
+}
+
+/**
+ * Применить массовое назначение.
+ *
+ * ЧАСТИЧНЫЙ ОТКАЗ НЕ ТЕРЯЕТ ПРОШЕДШЕГО — то же правило, что у
+ * assignSubjectsToTeacher и у массовой переклички: каждая пара идёт своим
+ * запросом, прошедшие остаются, о непрошедших человеку говорят числом и
+ * причиной. Одной пачкой INSERT сделать нельзя именно поэтому: одна занятая
+ * пара уронила бы все тридцать.
+ */
+export async function applyBulkAssignment(input: {
+  catalogIds: string[];
+  groupIds: string[];
+  teacherId: string | null;
+  schoolId: string;
+}): Promise<BulkAssignResult> {
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+  const разбор = await разложитьПары(anySb, input.catalogIds, input.groupIds, input.teacherId, input.schoolId);
+
+  const итог: BulkAssignResult = { created: 0, assigned: 0, failed: [] };
+  const имяГруппы = (id: string) => разбор.имена.группы.get(id) ?? "—";
+
+  for (const строка of разбор.создать) {
+    try {
+      const { error } = await anySb.from("subjects").insert({
+        catalog_id: строка.catalogId,
+        name: строка.name,
+        icon: строка.icon,
+        color: строка.color,
+        group_id: строка.groupId,
+        teacher_id: input.teacherId,
+        school_id: input.schoolId,
+      });
+      if (error) throw error;
+      итог.created += 1;
+    } catch (e) {
+      итог.failed.push({ subjectName: строка.name, groupName: имяГруппы(строка.groupId), reason: errorText(e) });
+    }
+  }
+
+  for (const строка of разбор.проставить) {
+    try {
+      // Условие «teacher_id is null» в самом UPDATE — защита от гонки: если
+      // между разбором и записью пару занял кто-то другой, мы обновим ноль
+      // строк и НЕ перебьём чужого учителя. Молча пропустить такое нельзя,
+      // поэтому случай уезжает в failed своей строкой.
+      const { data, error } = await anySb
+        .from("subjects").update({ teacher_id: input.teacherId })
+        .eq("id", строка.subjectId).is("teacher_id", null).select("id");
+      if (error) throw error;
+      if (!((data ?? []) as unknown[]).length) {
+        итог.failed.push({
+          subjectName: строка.name,
+          groupName: имяГруппы(строка.groupId),
+          reason: "Пару занял другой учитель, пока шло сохранение",
+        });
+        continue;
+      }
+      итог.assigned += 1;
+    } catch (e) {
+      итог.failed.push({ subjectName: строка.name, groupName: имяГруппы(строка.groupId), reason: errorText(e) });
+    }
+  }
+
+  // ── вторая и третья поверхности: по одному разу, а не на каждую пару ──
+  if (input.teacherId && (итог.created > 0 || итог.assigned > 0)) {
+    for (const groupId of разбор.группы) {
+      try {
+        await linkTeacherToGroup(anySb, groupId, input.teacherId, input.schoolId);
+      } catch (e) {
+        итог.failed.push({ subjectName: "—", groupName: имяГруппы(groupId), reason: errorText(e) });
+      }
+    }
+    // subject_slug ставится ОДИН раз на всю пачку: он у учителя один, и
+    // ensureSubjectSlug всё равно пишет только в пустое. Проверка на
+    // демо-школу внутри неё же, поэтому isDemoSchool здесь не дублируется.
+    const первыйСоСлагом = [...разбор.имена.предметы.values()].find((n) => getSubjectKeyByLabel(n));
+    if (первыйСоСлагом) {
+      try {
+        await ensureSubjectSlug(anySb, input.teacherId, первыйСоСлагом, input.schoolId);
+      } catch {
+        // Слаг — украшение карточки, а не право. Ронять из-за него пачку,
+        // которая уже прошла, нельзя.
+      }
+    }
+  }
+  return итог;
+}
+
+
 /** Ставит строку group_teachers, если её ещё нет. school_id — явно, дефолт
  *  под service-role даёт NULL. PK (group_id, teacher_id) делает повтор
  *  безвредным, триггеров на таблице нет. */
