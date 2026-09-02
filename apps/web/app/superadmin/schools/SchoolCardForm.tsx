@@ -2,7 +2,13 @@
 
 import { useRef, useState } from "react";
 import { ImageOff, Upload, X } from "lucide-react";
-import { getDictionary, type Locale } from "@snr/core";
+import {
+  getDictionary,
+  DEFAULT_LESSON_DURATION_MINUTES,
+  LESSON_DURATION_MIN_MINUTES,
+  LESSON_DURATION_MAX_MINUTES,
+  type Locale,
+} from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { origName, SCHOOL_CARD_FIELDS } from "@/lib/form-patch";
 
@@ -28,6 +34,9 @@ export type SchoolCardValues = {
    *  обязательным — форма должна открываться и в этом случае. */
   code?: string | null;
   autostart_enabled?: boolean;
+  /** Длительность урока в минутах — одно число на школу (миграция 246).
+   *  При создании школы значения ещё нет: подставляем умолчание. */
+  lesson_duration_minutes?: number | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -112,6 +121,28 @@ export function SchoolCardForm({
         />
         {t.autostartLabel}
       </label>
+
+      {/* ── Длительность урока (миграция 246) ──────────────────────────────
+          Одно число на всю школу. Учитель его не задаёт и не видит: сетка
+          звонков в школе одна. Влияет ТОЛЬКО на создаваемые уроки — у
+          существующих время начала и конца уже записано.
+
+          Границы 15..180 стоят и здесь, и в общем слое
+          (packages/core/src/utils/lessonDuration.ts), и ограничением в схеме.
+          Здесь они нужны, чтобы браузер отказал сразу и по-человечески, а не
+          показал сырой текст про constraint. */}
+      <Field label={t.fieldLessonDuration} hint={t.lessonDurationHint}>
+        <input
+          name="lesson_duration_minutes"
+          type="number"
+          inputMode="numeric"
+          min={LESSON_DURATION_MIN_MINUTES}
+          max={LESSON_DURATION_MAX_MINUTES}
+          step={1}
+          defaultValue={values.lesson_duration_minutes ?? DEFAULT_LESSON_DURATION_MINUTES}
+          className={inputCls}
+        />
+      </Field>
 
       {/* ── Логотип ─────────────────────────────────────────────────────── */}
       <Field label={t.fieldLogo} hint={t.logoHint}>

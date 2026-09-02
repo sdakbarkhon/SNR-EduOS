@@ -1394,11 +1394,21 @@ export async function createSchool(data: {
   name: string;
   code: string;
   autostart_enabled: boolean;
+  /** Длительность урока (миграция 246). Не передали — сработает умолчание
+   *  колонки, те же 45 минут. Пустой она быть не может: NOT NULL. */
+  lesson_duration_minutes?: number;
 }): Promise<string> {
   const sb = getServiceClient();
   const { data: school, error } = await sb
     .from("schools")
-    .insert({ name: data.name, code: data.code, autostart_enabled: data.autostart_enabled })
+    .insert({
+      name: data.name,
+      code: data.code,
+      autostart_enabled: data.autostart_enabled,
+      ...(data.lesson_duration_minutes !== undefined
+        ? { lesson_duration_minutes: data.lesson_duration_minutes }
+        : {}),
+    })
     .select("id")
     .single();
   if (error || !school) throw error ?? new Error("School insert failed");

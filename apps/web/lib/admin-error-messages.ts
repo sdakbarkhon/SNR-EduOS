@@ -33,6 +33,10 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
 
   if (PASSTHROUGH_MESSAGES.has(raw)) return raw;
 
+  // Длительность урока вне границ (миграция 246). Код, а не готовая фраза: она
+  // живёт в словарях на трёх языках, а сервер языка вызывающего не знает.
+  if (raw === "LESSON_DURATION_OUT_OF_RANGE") return getDictionary(locale).superadmin.lessonDurationBad;
+
   // Логотип школы: код отказа приходит из lib/school-card.ts вместе с числами,
   // потому что фраза живёт в словарях, а сервер языка вызывающего не знает.
   const logo = raw.match(/^LOGO_([A-Z_]+):(.*)$/);

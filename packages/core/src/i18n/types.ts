@@ -828,6 +828,9 @@ export interface Dictionary {
     fieldWebsite: string;
     fieldLegalDetails: string;
     legalDetailsHint: string;
+    fieldLessonDuration: string;    // длительность урока у школы (миграция 246)
+    lessonDurationHint: string;
+    lessonDurationBad: string;      // отказ, когда число вне границ
     sectionOrg: string;
     schoolUpdatedMsg: string;
     title: string;
@@ -2447,7 +2450,6 @@ export interface Dictionary {
     stageTaskCloseBtn: string;         // "Закрыть"
     // Auto-schedule + visibility (migration 36)
     completedLock: string;             // "Урок завершён. Редактирование недоступно."
-    durationMinutes: string;           // "Длительность (мин.)"
     stageLocked: string;               // "Сначала пройди"
     stageLockedSummary: string;        // "Доступно после завершения урока"
     materialVisibilityAll: string;     // "Видно всем"
@@ -2745,7 +2747,6 @@ export interface Dictionary {
     bulkTime: string;
     bulkFrom: string;
     bulkTo: string;
-    bulkDuration: string;
     bulkRoom: string;
     bulkTopics: string;
     bulkTopicsHint: string;

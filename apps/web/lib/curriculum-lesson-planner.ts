@@ -7,7 +7,7 @@
 // 08:30, и никто бы не понял почему. Правила лежат здесь, оба вызывающих места
 // берут их отсюда, второго способа не появляется.
 //
-// ПРАВИЛА ПЕРЕНЕСЕНЫ КАК БЫЛИ: 09:00, урок 45 минут, шаг 55 (45 + перемена 10),
+// ПРАВИЛА ПЕРЕНЕСЕНЫ КАК БЫЛИ: 09:00, шаг 55 (45 + перемена 10),
 // «Кабинет 101». Изменилось ровно одно и по необходимости — день начала: он
 // был жёстко «1 августа 2026», а к 18 августа эта дата ушла в прошлое, из-за
 // чего createLesson отверг бы любой такой урок. Теперь берётся позднее из
@@ -21,7 +21,21 @@ type AnyDb = any;
 /** С какого дня раскладывать. Дата начала учебного года — но только как
  *  НИЖНЯЯ граница: см. startDateFor ниже. */
 export const AUTO_START_DATE = "2026-08-01";
-export const SLOT_DURATION_MIN = 45;
+
+/**
+ * ДЛИТЕЛЬНОСТИ УРОКА ЗДЕСЬ БОЛЬШЕ НЕТ (01.09.2026, миграция 246).
+ *
+ * Стояла `export const SLOT_DURATION_MIN = 45`, и это был третий источник
+ * одного числа — рядом с полем в форме урока и полем в окне массового
+ * создания. Теперь число одно и лежит у школы
+ * (`schools.lesson_duration_minutes`); раскладка получает его доводом
+ * `durationMinutes`, а вызывающие роуты читают его через
+ * `getLessonDurationForGroup` из общего слоя.
+ *
+ * Довод сделан ОБЯЗАТЕЛЬНЫМ, без умолчания: со значением по умолчанию любой
+ * новый вызывающий молча вернул бы сюда сорок пять, и разошлись бы снова.
+ */
+
 /**
  * КАБИНЕТА У НАС НЕТ, И ВЫДУМЫВАТЬ ЕГО БОЛЬШЕ НЕ БУДЕМ (20.08.2026).
  *
@@ -46,7 +60,21 @@ export const SLOT_DURATION_MIN = 45;
 export const ROOM: string | null = null;
 
 const SLOT_START_MIN = 9 * 60; // 09:00
-const SLOT_STRIDE_MIN = 55; // урок 45 + перемена 10
+/**
+ * Шаг сетки: во сколько может начаться следующий урок дня. 45 + перемена 10.
+ *
+ * ОСТАВЛЕН ЧИСЛОМ НАМЕРЕННО (01.09.2026) — ждёт отдельного решения заказчика.
+ * Длительность урока уехала к школе, а шаг нет, и это не забывчивость: они
+ * про разное. Длительность — сколько идёт урок, шаг — через сколько начинается
+ * следующий, то есть длительность ПЛЮС перемена, а перемена нигде не хранится.
+ *
+ * Рассогласования при этом не возникает: findFreeSlot ниже сверяет
+ * ПРЕДПОЛАГАЕМЫЙ отрезок урока (durationMinutes) с уже существующими уроками
+ * группы, поэтому при длительности больше шага он просто пропустит наехавшие
+ * места и возьмёт следующее свободное. Меняется плотность сетки, а не её
+ * правильность.
+ */
+const SLOT_STRIDE_MIN = 55;
 const MAX_SLOTS_PER_DAY = 16; // 09:00 .. ~22:00, с большим запасом
 /** Сколько дней подряд разрешено просматривать в поисках свободного места,
  *  прежде чем признать расписание забитым. */
@@ -90,17 +118,17 @@ function startDateFor(nowMs: number): string {
 
 /** Первый свободный слот сетки на эту дату для этой группы, либо null если
  *  день занят целиком. */
-function findFreeSlot(dayLessons: Busy[], date: string, nowMs: number): string | null {
+function findFreeSlot(dayLessons: Busy[], date: string, nowMs: number, durationMinutes: number): string | null {
   for (let n = 0; n < MAX_SLOTS_PER_DAY; n++) {
     const hhmm = minutesToHHMM(SLOT_START_MIN + n * SLOT_STRIDE_MIN);
     const candStartMs = new Date(`${date}T${hhmm}:00+05:00`).getTime();
-    const candEndMs = candStartMs + SLOT_DURATION_MIN * 60 * 1000;
+    const candEndMs = candStartMs + durationMinutes * 60 * 1000;
     // Сегодняшние утренние слоты могли уже пройти — урок в прошлом создать
     // нельзя, и предлагать такое место бессмысленно.
     if (candStartMs <= nowMs) continue;
     const overlaps = dayLessons.some((l) => {
       const ls = new Date(l.starts_at).getTime();
-      const le = l.ends_at ? new Date(l.ends_at).getTime() : ls + SLOT_DURATION_MIN * 60 * 1000;
+      const le = l.ends_at ? new Date(l.ends_at).getTime() : ls + durationMinutes * 60 * 1000;
       return candStartMs < le && candEndMs > ls;
     });
     if (!overlaps) return hhmm;
@@ -122,6 +150,9 @@ export async function planLessonSlots(
   /** Школьное «сейчас» — то же, что уходит в createLesson. Обязателен: без
    *  него раскладка предлагала бы прошедшие даты, а createLesson их отвергал. */
   nowMs: number,
+  /** Длительность урока у школы (миграция 246). Обязателен и без умолчания:
+   *  с умолчанием любой новый вызывающий молча вернул бы сюда сорок пять. */
+  durationMinutes: number,
 ): Promise<PlannedSlot[]> {
   if (topics.length === 0) return [];
 
@@ -142,7 +173,7 @@ export async function planLessonSlots(
     let assigned = false;
     for (let guard = 0; guard < MAX_DAYS_SCANNED && !assigned; guard++) {
       const dayLessons = byDate.get(cursorDate) ?? [];
-      const slot = findFreeSlot(dayLessons, cursorDate, nowMs);
+      const slot = findFreeSlot(dayLessons, cursorDate, nowMs, durationMinutes);
       if (slot) {
         out.push({ topicId: topic.id, title: topic.title, description: topic.description, date: cursorDate, time: slot });
         // Занимаем слот сразу же, чтобы следующая тема не встала в тот же
@@ -150,7 +181,7 @@ export async function planLessonSlots(
         const startsAtMs = new Date(`${cursorDate}T${slot}:00+05:00`).getTime();
         byDate.set(cursorDate, [...dayLessons, {
           starts_at: new Date(startsAtMs).toISOString(),
-          ends_at: new Date(startsAtMs + SLOT_DURATION_MIN * 60 * 1000).toISOString(),
+          ends_at: new Date(startsAtMs + durationMinutes * 60 * 1000).toISOString(),
         }]);
         cursorDate = addDaysUTC(cursorDate, 1);
         assigned = true;
@@ -211,7 +242,9 @@ export type WeeklyPlanInput = {
   /** Обе границы включительно, «YYYY-MM-DD». */
   from: string;
   to: string;
-  durationMinutes?: number;
+  /** Длительность урока у школы (миграция 246). Обязательна и без умолчания:
+   *  раньше здесь стояло `?? SLOT_DURATION_MIN`, то есть молчаливые 45. */
+  durationMinutes: number;
 };
 
 /** Сколько дней подряд разрешено раскладывать. Год с запасом: больше учебного
@@ -242,7 +275,7 @@ export async function planWeeklySchedule(
   if (input.weekdays.length === 0) return [];
   if (input.to < input.from) return [];
 
-  const dur = input.durationMinutes ?? SLOT_DURATION_MIN;
+  const dur = input.durationMinutes;
   const existing = await getGroupLessonsInDateRange(db, groupId, input.from, input.to);
 
   const byDate = new Map<string, Busy[]>();

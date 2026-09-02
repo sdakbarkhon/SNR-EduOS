@@ -10,14 +10,15 @@ export default async function SuperAdminSchoolsPage() {
   const { data: schools } = await (supabase as any)
     .from("schools")
     .select(
-      "id, name, code, autostart_enabled, created_at, is_active, "
+      "id, name, code, autostart_enabled, lesson_duration_minutes, created_at, is_active, "
       + "logo_path, address, phone, email, director_name, website, legal_details",
     )
     .eq("is_demo", false)
     .order("created_at");
 
   const rows = (schools ?? []) as {
-    id: string; name: string; code: string | null; autostart_enabled: boolean; created_at: string;
+    id: string; name: string; code: string | null; autostart_enabled: boolean;
+    lesson_duration_minutes: number; created_at: string;
     is_active: boolean; logo_path: string | null; address: string | null; phone: string | null;
     email: string | null; director_name: string | null; website: string | null;
     legal_details: string | null;

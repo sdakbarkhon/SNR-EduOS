@@ -21,6 +21,8 @@ import type { SchoolWipePreview } from "@/lib/school-lifecycle";
 type School = {
   id: string; name: string; code: string | null;
   autostart_enabled: boolean; created_at: string;
+  /** Длительность урока — одно число на школу (миграция 246). */
+  lesson_duration_minutes: number;
   /** false — школа в архиве (миграция 202). */
   is_active: boolean;
   /** Карточка школы (миграция 210). Всё необязательное: школы заведены раньше

@@ -12,6 +12,7 @@ import { unwrap } from "./helpers";
 import { getChildCountedGrades } from "./parent";
 import { averageOf, testGrade5, type GradeSource } from "../utils/gradeAverage";
 import { tashkentDayKey, tashkentDayBoundsUtc, tashkentMonthBoundsUtc } from "../utils/date";
+import { DEFAULT_LESSON_DURATION_MINUTES, isValidLessonDuration } from "../utils/lessonDuration";
 import { getSubjectKeyByLabel, subjectFilterKey } from "../config/subjects";
 import { mySchoolStoragePath } from "../storage/path";
 import { getSubjects } from "./subjects";
@@ -3136,7 +3137,44 @@ export async function stopLive(
 }
 
 
-/** Обновляет поля урока (учитель): title, description, starts_at, duration_minutes, room. */
+/**
+ * Длительность урока у школы. Миграция 246.
+ *
+ * ОДНО ЧИСЛО НА ШКОЛУ, и читается оно ровно отсюда. Ни форма урока, ни
+ * планировщик, ни роуты массового создания своих копий не держат: раньше их
+ * было три (поле у учителя, поле в окне массового создания, константа
+ * SLOT_DURATION_MIN = 45), и это три способа разойтись.
+ *
+ * Не прочиталось — берём умолчание, а не падаем. Пустой колонка быть не может
+ * (NOT NULL DEFAULT 45), но школы может не оказаться под правилом доступа
+ * вызывающего, и уронить из-за этого создание урока было бы хуже, чем
+ * поставить те же 45, что стоят у всех 128 существующих уроков.
+ */
+export const getSchoolLessonDuration = async (db: Db, schoolId: string): Promise<number> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any)
+    .from("schools").select("lesson_duration_minutes").eq("id", schoolId).maybeSingle();
+  const value = Number((data as { lesson_duration_minutes?: number } | null)?.lesson_duration_minutes);
+  return isValidLessonDuration(value) ? value : DEFAULT_LESSON_DURATION_MINUTES;
+};
+
+/** То же, но по группе: у вызывающих на руках всегда группа, а не школа. */
+export const getLessonDurationForGroup = async (db: Db, groupId: string): Promise<number> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (db as any)
+    .from("groups").select("school_id").eq("id", groupId).maybeSingle();
+  const schoolId = (data as { school_id?: string } | null)?.school_id;
+  if (!schoolId) return DEFAULT_LESSON_DURATION_MINUTES;
+  return getSchoolLessonDuration(db, schoolId);
+};
+
+/** Обновляет поля урока (учитель): title, description, starts_at, room, группа, предмет.
+ *
+ *  ДЛИТЕЛЬНОСТИ ЗДЕСЬ НЕТ И БОЛЬШЕ НЕ БУДЕТ (01.09.2026, миграция 246). Её
+ *  задаёт школа одним числом на всех, а у существующего урока время начала и
+ *  конца уже записано и меняться от правки школьного числа не должно.
+ *  Принимать duration_minutes здесь значило бы завести переопределение на
+ *  отдельный урок — ровно то, что этим заходом убирали. */
 /**
  * Правка урока.
  *
@@ -3171,7 +3209,6 @@ export const updateLesson = async (
     title?: string | null;
     description?: string | null;
     starts_at?: string;
-    duration_minutes?: number;
     ends_at?: string | null;
     room?: string | null;
     group_id?: string;
@@ -3186,9 +3223,6 @@ export const updateLesson = async (
 ): Promise<void> => {
   if (patch.starts_at && new Date(patch.starts_at).getTime() < nowMs) {
     throw new Error("Нельзя создать урок в прошедшее время");
-  }
-  if (patch.duration_minutes !== undefined && (patch.duration_minutes < 5 || patch.duration_minutes > 240)) {
-    throw new Error("Некорректная длительность");
   }
   // Пустой предмет — не «оставить как было», а попытка снять обязательное
   // поле. База откажет not-null-ограничением (226), но отказ по-нашему
@@ -3212,7 +3246,6 @@ export const createLesson = async (
   input: {
     groupId: string;
     startsAt: string;
-    durationMinutes?: number;
     room: string | null;
     title: string | null;
     description: string | null;
@@ -3245,13 +3278,15 @@ export const createLesson = async (
    *  отложено (см. resheniya_2.md 07.08). */
   nowMs: number,
 ): Promise<{ id: string }> => {
-  const dur = input.durationMinutes ?? 45;
   // Отказ, а не подстановка «какого-нибудь» предмета: угадать предмет за
   // человека нельзя, а после миграции 226 база всё равно откажет — пусть
   // отказ будет внятным и по-русски, а не текстом про not-null constraint.
   if (!input.subjectId) throw new Error("У урока должен быть предмет");
   if (new Date(input.startsAt).getTime() < nowMs) throw new Error("Нельзя создать урок в прошедшее время");
-  if (dur < 5 || dur > 240) throw new Error("Некорректная длительность");
+  // 01.09.2026, миграция 246. Длительность НЕ приходит доводом и прийти не
+  // может: её задаёт школа одним числом на всех. Читаем её здесь, а не у
+  // вызывающего, именно поэтому — так переопределить число неоткуда.
+  const dur = await getLessonDurationForGroup(db, input.groupId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
   const { data, error } = await db2

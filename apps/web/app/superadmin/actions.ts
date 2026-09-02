@@ -15,6 +15,7 @@ import {
   readCardFields, removeSchoolLogo, uploadSchoolLogo,
 } from "@/lib/school-card";
 import { changedFields, ADMIN_GUARDED_FIELDS } from "@/lib/form-patch";
+import { parseLessonDuration, isValidLessonDuration } from "@snr/core";
 import { withJournal, journalAccessDenied, journalSchoolVisit } from "@/lib/superadmin-journal";
 import { guard, type ActionResult } from "@/lib/action-result";
 import { revalidatePath } from "next/cache";
@@ -63,7 +64,7 @@ async function schoolBasicsFor(schoolId: string): Promise<Record<string, unknown
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (createAdminClient() as any)
-      .from("schools").select("name, code, autostart_enabled").eq("id", schoolId).maybeSingle();
+      .from("schools").select("name, code, autostart_enabled, lesson_duration_minutes").eq("id", schoolId).maybeSingle();
     return (data as Record<string, unknown>) ?? null;
   } catch { return null; }
 }
@@ -78,6 +79,27 @@ async function adminNameFor(ref: { userId?: string; adminId?: string }): Promise
   } catch { return null; }
 }
 
+/**
+ * Длительность урока из формы карточки школы. Миграция 246.
+ *
+ * Три исхода, и путать их нельзя:
+ *   • поле пустое → `undefined`, колонка в запрос НЕ попадает и прежнее
+ *     значение остаётся. Это тот же приём, что у полей карточки
+ *     (lib/form-patch.ts): стёр по невнимательности — не потерял;
+ *   • число вне границ или не число → бросаем с готовым текстом. Молча
+ *     подставить 45 нельзя: человек напечатал 450, имея в виду 45, и обязан
+ *     об этом узнать;
+ *   • годное число → оно.
+ *
+ * Границы берутся из общего слоя, те же, что в ограничении схемы.
+ */
+function readLessonDuration(formData: FormData): number | undefined {
+  const parsed = parseLessonDuration(formData.get("lesson_duration_minutes") as string | null);
+  if (parsed === null) return undefined;
+  if (!isValidLessonDuration(parsed)) throw new Error("LESSON_DURATION_OUT_OF_RANGE");
+  return parsed;
+}
+
 // ── SCHOOLS ──────────────────────────────────────────────────────────────────
 
 export async function actionCreateSchool(formData: FormData) {
@@ -86,6 +108,7 @@ export async function actionCreateSchool(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
     const code = String(formData.get("code") ?? "").trim();
     const autostart_enabled = formData.get("autostart_enabled") === "on";
+    const lesson_duration_minutes = readLessonDuration(formData);
     if (!name || !code) throw new Error("Missing fields");
     // Номер школы до создания не существует, поэтому в строке «начато» его нет.
     // Он появляется во второй строке, «завершено», — ради него она тут и есть.
@@ -93,9 +116,9 @@ export async function actionCreateSchool(formData: FormData) {
       {
         action: "school.create", actorUserId: actor.id, actorName: actor.name,
         targetType: "school", targetName: name,
-        details: { name, code, autostart_enabled },
+        details: { name, code, autostart_enabled, lesson_duration_minutes },
       },
-      () => createSchool({ name, code, autostart_enabled }),
+      () => createSchool({ name, code, autostart_enabled, lesson_duration_minutes }),
       (newId) => ({ targetId: newId, details: { name, code } }),
     );
 
@@ -144,6 +167,7 @@ export async function actionUpdateSchool(schoolId: string, formData: FormData) {
     const code = String(formData.get("code") ?? "").trim();
     if (!name || !code) throw new Error("Missing fields");
     const autostart_enabled = formData.get("autostart_enabled") === "on";
+    const lesson_duration_minutes = readLessonDuration(formData);
 
     // «Было → стало» — ТОЛЬКО по изменившимся полям. Копия строки целиком
     // раздула бы журнал и натащила бы в него лишнее. Поля карточки собирает
@@ -151,6 +175,9 @@ export async function actionUpdateSchool(schoolId: string, formData: FormData) {
     // (lib/form-patch.ts), поэтому здесь сравниваем только имя, код и автостарт.
     const before = await schoolBasicsFor(schoolId);
     const after: Record<string, unknown> = { name, code, autostart_enabled };
+    // Пустое поле означает «не менял» — тогда его нет ни в запросе, ни в
+    // журнале «было → стало».
+    if (lesson_duration_minutes !== undefined) after.lesson_duration_minutes = lesson_duration_minutes;
     const diff: Record<string, unknown> = {};
     for (const k of Object.keys(after)) {
       if (before && before[k] !== after[k]) diff[k] = { before: before[k], after: after[k] };
@@ -168,7 +195,7 @@ export async function actionUpdateSchool(schoolId: string, formData: FormData) {
         details: { changed: diff, cardFields: cardKeys, logo },
       },
       async () => {
-        await updateSchoolCard(schoolId, { name, code, autostart_enabled });
+        await updateSchoolCard(schoolId, { name, code, autostart_enabled, ...(lesson_duration_minutes !== undefined ? { lesson_duration_minutes } : {}) });
         await saveSchoolCard(schoolId, formData);
       },
     );

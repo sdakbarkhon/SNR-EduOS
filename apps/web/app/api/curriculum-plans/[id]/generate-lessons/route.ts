@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMySchoolNowMs } from "@/lib/school-time-server";
-import { getCurriculumPlanById, getCurriculumTopicsWithUsage, createLesson } from "@snr/core";
-import { planLessonSlots, ROOM, SLOT_DURATION_MIN } from "@/lib/curriculum-lesson-planner";
+import { getCurriculumPlanById, getCurriculumTopicsWithUsage, createLesson, getLessonDurationForGroup } from "@snr/core";
+import { planLessonSlots, ROOM } from "@/lib/curriculum-lesson-planner";
 
 // Учебные планы — создание уроков из тем плана.
 //
@@ -101,9 +101,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // учителя. Нужен и раскладке: она не должна предлагать прошедшие даты.
   const nowMs = await getMySchoolNowMs(db);
 
+  // 01.09.2026, миграция 246. Длительность урока — одно число на школу; здесь
+  // она нужна и раскладке (чтобы понимать, наезжает ли слот на существующий
+  // урок), и никому больше: createLesson читает её сам.
+  const duration = await getLessonDurationForGroup(db, plan.group_id);
+
   let assignments;
   try {
-    assignments = await planLessonSlots(db, plan.group_id, unused, nowMs);
+    assignments = await planLessonSlots(db, plan.group_id, unused, nowMs, duration);
   } catch (e) {
     return NextResponse.json({
       error: e instanceof Error ? e.message : "Ошибка подбора места в расписании",
@@ -118,7 +123,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const lesson = await createLesson(db, {
         groupId: plan.group_id,
         startsAt: `${a.date}T${a.time}:00+05:00`,
-        durationMinutes: SLOT_DURATION_MIN,
         room: ROOM,
         title: a.title,
         description: a.description,

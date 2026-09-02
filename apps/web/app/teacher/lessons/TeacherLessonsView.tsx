@@ -43,7 +43,7 @@ type LessonItem = {
 };
 type FormState = {
   groupId: string; subjectId: string; date: string; startTime: string;
-  durationMinutes: string; room: string; title: string; desc: string;
+  room: string; title: string; desc: string;
   // Промт 4, Часть 5 — тема из учебного плана; null/"" = "своя тема" (title — свободный ввод как раньше).
   curriculumTopicId: string;
 };
@@ -154,7 +154,7 @@ function buildIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00+05:00`).toISOString();
 }
 function emptyForm(groupId = ""): FormState {
-  return { groupId, subjectId: "", date: "", startTime: "", durationMinutes: "45", room: "", title: "", desc: "", curriculumTopicId: "" };
+  return { groupId, subjectId: "", date: "", startTime: "", room: "", title: "", desc: "", curriculumTopicId: "" };
 }
 function lessonToForm(l: LessonItem): FormState {
   return {
@@ -165,7 +165,6 @@ function lessonToForm(l: LessonItem): FormState {
     groupId: l.group_id, subjectId: l.subject_id ?? "",
     date: toLocalDateStr(l.starts_at),
     startTime: toLocalTimeStr(l.starts_at),
-    durationMinutes: "45",
     room: l.room ?? "", title: l.title ?? "", desc: "",
     curriculumTopicId: "", // Часть 5 — редактирование НЕ предлагает селектор темы
   };
@@ -542,10 +541,11 @@ function LessonFormModal({
             </label>
             <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} />
           </div>
-          <div>
-            <label className={labelCls}>Длительность (мин.)</label>
-            <input type="number" min="5" max="240" value={form.durationMinutes} onChange={e => set("durationMinutes", e.target.value)} className={inputCls} />
-          </div>
+          {/* ДЛИТЕЛЬНОСТИ ЗДЕСЬ БОЛЬШЕ НЕТ (01.09.2026, миграция 246).
+              Её задаёт суперадмин в карточке школы — одно число на всех, и
+              спрашивать его у предметника незачем: сетка звонков в школе одна.
+              Новый урок берёт длительность у школы сам (createLesson), у
+              существующего своё время начала и конца уже записано. */}
           <div>
             <label className={labelCls}>Кабинет</label>
             <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
@@ -745,7 +745,6 @@ export function TeacherLessonsView({
 
   async function handleSave(form: FormState) {
     const startsAt = buildIso(form.date, form.startTime);
-    const durationMinutes = Math.max(5, Math.min(240, parseInt(form.durationMinutes, 10) || 45));
     if (formModal === "create") {
       // 26.08.2026, миграция 226: у урока обязан быть предмет. Селектор
       // предмета в форме обязателен и при одном предмете в группе
@@ -754,7 +753,7 @@ export function TeacherLessonsView({
       // про not-null constraint.
       if (!form.subjectId) throw new Error("Выберите предмет урока");
       const created = await createLesson(db, {
-        groupId: form.groupId, startsAt, durationMinutes,
+        groupId: form.groupId, startsAt,
         room: form.room || null, title: form.title || null, description: form.desc || null,
         subjectId: form.subjectId,
         curriculumTopicId: form.curriculumTopicId || null,
@@ -763,7 +762,7 @@ export function TeacherLessonsView({
       router.push(`/teacher/lessons/${created.id}`);
     } else if (formModal === "edit" && editLesson) {
       await updateLesson(db, editLesson.id, {
-        group_id: form.groupId, starts_at: startsAt, duration_minutes: durationMinutes,
+        group_id: form.groupId, starts_at: startsAt,
         room: form.room || null, title: form.title || null, description: form.desc || null,
         // 30.08.2026 (пункт 78). Без этой строки перенос урока в другую
         // группу оставлял предмет СТАРОЙ группы: урок в 7-А с английским

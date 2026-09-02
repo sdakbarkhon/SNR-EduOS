@@ -15,7 +15,7 @@ import {
   Smile,
   Star,
 } from "lucide-react";
-import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey, DEFAULT_LESSON_DURATION_MINUTES } from "@snr/core";
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -31,8 +31,11 @@ type ViewMode = "today" | "week";
 const MODE_KEY = "lessons-view-mode";
 const ACCENT = "#7C5CFC";
 const FALLBACK_COLOR = "#64748b";
-// Урок без ends_at и duration_minutes считаем стандартными 45 минутами
-const DEFAULT_LESSON_MIN = 45;
+// Урок без ends_at и duration_minutes считаем стандартной длительностью.
+// 01.09.2026: число не своё, а общее (packages/core/src/utils/lessonDuration.ts)
+// — то же, что умолчание колонки schools.lesson_duration_minutes. Здесь это
+// только запасной вариант для показа: у всех 128 уроков обе колонки заполнены.
+const DEFAULT_LESSON_MIN = DEFAULT_LESSON_DURATION_MINUTES;
 
 // ── date helpers (fixed UTC+5, как в queries) ────────────────────────────────
 

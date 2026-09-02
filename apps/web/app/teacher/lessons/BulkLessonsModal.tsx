@@ -93,7 +93,6 @@ export function BulkLessonsModal({
   const [time, setTime] = useState("09:00");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [duration, setDuration] = useState("45");
   const [room, setRoom] = useState("");
   const [useTopics, setUseTopics] = useState(true);
 
@@ -111,7 +110,8 @@ export function BulkLessonsModal({
     return {
       groupId, subjectId, weekdays, time, from, to,
       useTopics,
-      durationMinutes: Number(duration) || 45,
+      // Длительность не шлём: с 01.09.2026 (миграция 246) её задаёт школа
+      // одним числом, роут читает его сам. Здесь было поле — третий источник.
       room: room.trim() || undefined,
       preview: isPreview,
     };
@@ -215,16 +215,11 @@ export function BulkLessonsModal({
                 </div>
               </Field>
 
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {/* Поля длительности здесь больше нет (01.09.2026, миграция 246):
+                  одно число на школу задаёт суперадмин в её карточке. */}
+              <div className="grid grid-cols-3 gap-4">
                 <Field label={t.bulkTime}>
                   <input type="time" value={time} onChange={(e) => { setTime(e.target.value); setPreview(null); }} className={inputCls} />
-                </Field>
-                <Field label={t.bulkDuration}>
-                  <input
-                    type="text" inputMode="numeric" value={duration}
-                    onChange={(e) => { setDuration(e.target.value.replace(/\D/g, "").slice(0, 3)); setPreview(null); }}
-                    className={inputCls}
-                  />
                 </Field>
                 <Field label={t.bulkFrom}>
                   <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreview(null); }} className={inputCls} />

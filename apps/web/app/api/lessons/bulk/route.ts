@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMySchoolNowMs } from "@/lib/school-time-server";
-import { createLesson, getCurriculumPlanForGroupSubject, getCurriculumTopicsWithUsage } from "@snr/core";
+import { createLesson, getCurriculumPlanForGroupSubject, getCurriculumTopicsWithUsage, getLessonDurationForGroup } from "@snr/core";
 import {
-  planWeeklySchedule, assignTopicsInOrder, ROOM, SLOT_DURATION_MIN,
+  planWeeklySchedule, assignTopicsInOrder, ROOM,
   type PlannedLesson, type Weekday,
 } from "@/lib/curriculum-lesson-planner";
 
@@ -30,7 +30,6 @@ type Body = {
   from?: string;
   to?: string;
   useTopics?: boolean;
-  durationMinutes?: number;
   room?: string;
   preview?: boolean;
 };
@@ -66,8 +65,6 @@ export async function POST(req: NextRequest) {
   }
   if (to < from) return NextResponse.json({ error: "Конец периода раньше начала" }, { status: 400 });
 
-  const duration = Math.max(5, Math.min(240, body.durationMinutes ?? SLOT_DURATION_MIN));
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: teacher, error: teacherErr } = await (db as any)
     .from("teachers").select("id").eq("user_id", user.id).single();
@@ -96,6 +93,12 @@ export async function POST(req: NextRequest) {
   // Z.3 — «сейчас» от времени школы учителя, не от реальных часов: под
   // заморозкой демо-школы иначе отсекался бы весь период.
   const nowMs = await getMySchoolNowMs(db);
+
+  // 01.09.2026, миграция 246. Длительность урока — одно число на школу.
+  // Тело запроса её больше не несёт: окно массового создания о ней не
+  // спрашивает, и принимать её здесь значило бы оставить дверь для
+  // переопределения на отдельный урок.
+  const duration = await getLessonDurationForGroup(db, groupId);
 
   let planned: PlannedLesson[];
   try {
@@ -158,7 +161,6 @@ export async function POST(req: NextRequest) {
       const lesson = await createLesson(db, {
         groupId,
         startsAt: `${l.date}T${l.time}:00+05:00`,
-        durationMinutes: duration,
         room,
         title: l.topicTitle,
         description: l.topicDescription,
