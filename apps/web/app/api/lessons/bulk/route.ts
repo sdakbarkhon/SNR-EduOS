@@ -33,6 +33,10 @@ type Body = {
   from?: string;
   to?: string;
   useTopics?: boolean;
+  /** Создавать ТОЛЬКО те уроки, которым досталась тема плана (шаг 1 учебного
+   *  плана). Без этого раскладка занимает каждый подходящий день периода, а
+   *  темы кончаются раньше — и остаток уроков вышел бы без темы. */
+  onlyWithTopic?: boolean;
   room?: string;
   preview?: boolean;
 };
@@ -147,7 +151,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { lessons, lessonsWithoutTopic, topicsLeftOver } = assignTopicsInOrder(planned, topics);
+  const разложено = assignTopicsInOrder(planned, topics);
+  // 02.09.2026, шаг 1 учебного плана: уроков ровно столько, сколько свободных
+  // тем. Лишние дни периода отбрасываем ЗДЕСЬ, до предпросмотра, — иначе
+  // человек увидел бы в списке строки, которые всё равно не создадутся.
+  const lessons = body.onlyWithTopic
+    ? разложено.lessons.filter((l) => l.topicId !== null)
+    : разложено.lessons;
+  const lessonsWithoutTopic = body.onlyWithTopic ? 0 : разложено.lessonsWithoutTopic;
+  const topicsLeftOver = разложено.topicsLeftOver;
   const toCreate = lessons.filter((l) => !l.occupied);
   const occupied = lessons.length - toCreate.length;
 

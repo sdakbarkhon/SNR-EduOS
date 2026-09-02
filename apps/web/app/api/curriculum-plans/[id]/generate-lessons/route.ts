@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMySchoolNowMs } from "@/lib/school-time-server";
 import { getCurriculumPlanById, getCurriculumTopicsWithUsage, createLesson, getLessonDurationForGroup } from "@snr/core";
-import { planLessonSlots, ROOM } from "@/lib/curriculum-lesson-planner";
+import { planLessonSlots, ROOM, addDaysUTC, tashkentDateOf } from "@/lib/curriculum-lesson-planner";
 
 // Учебные планы — создание уроков из тем плана.
 //
@@ -33,10 +33,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Тело необязательное: старый вызов «создать все» шлёт POST без него вовсе,
   // и падать на разборе пустого тела нельзя.
   let onlyTopicId: string | null = null;
+  let startDate: string | null = null;
   try {
-    const body = (await req.json()) as { topicId?: string } | null;
+    const body = (await req.json()) as { topicId?: string; startDate?: string } | null;
     onlyTopicId = body?.topicId?.trim() ? body.topicId : null;
+    startDate = body?.startDate?.trim() ? body.startDate.trim() : null;
   } catch { /* тела нет — значит «создать все» */ }
+
+  // 02.09.2026, пункт 13. День начала выбирает учитель. Не прислал — берём
+  // школьное завтра: сегодняшние слоты могли уже пройти, и предлагать их
+  // значило бы обещать несбыточное (createLesson отвергает прошлое).
+  if (startDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    return NextResponse.json({ error: "Неверная дата начала" }, { status: 400 });
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: teacher, error: teacherErr } = await (db as any)
@@ -100,6 +109,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Z.3, заход 2 — валидация даты создаваемого урока от времени школы
   // учителя. Нужен и раскладке: она не должна предлагать прошедшие даты.
   const nowMs = await getMySchoolNowMs(db);
+  // Школьное завтра как запасной вариант — тем же счётом по Ташкенту, каким
+  // раскладка сравнивает даты.
+  const отДня = startDate ?? addDaysUTC(tashkentDateOf(new Date(nowMs).toISOString()), 1);
 
   // 01.09.2026, миграция 246. Длительность урока — одно число на школу; здесь
   // она нужна и раскладке (чтобы понимать, наезжает ли слот на существующий
@@ -108,7 +120,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   let assignments;
   try {
-    assignments = await planLessonSlots(db, plan.group_id, unused, nowMs, duration);
+    assignments = await planLessonSlots(db, plan.group_id, unused, nowMs, duration, отДня);
   } catch (e) {
     return NextResponse.json({
       error: e instanceof Error ? e.message : "Ошибка подбора места в расписании",

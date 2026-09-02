@@ -103,19 +103,33 @@ export interface Dictionary {
     errorFileTooLarge: string;  // "Файл больше 20 МБ"
     errorParseFailed: string;   // "Не удалось распарсить план"
     // 19.08.2026 — подписи экранов учебного плана, вынесенные из кода.
-    asTemplates: string;
-    asTemplatesHint: string;
-    autoCreateAll: string;
-    autoCreateBusy: string;
-    autoCreateHint: string;
-    autoResultCreated: string;
-    autoResultLine: string;
-    autoResultNothing: string;
-    autoResultSkipped: string;
     cancel: string;
     confirmFailed: string;
     createLessonFailed: string;
-    createLessonsHeading: string;
+    // Три шага работы с планом (02.09.2026, пункты 13 и 14).
+    stepsHeading: string;
+    step1Title: string;
+    step1Hint: string;
+    step1From: string;
+    step1NoTopics: string;
+    step1Done: string;
+    step2Title: string;
+    step2Locked: string;
+    step2Hint: string;
+    step2Empty: string;
+    step2Filled: string;
+    step2Counts: string;
+    step2Open: string;
+    step3Title: string;
+    step3Hint: string;
+    step3PickFirst: string;
+    step3Delete: string;
+    step3SelectAll: string;
+    step3ClearAll: string;
+    step3ConfirmTitle: string;
+    step3ConfirmLessons: string;
+    step3ConfirmNoLessons: string;
+    step3Partial: string;
     deleteTopicFailed: string;
     deleteTopicSubmit: string;
     deleteTopicTitle: string;
@@ -131,10 +145,6 @@ export interface Dictionary {
     listEmpty: string;
     networkError: string;
     noResults: string;
-    oneByOne: string;
-    oneByOneHide: string;
-    oneByOneHint: string;
-    oneByOneNoDateTime: string;
     pickFileBtn: string;
     processingHint: string;
     processingTitle: string;

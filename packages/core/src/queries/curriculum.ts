@@ -3,7 +3,7 @@
 // СОЗДАНИИ нового урока (см. createLesson в index.ts), не при редактировании.
 
 import type { Db } from "../supabase/factory";
-import type { CurriculumPlan, CurriculumPlanTopic, CurriculumPlanWithTopics, CurriculumTopicWithUsage } from "../types";
+import type { CurriculumPlan, CurriculumPlanTopic, CurriculumPlanWithTopics, CurriculumTopicLesson, CurriculumTopicWithUsage } from "../types";
 import { unwrap } from "./helpers";
 import { mySchoolStoragePath } from "../storage/path";
 
@@ -116,30 +116,56 @@ export async function getCurriculumTopicsWithUsage(db: Db, planId: string): Prom
     (db as AnyDb).from("curriculum_plan_topics").select("*").eq("plan_id", planId).order("order_index"),
     (db as AnyDb)
       .from("lessons")
-      .select("id, curriculum_topic_id, starts_at")
-      .not("curriculum_topic_id", "is", null)
+      // 02.09.2026 — ФИЛЬТР ПО ПЛАНУ. Раньше здесь стояло
+      // `.not("curriculum_topic_id","is",null)` без всякого плана: запрос тянул
+      // уроки ВСЕХ планов учителя разом, и на живой базе это 118 строк вместо
+      // 9. Лишнего никто не видел (счёт всё равно шёл по темам этого плана), но
+      // и возить чужое незачем. Встроенный `!inner` фильтрует по плану на
+      // стороне базы.
+      //
+      // ЭТАПЫ ТЕМ ЖЕ ПОХОДОМ. Шагу 2 нужно знать, наполнен ли урок, а второй
+      // запрос за этим — лишний круг. Имя внешнего ключа указано явно:
+      // у lessons и lesson_stages ДВЕ связи (ещё lessons.active_stage_id), и
+      // без уточнения PostgREST отказывается встраивать вовсе.
+      .select(
+        "id, curriculum_topic_id, starts_at,"
+        + " curriculum_plan_topics!inner(plan_id),"
+        + " lesson_stages!lesson_stages_lesson_id_fkey(stage_role)",
+      )
+      .eq("curriculum_plan_topics.plan_id", planId)
       .order("starts_at"),
   ]);
   if (topicsErr) throw topicsErr;
   if (lessonsErr) throw lessonsErr;
 
-  const usageCount = new Map<string, number>();
-  const firstLesson = new Map<string, { id: string; starts_at: string }>();
-  for (const l of (lessons ?? []) as Array<{ id: string; curriculum_topic_id: string; starts_at: string }>) {
-    usageCount.set(l.curriculum_topic_id, (usageCount.get(l.curriculum_topic_id) ?? 0) + 1);
-    // Список уже отсортирован по времени — первым встреченным и будет самый
-    // ранний, поэтому переписывать запись не нужно.
-    if (!firstLesson.has(l.curriculum_topic_id)) {
-      firstLesson.set(l.curriculum_topic_id, { id: l.id, starts_at: l.starts_at });
-    }
+  type Строка = {
+    id: string;
+    curriculum_topic_id: string;
+    starts_at: string;
+    lesson_stages?: Array<{ stage_role: string }> | null;
+  };
+
+  const byTopic = new Map<string, CurriculumTopicLesson[]>();
+  for (const l of (lessons ?? []) as Строка[]) {
+    // «Пусто» — это отсутствие middle-этапов, а не отсутствие этапов вовсе:
+    // «Старт» и «Итог» кладёт триггер каждому уроку без исключения.
+    const has_content = (l.lesson_stages ?? []).some((s) => s.stage_role === "middle");
+    const список = byTopic.get(l.curriculum_topic_id) ?? [];
+    список.push({ id: l.id, starts_at: l.starts_at, has_content });
+    byTopic.set(l.curriculum_topic_id, список);
   }
 
-  return ((topics ?? []) as CurriculumPlanTopic[]).map((t) => ({
-    ...t,
-    used_in_lessons: usageCount.get(t.id) ?? 0,
-    lesson_id: firstLesson.get(t.id)?.id ?? null,
-    lesson_starts_at: firstLesson.get(t.id)?.starts_at ?? null,
-  }));
+  return ((topics ?? []) as CurriculumPlanTopic[]).map((t) => {
+    // Список уже отсортирован по времени — первый и есть самый ранний.
+    const свои = byTopic.get(t.id) ?? [];
+    return {
+      ...t,
+      used_in_lessons: свои.length,
+      lesson_id: свои[0]?.id ?? null,
+      lesson_starts_at: свои[0]?.starts_at ?? null,
+      lessons: свои,
+    };
+  });
 }
 
 /** Добавить свою тему в план — рядом с теми, что пришли из разбора файла.

@@ -534,6 +534,20 @@ export type CurriculumPlanWithTopics = CurriculumPlan & {
 
 /** Тема плана + сколько существующих (будущих) уроков уже используют её —
  *  для селектора темы в форме создания урока ("использована в N уроках"). */
+/** Урок, созданный по теме плана, — с ответом на вопрос «наполнен ли он». */
+export type CurriculumTopicLesson = {
+  id: string;
+  starts_at: string;
+  /**
+   * Есть ли у урока хоть один этап роли `middle`.
+   *
+   * 02.09.2026. «Пусто» — это НЕ «ноль этапов»: триггер fn_create_default_stages
+   * кладёт каждому новому уроку «Старт» и «Итог», и они есть всегда. Содержимое
+   * урока — это middle-этапы, поэтому пустым считается урок без них.
+   */
+  has_content: boolean;
+};
+
 export type CurriculumTopicWithUsage = CurriculumPlanTopic & {
   used_in_lessons: number;
   /** Первый урок, созданный по этой теме, — чтобы кнопка вела К НЕМУ, а не
@@ -541,6 +555,9 @@ export type CurriculumTopicWithUsage = CurriculumPlanTopic & {
    *  (тему можно было использовать повторно), берётся самый ранний. */
   lesson_id: string | null;
   lesson_starts_at: string | null;
+  /** ВСЕ уроки темы по возрастанию времени. Нужен шагу 2 учебного плана:
+   *  он показывает, где пусто, а тема могла дать больше одного урока. */
+  lessons: CurriculumTopicLesson[];
 };
 
 // migration 118 — Промт 5Б: сохранённые проекты песочницы. service_id —
