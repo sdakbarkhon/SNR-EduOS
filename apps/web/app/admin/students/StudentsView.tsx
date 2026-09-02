@@ -347,7 +347,7 @@ export function StudentsView({
             t={t}
             onClose={() => setModal(null)}
             onSubmit={async (fd) => {
-              guard(() => startTransition(async () => {
+              guard(startTransition, async () => {
                 try {
                   await unwrap(actionCreateStudent(fd));
                   flash(
@@ -359,7 +359,7 @@ export function StudentsView({
                 } catch (e) {
                   flash(humanizeAdminError(e, locale as Locale));
                 }
-              }));
+              });
             }}
           />
         </Backdrop>

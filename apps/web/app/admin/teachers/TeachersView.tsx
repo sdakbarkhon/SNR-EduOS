@@ -404,7 +404,7 @@ export function TeachersView({
               t={t}
               onClose={() => setModal(null)}
               onSubmit={(fd) => {
-                guard(() => startTransition(async () => {
+                guard(startTransition, async () => {
                   try {
                     const res = await unwrap(actionCreateTeacher(fd));
                     // Сообщение говорит «Учитель создан» — раньше здесь стояла
@@ -425,7 +425,7 @@ export function TeachersView({
                   } catch (e) {
                     flash(humanizeAdminError(e, locale as Locale));
                   }
-                }));
+                });
               }}
             />
           </ModalCard>

@@ -52,7 +52,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
       setError(t.parentPhoneRequired);
       return;
     }
-    guard(() => startTransition(async () => {
+    guard(startTransition, async () => {
       try {
         const fd = new FormData();
         fd.set("full_name", fullName.trim());
@@ -64,7 +64,7 @@ export function NewParentForm({ students }: { students: Student[] }) {
       } catch (err) {
         setError(humanizeAdminError(err, locale as Locale));
       }
-    }));
+    });
   }
 
   function copy(text: string, kind: "phone" | "link") {

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, Trash2, Plus, X } from "lucide-react";
+import { Pencil, Trash2, Plus, X, ListPlus, AlertTriangle, Loader2 } from "lucide-react";
 // Z.2.2: захардкоженная карта `subjects` (10 ключей из config/subjects.ts)
 // больше НЕ питает выпадающий список — предметы берутся из справочника школы
 // (school_subjects). getSubjectKeyByLabel остаётся: это мост «русское название
@@ -14,8 +14,13 @@ import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
 import { unwrap } from "@/lib/action-result";
 import { useSubmitGuard } from "@/lib/use-submit-guard";
+import {
+  expandGroupNames, parseGroupLetters, checkGroupNames, chatThreadsForGroups,
+  GROUP_BULK_MAX, GROUP_TEMPLATE_NUMBER, GROUP_TEMPLATE_LETTER,
+} from "@snr/core";
 import { formatCoursePrice, formatCoursePriceInput } from "@/lib/course-price";
-import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup } from "../actions";
+import { actionCreateGroup, actionUpdateGroup, actionDeleteGroup, actionCreateGroupsBulk } from "../actions";
+import type { BulkGroupsResult } from "@/lib/admin-api";
 
 export type CatalogItem = { id: string; name: string; is_active: boolean };
 type Group = {
@@ -235,21 +240,105 @@ export function GroupsView({
     if (slug) nameBySlug.set(slug, c.name);
   }
 
-  const [modal, setModal] = useState<Modal | null>(defaultOpenAdd ? { kind: "add" } : null);
+  // Форма группы требует предмет из справочника. Пока активных предметов
+  // нет, создавать нечем — и это должно решаться ДО открытия окна.
+  //
+  // 03.09.2026 — ДЫРА, ЗАКРЫТАЯ ЗДЕСЬ. Кнопка выключалась по noSubjects, а
+  // окно, открытое сразу по адресу /admin/groups?action=add с дашборда, про
+  // запрет не знало вовсе: список предметов пуст, поле обязательное, форма
+  // открывалась в тупик. Поэтому noSubjects считается выше состояния и входит
+  // в его начальное значение.
+  const noSubjects = catalog.filter((cItem) => cItem.is_active).length === 0;
+
+  const [modal, setModal] = useState<Modal | null>(
+    defaultOpenAdd && !noSubjects ? { kind: "add" } : null,
+  );
   const [search, setSearch] = useState("");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   // Z.2.9 — второй клик до перерисовки больше не создаёт вторую запись.
   const guard = useSubmitGuard();
 
+  // ═══ МАССОВОЕ СОЗДАНИЕ ГРУПП (пункт 227) ═══════════════════════════════
+  //
+  // СПИСОК ИМЁН — ОСНОВА, ШАБЛОН — ПОМОЩНИК. Диапазон «с 1 по 12» покрывает
+  // только школьные классы; у центра имена вида «Science 1-класс» и «W-5».
+  // Поэтому шаблон лишь ЗАПОЛНЯЕТ правимый список, а не заменяет его.
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkPattern, setBulkPattern] = useState(`${GROUP_TEMPLATE_NUMBER}-${GROUP_TEMPLATE_LETTER} класс`);
+  const [bulkFrom, setBulkFrom] = useState("1");
+  const [bulkTo, setBulkTo] = useState("11");
+  const [bulkLetters, setBulkLetters] = useState("А");
+  const [bulkNames, setBulkNames] = useState("");
+  const [bulkSubject, setBulkSubject] = useState("");
+  const [bulkPrice, setBulkPrice] = useState("");
+  const [bulkTruncated, setBulkTruncated] = useState<number | null>(null);
+  const [bulkResult, setBulkResult] = useState<BulkGroupsResult | null>(null);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Занятость считается ПРЯМО ЗДЕСЬ, из уже загруженных групп: второго
+  // запроса за ней нет и заводить его незачем. Правило сравнения имён — одно
+  // на клиент и сервер, живёт в ядре (checkGroupNames → groupNameKey).
+  const bulkList = bulkNames.split("\n").map((x) => x.trim()).filter(Boolean);
+  const bulkCheck = checkGroupNames(bulkList, groups.map((g) => g.name));
+
+  function openBulk() {
+    setBulkNames("");
+    setBulkSubject("");
+    setBulkPrice("");
+    setBulkTruncated(null);
+    setBulkResult(null);
+    setBulkError("");
+    setBulkOpen(true);
+  }
+
+  /** Подстановка по шаблону. Заменяет список ЦЕЛИКОМ — об этом сказано над
+   *  кнопкой, чтобы набранное руками не пропадало неожиданно. */
+  function fillFromTemplate() {
+    const from = Number.parseInt(bulkFrom, 10);
+    const to = Number.parseInt(bulkTo, 10);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return;
+    const { names, wouldBe } = expandGroupNames({
+      pattern: bulkPattern, from, to, letters: parseGroupLetters(bulkLetters),
+    });
+    setBulkNames(names.join("\n"));
+    // Обрезание не молчит: человек просил 999, получил 200.
+    setBulkTruncated(wouldBe > names.length ? wouldBe : null);
+    setBulkResult(null);
+    setBulkError("");
+  }
+
+  function handleBulkCreate() {
+    if (bulkCheck.fresh.length === 0 || !bulkSubject) return;
+    setBulkBusy(true);
+    setBulkError("");
+    const fd = new FormData();
+    fd.set("names", JSON.stringify(bulkCheck.fresh));
+    fd.set("subject_catalog_id", bulkSubject);
+    fd.set("course_price", bulkPrice);
+    startTransition(async () => {
+      try {
+        const итог = await unwrap(actionCreateGroupsBulk(fd));
+        setBulkResult(итог);
+        // Созданные имена уходят из списка: повторное нажатие не должно
+        // пытаться завести их снова.
+        setBulkNames(
+          [...итог.failed.map((f) => f.name), ...bulkCheck.taken, ...bulkCheck.duplicated].join("\n"),
+        );
+      } catch (e) {
+        setBulkError(humanizeAdminError(e, locale as Locale));
+      } finally {
+        setBulkBusy(false);
+      }
+    });
+  }
+
   function flash(msg: string) {
     setFlashMsg(msg);
     setTimeout(() => setFlashMsg(null), 5000);
   }
 
-  // Форма группы требует предмет из справочника. Пока справочник пуст,
-  // создать группу нельзя — выключаем кнопку и говорим, чего не хватает.
-  const noSubjects = catalog.filter((cItem) => cItem.is_active).length === 0;
   const emptyText = search.trim()
     ? t.noResults
     : noSubjects ? t.emptyGroupsNeedSubject : t.emptyGroups;
@@ -266,6 +355,15 @@ export function GroupsView({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">{t.groupsTitle}</h1>
+        <button
+          onClick={openBulk}
+          disabled={noSubjects}
+          title={noSubjects ? t.needSubjectFirst : undefined}
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ListPlus className="h-4 w-4" />
+          {t.groupsBulk}
+        </button>
         <button
           onClick={() => setModal({ kind: "add" })}
           disabled={noSubjects}
@@ -342,6 +440,221 @@ export function GroupsView({
         </div>
       </div>
 
+      {/* ── МАССОВОЕ СОЗДАНИЕ ГРУПП (пункт 227) ─────────────────────── */}
+      {bulkOpen && (
+        <Backdrop onClose={() => !bulkBusy && setBulkOpen(false)}>
+          <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 p-5">
+              <h2 className="text-lg font-bold text-gray-800">{t.groupsBulkTitle}</h2>
+              <button
+                onClick={() => setBulkOpen(false)}
+                disabled={bulkBusy}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+              <p className="text-xs leading-relaxed text-gray-500">{t.groupsBulkHint}</p>
+
+              {/* ── ШАБЛОН-ПОМОЩНИК. Он ЗАПОЛНЯЕТ список, а не заменяет его
+                     собой: центру с именами «Science 1-класс» и «W-5» шаблон
+                     не подходит, и он просто печатает своё. ────────────── */}
+              <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50/60 p-3">
+                <Field label={t.groupsBulkTemplate}>
+                  <Input
+                    value={bulkPattern}
+                    onChange={(e) => setBulkPattern(e.target.value)}
+                    autoComplete="off"
+                  />
+                </Field>
+                <p className="text-[11px] leading-snug text-gray-400">{t.groupsBulkTemplateHint}</p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                    {t.groupsBulkFrom}
+                    <input
+                      value={bulkFrom}
+                      onChange={(e) => setBulkFrom(e.target.value.replace(/[^\d-]/g, ""))}
+                      inputMode="numeric"
+                      className="w-14 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-amber-400"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                    {t.groupsBulkTo}
+                    <input
+                      value={bulkTo}
+                      onChange={(e) => setBulkTo(e.target.value.replace(/[^\d-]/g, ""))}
+                      inputMode="numeric"
+                      className="w-14 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-amber-400"
+                    />
+                  </label>
+                  <label className="flex min-w-[9rem] flex-1 items-center gap-1.5 text-xs text-gray-600">
+                    {t.groupsBulkLetters}
+                    <input
+                      value={bulkLetters}
+                      onChange={(e) => setBulkLetters(e.target.value)}
+                      placeholder={t.groupsBulkLettersPlaceholder}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-amber-400"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={fillFromTemplate}
+                    className="rounded-xl bg-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-300"
+                  >
+                    {t.groupsBulkFill}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400">{t.groupsBulkOverwrite}</p>
+              </div>
+
+              {/* ── СПИСОК ИМЁН. Он же и есть показ до согласия: видно не
+                     «будет создано 24», а двадцать четыре имени. ───────── */}
+              <Field label={t.groupsBulkNames.replace("{n}", String(bulkList.length))}>
+                <textarea
+                  value={bulkNames}
+                  onChange={(e) => { setBulkNames(e.target.value); setBulkResult(null); setBulkError(""); }}
+                  rows={7}
+                  placeholder={t.groupsBulkNamesPlaceholder}
+                  className="w-full resize-y rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                />
+              </Field>
+
+              {bulkTruncated !== null && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-800">
+                  {t.groupsBulkTooMany
+                    .replace("{n}", String(bulkTruncated))
+                    .replace("{max}", String(GROUP_BULK_MAX))}
+                </p>
+              )}
+
+              <Field label={t.fieldSubject}>
+                <select
+                  value={bulkSubject}
+                  onChange={(e) => setBulkSubject(e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                >
+                  <option value="" disabled>{t.selectSubjectPlaceholder}</option>
+                  {catalog.filter((cItem) => cItem.is_active).map((cItem) => (
+                    <option key={cItem.id} value={cItem.id}>{cItem.name}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label={t.fieldCoursePrice}>
+                <Input
+                  value={bulkPrice}
+                  onChange={(e) => setBulkPrice(formatCoursePriceInput(e.target.value))}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-400">{t.groupsBulkPriceHint}</p>
+                {/* Про ноль говорим прямо: fn_issue_monthly_invoices берёт
+                    только группы с course_price > 0, и ученик такой группы
+                    попадает в «помехи» с причиной no_price. Проверено на
+                    живой базе 03.09.2026. */}
+                {bulkPrice.replace(/\s/g, "") === "" && (
+                  <p className="text-xs text-amber-700">{t.groupsBulkZeroPrice}</p>
+                )}
+              </Field>
+
+              {/* ── ЧТО ПРОИЗОЙДЁТ ─────────────────────────────────────── */}
+              {bulkList.length > 0 && (
+                <div className="space-y-1 rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-xs">
+                  {bulkCheck.fresh.length === 0 ? (
+                    <p className="text-amber-800">{t.groupsBulkNothing}</p>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-gray-800">
+                        {t.groupsBulkWillCreate.replace("{n}", String(bulkCheck.fresh.length))}
+                      </p>
+                      <p className="text-gray-600">
+                        {t.groupsBulkThreads.replace("{n}", String(chatThreadsForGroups(bulkCheck.fresh.length)))}
+                      </p>
+                    </>
+                  )}
+                  {bulkCheck.taken.length > 0 && (
+                    <p className="text-gray-500">
+                      <span className="font-semibold">
+                        {t.groupsBulkTaken.replace("{n}", String(bulkCheck.taken.length))}:
+                      </span>{" "}
+                      {bulkCheck.taken.join(", ")}
+                    </p>
+                  )}
+                  {bulkCheck.duplicated.length > 0 && (
+                    <p className="text-gray-500">
+                      <span className="font-semibold">
+                        {t.groupsBulkDuplicated.replace("{n}", String(bulkCheck.duplicated.length))}:
+                      </span>{" "}
+                      {bulkCheck.duplicated.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ── ЧТО ПОЛУЧИЛОСЬ. Обе правды сразу ───────────────────── */}
+              {bulkResult && (
+                <div className="space-y-1 rounded-xl bg-emerald-50 p-3 text-xs">
+                  <p className="font-semibold text-emerald-800">
+                    {t.groupsBulkDone.replace("{created}", String(bulkResult.created))}
+                  </p>
+                  {bulkResult.blocked.length > 0 && (
+                    <p className="text-amber-700">
+                      {t.groupsBulkSkipped.replace("{n}", String(bulkResult.blocked.length))}
+                    </p>
+                  )}
+                  {bulkResult.failed.length > 0 && (
+                    <div className="border-t border-emerald-100 pt-1.5">
+                      <p className="font-semibold text-red-700">
+                        {t.groupsBulkFailedTitle.replace("{n}", String(bulkResult.failed.length))}
+                      </p>
+                      <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
+                        {bulkResult.failed.map((f, i) => (
+                          <li key={i} className="text-red-600">
+                            {t.groupsBulkFailedRow.replace("{name}", f.name).replace("{reason}", f.reason)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {bulkError && (
+                <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {bulkError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 border-t border-gray-100 p-5">
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                disabled={bulkBusy}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t.cancelBtn}
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkCreate}
+                disabled={bulkBusy || bulkCheck.fresh.length === 0 || !bulkSubject}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+              >
+                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
+                {bulkBusy
+                  ? t.groupsBulkCreating
+                  : `${t.groupsBulkCreate} (${bulkCheck.fresh.length})`}
+              </button>
+            </div>
+          </div>
+        </Backdrop>
+      )}
+
       {modal?.kind === "add" && (
         <Backdrop onClose={() => setModal(null)}>
           <ModalCard title={t.addGroupTitle} onClose={() => setModal(null)}>
@@ -350,7 +663,7 @@ export function GroupsView({
               isPending={isPending}
               t={t}
               onClose={() => setModal(null)}
-              onSubmit={(fd) => guard(() => startTransition(async () => {
+              onSubmit={(fd) => guard(startTransition, async () => {
                 try {
                   await unwrap(actionCreateGroup(fd));
                   flash(t.groupCreatedMsg.replace("{name}", String(fd.get("name"))));
@@ -358,7 +671,7 @@ export function GroupsView({
                 } catch (e) {
                   flash(humanizeAdminError(e, locale as Locale));
                 }
-              }))}
+              })}
               submitLabel={t.createBtn}
             />
           </ModalCard>

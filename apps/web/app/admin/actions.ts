@@ -3,7 +3,7 @@
 import {
   createStudent, updateStudent, resetStudentPassword, deleteStudent,
   createTeacher, updateTeacher, resetTeacherPassword, deleteTeacher,
-  createGroup, updateGroup, deleteGroup,
+  createGroup, updateGroup, deleteGroup, createGroupsBulk,
   createSchoolSubject, updateSchoolSubject, setSchoolSubjectActive,
   createSubjectAssignment, updateSubjectAssignment, deleteSubjectAssignment,
   deleteSchoolSubject, getSchoolSubjectImpact, getSubjectAssignmentImpact,
@@ -12,7 +12,7 @@ import {
 } from "@/lib/admin-api";
 import type {
   SchoolSubjectDeletionImpact, SubjectDeletionImpact, TeacherDeletionImpact,
-  BulkAssignPlan, BulkAssignResult,
+  BulkAssignPlan, BulkAssignResult, BulkGroupsResult,
 } from "@/lib/admin-api";
 import { createClient } from "@/lib/supabase/server";
 import { changedFields, GOOGLE_EMAIL_FIELDS } from "@/lib/form-patch";
@@ -336,6 +336,47 @@ export async function actionCreateGroup(formData: FormData) {
     revalidatePath("/admin/groups");
     revalidatePath("/admin");
     return id;
+  });
+}
+
+/**
+ * МАССОВОЕ СОЗДАНИЕ ГРУПП. Пункт 227.
+ *
+ * Список имён приходит JSON-строкой: это не поля браузерной формы, а
+ * содержимое одного текстового поля, разобранного на строки. Предмет и цена —
+ * одни на всю пачку, читаются теми же функциями, что и у одиночной формы
+ * (resolveGroupSubject, readCoursePrice), поэтому понимаются одинаково.
+ *
+ * Два revalidatePath на всю пачку, а не на каждую группу.
+ */
+export async function actionCreateGroupsBulk(
+  formData: FormData,
+): Promise<ActionResult<BulkGroupsResult>> {
+  return guard(async () => {
+    const { schoolId } = await verifyAdmin();
+
+    let разобрано: unknown;
+    try {
+      разобрано = JSON.parse(String(formData.get("names") ?? "[]"));
+    } catch {
+      throw new Error("Missing fields");
+    }
+    if (!Array.isArray(разобрано)) throw new Error("Missing fields");
+    const names = разобрано.map((v) => String(v).trim()).filter(Boolean);
+    if (names.length === 0) throw new Error("Missing fields");
+
+    const subject = await resolveGroupSubject(formData, schoolId);
+    const итог = await createGroupsBulk({
+      names,
+      subject,
+      // undefined тут невозможно: поле в форме есть всегда, пустое = 0.
+      coursePrice: readCoursePrice(formData) ?? 0,
+      schoolId,
+    });
+
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin");
+    return итог;
   });
 }
 

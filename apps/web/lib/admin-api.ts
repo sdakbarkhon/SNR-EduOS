@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSubjectKeyByLabel, normalizeUzPhone, parentAuthEmail } from "@snr/core";
+import { getSubjectKeyByLabel, groupNameKey, GROUP_BULK_MAX, normalizeUzPhone, parentAuthEmail } from "@snr/core";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -780,6 +780,149 @@ export async function createGroup(data: {
     .single();
   if (error || !group) throw error ?? new Error("Group insert failed");
   return (group as { id: string }).id;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// МАССОВОЕ СОЗДАНИЕ ГРУПП. Пункт 227, 03.09.2026.
+//
+// ЗАЧЕМ. «Создать классы с первого по двенадцатый разом, а не по одному».
+// Сегодня группа заводится за 6 нажатий, и окно закрывается после каждого
+// сохранения: двенадцать классов — двенадцать заходов.
+//
+// ═══ ПОЧЕМУ НЕ «ДИАПАЗОН С 1 ПО 12» ═══════════════════════════════════════
+//
+// Живые имена групп 03.09.2026 распадаются на три семейства, и диапазон
+// покрывает только первое:
+//
+//   3-А класс, 7-А класс, 10-А класс          школьные классы
+//   Science 1-класс, SNR Робототехника         предметные группы центра
+//   G-7, W-5, Test Group                       короткие коды
+//
+// Поэтому основа формы — ПРАВИМЫЙ СПИСОК ИМЁН, а диапазон с шаблоном лишь
+// его заполняет. Школа жмёт «Подставить», центр печатает или вставляет своё.
+// Сам список и есть показ до согласия: видно не «будет создано 24», а
+// двадцать четыре имени.
+//
+// ═══ ЧТО ВЫНЕСЕНО ИЗ ЦИКЛА ════════════════════════════════════════════════
+//
+// createGroup на каждую группу вызывает assertGroupNameFree, а та вычитывает
+// ВСЕ группы школы целиком — плюс actionCreateGroup делает после каждой
+// вставки два revalidatePath. Тридцать групп по одной — тридцать полных
+// чтений и тридцать сбросов кэша.
+//
+//   было:  30 × (чтение всех групп + вставка) + 60 сбросов кэша
+//   стало: 1 чтение + 30 вставок + 2 сброса
+//
+// И это не только про скорость. Чтение из базы НЕ ВИДИТ повторов внутри
+// самой пачки: двенадцать имён, среди которых два одинаковых, пройдут
+// проверку все двенадцать раз. Множество имён живёт здесь, в памяти, и
+// пополняется по ходу — поэтому повтор внутри пачки ловится тоже.
+//
+// Вторая линия — уникальный индекс из миграции 249. Он ловит и гонку, и
+// двойной клик; проверка здесь остаётся первой, потому что умеет назвать,
+// какое именно имя занято, а индекс умеет только отказать.
+
+/** Имя, которое делать не будем, и почему. */
+export type BulkGroupBlocked = {
+  name: string;
+  /** `taken` — такая группа в школе уже есть; `dup` — имя повторяется внутри
+   *  самого списка. Для человека это разные новости. */
+  reason: "taken" | "dup";
+};
+
+export type BulkGroupsResult = {
+  created: number;
+  /** Пары, не прошедшие запись. Частичный отказ не теряет созданного — то же
+   *  правило, что у assignSubjectsToTeacher и массового назначения. */
+  failed: Array<{ name: string; reason: string }>;
+  /** Отсеянные ДО записи: занятые и повторы внутри списка. */
+  blocked: BulkGroupBlocked[];
+};
+
+// groupNameKey сюда НЕ дублируется. Она живёт в ядре
+// (packages/core/src/utils/groupNames.ts) и зовётся оттуда и формой, и этим
+// слоем: форма считает занятость на клиенте, сервер — при записи, и считать
+// они обязаны одинаково. В этом проекте копии правил расходились семь раз.
+
+/**
+ * Завести несколько групп разом.
+ *
+ * ОДНО ЧТЕНИЕ НА ВСЮ ПАЧКУ. Дальше только вставки; множество занятых имён
+ * пополняется по ходу, поэтому повтор внутри списка ловится без похода в
+ * базу.
+ *
+ * Предмет и цена — одни на всю пачку. Решение заказчика: живые цены внутри
+ * каждой школы одинаковы (1 500 000 / 800 000 / 0), а правка цены отдельной
+ * группы и так в одном клике. Двенадцать полей цены в форме — это двенадцать
+ * шансов промахнуться.
+ */
+export async function createGroupsBulk(input: {
+  names: string[];
+  subject: string;
+  coursePrice: number;
+  schoolId: string;
+}): Promise<BulkGroupsResult> {
+  // ПОТОЛОК ТОТ ЖЕ, ЧТО У ПОДСТАНОВКИ ШАБЛОНА. Форма не даст набрать больше,
+  // но она не единственный способ сюда попасть: действие открыто любому
+  // админу школы, и список приходит JSON-строкой. Отказ внятный, а не
+  // молчаливое обрезание — обрезать пачку наполовину хуже, чем не начать.
+  if (input.names.length > GROUP_BULK_MAX) throw new Error("TOO_MANY_GROUPS");
+
+  const sb = getServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySb = sb as any;
+
+  // ── постоянная часть: одно чтение ──
+  const { data: сущ, error: readErr } = await anySb
+    .from("groups").select("id, name").eq("school_id", input.schoolId);
+  if (readErr) throw readErr;
+
+  const занято = new Set<string>(
+    ((сущ ?? []) as Array<{ name: string | null }>).map((g) => groupNameKey(g.name ?? "")),
+  );
+
+  const итог: BulkGroupsResult = { created: 0, failed: [], blocked: [] };
+  // Внутри пачки повтор — отдельная новость: человек мог опечататься в
+  // списке, и сказать ему «занято» было бы неправдой.
+  const встречалось = new Set<string>();
+
+  for (const сырое of input.names) {
+    const name = сырое.trim();
+    if (!name) continue;
+    const ключ = groupNameKey(name);
+
+    if (встречалось.has(ключ)) {
+      итог.blocked.push({ name, reason: "dup" });
+      continue;
+    }
+    встречалось.add(ключ);
+
+    if (занято.has(ключ)) {
+      итог.blocked.push({ name, reason: "taken" });
+      continue;
+    }
+
+    try {
+      const { error } = await anySb.from("groups").insert({
+        name,
+        subject: input.subject,
+        teacher_id: null,
+        // school_id ЯВНО. Служебный ключ обходит RLS, auth.uid() там пуст, и
+        // умолчание current_school_id() дало бы NULL против NOT NULL. Та же
+        // ловушка, что уже ловила нас на lesson_stages и quiz_questions.
+        school_id: input.schoolId,
+        course_price: input.coursePrice,
+      });
+      if (error) throw error;
+      итог.created += 1;
+      // Занимаем имя сразу: следующая строка списка должна видеть эту.
+      занято.add(ключ);
+    } catch (e) {
+      итог.failed.push({ name, reason: errorText(e) });
+    }
+  }
+
+  return итог;
 }
 
 export async function updateGroup(

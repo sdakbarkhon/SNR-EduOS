@@ -147,8 +147,18 @@ export function humanizeAdminError(err: unknown, locale: Locale = "ru"): string 
   if (raw === "BAD_PHONE" || /Некорректный номер телефона/.test(raw)) {
     return t.phoneInvalid;
   }
-  if (raw === "GROUP_NAME_TAKEN") {
+  // GROUP_NAME_TAKEN бросает проверка в коде (assertGroupNameFree), а
+  // groups_school_name_unique_idx — уникальный индекс из миграции 249. Это
+  // две линии одной обороны, и человеку про них надо сказать одно и то же:
+  // проверка успевает первой в обычном случае, индекс ловит гонку, двойной
+  // клик и повтор внутри массовой пачки.
+  if (raw === "GROUP_NAME_TAKEN" || /groups_school_name_unique_idx/i.test(raw)) {
     return t.groupNameTaken;
+  }
+  // Пункт 227: потолок массового создания. Форма столько набрать не даст, но
+  // действие открыто любому админу школы, а список приходит строкой.
+  if (raw === "TOO_MANY_GROUPS") {
+    return t.groupsBulkTooManyError;
   }
   // Окно ученика, миграция 232. Дата рождения и пол проверяются на сервере,
   // а не только браузером: поле формы обходится запросом мимо неё.
