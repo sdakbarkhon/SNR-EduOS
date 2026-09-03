@@ -244,7 +244,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     setTimeout(() => setAiToast(false), 4000);
   }
 
-  async function save(status: "draft" | "published") {
+  async function save() {
     // ПРОВЕРКИ ИДУТ СВЕРХУ ВНИЗ, КАК ПОЛЯ ЛЕЖАТ НА ЭКРАНЕ. 03.09.2026.
     //
     // Раньше порядок был другой: название → поля типа → класс → предмет →
@@ -307,7 +307,6 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         teacherId: resolvedTeacherId,
         lessonId: lessonId || null,
         subjectId: subjectId || null,
-        status,
         testDurationSeconds: format === "test" ? Number(testDuration) * 60 : null,
         testAutoGrade: format === "test" ? autoGrade : true,
         programmingLanguage: format === "programming" ? progLanguage : null,
@@ -1074,12 +1073,15 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
 
       {error && <p className="text-[13px] font-medium text-danger">{error}</p>}
 
+      {/* ЧЕРНОВИКА БОЛЬШЕ НЕТ. 04.09.2026.
+          Кнопка «Сохранить черновик» звала тот же save(), только с доводом
+          status: "draft" — а колонки статуса у homework НЕТ ВОВСЕ, и довод
+          молча выбрасывался при вставке. То есть «черновик» публиковался
+          сразу, наравне с «Создать»: кнопка обещала то, чего никогда не
+          делала. Заказчик решил, что черновики не нужны, — убираем и
+          кнопку, и мёртвый довод. */}
       <div className="flex gap-3">
-        <button onClick={() => save("draft")} disabled={saving}
-          className="rounded-[12px] border border-slate-200 bg-white/80 px-5 py-2.5 text-[14px] font-semibold text-brand-ink transition-all hover:bg-white disabled:opacity-50">
-          {saving ? d.common.loading : d.teacher.saveDraft}
-        </button>
-        <button onClick={() => save("published")} disabled={saving}
+        <button onClick={() => save()} disabled={saving}
           className="rounded-[12px] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50"
           style={{ background: "linear-gradient(135deg,#1D6FF5,#0B3EDB)", boxShadow: "0 4px 16px rgba(29,111,245,0.35)" }}>
           {format === "test" ? d.homework.test.createTest : (saving && attachFile ? d.teacher.hwAttachProgress : saving ? d.common.loading : d.teacher.publish)}

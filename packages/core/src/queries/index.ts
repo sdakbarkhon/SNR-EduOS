@@ -2235,7 +2235,11 @@ export const createTeacherHomework = async (
     teacherId: string;
     lessonId?: string | null;
     subjectId?: string | null;
-    status?: "draft" | "published";
+    /* 04.09.2026 — довода `status` здесь больше нет. Колонки статуса у
+       homework никогда не было, и он молча выбрасывался при вставке: форма
+       звала «Сохранить черновик», а задание публиковалось наравне с обычным.
+       Кнопка убрана, довод — вместе с ней, чтобы следующий читающий не решил,
+       будто черновики где-то живут. */
     testDurationSeconds?: number | null;
     testAutoGrade?: boolean;
     programmingLanguage?: ProgrammingLanguage | null;
