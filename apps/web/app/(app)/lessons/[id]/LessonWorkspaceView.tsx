@@ -600,12 +600,18 @@ export function LessonWorkspaceView({
         .select("active_stage_id, demo_material_id, status")
         .eq("id", lesson.id)
         .maybeSingle()
-        .then(({ data }: { data: { active_stage_id: string | null; demo_material_id: string | null; status: string } | null }) => {
+        // 04.09.2026 — ОШИБКА БОЛЬШЕ НЕ НЕВИДИМА. Читали только `data`, а
+        // supabase-js на отказ (истёкшая сессия — 401, отказ прав — 403)
+        // промис НЕ отклоняет: он отдаёт `{ data: null, error }`. Такой
+        // ответ уходил в `if (!data) return` вместе с обычным «строки нет»,
+        // и опрос молчал сколько угодно долго, не оставляя ни следа.
+        .then(({ data, error }: { data: { active_stage_id: string | null; demo_material_id: string | null; status: string } | null; error: { message: string } | null }) => {
+          if (error) { console.error("[LessonWorkspaceView] опрос статуса урока отказал:", error.message); return; }
           if (!data) return;
           lastSyncOkAtRef.current = Date.now();
           applyLessonLiveUpdate(data);
         })
-        .catch(() => null);
+        .catch((e: unknown) => { console.error("[LessonWorkspaceView] опрос статуса урока не дошёл:", (e as Error)?.message ?? e); });
     }, 3000);
     const watchdog = setInterval(() => {
       setLiveSyncOk(Date.now() - lastSyncOkAtRef.current < LIVE_SYNC_STALE_MS);

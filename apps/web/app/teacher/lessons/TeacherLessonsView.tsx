@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -25,6 +25,7 @@ import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { BulkLessonsFields, type PlanState } from "./BulkLessonsModal";
 import { ModalPortal } from "@/components/ModalPortal";
+import { useRealtimeChannel } from "@/lib/realtime";
 import { DatePickerField, FIELD_INPUT, FIELD_LABEL } from "@/components/DatePickerField";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -778,6 +779,27 @@ export function TeacherLessonsView({
     void loadMonth(viewYear, viewMonth);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewYear, viewMonth]);
+
+  /**
+   * СПИСОК УЗНАЁТ О СМЕНЕ СТАТУСА САМ. 04.09.2026.
+   *
+   * Карточки рисовались из серверного пропа, засеянного в состояние один раз.
+   * Урок закрывался ночным заданием через пять минут после звонка, а в списке
+   * он оставался «Идёт сейчас» до перехода по меню или до F5 — ровно это и
+   * увидел заказчик.
+   *
+   * Экран самого урока такую подписку имеет с миграции 37, список — нет.
+   * Здесь она без фильтра по уроку: список показывает целый месяц, и фильтр
+   * пришлось бы держать по каждой карточке отдельно.
+   */
+  useRealtimeChannel(
+    "teacher-lessons-list",
+    "lessons",
+    undefined,
+    useCallback(() => { void loadMonth(viewYear, viewMonth); },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [viewYear, viewMonth]),
+  );
 
   function prevMonth() {
     if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
