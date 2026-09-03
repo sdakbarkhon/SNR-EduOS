@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { X, CalendarRange, Check, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Check, AlertTriangle } from "lucide-react";
 import { getDictionary } from "@snr/core";
 import type { Locale, SubjectWithGroup } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
@@ -10,6 +9,21 @@ import { useLocale } from "@/components/LocaleProvider";
 /**
  * Массовое создание уроков: правило «эти дни недели, это время, с такого числа
  * по такое» вместо сотни отдельных нажатий.
+ *
+ * ═══ 03.09.2026 — ЭТО БОЛЬШЕ НЕ ОКНО, А БЛОК ВНУТРИ ОКНА УРОКА ════════════
+ *
+ * Отдельной кнопки «массовое создание» снаружи больше нет: заказчик просил
+ * один вход в создание уроков с переключателем внутри. Сюда переехало ВСЁ,
+ * что здесь было, кроме трёх вещей, которые стали общими и живут теперь
+ * наверху окна: группа, предмет и кабинет. Их значения приходят свойствами.
+ *
+ * Ушла и собственная оболочка — затемнение, шапка и кнопка «Отмена»: у окна
+ * урока они свои, и вторых не нужно.
+ *
+ * НИЧЕГО ИЗ ПРАВИЛ НЕ ТРОНУТО. Дни недели, период, своё время по дням,
+ * галочка «брать темы из плана», предпросмотр с датами, занятые слоты серым и
+ * все четыре числа — «создастся», «занято», «без темы», «тем осталось» —
+ * остались слово в слово. Правила выбора тем этот заход не трогает вовсе.
  *
  * ДВА ШАГА, И ВТОРОЙ НЕОБРАТИМ ТОЛЬКО ПОСЛЕ СОГЛАСИЯ. Сначала окно показывает
  * раскладку: сколько уроков, на какие даты, какая тема куда встанет, что
@@ -54,16 +68,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function BulkLessonsModal({
-  groups,
-  teacherSubjects,
-  onClose,
+export function BulkLessonsFields({
+  groupId,
+  subjectId,
+  room,
   onCreated,
 }: {
-  groups: Array<{ id: string; name: string }>;
-  teacherSubjects: SubjectWithGroup[];
-  onClose: () => void;
-  /** Создано — родитель перечитывает месяц. */
+  /** Общие поля приходят сверху: они одни и те же у обоих режимов, и второй
+   *  их набор внутри блока означал бы, что переключение теряет введённое. */
+  groupId: string;
+  subjectId: string;
+  room: string;
+  /** Создано — родитель перечитывает месяц и закрывает окно. */
   onCreated: (count: number) => void;
 }) {
   const { locale } = useLocale();
@@ -73,21 +89,6 @@ export function BulkLessonsModal({
   const wdLabel: Record<number, string> = {
     1: t.wdMon, 2: t.wdTue, 3: t.wdWed, 4: t.wdThu, 5: t.wdFri, 6: t.wdSat, 7: t.wdSun,
   };
-
-  // Только те группы, где у учителя есть предмет: без предмета урок всё равно
-  // не создать, и предлагать такую группу значит вести в тупик.
-  const usableGroups = useMemo(
-    () => groups.filter((g) => teacherSubjects.some((s) => s.group_id === g.id)),
-    [groups, teacherSubjects],
-  );
-
-  const [groupId, setGroupId] = useState(usableGroups[0]?.id ?? "");
-  const subjectsOfGroup = useMemo(
-    () => teacherSubjects.filter((s) => s.group_id === groupId),
-    [teacherSubjects, groupId],
-  );
-  const [subjectId, setSubjectId] = useState(subjectsOfGroup[0]?.id ?? "");
-  useEffect(() => { setSubjectId(subjectsOfGroup[0]?.id ?? ""); }, [subjectsOfGroup]);
 
   const [weekdays, setWeekdays] = useState<number[]>([1, 3, 5]);
   const [time, setTime] = useState("09:00");
@@ -109,7 +110,6 @@ export function BulkLessonsModal({
   const timeOf = (n: number) => timeByWeekday[n] ?? time;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [room, setRoom] = useState("");
   const [useTopics, setUseTopics] = useState(true);
 
   const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -176,30 +176,10 @@ export function BulkLessonsModal({
     }
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-      >
-        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <CalendarRange className="h-5 w-5 text-blue-600" />
-            <div>
-              <h2 className="text-base font-bold text-[#1D1D1F]">{t.bulkTitle}</h2>
-              <p className="text-xs text-gray-400">{t.bulkSubtitle}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+  return (
+    <div className="space-y-4">
+      <>
+        <div className="space-y-4">
           {doneCount !== null ? (
             <div className="py-8 text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100">
@@ -209,27 +189,6 @@ export function BulkLessonsModal({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label={t.bulkGroup}>
-                  <select
-                    value={groupId}
-                    onChange={(e) => { setGroupId(e.target.value); setPreview(null); }}
-                    className={inputCls}
-                  >
-                    {usableGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                  </select>
-                </Field>
-                <Field label={t.bulkSubject}>
-                  <select
-                    value={subjectId}
-                    onChange={(e) => { setSubjectId(e.target.value); setPreview(null); }}
-                    className={inputCls}
-                  >
-                    {subjectsOfGroup.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </Field>
-              </div>
-
               <Field label={t.bulkWeekdays}>
                 <div className="flex flex-wrap gap-1.5">
                   {WEEKDAYS.map((n) => {
@@ -308,10 +267,6 @@ export function BulkLessonsModal({
                 )}
               </div>
 
-              <Field label={t.bulkRoom}>
-                <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Кабинет 101" className={inputCls} />
-              </Field>
-
               <label className="flex items-start gap-2.5 rounded-xl bg-gray-50 p-3">
                 <input
                   type="checkbox"
@@ -377,13 +332,7 @@ export function BulkLessonsModal({
         </div>
 
         {doneCount === null && (
-          <div className="flex shrink-0 gap-3 border-t border-gray-100 px-5 py-4">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-            >
-              {d.common.cancel}
-            </button>
+          <div className="flex gap-3 border-t border-gray-100 pt-4">
             {preview ? (
               <>
                 <button
@@ -411,8 +360,7 @@ export function BulkLessonsModal({
             )}
           </div>
         )}
-      </div>
-    </div>,
-    document.body,
+      </>
+    </div>
   );
 }

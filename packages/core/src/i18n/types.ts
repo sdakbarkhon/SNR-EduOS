@@ -2444,6 +2444,7 @@ export interface Dictionary {
     createNoSubjects: string;
     editSubjectHasGrades: string;   // «уже стоит оценок: {n}» — предупреждение при смене предмета
     createSelectSubject: string;
+    oneLesson: string;
     back: string;
     progressTitle: string;
     stagesTitle: string;

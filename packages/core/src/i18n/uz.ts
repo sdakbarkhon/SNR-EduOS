@@ -2373,6 +2373,7 @@ export const uz: Dictionary = {
     createNoSubjects: "Tayinlangan fanlaringiz yo'q. Administratorga murojaat qiling.",
     editSubjectHasGrades: "Bu dars uchun allaqachon {n} ta baho qo'yilgan. Fan almashtirilsa, ular dars bilan birga ko'chadi.",
     createSelectSubject: "Fan tanlang",
+    oneLesson: "Bitta dars",
     back: "Jadvalga qaytish",
     progressTitle: "Dars jarayoni",
     stagesTitle: "Dars bosqichlari",

@@ -2373,6 +2373,7 @@ export const en: Dictionary = {
     createNoSubjects: "You have no assigned subjects. Please contact the administrator.",
     editSubjectHasGrades: "This lesson already has {n} grades. Changing the subject moves them along with the lesson.",
     createSelectSubject: "Select subject",
+    oneLesson: "One lesson",
     back: "Back to schedule",
     progressTitle: "Lesson progress",
     stagesTitle: "Lesson stages",

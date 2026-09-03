@@ -9,8 +9,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const ITEM_H = 40;        // px per row
-const VISIBLE = 5;        // rows shown (2 above, centre, 2 below)
-const PAD = (VISIBLE - 1) / 2;
+/**
+ * Сколько строк видно в колесе. 03.09.2026 — стало НЕОБЯЗАТЕЛЬНЫМ СВОЙСТВОМ.
+ *
+ * Пять строк по сорок пикселей — это двести пикселей высоты, и в окне создания
+ * урока выбор времени занимал больше места, чем все остальные поля вместе.
+ * Три строки дают сто двадцать.
+ *
+ * Умолчание прежнее — пять: там, где колесо стоит просторно, оно и остаётся
+ * прежним. МЕХАНИЗМ НЕ ТРОНУТ: прокрутка, привязка к «не в прошлом», подсветка
+ * середины и отступы считаются от этого числа и подстраиваются сами.
+ */
+const VISIBLE_DEFAULT = 5;
 
 const APP_TZ = "Asia/Tashkent";
 
@@ -34,10 +44,11 @@ function nowInTashkent(): { dateStr: string; hour: number; minute: number } {
 type Item = { v: number; label: string; disabled: boolean };
 
 function Wheel({
-  items, value, onChange, ariaLabel,
+  items, value, onChange, ariaLabel, rows,
 }: {
   items: Item[];
   value: number;
+  rows: number;
   onChange: (v: number) => void;
   ariaLabel: string;
 }) {
@@ -101,7 +112,7 @@ function Wheel({
   }
 
   return (
-    <div className="relative flex-1 select-none" style={{ height: ITEM_H * VISIBLE }} role="listbox" aria-label={ariaLabel}>
+    <div className="relative flex-1 select-none" style={{ height: ITEM_H * rows }} role="listbox" aria-label={ariaLabel}>
       {/* Centre highlight band */}
       <div
         className="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 rounded-xl border-y-2 border-blue-200 bg-blue-50/50"
@@ -113,7 +124,7 @@ function Wheel({
         className="ios-wheel-scroll h-full overflow-y-auto overflow-x-hidden"
         style={{ scrollSnapType: "none", touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
       >
-        <div style={{ height: ITEM_H * PAD }} />
+        <div style={{ height: ITEM_H * ((rows - 1) / 2) }} />
         {items.map((it, i) => {
           const dist = Math.abs(i - centerIdx);
           const cls = it.disabled
@@ -140,18 +151,20 @@ function Wheel({
             </div>
           );
         })}
-        <div style={{ height: ITEM_H * PAD }} />
+        <div style={{ height: ITEM_H * ((rows - 1) / 2) }} />
       </div>
     </div>
   );
 }
 
 export function IosTimePicker({
-  value, onChange, minDate,
+  value, onChange, minDate, rows = VISIBLE_DEFAULT,
 }: {
   value: string;
   onChange: (v: string) => void;
   minDate?: string;
+  /** Сколько строк видно. Нечётное: середина — выбранное значение. */
+  rows?: number;
 }) {
   const now = useMemo(() => nowInTashkent(), []);
   const isToday = !!minDate && minDate === now.dateStr;
@@ -218,9 +231,9 @@ export function IosTimePicker({
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
       <style>{`.ios-wheel-scroll{scrollbar-width:none;-ms-overflow-style:none}.ios-wheel-scroll::-webkit-scrollbar{display:none}`}</style>
       <div className="flex items-stretch gap-2">
-        <Wheel items={hourItems} value={selHour} onChange={onHour} ariaLabel="Часы" />
+        <Wheel items={hourItems} value={selHour} onChange={onHour} ariaLabel="Часы" rows={rows} />
         <div className="flex items-center text-2xl font-bold text-slate-300">:</div>
-        <Wheel items={minuteItems} value={selMin} onChange={onMin} ariaLabel="Минуты" />
+        <Wheel items={minuteItems} value={selMin} onChange={onMin} ariaLabel="Минуты" rows={rows} />
       </div>
       <div className="mt-1 flex gap-2">
         <div className="flex-1 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400">часы</div>

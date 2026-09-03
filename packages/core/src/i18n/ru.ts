@@ -2380,6 +2380,7 @@ export const ru: Dictionary = {
     createNoSubjects: "У вас нет закреплённых предметов. Обратитесь к администратору.",
     editSubjectHasGrades: "За этот урок уже стоит оценок: {n}. При смене предмета они перейдут вместе с уроком.",
     createSelectSubject: "Выберите предмет",
+    oneLesson: "Один урок",
     back: "Назад к расписанию",
     progressTitle: "Прогресс урока",
     stagesTitle: "Этапы урока",

@@ -24,7 +24,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
-import { BulkLessonsModal } from "./BulkLessonsModal";
+import { BulkLessonsFields } from "./BulkLessonsModal";
 import { ModalPortal } from "@/components/ModalPortal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -331,11 +331,13 @@ function DatePickerField({
 
 // ── LessonFormModal ───────────────────────────────────────────────────────────
 function LessonFormModal({
-  mode, groups, teacherSubjects, initial, editLessonId, onClose, onSave,
+  mode, groups, teacherSubjects, initial, editLessonId, onClose, onSave, onBulkCreated,
 }: {
   mode: "create" | "edit"; groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
   initial: FormState;
+  /** Пачка создана — родитель перечитывает месяц. Своего запроса у окна нет. */
+  onBulkCreated: () => void;
   /** Правим существующий урок — его id. Нужен ровно для одного: узнать,
    *  есть ли у урока оценки, и предупредить перед сменой предмета. */
   editLessonId?: string;
@@ -344,9 +346,26 @@ function LessonFormModal({
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).lesson;
   const dc = getDictionary(locale as Locale).curriculum;
+  const dt = getDictionary(locale as Locale).teacher;
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  /**
+   * ОДИН УРОК ИЛИ НЕСКОЛЬКО. 03.09.2026.
+   *
+   * Раньше это были два разных окна и две кнопки снаружи. Стало одно окно с
+   * переключателем: вход в создание уроков один, а различаются у режимов
+   * только даты и время.
+   *
+   * ОБЩЕЕ СОСТОЯНИЕ ЖИВЁТ ЗДЕСЬ. Группа, предмет и кабинет лежат в `form` —
+   * то есть переключение режима их НЕ ТЕРЯЕТ: выбрал группу, передумал,
+   * переключился — она на месте. Второго набора этих полей внутри массового
+   * блока нет намеренно, иначе они бы разошлись.
+   *
+   * Правка урока переключателя не имеет вовсе: править пачкой нечего.
+   */
+  const [many, setMany] = useState(false);
 
   // СКОЛЬКО ОЦЕНОК УЖЕ СТОИТ У ЭТОГО УРОКА. 30.08.2026, пункт 78.
   //
@@ -460,7 +479,7 @@ function LessonFormModal({
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-        <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <div className="flex items-center justify-between p-6 pb-4">
             <h2 className="text-lg font-bold text-[#1D1D1F]">
               {mode === "create" ? "Новый урок" : "Редактировать урок"}
@@ -470,6 +489,32 @@ function LessonFormModal({
             </button>
           </div>
           <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
+            {/* ── ОДИН УРОК ИЛИ НЕСКОЛЬКО ─────────────────────────────────
+                Показывается только при создании: править пачкой нечего.
+                Общие поля ниже — одни и те же у обоих режимов, поэтому
+                переключение ничего не теряет. */}
+            {mode === "create" && (
+              <div className="flex w-fit rounded-full bg-gray-100 p-1">
+                {([false, true] as const).map((m) => (
+                  <button
+                    key={String(m)}
+                    type="button"
+                    onClick={() => setMany(m)}
+                    className={
+                      "rounded-full px-5 py-1.5 text-sm font-bold transition-all "
+                      + (many === m ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900")
+                    }
+                  >
+                    {m ? dt.bulkBtn : d.oneLesson}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* ── ОБЩЕЕ ДЛЯ ОБОИХ РЕЖИМОВ: группа, предмет, кабинет ────────
+                Две колонки вместо ленты: экран учителя от планшета и шире,
+                а окно сидело в 512 пикселях, и справа пустовало. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div>
               <label className={labelCls}>Группа *</label>
               <select
@@ -507,6 +552,18 @@ function LessonFormModal({
                 )}
               </div>
             )}
+            <div>
+              <label className={labelCls}>Кабинет</label>
+              <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
+            </div>
+            </div>
+
+            {/* ── ЧТО РАЗЛИЧАЕТСЯ ─────────────────────────────────────────
+                Дальше идут поля, свои у каждого режима: у одиночного дата,
+                время и название, у массового — период, дни недели, время по
+                дням и предпросмотр. */}
+            {!many && (
+              <>
             {mode === "create" && planTopics && planTopics.length > 0 && (
               <div>
                 <label className={labelCls}>{dc.topicFromPlan}</label>
@@ -535,25 +592,27 @@ function LessonFormModal({
                 </select>
               </div>
             )}
-            <div>
-              <label className={labelCls}>Дата *</label>
-              <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
-            </div>
-            <div>
-              <label className={`${labelCls} flex items-center gap-1.5`}>
-                <Clock className="h-3.5 w-3.5" /> Время начала *
-              </label>
-              <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div>
+                <label className={labelCls}>Дата *</label>
+                <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
+              </div>
+              <div>
+                <label className={`${labelCls} flex items-center gap-1.5`}>
+                  <Clock className="h-3.5 w-3.5" /> Время начала *
+                </label>
+                {/* Три строки вместо пяти: колесо занимало двести пикселей —
+                    больше, чем все остальные поля вместе. Механизм не тронут,
+                    высота задаётся необязательным свойством. */}
+                <IosTimePicker value={form.startTime} onChange={v => set("startTime", v)} minDate={form.date} rows={3} />
+              </div>
             </div>
             {/* ДЛИТЕЛЬНОСТИ ЗДЕСЬ БОЛЬШЕ НЕТ (01.09.2026, миграция 246).
                 Её задаёт суперадмин в карточке школы — одно число на всех, и
                 спрашивать его у предметника незачем: сетка звонков в школе одна.
                 Новый урок берёт длительность у школы сам (createLesson), у
                 существующего своё время начала и конца уже записано. */}
-            <div>
-              <label className={labelCls}>Кабинет</label>
-              <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
-            </div>
+
             {(mode !== "create" || !planTopics || planTopics.length === 0 || useCustomTopic) && (
               <div>
                 <label className={labelCls}>Название урока (опционально)</label>
@@ -573,6 +632,22 @@ function LessonFormModal({
                 {saving ? "Сохраняем…" : mode === "create" ? "Создать урок" : "Сохранить"}
               </button>
             </div>
+              </>
+            )}
+
+            {/* ── НЕСКОЛЬКО УРОКОВ ────────────────────────────────────────
+                Тот же блок, что был отдельным окном, целиком: дни недели,
+                период, своё время по дням, галочка тем, предпросмотр с
+                датами и занятыми слотами. Группу, предмет и кабинет он
+                берёт из общих полей выше — своих у него больше нет. */}
+            {many && (
+              <BulkLessonsFields
+                groupId={form.groupId}
+                subjectId={form.subjectId}
+                room={form.room}
+                onCreated={() => { onBulkCreated(); onClose(); }}
+              />
+            )}
           </form>
         </div>
       </div>
@@ -667,7 +742,6 @@ export function TeacherLessonsView({
 
   const [formModal, setFormModal] = useState<"create" | "edit" | null>(null);
   // Массовое создание — отдельное окно: правило на период, а не один урок.
-  const [bulkOpen, setBulkOpen] = useState(false);
   const [editLesson, setEditLesson] = useState<LessonItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LessonItem | null>(null);
 
@@ -928,14 +1002,9 @@ export function TeacherLessonsView({
               </h3>
               {(
                 <div className="flex shrink-0 items-center gap-2">
-                  {/* Уроки в школе повторяются неделя за неделей — правило на
-                      период вместо сотни отдельных нажатий на четверть. */}
-                  <button
-                    onClick={() => setBulkOpen(true)}
-                    className="flex items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100"
-                  >
-                    <CalendarRange className="h-3.5 w-3.5" /> {dt.bulkBtn}
-                  </button>
+                  {/* ОТДЕЛЬНОЙ КНОПКИ МАССОВОГО СОЗДАНИЯ ЗДЕСЬ БОЛЬШЕ НЕТ
+                      (03.09.2026): вход в создание уроков один, а «один или
+                      несколько» решается переключателем внутри окна. */}
                   <button
                     onClick={openCreate}
                     className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/30 transition-all hover:bg-blue-700 active:scale-95"
@@ -974,14 +1043,6 @@ export function TeacherLessonsView({
       </div>
 
       {/* Modals */}
-      {bulkOpen && (
-        <BulkLessonsModal
-          groups={groups}
-          teacherSubjects={teacherSubjects}
-          onClose={() => setBulkOpen(false)}
-          onCreated={() => { void loadMonth(viewYear, viewMonth); }}
-        />
-      )}
 
       {formModal && (
         <LessonFormModal
@@ -998,6 +1059,7 @@ export function TeacherLessonsView({
           editLessonId={formModal === "edit" ? editLesson?.id : undefined}
           onClose={() => setFormModal(null)}
           onSave={handleSave}
+          onBulkCreated={() => { void loadMonth(viewYear, viewMonth); }}
         />
       )}
       {deleteTarget && (
