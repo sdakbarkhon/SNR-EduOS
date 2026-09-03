@@ -15,7 +15,7 @@ import {
   Smile,
   Star,
 } from "lucide-react";
-import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey, DEFAULT_LESSON_DURATION_MINUTES } from "@snr/core";
+import { findCurrentLesson, findNextLesson, getDictionary, getStudentLessonsForWeek, tashkentDayKey, tashkentTimeHm, DEFAULT_LESSON_DURATION_MINUTES } from "@snr/core";
 import type { LessonWithSubject, Locale } from "@snr/core";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
@@ -49,8 +49,19 @@ function tk(iso: string): Date {
 function dateKey(iso: string): string {
   return tk(iso).toISOString().slice(0, 10);
 }
+/**
+ * ЧАС И МИНУТА УРОКА. 04.09.2026 — ЗДЕСЬ ОНИ ВСЕГДА БЫЛИ НУЛЯМИ.
+ *
+ * Стояло `tk(iso).toISOString().slice(11, 16)`. Но `tk` строит ПОЛНОЧЬ дня:
+ * он берёт у момента только ключ дня и приклеивает «T00:00:00Z». Время
+ * выбрасывалось ещё до среза — и любой урок в расписании ученика показывался
+ * как «00:00 – 00:00», сколько бы ни стояло в базе.
+ *
+ * `tk` для этого и написан — по нему раскладывают уроки по дням; ошибка была
+ * в том, что час брали из него же.
+ */
 function hm(iso: string): string {
-  return tk(iso).toISOString().slice(11, 16);
+  return tashkentTimeHm(iso);
 }
 function addDays(dateStr: string, n: number): string {
   const d = new Date(`${dateStr}T12:00:00Z`);

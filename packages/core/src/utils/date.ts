@@ -59,6 +59,18 @@ function shifted(value: DateLike): Date {
   return new Date(toMs(value) + TASHKENT_OFFSET_MS);
 }
 
+/**
+ * Время суток по Ташкенту, «09:05». 04.09.2026.
+ *
+ * Считается тем же сдвигом, что и ключ дня, а не через Intl — по той же
+ * причине: строка обязана совпадать до символа на сервере и на клиенте, и не
+ * зависеть от языка интерфейса. По ней не только подписывают урок, но и
+ * складывают колонки недельной сетки — «9:00 AM» сломал бы сортировку.
+ */
+export function tashkentTimeHm(value: DateLike): string {
+  return shifted(value).toISOString().slice(11, 16);
+}
+
 /** Год, месяц (1–12) и число по Ташкенту. */
 export function tashkentParts(value: DateLike): { year: number; month: number; day: number } {
   const d = shifted(value);
