@@ -1,48 +1,15 @@
-// Server-side only — generates slide illustrations.
-// Tries Google Imagen first (requires a billing-enabled Gemini API key — plain
-// Gemini Pro/Flash text access does NOT include Imagen, it's a separate Cloud
-// billing product). Falls back to Pollinations.ai (free, no key) on any failure.
-// Returns base64 PNG bytes, or null only if both providers fail.
+// Картинки СЛАЙДОВ. Основной рисовальщик — gemini-2.5-flash-image (тот же, что
+// у картинок этапов, и та же функция), запасной — Pollinations.ai (бесплатно,
+// без ключа). Возвращает base64 PNG или null, если не смог ни один.
+//
+// 04.09.2026 — ОТСЮДА УБРАН IMAGEN. Здесь была первая попытка через
+// imagen-3.0-generate-002 по адресу :predict, закрытая гейтом
+// AI_IMAGEN_ENABLED. Гейт не был включён никогда, а сам Imagen на ключе
+// отсутствует: перечень моделей отдаёт 55 штук, семейства imagen-* среди них
+// ноль. Мёртвая проверка вводила в заблуждение — «а вдруг включим» было
+// невозможно в принципе.
 
-const IMAGEN_MODEL = "imagen-3.0-generate-002";
-const IMAGEN_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:predict`;
-
-async function tryImagen(styledPrompt: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
-  if (!apiKey) {
-    console.warn("[ai-imagen] Imagen skipped: no GEMINI_API_KEY/GOOGLE_AI_API_KEY");
-    return null;
-  }
-
-  console.log(`[ai-imagen] Imagen (${IMAGEN_MODEL}) request, prompt:`, styledPrompt.slice(0, 150));
-  try {
-    const res = await fetch(`${IMAGEN_ENDPOINT}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        instances: [{ prompt: styledPrompt }],
-        parameters: { sampleCount: 1, aspectRatio: "16:9" },
-      }),
-    });
-    console.log("[ai-imagen] Imagen response status:", res.status);
-    if (!res.ok) {
-      const body = await res.text();
-      console.warn(`[ai-imagen] Imagen ${res.status} body:`, body.slice(0, 500));
-      return null;
-    }
-    const data = (await res.json()) as { predictions?: Array<{ bytesBase64Encoded?: string }> };
-    const b64 = data.predictions?.[0]?.bytesBase64Encoded ?? null;
-    if (!b64) {
-      console.warn("[ai-imagen] Imagen returned 200 but no predictions[0].bytesBase64Encoded:", JSON.stringify(data).slice(0, 300));
-    } else {
-      console.log("[ai-imagen] Imagen success, base64 length:", b64.length);
-    }
-    return b64;
-  } catch (e) {
-    console.warn("[ai-imagen] Imagen threw:", (e as Error)?.message);
-    return null;
-  }
-}
+import { tryGeminiImage } from "@/lib/ai/stage-media-prompts";
 
 async function tryPollinations(styledPrompt: string): Promise<string | null> {
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(styledPrompt)}?width=1024&height=576&nologo=true`;
@@ -64,23 +31,58 @@ async function tryPollinations(styledPrompt: string): Promise<string | null> {
   }
 }
 
-export async function generateSlideImage(imagePrompt: string): Promise<string | null> {
+/** Сколько знаков текста слайда кладём в промт картинки. */
+const ТЕКСТА_В_ПРОМТ = 700;
+
+/**
+ * КАРТИНКА СЛАЙДА. 04.09.2026 — ДВЕ ПРАВКИ.
+ *
+ * ПЕРВАЯ: РИСУЕТ GEMINI, А НЕ POLLINATIONS. Раньше здесь стоял гейт
+ * `AI_IMAGEN_ENABLED === "true"`, а переменной такой нет ни в окружении, ни в
+ * репозитории — то есть Imagen не пробовался НИ РАЗУ, и сто процентов
+ * картинок слайдов рисовал запасной путь. Гейт убран как мёртвый: Imagen на
+ * ключе нет вовсе — в перечне моделей семейства imagen-* ноль штук, зато есть
+ * шесть картиночных Gemini. Рисуем тем же gemini-2.5-flash-image, которым уже
+ * рисуются картинки этапов, и той же функцией — второй копии вызова нет.
+ *
+ * Pollinations остаётся запасным: он и был им у картинок этапов, работает и
+ * стоит ноль. Разница видна по весу файла — у Gemini в среднем 907 КБ против
+ * 24 КБ у запасного.
+ *
+ * ВТОРАЯ: В ПРОМТ ИДЁТ ТЕКСТ СЛАЙДА. Раньше уходил только image_prompt,
+ * который модель сочинила заранее, — картинка не видела содержимого слайда и
+ * не могла быть про него. Теперь рядом кладётся сам текст, обрезанный до
+ * ${ТЕКСТА_В_ПРОМТ} знаков: этого хватает, чтобы понять, о чём слайд, и промт
+ * не раздувается — картиночная модель длинные простыни всё равно смазывает.
+ */
+export async function generateSlideImage(
+  imagePrompt: string,
+  slide?: { title?: string; content?: string },
+): Promise<string | null> {
   if (!imagePrompt.trim()) return null;
 
-  // Academic illustration style for consistency across slides.
-  const styledPrompt = `Academic educational illustration, clean flat style, soft colors, no text labels. ${imagePrompt.trim()}`;
+  const текст = (slide?.content ?? "").replace(/\s+/g, " ").trim().slice(0, ТЕКСТА_В_ПРОМТ);
+  const контекст = [
+    slide?.title?.trim() ? `Slide title: ${slide.title.trim()}` : "",
+    текст ? `Slide text: ${текст}` : "",
+  ].filter(Boolean).join("\n");
 
-  // Imagen via generativelanguage.googleapis.com's :predict path 404s for
-  // every request — confirmed live (imagen-3.0-generate-002 "is not found
-  // for API version v1beta, or is not supported for predict"), independent
-  // of the API key. Attempting it first burned a full failed round trip per
-  // slide (up to MAX_SLIDE_IMAGES of them), pushing generate-stages past its
-  // 60s function timeout. Skip straight to the fallback that actually works
-  // until this is repointed at a real Imagen-capable endpoint.
-  if (process.env.AI_IMAGEN_ENABLED === "true") {
-    const fromImagen = await tryImagen(styledPrompt);
-    if (fromImagen) return fromImagen;
-    console.log("[ai-imagen] Imagen unavailable, falling back to Pollinations");
+  // Academic illustration style for consistency across slides.
+  const styledPrompt = [
+    `Academic educational illustration, clean flat style, soft colors, no text labels. ${imagePrompt.trim()}`,
+    контекст ? `Draw exactly what this slide is about.\n${контекст}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    try {
+      const buffer = await tryGeminiImage(styledPrompt, apiKey);
+      return buffer.toString("base64");
+    } catch (e) {
+      console.warn("[ai-imagen] gemini не нарисовал, уходим на Pollinations:", (e as Error)?.message);
+    }
+  } else {
+    console.warn("[ai-imagen] нет ключа Gemini — сразу на Pollinations");
   }
   return tryPollinations(styledPrompt);
 }

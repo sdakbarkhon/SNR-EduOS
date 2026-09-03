@@ -157,7 +157,20 @@ type GeminiImageResponse = {
 
 export type StageImageResult = { buffer: Buffer; source: "gemini" | "pollinations" };
 
-async function tryGeminiImage(styledPrompt: string, apiKey: string): Promise<Buffer> {
+/**
+ * ОДИН РИСОВАЛЬЩИК НА ДВА МЕСТА. 04.09.2026.
+ *
+ * Открыто наружу без единого изменения поведения: этой же функцией теперь
+ * рисуются картинки СЛАЙДОВ (lib/ai-imagen.ts). До сегодня слайды шли в
+ * Pollinations, потому что рядом стоял гейт на Imagen, которого на ключе нет
+ * вовсе (проверено перечнем моделей: семейства imagen-* ноль). Заводить
+ * второй вызов того же эндпоинта ради этого нельзя — в этом проекте копии
+ * расходились семь раз.
+ *
+ * Картинки этапов от переезда не меняются: тело функции то же, вызывающий у
+ * них тот же.
+ */
+export async function tryGeminiImage(styledPrompt: string, apiKey: string): Promise<Buffer> {
   const res = await fetch(`${IMAGE_ENDPOINT}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -611,7 +611,13 @@ export async function POST(req: NextRequest) {
     await Promise.all(
       slideTasks.map(async (slide, idx) => {
         try {
-          const base64 = await generateSlideImage(slide.image_prompt!);
+          // 04.09.2026 — рядом с image_prompt едет и сам слайд: без него
+          // картинка рисовалась по заголовку, который модель сочинила
+          // заранее, и содержимого слайда не видела вовсе.
+          const base64 = await generateSlideImage(slide.image_prompt!, {
+            title: slide.title,
+            content: slide.content,
+          });
           if (!base64) return;
           const buffer = Buffer.from(base64, "base64");
           const filename = schoolStoragePath(lessonSchoolId, body.lesson_id, `${Date.now()}-${idx}.png`);
