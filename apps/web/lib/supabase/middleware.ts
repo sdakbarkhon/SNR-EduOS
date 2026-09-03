@@ -2,8 +2,52 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@snr/core";
 import { getSupabaseEnv } from "../env";
-import { getCurrentUserRole, roleToHome } from "../auth";
+import { getCurrentUserRole, roleToHome, type UserRole } from "../auth";
 import { DEMO_SESSION_COOKIE, sessionIdFromAccessToken } from "../single-session";
+
+/**
+ * ПРЕДЕЛ ОЖИДАНИЯ СЕТЕВОГО ШАГА ПОСРЕДНИКА. 04.09.2026.
+ *
+ * БЕДА. Посредник ходит в базу на КАЖДОМ переходе — сверить сессию и узнать
+ * роль. Ни у одного из этих запросов не было предела ожидания. На полуоткрытом
+ * соединении (уснувший ноутбук, мобильная сеть, VPN, captive portal) запрос не
+ * завершается ни успехом, ни ошибкой — и переход по меню не происходит ВООБЩЕ.
+ * Человек постоял без дела, нажал пункт меню, и страница замерла навсегда;
+ * спасала только перезагрузка. Это и есть «зависание после простоя».
+ *
+ * СКОЛЬКО. Три секунды. Здоровый круг до базы во Франкфурте — сотни
+ * миллисекунд; три секунды это десятикратный запас на плохую связь и заведомо
+ * меньше, чем человек готов ждать, прежде чем решит, что всё сломалось.
+ *
+ * НЕ ДОЖДАЛИСЬ — ПУСКАЕМ, А НЕ ВЫКИДЫВАЕМ. Ровно та же осторожность, что уже
+ * принята для сбоя сверки сессии («недоступность БД не должна разлогинивать
+ * всех разом»): молчание базы — не повод выставить человека на экран входа.
+ * Доступ от этого не открывается: разделы админа, суперадмина, учителя и
+ * родителя проверяют роль ещё раз в своём layout, а последнее слово всё равно
+ * за правилами доступа в самой базе.
+ */
+const ПРЕДЕЛ_МС = 3000;
+
+/** Не дождались — отдаём запасное значение и пишем в журнал. */
+function сПределом<T>(обещание: PromiseLike<T>, запасное: T, чтоЭто: string): Promise<T> {
+  return new Promise<T>((готово) => {
+    const таймер = setTimeout(() => {
+      console.warn(`[middleware] ${чтоЭто}: база молчит дольше ${ПРЕДЕЛ_МС} мс — пускаем дальше`);
+      готово(запасное);
+    }, ПРЕДЕЛ_МС);
+    обещание.then(
+      (значение) => { clearTimeout(таймер); готово(значение); },
+      (ошибка) => {
+        clearTimeout(таймер);
+        console.warn(`[middleware] ${чтоЭто} отказал:`, (ошибка as Error)?.message ?? ошибка);
+        готово(запасное);
+      },
+    );
+  });
+}
+
+/** Роль не успела приехать. Не то же самое, что «роли нет». */
+const РОЛЬ_НЕ_УСПЕЛА = "__не_успела__" as const;
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -33,9 +77,22 @@ export async function updateSession(request: NextRequest) {
   // check_user_session RPC ниже — PostgREST резолвит auth.uid() только для
   // реально подписанного токена, так что поддельный/протухший JWT провалит
   // именно эту проверку (а не молча пройдёт мимо неё).
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  //
+  // Обычно чтение из cookie идёт без сети. НО если токен протух, getSession
+  // молча уходит его обновлять — и вот это уже сеть, которая может подвиснуть.
+  // Не дождались — пускаем запрос дальше без проверок посредника: свой layout
+  // у каждого раздела всё равно спросит, кто пришёл.
+  const НЕ_УСПЕЛИ = Symbol("нет ответа");
+  const сессия = await сПределом<
+    { data: { session: { user: unknown; access_token?: string } | null } } | typeof НЕ_УСПЕЛИ
+  >(
+    supabase.auth.getSession() as never,
+    НЕ_УСПЕЛИ,
+    "чтение сессии",
+  );
+  if (сессия === НЕ_УСПЕЛИ) return response;
+
+  const session = сессия.data.session as { user: { id: string }; access_token?: string } | null;
   const user = session?.user ?? null;
 
   const { pathname } = request.nextUrl;
@@ -98,9 +155,13 @@ export async function updateSession(request: NextRequest) {
       : Promise.resolve({ data: null, error: null });
     const rolePromise = getCurrentUserRole(supabase, user.id);
 
+    // Оба под пределом. Сверке сессии молчание отдаём как ОШИБКУ — ниже уже
+    // есть правило «сбой сверки считаем годной сессией», и второго решения
+    // заводить не надо. Роли молчание отдаём отдельным значением: пустая роль
+    // означала бы «прав нет» и увела бы человека на экран входа.
     const [{ data: checkResult, error: checkError }, role] = await Promise.all([
-      sessionCheckPromise,
-      rolePromise,
+      сПределом(sessionCheckPromise, { data: null, error: { message: "timeout" } }, "сверка сессии"),
+      сПределом<UserRole | typeof РОЛЬ_НЕ_УСПЕЛА>(rolePromise, РОЛЬ_НЕ_УСПЕЛА, "чтение роли"),
     ]);
 
     // Fail-open при сбое RPC: недоступность БД не должна разлогинивать
@@ -125,6 +186,10 @@ export async function updateSession(request: NextRequest) {
       redirectResponse.cookies.delete(DEMO_SESSION_COOKIE);
       return redirectResponse;
     }
+
+    // Роль не приехала — решать нечем. Пускаем: чужой раздел всё равно
+    // отобьёт свой layout, а данные — правила доступа.
+    if (role === РОЛЬ_НЕ_УСПЕЛА) return response;
 
     const isSuperAdmin = role === "super_admin";
     const isManager = role === "manager";
