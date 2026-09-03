@@ -119,12 +119,11 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   useEffect(() => {
     setLessonId("");
   }, [subjectId]);
-
   const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
-    if (f && f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); e.target.value = ""; return; }
+    if (f && f.size > MAX_FILE_BYTES) { setError(d.teacher.hwErrFileTooBig.replace("{size}", "50")); e.target.value = ""; return; }
     setError(null);
     setAttachFile(f);
     setAttachVideoUrl("");
@@ -134,7 +133,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
     if (!f) return;
-    if (f.size > MAX_FILE_BYTES) { setError("Файл больше 50 МБ"); return; }
+    if (f.size > MAX_FILE_BYTES) { setError(d.teacher.hwErrFileTooBig.replace("{size}", "50")); return; }
     setError(null);
     setAttachFile(f);
     setAttachVideoUrl("");
@@ -217,13 +216,25 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   }
 
   async function save(status: "draft" | "published") {
-    if (!title.trim()) { setError("Введите название"); return; }
-    if (format === "programming" && !description.trim()) { setError("Введите условие задачи"); return; }
+    // ПРОВЕРКИ ИДУТ СВЕРХУ ВНИЗ, КАК ПОЛЯ ЛЕЖАТ НА ЭКРАНЕ. 03.09.2026.
+    //
+    // Раньше порядок был другой: название → поля типа → класс → предмет →
+    // дедлайн. Учитель, заполнивший форму наполовину, получал ошибки в
+    // порядке, которого на экране нет: поправил название — и его бросало
+    // вниз, к полям выбранного типа, хотя пустыми оставались класс, предмет
+    // и дедлайн прямо под курсором. Теперь сперва все четыре обязательных
+    // поля общей части, и только потом — то, что зависит от типа.
+    if (!title.trim()) { setError(d.teacher.hwErrTitle); return; }
+    if (!groupId) { setError(d.teacher.hwErrGroup); return; }
+    if (!subjectId) { setError(d.lesson.createSelectSubject); return; }
+    if (!deadline) { setError(d.teacher.hwErrDeadline); return; }
+
+    if (format === "programming" && !description.trim()) { setError(d.teacher.hwErrTask); return; }
     if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
     if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
     if (format === "file" && videoUrlInvalid) { setError(d.lesson.materialInvalidVideoUrl); return; }
     if (format === "code_completion" && !codeCompletionValid(ccTemplate, ccGaps)) {
-      setError("Проверьте упражнение: шаблон кода и пропуски заполнены не полностью");
+      setError(d.teacher.hwErrGaps);
       return;
     }
     // БОЛЬШОЕ ОБНОВЛЕНИЕ §9.1 — ссылка необязательна: пустая строка → на
@@ -234,17 +245,13 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
       if (!v.valid) { setExternalUrlError(v.error); setError(v.error); return; }
       setExternalUrlError(null);
     }
-    if (!groupId) { setError("Выберите группу"); return; }
-    if (!subjectId) { setError(d.lesson.createSelectSubject); return; }
-    if (!deadline) { setError("Укажите дедлайн"); return; }
-
     // teacherId may be "" if getMyTeacher failed at page load — fetch from auth as fallback
     let resolvedTeacherId = teacherId;
     if (!resolvedTeacherId) {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError("Нет активной сессии — войдите снова"); return; }
+      if (!user) { setError(d.teacher.hwErrNoSession); return; }
       const { data: t } = await supabase.from("teachers").select("id").eq("user_id", user.id).single();
-      if (!t) { setError("Профиль учителя не найден"); return; }
+      if (!t) { setError(d.teacher.hwErrNoTeacher); return; }
       resolvedTeacherId = (t as { id: string }).id;
     }
 
@@ -366,13 +373,97 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     ?? lessonsForGroup.find((l) => l.id === lessonId)?.subjectName
     ?? null;
   const allowedServiceOrder = EXTERNAL_SERVICE_ORDER.filter((key) => getServicesForSubject(selectedSubjectName).includes(key));
-  const TYPE_TABS: Array<{ key: Format; label: string; Icon: typeof FileText }> = [
-    { key: "file", label: d.homework.typeFile, Icon: FileText },
-    { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
-    { key: "programming", label: d.homework.typeProgramming, Icon: Code },
-    { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
-    { key: "code_completion", label: d.homework.typeCodeCompletion, Icon: Blocks },
-    ...allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
+
+  /**
+   * ПРЕДМЕТ ВЫБИРАЕТСЯ САМ, КОГДА ОН У КЛАССА ОДИН. 03.09.2026.
+   *
+   * Пока предмет не выбран, заперто поле «К какому уроку» и НЕ сужен список
+   * типов задания — то есть одна незаполненная строка держала две помехи
+   * сразу. Если выбора нет вовсе, требовать его от человека незачем.
+   *
+   * Ровно один — и только он: при двух и более предметах выбор остаётся за
+   * учителем, подставлять первый попавшийся было бы враньём.
+   */
+  useEffect(() => {
+    if (subjectsForGroup.length === 1 && !subjectId) setSubjectId(subjectsForGroup[0]!.id);
+  }, [subjectsForGroup, subjectId]);
+
+  /**
+   * ВЫБРАННЫЙ СЕРВИС НЕ МОЖЕТ ОСТАТЬСЯ ВЫБРАННЫМ, ИСЧЕЗНУВ С ЭКРАНА.
+   *
+   * Список внешних сервисов сужается по предмету. Учитель мог нажать
+   * «Wokwi», потом выбрать «Математику» — кнопка пропадала, а `format`
+   * оставался `wokwi`: форма продолжала работать в режиме, которого на
+   * экране больше нет, и ни одна кнопка не была подсвечена.
+   *
+   * Это хуже непонятности — это неправда. Возвращаем к «Файлу»: он есть
+   * всегда и ничего не теряет, кроме самого выбора типа.
+   */
+  useEffect(() => {
+    if (isExternalService(format) && !allowedServiceOrder.includes(format)) setFormat("file");
+  }, [allowedServiceOrder, format]);
+
+  /**
+   * ТИПЫ ЗАДАНИЯ, СГРУППИРОВАННЫЕ ПО ПРИЗНАКУ «ЧТО ВЕРНЁТСЯ НА ПРОВЕРКУ».
+   * 03.09.2026.
+   *
+   * Раньше все девятнадцать кнопок вываливались одним flex-wrap в четыре
+   * ряда — без порядка и без единого слова о том, чем они друг от друга
+   * отличаются. Заказчик открыл экран и сказал: «даже я не понимаю, что
+   * там нужно сделать».
+   *
+   * ПОЧЕМУ ДЕЛИМ ИМЕННО ТАК. Деление по предметам уже сделано машиной —
+   * список сервисов сужается по выбранному предмету сам (getServicesFor-
+   * Subject). Повторять его заголовками значит объяснять то, что и так
+   * отфильтровано. А вот ЧТО ВЕРНЁТСЯ УЧИТЕЛЮ — нигде не написано, и это
+   * ровно тот вопрос, ответа на который у человека нет:
+   *
+   *   тест и код с пропусками   считаются на сервере, оценка без учителя;
+   *   файл, программирование,
+   *   набор заданий             работа приходит обратно, оценивает человек;
+   *   четырнадцать сервисов     работа живёт на чужом сайте, обратно
+   *                             не приходит ничего.
+   *
+   * НИЧЕГО НЕ ПРЯЧЕМ. Заказчик прямо просил не убирать типы за выпадающий
+   * список — все они остаются на экране, только разложены по трём полкам.
+   *
+   * Механизмы типов не тронуты: это тот же массив, что и был, разрезанный
+   * на три и снабжённый заголовками.
+   */
+  type ТипКнопки = { key: Format; label: string; Icon: typeof FileText };
+  const ГРУППЫ_ТИПОВ: Array<{ title: string; hint: string; count: string | null; items: ТипКнопки[] }> = [
+    {
+      title: d.teacher.hwGroupAuto,
+      hint: d.teacher.hwGroupAutoHint,
+      count: null,
+      items: [
+        { key: "test", label: d.homework.typeTest, Icon: ClipboardList },
+        { key: "code_completion", label: d.homework.typeCodeCompletion, Icon: Blocks },
+      ],
+    },
+    {
+      title: d.teacher.hwGroupManual,
+      hint: d.teacher.hwGroupManualHint,
+      count: null,
+      items: [
+        { key: "file", label: d.homework.typeFile, Icon: FileText },
+        { key: "programming", label: d.homework.typeProgramming, Icon: Code },
+        { key: "bundle", label: d.homework.typeBundle, Icon: Layers },
+      ],
+    },
+    {
+      title: d.teacher.hwGroupExternal,
+      hint: d.teacher.hwGroupExternalHint,
+      // Число рядом с заголовком снимает неожиданность: список внешних
+      // сервисов перестраивается, когда учитель выбирает предмет, и без
+      // подписи это выглядит как сбой экрана.
+      count: selectedSubjectName
+        ? d.teacher.hwGroupExternalCount
+            .replace("{n}", String(allowedServiceOrder.length))
+            .replace("{subject}", selectedSubjectName)
+        : d.teacher.hwGroupExternalAll.replace("{n}", String(allowedServiceOrder.length)),
+      items: allowedServiceOrder.map((key) => ({ key, label: SERVICE_CONFIG[key].name, Icon: Globe })),
+    },
   ];
   const SUBTASK_TYPE_TABS: Array<{ key: HomeworkSubtaskType; label: string }> = [
     { key: "file", label: d.homework.typeFile },
@@ -382,7 +473,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5">
+    <div className="mx-auto w-full max-w-6xl space-y-5">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="rounded-xl p-2 text-brand-ink-muted hover:bg-white/60">
           <ChevronLeft size={20} />
@@ -402,46 +493,81 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         )}
       </div>
 
-      {/* Type switcher */}
-      <div className="flex flex-wrap gap-2">
-        {TYPE_TABS.map((t) => {
-          const active = format === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setFormat(t.key)}
-              className={cn(
-                "flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all",
-                active
-                  ? "bg-brand-blue text-white shadow-md shadow-brand-blue/25"
-                  : "bg-white/70 border border-slate-200 text-brand-ink-muted hover:bg-white",
+      {/* ВЫБОР ТИПА — три полки с заголовками. Разбор в ГРУППЫ_ТИПОВ выше. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {ГРУППЫ_ТИПОВ.map((г) => (
+          <section
+            key={г.title}
+            className="rounded-[20px] border border-white/80 bg-white/70 p-4 backdrop-blur-xl"
+            style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}
+          >
+            <h2 className="text-[13px] font-bold text-brand-ink">
+              {г.title}
+              {г.count && (
+                <span className="ml-1.5 font-medium text-brand-ink-muted">· {г.count}</span>
               )}
-            >
-              <t.Icon size={15} />
-              {t.label}
-            </button>
-          );
-        })}
+            </h2>
+            <p className="mt-0.5 text-[11.5px] leading-snug text-slate-500">{г.hint}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {г.items.map((t) => {
+                const active = format === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setFormat(t.key)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all",
+                      active
+                        ? "bg-brand-blue text-white shadow-md shadow-brand-blue/25"
+                        : "bg-white/70 border border-slate-200 text-brand-ink-muted hover:bg-white",
+                    )}
+                  >
+                    <t.Icon size={15} />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
       <div className="rounded-[20px] bg-white/70 border border-white/80 backdrop-blur-xl p-5 space-y-4"
         style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Строка-легенда: раньше на экране не было сказано НИ СЛОВА о том,
+            что обязательно. Обязательных ровно четыре — название, класс,
+            предмет, дедлайн; всё остальное можно оставить пустым. */}
+        <p className="text-[12px] text-slate-500">
+          <span className="text-red-500">*</span> {d.teacher.hwRequiredLegend}
+        </p>
+
+        {/* ДВЕ КОЛОНКИ. Экран учителя не адаптируется под телефон (только
+            768 и шире), а форма сидела в max-w-2xl — 672 px на холсте 1920,
+            и справа пустовала тысяча. Поля общей части идут парами; блоки,
+            зависящие от типа, ниже остаются во всю ширину: там редакторы
+            кода и списки вопросов, которым узкая колонка вредна. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formName}</span>
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.formName} <span className="text-red-500">*</span>
+            </span>
             <input value={title} onChange={(e) => setTitle(e.target.value)}
               className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formGroup}</span>
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.formGroup} <span className="text-red-500">*</span>
+            </span>
             <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
               className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none">
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formSubject}</span>
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.formSubject} <span className="text-red-500">*</span>
+            </span>
             {subjectsForGroup.length === 0 ? (
               <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-700">
                 {d.lesson.createNoSubjects}
@@ -454,16 +580,18 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
               </select>
             )}
           </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-brand-ink-muted">
+              {d.teacher.formDeadline} <span className="text-red-500">*</span>
+            </span>
+            <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+              className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none" />
+          </label>
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formDesc}</span>
           <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)}
             className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20 resize-none" />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-brand-ink-muted">{d.teacher.formDeadline}</span>
-          <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)}
-            className="rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none" />
         </label>
 
         {/* Lesson selector — filtered to the selected subject's lessons;
@@ -501,6 +629,12 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
               </>
             )}
           </select>
+          {/* Зависимость сказана словами, а не одной бледной строкой внутри
+              закрытого списка: заказчик прямо назвал её как пример того,
+              что «видно только когда попробуешь». */}
+          {!subjectId && (
+            <span className="text-[11.5px] text-amber-700">{d.teacher.hwLessonNeedsSubject}</span>
+          )}
         </label>
 
         {/* Подсказка (§8.1) — независима от типа ДЗ, всегда доступна */}
@@ -806,7 +940,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
               {d.homework.programming.testsLabel} <span className="font-normal text-slate-400">(опционально)</span>
             </span>
             <input ref={testsRef} type="file" accept=".txt,.json,.py,.cpp,.zip,application/zip,text/plain"
-              onChange={(e) => { const f = e.target.files?.[0] ?? null; if (f && f.size > 10 * 1024 * 1024) { setError("Файл больше 10 МБ"); if (testsRef.current) testsRef.current.value = ""; return; } setError(null); setTestsFile(f); }}
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; if (f && f.size > 10 * 1024 * 1024) { setError(d.teacher.hwErrFileTooBig.replace("{size}", "10")); if (testsRef.current) testsRef.current.value = ""; return; } setError(null); setTestsFile(f); }}
               className="hidden" id="prog-tests" />
             {testsFile ? (
               <div className="flex items-center gap-3 rounded-[14px] border border-emerald-400/40 bg-emerald-50/60 px-4 py-3">
