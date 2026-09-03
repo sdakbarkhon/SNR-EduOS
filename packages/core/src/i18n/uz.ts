@@ -2126,7 +2126,8 @@ export const uz: Dictionary = {
     quickTopicsSubtitle: "So'rash uchun bosing",
     tipTitle: "Kunning maslahati",
     tipBody: "Savollarni qismlarga bo'lib ber — murakkab mavzuni qadam-baqadam tushunish osonroq.",
-    usageLimitLabel: "Bugun qolgan so'rovlar: {remaining} / {limit}",
+    usageLimitLabel: "Qolgan so‘rovlar: {remaining} / {limit}",
+    usageBlocked: "So‘rovlar tugadi. Yana {time} da ochiladi",
     usageLimitReached: "Yordamchiga kunlik so'rovlar limiti tugadi — kuniga o'quvchiga o'nta, dars va shu tugma uchun umumiy. Ertaga qaytib keling.",
     suggestions: [
       "Tenglamani yechishga yordam ber",
@@ -3261,15 +3262,15 @@ export const uz: Dictionary = {
     workStepHomework: "SI topshiriq tuzmoqda",
     workOf: "{n} dan {i}",
     chat: {
-      title: "Robobot",
+      title: "EduOS Assistant",
       placeholder: "Savol yozing…",
       send: "Yuborish",
-      welcomeMessage: "Salom! Men Robobot 🤖. Bu dars bo'yicha yordam bera olaman. So'rang!",
+      welcomeMessage: "Assalomu alaykum! Men EduOS Assistant. Shu dars bo'yicha yordam beraman — so'rang.",
       remaining: "Qoldi: {n} / {total}",
       limitReached: "Kunlik limit tugadi. Ertaga qayting.",
       error: "Xatolik yuz berdi, qayta urinib ko'ring",
       collapse: "Yig'ish",
-      expand: "Robobot",
+      expand: "EduOS Assistant",
       loading: "O'ylamoqda…",
     },
     generateHomework: {

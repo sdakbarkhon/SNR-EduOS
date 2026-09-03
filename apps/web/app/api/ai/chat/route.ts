@@ -9,7 +9,7 @@ import {
   EDUOS_ASSISTANT_STUDENT_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import {
-  STUDENT_AI_DAILY_LIMIT,
+  STUDENT_AI_LIMIT,
   getStudentAiUsage,
   logStudentAiExchange,
 } from "@/lib/ai/student-daily-limit";
@@ -88,11 +88,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  // Дневной лимит — общий с помощником по кнопке (см. student-daily-limit.ts).
+  // Лимит окна — общий с помощником по кнопке (см. student-daily-limit.ts).
+  // Отказ несёт МОМЕНТ, когда отпустит: «кончилось» без «когда вернётся» —
+  // это тупик, из которого человеку некуда идти.
   const usage = await getStudentAiUsage(db, user.id);
-  if (usage.remaining <= 0) {
+  if (usage.studentId && usage.remaining <= 0) {
     return NextResponse.json(
-      { error: "limit_reached", remaining: 0, limit: usage.limit },
+      { error: "limit_reached", remaining: 0, limit: usage.limit, blocked_until: usage.blockedUntil },
       { status: 429 },
     );
   }
@@ -269,5 +271,5 @@ ${ragCtx}
   });
 
   const remaining = Math.max(0, usage.remaining - 1);
-  return NextResponse.json({ text, remaining, limit: STUDENT_AI_DAILY_LIMIT });
+  return NextResponse.json({ text, remaining, limit: STUDENT_AI_LIMIT });
 }

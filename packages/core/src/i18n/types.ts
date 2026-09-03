@@ -2165,7 +2165,7 @@ export interface Dictionary {
     };
   };
   // Iter5 P10 — standalone /ai-assistant page (Claude Design redesign);
-  // separate from `ai.chat` above, which is the in-lesson "Робокот" panel.
+  // separate from `ai.chat` above, which is the in-lesson assistant panel.
   aiAssistant: {
     title: string;             // "AI-помощник"
     subtitle: string;          // "Твой умный помощник в учёбе — спрашивай что угодно"
@@ -2182,7 +2182,8 @@ export interface Dictionary {
     tipBody: string;
     suggestions: string[];     // 4 quick-prompt chips
     // Пачка 3, Задача 2 — глобальный дневной лимит Gemini под чатом (миграция 136).
-    usageLimitLabel: string;   // "Осталось запросов сегодня: {remaining} / {limit}" — интерполируются
+    usageLimitLabel: string;
+    usageBlocked: string;
     usageLimitReached: string;  // сообщение при исчерпании общего дневного лимита ученика
   };
   demo: {
@@ -3377,10 +3378,10 @@ export interface Dictionary {
     workStepHomework: string;
     workOf: string;
     chat: {
-      title: string;             // "Робокот"
+      title: string;             // "EduOS Assistant"
       placeholder: string;       // "Напиши вопрос…"
       send: string;              // "Отправить"
-      welcomeMessage: string;    // "Привет! Я Робокот 🤖…"
+      welcomeMessage: string;    // "Здравствуйте! Я EduOS Assistant…"
       remaining: string;         // "Осталось: {n} из {total}"
       limitReached: string;      // "Лимит на сегодня исчерпан…"
       error: string;             // "Что-то пошло не так…"

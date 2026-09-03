@@ -33,8 +33,22 @@ export async function GET() {
 
   const usage = await getStudentAiUsage(db, user.id);
   if (usage.studentId) {
-    return NextResponse.json({ used: usage.used, limit: usage.limit, remaining: usage.remaining });
+    return NextResponse.json({
+      used: usage.used,
+      limit: usage.limit,
+      remaining: usage.remaining,
+      blockedUntil: usage.blockedUntil,
+    });
   }
+
+  // 04.09.2026 — НЕ УЧЕНИК: СЧЁТЧИКА НЕТ ВОВСЕ.
+  //
+  // Раньше сюда доходил учитель и получал ОБЩИЙ на всю установку расход
+  // Gemini — а экран печатал его той же строкой «Осталось запросов…», как
+  // ученическую квоту. Учителя не ограничиваем, значит и счётчик ему не
+  // положен: `limit: null` — знак «лимита нет», экран по нему ничего не
+  // рисует. Общий расход остаётся в ответе для наблюдения (админ, менеджер,
+  // суперадмин смотрят его на своих экранах), но квотой не притворяется.
 
   const admin = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,7 +60,9 @@ export async function GET() {
   const used = typeof data === "number" ? data : 0;
   return NextResponse.json({
     used,
-    limit: AI_USAGE_DAILY_LIMIT,
+    limit: null,
+    installUsed: used,
+    installLimit: AI_USAGE_DAILY_LIMIT,
     remaining: Math.max(0, AI_USAGE_DAILY_LIMIT - used),
   });
 }

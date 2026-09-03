@@ -26,7 +26,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import ReactMarkdown, { type Components } from "react-markdown";
-import { Bot, Send, X } from "lucide-react";
+import { Sparkles, Send, X } from "lucide-react";
 import { MARKDOWN_REMARK_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from "./markdown-plugins";
 import { SyntaxHighlighter, oneDark } from "./lesson-stages/highlighter";
 
@@ -146,7 +146,7 @@ export function AiChatShell({
       {/* Шапка */}
       <div className="flex shrink-0 items-center gap-3 rounded-t-[20px] bg-gradient-to-br from-violet-500 to-indigo-600 px-4 py-3.5 text-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-          <Bot className="h-5 w-5" />
+          <Sparkles className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-extrabold">{title}</p>
@@ -201,7 +201,7 @@ export function AiChatShell({
               ) : (
                 <div key={m.key} className="flex items-end gap-2">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-                    <Bot className="h-3.5 w-3.5" />
+                    <Sparkles className="h-3.5 w-3.5" />
                   </div>
                   <div className="max-w-[82%] rounded-[16px] rounded-tl-md bg-[#F3F1FB] px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-700">
                     <div className="prose prose-sm max-w-none prose-p:my-1 prose-p:first:mt-0 prose-p:last:mb-0 [&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
@@ -221,7 +221,7 @@ export function AiChatShell({
             {loading && (
               <div className="flex items-end gap-2">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-                  <Bot className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5" />
                 </div>
                 <div className="flex items-center gap-1.5 rounded-[16px] rounded-tl-md bg-[#F3F1FB] px-3.5 py-3.5">
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />

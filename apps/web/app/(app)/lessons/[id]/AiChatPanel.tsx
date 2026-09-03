@@ -28,8 +28,11 @@ import { getDictionary } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { AiChatShell, type AiChatShellMessage } from "@/components/ai-chat-shell";
+import { STUDENT_AI_LIMIT } from "@/lib/ai/student-daily-limit";
 
-const DAILY_LIMIT = 10;
+// Число живёт в одном месте — вместе с правилом окна (lib/ai/student-daily-limit).
+// Своя копия «10» здесь и создавала расхождение с ответом сервера.
+const LIMIT = STUDENT_AI_LIMIT;
 const OPEN_KEY = "ai_chat_open";
 
 interface Message {
@@ -59,7 +62,9 @@ export function AiChatPanel({
   // заново дёргало бы серверную историю.
   const [everOpened, setEverOpened] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [remaining, setRemaining] = useState(DAILY_LIMIT);
+  const [remaining, setRemaining] = useState(LIMIT);
+  /** До какого момента запас исчерпан. Приходит с сервера вместе с отказом. */
+  const [blockedUntil, setBlockedUntil] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -119,13 +124,20 @@ export function AiChatPanel({
           }),
         });
 
-        const data = (await res.json()) as { text?: string; remaining?: number; error?: string };
+        const data = (await res.json()) as { text?: string; remaining?: number; error?: string; blocked_until?: string | null };
 
         if (res.status === 429) {
           setRemaining(0);
+          setBlockedUntil(data.blocked_until ?? null);
           setMessages((prev) => [
             ...prev,
-            { id: crypto.randomUUID(), role: "assistant", content: t.limitReached },
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: data.blocked_until
+                ? ta.usageBlocked.replace("{time}", new Date(data.blocked_until).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" }))
+                : t.limitReached,
+            },
           ]);
           return;
         }
@@ -191,10 +203,13 @@ export function AiChatPanel({
             <AiChatShell
               title={ta.chatName}
               statusLabel={ta.onlineStatus}
-              usage={{ remaining, limit: DAILY_LIMIT }}
-              usageLabel={ta.usageLimitLabel
-                .replace("{remaining}", String(remaining))
-                .replace("{limit}", String(DAILY_LIMIT))}
+              usage={{ remaining, limit: LIMIT }}
+              usageLabel={remaining === 0 && blockedUntil
+                ? ta.usageBlocked.replace("{time}",
+                    new Date(blockedUntil).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" }))
+                : ta.usageLimitLabel
+                    .replace("{remaining}", String(remaining))
+                    .replace("{limit}", String(LIMIT))}
               onClose={toggle}
               closeLabel={d.ai.fab.closeLabel}
               messages={shellMessages}

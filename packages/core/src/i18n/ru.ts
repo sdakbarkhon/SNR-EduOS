@@ -2130,7 +2130,8 @@ export const ru: Dictionary = {
     quickTopicsSubtitle: "Нажми, чтобы спросить",
     tipTitle: "Совет дня",
     tipBody: "Задавай вопросы по частям — так проще разобраться в сложной теме шаг за шагом.",
-    usageLimitLabel: "Осталось запросов сегодня: {remaining} / {limit}",
+    usageLimitLabel: "Осталось запросов: {remaining} из {limit}",
+    usageBlocked: "Запросы кончились. Снова будут доступны в {time}",
     usageLimitReached: "Дневной лимит запросов к помощнику исчерпан — по десять на ученика в сутки, общих для урока и этой кнопки. Возвращайся завтра.",
     suggestions: [
       "Помоги решить уравнение",
@@ -3273,15 +3274,15 @@ export const ru: Dictionary = {
     workStepHomework: "ИИ составляет задание",
     workOf: "{i} из {n}",
     chat: {
-      title: "Робокот",
+      title: "EduOS Assistant",
       placeholder: "Напиши вопрос…",
       send: "Отправить",
-      welcomeMessage: "Привет! Я Робокот 🤖. Могу помочь с этим уроком. Спрашивай!",
+      welcomeMessage: "Здравствуйте! Я EduOS Assistant. Помогу разобраться с этим уроком — спрашивайте.",
       remaining: "Осталось: {n} из {total}",
       limitReached: "Лимит на сегодня исчерпан. Возвращайся завтра.",
       error: "Что-то пошло не так, попробуй ещё раз",
       collapse: "Свернуть",
-      expand: "Робокот",
+      expand: "EduOS Assistant",
       loading: "Думаю…",
     },
     generateHomework: {

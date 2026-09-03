@@ -2126,7 +2126,8 @@ export const en: Dictionary = {
     quickTopicsSubtitle: "Tap to ask",
     tipTitle: "Tip of the day",
     tipBody: "Ask questions one part at a time — it's easier to work through a hard topic step by step.",
-    usageLimitLabel: "Requests remaining today: {remaining} / {limit}",
+    usageLimitLabel: "Requests left: {remaining} of {limit}",
+    usageBlocked: "You have used all requests. They come back at {time}",
     usageLimitReached: "The daily assistant limit is used up — ten per student a day, shared between the lesson chat and this button. Come back tomorrow.",
     suggestions: [
       "Help me solve an equation",
@@ -3261,15 +3262,15 @@ export const en: Dictionary = {
     workStepHomework: "The AI is drafting the assignment",
     workOf: "{i} of {n}",
     chat: {
-      title: "Robocat",
+      title: "EduOS Assistant",
       placeholder: "Ask a question…",
       send: "Send",
-      welcomeMessage: "Hi! I'm Robocat 🤖. I can help with this lesson. Ask away!",
+      welcomeMessage: "Hello! I am EduOS Assistant. I can help you with this lesson — just ask.",
       remaining: "Remaining: {n} of {total}",
       limitReached: "Daily limit reached. Come back tomorrow.",
       error: "Something went wrong, please try again",
       collapse: "Collapse",
-      expand: "Robocat",
+      expand: "EduOS Assistant",
       loading: "Thinking…",
     },
     generateHomework: {

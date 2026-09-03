@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bot, Send, MoreHorizontal, Calculator, Languages, Bug, BookOpen } from "lucide-react";
+import { Sparkles, Send, MoreHorizontal, Calculator, Languages, Bug, BookOpen } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components";
 import { askAssistant } from "@/lib/ai/ask-assistant";
@@ -25,7 +25,16 @@ const MAX_HISTORY_MESSAGES = 15;
 const USAGE_POLL_INTERVAL_MS = 30_000;
 
 type Message = { role: "user" | "model"; text: string };
-type AiUsage = { used: number; limit: number; remaining: number };
+/** limit === null — лимита у этого человека нет (учитель и все, кто не
+ *  ученик): счётчик тогда не рисуется вовсе. */
+/** «до 14:35» — час и минута по Ташкенту. Дату не показываем: окно два часа,
+ *  дальше сегодняшнего дня оно уйти почти не может, а лишнее число только
+ *  утяжеляет короткую строку. */
+function отпуститВ(iso: string): string {
+  return new Date(iso).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" });
+}
+
+type AiUsage = { used: number; limit: number | null; remaining: number; blockedUntil?: string | null };
 
 async function fetchAiUsage(): Promise<AiUsage | null> {
   try {
@@ -109,7 +118,7 @@ export function AiAssistantView() {
     <PageContainer className="flex flex-col gap-6">
       <div>
         <h1 className="flex items-center gap-2.5 text-3xl font-extrabold tracking-tight text-slate-900">
-          {t.title} <Bot className="h-7 w-7 text-violet-500" />
+          {t.title} <Sparkles className="h-7 w-7 text-violet-500" />
         </h1>
         <p className="mt-1.5 text-sm text-slate-500">{t.subtitle}</p>
       </div>
@@ -120,7 +129,7 @@ export function AiAssistantView() {
           {/* Chat header */}
           <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-md shadow-indigo-500/30">
-              <Bot className="h-5 w-5" />
+              <Sparkles className="h-5 w-5" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-extrabold text-slate-900">{t.chatName}</p>
@@ -131,17 +140,21 @@ export function AiAssistantView() {
                   тот же фиолетовый градиент, что у аватара чата (в самой
                   шапке нет сплошной заливки, поэтому "белый текст на
                   фиолетовом" реализован как маленькая пилюля). */}
-              {usage && (
+              {usage && usage.limit !== null && (
                 <p
                   className={`mt-1 inline-block w-fit rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 px-2.5 py-0.5 text-[11px] font-semibold opacity-85 ${
-                    usage.remaining < 50
+                    usage.remaining === 0
                       ? "text-red-300"
-                      : usage.remaining <= 100
+                      : usage.remaining <= 5
                         ? "text-yellow-300"
                         : "text-white"
                   }`}
                 >
-                  {t.usageLimitLabel.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}
+                  {usage.remaining === 0 && usage.blockedUntil
+                    ? t.usageBlocked.replace("{time}", отпуститВ(usage.blockedUntil))
+                    : t.usageLimitLabel
+                        .replace("{remaining}", String(usage.remaining))
+                        .replace("{limit}", String(usage.limit))}
                 </p>
               )}
             </div>
@@ -167,7 +180,7 @@ export function AiAssistantView() {
                   ) : (
                     <div key={i} className="flex items-end gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-                        <Bot className="h-4 w-4" />
+                        <Sparkles className="h-4 w-4" />
                       </div>
                       <div className="max-w-[78%] whitespace-pre-wrap rounded-[20px] rounded-tl-md bg-[#F3F1FB] px-4 py-3 text-sm leading-relaxed text-slate-700">
                         {m.text}
@@ -179,7 +192,7 @@ export function AiAssistantView() {
                 {loading && (
                   <div className="flex items-end gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-                      <Bot className="h-4 w-4" />
+                      <Sparkles className="h-4 w-4" />
                     </div>
                     <div className="flex items-center gap-1.5 rounded-[20px] rounded-tl-md bg-[#F3F1FB] px-4 py-4">
                       <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
