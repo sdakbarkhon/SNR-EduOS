@@ -3072,7 +3072,7 @@ export const uz: Dictionary = {
     libraryUpload: "Yuklash",
     libraryUploading: "Yuklanmoqda…",
     librarySuccess: "Material yuklandi",
-    libraryCuratorNotice: "Materiallarni fani tayinlangan o'qituvchi yuklay oladi",
+    libraryNoDepartmentNotice: "Fanigizda hozircha kafedra yo‘q: uning nomi fanlar ma‘lumotnomasiga kiritilmagan. Administratorga ayting — qo‘shilgach, yuklash paydo bo‘ladi.",
     libraryErrTitleRequired: "Nomini kiriting",
     libraryErrFileRequired: "Faylni biriktiring",
     libraryErrFileTooLarge: "Fayl juda katta (maksimal 50 MB)",

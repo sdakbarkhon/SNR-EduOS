@@ -3082,7 +3082,7 @@ export const ru: Dictionary = {
     libraryUpload: "Загрузить",
     libraryUploading: "Загружаем…",
     librarySuccess: "Материал загружен",
-    libraryCuratorNotice: "Загружать материалы может учитель с назначенным предметом",
+    libraryNoDepartmentNotice: "Кафедры у вашего предмета пока нет: его название не заведено в справочнике предметов. Скажите администратору — он добавит, и загрузка появится.",
     libraryErrTitleRequired: "Введите название",
     libraryErrFileRequired: "Прикрепите файл",
     libraryErrFileTooLarge: "Файл слишком большой (макс. 50 МБ)",

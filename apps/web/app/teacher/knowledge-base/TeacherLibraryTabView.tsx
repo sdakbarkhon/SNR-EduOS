@@ -34,7 +34,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FileViewerModal } from "@/components/FileViewerModal";
 import { VideoEmbedPlayer } from "@/components/video/VideoEmbedPlayer";
 import { LibraryUploadModal, LibraryVideoLinkModal } from "@/components/KnowledgeBaseFilePicker";
-import { canUseDepartmentLibrary } from "@/lib/curator";
+import { canUploadToDepartment } from "@/lib/department-library";
 import { ModalPortal } from "@/components/ModalPortal";
 
 function iconFor(fileType: string | null, isVideo: boolean) {
@@ -201,8 +201,9 @@ export function TeacherLibraryTabView({
     return () => clearTimeout(t);
   }, [rawQuery]);
 
-  // Не «куратор», а «есть ли у меня кафедра» — см. lib/curator.ts.
-  const hasDepartment = canUseDepartmentLibrary(initialSubjectSlug);
+  // «Есть ли у меня кафедра» — по тому же списку предметов, что смотрит база
+  // (fn_my_subject_slugs). См. lib/department-library.ts.
+  const hasDepartment = canUploadToDepartment(subjectSlugs);
 
   const subjectsPresent = useMemo(() => {
     const set = new Set(materials.map((m) => m.subject_slug).filter(Boolean));
@@ -358,7 +359,7 @@ export function TeacherLibraryTabView({
             </button>
           </div>
         ) : (
-          <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">{dt.libraryCuratorNotice}</span>
+          <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">{dt.libraryNoDepartmentNotice}</span>
         )}
         {error && <span className="text-xs font-medium text-red-600">{error}</span>}
       </div>

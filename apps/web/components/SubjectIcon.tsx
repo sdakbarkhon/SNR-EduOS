@@ -3,12 +3,19 @@ import {
   Bot,
   BookOpen,
   Calculator,
+  CircuitBoard,
   Code2,
   FlaskConical,
+  Globe,
   Languages,
   Leaf,
+  Microscope,
   Monitor,
+  Music,
+  Palette,
   Scroll,
+  TreePine,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { getSubjectStyle } from "@snr/core";
@@ -24,6 +31,15 @@ const ICONS: Record<string, LucideIcon> = {
   "flask-conical": FlaskConical,
   "book-open": BookOpen,
   "code-2": Code2,
+  // 04.09.2026 — семь предметов, дописанных в словарь. Без строки здесь
+  // значок молча падает на книгу: не поломка, но и не то, что имели в виду.
+  microscope: Microscope,
+  "circuit-board": CircuitBoard,
+  "tree-pine": TreePine,
+  palette: Palette,
+  music: Music,
+  globe: Globe,
+  users: Users,
 };
 
 /** Resolves a subject to its lucide icon + color, no wrapper/background — for embedding inside an already-styled container (colored tile, gradient cover). */

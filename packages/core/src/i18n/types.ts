@@ -3184,7 +3184,7 @@ export interface Dictionary {
     libraryUpload: string;
     libraryUploading: string;
     librarySuccess: string;
-    libraryCuratorNotice: string;
+    libraryNoDepartmentNotice: string;
     libraryErrTitleRequired: string;
     libraryErrFileRequired: string;
     libraryErrFileTooLarge: string;

@@ -17,6 +17,29 @@ export const subjects: Record<string, SubjectStyle> = {
   history:     { label: "История",          color: "#B5793A", icon: "scroll" },
   biology:     { label: "Биология",         color: "#2DBE7E", icon: "leaf" },
   chemistry:   { label: "Химия",            color: "#9B5DE5", icon: "flask-conical" },
+
+  /**
+   * 04.09.2026 — СЕМЬ НАЗВАНИЙ, КОТОРЫХ ЗДЕСЬ НЕ ХВАТАЛО.
+   *
+   * Этот словарь — не украшение: по нему `getSubjectKeyByLabel` выдаёт слаг
+   * при назначении учителя на предмет, а без слага у учителя нет кафедры и
+   * он не может загрузить материал в библиотеку. Названия, которых здесь
+   * нет, слага не получают — и трое учителей («Science» дважды и
+   * «Схемотехника») сидели без кафедры именно поэтому.
+   *
+   * Взяты все названия из справочника школ, которых не было: два уже
+   * работающих и пять, ждавших своей очереди.
+   *
+   * Сверка идёт ТОЧНОЙ строкой, поэтому подпись обязана совпадать с тем, что
+   * набрали в карточке предмета, — «Science» латиницей, «ИЗО» заглавными.
+   */
+  science:     { label: "Science",          color: "#14B8A6", icon: "microscope" },
+  circuitry:   { label: "Схемотехника",     color: "#64748B", icon: "circuit-board" },
+  nature:      { label: "Природоведение",   color: "#16A34A", icon: "tree-pine" },
+  art:         { label: "ИЗО",              color: "#EC4899", icon: "palette" },
+  music:       { label: "Музыка",           color: "#8B5CF6", icon: "music" },
+  geography:   { label: "География",        color: "#F97316", icon: "globe" },
+  social:      { label: "Обществознание",   color: "#71717A", icon: "users" },
 };
 
 export const defaultSubjectStyle: SubjectStyle = {

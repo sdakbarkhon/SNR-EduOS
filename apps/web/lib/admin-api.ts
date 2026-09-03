@@ -1973,23 +1973,47 @@ async function unlinkTeacherFromGroupIfUnused(
   return ((удалено ?? []) as unknown[]).length > 0;
 }
 
-/** Проставляет subject_slug при первом назначении — только в реальных школах
- *  и только поверх пустого значения. Разбор почему так — в шапке блока. */
+/**
+ * Проставляет subject_slug при первом назначении — только в реальных школах и
+ * только поверх пустого значения. Разбор почему так — в шапке блока.
+ *
+ * ═══ НЕЗНАКОМОЕ НАЗВАНИЕ БОЛЬШЕ НЕ ИСЧЕЗАЕТ МОЛЧА (04.09.2026) ════════════
+ *
+ * Здесь стояло `if (!slug) return;` — и это был корень всей истории: предмет
+ * с названием вне словаря (например «Science») слага не получал, учитель
+ * оставался без кафедры, и НИ ОДНОГО СЛЕДА об этом не оставалось. Три учителя
+ * так и жили, пока заказчик не пожаловался.
+ *
+ * ПОЧЕМУ НЕ ОТКАЗ. Уронить назначение из-за подписи было бы хуже болезни:
+ * учитель не получил бы ни группы, ни уроков, ни доступа — ради поля, которое
+ * влияет ровно на одну вкладку. Поэтому назначение проходит, а случай
+ * называется вслух: строка в журнале сервера с точным названием предмета, и
+ * вызывающий получает исход, который может показать человеку.
+ */
+type ИсходСлага = "написан" | "уже-был" | "демо-школа" | "нет-в-справочнике";
+
 async function ensureSubjectSlug(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   teacherId: string,
   subjectName: string,
   schoolId: string,
-) {
-  if (await isDemoSchool(schoolId)) return;
+): Promise<ИсходСлага> {
+  if (await isDemoSchool(schoolId)) return "демо-школа";
   const slug = getSubjectKeyByLabel(subjectName);
-  if (!slug) return;
+  if (!slug) {
+    console.warn(
+      `[subject-slug] предмета «${subjectName}» нет в справочнике packages/core/src/config/subjects.ts — `
+      + `учитель ${teacherId} остался без кафедры: библиотека кафедры ему недоступна, пока название не добавят.`,
+    );
+    return "нет-в-справочнике";
+  }
   const { data: teacher } = await sb
     .from("teachers").select("subject_slug").eq("id", teacherId).maybeSingle();
-  if (!teacher || teacher.subject_slug) return;
+  if (!teacher || teacher.subject_slug) return "уже-был";
   const { error } = await sb.from("teachers").update({ subject_slug: slug }).eq("id", teacherId);
   if (error) throw error;
+  return "написан";
 }
 
 /**

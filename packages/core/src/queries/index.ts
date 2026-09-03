@@ -2349,8 +2349,10 @@ export const createTestQuestions = async (
 // это подпись в карточке, а не роль. Кто ведёт предмет, записано в
 // subjects.teacher_id, и сужаем мы теперь строго по нему.
 //
-// НЕ ПУТАТЬ С БИБЛИОТЕКОЙ КАФЕДРЫ: там пустой слаг — законный признак
-// («кафедры нет»), и он остаётся, см. canUseDepartmentLibrary.
+// НЕ ПУТАТЬ С БИБЛИОТЕКОЙ КАФЕДРЫ: там пустой список предметов — законный
+// признак «кафедры нет», и он остаётся. С 04.09.2026 список берётся из
+// fn_my_subject_slugs(), а не из колонки карточки: см.
+// apps/web/lib/department-library.ts.
 type TeacherSubjectFilter = { teacherId: string; subjectIds: string[] | null };
 
 /** Свои предметы учителя. subjectIds всегда список — пусть и пустой:

@@ -3072,7 +3072,7 @@ export const en: Dictionary = {
     libraryUpload: "Upload",
     libraryUploading: "Uploading…",
     librarySuccess: "Material uploaded",
-    libraryCuratorNotice: "Materials can be uploaded by a teacher with an assigned subject",
+    libraryNoDepartmentNotice: "Your subject has no department yet: its name is not in the subject reference. Tell the administrator — once it is added, uploading will appear.",
     libraryErrTitleRequired: "Enter a title",
     libraryErrFileRequired: "Attach a file",
     libraryErrFileTooLarge: "File is too large (max 50 MB)",

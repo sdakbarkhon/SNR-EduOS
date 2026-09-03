@@ -46,7 +46,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { parseVideoUrl } from "@/lib/video-url";
 import { uploadVideoFile } from "@/lib/video-storage";
-import { canUseDepartmentLibrary } from "@/lib/curator";
+import { canUploadToDepartment } from "@/lib/department-library";
 import { mySchoolStoragePath } from "@snr/core";
 import { ModalPortal } from "@/components/ModalPortal";
 
@@ -730,10 +730,18 @@ export function KnowledgeBaseFilePicker({
   // таргетируется на ЛЮБОЙ поднабор ВСЕХ групп учителя — та же семантика,
   // что была на снесённой странице /teacher/library.
   const [myTeacher, setMyTeacher] = useState<{ id: string; subject_slug: string | null } | null>(null);
+  /**
+   * МОИ ПРЕДМЕТЫ — ИЗ ТОЙ ЖЕ ФУНКЦИИ, ЧТО У ВКЛАДКИ БИБЛИОТЕКИ (04.09.2026).
+   *
+   * Здесь спрашивали колонку карточки `teachers.subject_slug`, а вкладка
+   * библиотеки — `fn_my_subject_slugs()`. Два ответа на один вопрос в одном
+   * экране: у одного и того же учителя кнопка загрузки могла быть на вкладке
+   * и не быть в выборе файлов. Теперь источник один — тот же, что в правиле
+   * вставки.
+   */
+  const [mySubjectSlugs, setMySubjectSlugs] = useState<string[]>([]);
   const [myGroups, setMyGroups] = useState<Array<{ id: string; name: string }>>([]);
-  // Не «куратор», а «есть ли у меня кафедра»: правило библиотеки — свой
-  // непустой предмет, см. lib/curator.ts и политику вставки.
-  const hasDepartment = canUseDepartmentLibrary(myTeacher?.subject_slug);
+  const hasDepartment = canUploadToDepartment(mySubjectSlugs);
   const [showLibUpload, setShowLibUpload] = useState(false);
   const [showLibVideo, setShowLibVideo] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -786,6 +794,18 @@ export function KnowledgeBaseFilePicker({
       if (teacherRes.status === "fulfilled") {
         const t = teacherRes.value as unknown as { id: string; subject_slug: string | null };
         setMyTeacher({ id: t.id, subject_slug: t.subject_slug });
+        // Список предметов — отдельным вопросом к базе, тем же, что у вкладки.
+        // Ошибка здесь не должна ронять весь выбор файлов: без списка просто
+        // не будет кнопок загрузки в кафедру.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb as any).rpc("fn_my_subject_slugs").then((r: { data: unknown }) => {
+          const rows = (r?.data ?? []) as Array<{ subject_slug: string } | string>;
+          setMySubjectSlugs(
+            rows.map((x) => (typeof x === "string" ? x : x.subject_slug)).filter(Boolean) as string[],
+          );
+        }).catch((e: unknown) => {
+          console.error("[KnowledgeBaseFilePicker] не удалось прочитать список предметов:", e);
+        });
       } else {
         console.error("[KnowledgeBaseFilePicker] failed to resolve current teacher:", teacherRes.reason);
       }
@@ -1035,7 +1055,7 @@ export function KnowledgeBaseFilePicker({
           {tab === "teacherLibrary" && !hasDepartment && myTeacher && (
             <div className="border-b border-slate-100 px-6 py-3">
               <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
-                {dt.libraryCuratorNotice}
+                {dt.libraryNoDepartmentNotice}
               </span>
             </div>
           )}
@@ -1130,7 +1150,8 @@ export function KnowledgeBaseFilePicker({
           <LibraryUploadModal
             groups={myGroups}
             teacherId={myTeacher.id}
-            subjectSlug={myTeacher.subject_slug ?? ""}
+            subjectSlug={mySubjectSlugs[0] ?? ""}
+            subjectSlugs={mySubjectSlugs}
             dt={dt}
             onClose={() => setShowLibUpload(false)}
             onSuccess={() => { setShowLibUpload(false); refetchLibrary(); }}
@@ -1139,7 +1160,8 @@ export function KnowledgeBaseFilePicker({
         {showLibVideo && myTeacher && hasDepartment && (
           <LibraryVideoLinkModal
             groups={myGroups}
-            subjectSlug={myTeacher.subject_slug ?? ""}
+            subjectSlug={mySubjectSlugs[0] ?? ""}
+            subjectSlugs={mySubjectSlugs}
             dt={dt}
             onClose={() => setShowLibVideo(false)}
             onSuccess={() => { setShowLibVideo(false); refetchLibrary(); }}
