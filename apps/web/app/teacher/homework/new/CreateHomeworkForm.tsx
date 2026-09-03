@@ -230,6 +230,13 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
       if (data.config.expectedOutput) setExpectedOutput(data.config.expectedOutput);
       if (data.config.language) setProgLanguage(data.config.language);
     }
+    // Код с пропусками: шаблон и пропуски приходят в тех же именах, в каких
+    // лежат в задании, — раскладывать по-другому не нужно.
+    if (format === "code_completion" && data.config) {
+      if (data.config.code_template) setCcTemplate(data.config.code_template);
+      if (Array.isArray(data.config.gaps)) setCcGaps(data.config.gaps);
+      if (data.config.language) setProgLanguage(data.config.language);
+    }
     if (format === "bundle" && data.subtasks) {
       setSubtasks(data.subtasks.map((s) => ({ type: s.type, title: s.title, description: s.description, config: s.config })));
     }

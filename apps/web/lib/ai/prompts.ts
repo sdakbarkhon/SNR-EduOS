@@ -144,6 +144,35 @@ export function buildHomeworkProgrammingPrompt(topic: string, level: string, hin
 title — короткое название без кавычек. description — условие задачи: что делает программа, входные/выходные данные, академический стиль, без markdown и эмодзи. starterCode — код-скелет с TODO (НЕ полное решение). expectedOutput — пример вывода правильного решения. language — "python"|"javascript"|"cpp"|"java".`;
 }
 
+/**
+ * КОД С ПРОПУСКАМИ. 04.09.2026 — тип был в форме, а в генерации его не было.
+ *
+ * Правила пропусков не выдуманы здесь, а взяты из проверки, которая уже стоит
+ * в форме (`codeCompletionIssues`): плейсхолдер вида __GAP1__ в коде, тот же
+ * идентификатор в списке, минимум два варианта, правильный — среди них, от
+ * трёх до двенадцати пропусков. Промт обязан просить ровно то, что форма потом
+ * примет, иначе учитель получал бы «сгенерировано» и красный список ошибок.
+ */
+export function buildHomeworkCodeCompletionPrompt(
+  topic: string, level: string, hints: string | undefined, groupContext?: string,
+): string {
+  const langHint = hints && /c\+\+|си\+\+|cpp/i.test(hints) ? "cpp"
+    : hints && /java(?!script)/i.test(hints) ? "java"
+    : hints && /javascript|js\b/i.test(hints) ? "javascript"
+    : "python";
+  return `Ты — методический ассистент учителя школы в Узбекистане. Составь упражнение «код с пропусками».
+
+Тема: ${topic}
+Класс/уровень: ${level}${hintsLine(hints)}${groupLine(groupContext)}
+Язык по умолчанию: ${langHint} (если пожелания учителя явно не требуют другого).
+
+title — короткое название без кавычек. description — что должна делать программа, академический стиль, без markdown и эмодзи.
+codeTemplate — рабочий код на выбранном языке, в котором СТЁРТЫ ключевые места: вместо каждого стоит плейсхолдер вида __GAP1__, __GAP2__ и так далее.
+gaps — список пропусков: от 3 до 6 штук. У каждого id ровно как в коде (GAP1, GAP2 — только латиница в верхнем регистре и цифры), correct — правильный фрагмент, options — от 3 до 4 вариантов, среди которых ОБЯЗАТЕЛЬНО есть correct.
+Каждый плейсхолдер из кода должен быть в списке, и каждый пропуск из списка — в коде. Лишних плейсхолдеров не оставляй.
+language — "python"|"javascript"|"cpp"|"java".`;
+}
+
 export function buildHomeworkBundlePrompt(
   topic: string,
   level: string,

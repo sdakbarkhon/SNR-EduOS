@@ -39,6 +39,29 @@ export const HOMEWORK_TEST_SCHEMA: ResponseSchema = {
   required: ["title", "description", "questions"],
 };
 
+export const HOMEWORK_CODE_COMPLETION_SCHEMA: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    title: { type: SchemaType.STRING },
+    description: { type: SchemaType.STRING },
+    codeTemplate: { type: SchemaType.STRING },
+    language: { type: SchemaType.STRING, enum: ["python", "javascript", "cpp", "java"], format: "enum" },
+    gaps: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          id: { type: SchemaType.STRING },
+          correct: { type: SchemaType.STRING },
+          options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        },
+        required: ["id", "correct", "options"],
+      },
+    },
+  },
+  required: ["title", "description", "codeTemplate", "language", "gaps"],
+};
+
 export const HOMEWORK_PROGRAMMING_SCHEMA: ResponseSchema = {
   type: SchemaType.OBJECT,
   properties: {

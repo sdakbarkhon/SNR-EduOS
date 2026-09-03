@@ -7,8 +7,11 @@ import { getMySchoolNow } from "@/lib/school-time-server";
 import { getSubjectKeyByLabel } from "@snr/core";
 import {
   buildHomeworkFilePrompt, buildHomeworkTestPrompt, buildHomeworkProgrammingPrompt, buildHomeworkBundlePrompt,
+  buildHomeworkCodeCompletionPrompt,
 } from "@/lib/ai/prompts";
-import { HOMEWORK_FILE_SCHEMA, HOMEWORK_TEST_SCHEMA, HOMEWORK_PROGRAMMING_SCHEMA } from "@/lib/ai/schemas";
+import {
+  HOMEWORK_FILE_SCHEMA, HOMEWORK_TEST_SCHEMA, HOMEWORK_PROGRAMMING_SCHEMA, HOMEWORK_CODE_COMPLETION_SCHEMA,
+} from "@/lib/ai/schemas";
 import { EXTERNAL_SERVICE_ORDER } from "@/lib/external-services";
 import type { CodeLanguage, ExternalServiceType } from "@snr/core";
 
@@ -17,10 +20,14 @@ export const maxDuration = 30;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type HomeworkType = "file" | "test" | "programming" | "bundle";
+type HomeworkType = "file" | "test" | "programming" | "bundle" | "code_completion";
 type SubtaskType = "file" | "test" | "code" | ExternalServiceType;
 
-const ALLOWED_TYPES: HomeworkType[] = ["file", "test", "programming", "bundle"];
+// 04.09.2026 — «код с пропусками» добавлен пятым. Тип был в форме с самого
+// начала, а здесь его не завели: форма отправляла его как есть, роут отвечал
+// «Invalid type», и учитель видел «Попробуйте ещё раз» — совет, который не мог
+// помочь никогда.
+const ALLOWED_TYPES: HomeworkType[] = ["file", "test", "programming", "bundle", "code_completion"];
 const ALLOWED_SUBTASK_TYPES: SubtaskType[] = ["file", "test", "code", ...EXTERNAL_SERVICE_ORDER];
 const RUNNABLE_LANGUAGES: CodeLanguage[] = ["python", "javascript", "cpp", "java"];
 
@@ -34,6 +41,12 @@ interface RequestBody {
    *  генерируется ровно как раньше. */
   groupId?: string;
   subjectId?: string;
+}
+
+interface GenGap {
+  id?: string;
+  correct?: string;
+  options?: unknown[];
 }
 
 interface GenQuestion {
@@ -62,6 +75,9 @@ interface GenRaw {
   language?: string;
   expectedOutput?: string;
   subtasks?: GenSubtask[];
+  /** Код с пропусками: шаблон и список пропусков. */
+  codeTemplate?: string;
+  gaps?: GenGap[];
 }
 
 interface NormalizedQuestion { question: string; options: string[]; correctIndex: number }
@@ -74,6 +90,10 @@ interface GeneratedHomework {
     starterCode?: string;
     language?: CodeLanguage;
     expectedOutput?: string;
+    /** Код с пропусками. Имена полей — как в базе (CodeCompletionPayload),
+     *  чтобы форма клала их в задание без переименований. */
+    code_template?: string;
+    gaps?: Array<{ id: string; correct: string; options: string[] }>;
   };
   subtasks?: Array<{
     type: SubtaskType;
@@ -131,6 +151,56 @@ function normalizeProgrammingResult(parsed: GenRaw): GeneratedHomework | null {
   const language = normalizeLanguage(parsed.language);
   return { title, description, config: { starterCode, expectedOutput, language } };
 }
+
+/**
+ * КОД С ПРОПУСКАМИ: приводим ответ к тому, что примет форма.
+ *
+ * Правила не выдуманы здесь — они списаны с `codeCompletionIssues` в
+ * `components/teacher/CodeCompletionBuilder`: плейсхолдер `__GAP1__` в коде,
+ * тот же id в списке, минимум два варианта, правильный среди них. Отдать
+ * учителю «сгенерировано» и красный список ошибок было бы хуже, чем честно
+ * отбраковать ответ и попробовать ещё раз.
+ *
+ * Пропуск, у которого нет плейсхолдера в коде, выбрасываем; плейсхолдер без
+ * пропуска — повод забраковать весь ответ: ученик увидел бы сырое `__GAP3__`.
+ */
+function normalizeCodeCompletionResult(parsed: GenRaw): GeneratedHomework | null {
+  const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
+  const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
+  const codeTemplate = typeof parsed.codeTemplate === "string" ? parsed.codeTemplate.trim() : "";
+  if (!title || !codeTemplate) return null;
+
+  const сырые = Array.isArray(parsed.gaps) ? parsed.gaps : [];
+  const пропуски: Array<{ id: string; correct: string; options: string[] }> = [];
+  for (const g of сырые) {
+    const id = typeof g?.id === "string" ? g.id.trim().toUpperCase() : "";
+    if (!/^[A-Z0-9]+$/.test(id)) continue;
+    if (!codeTemplate.includes(`__${id}__`)) continue;
+    if (пропуски.some((x) => x.id === id)) continue;
+    const correct = typeof g?.correct === "string" ? g.correct.trim() : "";
+    if (!correct) continue;
+    const options = Array.isArray(g?.options)
+      ? [...new Set(g.options.filter((o): o is string => typeof o === "string" && !!o.trim()).map((o) => o.trim()))]
+      : [];
+    if (!options.includes(correct)) options.unshift(correct);
+    if (options.length < 2) continue;
+    пропуски.push({ id, correct, options });
+  }
+  if (пропуски.length < CODE_COMPLETION_MIN_GAPS) return null;
+
+  // Плейсхолдер в коде без описанного пропуска — брак: ученик увидит __GAP3__.
+  const вКоде = [...codeTemplate.matchAll(/__([A-Z0-9]+)__/g)].map((m) => m[1]);
+  if (вКоде.some((p) => !пропуски.some((g) => g.id === p))) return null;
+
+  return {
+    title,
+    description,
+    config: { code_template: codeTemplate, gaps: пропуски, language: normalizeLanguage(parsed.language) },
+  };
+}
+
+/** Столько же требует форма (CodeCompletionBuilder.MIN_GAPS). */
+const CODE_COMPLETION_MIN_GAPS = 3;
 
 const MAX_BUNDLE_SUBTASKS = 4;
 
@@ -190,7 +260,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing topic" }, { status: 400 });
   }
   if (!body.type || !ALLOWED_TYPES.includes(body.type)) {
-    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    // Правда вместо «Invalid type»: этот текст доходит до учителя, и «попробуйте
+    // ещё раз» на неподдерживаемом типе — совет, который не сработает никогда.
+    return NextResponse.json(
+      { error: "Для этого типа задания генерация пока не сделана — заполните поля вручную." },
+      { status: 400 },
+    );
   }
 
   const topic = body.topic.trim();
@@ -230,6 +305,7 @@ export async function POST(req: NextRequest) {
   const prompt = type === "file" ? buildHomeworkFilePrompt(topic, level, hints, groupContext)
     : type === "test" ? buildHomeworkTestPrompt(topic, level, hints, groupContext)
     : type === "programming" ? buildHomeworkProgrammingPrompt(topic, level, hints, groupContext)
+    : type === "code_completion" ? buildHomeworkCodeCompletionPrompt(topic, level, hints, groupContext)
     : buildHomeworkBundlePrompt(topic, level, hints, requestedSubtaskTypes, EXTERNAL_SERVICE_ORDER, groupContext);
 
   // bundle остаётся без строгой схемы — см. комментарий в lib/ai/schemas.ts
@@ -238,6 +314,7 @@ export async function POST(req: NextRequest) {
   const schema = type === "file" ? HOMEWORK_FILE_SCHEMA
     : type === "test" ? HOMEWORK_TEST_SCHEMA
     : type === "programming" ? HOMEWORK_PROGRAMMING_SCHEMA
+    : type === "code_completion" ? HOMEWORK_CODE_COMPLETION_SCHEMA
     : null;
 
   let result: GeneratedHomework | null = null;
@@ -258,6 +335,7 @@ export async function POST(req: NextRequest) {
     const normalized = type === "file" ? normalizeFileResult(parsed)
       : type === "test" ? normalizeTestResult(parsed)
       : type === "programming" ? normalizeProgrammingResult(parsed)
+      : type === "code_completion" ? normalizeCodeCompletionResult(parsed)
       : normalizeBundleResult(parsed);
 
     if (!normalized) {

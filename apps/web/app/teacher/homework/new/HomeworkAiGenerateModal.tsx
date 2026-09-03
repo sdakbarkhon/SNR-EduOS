@@ -17,6 +17,9 @@ export interface GeneratedHomework {
   config?: {
     questions?: Array<{ question: string; options: string[]; correctIndex: number }>; // type="test"
     starterCode?: string; language?: CodeLanguage; expectedOutput?: string;            // type="programming"
+    // type="code_completion" — имена как в задании (CodeCompletionPayload).
+    code_template?: string;
+    gaps?: Array<{ id: string; correct: string; options: string[] }>;
   };
   subtasks?: Array<{
     type: "file" | "test" | "code" | ExternalServiceType;
@@ -109,7 +112,20 @@ export function HomeworkAiGenerateModal({ isOpen, onClose, type, groupLabel, gro
       });
       const data = (await res.json()) as GeneratedHomework & { error?: string };
       if (!res.ok || data.error) {
-        setError(t.error);
+        // 04.09.2026 — ПРИЧИНА БОЛЬШЕ НЕ ПРЯЧЕТСЯ.
+        //
+        // Здесь всегда показывалось «Не удалось сгенерировать задание,
+        // попробуйте ещё раз» — и на неподдерживаемом типе, и на кончившемся
+        // ключе, и на перегруженной модели. Совет «попробуйте ещё раз» в двух
+        // случаях из трёх не мог помочь никогда, а разобраться по нему было
+        // нечем: настоящую причину сервер знал и молчал.
+        //
+        // Показываем текст сервера, когда он человеческий. Технические строки
+        // («Invalid type», «Generated JSON parse error») наружу не пускаем —
+        // для них остаётся прежняя общая фраза.
+        const серверный = typeof data.error === "string" ? data.error.trim() : "";
+        const человеческий = серверный && /[а-яё]/i.test(серверный);
+        setError(человеческий ? серверный : t.error);
         return;
       }
       onApply(data);
