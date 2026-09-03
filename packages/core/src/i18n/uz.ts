@@ -368,6 +368,7 @@ export const uz: Dictionary = {
     weekSub: "Ritmda bo'l va hammasiga ulgur!",
     next: "Keyingi",
     weekend: "Dam olish kuni",
+    noLessonsDay: "Darslar yo‘q",
     viewWeek: "Haftani ko'rish",
     nextLessonIn: "O'tkazib yuborma! Keyingi darsing {time}dan keyin.",
     allDoneToday: "Bugungi darslar tugadi! Ajoyib ish 👏",

@@ -368,6 +368,7 @@ export const en: Dictionary = {
     weekSub: "Stay in rhythm and get everything done!",
     next: "Next",
     weekend: "Day off",
+    noLessonsDay: "No lessons",
     viewWeek: "View week",
     nextLessonIn: "Don't miss it! Your next lesson is in {time}.",
     allDoneToday: "That's all for today! Great work 👏",

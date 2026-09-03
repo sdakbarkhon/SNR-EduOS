@@ -493,7 +493,11 @@ function WeekDayList({
               </div>
             ) : (
               <div className="flex flex-1 items-center gap-1.5 py-1.5 text-xs font-bold text-slate-400">
-                <Backpack className="h-4 w-4 text-violet-400 opacity-70" /> {s.weekend} <Smile className="h-3.5 w-3.5" />
+                {/* 04.09.2026 — было «Выходной». Пустой день и выходной —
+                    разные вещи: приложение про календарь школы не знает
+                    ничего, оно видит только «уроков на этот день нет».
+                    Называть вторник без занятий выходным — врать. */}
+                <Backpack className="h-4 w-4 text-violet-400 opacity-70" /> {s.noLessonsDay} <Smile className="h-3.5 w-3.5" />
               </div>
             )}
           </div>
@@ -683,7 +687,7 @@ function WeekGrid({
               }),
             )}
 
-            {/* Пустые дни (выходные) */}
+            {/* Дни без уроков — не «выходные»: см. подпись ниже. */}
             {days.map((day, di) =>
               emptyDays[di] ? (
                 <div
@@ -692,7 +696,7 @@ function WeekGrid({
                   style={{ gridColumn: di + 2, gridRow: `1 / ${rowCount + 1}` }}
                 >
                   <Backpack className="h-8 w-8 text-violet-400 opacity-70" />
-                  <span className="flex items-center gap-1 px-1 text-center text-xs font-bold text-slate-400">{s.weekend} <Smile className="h-3.5 w-3.5" /></span>
+                  <span className="flex items-center gap-1 px-1 text-center text-xs font-bold text-slate-400">{s.noLessonsDay} <Smile className="h-3.5 w-3.5" /></span>
                 </div>
               ) : null,
             )}

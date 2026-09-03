@@ -365,6 +365,7 @@ export interface Dictionary {
     weekSub: string;          // "Будь в ритме и всё успевай!"
     next: string;             // "Далее" (upcoming-lesson badge)
     weekend: string;          // "Выходной"
+    noLessonsDay: string;
     viewWeek: string;         // "Посмотреть неделю" (empty-today CTA)
     nextLessonIn: string;     // "Не пропусти! Твой следующий урок через {time}."
     allDoneToday: string;     // "На сегодня всё! Отличная работа 👏"

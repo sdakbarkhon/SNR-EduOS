@@ -368,6 +368,7 @@ export const ru: Dictionary = {
     weekSub: "Будь в ритме и всё успевай!",
     next: "Далее",
     weekend: "Выходной",
+    noLessonsDay: "Уроков нет",
     viewWeek: "Посмотреть неделю",
     nextLessonIn: "Не пропусти! Твой следующий урок через {time}.",
     allDoneToday: "На сегодня всё! Отличная работа 👏",
