@@ -670,6 +670,10 @@ export function LessonWorkspaceView({
   // перевести урок в 'completed' пока панель открыта); настоящая защита —
   // RLS-политика на lessons (см. отчёт по задаче).
   async function handleActivateStage(stageId: string) {
+    // Витрина и только витрина: в настоящей школе этапы ведёт учитель.
+    // Кнопки у ученика больше нет, но действие закрываем и здесь — чтобы
+    // оно не ожило от следующей перестановки разметки.
+    if (!isDemoSchool) return;
     if (isCompleted || activatingStageId || lesson.isThirdLessonViewer) return;
     setActivatingStageId(stageId);
     try {
@@ -1234,13 +1238,21 @@ export function LessonWorkspaceView({
             </div>
           )}
 
-          {/* Активация этапов учеником — тот же блок/паттерн, что у учителя
-              в TeacherLessonDetailView.tsx ("Управление этапами"): список
-              middle-этапов, состояние (пройден/активен/впереди), кнопка
-              "Активировать". Действие меняет active_stage_id для ВСЕГО
-              урока (см. handleActivateStage выше) — realtime-канал уже
-              разносит это учителю и остальным ученикам без изменений. */}
-          {!isCompleted && !lesson.isThirdLessonViewer && allMiddleStages.length > 0 && (
+          {/* ── УПРАВЛЕНИЕ ЭТАПАМИ — ТОЛЬКО В ДЕМО-ШКОЛЕ ──────────────────
+              Блок сделан для витрины: посетитель играет за ученика, живого
+              учителя рядом нет, и вести урок некому — значит ведёт он сам.
+              Действие меняет active_stage_id для ВСЕГО урока и разлетается
+              по группе.
+
+              04.09.2026 — ГЕЙТА ЗДЕСЬ НЕ БЫЛО ВОВСЕ. В настоящей школе
+              обычный ученик видел «Управление этапами» с кнопкой
+              «Активировать» у каждого этапа и мог переключить этап всему
+              классу поверх учителя. Заказчик это и увидел, войдя учеником.
+
+              Гейт по школе, а не по автостарту: у демо-школы автостарт
+              выключен, но выключить его может и настоящая школа — и дыра
+              вернулась бы молча. */}
+          {isDemoSchool && !isCompleted && !lesson.isThirdLessonViewer && allMiddleStages.length > 0 && (
             <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
               <div className="flex items-center gap-2">
                 <span className="flex h-2 w-2 rounded-full bg-violet-500" />
