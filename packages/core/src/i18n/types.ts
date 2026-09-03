@@ -3069,6 +3069,8 @@ export interface Dictionary {
     hwLessonNeedsSubject: string;
     hwErrTitle: string;
     hwErrTask: string;
+    hwErrTestDuration: string;
+    hwErrTestDurationMax: string;
     hwErrGaps: string;
     hwErrGroup: string;
     hwErrDeadline: string;

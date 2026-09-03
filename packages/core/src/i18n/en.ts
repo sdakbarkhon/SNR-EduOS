@@ -2960,6 +2960,8 @@ export const en: Dictionary = {
     hwLessonNeedsSubject: "Becomes available once you pick a subject",
     hwErrTitle: "Enter a title",
     hwErrTask: "Enter the task statement",
+    hwErrTestDuration: "Set the test duration — a whole number of minutes greater than zero",
+    hwErrTestDurationMax: "Test duration must be at most {max} minutes",
     hwErrGaps: "Check the exercise: the code template and the gaps are incomplete",
     hwErrGroup: "Choose a class",
     hwErrDeadline: "Set a deadline",

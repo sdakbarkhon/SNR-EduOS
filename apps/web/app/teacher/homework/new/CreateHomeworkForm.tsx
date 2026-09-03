@@ -46,6 +46,16 @@ interface Props {
   teacherId: string;
 }
 
+/**
+ * ПОТОЛОК ДЛИТЕЛЬНОСТИ ТЕСТА — ТРИ ЧАСА.
+ *
+ * Столько же стояло в поле раньше (max={180}), и это разумно: школьный урок
+ * идёт сорок пять минут, самая длинная контрольная — две пары. Тест на сутки
+ * заводить незачем, а опечатка в три знака («300» вместо «30») иначе прошла бы
+ * молча.
+ */
+const TEST_DURATION_MAX_MIN = 180;
+
 export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale);
@@ -53,7 +63,19 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
   const supabase = createClient();
 
   const [format, setFormat] = useState<Format>("file");
-  const [testDuration, setTestDuration] = useState(10); // minutes
+  /**
+   * ДЛИТЕЛЬНОСТЬ ТЕСТА — СТРОКОЙ, А НЕ ЧИСЛОМ. 04.09.2026.
+   *
+   * Было число и `Math.max(1, parseInt(v) || 1)` на каждое нажатие. Стереть
+   * поле было нельзя: пустая строка даёт NaN, `|| 1` возвращал единицу, и
+   * единица тут же вставала обратно. Учитель набирал 30 поверх неё и получал
+   * 130 — ровно то, на что пожаловался заказчик.
+   *
+   * ПУСТОЕ ПОЛЕ МЕЖДУ ДВУМЯ НАЖАТИЯМИ — НОРМАЛЬНОЕ СОСТОЯНИЕ. Поэтому здесь
+   * строка: она умеет быть пустой. Запрет стоит при сохранении, а не при
+   * вводе — см. проверку в handleSubmit.
+   */
+  const [testDuration, setTestDuration] = useState("10"); // минуты, строкой
   const [autoGrade, setAutoGrade] = useState(true);
   const [progLanguage, setProgLanguage] = useState<CodeLanguage>("python");
   const [starterCode, setStarterCode] = useState("");
@@ -229,6 +251,19 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
     if (!subjectId) { setError(d.lesson.createSelectSubject); return; }
     if (!deadline) { setError(d.teacher.hwErrDeadline); return; }
 
+    // Длительность теста: пустое и ноль не принимаем ЗДЕСЬ, а не при вводе.
+    if (format === "test") {
+      const минут = Number(testDuration);
+      if (!testDuration.trim() || !Number.isFinite(минут) || минут <= 0) {
+        setError(d.teacher.hwErrTestDuration);
+        return;
+      }
+      if (минут > TEST_DURATION_MAX_MIN) {
+        setError(d.teacher.hwErrTestDurationMax.replace("{max}", String(TEST_DURATION_MAX_MIN)));
+        return;
+      }
+    }
+
     if (format === "programming" && !description.trim()) { setError(d.teacher.hwErrTask); return; }
     if (format === "bundle" && (subtasks.length < 1 || subtasks.length > 10)) { setError(d.teacher.bundleMinHint); return; }
     if (format === "bundle" && subtasks.some((s) => !s.title.trim())) { setError(d.teacher.bundleSubtaskTitle); return; }
@@ -266,7 +301,7 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
         lessonId: lessonId || null,
         subjectId: subjectId || null,
         status,
-        testDurationSeconds: format === "test" ? testDuration * 60 : null,
+        testDurationSeconds: format === "test" ? Number(testDuration) * 60 : null,
         testAutoGrade: format === "test" ? autoGrade : true,
         programmingLanguage: format === "programming" ? progLanguage : null,
         starterCode: format === "programming" ? (starterCode || null) : null,
@@ -835,8 +870,17 @@ export function CreateHomeworkForm({ groups, subjects, teacherId }: Props) {
             style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
             <label className="flex flex-col gap-1.5">
               <span className="text-[13px] font-medium text-brand-ink-muted">{d.homework.test.durationLabel}</span>
-              <input type="number" min={1} max={180} value={testDuration}
-                onChange={(e) => setTestDuration(Math.max(1, parseInt(e.target.value) || 1))}
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={3}
+                placeholder={String(TEST_DURATION_MAX_MIN)}
+                value={testDuration}
+                // Только цифры, и пустое поле разрешено: правит человек, а не
+                // сторож. Тип text вместо number намеренно — number в браузере
+                // отдаёт пустую строку и на «12e», и на «-», и отличить одно от
+                // другого в onChange уже нельзя.
+                onChange={(e) => setTestDuration(e.target.value.replace(/\D/g, ""))}
                 className="w-32 rounded-[10px] border border-slate-200 bg-white/80 px-3 py-2.5 text-[14px] text-brand-ink focus:outline-none focus:border-brand-blue/50" />
             </label>
             <label className="flex items-start gap-2.5 cursor-pointer">

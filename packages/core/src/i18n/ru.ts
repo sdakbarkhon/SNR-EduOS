@@ -2970,6 +2970,8 @@ export const ru: Dictionary = {
     hwLessonNeedsSubject: "Станет доступно, когда выберете предмет",
     hwErrTitle: "Введите название",
     hwErrTask: "Введите условие задачи",
+    hwErrTestDuration: "Укажите длительность теста — целое число минут больше нуля",
+    hwErrTestDurationMax: "Длительность теста не больше {max} минут",
     hwErrGaps: "Проверьте упражнение: шаблон кода и пропуски заполнены не полностью",
     hwErrGroup: "Выберите класс",
     hwErrDeadline: "Укажите дедлайн",

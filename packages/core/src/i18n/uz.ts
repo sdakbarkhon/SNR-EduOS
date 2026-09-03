@@ -2960,6 +2960,8 @@ export const uz: Dictionary = {
     hwLessonNeedsSubject: "Fanni tanlaganingizdan keyin ochiladi",
     hwErrTitle: "Sarlavhani kiriting",
     hwErrTask: "Masala shartini kiriting",
+    hwErrTestDuration: "Test davomiyligini kiriting — noldan katta butun daqiqa",
+    hwErrTestDurationMax: "Test davomiyligi ko‘pi bilan {max} daqiqa",
     hwErrGaps: "Mashqni tekshiring: kod shabloni va bo'shliqlar to'liq emas",
     hwErrGroup: "Sinfni tanlang",
     hwErrDeadline: "Muddatni belgilang",
