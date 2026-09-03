@@ -5,7 +5,16 @@ import { redirect } from "next/navigation";
 import { safeQuery } from "@/lib/safe-query";
 import { CurriculumPlansView } from "./CurriculumPlansView";
 
-export default async function TeacherCurriculumPage() {
+// Пара «группа + предмет» может прийти доводом адреса: так сюда ведёт отказ
+// массового создания уроков — «плана нет, вот где его завести». Читаем её
+// здесь, на сервере: useSearchParams в клиенте потребовал бы Suspense, и на
+// этом мы уже один раз потеряли карточку входа.
+export default async function TeacherCurriculumPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ group?: string; subject?: string }>;
+}) {
+  const { group: preGroupId, subject: preSubjectId } = await searchParams;
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
@@ -55,6 +64,15 @@ export default async function TeacherCurriculumPage() {
       groups={groups.map((g) => ({ id: g.id, name: g.name }))}
       subjects={subjects.map((s) => ({ id: s.id, name: s.name, group_id: s.group_id }))}
       teacherId={teacher.id}
+      preselect={
+        // Пара годится, только если она СВОЯ: чужой id в адресе не должен
+        // открывать окно с недоступной группой.
+        preGroupId && preSubjectId
+          && groups.some((g) => g.id === preGroupId)
+          && subjects.some((s) => s.id === preSubjectId && s.group_id === preGroupId)
+          ? { groupId: preGroupId, subjectId: preSubjectId }
+          : null
+      }
     />
   );
 }

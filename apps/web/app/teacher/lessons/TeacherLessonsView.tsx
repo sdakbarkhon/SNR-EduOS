@@ -24,7 +24,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
-import { BulkLessonsFields } from "./BulkLessonsModal";
+import { BulkLessonsFields, type PlanState } from "./BulkLessonsModal";
 import { ModalPortal } from "@/components/ModalPortal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -331,10 +331,11 @@ function DatePickerField({
 
 // ── LessonFormModal ───────────────────────────────────────────────────────────
 function LessonFormModal({
-  mode, groups, teacherSubjects, initial, editLessonId, onClose, onSave, onBulkCreated,
+  mode, groups, teacherSubjects, teacherId, initial, editLessonId, onClose, onSave, onBulkCreated,
 }: {
   mode: "create" | "edit"; groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
+  teacherId: string;
   initial: FormState;
   /** Пачка создана — родитель перечитывает месяц. Своего запроса у окна нет. */
   onBulkCreated: () => void;
@@ -411,21 +412,39 @@ function LessonFormModal({
   // (группа, предмет) есть план.
   const [planTopics, setPlanTopics] = useState<CurriculumTopicWithUsage[] | null>(null);
   const [useCustomTopic, setUseCustomTopic] = useState(true);
+  /**
+   * ЕСТЬ ЛИ ПЛАН — ОТДЕЛЬНЫМ СОСТОЯНИЕМ. 04.09.2026.
+   *
+   * `planTopics === null` значит сразу три разных вещи: ещё грузим, плана нет,
+   * запрос упал. Одиночному уроку этого хватало — он просто не показывает
+   * селектор темы. Массовому не хватает: «плана нет» там означает отказ со
+   * ссылкой, а «ещё грузим» — подождать, и путать их нельзя.
+   */
+  const [planState, setPlanState] = useState<PlanState>({ kind: "loading" });
   useEffect(() => {
-    if (mode !== "create" || !form.groupId || !form.subjectId) { setPlanTopics(null); return; }
+    if (mode !== "create" || !form.groupId || !form.subjectId) {
+      setPlanTopics(null);
+      setPlanState({ kind: "loading" });
+      return;
+    }
     let cancelled = false;
     const db = createClient();
+    setPlanState({ kind: "loading" });
     getCurriculumPlanForGroupSubject(db, form.groupId, form.subjectId)
       .then((plan) => {
         if (cancelled) return;
-        if (!plan) { setPlanTopics(null); setUseCustomTopic(true); return; }
+        if (!plan) { setPlanTopics(null); setUseCustomTopic(true); setPlanState({ kind: "none" }); return; }
         return getCurriculumTopicsWithUsage(db, plan.id).then((topics) => {
           if (cancelled) return;
           setPlanTopics(topics);
           setUseCustomTopic(topics.length === 0);
+          // Свободные — те, по которым урока ещё нет: столько уроков пачка и
+          // создаст. Счёт тот же, что на сервере, но показать число надо до
+          // предпросмотра, иначе период не из чего считать.
+          setPlanState({ kind: "ok", freeTopics: topics.filter((t) => t.used_in_lessons === 0).length });
         });
       })
-      .catch(() => { if (!cancelled) setPlanTopics(null); });
+      .catch(() => { if (!cancelled) { setPlanTopics(null); setPlanState({ kind: "error" }); } });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, form.groupId, form.subjectId]);
@@ -645,6 +664,10 @@ function LessonFormModal({
                 groupId={form.groupId}
                 subjectId={form.subjectId}
                 room={form.room}
+                groupName={groups.find((g) => g.id === form.groupId)?.name ?? ""}
+                subjectName={teacherSubjects.find((s) => s.id === form.subjectId)?.name ?? ""}
+                teacherId={teacherId}
+                plan={planState}
                 onCreated={() => { onBulkCreated(); onClose(); }}
               />
             )}
@@ -697,11 +720,15 @@ export function TeacherLessonsView({
   lessons: initialLessons,
   groups,
   teacherSubjects,
+  teacherId,
   loadError = false,
 }: {
   lessons: LessonItem[];
   groups: GroupItem[];
   teacherSubjects: SubjectWithGroup[];
+  /** Ключ памяти праздников в массовом создании. Тот же учитель — те же
+   *  праздники, что он отметил в учебном плане. */
+  teacherId: string;
   loadError?: boolean;
   // 30.08.2026 — пропа isCurator здесь больше нет. Он прятал создание урока
   // и меню карточек у наблюдателя; роль убрана из продукта, прятать не от кого.
@@ -1049,6 +1076,7 @@ export function TeacherLessonsView({
           mode={formModal}
           groups={groups}
           teacherSubjects={teacherSubjects}
+          teacherId={teacherId}
           initial={
             formModal === "edit" && editLesson
               ? lessonToForm(editLesson)

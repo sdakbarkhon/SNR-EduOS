@@ -19,6 +19,7 @@ import type { CurriculumPlanStatus, CurriculumPlanWithTopics, CurriculumTopicWit
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
+import { HolidayCalendar, useHolidays, датыВыходных } from "@/components/teacher/HolidayCalendar";
 import { PageContainer } from "@/components/PageContainer";
 import { useRealtimeChannel } from "@/lib/realtime";
 import { ModalPortal } from "@/components/ModalPortal";
@@ -225,94 +226,14 @@ export function CurriculumPlanDetailView({
   const timeOf = (n: number) => timeByWeekday[n] ?? time;
 
   /**
-   * ВЫХОДНЫЕ И ПРАЗДНИКИ. 03.09.2026.
-   *
-   * ГДЕ ЖИВУТ. В форме — на время создания, как просил заказчик («в настройки
-   * школы не выносим»). Плюс последний набор запоминается В БРАУЗЕРЕ учителя:
-   * праздники в стране одни, а планов у учителя несколько, и вводить их заново
-   * каждый раз — ровно тот труд, на котором ошибаются.
-   *
-   * ПОЧЕМУ НЕ В БАЗЕ. В `curriculum_plans` нет ни свободного jsonb, ни колонки
-   * под даты — проверено; хранение потребовало бы миграции, а её в этом заходе
-   * заводить нельзя. Границы честные и названы человеку: это память ОДНОГО
-   * браузера, а не календарь школы. Понадобится общий — это отдельное решение.
-   *
-   * Ключ на учителя: за одним браузером могут сидеть двое.
+   * ВЫХОДНЫЕ И ПРАЗДНИКИ. Календарь и память переехали в общий компонент
+   * `components/teacher/HolidayCalendar` (04.09.2026): тот же календарь
+   * понадобился массовому созданию уроков, а копия правил разошлась бы.
+   * Правила самого плана этим не тронуты — сдвиг тем по-прежнему делает
+   * раскладка, здесь только выбор дней.
    */
-  const ключПраздников = `snr-holidays-${plan.teacher_id}`;
-  const [holidays, setHolidays] = useState<string[]>([]);
-  const [holidaysFromMemory, setHolidaysFromMemory] = useState(false);
-
-  useEffect(() => {
-    try {
-      const сохранённое = window.localStorage.getItem(ключПраздников);
-      if (!сохранённое) return;
-      const разобрано: unknown = JSON.parse(сохранённое);
-      if (!Array.isArray(разобрано)) return;
-      const даты = разобрано.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
-      if (даты.length === 0) return;
-      setHolidays(даты.sort());
-      setHolidaysFromMemory(true);
-    } catch {
-      // Хранилище может быть закрыто настройками браузера или приватным
-      // окном. Праздники — удобство, а не право: молча работаем без памяти.
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function запомнитьПраздники(даты: string[]) {
-    try {
-      if (даты.length === 0) window.localStorage.removeItem(ключПраздников);
-      else window.localStorage.setItem(ключПраздников, JSON.stringify(даты));
-    } catch { /* см. выше: без памяти форма работает */ }
-  }
-
-  function toggleHoliday(день: string) {
-    setStep1Preview(null);
-    setHolidaysFromMemory(false);
-    setHolidays((cur) => {
-      const дальше = cur.includes(день) ? cur.filter((d) => d !== день) : [...cur, день].sort();
-      запомнитьПраздники(дальше);
-      return дальше;
-    });
-  }
-
-
-  /**
-   * КАЛЕНДАРЬ ПРАЗДНИКОВ — СЧЁТ ПО UTC, БЕЗ ЧАСОВОГО ПОЯСА.
-   *
-   * Здесь календарная дата, а не момент времени: у «12 ноября» пояса нет.
-   * Поэтому сетка строится через Date.UTC — тот же приём, что у addDays
-   * выше, и по той же причине: смещение +5 сдвинуло бы день на границе суток.
-   */
-  const [calMonth, setCalMonth] = useState<string>(() => tashkentDayKey(schoolNowMs()).slice(0, 7));
-
-  function сдвигМесяца(месяц: string, на: number): string {
-    const [y, m] = месяц.split("-").map(Number);
-    const dt = new Date(Date.UTC(y!, (m ?? 1) - 1 + на, 1));
-    return dt.toISOString().slice(0, 7);
-  }
-
-  function подписьМесяца(месяц: string): string {
-    const [y, m] = месяц.split("-").map(Number);
-    return new Date(Date.UTC(y!, (m ?? 1) - 1, 1))
-      .toLocaleDateString(locale === "en" ? "en-US" : locale === "uz" ? "uz-UZ" : "ru-RU",
-        { month: "long", year: "numeric", timeZone: "UTC" });
-  }
-
-  /** Дни месяца, выровненные по понедельнику. null — пустая клетка. */
-  function сеткаМесяца(месяц: string): Array<string | null> {
-    const [y, m] = месяц.split("-").map(Number);
-    const первое = new Date(Date.UTC(y!, (m ?? 1) - 1, 1));
-    // getUTCDay: 0 — воскресенье. Нам нужен отступ от понедельника.
-    const отступ = (первое.getUTCDay() + 6) % 7;
-    const дней = new Date(Date.UTC(y!, m ?? 1, 0)).getUTCDate();
-    const клетки: Array<string | null> = Array.from({ length: отступ }, () => null);
-    for (let d = 1; d <= дней; d++) {
-      клетки.push(`${месяц}-${String(d).padStart(2, "0")}`);
-    }
-    return клетки;
-  }
+  const выходные = useHolidays(plan.teacher_id, schoolNowMs());
+  const holidays = датыВыходных(выходные.дни);
 
   const [step1Busy, setStep1Busy] = useState(false);
   const [step1Error, setStep1Error] = useState<string | null>(null);
@@ -958,91 +879,13 @@ export function CurriculumPlanDetailView({
                 </div>
 
 
-                {/* ── ВЫХОДНЫЕ И ПРАЗДНИКИ ────────────────────────────────
-                    Месячный календарь со щелчком по дню, а не поле «даты
-                    через запятую»: по полю промахиваются, а промах здесь
-                    означает урок в выходной. */}
-                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CalendarRange className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                    <span className="text-xs font-bold text-slate-800">{tc.holidaysTitle}</span>
-                    {holidaysFromMemory && holidays.length > 0 && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        {tc.holidaysRemembered}
-                      </span>
-                    )}
-                    {holidays.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => { setHolidays([]); запомнитьПраздники([]); setHolidaysFromMemory(false); setStep1Preview(null); }}
-                        className="ml-auto rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
-                      >
-                        {tc.holidaysClear}
-                      </button>
-                    )}
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{tc.holidaysHint}</p>
-
-                  <div className="mt-2.5 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCalMonth((m) => сдвигМесяца(m, -1))}
-                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50"
-                    >
-                      ‹
-                    </button>
-                    <span className="text-xs font-bold text-slate-700">{подписьМесяца(calMonth)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCalMonth((m) => сдвигМесяца(m, 1))}
-                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50"
-                    >
-                      ›
-                    </button>
-                  </div>
-
-                  <div className="mt-2 grid grid-cols-7 gap-1">
-                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                      <span key={n} className="text-center text-[10px] font-bold uppercase text-gray-400">{wdLabel[n]}</span>
-                    ))}
-                    {сеткаМесяца(calMonth).map((день, i) => {
-                      if (!день) return <span key={`п${i}`} />;
-                      const отмечен = holidays.includes(день);
-                      return (
-                        <button
-                          key={день}
-                          type="button"
-                          onClick={() => toggleHoliday(день)}
-                          className={
-                            "rounded-lg py-1 text-[11px] font-semibold transition-colors "
-                            + (отмечен
-                              ? "bg-red-500 text-white"
-                              : "bg-white text-slate-600 hover:bg-slate-100")
-                          }
-                        >
-                          {Number(день.slice(8, 10))}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {holidays.length === 0 ? (
-                    <p className="mt-2 text-[11px] text-slate-400">{tc.holidaysNone}</p>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {holidays.map((день) => (
-                        <button
-                          key={день}
-                          type="button"
-                          onClick={() => toggleHoliday(день)}
-                          className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-200"
-                        >
-                          {день.slice(8, 10)}.{день.slice(5, 7)}
-                          <XCircle className="h-3 w-3" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                <div className="mt-3">
+                  <HolidayCalendar
+                    дни={выходные.дни}
+                    изПамяти={выходные.изПамяти}
+                    месяцПоУмолчанию={выходные.месяцПоУмолчанию}
+                    onChange={(следующие) => { выходные.изменить(следующие); setStep1Preview(null); }}
+                  />
                 </div>
 
                 {step1Error && (

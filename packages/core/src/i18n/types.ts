@@ -114,6 +114,8 @@ export interface Dictionary {
     holidaysRemembered: string;
     holidaysClear: string;
     holidaysNone: string;
+    holidayNotePlaceholder: string;
+    holidayNoteAdd: string;
     skippedTopics: string;
     skippedTopicsWhich: string;
     notEnoughSlots: string;
@@ -2955,17 +2957,19 @@ export interface Dictionary {
     bulkPerDayTimeHint: string;
     bulkTimeSame: string;          // подпись общего времени, когда режим выключен
     bulkFrom: string;
-    bulkTo: string;
+    bulkNoPlanTitle: string;
+    bulkNoPlanWhat: string;
+    bulkNoPlanLink: string;
+    bulkPlanChecking: string;
+    bulkFromPlan: string;
+    bulkSlotsBusy: string;
+    bulkTopicsSkipped: string;
     bulkRoom: string;
-    bulkTopics: string;
-    bulkTopicsHint: string;
-    bulkTopicsNone: string;
     bulkPreviewBtn: string;
     bulkPreviewLoading: string;
     bulkPreviewTitle: string;
     bulkWillCreate: string;
     bulkOccupied: string;
-    bulkNoTopic: string;
     bulkTopicsLeft: string;
     bulkNothing: string;
     bulkCreateBtn: string;

@@ -20,11 +20,15 @@ export function CurriculumPlansView({
   groups,
   subjects,
   teacherId,
+  preselect = null,
 }: {
   plans: CurriculumPlanWithTopics[];
   groups: GroupItem[];
   subjects: SubjectItem[];
   teacherId: string;
+  /** Пришли по ссылке «создать план для этой пары» — окно загрузки
+   *  открывается сразу и с уже выбранными группой и предметом. */
+  preselect?: { groupId: string; subjectId: string } | null;
 }) {
   const { locale } = useLocale();
   const d = getDictionary(locale as Locale).curriculum;
@@ -32,7 +36,7 @@ export function CurriculumPlansView({
   // на страницу плана сразу после создания (Большой фикс, Блок 6, ЗАДАЧА 1),
   // список этой страницы просто не участвует в том флоу.
   const plans = initialPlans;
-  const [uploadModal, setUploadModal] = useState(false);
+  const [uploadModal, setUploadModal] = useState(preselect !== null);
   const [bookModal, setBookModal] = useState(false);
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -108,6 +112,7 @@ export function CurriculumPlansView({
           groups={groups}
           subjects={subjects}
           teacherId={teacherId}
+          preselect={preselect}
           onClose={() => setUploadModal(false)}
         />
       )}
@@ -149,11 +154,12 @@ function isPdfOrDocxFile(f: File): "pdf" | "docx" | null {
 }
 
 function UploadPlanModal({
-  groups, subjects, teacherId, onClose,
+  groups, subjects, teacherId, preselect, onClose,
 }: {
   groups: GroupItem[];
   subjects: SubjectItem[];
   teacherId: string;
+  preselect?: { groupId: string; subjectId: string } | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -162,8 +168,8 @@ function UploadPlanModal({
   const db = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [groupId, setGroupId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
+  const [groupId, setGroupId] = useState(preselect?.groupId ?? "");
+  const [subjectId, setSubjectId] = useState(preselect?.subjectId ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [sourceFileType, setSourceFileType] = useState<"pdf" | "docx" | null>(null);
   const [fileError, setFileError] = useState("");

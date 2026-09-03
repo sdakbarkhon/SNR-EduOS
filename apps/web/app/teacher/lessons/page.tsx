@@ -68,6 +68,7 @@ export default async function TeacherLessonsPage() {
       lessons={lessons}
       groups={groups}
       teacherSubjects={teacherSubjects ?? []}
+      teacherId={teacher.id}
       loadError={lessonsRes.failed}
     />
   );
