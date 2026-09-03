@@ -167,7 +167,13 @@ export async function actionTopUpStudentBalance(formData: FormData) {
     // деньгами, хотя лежит не в разделе оплат, а среди действий с учениками.
     // Школа приходит формой — как у шести соседних действий.
     const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
-    const { schoolId, isSuperAdmin } = await verifyAdmin(школаИзФормы);
+    const { schoolId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
+    // ДЕНЬГИ МЕНЯЕТ ТОЛЬКО МЕНЕДЖЕР. Пополнение баланса лежит среди действий
+    // с учениками, но это деньги — и уезжает вместе с разделом оплат, иначе
+    // половина денежной работы осталась бы у админа. Тот же отказ, что в
+    // app/admin/payments/actions.ts; кнопка кошелька у админа при этом
+    // убрана, так что в отказ ведёт только вызов в обход экрана.
+    if (role !== "manager") throw new Error("MONEY_MANAGER_ONLY");
     const studentId = String(formData.get("student_id") ?? "");
     const amount = parseCoursePrice(String(formData.get("amount") ?? ""));
     const note = String(formData.get("note") ?? "");

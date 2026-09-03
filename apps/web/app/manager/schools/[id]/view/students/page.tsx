@@ -33,6 +33,9 @@ export default async function ManagerStudentsPage({
       // Суперадмин сюда тоже заходит — на чтение. Школы ему не даём: без неё
       // формы уйдут без school_id, а verifyStaff его и не пустит.
       schoolId={actor.role === "manager" ? school.id : undefined}
+      // Пополнение баланса — деньги, и оно у менеджера. Суперадмин заходит
+      // сюда читать, и школы ему не дают, — значит и кошелька он не увидит.
+      canMoney={actor.role === "manager"}
     />
   );
 }

@@ -21,7 +21,7 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Wallet, Pencil, Ban, RotateCcw, X } from "lucide-react";
+import { Eye, Wallet, Pencil, Ban, RotateCcw, X } from "lucide-react";
 import { getDictionary, type Locale } from "@snr/core";
 import { useLocale } from "@/components/LocaleProvider";
 import { humanizeAdminError } from "@/lib/admin-error-messages";
@@ -122,10 +122,24 @@ export function PaymentsAdminView({
    * менеджер: своей школы у него нет, и подставить её некому.
    */
   schoolId,
+  /**
+   * Можно ли отсюда МЕНЯТЬ деньги. Решение заказчика: деньгами школ управляют
+   * менеджеры, админ школы их только видит.
+   *
+   * УМОЛЧАНИЕ — «НЕЛЬЗЯ», И ЭТО НАРОЧНО. Кто права не назвал, тот их не
+   * получил: новый экран, забывший передать свойство, окажется безопасным, а
+   * не всесильным. Менеджер называет их явно.
+   *
+   * Свойство ПРЯЧЕТ кнопки, а не отключает их: отключённая кнопка обещает,
+   * что когда-нибудь нажмётся. Запрет живёт не здесь, а в самих действиях —
+   * здесь только вежливость, чтобы не было мёртвых кнопок.
+   */
+  canEdit = false,
 }: {
   invoices: SchoolInvoiceRow[];
   blockers: InvoiceBlockerRow[];
   schoolId?: string;
+  canEdit?: boolean;
 }) {
   /** Дописать школу в форму. Без неё форма остаётся прежней. */
   const сШколой = (fd: FormData) => {
@@ -178,15 +192,26 @@ export function PaymentsAdminView({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">{t.paymentsTitle}</h1>
-        <button
-          onClick={openIssue}
-          disabled={isPending}
-          className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60"
-        >
-          <Wallet className="h-4 w-4" />
-          {isPending ? t.paymentsIssuing : t.paymentsIssueBtn}
-        </button>
+        {canEdit && (
+          <button
+            onClick={openIssue}
+            disabled={isPending}
+            className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-60"
+          >
+            <Wallet className="h-4 w-4" />
+            {isPending ? t.paymentsIssuing : t.paymentsIssueBtn}
+          </button>
+        )}
       </div>
+
+      {/* Почему кнопок нет. Молчащий экран человек считает сломанным, а не
+          устроенным так нарочно, — и идёт искать поддержку. */}
+      {!canEdit && (
+        <div className="flex items-start gap-3 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200">
+          <Eye className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+          <p>{t.paymentsReadOnlyNote}</p>
+        </div>
+      )}
 
       {flashMsg && (
         <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
@@ -241,7 +266,7 @@ export function PaymentsAdminView({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {row.status === "open" && (
+                        {canEdit && row.status === "open" && (
                           <>
                             <button
                               onClick={() => { setAmount(formatSum(row.amount)); setModal({ kind: "adjust", row }); }}
@@ -259,7 +284,7 @@ export function PaymentsAdminView({
                             </button>
                           </>
                         )}
-                        {row.status === "canceled" && (
+                        {canEdit && row.status === "canceled" && (
                           <button
                             onClick={() => startTransition(async () => {
                               try {

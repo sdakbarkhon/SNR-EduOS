@@ -38,26 +38,33 @@ async function verifyAdmin(
 }
 
 /**
- * ═══ ДЕНЬГИ ОТКРЫТЫ МЕНЕДЖЕРУ. Срез 3d, 03.09.2026 ════════════════════════
+ * ═══ ДЕНЬГИ МЕНЯЕТ ТОЛЬКО МЕНЕДЖЕР. Заход «отобрать деньги», 03.09.2026 ════
  *
- * Здесь стоял `assertMoneyAllowed`, отбивавший менеджера от всех пяти
- * действий. Он был не решением, а честным отказом на месте упора в схему:
- * `tuition_invoices.adjusted_by` ссылался на `admins`, строки в которых у
- * менеджера нет и быть не может.
+ * Решение заказчика: на первое время деньгами школ управляют менеджеры.
+ * Админ школы деньги ВИДИТ — счета, суммы, состояния, балансы, причины
+ * прошлых правок, список «кому счёт выставить нельзя», — но не меняет.
  *
- * Пропустить его пустотой было нельзя даже при желании: проверка
- * `tuition_invoices_adjusted_has_author` требует автора и время всегда, когда
- * сумма помечена правленой. База отбила бы такую запись сама.
+ * ПОЧЕМУ ПРОСМОТР ОСТАВЛЕН, А НЕ УБРАН РАЗДЕЛ ЦЕЛИКОМ. Школа обязана видеть
+ * свои деньги, даже если ими не управляет: без этого администратор не сможет
+ * ответить родителю на вопрос «за что счёт», не позвонив менеджеру.
  *
- * Миграция 251 перевела `adjusted_by` на `auth.users` и завела рядом
- * `adjusted_by_role`. Автор теперь записывается у любой роли, и в истории
- * видно не только КТО, но и В КАКОМ КАЧЕСТВЕ.
+ * ЗАСЛОН СТОИТ ДВАЖДЫ, И ЭТО НЕ ИЗБЫТОК:
+ *   на экране — кнопок нет вовсе, чтобы не было мёртвых кнопок;
+ *   здесь     — отказ, потому что действие можно вызвать в обход экрана.
+ * Первое — вежливость, второе — собственно запрет.
+ *
+ * ЗЕРКАЛО ПРЕЖНЕГО. Ровно здесь до среза 3d стоял `assertMoneyAllowed`,
+ * отбивавший менеджера. Теперь тот же заслон развёрнут в другую сторону —
+ * и это ровно та причина, по которой права решаются В КОДЕ, а не в правилах
+ * доступа: разворот занял одну функцию, а не миграцию.
  *
  * ШКОЛА. Админу она не нужна — она в его строке; менеджеру обязательна —
  * своей у него нет. Формы несут её полем `school_id`, действия без формы —
- * необязательным доводом. Подделать нечего: менеджеру и так разрешены все
- * школы, а у админа чужая школа отвергается, а не подставляется молча.
+ * необязательным доводом.
  */
+function assertMoneyWriter(role: StaffRole): void {
+  if (role !== "manager") throw new Error("MONEY_MANAGER_ONLY");
+}
 
 /**
  * Что случится, если нажать «Выставить счета».
@@ -70,7 +77,8 @@ export async function actionIssuePreview(
   requestedSchoolId?: string | null,
 ): Promise<ActionResult<IssuePreview>> {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin(requestedSchoolId);
+    const { schoolId, role } = await verifyAdmin(requestedSchoolId);
+    assertMoneyWriter(role);
     return issueInvoicesPreview(schoolId);
   });
 }
@@ -78,7 +86,8 @@ export async function actionIssuePreview(
 /** Выставить счета своей школе. Граница школы — в функции базы (миграция 230). */
 export async function actionIssueInvoicesNow(requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId } = await verifyAdmin(requestedSchoolId);
+    const { schoolId, role } = await verifyAdmin(requestedSchoolId);
+    assertMoneyWriter(role);
     const result = await issueInvoicesNow(schoolId);
     revalidatePath("/admin/payments");
     return result;
@@ -91,6 +100,7 @@ export async function actionAdjustInvoice(formData: FormData) {
   const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
   return guard(async () => {
     const { schoolId, userId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
+    assertMoneyWriter(role);
     await adjustInvoiceAmount({
       invoiceId: String(formData.get("invoice_id") ?? ""),
       amount: parseCoursePrice(String(formData.get("amount") ?? "")),
@@ -111,6 +121,7 @@ export async function actionCancelInvoice(formData: FormData) {
   const школаИзФормы = String(formData.get("school_id") ?? "").trim() || null;
   return guard(async () => {
     const { schoolId, userId, isSuperAdmin, role } = await verifyAdmin(школаИзФормы);
+    assertMoneyWriter(role);
     await cancelInvoice({
       invoiceId: String(formData.get("invoice_id") ?? ""),
       reason: String(formData.get("reason") ?? ""),
@@ -126,7 +137,8 @@ export async function actionCancelInvoice(formData: FormData) {
 /** Вернуть отменённый счёт в работу. */
 export async function actionRestoreInvoice(invoiceId: string, requestedSchoolId?: string | null) {
   return guard(async () => {
-    const { schoolId, isSuperAdmin } = await verifyAdmin(requestedSchoolId);
+    const { schoolId, isSuperAdmin, role } = await verifyAdmin(requestedSchoolId);
+    assertMoneyWriter(role);
     await restoreInvoice({ invoiceId, callerSchoolId: schoolId, callerIsSuperAdmin: isSuperAdmin });
     revalidatePath("/admin/payments");
   });

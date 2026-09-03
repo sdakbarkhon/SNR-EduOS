@@ -193,11 +193,25 @@ export function StudentsView({
    * менеджер: своей школы у него нет, и подставить её некому.
    */
   schoolId,
+  /**
+   * Можно ли отсюда МЕНЯТЬ деньги — здесь это одна кнопка: пополнение
+   * баланса. Она лежит не в разделе оплат, но это деньги, и уехала к
+   * менеджеру вместе с ними.
+   *
+   * КОЛОНКА БАЛАНСА ОСТАЁТСЯ ВСЕГДА. Школа обязана видеть, кто сколько
+   * должен, даже когда не управляет деньгами: иначе администратор не ответит
+   * родителю, не позвонив менеджеру.
+   *
+   * Умолчание — «нельзя», как и на экране оплат: кто права не назвал, тот их
+   * не получил.
+   */
+  canMoney = false,
 }: {
   students: Student[];
   groups: Group[];
   defaultOpenAdd?: boolean;
   schoolId?: string;
+  canMoney?: boolean;
 }) {
   /** Дописать школу в форму. Без неё форма остаётся прежней. */
   const сШколой = (fd: FormData) => {
@@ -330,13 +344,15 @@ export function StudentsView({
                           >
                             <KeyRound className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => setModal({ kind: "topup", student: s })}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600"
-                            title={t.topUpBalanceBtn}
-                          >
-                            <Wallet className="h-4 w-4" />
-                          </button>
+                          {canMoney && (
+                            <button
+                              onClick={() => setModal({ kind: "topup", student: s })}
+                              className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600"
+                              title={t.topUpBalanceBtn}
+                            >
+                              <Wallet className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setModal({ kind: "delete", student: s })}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"

@@ -760,6 +760,7 @@ export interface Dictionary {
     coursePriceNotSet: string;
     tableBalance: string;
     navPayments: string;
+    paymentsReadOnlyNote: string;
     paymentsTitle: string;
     paymentsInvoicesCap: string;
     paymentsBlockersCap: string;
@@ -1424,6 +1425,7 @@ export interface Dictionary {
     authUserOperationFailed: string;
     topUpAmountInvalid: string;
     topUpReasonRequired: string;
+    moneyManagerOnly: string;
     invoiceNotOpen: string;
     invoiceNotCanceled: string;
     invoiceNotFound: string;

@@ -32,5 +32,10 @@ export default async function ManagerPaymentsPage({
   }
 
   const { invoices, blockers } = await loadPaymentsPage(db, school.id);
-  return <PaymentsAdminView invoices={invoices} blockers={blockers} schoolId={school.id} />;
+  // canEdit НАЗЫВАЕТСЯ ЯВНО. Умолчание у экрана — «только смотреть», потому
+  // что деньгами школ управляют менеджеры, и админ сюда приходит читать.
+  // Менеджер — единственный, кто права называет.
+  return (
+    <PaymentsAdminView invoices={invoices} blockers={blockers} schoolId={school.id} canEdit />
+  );
 }
