@@ -2853,6 +2853,7 @@ export const en: Dictionary = {
     bulkNoPlanWhat: "Bulk lessons are created from the curriculum plan: one topic — one lesson, in order. There is no plan yet for {group} · {subject}.",
     bulkNoPlanLink: "Create a curriculum plan",
     bulkPlanChecking: "Checking the curriculum plan…",
+    bulkPickPair: "Choose a group and a subject first — topics come from their curriculum plan.",
     bulkFromPlan: "Topics are taken from the curriculum plan in order. Free topics: {n} — that is how many lessons you will get.",
     bulkSlotsBusy: "Slots taken: {n} — a lesson already stands on those days, the topic goes to the next one",
     bulkTopicsSkipped: "Topics skipped: {n} — lessons for them already exist",

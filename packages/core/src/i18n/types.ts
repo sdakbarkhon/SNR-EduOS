@@ -2961,6 +2961,7 @@ export interface Dictionary {
     bulkNoPlanWhat: string;
     bulkNoPlanLink: string;
     bulkPlanChecking: string;
+    bulkPickPair: string;
     bulkFromPlan: string;
     bulkSlotsBusy: string;
     bulkTopicsSkipped: string;

@@ -9,6 +9,8 @@ import { useLocale } from "@/components/LocaleProvider";
 import { useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { addDaysUTC } from "@/lib/curriculum-lesson-planner";
 import { HolidayCalendar, useHolidays, датыВыходных } from "@/components/teacher/HolidayCalendar";
+import { DatePickerField, FIELD_LABEL } from "@/components/DatePickerField";
+import { IosTimePicker } from "@/components/IosTimePicker";
 
 /**
  * Массовое создание уроков: правило «эти дни недели, это время, начиная с
@@ -79,18 +81,26 @@ type PreviewResult = {
 
 /** Что известно про учебный план пары «группа + предмет». */
 export type PlanState =
+  /** Группа или предмет ещё не выбраны — спрашивать план не о чем. */
+  | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "none" }
   | { kind: "error" }
   | { kind: "ok"; freeTopics: number };
 
-const inputCls =
-  "rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
-
+/**
+ * ВИД ПОЛЕЙ — ОБЩИЙ С ОДИНОЧНЫМ РЕЖИМОМ (04.09.2026).
+ *
+ * Здесь была своя копия классов и своя подпись — мелкая, серая, заглавными, —
+ * из-за чего два режима одного окна выглядели как два разных окна: у
+ * одиночного подписи тёмные и поля просторные, у массового узкие ленты.
+ * Теперь подпись берётся из `components/DatePickerField`, а дата и время —
+ * теми же элементами, что у одиночного урока.
+ */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-bold uppercase tracking-wide text-gray-400">{label}</label>
+    <div>
+      <label className={FIELD_LABEL}>{label}</label>
       {children}
     </div>
   );
@@ -276,6 +286,15 @@ export function BulkLessonsFields({
     );
   }
 
+  // «ЕЩЁ НЕ ВЫБРАЛИ» И «СМОТРИМ ПЛАН» — РАЗНЫЕ ВЕЩИ (04.09.2026).
+  //
+  // Вчера оба состояния были одним словом «Смотрим учебный план…», и это
+  // читалось как поломка: окно открывается с пустым предметом, значит первое,
+  // что видел учитель, — серая строка про план, которого он не выбирал.
+  if (plan.kind === "idle") {
+    return <p className="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-500">{t.bulkPickPair}</p>;
+  }
+
   if (plan.kind === "loading") {
     return <p className="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-500">{t.bulkPlanChecking}</p>;
   }
@@ -307,37 +326,49 @@ export function BulkLessonsFields({
               {t.bulkFromPlan.replace("{n}", String(свободныхТем))}
             </p>
 
-            <Field label={t.bulkWeekdays}>
-              <div className="flex flex-wrap gap-1.5">
-                {WEEKDAYS.map((n) => {
-                  const on = weekdays.includes(n);
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => toggleWeekday(n)}
-                      className={`h-9 w-11 rounded-lg text-xs font-bold transition-colors ${
-                        on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {wdLabel[n]}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-
             {/* Поля длительности здесь больше нет (01.09.2026, миграция 246):
                 одно число на школу задаёт суперадмин в её карточке. */}
-            {/* Общее время — оно же умолчание для режима «по дням».
+            {/* ── КОГДА ───────────────────────────────────────────────────
+                ТА ЖЕ РАСКЛАДКА, ЧТО У ОДИНОЧНОГО УРОКА (04.09.2026): колесо
+                времени справа на треть ряда, слева — всё остальное. Раньше
+                здесь стояли системные поля «date» и «time» узкими лентами,
+                и режимы читались как два разных окна.
+
                 Поля «по какое число» нет: конец периода считается от числа
                 тем, см. конецПериода(). */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="space-y-4 lg:col-span-2">
+                <Field label={t.bulkFrom}>
+                  <DatePickerField value={from} onChange={(v) => { setFrom(v); setPreview(null); }} minToday />
+                </Field>
+                <Field label={t.bulkWeekdays}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((n) => {
+                      const on = weekdays.includes(n);
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => toggleWeekday(n)}
+                          className={`h-9 w-11 rounded-lg text-xs font-bold transition-colors ${
+                            on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          {wdLabel[n]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              </div>
               <Field label={t.bulkTime}>
-                <input type="time" value={time} onChange={(e) => { setTime(e.target.value); setPreview(null); }} className={inputCls} />
-              </Field>
-              <Field label={t.bulkFrom}>
-                <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreview(null); }} className={inputCls} />
+                {/* Общее время — оно же умолчание для режима «по дням». */}
+                <IosTimePicker
+                  value={time}
+                  onChange={(v) => { setTime(v); setPreview(null); }}
+                  minDate={from}
+                  rows={3}
+                />
               </Field>
             </div>
 

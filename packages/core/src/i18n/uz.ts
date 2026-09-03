@@ -2853,6 +2853,7 @@ export const uz: Dictionary = {
     bulkNoPlanWhat: "Darslar to‘p-to‘p bo‘lib o‘quv rejasi mavzulari bo‘yicha yaratiladi: bitta mavzu — bitta dars, tartib bilan. «{group} · {subject}» juftligi uchun reja hali yo‘q.",
     bulkNoPlanLink: "O‘quv rejasi yaratish",
     bulkPlanChecking: "O‘quv rejasi qaralmoqda…",
+    bulkPickPair: "Avval guruh va fanni tanlang — mavzular ularning o‘quv rejasidan olinadi.",
     bulkFromPlan: "Mavzular o‘quv rejasidan tartib bilan olinadi. Bo‘sh mavzular: {n} — shuncha dars chiqadi.",
     bulkSlotsBusy: "Band slotlar: {n} — o‘sha kunlarda dars allaqachon bor, mavzu keyingi kunga o‘tadi",
     bulkTopicsSkipped: "O‘tkazib yuborilgan mavzular: {n} — ular bo‘yicha darslar yaratilgan",

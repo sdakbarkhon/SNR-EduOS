@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DayPicker } from "react-day-picker";
 import {
   ChevronLeft, ChevronRight, MapPin, Clock, Plus,
   MoreHorizontal, Pencil, Trash2, X, AlertTriangle, CalendarDays, CalendarRange,
@@ -26,6 +25,7 @@ import { isDemoEditBlockedError } from "@/lib/useIsDemoSession";
 import { useSchoolNow, useSchoolNowSnapshot } from "@/components/SchoolTimeProvider";
 import { BulkLessonsFields, type PlanState } from "./BulkLessonsModal";
 import { ModalPortal } from "@/components/ModalPortal";
+import { DatePickerField, FIELD_INPUT, FIELD_LABEL } from "@/components/DatePickerField";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GroupItem = { id: string; name: string; subject: string };
@@ -256,79 +256,6 @@ function LessonCard({
 }
 
 // ── DatePickerField ───────────────────────────────────────────────────────────
-function DatePickerField({
-  value, onChange, inputCls, minToday = false,
-}: {
-  value: string; onChange: (v: string) => void; inputCls: string; minToday?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  // Z.3, заход 3 — «сегодня» школы для нижней границы календаря. Свой вызов
-  // хука: это отдельный компонент, до значения из TeacherLessonsView ему не
-  // дотянуться, а провайдер один на всё дерево.
-  const schoolNowMs = useSchoolNowSnapshot();
-
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  const selectedDate = value ? new Date(`${value}T12:00:00`) : undefined;
-  const display = value
-    ? new Date(`${value}T12:00:00`).toLocaleDateString("ru", {
-        day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Tashkent",
-      })
-    : "";
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`${inputCls} flex items-center justify-between text-left ${!value ? "text-gray-400" : ""}`}
-      >
-        <span>{display || "Выберите дату"}</span>
-        <CalendarDays className="h-4 w-4 shrink-0 text-gray-400" />
-      </button>
-      {open && (
-        <div
-          className="absolute left-0 top-full z-[200] mt-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl"
-          style={{
-            // Override rdp accent colour to match design blue
-            ["--rdp-accent-color" as string]: "#2563eb",
-            ["--rdp-accent-background-color" as string]: "#eff6ff",
-            ["--rdp-day-height" as string]: "36px",
-            ["--rdp-day-width" as string]: "36px",
-            ["--rdp-day_button-height" as string]: "34px",
-            ["--rdp-day_button-width" as string]: "34px",
-          }}
-        >
-          <DayPicker
-            mode="single"
-            selected={selectedDate}
-            onSelect={(d) => {
-              if (!d) return;
-              // DayPicker отдаёт локальную полночь выбранной клетки — это
-              // календарная дата, а не момент. Читаем её теми же локальными
-              // полями, какими она и создана: подмешивать сюда пояс нельзя,
-              // иначе выбор съедет на день.
-              const y = d.getFullYear();
-              const m = String(d.getMonth() + 1).padStart(2, "0");
-              const day = String(d.getDate()).padStart(2, "0");
-              onChange(`${y}-${m}-${day}`);
-              setOpen(false);
-            }}
-            disabled={minToday ? { before: new Date(new Date(schoolNowMs()).setHours(0, 0, 0, 0)) } : undefined}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── LessonFormModal ───────────────────────────────────────────────────────────
 function LessonFormModal({
   mode, groups, teacherSubjects, teacherId, initial, editLessonId, onClose, onSave, onBulkCreated,
@@ -422,9 +349,13 @@ function LessonFormModal({
    */
   const [planState, setPlanState] = useState<PlanState>({ kind: "loading" });
   useEffect(() => {
+    // Пока пара не выбрана — это НЕ загрузка. Окно открывается с пустым
+    // предметом, и «loading» здесь означал, что первое, что видит учитель в
+    // массовом режиме, — строка «Смотрим учебный план…» про план, которого он
+    // не выбирал. Состояние своё, подпись своя.
     if (mode !== "create" || !form.groupId || !form.subjectId) {
       setPlanTopics(null);
-      setPlanState({ kind: "loading" });
+      setPlanState({ kind: "idle" });
       return;
     }
     let cancelled = false;
@@ -474,8 +405,10 @@ function LessonFormModal({
     }
   }
 
-  const inputCls = "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1D1D1F] outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
-  const labelCls = "mb-1 block text-xs font-semibold text-gray-600";
+  // Вид полей — из общего места: у массового режима была своя копия этих
+  // строк, и она уже успела разойтись отступом.
+  const inputCls = FIELD_INPUT;
+  const labelCls = FIELD_LABEL;
 
   // No subjects assigned to this teacher at all
   if (teacherSubjects.length === 0) {
@@ -531,9 +464,14 @@ function LessonFormModal({
             )}
 
             {/* ── ОБЩЕЕ ДЛЯ ОБОИХ РЕЖИМОВ: группа, предмет, кабинет ────────
-                Две колонки вместо ленты: экран учителя от планшета и шире,
-                а окно сидело в 512 пикселях, и справа пустовало. */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                ТРИ КОЛОНКИ, А НЕ ДВЕ (04.09.2026). В двух полей было три, и
+                «Кабинет» уезжал на второй ряд, оставляя справа пустую
+                половину. Полей ровно три — значит и колонок три.
+
+                Предмет показывается ВСЕГДА, даже пока группа не выбрана:
+                раньше поле появлялось только после выбора группы, и ряд
+                сначала был дырявым, а потом перестраивался под курсором. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div>
               <label className={labelCls}>Группа *</label>
               <select
@@ -547,10 +485,13 @@ function LessonFormModal({
                 ))}
               </select>
             </div>
-            {form.groupId && (
-              <div>
+            <div>
                 <label className={labelCls}>{d.createSelectSubject} *</label>
-                {groupSubjects.length === 0 ? (
+                {!form.groupId ? (
+                  <select disabled className={`${inputCls} text-gray-400`}>
+                    <option>{d.createSelectSubject}</option>
+                  </select>
+                ) : groupSubjects.length === 0 ? (
                   <p className="text-xs text-amber-600 mt-1">{d.createNoSubjects}</p>
                 ) : (
                   <select value={form.subjectId} onChange={e => set("subjectId", e.target.value)} className={inputCls}>
@@ -569,8 +510,7 @@ function LessonFormModal({
                     {d.editSubjectHasGrades.replace("{n}", String(оценокУУрока))}
                   </p>
                 )}
-              </div>
-            )}
+            </div>
             <div>
               <label className={labelCls}>Кабинет</label>
               <input type="text" value={form.room} onChange={e => set("room", e.target.value)} placeholder="например: 305" className={inputCls} />
@@ -611,10 +551,33 @@ function LessonFormModal({
                 </select>
               </div>
             )}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div>
-                <label className={labelCls}>Дата *</label>
-                <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
+            {/* ── КОГДА И ЧТО ─────────────────────────────────────────────
+                КОЛЕСО СПРАВА, ОСТАЛЬНОЕ СЛЕВА (04.09.2026). Колесо высотой в
+                три строки — это сто шестьдесят пикселей, вчетверо выше поля
+                даты, и когда они стояли рядом по половине ряда, слева под
+                датой зияла пустота на всю высоту колеса. Теперь левая
+                колонка держит дату, название и описание — и обе стороны ряда
+                кончаются примерно на одной высоте.
+
+                Тот же приём применён в массовом режиме: справа то же колесо,
+                слева дата и дни недели. Два режима должны читаться как одно
+                окно, а не как два разных. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="space-y-4 lg:col-span-2">
+                <div>
+                  <label className={labelCls}>Дата *</label>
+                  <DatePickerField value={form.date} onChange={v => set("date", v)} inputCls={inputCls} minToday />
+                </div>
+                {(mode !== "create" || !planTopics || planTopics.length === 0 || useCustomTopic) && (
+                  <div>
+                    <label className={labelCls}>Название урока (опционально)</label>
+                    <input type="text" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Например: Циклы в Python" className={inputCls} />
+                  </div>
+                )}
+                <div>
+                  <label className={labelCls}>Описание / цель (опционально)</label>
+                  <textarea rows={2} value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="Что ученики должны узнать" className={`${inputCls} resize-none`} />
+                </div>
               </div>
               <div>
                 <label className={`${labelCls} flex items-center gap-1.5`}>
@@ -631,17 +594,6 @@ function LessonFormModal({
                 спрашивать его у предметника незачем: сетка звонков в школе одна.
                 Новый урок берёт длительность у школы сам (createLesson), у
                 существующего своё время начала и конца уже записано. */}
-
-            {(mode !== "create" || !planTopics || planTopics.length === 0 || useCustomTopic) && (
-              <div>
-                <label className={labelCls}>Название урока (опционально)</label>
-                <input type="text" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Например: Циклы в Python" className={inputCls} />
-              </div>
-            )}
-            <div>
-              <label className={labelCls}>Описание / цель (опционально)</label>
-              <textarea rows={2} value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="Что ученики должны узнать" className={`${inputCls} resize-none`} />
-            </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
@@ -655,10 +607,11 @@ function LessonFormModal({
             )}
 
             {/* ── НЕСКОЛЬКО УРОКОВ ────────────────────────────────────────
-                Тот же блок, что был отдельным окном, целиком: дни недели,
-                период, своё время по дням, галочка тем, предпросмотр с
-                датами и занятыми слотами. Группу, предмет и кабинет он
-                берёт из общих полей выше — своих у него больше нет. */}
+                Дни недели, день начала, своё время по дням, праздники и
+                предпросмотр с занятыми слотами. Галочки тем здесь больше
+                нет: с 04.09.2026 темы всегда берутся из учебного плана.
+                Группу, предмет и кабинет блок берёт из общих полей выше —
+                своих у него нет. */}
             {many && (
               <BulkLessonsFields
                 groupId={form.groupId}
