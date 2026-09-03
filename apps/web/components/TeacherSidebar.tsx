@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Award, CalendarDays, GraduationCap, Briefcase,
   Megaphone, Users, Settings, Bell, MessageCircle,
-  PanelLeftClose, PanelLeftOpen, ClipboardList,
-} from "lucide-react";
+  PanelLeftClose, PanelLeftOpen, ClipboardList, ClipboardCheck,} from "lucide-react";
 import { getDictionary, getUnreadThreadCount } from "@snr/core";
 import type { Locale } from "@snr/core";
 import { cn } from "@/lib/cn";
@@ -33,6 +32,9 @@ export const teacherNavItems = [
   { key: "curriculum", href: "/teacher/curriculum",   icon: ClipboardList, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navCurriculumPlans },
   { key: "homework",   href: "/teacher/homework",     icon: BookOpen,      label: (d: ReturnType<typeof getDictionary>) => d.teacher.navHomework },
   { key: "grades",     href: "/teacher/grades",       icon: Award,         label: (d: ReturnType<typeof getDictionary>) => d.teacher.navGrades },
+  // Пункт 255, 03.09.2026 — ВОЗВРАЩЁН. Он был удалён 27.06 коммитом 403670b6
+  // походя, третьим пунктом в чужой правке про PGRST116, без объяснения.
+  { key: "attendance", href: "/teacher/attendance",   icon: ClipboardCheck, label: (d: ReturnType<typeof getDictionary>) => d.attendance.teacherTitle },
   { key: "knowledgeBase", href: "/teacher/knowledge-base", icon: GraduationCap, label: (d: ReturnType<typeof getDictionary>) => d.teacher.navKnowledgeBase },
   // Уборка (после Захода 2) — отдельный пункт "Материалы кафедры"
   // (/teacher/library, миграция 147) убран: загрузка/видео-ссылка/удаление

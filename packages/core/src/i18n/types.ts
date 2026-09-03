@@ -420,6 +420,10 @@ export interface Dictionary {
     teacherLegendPresent: string;
     teacherLegendAbsent: string;
     teacherLegendNone: string;
+    teacherNoAuthor: string;
+    teacherNoAuthorHint: string;
+    teacherMarksCount: string;
+    teacherOlderHidden: string;
   };
   admin: {
     googleBlockTitle: string;

@@ -421,6 +421,10 @@ export const en: Dictionary = {
     teacherLegendPresent: "Present",
     teacherLegendAbsent: "Unexcused",
     teacherLegendNone: "Not marked",
+    teacherNoAuthor: "No author",
+    teacherNoAuthorHint: "The mark was not set by a teacher: it may come from lesson auto-close, from a teacher who has since been removed, or from an old data import. Such a mark can be corrected in the lesson roll call.",
+    teacherMarksCount: "Marks this month: {n}",
+    teacherOlderHidden: "Earlier lessons of the month ({n}) — scroll left",
   },
   admin: {
     googleBlockTitle: "Sign in with Google",

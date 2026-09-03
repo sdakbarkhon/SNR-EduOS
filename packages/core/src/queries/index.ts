@@ -165,7 +165,33 @@ export const getStudentAttendance = async (
   };
 };
 
-/** Посещаемость группы для учителя: матрица студент × урок. */
+/**
+ * Посещаемость группы для учителя: матрица ученик × урок.
+ *
+ * ═══ 03.09.2026 — ФУНКЦИЯ ОЖИВЛЕНА И ПОЧИНЕНА ═════════════════════════════
+ *
+ * Она пролежала без единого вызова с 27.06.2026, когда коммит 403670b6 снёс
+ * экран посещаемости учителя — походя, третьим пунктом в чужой правке про
+ * PGRST116, без объяснения. Экран восстановлен, и перед тем как звать её,
+ * пришлось починить ДВА дефекта, которые за это время никто не мог заметить:
+ *
+ *   1. `.in("id", db2.from(...).select(...))` — в `.in()` передавался
+ *      СТРОИТЕЛЬ ЗАПРОСА, а не список идентификаторов. PostgREST ждёт
+ *      перечисление; подзапросов он так не принимает.
+ *
+ *   2. `l.starts_at.slice(0, 7) === month` — месяц резался по UTC-строке.
+ *      Урок 1 августа 00:30 по Ташкенту — это 31 июля 19:30 UTC, и он попадал
+ *      в июль. Та же болезнь, что чинили в календарях посещаемости 26.08.
+ *      Теперь границы даёт общая `tashkentMonthBoundsUtc` — шестнадцатой
+ *      копии смещения «+5 часов» здесь нет.
+ *
+ * СУЖЕНО ДО СВОЕГО ПРЕДМЕТА, как и `getTeacherAttendance`: учитель английского
+ * не должен видеть, кто ходил на математику в том же классе.
+ *
+ * ПРОЦЕНТ СЧИТАЕТСЯ ПО ОТМЕТКАМ, а не по клеткам «ученики × уроки». Прежняя
+ * формула считала неотмеченного ученика отсутствующим — а это разные вещи, и
+ * число расходилось бы с «Моими классами».
+ */
 export const getGroupAttendance = async (
   db: Db,
   groupId: string,
@@ -174,37 +200,59 @@ export const getGroupAttendance = async (
   lessons: Array<{ id: string; topic: string | null; starts_at: string }>;
   students: Array<{ id: string; full_name: string }>;
   matrix: Record<string, Record<string, AttendanceStatus | null>>;
+  /** Отметки без записанного автора: ключ «ученик::урок». */
+  noAuthor: Record<string, true>;
   groupAvgPct: number;
 }> => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db2 = db as any;
+  const filter = await getTeacherSubjectFilter(db);
+  const свои = filter && filter.subjectIds !== null ? new Set(filter.subjectIds) : null;
 
-  const lessonsRes = await db2
+  let lessonsQ = db2
     .from("lessons")
-    .select("id, topic, starts_at")
-    .eq("group_id", groupId)
-    .order("starts_at", { ascending: true });
+    .select("id, topic, starts_at, subject_id")
+    .eq("group_id", groupId);
+  // Месяц отбирается В ЗАПРОСЕ и по ташкентским границам: тянуть все уроки
+  // группы за все годы, чтобы отбросить их в памяти, незачем.
+  if (month) {
+    const [y, m] = month.split("-").map(Number);
+    if (y && m) {
+      const { startIso, endIso } = tashkentMonthBoundsUtc(y, m);
+      lessonsQ = lessonsQ.gte("starts_at", startIso).lte("starts_at", endIso);
+    }
+  }
+  const lessonsRes = await lessonsQ.order("starts_at", { ascending: true });
   if (lessonsRes.error) console.error("[getGroupAttendance] lessons query failed:", lessonsRes.error.message);
 
-  let lessons = (lessonsRes.data ?? []) as Array<{ id: string; topic: string | null; starts_at: string }>;
-  if (month) lessons = lessons.filter((l) => l.starts_at.slice(0, 7) === month);
+  const все = (lessonsRes.data ?? []) as Array<{ id: string; topic: string | null; starts_at: string; subject_id: string | null }>;
+  const lessons = (свои ? все.filter((l) => l.subject_id != null && свои.has(l.subject_id)) : все)
+    .map(({ id, topic, starts_at }) => ({ id, topic, starts_at }));
 
-  const studentsRes = await db2
-    .from("students")
-    .select("id, full_name")
-    .in("id", db2.from("student_groups").select("student_id").eq("group_id", groupId));
+  // Состав группы — двумя запросами вместо подзапроса: сначала связи, потом
+  // сами ученики. Именно здесь и стоял первый дефект.
+  const связиRes = await db2
+    .from("student_groups")
+    .select("student_id")
+    .eq("group_id", groupId);
+  if (связиRes.error) console.error("[getGroupAttendance] student_groups query failed:", связиRes.error.message);
+  const ids = ((связиRes.data ?? []) as Array<{ student_id: string }>).map((r) => r.student_id);
+
+  const studentsRes = ids.length === 0
+    ? { data: [], error: null }
+    : await db2.from("students").select("id, full_name").in("id", ids).order("full_name");
   if (studentsRes.error) console.error("[getGroupAttendance] students query failed:", studentsRes.error.message);
 
   const students = (studentsRes.data ?? []) as Array<{ id: string; full_name: string }>;
 
   if (lessons.length === 0 || students.length === 0) {
-    return { lessons, students, matrix: {}, groupAvgPct: 0 };
+    return { lessons, students, matrix: {}, noAuthor: {}, groupAvgPct: 0 };
   }
 
   const lessonIds = lessons.map((l) => l.id);
   const attRes = await db2
     .from("attendance")
-    .select("student_id, lesson_id, status")
+    .select("student_id, lesson_id, status, marked_by")
     .in("lesson_id", lessonIds);
   if (attRes.error) console.error("[getGroupAttendance] attendance query failed:", attRes.error.message);
 
@@ -213,17 +261,23 @@ export const getGroupAttendance = async (
     matrix[s.id] = {};
     for (const l of lessons) { const m = matrix[s.id]; if (m) m[l.id] = null; }
   }
-  for (const row of (attRes.data ?? []) as Array<{ student_id: string; lesson_id: string; status: AttendanceStatus }>) {
+  const noAuthor: Record<string, true> = {};
+  let отметок = 0;
+  let присутствий = 0;
+  for (const row of (attRes.data ?? []) as Array<{ student_id: string; lesson_id: string; status: AttendanceStatus; marked_by: string | null }>) {
     const rowMatrix = matrix[row.student_id];
-    if (rowMatrix) rowMatrix[row.lesson_id] = row.status;
+    if (!rowMatrix) continue;
+    rowMatrix[row.lesson_id] = row.status;
+    отметок += 1;
+    if (row.status === "present") присутствий += 1;
+    if (row.marked_by === null) noAuthor[`${row.student_id}::${row.lesson_id}`] = true;
   }
 
-  const totalCells = students.length * lessons.length;
-  const presentCells = Object.values(matrix).flatMap((row) => Object.values(row))
-    .filter((s) => s === "present").length;
-  const groupAvgPct = totalCells > 0 ? Math.round((presentCells / totalCells) * 100) : 0;
+  // ПО ОТМЕТКАМ, а не по клеткам: неотмеченный ученик не отсутствовал —
+  // про него просто ничего не известно, и считать его прогулом нельзя.
+  const groupAvgPct = отметок > 0 ? Math.round((присутствий / отметок) * 1000) / 10 : 0;
 
-  return { lessons, students, matrix, groupAvgPct };
+  return { lessons, students, matrix, noAuthor, groupAvgPct };
 };
 
 // --- Домашние задания ---
@@ -1124,12 +1178,105 @@ export const getTeacherGrades = async (db: Db): Promise<Array<{ group_id: string
   return grades.map((g) => ({ group_id: g.groupId, score: g.grade5 }));
 };
 
-/** Посещаемость в группах учителя — статус + group_id урока (для % по группе). */
-export const getTeacherAttendance = (db: Db) =>
-  db
+/**
+ * Посещаемость в группах учителя — статус + group_id урока (для % по группе).
+ *
+ * ═══ 03.09.2026 — СУЖЕНО ДО СВОЕГО ПРЕДМЕТА ═══════════════════════════════
+ *
+ * Раньше здесь не было ни одного фильтра: отбор целиком лежал на правиле
+ * доступа `is_my_teacher_group`, а оно широкое — истинно для любой группы, где
+ * учитель ведёт хоть что-нибудь. Значит учитель английского видел, кто ходил
+ * на математику в тот же класс. Это был НЕДОСМОТР, а не решение: функция
+ * `getTeacherSubjectFilter` заведена ровно для этого и уже сужает средний балл
+ * и расписание.
+ *
+ * ЧИСЛО НА «МОИХ КЛАССАХ» ОТ ЭТОГО ИЗМЕНИТСЯ — и должно: оно станет
+ * посещаемостью СВОИХ уроков, а не всех уроков класса. Сводка посещаемости
+ * зовёт то же сужение, поэтому два экрана не могут разойтись.
+ */
+export const getTeacherAttendance = async (db: Db): Promise<Array<{ status: string; lesson: { group_id: string } | null }>> => {
+  const filter = await getTeacherSubjectFilter(db);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = await (db as any)
     .from("attendance")
-    .select("status, lesson:lessons!inner(group_id)")
-    .then(unwrap);
+    .select("status, lesson:lessons!inner(group_id, subject_id)")
+    .then(unwrap) as Array<{ status: string; lesson: { group_id: string; subject_id: string | null } | null }>;
+  if (!filter || filter.subjectIds === null) return rows;
+  const свои = new Set(filter.subjectIds);
+  return rows.filter((r) => r.lesson?.subject_id != null && свои.has(r.lesson.subject_id));
+};
+
+/** Одна клетка сводки: сколько отметок и каких у группы за месяц. */
+export type TeacherAttendanceGroupRow = {
+  groupId: string;
+  total: number;
+  present: number;
+  excused: number;
+  unexcused: number;
+  /** Отметки без записанного автора. Их четыре источника: прогул от
+   *  автозавершения, отметки уволенного учителя (marked_by ON DELETE SET NULL),
+   *  исторический бэкфилл и демо-генератор. Поэтому «автора нет», а не
+   *  «машина» — второе было бы неправдой в трёх случаях из четырёх. */
+  noAuthor: number;
+  /** Процент присутствия ПО ОТМЕТКАМ — то же правило, что на «Моих классах».
+   *  Не по клеткам «ученики × уроки»: неотмеченный ученик не то же самое, что
+   *  отсутствовавший, и считать его прогулом значило бы врать. */
+  percent: number;
+};
+
+/**
+ * Сводка посещаемости по группам учителя за месяц. 03.09.2026.
+ *
+ * Один проход по отметкам вместо вызова getGroupAttendance на каждую группу:
+ * у учителя их бывает три-четыре, а походов было бы втрое больше.
+ *
+ * Месяц режется ГРАНИЦАМИ ТАШКЕНТСКИХ СУТОК В UTC — общей утилитой
+ * `tashkentMonthBoundsUtc`. Своего «+5 часов» здесь нет ни одного: в проекте
+ * их и так пятнадцать штук в одном файле, шестнадцатая копия не нужна.
+ */
+export const getTeacherAttendanceSummary = async (
+  db: Db,
+  month: string,
+): Promise<TeacherAttendanceGroupRow[]> => {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return [];
+  const { startIso, endIso } = tashkentMonthBoundsUtc(y, m);
+  const filter = await getTeacherSubjectFilter(db);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = await (db as any)
+    .from("attendance")
+    .select("status, marked_by, lesson:lessons!inner(group_id, subject_id, starts_at)")
+    .gte("lesson.starts_at", startIso)
+    .lte("lesson.starts_at", endIso)
+    .then(unwrap) as Array<{
+      status: string;
+      marked_by: string | null;
+      lesson: { group_id: string; subject_id: string | null; starts_at: string } | null;
+    }>;
+
+  const свои = filter && filter.subjectIds !== null ? new Set(filter.subjectIds) : null;
+  const по = new Map<string, TeacherAttendanceGroupRow>();
+  for (const r of rows) {
+    const l = r.lesson;
+    if (!l) continue;
+    if (свои && (l.subject_id == null || !свои.has(l.subject_id))) continue;
+    let клетка = по.get(l.group_id);
+    if (!клетка) {
+      клетка = { groupId: l.group_id, total: 0, present: 0, excused: 0, unexcused: 0, noAuthor: 0, percent: 0 };
+      по.set(l.group_id, клетка);
+    }
+    клетка.total += 1;
+    if (r.status === "present") клетка.present += 1;
+    else if (r.status === "absent_excused") клетка.excused += 1;
+    else if (r.status === "absent_unexcused") клетка.unexcused += 1;
+    if (r.marked_by === null) клетка.noAuthor += 1;
+  }
+  for (const к of по.values()) {
+    к.percent = к.total > 0 ? Math.round((к.present / к.total) * 1000) / 10 : 0;
+  }
+  return [...по.values()];
+};
 
 // --- Этап 2: Оценки и прогресс ---
 

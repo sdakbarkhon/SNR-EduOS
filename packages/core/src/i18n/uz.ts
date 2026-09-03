@@ -421,6 +421,10 @@ export const uz: Dictionary = {
     teacherLegendPresent: "Qatnashdi",
     teacherLegendAbsent: "Sababsiz yo'q",
     teacherLegendNone: "Belgilanmagan",
+    teacherNoAuthor: "Muallif yo'q",
+    teacherNoAuthorHint: "Belgini o'qituvchi qo'ymagan: u darsni avtomatik yopishdan, ishdan bo'shagan o'qituvchidan yoki eski ma'lumotlarni ko'chirishdan kelgan bo'lishi mumkin. Bunday belgini dars davomatida to'g'rilash mumkin.",
+    teacherMarksCount: "Oydagi belgilar: {n}",
+    teacherOlderHidden: "Oyning oldingi darslari ({n}) — chapga suring",
   },
   admin: {
     googleBlockTitle: "Google orqali kirish",

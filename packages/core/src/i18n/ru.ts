@@ -421,6 +421,10 @@ export const ru: Dictionary = {
     teacherLegendPresent: "Присутствовал",
     teacherLegendAbsent: "Без причины",
     teacherLegendNone: "Не отмечен",
+    teacherNoAuthor: "Автора нет",
+    teacherNoAuthorHint: "Отметку поставил не учитель: её мог проставить автозавершение урока, оставить уволенный учитель или перенос старых данных. Такую отметку можно поправить в перекличке урока.",
+    teacherMarksCount: "Отметок за месяц: {n}",
+    teacherOlderHidden: "Ранние уроки месяца ({n}) — прокруткой влево",
   },
   admin: {
     googleBlockTitle: "Вход через Google",
