@@ -6,7 +6,7 @@ import { AI_TASKS } from "@/lib/ai/usage";
 import { getGroupPerformance, groupPerformancePromptSection } from "@/lib/ai/group-performance";
 import { getMySchoolNow } from "@/lib/school-time-server";
 import { getSubjectKeyByLabel, subjectDisplay } from "@snr/core";
-import { buildLessonGenerationPrompt, type CurriculumTopicContext } from "@/lib/ai/prompts";
+import { buildLessonGenerationPrompt, разныхТиповНужно, type CurriculumTopicContext } from "@/lib/ai/prompts";
 import { generateSlideImage } from "@/lib/ai-imagen";
 import { uploadImageAndSign } from "@/lib/ai/stage-media-prompts";
 import { gradeFromGroupName, JUNIOR_GRADE_MAX } from "@/lib/group-grade";
@@ -167,14 +167,30 @@ const CONTENT_ALIASES: Record<string, string> = {
 
 function normalizeStage(s: GenStage, overallDifficulty: string): GenStage | null {
   if (!s || typeof s.title !== "string" || !s.title.trim()) return null;
-  let ct = String(s.content_type ?? "presentation").trim().toLowerCase();
+  /**
+   * НЕИЗВЕСТНЫЙ ТИП БОЛЬШЕ НЕ СТАНОВИТСЯ ПРЕЗЕНТАЦИЕЙ. 04.09.2026.
+   *
+   * Было: `String(s.content_type ?? "presentation")`, а дальше любой
+   * непонятый тип тоже подменялся на презентацию — с записью в журнал, но
+   * с сохранением этапа. Это был ТРЕТИЙ источник презентаций подряд, и самый
+   * обидный: модель предлагала инструмент, мы его не понимали и молча
+   * превращали работу ученика в показ слайдов.
+   *
+   * Теперь такой этап ВЫБРАСЫВАЕТСЯ, а не подменяется. Выброшенный этап
+   * укорачивает план — и это заметно: план из двух этапов вместо четырёх не
+   * пройдёт проверку состава ниже и будет сгенерирован заново. Молчания не
+   * остаётся ни в каком виде: причина пишется в журнал сервера и попадает в
+   * счётчик, который читает проверка.
+   */
+  const сырой = s.content_type;
+  let ct = String(сырой ?? "").trim().toLowerCase();
   if (!ALLOWED_CONTENT.includes(ct) && CONTENT_ALIASES[ct]) ct = CONTENT_ALIASES[ct]!;
   if (!ALLOWED_CONTENT.includes(ct)) {
-    // Логируем ПЕРЕД подменой: раньше подмена была немой, и отличить
-    // «модель не предложила квиз» от «предложила, но мы её не поняли» в
-    // проде было невозможно.
-    console.warn("[ai-generate] неизвестный content_type:", JSON.stringify(s.content_type), "→ presentation");
-    ct = "presentation";
+    console.warn(
+      "[ai-generate] этап выброшен — тип не опознан:",
+      JSON.stringify(сырой ?? null), "| заголовок:", JSON.stringify(s.title),
+    );
+    return null;
   }
   // Honour stage_type from AI (theory/task), fallback to ct-based
   const stage_type = ["theory", "task"].includes(String(s.stage_type ?? ""))
@@ -508,17 +524,59 @@ export async function POST(req: NextRequest) {
       (s) => s.content_type === "presentation" && PRACTICE_TITLE.test(s.title ?? ""),
     );
 
-    if (
-      attempt < 2 &&
-      ((needQuiz && !hasQuiz) || distinctTypes < 2 || emptyPresentations.length > 0 || practiceAsPresentation.length > 0)
-    ) {
+    /**
+     * ЧТО ПРОВЕРЯЕМ И ЧТО ДЕЛАЕМ НА ПОСЛЕДНЕЙ ПОПЫТКЕ. 04.09.2026.
+     *
+     * ПОРОГ РАЗНООБРАЗИЯ ТЕПЕРЬ ОБЩИЙ С ПРОМТОМ. Здесь была захардкоженная
+     * двойка, а промт для сорока пяти минут просил три типа, для девяноста —
+     * четыре. План «презентация + презентация + презентация + квиз» давал два
+     * типа и проходил насквозь. Число теперь одно на обоих — разныхТиповНужно.
+     *
+     * ПОЧЕМУ НЕ ОТКЛОНЯТЬ ВСЁ И НА ПОСЛЕДНЕЙ ПОПЫТКЕ. Отклонить — значит
+     * оставить учителя вообще без плана, а перегенерировать ещё раз — значит
+     * платить: решение заказчика такую цену не одобряет. Поэтому середина, и
+     * она проходит по одной черте: ПОКАЗЫВАТЬ НЕЧЕГО или ПРОСТО ХУЖЕ.
+     *
+     *   НЕ ПРИНИМАЕМ НИКОГДА — презентация без слайдов. Это пустой экран:
+     *   ученик открывает этап и не видит ничего. Такой этап на последней
+     *   попытке ВЫБРАСЫВАЕТСЯ из плана — терять нечего, там пусто.
+     *
+     *   ПРИНИМАЕМ НА ПОСЛЕДНЕЙ ПОПЫТКЕ, ЗАПИСАВ В ЖУРНАЛ — нет квиза, мало
+     *   разных типов, практика названа презентацией. Урок с такими изъянами
+     *   всё равно можно вести, а учитель поправит руками за минуту. Платить
+     *   за четвёртую попытку ради этого не стоит.
+     */
+    const нужноТипов = разныхТиповНужно(durationMin);
+    const плохо = (needQuiz && !hasQuiz) || distinctTypes < нужноТипов
+      || emptyPresentations.length > 0 || practiceAsPresentation.length > 0;
+
+    if (плохо) {
       console.warn(
-        `[ai-generate] attempt ${attempt}: план отклонён — квиз=${hasQuiz}, разных типов=${distinctTypes},`,
+        `[ai-generate] attempt ${attempt}: квиз=${hasQuiz}, разных типов=${distinctTypes} из ${нужноТипов},`,
         `презентаций без слайдов=${emptyPresentations.length}, практик как презентация=${practiceAsPresentation.length};`,
         "типы:", stages.map((s) => s.content_type).join(","),
       );
+    }
+
+    if (attempt < 2 && плохо) {
       lastError = "Plan rejected: missing quiz, too little variety, slideless presentation or practice typed as presentation";
       continue;
+    }
+
+    // Последняя попытка: пустые презентации выбрасываем, остальное принимаем.
+    if (emptyPresentations.length > 0) {
+      const пустые = new Set(emptyPresentations);
+      const оставшиеся = stages.filter((st) => !пустые.has(st));
+      console.warn(
+        `[ai-generate] последняя попытка: выброшено пустых презентаций ${emptyPresentations.length},`,
+        `осталось этапов ${оставшиеся.length}`,
+      );
+      if (оставшиеся.length === 0) {
+        lastError = "Plan rejected: all stages were slideless presentations";
+        continue;
+      }
+      stages.length = 0;
+      stages.push(...оставшиеся);
     }
     result = {
       lesson_title_suggestion: parsed.lesson_title_suggestion ?? "",
