@@ -109,6 +109,14 @@ export interface Dictionary {
     // Три шага работы с планом (02.09.2026, пункты 13 и 14).
     stepsHeading: string;
     step1Title: string;
+    holidaysTitle: string;
+    holidaysHint: string;
+    holidaysRemembered: string;
+    holidaysClear: string;
+    holidaysNone: string;
+    skippedTopics: string;
+    skippedTopicsWhich: string;
+    notEnoughSlots: string;
     step1Hint: string;
     step1From: string;
     step1NoTopics: string;

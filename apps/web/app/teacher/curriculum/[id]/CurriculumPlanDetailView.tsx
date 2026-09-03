@@ -36,6 +36,9 @@ type BulkPreview = {
   lessons: Array<{ date: string; time: string; occupied: boolean; topicTitle: string | null }>;
   willCreate: number;
   occupied: number;
+  /** Темы, по которым урок уже есть: в раздачу они не идут и не шли, но
+   *  молчать об этом нельзя — тишина читается как «часть тем потерялась». */
+  topicsAlreadyUsed?: Array<{ id: string; title: string; lessons: number }>;
 };
 
 type GenerateLessonsResult = {
@@ -220,6 +223,96 @@ export function CurriculumPlanDetailView({
   const [timeByWeekday, setTimeByWeekday] = useState<Record<number, string>>({});
   const timeOf = (n: number) => timeByWeekday[n] ?? time;
 
+  /**
+   * ВЫХОДНЫЕ И ПРАЗДНИКИ. 03.09.2026.
+   *
+   * ГДЕ ЖИВУТ. В форме — на время создания, как просил заказчик («в настройки
+   * школы не выносим»). Плюс последний набор запоминается В БРАУЗЕРЕ учителя:
+   * праздники в стране одни, а планов у учителя несколько, и вводить их заново
+   * каждый раз — ровно тот труд, на котором ошибаются.
+   *
+   * ПОЧЕМУ НЕ В БАЗЕ. В `curriculum_plans` нет ни свободного jsonb, ни колонки
+   * под даты — проверено; хранение потребовало бы миграции, а её в этом заходе
+   * заводить нельзя. Границы честные и названы человеку: это память ОДНОГО
+   * браузера, а не календарь школы. Понадобится общий — это отдельное решение.
+   *
+   * Ключ на учителя: за одним браузером могут сидеть двое.
+   */
+  const ключПраздников = `snr-holidays-${plan.teacher_id}`;
+  const [holidays, setHolidays] = useState<string[]>([]);
+  const [holidaysFromMemory, setHolidaysFromMemory] = useState(false);
+
+  useEffect(() => {
+    try {
+      const сохранённое = window.localStorage.getItem(ключПраздников);
+      if (!сохранённое) return;
+      const разобрано: unknown = JSON.parse(сохранённое);
+      if (!Array.isArray(разобрано)) return;
+      const даты = разобрано.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
+      if (даты.length === 0) return;
+      setHolidays(даты.sort());
+      setHolidaysFromMemory(true);
+    } catch {
+      // Хранилище может быть закрыто настройками браузера или приватным
+      // окном. Праздники — удобство, а не право: молча работаем без памяти.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function запомнитьПраздники(даты: string[]) {
+    try {
+      if (даты.length === 0) window.localStorage.removeItem(ключПраздников);
+      else window.localStorage.setItem(ключПраздников, JSON.stringify(даты));
+    } catch { /* см. выше: без памяти форма работает */ }
+  }
+
+  function toggleHoliday(день: string) {
+    setStep1Preview(null);
+    setHolidaysFromMemory(false);
+    setHolidays((cur) => {
+      const дальше = cur.includes(день) ? cur.filter((d) => d !== день) : [...cur, день].sort();
+      запомнитьПраздники(дальше);
+      return дальше;
+    });
+  }
+
+
+  /**
+   * КАЛЕНДАРЬ ПРАЗДНИКОВ — СЧЁТ ПО UTC, БЕЗ ЧАСОВОГО ПОЯСА.
+   *
+   * Здесь календарная дата, а не момент времени: у «12 ноября» пояса нет.
+   * Поэтому сетка строится через Date.UTC — тот же приём, что у addDays
+   * выше, и по той же причине: смещение +5 сдвинуло бы день на границе суток.
+   */
+  const [calMonth, setCalMonth] = useState<string>(() => tashkentDayKey(schoolNowMs()).slice(0, 7));
+
+  function сдвигМесяца(месяц: string, на: number): string {
+    const [y, m] = месяц.split("-").map(Number);
+    const dt = new Date(Date.UTC(y!, (m ?? 1) - 1 + на, 1));
+    return dt.toISOString().slice(0, 7);
+  }
+
+  function подписьМесяца(месяц: string): string {
+    const [y, m] = месяц.split("-").map(Number);
+    return new Date(Date.UTC(y!, (m ?? 1) - 1, 1))
+      .toLocaleDateString(locale === "en" ? "en-US" : locale === "uz" ? "uz-UZ" : "ru-RU",
+        { month: "long", year: "numeric", timeZone: "UTC" });
+  }
+
+  /** Дни месяца, выровненные по понедельнику. null — пустая клетка. */
+  function сеткаМесяца(месяц: string): Array<string | null> {
+    const [y, m] = месяц.split("-").map(Number);
+    const первое = new Date(Date.UTC(y!, (m ?? 1) - 1, 1));
+    // getUTCDay: 0 — воскресенье. Нам нужен отступ от понедельника.
+    const отступ = (первое.getUTCDay() + 6) % 7;
+    const дней = new Date(Date.UTC(y!, m ?? 1, 0)).getUTCDate();
+    const клетки: Array<string | null> = Array.from({ length: отступ }, () => null);
+    for (let d = 1; d <= дней; d++) {
+      клетки.push(`${месяц}-${String(d).padStart(2, "0")}`);
+    }
+    return клетки;
+  }
+
   const [step1Busy, setStep1Busy] = useState(false);
   const [step1Error, setStep1Error] = useState<string | null>(null);
   const [step1Preview, setStep1Preview] = useState<BulkPreview | null>(null);
@@ -276,6 +369,9 @@ export function CurriculumPlanDetailView({
             : undefined,
           useTopics: true,
           onlyWithTopic: true,
+          // Слот в такой день не рождается — и урок сдвигается на следующий
+          // рабочий сам, потому что темы садятся на слоты по порядку.
+          holidays,
           preview: isPreview,
         }),
       });
@@ -745,18 +841,28 @@ export function CurriculumPlanDetailView({
         </div>
       )}
 
-      {/* ═══ ТРИ ШАГА ПО ПОРЯДКУ ═════════════════════════════════════════
-          02.09.2026, пункты 13 и 14. Раньше три кнопки лежали ВНИЗУ, после
-          всего списка тем, и были равноправны: «создать все», «по одной»,
-          «как шаблоны». Порядка в них не читалось, а «как шаблоны» вообще
-          уводила со страницы в форму урока. Теперь это три шага, по порядку,
-          наверху — до списка тем, потому что с них работа и начинается. */}
+      {/* ═══ ДВЕ КНОПКИ, КАЖДАЯ САМА ПО СЕБЕ ══════════════════════════════
+          03.09.2026. ЗДЕСЬ БЫЛИ ТРИ ШАГА С НУМЕРАЦИЕЙ И ЗАМКОМ — и это была
+          ОШИБКА ПОНИМАНИЯ, а не решение: заказчик просил три КНОПКИ, а
+          получил лестницу «сначала сделайте предыдущий».
+
+          Что убрано:
+            * кружки «1 2 3» — они и создавали впечатление порядка;
+            * замок на наполнении через ИИ: при нуле уроков карточка гасла
+              целиком и не давала даже посмотреть, что внутри. Теперь она
+              живая всегда, а при нуле уроков честно говорит, что наполнять
+              нечего;
+            * удаление тем уехало отсюда ВНИЗ, к самому списку тем: галочки
+              и так стояли у каждой темы, а кнопки жили наверху — работа со
+              списком была разорвана надвое.
+
+          Наверху осталось ровно то, что создаёт: уроки и их наполнение. */}
       {isOwner && (
         <div className="space-y-3">
-          {/* ── ШАГ 1 ─────────────────────────────────────────────────── */}
+          {/* ── СОЗДАТЬ УРОКИ ─────────────────────────────────────────── */}
           <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">1</span>
+              <CalendarPlus className="h-4 w-4 shrink-0 text-blue-600" />
               <h2 className="text-sm font-bold text-slate-900">{tc.step1Title}</h2>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">{tc.step1Hint}</p>
@@ -850,6 +956,94 @@ export function CurriculumPlanDetailView({
                   )}
                 </div>
 
+
+                {/* ── ВЫХОДНЫЕ И ПРАЗДНИКИ ────────────────────────────────
+                    Месячный календарь со щелчком по дню, а не поле «даты
+                    через запятую»: по полю промахиваются, а промах здесь
+                    означает урок в выходной. */}
+                <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CalendarRange className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    <span className="text-xs font-bold text-slate-800">{tc.holidaysTitle}</span>
+                    {holidaysFromMemory && holidays.length > 0 && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        {tc.holidaysRemembered}
+                      </span>
+                    )}
+                    {holidays.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setHolidays([]); запомнитьПраздники([]); setHolidaysFromMemory(false); setStep1Preview(null); }}
+                        className="ml-auto rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
+                      >
+                        {tc.holidaysClear}
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{tc.holidaysHint}</p>
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCalMonth((m) => сдвигМесяца(m, -1))}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50"
+                    >
+                      ‹
+                    </button>
+                    <span className="text-xs font-bold text-slate-700">{подписьМесяца(calMonth)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCalMonth((m) => сдвигМесяца(m, 1))}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50"
+                    >
+                      ›
+                    </button>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-7 gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <span key={n} className="text-center text-[10px] font-bold uppercase text-gray-400">{wdLabel[n]}</span>
+                    ))}
+                    {сеткаМесяца(calMonth).map((день, i) => {
+                      if (!день) return <span key={`п${i}`} />;
+                      const отмечен = holidays.includes(день);
+                      return (
+                        <button
+                          key={день}
+                          type="button"
+                          onClick={() => toggleHoliday(день)}
+                          className={
+                            "rounded-lg py-1 text-[11px] font-semibold transition-colors "
+                            + (отмечен
+                              ? "bg-red-500 text-white"
+                              : "bg-white text-slate-600 hover:bg-slate-100")
+                          }
+                        >
+                          {Number(день.slice(8, 10))}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {holidays.length === 0 ? (
+                    <p className="mt-2 text-[11px] text-slate-400">{tc.holidaysNone}</p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {holidays.map((день) => (
+                        <button
+                          key={день}
+                          type="button"
+                          onClick={() => toggleHoliday(день)}
+                          className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-200"
+                        >
+                          {день.slice(8, 10)}.{день.slice(5, 7)}
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {step1Error && (
                   <p className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-700">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -873,6 +1067,42 @@ export function CurriculumPlanDetailView({
                     </p>
                     {step1Preview.occupied > 0 && (
                       <p className="text-sm text-gray-700">{tt.bulkOccupied.replace("{n}", String(step1Preview.occupied))}</p>
+                    )}
+
+                    {/* СЛОТОВ НЕ ХВАТИТ — говорим ДО создания, а не после.
+                        Запас периода четыре недели; если выходных отмечено
+                        столько, что слоты кончились, часть тем останется без
+                        урока. Молчать об этом нельзя: человек нажмёт «создать»
+                        и недосчитается тем, не поняв почему. */}
+                    {step1Preview.willCreate < freeTopics.length && (
+                      <p className="mt-1.5 flex items-start gap-2 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        {format(tc.notEnoughSlots, { topics: freeTopics.length, lessons: step1Preview.willCreate })}
+                      </p>
+                    )}
+
+                    {/* ПРОПУЩЕННЫЕ ТЕМЫ. Тема, по которой урок уже есть, в
+                        раздачу не идёт и не шла — но раньше об этом не
+                        говорили, и тишина читалась как «часть тем потерялась».
+                        Теперь строка и список: какие именно и почему. */}
+                    {(step1Preview.topicsAlreadyUsed?.length ?? 0) > 0 && (
+                      <details className="mt-1.5 rounded-lg bg-white/70 px-2.5 py-2">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-700">
+                          {format(tc.skippedTopics, { n: step1Preview.topicsAlreadyUsed!.length })}
+                          <span className="ml-1.5 font-normal text-blue-600">{tc.skippedTopicsWhich}</span>
+                        </summary>
+                        <ul className="mt-1.5 space-y-0.5">
+                          {step1Preview.topicsAlreadyUsed!.map((t) => (
+                            <li key={t.id} className="flex items-start gap-1.5 text-[11px] text-gray-600">
+                              <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-600" />
+                              <span>
+                                {t.title}
+                                {t.lessons > 1 && <span className="ml-1 text-amber-600">({t.lessons})</span>}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     )}
                     {step1Preview.lessons.length === 0 ? (
                       <p className="mt-1.5 text-sm text-gray-500">{tt.bulkNothing}</p>
@@ -928,19 +1158,28 @@ export function CurriculumPlanDetailView({
             )}
           </div>
 
-          {/* ── ШАГ 2 ─────────────────────────────────────────────────── */}
-          <div className={`rounded-2xl border p-5 shadow-sm ${planLessons.length === 0 ? "border-slate-100 bg-slate-50/60" : "border-violet-100 bg-white"}`}>
+          {/* ── НАПОЛНИТЬ ЧЕРЕЗ ИИ ────────────────────────────────────────
+              Кнопка НЕ заперта при нуле уроков: замок здесь был лестницей, а
+              не защитой. Наполнять нечего — так и написано, но карточка живая
+              и открыта. */}
+          <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-white ${planLessons.length === 0 ? "bg-slate-300" : "bg-violet-600"}`}>2</span>
+              <Sparkles className="h-4 w-4 shrink-0 text-violet-600" />
               <h2 className="text-sm font-bold text-slate-900">{tc.step2Title}</h2>
-              {planLessons.length === 0 && <Lock className="h-3.5 w-3.5 text-slate-400" />}
             </div>
 
+            {/* Пояснение видно ВСЕГДА — и когда уроков нет тоже: человек должен
+                понимать, что эта кнопка делает, ещё до того, как ему будет чем
+                её кормить. Раньше при нуле уроков вместо всего содержимого
+                стояла одна строка «сначала создайте уроки». */}
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">{tc.step2Hint}</p>
+
             {planLessons.length === 0 ? (
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">{tc.step2Locked}</p>
+              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-500">
+                {tc.step2Locked}
+              </p>
             ) : (
               <>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{tc.step2Hint}</p>
                 <p className="mt-2 text-xs font-bold text-violet-700">
                   {format(tc.step2Counts, { empty: emptyLessons, all: planLessons.length })}
                 </p>
@@ -1138,45 +1377,49 @@ export function CurriculumPlanDetailView({
               </>
             )}
           </div>
+        </div>
+      )}
 
-          {/* ── ШАГ 3 ─────────────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-400 text-[11px] font-bold text-white">3</span>
-              <h2 className="text-sm font-bold text-slate-900">{tc.step3Title}</h2>
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">{tc.step3Hint}</p>
+      {/* ── РАБОТА СО СПИСКОМ ТЕМ ────────────────────────────────────────
+          03.09.2026. Эти кнопки жили НАВЕРХУ, отдельной карточкой «шаг 3», а
+          галочки, которыми выбирают темы, — здесь, у каждой темы. Работа со
+          списком была разорвана надвое: выбираешь внизу, нажимаешь наверху.
 
-            {bulkDeleteError && (
-              <p className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-700">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                {bulkDeleteError}
-              </p>
-            )}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setPicked(new Set(topics.map((t) => t.id)))}
-                className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                {tc.step3SelectAll}
-              </button>
-              <button
-                onClick={() => { setPicked(new Set()); setBulkDeleteError(null); }}
-                disabled={picked.size === 0}
-                className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-              >
-                {tc.step3ClearAll}
-              </button>
-              <button
-                onClick={askBulkDelete}
-                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {format(tc.step3Delete, { n: picked.size })}
-              </button>
-            </div>
+          Теперь всё вместе: галочки у тем, кнопки — над первой темой. Это
+          часть работы со списком, а не отдельное действие. */}
+      {isOwner && topics.length > 0 && (
+        <div className="space-y-2">
+          {bulkDeleteError && (
+            <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs text-red-700">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {bulkDeleteError}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-bold text-slate-900">{tc.step3Title}</span>
+            <button
+              onClick={() => setPicked(new Set(topics.map((t) => t.id)))}
+              className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              {tc.step3SelectAll}
+            </button>
+            <button
+              onClick={() => { setPicked(new Set()); setBulkDeleteError(null); }}
+              disabled={picked.size === 0}
+              className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              {tc.step3ClearAll}
+            </button>
+            <button
+              onClick={askBulkDelete}
+              disabled={picked.size === 0}
+              className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {format(tc.step3Delete, { n: picked.size })}
+            </button>
           </div>
+          <p className="text-[11px] leading-snug text-slate-500">{tc.step3Hint}</p>
         </div>
       )}
 

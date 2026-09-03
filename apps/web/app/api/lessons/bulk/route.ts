@@ -30,6 +30,10 @@ type Body = {
   /** Своё время по дням недели (пункт 11). Ключ — ISO-день, «1».. «7».
    *  Не пришло — все дни идут по `time`, как было до 02.09.2026. */
   timeByWeekday?: Record<string, string>;
+  /** Выходные и праздники, «YYYY-MM-DD». Шлёт только учебный план: в массовом
+   *  создании на экране уроков период жёсткий и тем нет — там праздник просто
+   *  съел бы урок, а это другое поведение, и заводить его не просили. */
+  holidays?: string[];
   from?: string;
   to?: string;
   useTopics?: boolean;
@@ -71,6 +75,12 @@ export async function POST(req: NextRequest) {
   // Своё время по дням недели. Берём ТОЛЬКО выбранные дни и только годные
   // значения: мусор из тела запроса не должен доехать до раскладки, а лишний
   // день (учитель задал время, потом снял галку) — просто не нужен.
+  // Праздники: только даты вида YYYY-MM-DD, дубли схлопываются. Мусор молча
+  // отбрасываем — раскладка не должна падать из-за кривой строки в теле.
+  const holidays = [...new Set(
+    (body.holidays ?? []).filter((d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)),
+  )];
+
   const timeByWeekday: Partial<Record<Weekday, string>> = {};
   for (const [ключ, значение] of Object.entries(body.timeByWeekday ?? {})) {
     const день = Number(ключ) as Weekday;
@@ -123,7 +133,7 @@ export async function POST(req: NextRequest) {
   let planned: PlannedLesson[];
   try {
     planned = await planWeeklySchedule(db, groupId, {
-      weekdays, time, timeByWeekday, from, to, durationMinutes: duration,
+      weekdays, time, timeByWeekday, from, to, durationMinutes: duration, holidays,
     }, nowMs);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка раскладки" }, { status: 500 });
@@ -132,6 +142,10 @@ export async function POST(req: NextRequest) {
   // Темы из учебного плана этой пары (группа, предмет), по порядку и только
   // свободные: тема, по которой урок уже есть, второй раз не раздаётся.
   let topics: Array<{ id: string; title: string; description: string | null }> = [];
+  // Темы, по которым урок УЖЕ создан. Раздачу они не получают и раньше, но
+  // человеку об этом не говорили — а тишина здесь читается как «часть тем
+  // потерялась». Отдаём списком, показывает вызывающий.
+  let topicsAlreadyUsed: Array<{ id: string; title: string; lessons: number }> = [];
   let planTitle: string | null = null;
   if (body.useTopics) {
     try {
@@ -139,6 +153,10 @@ export async function POST(req: NextRequest) {
       if (plan) {
         planTitle = plan.title;
         const withUsage = await getCurriculumTopicsWithUsage(db, plan.id);
+        topicsAlreadyUsed = withUsage
+          .filter((t) => t.used_in_lessons > 0)
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((t) => ({ id: t.id, title: t.title, lessons: t.used_in_lessons }));
         topics = withUsage
           .filter((t) => t.used_in_lessons === 0)
           .sort((a, b) => a.order_index - b.order_index)
@@ -173,6 +191,7 @@ export async function POST(req: NextRequest) {
       lessonsWithoutTopic: body.useTopics ? lessonsWithoutTopic : 0,
       topicsLeftOver: body.useTopics ? topicsLeftOver : 0,
       topicsAvailable: topics.length,
+      topicsAlreadyUsed: body.useTopics ? topicsAlreadyUsed : [],
       planTitle,
     });
   }
